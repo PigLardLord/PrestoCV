@@ -7,12 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		23B2637024084A500058BA2D /* ProfileImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B2636F24084A500058BA2D /* ProfileImage.swift */; };
+		23B263732409AEB00058BA2D /* CV.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B263722409AEB00058BA2D /* CV.swift */; };
 		23CEBA8C2404849600ABC26D /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CEBA8B2404849600ABC26D /* AppDelegate.swift */; };
 		23CEBA8E2404849600ABC26D /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CEBA8D2404849600ABC26D /* SceneDelegate.swift */; };
 		23CEBA902404849600ABC26D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CEBA8F2404849600ABC26D /* ContentView.swift */; };
 		23CEBA922404849C00ABC26D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 23CEBA912404849C00ABC26D /* Assets.xcassets */; };
 		23CEBA952404849C00ABC26D /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 23CEBA942404849C00ABC26D /* Preview Assets.xcassets */; };
-		23CEBA982404849C00ABC26D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 23CEBA962404849C00ABC26D /* LaunchScreen.storyboard */; };
 		23CEBAA32404849C00ABC26D /* PrestoCVAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CEBAA22404849C00ABC26D /* PrestoCVAppTests.swift */; };
 		23CEBAAE2404849C00ABC26D /* PrestoCVAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CEBAAD2404849C00ABC26D /* PrestoCVAppUITests.swift */; };
 /* End PBXBuildFile section */
@@ -35,13 +36,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		23B2636F24084A500058BA2D /* ProfileImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileImage.swift; sourceTree = "<group>"; };
+		23B263722409AEB00058BA2D /* CV.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CV.swift; sourceTree = "<group>"; };
 		23CEBA882404849600ABC26D /* PrestoCVApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PrestoCVApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		23CEBA8B2404849600ABC26D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		23CEBA8D2404849600ABC26D /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		23CEBA8F2404849600ABC26D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		23CEBA912404849C00ABC26D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		23CEBA942404849C00ABC26D /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		23CEBA972404849C00ABC26D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		23CEBA992404849C00ABC26D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		23CEBA9E2404849C00ABC26D /* PrestoCVAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrestoCVAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		23CEBAA22404849C00ABC26D /* PrestoCVAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrestoCVAppTests.swift; sourceTree = "<group>"; };
@@ -76,6 +78,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		23B263712409ADF50058BA2D /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				23B263722409AEB00058BA2D /* CV.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
 		23CEBA7F2404849600ABC26D = {
 			isa = PBXGroup;
 			children = (
@@ -99,11 +109,12 @@
 		23CEBA8A2404849600ABC26D /* PrestoCVApp */ = {
 			isa = PBXGroup;
 			children = (
+				23B263712409ADF50058BA2D /* Models */,
 				23CEBA8B2404849600ABC26D /* AppDelegate.swift */,
 				23CEBA8D2404849600ABC26D /* SceneDelegate.swift */,
 				23CEBA8F2404849600ABC26D /* ContentView.swift */,
+				23B2636F24084A500058BA2D /* ProfileImage.swift */,
 				23CEBA912404849C00ABC26D /* Assets.xcassets */,
-				23CEBA962404849C00ABC26D /* LaunchScreen.storyboard */,
 				23CEBA992404849C00ABC26D /* Info.plist */,
 				23CEBA932404849C00ABC26D /* Preview Content */,
 			);
@@ -240,7 +251,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				23CEBA982404849C00ABC26D /* LaunchScreen.storyboard in Resources */,
 				23CEBA952404849C00ABC26D /* Preview Assets.xcassets in Resources */,
 				23CEBA922404849C00ABC26D /* Assets.xcassets in Resources */,
 			);
@@ -268,7 +278,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				23CEBA8C2404849600ABC26D /* AppDelegate.swift in Sources */,
+				23B2637024084A500058BA2D /* ProfileImage.swift in Sources */,
 				23CEBA8E2404849600ABC26D /* SceneDelegate.swift in Sources */,
+				23B263732409AEB00058BA2D /* CV.swift in Sources */,
 				23CEBA902404849600ABC26D /* ContentView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -303,17 +315,6 @@
 			targetProxy = 23CEBAAA2404849C00ABC26D /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
-
-/* Begin PBXVariantGroup section */
-		23CEBA962404849C00ABC26D /* LaunchScreen.storyboard */ = {
-			isa = PBXVariantGroup;
-			children = (
-				23CEBA972404849C00ABC26D /* Base */,
-			);
-			name = LaunchScreen.storyboard;
-			sourceTree = "<group>";
-		};
-/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		23CEBAB02404849C00ABC26D /* Debug */ = {
