@@ -10,14 +10,8 @@ import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        Image("AppIcon")
-        .resizable()
-            .aspectRatio(contentMode: .fill)
-        .frame(width: 250.0, height: 250.0, alignment: .center)
-        .clipShape(Circle())
+        ProfileImage()
 
-        
-        
     }
 }
 
