@@ -2,46 +2,38 @@
 //  CV.swift
 //  PrestoCVApp
 //
-//  Created by Giovanni Trovato on 28/02/2020.
+//  Created by Giovanni Trovato on 20/03/2020.
 //  Copyright © 2020 Giovanni Trovato. All rights reserved.
 //
 
 import Foundation
 
-protocol CV{
-    var header : Header {get}
-    var personalData : PersonalData { get }
-    var workingExperiences :[WorkEsperience] {get}
-    var educations: [EducationItem] {get}
-    var teckSkills: [Skill] {get}
-    var personalSkills: [Skill] {get}
-}
-
-protocol Header {
-    var image: String { get }
-    var introduction: String { get }
-}
-
-protocol PersonalData {
-    var name: String { get }
-    var surname: String { get }
-    var tel: String { get }
-    var address: String { get }
-}
-
-protocol WorkEsperience {
-    var name: String { get }
-    var startingDate: Date { get }
-    var endDate: Date { get }
-    var description: String { get }
-}
-
-protocol EducationItem: WorkEsperience {
+struct CV : Codable {
+    let header : Header?
+    let personalData : PersonalData?
+    let workingExperiences : [ExperienceItem]?
+    let educations : [ExperienceItem]?
+    let teckSkills : [Skill]?
+    let personalSkills : [Skill]?
+    
+    enum CodingKeys: String, CodingKey {
+        
+        case header = "header"
+        case personalData = "personalData"
+        case workingExperiences = "workingExperiences"
+        case educations = "educations"
+        case teckSkills = "teckSkills"
+        case personalSkills = "personalSkills"
+    }
+    
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        header = try values.decodeIfPresent(Header.self, forKey: .header)
+        personalData = try values.decodeIfPresent(PersonalData.self, forKey: .personalData)
+        workingExperiences = try values.decodeIfPresent([ExperienceItem].self, forKey: .workingExperiences)
+        educations = try values.decodeIfPresent([ExperienceItem].self, forKey: .educations)
+        teckSkills = try values.decodeIfPresent([Skill].self, forKey: .teckSkills)
+        personalSkills = try values.decodeIfPresent([Skill].self, forKey: .personalSkills)
+    }
     
 }
-
-protocol Skill {
-    var title: String { get }
-    var level: Int { get }
-}
-

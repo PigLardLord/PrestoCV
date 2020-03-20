@@ -1,0 +1,42 @@
+{
+  "CV": {
+    "header": {
+      "image": "String",
+      "introduction": "String"
+    },
+    "personalData": {
+      "name": "String",
+      "surname": "String",
+      "tel": "String",
+      "address": "String"
+    },
+    "workingExperiences": [
+      {
+        "name": "String",
+        "startingDate": "2012-04-23T18:25:43.511Z",
+        "endDate": "2012-04-23T18:25:43.511Z",
+        "description": "String"
+      }
+    ],
+    "educations": [
+      {
+        "name": "String",
+        "startingDate": "2012-04-23T18:25:43.511Z",
+        "endDate": "2012-04-23T18:25:43.511Z",
+        "description": "String"
+      }
+    ],
+    "teckSkills": [
+      {
+        "title": "String",
+        "level": 5
+      }
+    ],
+    "personalSkills": [
+      {
+        "title": "String",
+        "level": 5
+      }
+    ]
+  }
+}

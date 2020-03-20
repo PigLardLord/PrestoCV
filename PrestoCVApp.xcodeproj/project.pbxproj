@@ -7,8 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		23AB1CF424257354004490C5 /* CV.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23AB1CF324257354004490C5 /* CV.swift */; };
 		23B2637024084A500058BA2D /* ProfileImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B2636F24084A500058BA2D /* ProfileImage.swift */; };
-		23B263732409AEB00058BA2D /* CV.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B263722409AEB00058BA2D /* CV.swift */; };
+		23B2637D240C38710058BA2D /* PersonalData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B26376240C38710058BA2D /* PersonalData.swift */; };
+		23B2637E240C38710058BA2D /* Skill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B26377240C38710058BA2D /* Skill.swift */; };
+		23B26380240C38710058BA2D /* Header.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B26379240C38710058BA2D /* Header.swift */; };
+		23B26382240C38710058BA2D /* ExperienceItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B2637B240C38710058BA2D /* ExperienceItem.swift */; };
+		23B26384240C6F3F0058BA2D /* Loader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B26383240C6F3F0058BA2D /* Loader.swift */; };
 		23CEBA8C2404849600ABC26D /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CEBA8B2404849600ABC26D /* AppDelegate.swift */; };
 		23CEBA8E2404849600ABC26D /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CEBA8D2404849600ABC26D /* SceneDelegate.swift */; };
 		23CEBA902404849600ABC26D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CEBA8F2404849600ABC26D /* ContentView.swift */; };
@@ -36,8 +41,13 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		23AB1CF324257354004490C5 /* CV.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CV.swift; sourceTree = "<group>"; };
 		23B2636F24084A500058BA2D /* ProfileImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileImage.swift; sourceTree = "<group>"; };
-		23B263722409AEB00058BA2D /* CV.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CV.swift; sourceTree = "<group>"; };
+		23B26376240C38710058BA2D /* PersonalData.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PersonalData.swift; sourceTree = "<group>"; };
+		23B26377240C38710058BA2D /* Skill.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Skill.swift; sourceTree = "<group>"; };
+		23B26379240C38710058BA2D /* Header.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Header.swift; sourceTree = "<group>"; };
+		23B2637B240C38710058BA2D /* ExperienceItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ExperienceItem.swift; sourceTree = "<group>"; };
+		23B26383240C6F3F0058BA2D /* Loader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Loader.swift; sourceTree = "<group>"; };
 		23CEBA882404849600ABC26D /* PrestoCVApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PrestoCVApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		23CEBA8B2404849600ABC26D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		23CEBA8D2404849600ABC26D /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -81,9 +91,21 @@
 		23B263712409ADF50058BA2D /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				23B263722409AEB00058BA2D /* CV.swift */,
+				23B26379240C38710058BA2D /* Header.swift */,
+				23B26376240C38710058BA2D /* PersonalData.swift */,
+				23B26377240C38710058BA2D /* Skill.swift */,
+				23B2637B240C38710058BA2D /* ExperienceItem.swift */,
+				23B26383240C6F3F0058BA2D /* Loader.swift */,
+				23AB1CF324257354004490C5 /* CV.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		23B26374240C193D0058BA2D /* FileModels */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = FileModels;
 			sourceTree = "<group>";
 		};
 		23CEBA7F2404849600ABC26D = {
@@ -109,6 +131,7 @@
 		23CEBA8A2404849600ABC26D /* PrestoCVApp */ = {
 			isa = PBXGroup;
 			children = (
+				23B26374240C193D0058BA2D /* FileModels */,
 				23B263712409ADF50058BA2D /* Models */,
 				23CEBA8B2404849600ABC26D /* AppDelegate.swift */,
 				23CEBA8D2404849600ABC26D /* SceneDelegate.swift */,
@@ -277,10 +300,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				23B26380240C38710058BA2D /* Header.swift in Sources */,
 				23CEBA8C2404849600ABC26D /* AppDelegate.swift in Sources */,
+				23B26382240C38710058BA2D /* ExperienceItem.swift in Sources */,
 				23B2637024084A500058BA2D /* ProfileImage.swift in Sources */,
+				23B26384240C6F3F0058BA2D /* Loader.swift in Sources */,
 				23CEBA8E2404849600ABC26D /* SceneDelegate.swift in Sources */,
-				23B263732409AEB00058BA2D /* CV.swift in Sources */,
+				23B2637E240C38710058BA2D /* Skill.swift in Sources */,
+				23B2637D240C38710058BA2D /* PersonalData.swift in Sources */,
+				23AB1CF424257354004490C5 /* CV.swift in Sources */,
 				23CEBA902404849600ABC26D /* ContentView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

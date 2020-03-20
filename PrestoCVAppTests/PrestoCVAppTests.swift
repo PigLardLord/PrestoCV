@@ -20,15 +20,20 @@ class PrestoCVAppTests: XCTestCase {
     }
 
     func testExample() {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        let sut:CV = Loader.fetch()
+        
+        XCTAssertTrue(sut.educations?.count == 1)
     }
 
-    func testPerformanceExample() {
-        // This is an example of a performance test case.
-        self.measure {
-            // Put the code you want to measure the time of here.
-        }
-    }
+    
 
+}
+
+
+private extension Loader {
+    static func fetch() -> CV {
+        let decoder = JSONDecoder()
+        let curriculum = try! decoder.decode(CV.self, from: Data(repeating: 1, count: 1))
+        return curriculum
+    }
 }
