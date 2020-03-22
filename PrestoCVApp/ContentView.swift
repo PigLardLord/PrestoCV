@@ -3,7 +3,7 @@
 //  PrestoCVApp
 //
 //  Created by Giovanni Trovato on 24/02/2020.
-//  Copyright © 2020 pigLardLord. All rights reserved.
+//  Copyright © 2020 PigLardLord. All rights reserved.
 //
 
 import SwiftUI
