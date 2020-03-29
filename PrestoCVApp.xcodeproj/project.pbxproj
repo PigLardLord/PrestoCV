@@ -23,18 +23,10 @@
 		23CEBA902404849600ABC26D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CEBA8F2404849600ABC26D /* ContentView.swift */; };
 		23CEBA922404849C00ABC26D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 23CEBA912404849C00ABC26D /* Assets.xcassets */; };
 		23CEBA952404849C00ABC26D /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 23CEBA942404849C00ABC26D /* Preview Assets.xcassets */; };
-		23CEBAAE2404849C00ABC26D /* PrestoCVAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CEBAAD2404849C00ABC26D /* PrestoCVAppUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		23CEBA9F2404849C00ABC26D /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 23CEBA802404849600ABC26D /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 23CEBA872404849600ABC26D;
-			remoteInfo = PrestoCVApp;
-		};
-		23CEBAAA2404849C00ABC26D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 23CEBA802404849600ABC26D /* Project object */;
 			proxyType = 1;
@@ -64,9 +56,6 @@
 		23CEBA992404849C00ABC26D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		23CEBA9E2404849C00ABC26D /* PrestoCVAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrestoCVAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		23CEBAA42404849C00ABC26D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		23CEBAA92404849C00ABC26D /* PrestoCVAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrestoCVAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		23CEBAAD2404849C00ABC26D /* PrestoCVAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrestoCVAppUITests.swift; sourceTree = "<group>"; };
-		23CEBAAF2404849C00ABC26D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,13 +67,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		23CEBA9B2404849C00ABC26D /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		23CEBAA62404849C00ABC26D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +104,6 @@
 			children = (
 				23CEBA8A2404849600ABC26D /* PrestoCVApp */,
 				23CEBAA12404849C00ABC26D /* PrestoCVAppTests */,
-				23CEBAAC2404849C00ABC26D /* PrestoCVAppUITests */,
 				23CEBA892404849600ABC26D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -132,7 +113,6 @@
 			children = (
 				23CEBA882404849600ABC26D /* PrestoCVApp.app */,
 				23CEBA9E2404849C00ABC26D /* PrestoCVAppTests.xctest */,
-				23CEBAA92404849C00ABC26D /* PrestoCVAppUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -168,15 +148,6 @@
 				231A06EC2427D96D00B2AA9A /* FileRepositoryTests.swift */,
 			);
 			path = PrestoCVAppTests;
-			sourceTree = "<group>";
-		};
-		23CEBAAC2404849C00ABC26D /* PrestoCVAppUITests */ = {
-			isa = PBXGroup;
-			children = (
-				23CEBAAD2404849C00ABC26D /* PrestoCVAppUITests.swift */,
-				23CEBAAF2404849C00ABC26D /* Info.plist */,
-			);
-			path = PrestoCVAppUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -217,24 +188,6 @@
 			productReference = 23CEBA9E2404849C00ABC26D /* PrestoCVAppTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		23CEBAA82404849C00ABC26D /* PrestoCVAppUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 23CEBAB82404849C00ABC26D /* Build configuration list for PBXNativeTarget "PrestoCVAppUITests" */;
-			buildPhases = (
-				23CEBAA52404849C00ABC26D /* Sources */,
-				23CEBAA62404849C00ABC26D /* Frameworks */,
-				23CEBAA72404849C00ABC26D /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				23CEBAAB2404849C00ABC26D /* PBXTargetDependency */,
-			);
-			name = PrestoCVAppUITests;
-			productName = PrestoCVAppUITests;
-			productReference = 23CEBAA92404849C00ABC26D /* PrestoCVAppUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -249,10 +202,6 @@
 						CreatedOnToolsVersion = 11.3;
 					};
 					23CEBA9D2404849C00ABC26D = {
-						CreatedOnToolsVersion = 11.3;
-						TestTargetID = 23CEBA872404849600ABC26D;
-					};
-					23CEBAA82404849C00ABC26D = {
 						CreatedOnToolsVersion = 11.3;
 						TestTargetID = 23CEBA872404849600ABC26D;
 					};
@@ -273,7 +222,6 @@
 			targets = (
 				23CEBA872404849600ABC26D /* PrestoCVApp */,
 				23CEBA9D2404849C00ABC26D /* PrestoCVAppTests */,
-				23CEBAA82404849C00ABC26D /* PrestoCVAppUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -289,13 +237,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		23CEBA9C2404849C00ABC26D /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		23CEBAA72404849C00ABC26D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -333,14 +274,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		23CEBAA52404849C00ABC26D /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				23CEBAAE2404849C00ABC26D /* PrestoCVAppUITests.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -348,11 +281,6 @@
 			isa = PBXTargetDependency;
 			target = 23CEBA872404849600ABC26D /* PrestoCVApp */;
 			targetProxy = 23CEBA9F2404849C00ABC26D /* PBXContainerItemProxy */;
-		};
-		23CEBAAB2404849C00ABC26D /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 23CEBA872404849600ABC26D /* PrestoCVApp */;
-			targetProxy = 23CEBAAA2404849C00ABC26D /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -517,7 +445,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = AAAAAAAAAA;
+				DEVELOPMENT_TEAM = TR4PC56K8G;
 				INFOPLIST_FILE = PrestoCVAppTests/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 13.2;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -539,7 +467,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = AAAAAAAAAA;
+				DEVELOPMENT_TEAM = TR4PC56K8G;
 				INFOPLIST_FILE = PrestoCVAppTests/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 13.2;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -552,46 +480,6 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PrestoCVApp.app/PrestoCVApp";
-			};
-			name = Release;
-		};
-		23CEBAB92404849C00ABC26D /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = AAAAAAAAAA;
-				INFOPLIST_FILE = PrestoCVAppUITests/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.piglardlord.prototypecvapp.PrestoCVAppUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = PrestoCVApp;
-			};
-			name = Debug;
-		};
-		23CEBABA2404849C00ABC26D /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = AAAAAAAAAA;
-				INFOPLIST_FILE = PrestoCVAppUITests/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.piglardlord.prototypecvapp.PrestoCVAppUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = PrestoCVApp;
 			};
 			name = Release;
 		};
@@ -621,15 +509,6 @@
 			buildConfigurations = (
 				23CEBAB62404849C00ABC26D /* Debug */,
 				23CEBAB72404849C00ABC26D /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		23CEBAB82404849C00ABC26D /* Build configuration list for PBXNativeTarget "PrestoCVAppUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				23CEBAB92404849C00ABC26D /* Debug */,
-				23CEBABA2404849C00ABC26D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
