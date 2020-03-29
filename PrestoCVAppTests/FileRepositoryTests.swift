@@ -72,16 +72,21 @@ fileprivate var jsonCVString = """
 
 class FileRepositoryTests: XCTestCase {
 
+    var repo: CVRepository!
+    var url: URL!
+    
     override func setUp() {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
+        let base = NSTemporaryDirectory()
+        let sub = "TEST"
+        repo = FileCVRepository(baseDirectory: base, subdir: sub)
+        url = URL(fileURLWithPath: base).appendingPathComponent(sub)
     }
 
     override func tearDown() {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
+        clearTempFolder()
     }
 
     func test_saving_cv_succeed() {
-        let repo = FileCVRepository(searchPathDir: .documentDirectory)
         var cv = try! CV.from(string: jsonCVString)
         let id = UUID()
         cv.id = id
@@ -93,5 +98,35 @@ class FileRepositoryTests: XCTestCase {
         // This is an example of a functional test case.
         // Use XCTAssert and related functions to verify your tests produce the correct results.
     }
-
+    
+    func test_save_more_cv_succeed() {
+        var cv1 = try! CV.from(string: jsonCVString)
+        let id1 = UUID()
+        cv1.id = id1
+        
+        var cv2 = try! CV.from(string: jsonCVString)
+        let id2 = UUID()
+        cv2.id = id2
+        
+        repo.add(curriculum: cv1)
+        repo.add(curriculum: cv2)
+        
+        
+        
+        let loadedcvs = repo.getAll()
+        XCTAssert(loadedcvs.count == 2)
+    }
+    
+    private func clearTempFolder() {
+        let fileManager = FileManager.default
+        
+        do {
+            let filePaths = try fileManager.contentsOfDirectory(atPath: url.path)
+            for filePath in filePaths {
+                try fileManager.removeItem(atPath: url.appendingPathComponent(filePath).path)
+            }
+        } catch {
+            print("Could not clear temp folder: \(error)")
+        }
+    }
 }

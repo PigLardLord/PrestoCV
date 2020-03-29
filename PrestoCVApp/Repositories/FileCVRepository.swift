@@ -11,6 +11,7 @@ import Foundation
 class FileCVRepository: CVRepository {
     
     private var baseDirectory: URL
+    private var subDirectory = "CVs"
     
     init(searchPathDir: FileManager.SearchPathDirectory) {
     
@@ -21,15 +22,16 @@ class FileCVRepository: CVRepository {
         baseDirectory = dir
     }
     
-    init(baseDirectory: URL) {
-        self.baseDirectory = baseDirectory
+    init(baseDirectory: String, subdir: String) {
+        self.baseDirectory = URL(fileURLWithPath: baseDirectory)
+        self.subDirectory = subdir
     }
     
     
     
-    private func getFilePath(for id: UUID) -> String {
+    private func getFilePath(for id: UUID? = nil) -> String {
         
-        let dataPath = baseDirectory.appendingPathComponent("CVs")
+        var dataPath = baseDirectory.appendingPathComponent(subDirectory)
         
         if !FileManager.default.fileExists(atPath: dataPath.path) {
             do {
@@ -39,9 +41,11 @@ class FileCVRepository: CVRepository {
             }
         }
         
-        let fileURL = dataPath.appendingPathComponent(id.uuidString, isDirectory: false)
+        if let id = id {
+           dataPath = dataPath.appendingPathComponent(id.uuidString, isDirectory: false)
+        }
         
-        return fileURL.path
+        return dataPath.path
     }
     
     private func save(cv: CV){
@@ -94,8 +98,8 @@ class FileCVRepository: CVRepository {
         
         var result = Array<CV>()
         do {
-            // Get the directory contents urls (including subfolders urls)
-            let directoryContents = try FileManager.default.contentsOfDirectory(atPath: "")
+            let dirPath = getFilePath()
+            let directoryContents = try FileManager.default.contentsOfDirectory(atPath: dirPath)
             
             result = directoryContents.map { (element) -> CV in
                 guard let id = UUID(uuidString: element) else {
