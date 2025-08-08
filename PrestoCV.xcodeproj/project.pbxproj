@@ -3,18 +3,11 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		23A94C0D2E1D78F20066CE9A /* PrestoCVCore in Frameworks */ = {isa = PBXBuildFile; productRef = 23A94C0E2E1D78F20066CE9A /* PrestoCVCore */; };
-		23E2E8A827562C01000F2E5D /* PrestoCVApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E2E8A727562C01000F2E5D /* PrestoCVApp.swift */; };
-		23E2E8AA27562C01000F2E5D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E2E8A927562C01000F2E5D /* ContentView.swift */; };
-		23E2E8AC27562C02000F2E5D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 23E2E8AB27562C02000F2E5D /* Assets.xcassets */; };
-		23E2E8AF27562C02000F2E5D /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 23E2E8AE27562C02000F2E5D /* Preview Assets.xcassets */; };
-		23E2E8B927562C02000F2E5D /* PrestoCVTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E2E8B827562C02000F2E5D /* PrestoCVTests.swift */; };
-		23E2E8C327562C02000F2E5D /* PrestoCVUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E2E8C227562C02000F2E5D /* PrestoCVUITests.swift */; };
-		23E2E8C527562C02000F2E5D /* PrestoCVUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E2E8C427562C02000F2E5D /* PrestoCVUITestsLaunchTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,16 +30,15 @@
 /* Begin PBXFileReference section */
 		23A94C0C2E1D78F20066CE9A /* PrestoCVCore */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = PrestoCVCore; sourceTree = SOURCE_ROOT; };
 		23E2E8A427562C01000F2E5D /* PrestoCV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PrestoCV.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		23E2E8A727562C01000F2E5D /* PrestoCVApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrestoCVApp.swift; sourceTree = "<group>"; };
-		23E2E8A927562C01000F2E5D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		23E2E8AB27562C02000F2E5D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		23E2E8AE27562C02000F2E5D /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		23E2E8B427562C02000F2E5D /* PrestoCVTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrestoCVTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		23E2E8B827562C02000F2E5D /* PrestoCVTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrestoCVTests.swift; sourceTree = "<group>"; };
 		23E2E8BE27562C02000F2E5D /* PrestoCVUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrestoCVUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		23E2E8C227562C02000F2E5D /* PrestoCVUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrestoCVUITests.swift; sourceTree = "<group>"; };
-		23E2E8C427562C02000F2E5D /* PrestoCVUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrestoCVUITestsLaunchTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		23AE8FE92E46671800A86F6E /* PrestoCVTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = PrestoCVTests; sourceTree = "<group>"; };
+		23AE8FED2E46671B00A86F6E /* PrestoCVUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = PrestoCVUITests; sourceTree = "<group>"; };
+		23AE90052E46676F00A86F6E /* PrestoCV */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = PrestoCV; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		23E2E8A127562C01000F2E5D /* Frameworks */ = {
@@ -74,20 +66,13 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		238BE3042AC7454D00B8F969 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
 		23E2E89B27562C01000F2E5D = {
 			isa = PBXGroup;
 			children = (
 				23A94C0C2E1D78F20066CE9A /* PrestoCVCore */,
-				23E2E8A627562C01000F2E5D /* PrestoCV */,
-				23E2E8B727562C02000F2E5D /* PrestoCVTests */,
-				23E2E8C127562C02000F2E5D /* PrestoCVUITests */,
+				23AE90052E46676F00A86F6E /* PrestoCV */,
+				23AE8FE92E46671800A86F6E /* PrestoCVTests */,
+				23AE8FED2E46671B00A86F6E /* PrestoCVUITests */,
 				23E2E8A527562C01000F2E5D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -100,43 +85,6 @@
 				23E2E8BE27562C02000F2E5D /* PrestoCVUITests.xctest */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		23E2E8A627562C01000F2E5D /* PrestoCV */ = {
-			isa = PBXGroup;
-			children = (
-				238BE3042AC7454D00B8F969 /* Models */,
-				23E2E8A727562C01000F2E5D /* PrestoCVApp.swift */,
-				23E2E8A927562C01000F2E5D /* ContentView.swift */,
-				23E2E8AB27562C02000F2E5D /* Assets.xcassets */,
-				23E2E8AD27562C02000F2E5D /* Preview Content */,
-			);
-			path = PrestoCV;
-			sourceTree = "<group>";
-		};
-		23E2E8AD27562C02000F2E5D /* Preview Content */ = {
-			isa = PBXGroup;
-			children = (
-				23E2E8AE27562C02000F2E5D /* Preview Assets.xcassets */,
-			);
-			path = "Preview Content";
-			sourceTree = "<group>";
-		};
-		23E2E8B727562C02000F2E5D /* PrestoCVTests */ = {
-			isa = PBXGroup;
-			children = (
-				23E2E8B827562C02000F2E5D /* PrestoCVTests.swift */,
-			);
-			path = PrestoCVTests;
-			sourceTree = "<group>";
-		};
-		23E2E8C127562C02000F2E5D /* PrestoCVUITests */ = {
-			isa = PBXGroup;
-			children = (
-				23E2E8C227562C02000F2E5D /* PrestoCVUITests.swift */,
-				23E2E8C427562C02000F2E5D /* PrestoCVUITestsLaunchTests.swift */,
-			);
-			path = PrestoCVUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -153,6 +101,9 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				23AE90052E46676F00A86F6E /* PrestoCV */,
 			);
 			name = PrestoCV;
 			packageProductDependencies = (
@@ -175,6 +126,9 @@
 			dependencies = (
 				23E2E8B627562C02000F2E5D /* PBXTargetDependency */,
 			);
+			fileSystemSynchronizedGroups = (
+				23AE8FE92E46671800A86F6E /* PrestoCVTests */,
+			);
 			name = PrestoCVTests;
 			productName = PrestoCVTests;
 			productReference = 23E2E8B427562C02000F2E5D /* PrestoCVTests.xctest */;
@@ -192,6 +146,9 @@
 			);
 			dependencies = (
 				23E2E8C027562C02000F2E5D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				23AE8FED2E46671B00A86F6E /* PrestoCVUITests */,
 			);
 			name = PrestoCVUITests;
 			productName = PrestoCVUITests;
@@ -249,8 +206,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				23E2E8AF27562C02000F2E5D /* Preview Assets.xcassets in Resources */,
-				23E2E8AC27562C02000F2E5D /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -275,8 +230,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				23E2E8AA27562C01000F2E5D /* ContentView.swift in Sources */,
-				23E2E8A827562C01000F2E5D /* PrestoCVApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -284,7 +237,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				23E2E8B927562C02000F2E5D /* PrestoCVTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -292,8 +244,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				23E2E8C327562C02000F2E5D /* PrestoCVUITests.swift in Sources */,
-				23E2E8C527562C02000F2E5D /* PrestoCVUITestsLaunchTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -490,7 +440,6 @@
 		23E2E8CC27562C02000F2E5D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -515,7 +464,6 @@
 		23E2E8CD27562C02000F2E5D /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -540,7 +488,6 @@
 		23E2E8CF27562C02000F2E5D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TR4PC56K8G;
@@ -563,7 +510,6 @@
 		23E2E8D027562C02000F2E5D /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TR4PC56K8G;
