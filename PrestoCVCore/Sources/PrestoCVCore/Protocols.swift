@@ -60,3 +60,10 @@ public protocol CacheServiceProtocol {
     func remove(forKey key: String) async
     func clear() async
 }
+
+// MARK: - Dependency Container Protocol
+
+public protocol DependencyContainerProtocol {
+    func makeOnboardingUseCase() -> OnboardingUseCaseProtocol
+    func makeCVManagementUseCase() -> CVManagementUseCaseProtocol
+}
