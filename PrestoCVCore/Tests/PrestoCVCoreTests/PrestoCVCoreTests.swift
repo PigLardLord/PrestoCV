@@ -264,7 +264,7 @@ struct DependencyContainerTests {
 @Suite("Dependency Wiring Tests")
 struct DependencyWiringTests {
     
-    @Test("OnboardingUseCase is properly wired with dependencies")
+    @Test("Wiring: OnboardingUseCase returns firstTime state when no CVs exist")
     func onboardingUseCaseIsProperlyWired() async {
         let container = TestDependencyContainer()
         defer { container.reset() }
@@ -277,7 +277,7 @@ struct DependencyWiringTests {
         #expect(onboardingState == .firstTime)
     }
     
-    @Test("CVManagementUseCase is properly wired with dependencies")
+    @Test("Wiring: CVManagementUseCase returns empty CV list when storage is clean")
     func cvManagementUseCaseIsProperlyWired() async throws {
         let container = TestDependencyContainer()
         defer { container.reset() }
@@ -364,7 +364,7 @@ private struct TestHelpers {
 @Suite("Integration Tests")
 struct IntegrationTests {
     
-    @Test("Container creates functional dependency graph")
+    @Test("Integration: End-to-end CV creation through onboarding flow updates state correctly")
     func containerCreatesFunctionalDependencyGraph() async throws {
         try await TestHelpers.withUseCases { onboardingUseCase, cvManagementUseCase in
             // Check initial state - should be .firstTime with empty mock storage
@@ -392,7 +392,7 @@ struct IntegrationTests {
         }
     }
     
-    @Test("CV creation and management workflow")
+    @Test("CVManagement: Complete CRUD workflow for CV operations succeeds")
     func cvCreationAndManagementWorkflow() async throws {
         try await TestHelpers.withCVManagementUseCase { cvManagementUseCase in
             // Start with empty storage
@@ -432,7 +432,7 @@ struct IntegrationTests {
         }
     }
     
-    @Test("CV duplication workflow")
+    @Test("CVManagement: CV duplication creates new instance with Copy suffix")
     func cvDuplicationWorkflow() async throws {
         try await TestHelpers.withCVManagementUseCase { cvManagementUseCase in
             // Create an original CV
