@@ -24,8 +24,10 @@ final class MockStorageService: StorageServiceProtocol {
     
     func loadAll<T: Codable>(_ type: T.Type) async throws -> [T] {
         var objects: [T] = []
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
         for data in storage.values {
-            if let object = try? JSONDecoder().decode(type, from: data) {
+            if let object = try? decoder.decode(type, from: data) {
                 objects.append(object)
             }
         }
