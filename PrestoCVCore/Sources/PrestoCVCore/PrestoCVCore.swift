@@ -144,14 +144,14 @@ public struct Social: Codable, Identifiable {
 
 // MARK: - Supporting Types
 
-public enum OnboardingState {
+public enum OnboardingState: Equatable {
     case loading
     case firstTime
     case returning
     case error(AppError)
 }
 
-public enum AppError: LocalizedError {
+public enum AppError: LocalizedError, Equatable {
     case fileSystemError(Error)
     case templateNotFound
     case invalidCVData
@@ -167,6 +167,20 @@ public enum AppError: LocalizedError {
             return "Invalid CV data format"
         case .storageError(let message):
             return "Storage error: \(message)"
+        }
+    }
+    
+    public static func == (lhs: AppError, rhs: AppError) -> Bool {
+        switch (lhs, rhs) {
+        case (.templateNotFound, .templateNotFound),
+             (.invalidCVData, .invalidCVData):
+            return true
+        case (.fileSystemError(let lhsError), .fileSystemError(let rhsError)):
+            return lhsError.localizedDescription == rhsError.localizedDescription
+        case (.storageError(let lhsMessage), .storageError(let rhsMessage)):
+            return lhsMessage == rhsMessage
+        default:
+            return false
         }
     }
 }
