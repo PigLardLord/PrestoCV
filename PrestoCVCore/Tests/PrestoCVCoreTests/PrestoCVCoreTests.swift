@@ -316,6 +316,15 @@ struct DependencyWiringTests {
     }
 }
 
+// MARK: - Test Constants
+
+private enum TestConstants {
+    static let integrationTestCVName = "Integration Test CV"
+    static let testCVName = "Test CV"
+    static let originalCVName = "Original CV"
+    static let updatedTestCVName = "Updated Test CV"
+}
+
 // MARK: - Integration Tests
 
 @Suite("Integration Tests")
@@ -338,7 +347,7 @@ struct IntegrationTests {
         #expect(initialCVs.count == 0)
         
         // Create a CV and verify it's added
-        let uniqueName = "Integration Test CV"
+        let uniqueName = TestConstants.integrationTestCVName
         let template = CVTestDataBuilder().withName(uniqueName).build()
         let createdCV = try await onboardingUseCase.createFirstCV(from: template)
         
@@ -366,28 +375,28 @@ struct IntegrationTests {
         #expect(initialCVs.count == 0)
         
         // Create a CV using the management use case
-        let template = CVTestDataBuilder().withName("Test CV").build()
+        let template = CVTestDataBuilder().withName(TestConstants.testCVName).build()
         let createdCV = try await cvManagementUseCase.createCV(from: template)
         
-        #expect(createdCV.name == "Test CV")
+        #expect(createdCV.name == TestConstants.testCVName)
         #expect(createdCV.id != template.id)
         
         // Verify it was added
         let cvsAfterCreation = try await cvManagementUseCase.getAllCVs()
         #expect(cvsAfterCreation.count == 1)
-        #expect(cvsAfterCreation.first?.name == "Test CV")
+        #expect(cvsAfterCreation.first?.name == TestConstants.testCVName)
         
         // Update the CV
-        let updatedCV = CVTestDataBuilder().withName("Updated Test CV").build(id: createdCV.id)
+        let updatedCV = CVTestDataBuilder().withName(TestConstants.updatedTestCVName).build(id: createdCV.id)
         
         let savedUpdatedCV = try await cvManagementUseCase.updateCV(updatedCV)
-        #expect(savedUpdatedCV.name == "Updated Test CV")
+        #expect(savedUpdatedCV.name == TestConstants.updatedTestCVName)
         #expect(savedUpdatedCV.id == createdCV.id)
         
         // Verify the update
         let cvsAfterUpdate = try await cvManagementUseCase.getAllCVs()
         #expect(cvsAfterUpdate.count == 1)
-        #expect(cvsAfterUpdate.first?.name == "Updated Test CV")
+        #expect(cvsAfterUpdate.first?.name == TestConstants.updatedTestCVName)
         
         // Delete the CV
         try await cvManagementUseCase.deleteCV(id: createdCV.id)
@@ -405,7 +414,7 @@ struct IntegrationTests {
         let cvManagementUseCase = container.makeCVManagementUseCase()
         
         // Create an original CV
-        let originalTemplate = CVTestDataBuilder().withName("Original CV").build()
+        let originalTemplate = CVTestDataBuilder().withName(TestConstants.originalCVName).build()
         let originalCV = try await cvManagementUseCase.createCV(from: originalTemplate)
         
         // Duplicate the CV
