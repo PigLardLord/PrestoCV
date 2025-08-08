@@ -3,10 +3,11 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 55;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		23A94C0D2E1D78F20066CE9A /* PrestoCVCore in Frameworks */ = {isa = PBXBuildFile; productRef = 23A94C0E2E1D78F20066CE9A /* PrestoCVCore */; };
 		23E2E8A827562C01000F2E5D /* PrestoCVApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E2E8A727562C01000F2E5D /* PrestoCVApp.swift */; };
 		23E2E8AA27562C01000F2E5D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E2E8A927562C01000F2E5D /* ContentView.swift */; };
 		23E2E8AC27562C02000F2E5D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 23E2E8AB27562C02000F2E5D /* Assets.xcassets */; };
@@ -52,6 +53,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				23A94C0D2E1D78F20066CE9A /* PrestoCVCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -153,6 +155,9 @@
 			dependencies = (
 			);
 			name = PrestoCV;
+			packageProductDependencies = (
+				23A94C0E2E1D78F20066CE9A /* PrestoCVCore */,
+			);
 			productName = PrestoCV;
 			productReference = 23E2E8A427562C01000F2E5D /* PrestoCV.app */;
 			productType = "com.apple.product-type.application";
@@ -225,6 +230,9 @@
 				Base,
 			);
 			mainGroup = 23E2E89B27562C01000F2E5D;
+			packageReferences = (
+				23FC5F082E45FD3800C598FC /* XCLocalSwiftPackageReference "PrestoCVCore" */,
+			);
 			productRefGroup = 23E2E8A527562C01000F2E5D /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -356,7 +364,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -411,7 +419,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
@@ -488,7 +496,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TR4PC56K8G;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -513,7 +521,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TR4PC56K8G;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -615,6 +623,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		23FC5F082E45FD3800C598FC /* XCLocalSwiftPackageReference "PrestoCVCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = PrestoCVCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		23A94C0E2E1D78F20066CE9A /* PrestoCVCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PrestoCVCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 23E2E89C27562C01000F2E5D /* Project object */;
 }
