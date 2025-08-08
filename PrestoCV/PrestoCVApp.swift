@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import PrestoCVCore
 
 @main
 struct PrestoCVApp: App {

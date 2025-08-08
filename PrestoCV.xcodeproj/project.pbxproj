@@ -34,6 +34,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		23A94C0C2E1D78F20066CE9A /* PrestoCVCore */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = PrestoCVCore; sourceTree = SOURCE_ROOT; };
 		23E2E8A427562C01000F2E5D /* PrestoCV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PrestoCV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		23E2E8A727562C01000F2E5D /* PrestoCVApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrestoCVApp.swift; sourceTree = "<group>"; };
 		23E2E8A927562C01000F2E5D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -71,9 +72,17 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		238BE3042AC7454D00B8F969 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
 		23E2E89B27562C01000F2E5D = {
 			isa = PBXGroup;
 			children = (
+				23A94C0C2E1D78F20066CE9A /* PrestoCVCore */,
 				23E2E8A627562C01000F2E5D /* PrestoCV */,
 				23E2E8B727562C02000F2E5D /* PrestoCVTests */,
 				23E2E8C127562C02000F2E5D /* PrestoCVUITests */,
@@ -94,6 +103,7 @@
 		23E2E8A627562C01000F2E5D /* PrestoCV */ = {
 			isa = PBXGroup;
 			children = (
+				238BE3042AC7454D00B8F969 /* Models */,
 				23E2E8A727562C01000F2E5D /* PrestoCVApp.swift */,
 				23E2E8A927562C01000F2E5D /* ContentView.swift */,
 				23E2E8AB27562C02000F2E5D /* Assets.xcassets */,
