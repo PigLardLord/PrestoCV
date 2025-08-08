@@ -65,6 +65,105 @@ final class MockStorageService: StorageServiceProtocol {
     }
 }
 
+/// A builder for creating test CVModel instances with default values and fluent configuration
+struct CVTestDataBuilder {
+    private var name: String = "Test CV"
+    private var title: String = ""
+    private var location: String = ""
+    private var email: String = ""
+    private var phone: String = ""
+    private var portfolio: String = ""
+    private var profile: String = ""
+    private var relevant_experience: [Experience] = []
+    private var education: [Education] = []
+    private var skills: [Skill] = []
+    private var languages: [Language] = []
+    private var certifications: [Certification] = []
+    private var interests: [String] = []
+    private var social: [Social] = []
+    
+    func withName(_ name: String) -> CVTestDataBuilder {
+        var builder = self
+        builder.name = name
+        return builder
+    }
+    
+    func withTitle(_ title: String) -> CVTestDataBuilder {
+        var builder = self
+        builder.title = title
+        return builder
+    }
+    
+    func withLocation(_ location: String) -> CVTestDataBuilder {
+        var builder = self
+        builder.location = location
+        return builder
+    }
+    
+    func withEmail(_ email: String) -> CVTestDataBuilder {
+        var builder = self
+        builder.email = email
+        return builder
+    }
+    
+    func withPhone(_ phone: String) -> CVTestDataBuilder {
+        var builder = self
+        builder.phone = phone
+        return builder
+    }
+    
+    func withProfile(_ profile: String) -> CVTestDataBuilder {
+        var builder = self
+        builder.profile = profile
+        return builder
+    }
+    
+    func withSkills(_ skills: [Skill]) -> CVTestDataBuilder {
+        var builder = self
+        builder.skills = skills
+        return builder
+    }
+    
+    func build() -> CVModel {
+        return CVModel(
+            name: name,
+            title: title,
+            location: location,
+            email: email,
+            phone: phone,
+            portfolio: portfolio,
+            profile: profile,
+            relevant_experience: relevant_experience,
+            education: education,
+            skills: skills,
+            languages: languages,
+            certifications: certifications,
+            interests: interests,
+            social: social
+        )
+    }
+    
+    func build(id: UUID) -> CVModel {
+        return CVModel(
+            id: id,
+            name: name,
+            title: title,
+            location: location,
+            email: email,
+            phone: phone,
+            portfolio: portfolio,
+            profile: profile,
+            relevant_experience: relevant_experience,
+            education: education,
+            skills: skills,
+            languages: languages,
+            certifications: certifications,
+            interests: interests,
+            social: social
+        )
+    }
+}
+
 /// A test dependency container that uses mocked services
 final class TestDependencyContainer: DependencyContainerProtocol {
     private let mockStorageService = MockStorageService()
@@ -240,7 +339,7 @@ struct IntegrationTests {
         
         // Create a CV and verify it's added
         let uniqueName = "Integration Test CV"
-        let template = CVModel(name: uniqueName)
+        let template = CVTestDataBuilder().withName(uniqueName).build()
         let createdCV = try await onboardingUseCase.createFirstCV(from: template)
         
         #expect(createdCV.name == uniqueName)
@@ -267,7 +366,7 @@ struct IntegrationTests {
         #expect(initialCVs.count == 0)
         
         // Create a CV using the management use case
-        let template = CVModel(name: "Test CV")
+        let template = CVTestDataBuilder().withName("Test CV").build()
         let createdCV = try await cvManagementUseCase.createCV(from: template)
         
         #expect(createdCV.name == "Test CV")
@@ -279,23 +378,7 @@ struct IntegrationTests {
         #expect(cvsAfterCreation.first?.name == "Test CV")
         
         // Update the CV
-        let updatedCV = CVModel(
-            id: createdCV.id,
-            name: "Updated Test CV",
-            title: createdCV.title,
-            location: createdCV.location,
-            email: createdCV.email,
-            phone: createdCV.phone,
-            portfolio: createdCV.portfolio,
-            profile: createdCV.profile,
-            relevant_experience: createdCV.relevant_experience,
-            education: createdCV.education,
-            skills: createdCV.skills,
-            languages: createdCV.languages,
-            certifications: createdCV.certifications,
-            interests: createdCV.interests,
-            social: createdCV.social
-        )
+        let updatedCV = CVTestDataBuilder().withName("Updated Test CV").build(id: createdCV.id)
         
         let savedUpdatedCV = try await cvManagementUseCase.updateCV(updatedCV)
         #expect(savedUpdatedCV.name == "Updated Test CV")
@@ -322,7 +405,7 @@ struct IntegrationTests {
         let cvManagementUseCase = container.makeCVManagementUseCase()
         
         // Create an original CV
-        let originalTemplate = CVModel(name: "Original CV")
+        let originalTemplate = CVTestDataBuilder().withName("Original CV").build()
         let originalCV = try await cvManagementUseCase.createCV(from: originalTemplate)
         
         // Duplicate the CV
