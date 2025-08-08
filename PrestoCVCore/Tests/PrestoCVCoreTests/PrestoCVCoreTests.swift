@@ -325,6 +325,40 @@ private enum TestConstants {
     static let updatedTestCVName = "Updated Test CV"
 }
 
+// MARK: - Test Helpers
+
+private struct TestHelpers {
+    /// Creates a test container with automatic cleanup
+    static func withTestContainer<T>(
+        _ operation: (TestDependencyContainer) async throws -> T
+    ) async rethrows -> T {
+        let container = TestDependencyContainer()
+        defer { container.reset() }
+        return try await operation(container)
+    }
+    
+    /// Creates a CV management use case with container cleanup
+    static func withCVManagementUseCase<T>(
+        _ operation: (CVManagementUseCaseProtocol) async throws -> T
+    ) async rethrows -> T {
+        return try await withTestContainer { container in
+            let useCase = container.makeCVManagementUseCase()
+            return try await operation(useCase)
+        }
+    }
+    
+    /// Creates both onboarding and CV management use cases with container cleanup
+    static func withUseCases<T>(
+        _ operation: (OnboardingUseCaseProtocol, CVManagementUseCaseProtocol) async throws -> T
+    ) async rethrows -> T {
+        return try await withTestContainer { container in
+            let onboardingUseCase = container.makeOnboardingUseCase()
+            let cvManagementUseCase = container.makeCVManagementUseCase()
+            return try await operation(onboardingUseCase, cvManagementUseCase)
+        }
+    }
+}
+
 // MARK: - Integration Tests
 
 @Suite("Integration Tests")
@@ -332,101 +366,90 @@ struct IntegrationTests {
     
     @Test("Container creates functional dependency graph")
     func containerCreatesFunctionalDependencyGraph() async throws {
-        let container = TestDependencyContainer()
-        defer { container.reset() }
-        
-        // Test that the entire dependency graph works together
-        let onboardingUseCase = container.makeOnboardingUseCase()
-        let cvManagementUseCase = container.makeCVManagementUseCase()
-        
-        // Check initial state - should be .firstTime with empty mock storage
-        let initialState = await onboardingUseCase.checkOnboardingRequired()
-        let initialCVs = try await cvManagementUseCase.getAllCVs()
-        
-        #expect(initialState == .firstTime)
-        #expect(initialCVs.count == 0)
-        
-        // Create a CV and verify it's added
-        let uniqueName = TestConstants.integrationTestCVName
-        let template = CVTestDataBuilder().withName(uniqueName).build()
-        let createdCV = try await onboardingUseCase.createFirstCV(from: template)
-        
-        #expect(createdCV.name == uniqueName)
-        #expect(createdCV.id != template.id) // Should have new ID
-        
-        // Verify that the CV was added to the collection
-        let newState = await onboardingUseCase.checkOnboardingRequired()
-        let newCVs = try await cvManagementUseCase.getAllCVs()
-        
-        #expect(newState == .returning) // Should now show returning user after CV creation
-        #expect(newCVs.count == 1) // Should have exactly one CV
-        #expect(newCVs.contains { $0.name == uniqueName }) // Should contain our new CV
+        try await TestHelpers.withUseCases { onboardingUseCase, cvManagementUseCase in
+            // Check initial state - should be .firstTime with empty mock storage
+            let initialState = await onboardingUseCase.checkOnboardingRequired()
+            let initialCVs = try await cvManagementUseCase.getAllCVs()
+            
+            #expect(initialState == .firstTime)
+            #expect(initialCVs.count == 0)
+            
+            // Create a CV and verify it's added
+            let uniqueName = TestConstants.integrationTestCVName
+            let template = CVTestDataBuilder().withName(uniqueName).build()
+            let createdCV = try await onboardingUseCase.createFirstCV(from: template)
+            
+            #expect(createdCV.name == uniqueName)
+            #expect(createdCV.id != template.id) // Should have new ID
+            
+            // Verify that the CV was added to the collection
+            let newState = await onboardingUseCase.checkOnboardingRequired()
+            let newCVs = try await cvManagementUseCase.getAllCVs()
+            
+            #expect(newState == .returning) // Should now show returning user after CV creation
+            #expect(newCVs.count == 1) // Should have exactly one CV
+            #expect(newCVs.contains { $0.name == uniqueName }) // Should contain our new CV
+        }
     }
     
     @Test("CV creation and management workflow")
     func cvCreationAndManagementWorkflow() async throws {
-        let container = TestDependencyContainer()
-        defer { container.reset() }
-        
-        let cvManagementUseCase = container.makeCVManagementUseCase()
-        
-        // Start with empty storage
-        let initialCVs = try await cvManagementUseCase.getAllCVs()
-        #expect(initialCVs.count == 0)
-        
-        // Create a CV using the management use case
-        let template = CVTestDataBuilder().withName(TestConstants.testCVName).build()
-        let createdCV = try await cvManagementUseCase.createCV(from: template)
-        
-        #expect(createdCV.name == TestConstants.testCVName)
-        #expect(createdCV.id != template.id)
-        
-        // Verify it was added
-        let cvsAfterCreation = try await cvManagementUseCase.getAllCVs()
-        #expect(cvsAfterCreation.count == 1)
-        #expect(cvsAfterCreation.first?.name == TestConstants.testCVName)
-        
-        // Update the CV
-        let updatedCV = CVTestDataBuilder().withName(TestConstants.updatedTestCVName).build(id: createdCV.id)
-        
-        let savedUpdatedCV = try await cvManagementUseCase.updateCV(updatedCV)
-        #expect(savedUpdatedCV.name == TestConstants.updatedTestCVName)
-        #expect(savedUpdatedCV.id == createdCV.id)
-        
-        // Verify the update
-        let cvsAfterUpdate = try await cvManagementUseCase.getAllCVs()
-        #expect(cvsAfterUpdate.count == 1)
-        #expect(cvsAfterUpdate.first?.name == TestConstants.updatedTestCVName)
-        
-        // Delete the CV
-        try await cvManagementUseCase.deleteCV(id: createdCV.id)
-        
-        // Verify deletion
-        let cvsAfterDeletion = try await cvManagementUseCase.getAllCVs()
-        #expect(cvsAfterDeletion.count == 0)
+        try await TestHelpers.withCVManagementUseCase { cvManagementUseCase in
+            // Start with empty storage
+            let initialCVs = try await cvManagementUseCase.getAllCVs()
+            #expect(initialCVs.count == 0)
+            
+            // Create a CV using the management use case
+            let template = CVTestDataBuilder().withName(TestConstants.testCVName).build()
+            let createdCV = try await cvManagementUseCase.createCV(from: template)
+            
+            #expect(createdCV.name == TestConstants.testCVName)
+            #expect(createdCV.id != template.id)
+            
+            // Verify it was added
+            let cvsAfterCreation = try await cvManagementUseCase.getAllCVs()
+            #expect(cvsAfterCreation.count == 1)
+            #expect(cvsAfterCreation.first?.name == TestConstants.testCVName)
+            
+            // Update the CV
+            let updatedCV = CVTestDataBuilder().withName(TestConstants.updatedTestCVName).build(id: createdCV.id)
+            
+            let savedUpdatedCV = try await cvManagementUseCase.updateCV(updatedCV)
+            #expect(savedUpdatedCV.name == TestConstants.updatedTestCVName)
+            #expect(savedUpdatedCV.id == createdCV.id)
+            
+            // Verify the update
+            let cvsAfterUpdate = try await cvManagementUseCase.getAllCVs()
+            #expect(cvsAfterUpdate.count == 1)
+            #expect(cvsAfterUpdate.first?.name == TestConstants.updatedTestCVName)
+            
+            // Delete the CV
+            try await cvManagementUseCase.deleteCV(id: createdCV.id)
+            
+            // Verify deletion
+            let cvsAfterDeletion = try await cvManagementUseCase.getAllCVs()
+            #expect(cvsAfterDeletion.count == 0)
+        }
     }
     
     @Test("CV duplication workflow")
     func cvDuplicationWorkflow() async throws {
-        let container = TestDependencyContainer()
-        defer { container.reset() }
-        
-        let cvManagementUseCase = container.makeCVManagementUseCase()
-        
-        // Create an original CV
-        let originalTemplate = CVTestDataBuilder().withName(TestConstants.originalCVName).build()
-        let originalCV = try await cvManagementUseCase.createCV(from: originalTemplate)
-        
-        // Duplicate the CV
-        let duplicatedCV = try await cvManagementUseCase.duplicateCV(id: originalCV.id)
-        
-        #expect(duplicatedCV.name.contains("Copy")) // Should have "Copy" in the name
-        #expect(duplicatedCV.id != originalCV.id) // Should have different ID
-        
-        // Verify both CVs exist
-        let allCVs = try await cvManagementUseCase.getAllCVs()
-        #expect(allCVs.count == 2)
-        #expect(allCVs.contains { $0.id == originalCV.id })
-        #expect(allCVs.contains { $0.id == duplicatedCV.id })
+        try await TestHelpers.withCVManagementUseCase { cvManagementUseCase in
+            // Create an original CV
+            let originalTemplate = CVTestDataBuilder().withName(TestConstants.originalCVName).build()
+            let originalCV = try await cvManagementUseCase.createCV(from: originalTemplate)
+            
+            // Duplicate the CV
+            let duplicatedCV = try await cvManagementUseCase.duplicateCV(id: originalCV.id)
+            
+            #expect(duplicatedCV.name.contains("Copy")) // Should have "Copy" in the name
+            #expect(duplicatedCV.id != originalCV.id) // Should have different ID
+            
+            // Verify both CVs exist
+            let allCVs = try await cvManagementUseCase.getAllCVs()
+            #expect(allCVs.count == 2)
+            #expect(allCVs.contains { $0.id == originalCV.id })
+            #expect(allCVs.contains { $0.id == duplicatedCV.id })
+        }
     }
 }
