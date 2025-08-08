@@ -8,24 +8,33 @@ import Foundation
 final class MockStorageService: StorageServiceProtocol {
     private var storage: [String: Data] = [:]
     
-    func save<T: Codable>(_ object: T, to identifier: String) async throws {
+    private func makeEncoder() -> JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+    
+    private func makeDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }
+    
+    func save<T: Codable>(_ object: T, to identifier: String) async throws {
+        let encoder = makeEncoder()
         let data = try encoder.encode(object)
         storage[identifier] = data
     }
     
     func load<T: Codable>(_ type: T.Type, from identifier: String) async throws -> T? {
         guard let data = storage[identifier] else { return nil }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = makeDecoder()
         return try decoder.decode(type, from: data)
     }
     
     func loadAll<T: Codable>(_ type: T.Type) async throws -> [T] {
         var objects: [T] = []
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = makeDecoder()
         for data in storage.values {
             if let object = try? decoder.decode(type, from: data) {
                 objects.append(object)
