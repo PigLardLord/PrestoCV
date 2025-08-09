@@ -64,6 +64,6 @@ public protocol CacheServiceProtocol {
 // MARK: - Dependency Container Protocol
 
 public protocol DependencyContainerProtocol {
-    func makeOnboardingUseCase() -> OnboardingUseCaseProtocol
-    func makeCVManagementUseCase() -> CVManagementUseCaseProtocol
+    func makeOnboardingUseCase() throws -> OnboardingUseCaseProtocol
+    func makeCVManagementUseCase() throws -> CVManagementUseCaseProtocol
 }

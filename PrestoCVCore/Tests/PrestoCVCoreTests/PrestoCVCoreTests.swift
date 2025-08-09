@@ -180,7 +180,7 @@ final class TestDependencyContainer: DependencyContainerProtocol {
         return OnboardingRepository(cvRepository: cvRepository)
     }()
     
-    func makeOnboardingUseCase() -> OnboardingUseCaseProtocol {
+    func makeOnboardingUseCase() throws -> OnboardingUseCaseProtocol {
         return OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
@@ -188,7 +188,7 @@ final class TestDependencyContainer: DependencyContainerProtocol {
         )
     }
     
-    func makeCVManagementUseCase() -> CVManagementUseCaseProtocol {
+    func makeCVManagementUseCase() throws -> CVManagementUseCaseProtocol {
         return CVManagementUseCase(
             cvRepository: cvRepository,
             templateRepository: templateRepository
@@ -223,18 +223,18 @@ struct DependencyContainerTests {
     // MARK: - Factory Method Tests
     
     @Test("makeOnboardingUseCase returns OnboardingUseCase instance")
-    func makeOnboardingUseCaseReturnsCorrectType() {
+    func makeOnboardingUseCaseReturnsCorrectType() throws {
         let container = TestDependencyContainer()
-        let useCase = container.makeOnboardingUseCase()
+        let useCase = try container.makeOnboardingUseCase()
         
         #expect(useCase is OnboardingUseCase)
         #expect(type(of: useCase) == OnboardingUseCase.self)
     }
     
     @Test("makeCVManagementUseCase returns CVManagementUseCase instance")
-    func makeCVManagementUseCaseReturnsCorrectType() {
+    func makeCVManagementUseCaseReturnsCorrectType() throws {
         let container = TestDependencyContainer()
-        let useCase = container.makeCVManagementUseCase()
+        let useCase = try container.makeCVManagementUseCase()
         
         #expect(useCase is CVManagementUseCase)
         #expect(type(of: useCase) == CVManagementUseCase.self)
@@ -243,12 +243,12 @@ struct DependencyContainerTests {
     // MARK: - Protocol Conformance Tests
     
     @Test("DependencyContainer conforms to DependencyContainerProtocol")
-    func containerConformsToProtocol() {
+    func containerConformsToProtocol() throws {
         let container: DependencyContainerProtocol = TestDependencyContainer()
         
         // Test that protocol methods are accessible and return valid instances
-        let onboardingUseCase = container.makeOnboardingUseCase()
-        let cvManagementUseCase = container.makeCVManagementUseCase()
+        let onboardingUseCase = try container.makeOnboardingUseCase()
+        let cvManagementUseCase = try container.makeCVManagementUseCase()
         
         // Verify the factory methods return concrete instances by checking they're not nil
         let onboardingUseCaseName = String(describing: type(of: onboardingUseCase))
@@ -265,11 +265,11 @@ struct DependencyContainerTests {
 struct DependencyWiringTests {
     
     @Test("Wiring: OnboardingUseCase returns firstTime state when no CVs exist")
-    func onboardingUseCaseIsProperlyWired() async {
+    func onboardingUseCaseIsProperlyWired() async throws {
         let container = TestDependencyContainer()
         defer { container.reset() }
         
-        let useCase = container.makeOnboardingUseCase()
+        let useCase = try container.makeOnboardingUseCase()
         
         // Test that the use case can perform its basic operations without errors
         let onboardingState = await useCase.checkOnboardingRequired()
@@ -282,7 +282,7 @@ struct DependencyWiringTests {
         let container = TestDependencyContainer()
         defer { container.reset() }
         
-        let useCase = container.makeCVManagementUseCase()
+        let useCase = try container.makeCVManagementUseCase()
         
         // Test that the use case can perform basic operations without crashing
         let cvs = try await useCase.getAllCVs()
@@ -296,10 +296,10 @@ struct DependencyWiringTests {
         defer { container.reset() }
         
         // Create multiple use cases
-        let onboardingUseCase1 = container.makeOnboardingUseCase()
-        let onboardingUseCase2 = container.makeOnboardingUseCase()
-        let cvManagementUseCase1 = container.makeCVManagementUseCase()
-        let cvManagementUseCase2 = container.makeCVManagementUseCase()
+        let onboardingUseCase1 = try container.makeOnboardingUseCase()
+        let onboardingUseCase2 = try container.makeOnboardingUseCase()
+        let cvManagementUseCase1 = try container.makeCVManagementUseCase()
+        let cvManagementUseCase2 = try container.makeCVManagementUseCase()
         
         // Test that they share the same underlying repositories by checking behavior consistency
         // Both onboarding use cases should return the same state
@@ -342,7 +342,7 @@ private struct TestHelpers {
         _ operation: (CVManagementUseCaseProtocol) async throws -> T
     ) async rethrows -> T {
         return try await withTestContainer { container in
-            let useCase = container.makeCVManagementUseCase()
+            let useCase = try container.makeCVManagementUseCase()
             return try await operation(useCase)
         }
     }
@@ -352,8 +352,8 @@ private struct TestHelpers {
         _ operation: (OnboardingUseCaseProtocol, CVManagementUseCaseProtocol) async throws -> T
     ) async rethrows -> T {
         return try await withTestContainer { container in
-            let onboardingUseCase = container.makeOnboardingUseCase()
-            let cvManagementUseCase = container.makeCVManagementUseCase()
+            let onboardingUseCase = try container.makeOnboardingUseCase()
+            let cvManagementUseCase = try container.makeCVManagementUseCase()
             return try await operation(onboardingUseCase, cvManagementUseCase)
         }
     }
