@@ -1,6 +1,6 @@
 import Foundation
 
-public final class OnboardingUseCase: OnboardingUseCaseProtocol, @unchecked Sendable {
+public final class OnboardingUseCase: OnboardingUseCaseProtocol, Sendable {
     private let onboardingRepository: OnboardingRepositoryProtocol
     private let templateRepository: TemplateRepositoryProtocol
     private let cvRepository: CVRepositoryProtocol

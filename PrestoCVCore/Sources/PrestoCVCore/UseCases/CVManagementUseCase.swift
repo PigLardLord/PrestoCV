@@ -1,6 +1,6 @@
 import Foundation
 
-public final class CVManagementUseCase: CVManagementUseCaseProtocol, @unchecked Sendable {
+public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
     private let cvRepository: CVRepositoryProtocol
     private let templateRepository: TemplateRepositoryProtocol
     

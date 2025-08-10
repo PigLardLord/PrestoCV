@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Template Repository Implementation
 
-public final class TemplateRepository: TemplateRepositoryProtocol, @unchecked Sendable {
+public final class TemplateRepository: TemplateRepositoryProtocol, Sendable {
     private let storageService: StorageServiceProtocol
     
     public init(storageService: StorageServiceProtocol) {

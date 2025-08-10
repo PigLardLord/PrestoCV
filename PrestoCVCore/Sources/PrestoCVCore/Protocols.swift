@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Repository Protocols
 
-public protocol CVRepositoryProtocol {
+public protocol CVRepositoryProtocol: Sendable {
     func getAllCVs() async throws -> [CVModel]
     func getCV(by id: UUID) async throws -> CVModel?
     func saveCV(_ cv: CVModel) async throws -> CVModel
@@ -11,12 +11,12 @@ public protocol CVRepositoryProtocol {
     func getCVsCount() async -> Int
 }
 
-public protocol OnboardingRepositoryProtocol {
+public protocol OnboardingRepositoryProtocol: Sendable {
     func hasExistingCVs() async -> Bool
     func getOnboardingState() async -> OnboardingState
 }
 
-public protocol TemplateRepositoryProtocol {
+public protocol TemplateRepositoryProtocol: Sendable {
     func getDefaultTemplate() async throws -> CVModel
     func getAllTemplates() async throws -> [CVModel]
     func getTemplate(by name: String) async throws -> CVModel?
@@ -24,12 +24,12 @@ public protocol TemplateRepositoryProtocol {
 
 // MARK: - Use Case Protocols
 
-public protocol OnboardingUseCaseProtocol {
+public protocol OnboardingUseCaseProtocol: Sendable {
     func checkOnboardingRequired() async -> OnboardingState
     func createFirstCV(from template: CVModel) async throws -> CVModel
 }
 
-public protocol CVManagementUseCaseProtocol {
+public protocol CVManagementUseCaseProtocol: Sendable {
     func getAllCVs() async throws -> [CVModel]
     func createCV(from template: CVModel) async throws -> CVModel
     func updateCV(_ cv: CVModel) async throws -> CVModel
