@@ -3,7 +3,7 @@ import Foundation
 @testable import PrestoCVCore
 
 /// A test dependency container that uses mocked services
-public final class TestDependencyContainer: DependencyContainerProtocol {
+public final class TestDependencyContainer: DependencyContainerProtocol, @unchecked Sendable {
     private let mockStorageService = MockStorageService()
     
     private lazy var cvRepository: CVRepositoryProtocol = {

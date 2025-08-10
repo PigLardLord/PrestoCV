@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Cross-Platform Storage Service
 
-public final class FileStorageService: StorageServiceProtocol {
+public actor FileStorageService: StorageServiceProtocol{
     private let fileManager: FileManager
     private let baseDirectory: URL
     private let fileExtension = "json"
@@ -16,12 +16,15 @@ public final class FileStorageService: StorageServiceProtocol {
         self.fileManager = fileManager
         self.baseDirectory = baseDirectory
         
-        try createBaseDirectoryIfNeeded()
+        // Create directory synchronously since init must be synchronous
+        // and this is a one-time setup operation
+        guard !fileManager.fileExists(atPath: baseDirectory.path) else { return }
+        try fileManager.createDirectory(at: baseDirectory, withIntermediateDirectories: true)
     }
     
     // MARK: - Public Methods
     
-    public func save<T: Codable>(_ object: T, to identifier: String) async throws {
+    public func save<T: Codable & Sendable>(_ object: T, to identifier: String) async throws {
         let url = fileURL(for: identifier)
         let encoder = configuredJSONEncoder()
         
@@ -29,7 +32,7 @@ public final class FileStorageService: StorageServiceProtocol {
         try data.write(to: url)
     }
     
-    public func load<T: Codable>(_ type: T.Type, from identifier: String) async throws -> T? {
+    public func load<T: Codable & Sendable>(_ type: T.Type, from identifier: String) async throws -> T? {
         let url = fileURL(for: identifier)
         
         guard fileManager.fileExists(atPath: url.path) else {
@@ -46,7 +49,7 @@ public final class FileStorageService: StorageServiceProtocol {
     /// - Returns: An array of successfully loaded objects
     /// - Throws: Storage error if directory cannot be read
     /// - Note: Invalid files are silently skipped to ensure partial success
-    public func loadAll<T: Codable>(_ type: T.Type) async throws -> [T] {
+    public func loadAll<T: Codable & Sendable>(_ type: T.Type) async throws -> [T] {
         let urls = try getStoredFileURLs()
         var objects: [T] = []
         let decoder = configuredJSONDecoder()
@@ -92,12 +95,6 @@ public final class FileStorageService: StorageServiceProtocol {
     }
     
     // MARK: - Private Methods
-    
-    private func createBaseDirectoryIfNeeded() throws {
-        guard !fileManager.fileExists(atPath: baseDirectory.path) else { return }
-        
-        try fileManager.createDirectory(at: baseDirectory, withIntermediateDirectories: true)
-    }
     
     private func configuredJSONEncoder() -> JSONEncoder {
         let encoder = JSONEncoder()

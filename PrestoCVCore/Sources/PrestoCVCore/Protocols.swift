@@ -40,9 +40,9 @@ public protocol CVManagementUseCaseProtocol {
 // MARK: - Infrastructure Protocols
 
 public protocol StorageServiceProtocol {
-    func save<T: Codable>(_ object: T, to identifier: String) async throws
-    func load<T: Codable>(_ type: T.Type, from identifier: String) async throws -> T?
-    func loadAll<T: Codable>(_ type: T.Type) async throws -> [T]
+    func save<T: Codable & Sendable>(_ object: T, to identifier: String) async throws
+    func load<T: Codable & Sendable>(_ type: T.Type, from identifier: String) async throws -> T?
+    func loadAll<T: Codable & Sendable>(_ type: T.Type) async throws -> [T]
     func delete(identifier: String) async throws
     func exists(identifier: String) async -> Bool
     func getAllIdentifiers() async throws -> [String]

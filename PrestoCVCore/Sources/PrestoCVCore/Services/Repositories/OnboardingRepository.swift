@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Onboarding Repository Implementation
 
-public final class OnboardingRepository: OnboardingRepositoryProtocol {
+public final class OnboardingRepository: OnboardingRepositoryProtocol, @unchecked Sendable {
     private let cvRepository: CVRepositoryProtocol
     
     public init(cvRepository: CVRepositoryProtocol) {

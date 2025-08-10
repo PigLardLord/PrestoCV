@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - CV Models
 
-public struct CVModel: Codable, Identifiable {
+public struct CVModel: Codable, Identifiable, Sendable {
     public var id: UUID
     public var name: String
     public var title: String
@@ -54,7 +54,7 @@ public struct CVModel: Codable, Identifiable {
     }
 }
 
-public struct Experience: Codable, Identifiable {
+public struct Experience: Codable, Identifiable, Sendable {
     public var id: UUID
     public var title: String
     public var company: String
@@ -72,7 +72,7 @@ public struct Experience: Codable, Identifiable {
     }
 }
 
-public struct Education: Codable, Identifiable {
+public struct Education: Codable, Identifiable, Sendable {
     public var id: UUID
     public var degree: String
     public var school: String
@@ -88,7 +88,7 @@ public struct Education: Codable, Identifiable {
     }
 }
 
-public struct Skill: Codable, Identifiable {
+public struct Skill: Codable, Identifiable, Sendable {
     public var id: UUID
     public var name: String
     public var level: Int
@@ -100,7 +100,7 @@ public struct Skill: Codable, Identifiable {
     }
 }
 
-public struct Language: Codable, Identifiable {
+public struct Language: Codable, Identifiable, Sendable {
     public var id: UUID
     public var name: String
     public var level: String
@@ -112,7 +112,7 @@ public struct Language: Codable, Identifiable {
     }
 }
 
-public struct Certification: Codable, Identifiable {
+public struct Certification: Codable, Identifiable, Sendable {
     public var id: UUID
     public var name: String
     public var issuer: String
@@ -130,7 +130,7 @@ public struct Certification: Codable, Identifiable {
     }
 }
 
-public struct Social: Codable, Identifiable {
+public struct Social: Codable, Identifiable, Sendable {
     public var id: UUID
     public var platform: String
     public var url: String
@@ -144,14 +144,14 @@ public struct Social: Codable, Identifiable {
 
 // MARK: - Supporting Types
 
-public enum OnboardingState: Equatable {
+public enum OnboardingState: Equatable, Sendable {
     case loading
     case firstTime
     case returning
     case error(AppError)
 }
 
-public enum AppError: LocalizedError, Equatable {
+public enum AppError: LocalizedError, Equatable, Sendable {
     case fileSystemError(Error)
     case templateNotFound
     case invalidCVData
