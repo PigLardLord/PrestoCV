@@ -59,11 +59,12 @@ final class MockTemplateRepository: TemplateRepositoryProtocol {
 
 // MARK: - OnboardingViewModel Tests
 
+@MainActor
 @Suite("OnboardingViewModel Tests")
 struct OnboardingViewModelTests {
     
     @Test("ViewModel initializes with loading state")
-    func viewModelInitializesWithLoadingState() async {
+    func viewModelInitializesWithLoadingState() {
         let mockOnboardingUseCase = MockOnboardingUseCase()
         let mockTemplateRepository = MockTemplateRepository()
         
