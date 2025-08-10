@@ -6,7 +6,7 @@ struct OnboardingView: View {
     @EnvironmentObject var router: AppRouter
     
     var body: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: DesignTokens.Spacing.xxl) {
             Spacer()
             
             // Welcome Section
@@ -17,67 +17,52 @@ struct OnboardingView: View {
             
             Spacer()
         }
-        .padding(.horizontal, 24)
-        .background(Color(.systemBackground))
+        .padding(.horizontal, DesignTokens.Spacing.xl)
+        .background(DesignTokens.Colors.background)
         .navigationTitle("Welcome")
         .navigationBarTitleDisplayMode(.large)
     }
     
     private var welcomeSection: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DesignTokens.Spacing.lg) {
             Image(systemName: "doc.text.fill")
-                .font(.system(size: 80))
-                .foregroundColor(.accentColor)
+                .font(DesignTokens.IconSize.hero.font)
+                .foregroundColor(DesignTokens.Colors.accent)
             
             Text("Welcome to PrestoCV")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+                .typography(.largeTitle)
+                .foregroundColor(DesignTokens.Colors.primary)
                 .multilineTextAlignment(.center)
             
             Text("Create professional CVs easily and manage all your career documents in one place.")
-                .font(.body)
-                .foregroundColor(.secondary)
+                .typography(.body)
+                .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal)
+                .padding(.horizontal, DesignTokens.Spacing.md)
         }
     }
     
     private var actionSection: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DesignTokens.Spacing.lg) {
             // Create First CV Button
-            Button(action: {
-                Task {
-                    await viewModel.createFirstCV()
-                    // Navigation will be handled automatically via state change
-                }
-            }) {
-                HStack {
-                    if viewModel.isCreatingCV {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                            .foregroundColor(.white)
-                    } else {
-                        Image(systemName: "plus.circle.fill")
+            PrimaryButton(
+                title: viewModel.isCreatingCV ? "Creating..." : "Create Your First CV",
+                icon: viewModel.isCreatingCV ? nil : "plus.circle.fill",
+                isLoading: viewModel.isCreatingCV,
+                action: {
+                    Task {
+                        await viewModel.createFirstCV()
+                        // Navigation will be handled automatically via state change
                     }
-                    Text(viewModel.isCreatingCV ? "Creating..." : "Create Your First CV")
                 }
-                .font(.headline)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.accentColor)
-                .cornerRadius(12)
-            }
-            .disabled(viewModel.isCreatingCV)
+            )
             
             // Skip for now - placeholder for future feature
-            Button("Skip for now") {
+            SecondaryButton.text(title: "Skip for now") {
                 router.replace(with: .cvList)
             }
-            .font(.subheadline)
-            .foregroundColor(.secondary)
         }
-        .padding(.horizontal)
+        .padding(.horizontal, DesignTokens.Spacing.md)
     }
 }
 

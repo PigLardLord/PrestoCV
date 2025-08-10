@@ -46,52 +46,13 @@ struct CVListView: View {
     // MARK: - View Components
     
     private var loadingView: some View {
-        VStack {
-            ProgressView()
-            Text("Loading your CVs...")
-                .padding(.top)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        LoadingView.fullscreen(message: "Loading your CVs...")
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            
-            Image(systemName: "doc.text")
-                .font(.system(size: 60))
-                .foregroundColor(.secondary)
-            
-            VStack(spacing: 8) {
-                Text("No CVs Yet")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                
-                Text("Create your first CV to get started")
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            
-            Button(action: {
-                router.navigate(to: .templateSelection)
-            }) {
-                HStack {
-                    Image(systemName: "plus.circle.fill")
-                    Text("Create Your First CV")
-                }
-                .font(.headline)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.accentColor)
-                .cornerRadius(12)
-            }
-            .padding(.horizontal, 32)
-            
-            Spacer()
+        EmptyStateView.noCVs {
+            router.navigate(to: .templateSelection)
         }
-        .padding()
     }
     
     private var cvListView: some View {
@@ -122,23 +83,23 @@ private struct CVRowView: View {
     var body: some View {
         Button(action: onTap) {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                     Text(cv.name.isEmpty ? "Untitled CV" : cv.name)
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                        .typography(.headline)
+                        .foregroundColor(DesignTokens.Colors.primary)
                         .lineLimit(1)
                     
                     if !cv.title.isEmpty {
                         Text(cv.title)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .typography(.subheadline)
+                            .foregroundColor(DesignTokens.Colors.secondary)
                             .lineLimit(1)
                     }
                     
                     if !cv.location.isEmpty {
                         Text(cv.location)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .typography(.caption1)
+                            .foregroundColor(DesignTokens.Colors.secondary)
                             .lineLimit(1)
                     }
                 }
@@ -146,12 +107,14 @@ private struct CVRowView: View {
                 Spacer()
                 
                 Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(DesignTokens.IconSize.small.font)
+                    .foregroundColor(DesignTokens.Colors.secondary)
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, DesignTokens.Spacing.xxs)
         }
         .buttonStyle(PlainButtonStyle())
+        .accessibilityLabel("CV: \(cv.name.isEmpty ? "Untitled" : cv.name)")
+        .accessibilityAddTraits(.isButton)
     }
 }
 

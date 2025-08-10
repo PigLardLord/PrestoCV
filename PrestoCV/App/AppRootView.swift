@@ -37,13 +37,15 @@ struct AppRootView: View {
             Group {
                 switch onboardingViewModel.onboardingState {
                 case .loading:
-                    LoadingView()
+                    LoadingView.fullscreen(message: "Checking your account...")
                 case .firstTime:
                     OnboardingView(viewModel: onboardingViewModel)
                 case .returning:
                     CVListView(viewModel: cvListViewModel)
                 case .error:
-                    ErrorView(message: onboardingViewModel.errorMessage)
+                    ErrorView.generic(
+                        message: onboardingViewModel.errorMessage
+                    )
                 }
             }
             .navigationDestination(for: Route.self) { route in
@@ -72,33 +74,7 @@ struct AppRootView: View {
 }
 
 // MARK: - Placeholder Views
-
-private struct LoadingView: View {
-    var body: some View {
-        VStack {
-            ProgressView()
-            Text("Loading...")
-                .padding(.top)
-        }
-    }
-}
-
-private struct ErrorView: View {
-    let message: String
-    
-    var body: some View {
-        VStack {
-            Image(systemName: "exclamationmark.triangle")
-                .foregroundColor(.red)
-                .font(.largeTitle)
-            Text("Error")
-                .font(.headline)
-            Text(message)
-                .multilineTextAlignment(.center)
-                .padding()
-        }
-    }
-}
+// LoadingView and ErrorView are now imported from DesignSystem
 
 // OnboardingView is now in its own file
 
