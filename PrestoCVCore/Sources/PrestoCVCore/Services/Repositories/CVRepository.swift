@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - CV Repository Implementation
 
-public final class CVRepository: CVRepositoryProtocol, @unchecked Sendable {
+public final class CVRepository: CVRepositoryProtocol, Sendable {
     private let storageService: StorageServiceProtocol
     
     public init(storageService: StorageServiceProtocol) {
