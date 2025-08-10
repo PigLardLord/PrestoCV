@@ -10,9 +10,11 @@ import PrestoCVCore
 
 @main
 struct PrestoCVApp: App {
+    private let dependencyContainer = DependencyContainer()
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppRootView(dependencyContainer: dependencyContainer)
         }
     }
 }

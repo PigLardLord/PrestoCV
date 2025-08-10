@@ -73,4 +73,8 @@ public final class DependencyContainer: DependencyContainerProtocol {
             templateRepository: try getTemplateRepository()
         )
     }
+    
+    public func makeTemplateRepository() throws -> TemplateRepositoryProtocol {
+        return try getTemplateRepository()
+    }
 }
