@@ -183,18 +183,10 @@ public enum DesignTokens {
     }
 }
 
+
 // MARK: - View Extensions for Easy Access
 extension View {
     
-    // MARK: - Spacing
-    func padding(_ edges: Edge.Set = .all, _ spacing: DesignTokens.Spacing.Type) -> some View {
-        switch spacing {
-        case is DesignTokens.Spacing.Type:
-            return self.padding(edges, DesignTokens.Spacing.md)
-        default:
-            return self.padding(edges, DesignTokens.Spacing.md)
-        }
-    }
     
     // MARK: - Typography
     func typography(_ style: DesignTokens.Typography) -> some View {
@@ -203,15 +195,6 @@ extension View {
             .fontWeight(style.weight)
     }
     
-    // MARK: - Corner Radius
-    func cornerRadius(_ radius: DesignTokens.CornerRadius.Type) -> some View {
-        switch radius {
-        case is DesignTokens.CornerRadius.Type:
-            return self.cornerRadius(DesignTokens.CornerRadius.md)
-        default:
-            return self.cornerRadius(DesignTokens.CornerRadius.md)
-        }
-    }
     
     // MARK: - Shadow
     func designShadow(_ shadow: DesignTokens.Shadow) -> some View {
