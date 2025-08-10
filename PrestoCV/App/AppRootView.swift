@@ -4,17 +4,25 @@ import PrestoCVCore
 struct AppRootView: View {
     @StateObject private var router = AppRouter()
     @StateObject private var onboardingViewModel: OnboardingViewModel
+    @StateObject private var cvListViewModel: CVListViewModel
     
     init(dependencyContainer: DependencyContainer) {
         // Create dependencies using factory methods with error handling
         do {
             let onboardingUseCase = try dependencyContainer.makeOnboardingUseCase()
             let templateRepository = try dependencyContainer.makeTemplateRepository()
+            let cvManagementUseCase = try dependencyContainer.makeCVManagementUseCase()
             
             self._onboardingViewModel = StateObject(
                 wrappedValue: OnboardingViewModel(
                     onboardingUseCase: onboardingUseCase,
                     templateRepository: templateRepository
+                )
+            )
+            
+            self._cvListViewModel = StateObject(
+                wrappedValue: CVListViewModel(
+                    cvManagementUseCase: cvManagementUseCase
                 )
             )
         } catch {
@@ -33,7 +41,7 @@ struct AppRootView: View {
                 case .firstTime:
                     OnboardingView(viewModel: onboardingViewModel)
                 case .returning:
-                    CVListView()
+                    CVListView(viewModel: cvListViewModel)
                 case .error:
                     ErrorView(message: onboardingViewModel.errorMessage)
                 }
@@ -54,7 +62,7 @@ struct AppRootView: View {
         case .onboarding:
             OnboardingView(viewModel: onboardingViewModel)
         case .cvList:
-            CVListView()
+            CVListView(viewModel: cvListViewModel)
         case .cvEditor(let cvId):
             CVEditorView(cvId: cvId)
         case .templateSelection:
@@ -94,11 +102,6 @@ private struct ErrorView: View {
 
 // OnboardingView is now in its own file
 
-private struct CVListView: View {
-    var body: some View {
-        Text("CV List - Placeholder")
-    }
-}
 
 private struct CVEditorView: View {
     let cvId: String?
