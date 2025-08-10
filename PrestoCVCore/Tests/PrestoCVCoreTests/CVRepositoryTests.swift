@@ -237,6 +237,19 @@ struct CVRepositoryTests {
         let mockStorage = MockStorageService()
         let repository = CVRepository(storageService: mockStorage)
         
+        // Ensure storage is completely empty
+        #expect(mockStorage.isEmpty())
+        
+        // Verify getAllCVs returns empty array first
+        do {
+            let cvs = try await repository.getAllCVs()
+            #expect(cvs.isEmpty)
+            #expect(cvs.count == 0)
+        } catch {
+            #expect(Bool(false), "getAllCVs should not throw with empty storage")
+        }
+        
+        // Now test cvExists which should return false for empty array
         let exists = await repository.cvExists()
         #expect(exists == false)
     }
@@ -271,6 +284,19 @@ struct CVRepositoryTests {
         let mockStorage = MockStorageService()
         let repository = CVRepository(storageService: mockStorage)
         
+        // Ensure storage is completely empty
+        #expect(mockStorage.isEmpty())
+        
+        // Verify getAllCVs returns empty array first
+        do {
+            let cvs = try await repository.getAllCVs()
+            #expect(cvs.isEmpty)
+            #expect(cvs.count == 0)
+        } catch {
+            #expect(Bool(false), "getAllCVs should not throw with empty storage")
+        }
+        
+        // Now test getCVsCount which should return 0
         let count = await repository.getCVsCount()
         #expect(count == 0)
     }
