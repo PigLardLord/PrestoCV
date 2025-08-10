@@ -17,24 +17,7 @@ public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
     }
     
     public func createCV(from template: CVModel) async throws -> CVModel {
-        let newCV = CVModel(
-            id: UUID(),
-            name: template.name,
-            title: template.title,
-            location: template.location,
-            email: template.email,
-            phone: template.phone,
-            portfolio: template.portfolio,
-            profile: template.profile,
-            relevant_experience: template.relevant_experience,
-            education: template.education,
-            skills: template.skills,
-            languages: template.languages,
-            certifications: template.certifications,
-            interests: template.interests,
-            social: template.social
-        )
-        
+        let newCV = CVModel(from: template)
         return try await cvRepository.saveCV(newCV)
     }
     
@@ -51,23 +34,7 @@ public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
             throw AppError.invalidCVData
         }
         
-        let duplicatedCV = CVModel(
-            id: UUID(),
-            name: "\(originalCV.name) (Copy)",
-            title: originalCV.title,
-            location: originalCV.location,
-            email: originalCV.email,
-            phone: originalCV.phone,
-            portfolio: originalCV.portfolio,
-            profile: originalCV.profile,
-            relevant_experience: originalCV.relevant_experience,
-            education: originalCV.education,
-            skills: originalCV.skills,
-            languages: originalCV.languages,
-            certifications: originalCV.certifications,
-            interests: originalCV.interests,
-            social: originalCV.social
-        )
+        let duplicatedCV = originalCV.copy { "\($0) (Copy)" }
         
         return try await cvRepository.saveCV(duplicatedCV)
     }

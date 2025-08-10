@@ -52,4 +52,25 @@ public struct CVModel: Codable, Identifiable, Sendable {
         self.interests = interests
         self.social = social
     }
+    
+    /// Creates a new CV from an existing template with a new ID
+    /// - Parameters:
+    ///   - template: The CV to copy from
+    ///   - newId: The UUID for the new CV (defaults to a new UUID)
+    public init(from template: CVModel, newId: UUID = UUID()) {
+        self = template
+        self.id = newId
+    }
+    
+    /// Creates a copy of this CV with a new ID and optional name modification
+    /// - Parameters:
+    ///   - newId: The UUID for the new CV (defaults to a new UUID)
+    ///   - nameModifier: Optional closure to modify the name (e.g., add " (Copy)")
+    public func copy(newId: UUID = UUID(), nameModifier: ((String) -> String)? = nil) -> CVModel {
+        var copy = CVModel(from: self, newId: newId)
+        if let nameModifier = nameModifier {
+            copy.name = nameModifier(copy.name)
+        }
+        return copy
+    }
 }
