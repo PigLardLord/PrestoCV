@@ -92,13 +92,7 @@ private struct ErrorView: View {
     }
 }
 
-private struct OnboardingView: View {
-    @ObservedObject var viewModel: OnboardingViewModel
-    
-    var body: some View {
-        Text("Onboarding - Placeholder")
-    }
-}
+// OnboardingView is now in its own file
 
 private struct CVListView: View {
     var body: some View {
