@@ -63,7 +63,7 @@ public final class DependencyContainer: DependencyContainerProtocol {
         return OnboardingUseCase(
             onboardingRepository: try getOnboardingRepository(),
             templateRepository: try getTemplateRepository(),
-            cvRepository: try getCVRepository()
+            cvManagementUseCase: try makeCVManagementUseCase()
         )
     }
     

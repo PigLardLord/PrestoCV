@@ -202,15 +202,15 @@ struct IntegrationTests {
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
-        let onboardingUseCase = OnboardingUseCase(
-            onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
-            cvRepository: cvRepository
-        )
-        
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
             templateRepository: templateRepository
+        )
+        
+        let onboardingUseCase = OnboardingUseCase(
+            onboardingRepository: onboardingRepository,
+            templateRepository: templateRepository,
+            cvManagementUseCase: cvManagementUseCase
         )
         
         // 1. Create CV through onboarding

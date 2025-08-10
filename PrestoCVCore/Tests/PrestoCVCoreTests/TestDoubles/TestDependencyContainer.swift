@@ -19,10 +19,15 @@ public final class TestDependencyContainer: DependencyContainerProtocol, @unchec
     }()
     
     public func makeOnboardingUseCase() throws -> OnboardingUseCaseProtocol {
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
+        
         return OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
     }
     

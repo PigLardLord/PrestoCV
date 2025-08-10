@@ -13,11 +13,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         #expect(type(of: useCase) == OnboardingUseCase.self)
@@ -31,11 +35,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         let state = await useCase.checkOnboardingRequired()
@@ -48,11 +56,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         // Add a CV to make user a returning user
@@ -69,11 +81,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         let useCaseState = await useCase.checkOnboardingRequired()
@@ -90,11 +106,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         let template = CVTestDataBuilder.completeCV().build()
@@ -115,11 +135,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         let template = CVTestDataBuilder.minimalCV().build()
@@ -138,11 +162,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         let template = CVTestDataBuilder.completeCV().build()
@@ -161,11 +189,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         let template = CVTestDataBuilder.completeCV().build()
@@ -205,11 +237,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         let emptyTemplate = CVModel() // Default empty template
@@ -234,11 +270,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         // Initially should be first time
@@ -260,11 +300,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         // 1. Check if onboarding required (should be first time)
@@ -302,11 +346,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         // Since MockStorageService doesn't throw errors, this test verifies the pattern
@@ -327,11 +375,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         // Perform sequential state checks to verify consistency
@@ -349,11 +401,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         let template1 = CVTestDataBuilder.minimalCV().withName("CV 1").build()
@@ -390,11 +446,15 @@ struct OnboardingUseCaseTests {
         let cvRepository = CVRepository(storageService: mockStorage)
         let templateRepository = TemplateRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        let cvManagementUseCase = CVManagementUseCase(
+            cvRepository: cvRepository,
+            templateRepository: templateRepository
+        )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
             templateRepository: templateRepository,
-            cvRepository: cvRepository
+            cvManagementUseCase: cvManagementUseCase
         )
         
         let template = CVTestDataBuilder.minimalCV().build()
