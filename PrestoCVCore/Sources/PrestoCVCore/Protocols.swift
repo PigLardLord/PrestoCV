@@ -35,6 +35,7 @@ public protocol CVManagementUseCaseProtocol: Sendable {
     func updateCV(_ cv: CVModel) async throws -> CVModel
     func deleteCV(id: UUID) async throws
     func duplicateCV(id: UUID) async throws -> CVModel
+    func getCV(by id: UUID) async throws -> CVModel?
 }
 
 // MARK: - Infrastructure Protocols

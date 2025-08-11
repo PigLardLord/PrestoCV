@@ -5,13 +5,21 @@ final class CVEditorViewModel: ObservableObject {
     
     // MARK: - Published Properties
     @Published var cv: CVModel = CVModel()
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String = ""
+    @Published var viewState: ViewState<CVModel> = .idle
     
     // MARK: - Private Properties
     private let cvManagementUseCase: CVManagementUseCaseProtocol
     private let cvId: String?
     private var isNewCV: Bool { cvId == nil }
+    
+    // MARK: - Computed Properties
+    var isLoading: Bool {
+        viewState.isLoading
+    }
+    
+    var errorMessage: String {
+        viewState.errorMessage ?? ""
+    }
     
     // MARK: - Initialization
     init(
@@ -25,31 +33,23 @@ final class CVEditorViewModel: ObservableObject {
     // MARK: - Public Methods
     @MainActor
     func loadCV() async {
+        // If no CV ID, we're creating a new CV, so leave the default empty CV
         guard let cvId = cvId,
-              let uuid = UUID(uuidString: cvId) else {
-            // If no CV ID, we're creating a new CV, so leave the default empty CV
-            return
-        }
+              let uuid = UUID(uuidString: cvId) else { return }
         
-        isLoading = true
-        errorMessage = ""
+        viewState = .loading
         
         do {
-            // For editing existing CVs, we would load it here
-            // For now, we'll just create a placeholder implementation
-            // In a real app, you would fetch the CV by ID from the repository
-            cv = CVModel()
+            try await loadExistingCV(with: uuid)
+            viewState = .loaded(cv)
         } catch {
-            errorMessage = error.localizedDescription
+            viewState = .error(error.localizedDescription)
         }
-        
-        isLoading = false
     }
     
     @MainActor
     func saveCV() async -> Bool {
-        isLoading = true
-        errorMessage = ""
+        viewState = .loading
         
         do {
             if isNewCV {
@@ -59,13 +59,17 @@ final class CVEditorViewModel: ObservableObject {
                 // Update existing CV
                 let _ = try await cvManagementUseCase.updateCV(cv)
             }
-            isLoading = false
+            viewState = .loaded(cv)
             return true
         } catch {
-            errorMessage = error.localizedDescription
-            isLoading = false
+            viewState = .error(error.localizedDescription)
             return false
         }
+    }
+    
+    @MainActor
+    func clearError() {
+        viewState = viewState.clearingError()
     }
     
     @MainActor
@@ -86,5 +90,17 @@ final class CVEditorViewModel: ObservableObject {
     @MainActor
     func removeExperience(at index: Int) {
         cv.relevant_experience.remove(at: index)
+    }
+    
+    // MARK: - Private Methods
+    private func loadExistingCV(with uuid: UUID) async throws {
+        guard let loadedCV = try await cvManagementUseCase.getCV(by: uuid) else {
+            throw CVLoadingError.cvNotFound
+        }
+        cv = loadedCV
+    }
+    
+    private enum CVLoadingError: Error {
+        case cvNotFound
     }
 }

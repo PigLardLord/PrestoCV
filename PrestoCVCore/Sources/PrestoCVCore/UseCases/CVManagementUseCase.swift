@@ -38,4 +38,8 @@ public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
         
         return try await cvRepository.saveCV(duplicatedCV)
     }
+    
+    public func getCV(by id: UUID) async throws -> CVModel? {
+        return try await cvRepository.getCV(by: id)
+    }
 }
