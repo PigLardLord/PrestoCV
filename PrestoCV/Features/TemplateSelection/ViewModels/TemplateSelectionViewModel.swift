@@ -47,7 +47,8 @@ final class TemplateSelectionViewModel: ObservableObject {
             let newCV = try await templateRepository.getDefaultTemplate()
             return newCV
         } catch {
-            viewState = .error(error.localizedDescription)
+            // Don't set viewState to error here as this is not a UI error
+            // but a method that returns nil on failure
             return nil
         }
     }
