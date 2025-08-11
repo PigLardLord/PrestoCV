@@ -4,12 +4,23 @@ import PrestoCVCore
 final class TemplateSelectionViewModel: ObservableObject {
     
     // MARK: - Published Properties
-    @Published var templates: [CVModel] = []
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String = ""
+    @Published var viewState: ViewState<[CVModel]> = .idle
     
     // MARK: - Private Properties
     private let templateRepository: TemplateRepositoryProtocol
+    
+    // MARK: - Computed Properties
+    var templates: [CVModel] {
+        viewState.data ?? []
+    }
+    
+    var isLoading: Bool {
+        viewState.isLoading
+    }
+    
+    var errorMessage: String {
+        viewState.errorMessage ?? ""
+    }
     
     // MARK: - Initialization
     init(templateRepository: TemplateRepositoryProtocol) {
@@ -19,16 +30,14 @@ final class TemplateSelectionViewModel: ObservableObject {
     // MARK: - Public Methods
     @MainActor
     func loadTemplates() async {
-        isLoading = true
-        errorMessage = ""
+        viewState = .loading
         
         do {
-            templates = try await templateRepository.getAllTemplates()
+            let loadedTemplates = try await templateRepository.getAllTemplates()
+            viewState = .loaded(loadedTemplates)
         } catch {
-            errorMessage = error.localizedDescription
+            viewState = .error(error.localizedDescription)
         }
-        
-        isLoading = false
     }
     
     @MainActor
@@ -38,8 +47,13 @@ final class TemplateSelectionViewModel: ObservableObject {
             let newCV = try await templateRepository.getDefaultTemplate()
             return newCV
         } catch {
-            errorMessage = error.localizedDescription
+            viewState = .error(error.localizedDescription)
             return nil
         }
+    }
+    
+    @MainActor
+    func clearError() {
+        viewState = viewState.clearingError()
     }
 }

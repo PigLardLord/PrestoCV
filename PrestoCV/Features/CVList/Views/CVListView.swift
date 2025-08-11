@@ -36,7 +36,7 @@ struct CVListView: View {
         }
         .alert("Error", isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
             Button("OK") {
-                viewModel.errorMessage = ""
+                viewModel.clearError()
             }
         } message: {
             Text(viewModel.errorMessage)

@@ -5,12 +5,23 @@ import PrestoCVCore
 final class CVListViewModel: ObservableObject {
     
     // MARK: - Published Properties
-    @Published var cvs: [CVModel] = []
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String = ""
+    @Published var viewState: ViewState<[CVModel]> = .idle
     
     // MARK: - Private Properties
     private let cvManagementUseCase: CVManagementUseCaseProtocol
+    
+    // MARK: - Computed Properties
+    var cvs: [CVModel] {
+        viewState.data ?? []
+    }
+    
+    var isLoading: Bool {
+        viewState.isLoading
+    }
+    
+    var errorMessage: String {
+        viewState.errorMessage ?? ""
+    }
     
     // MARK: - Initialization
     init(cvManagementUseCase: CVManagementUseCaseProtocol) {
@@ -19,35 +30,43 @@ final class CVListViewModel: ObservableObject {
     
     // MARK: - Public Methods
     func loadCVs() async {
-        isLoading = true
-        errorMessage = ""
+        viewState = .loading
         
         do {
-            cvs = try await cvManagementUseCase.getAllCVs()
+            let loadedCVs = try await cvManagementUseCase.getAllCVs()
+            viewState = .loaded(loadedCVs)
         } catch {
-            errorMessage = error.localizedDescription
+            viewState = .error(error.localizedDescription)
         }
-        
-        isLoading = false
     }
     
     func deleteCV(withId id: UUID) async {
         do {
             try await cvManagementUseCase.deleteCV(id: id)
-            // Remove from local array to update UI immediately
-            cvs.removeAll { $0.id == id }
+            // Update local state to reflect deletion
+            if var currentCVs = viewState.data {
+                currentCVs.removeAll { $0.id == id }
+                viewState = .loaded(currentCVs)
+            }
         } catch {
-            errorMessage = error.localizedDescription
+            viewState = .error(error.localizedDescription)
         }
     }
     
     func duplicateCV(withId id: UUID) async {
         do {
             let duplicatedCV = try await cvManagementUseCase.duplicateCV(id: id)
-            // Add to local array to update UI immediately
-            cvs.append(duplicatedCV)
+            // Update local state to include duplicated CV
+            if var currentCVs = viewState.data {
+                currentCVs.append(duplicatedCV)
+                viewState = .loaded(currentCVs)
+            }
         } catch {
-            errorMessage = error.localizedDescription
+            viewState = .error(error.localizedDescription)
         }
+    }
+    
+    func clearError() {
+        viewState = viewState.clearingError()
     }
 }
