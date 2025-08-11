@@ -40,41 +40,49 @@ public final class DependencyContainer: DependencyContainerProtocol {
         }
     }
     
-    private func getCVRepository() throws -> CVRepositoryProtocol {
-        let storage = try getStorageService()
-        return CVRepository(storageService: storage)
-    }
+    // MARK: - Private Methods
     
-    private func getTemplateRepository() throws -> TemplateRepositoryProtocol {
-        let storage = try getStorageService()
-        return TemplateRepository(storageService: storage)
+    private func getCVRepository() throws -> CVRepositoryProtocol {
+        let storageService = try getStorageService()
+        return CVRepository(storageService: storageService)
     }
     
     private func getOnboardingRepository() throws -> OnboardingRepositoryProtocol {
-        let cvRepo = try getCVRepository()
-        return OnboardingRepository(cvRepository: cvRepo)
+        let cvRepository = try getCVRepository()
+        return OnboardingRepository(cvRepository: cvRepository)
     }
     
-    // MARK: - Public Initializer
+    private func getSampleRepository() throws -> SampleCVRepositoryProtocol {
+        let storageService = try getStorageService()
+        return SampleCVRepository(storageService: storageService)
+    }
+    
+    // MARK: - Public Methods
+    
     public init() {}
     
-    // MARK: - Use Case Factory Methods
     public func makeOnboardingUseCase() throws -> OnboardingUseCaseProtocol {
+        let onboardingRepo = try getOnboardingRepository()
+        let sampleRepo = try getSampleRepository()
+        let cvManagementUseCase = try makeCVManagementUseCase()
         return OnboardingUseCase(
-            onboardingRepository: try getOnboardingRepository(),
-            templateRepository: try getTemplateRepository(),
-            cvManagementUseCase: try makeCVManagementUseCase()
+            onboardingRepository: onboardingRepo,
+            sampleRepository: sampleRepo,
+            cvManagementUseCase: cvManagementUseCase
         )
     }
     
     public func makeCVManagementUseCase() throws -> CVManagementUseCaseProtocol {
+        let cvRepo = try getCVRepository()
+        let sampleRepo = try getSampleRepository()
         return CVManagementUseCase(
-            cvRepository: try getCVRepository(),
-            templateRepository: try getTemplateRepository()
+            cvRepository: cvRepo,
+            sampleRepository: sampleRepo
         )
     }
     
-    public func makeTemplateRepository() throws -> TemplateRepositoryProtocol {
-        return try getTemplateRepository()
+    public func makeSampleCVRepository() throws -> SampleCVRepositoryProtocol {
+        let storageService = try getStorageService()
+        return SampleCVRepository(storageService: storageService)
     }
 }

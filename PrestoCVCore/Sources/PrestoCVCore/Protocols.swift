@@ -16,10 +16,10 @@ public protocol OnboardingRepositoryProtocol: Sendable {
     func getOnboardingState() async -> OnboardingState
 }
 
-public protocol TemplateRepositoryProtocol: Sendable {
-    func getDefaultTemplate() async throws -> CVModel
-    func getAllTemplates() async throws -> [CVModel]
-    func getTemplate(by name: String) async throws -> CVModel?
+public protocol SampleCVRepositoryProtocol: Sendable {
+    func getDefaultSample() async throws -> CVModel
+    func getAllSamples() async throws -> [CVModel]
+    func getSample(by name: String) async throws -> CVModel?
 }
 
 // MARK: - Use Case Protocols
@@ -67,5 +67,5 @@ public protocol CacheServiceProtocol {
 public protocol DependencyContainerProtocol {
     func makeOnboardingUseCase() throws -> OnboardingUseCaseProtocol
     func makeCVManagementUseCase() throws -> CVManagementUseCaseProtocol
-    func makeTemplateRepository() throws -> TemplateRepositoryProtocol
+    func makeSampleCVRepository() throws -> SampleCVRepositoryProtocol
 }

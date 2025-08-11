@@ -2,16 +2,16 @@ import Foundation
 
 public final class OnboardingUseCase: OnboardingUseCaseProtocol, Sendable {
     private let onboardingRepository: OnboardingRepositoryProtocol
-    private let templateRepository: TemplateRepositoryProtocol
+    private let sampleRepository: SampleCVRepositoryProtocol
     private let cvManagementUseCase: CVManagementUseCaseProtocol
     
     public init(
         onboardingRepository: OnboardingRepositoryProtocol,
-        templateRepository: TemplateRepositoryProtocol,
+        sampleRepository: SampleCVRepositoryProtocol,
         cvManagementUseCase: CVManagementUseCaseProtocol
     ) {
         self.onboardingRepository = onboardingRepository
-        self.templateRepository = templateRepository
+        self.sampleRepository = sampleRepository
         self.cvManagementUseCase = cvManagementUseCase
     }
     

@@ -7,7 +7,7 @@ final class TemplateSelectionViewModel: ObservableObject {
     @Published var viewState: ViewState<[CVModel]> = .idle
     
     // MARK: - Private Properties
-    private let templateRepository: TemplateRepositoryProtocol
+    private let sampleRepository: SampleCVRepositoryProtocol
     
     // MARK: - Computed Properties
     var templates: [CVModel] {
@@ -23,8 +23,8 @@ final class TemplateSelectionViewModel: ObservableObject {
     }
     
     // MARK: - Initialization
-    init(templateRepository: TemplateRepositoryProtocol) {
-        self.templateRepository = templateRepository
+    init(sampleRepository: SampleCVRepositoryProtocol) {
+        self.sampleRepository = sampleRepository
     }
     
     // MARK: - Public Methods
@@ -33,7 +33,7 @@ final class TemplateSelectionViewModel: ObservableObject {
         viewState = .loading
         
         do {
-            let loadedTemplates = try await templateRepository.getAllTemplates()
+            let loadedTemplates = try await sampleRepository.getAllSamples()
             viewState = .loaded(loadedTemplates)
         } catch {
             viewState = .error(error.localizedDescription)
@@ -44,7 +44,7 @@ final class TemplateSelectionViewModel: ObservableObject {
     func selectTemplate(_ template: CVModel) async -> CVModel? {
         do {
             // Create a new CV from the selected template
-            let newCV = try await templateRepository.getDefaultTemplate()
+            let newCV = try await sampleRepository.getDefaultSample()
             return newCV
         } catch {
             // Don't set viewState to error here as this is not a UI error

@@ -11,15 +11,15 @@ final class OnboardingViewModel: ObservableObject {
     
     // MARK: - Private Properties
     private let onboardingUseCase: OnboardingUseCaseProtocol
-    private let templateRepository: TemplateRepositoryProtocol
+    private let sampleRepository: SampleCVRepositoryProtocol
     
     // MARK: - Initialization
     init(
         onboardingUseCase: OnboardingUseCaseProtocol,
-        templateRepository: TemplateRepositoryProtocol
+        sampleRepository: SampleCVRepositoryProtocol
     ) {
         self.onboardingUseCase = onboardingUseCase
-        self.templateRepository = templateRepository
+        self.sampleRepository = sampleRepository
     }
     
     // MARK: - Public Methods
@@ -38,7 +38,7 @@ final class OnboardingViewModel: ObservableObject {
         errorMessage = ""
         
         do {
-            let template = try await templateRepository.getDefaultTemplate()
+            let template = try await sampleRepository.getDefaultSample()
             let _ = try await onboardingUseCase.createFirstCV(from: template)
             
             // Update state to reflect successful CV creation

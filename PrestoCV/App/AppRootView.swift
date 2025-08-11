@@ -15,13 +15,13 @@ struct AppRootView: View {
         // Create dependencies using factory methods with error handling
         do {
             let onboardingUseCase = try dependencyContainer.makeOnboardingUseCase()
-            let templateRepository = try dependencyContainer.makeTemplateRepository()
+            let sampleRepository = try dependencyContainer.makeSampleCVRepository()
             let cvManagementUseCase = try dependencyContainer.makeCVManagementUseCase()
             
             self._onboardingViewModel = StateObject(
                 wrappedValue: OnboardingViewModel(
                     onboardingUseCase: onboardingUseCase,
-                    templateRepository: templateRepository
+                    sampleRepository: sampleRepository
                 )
             )
             

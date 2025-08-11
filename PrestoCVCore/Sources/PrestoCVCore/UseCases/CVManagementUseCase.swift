@@ -2,14 +2,14 @@ import Foundation
 
 public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
     private let cvRepository: CVRepositoryProtocol
-    private let templateRepository: TemplateRepositoryProtocol
+    private let sampleRepository: SampleCVRepositoryProtocol
     
     public init(
         cvRepository: CVRepositoryProtocol,
-        templateRepository: TemplateRepositoryProtocol
+        sampleRepository: SampleCVRepositoryProtocol
     ) {
         self.cvRepository = cvRepository
-        self.templateRepository = templateRepository
+        self.sampleRepository = sampleRepository
     }
     
     public func getAllCVs() async throws -> [CVModel] {

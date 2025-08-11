@@ -9,9 +9,17 @@ final class ViewModelFactory {
     }
     
     @MainActor
+    func makeOnboardingViewModel() throws -> OnboardingViewModel {
+        return OnboardingViewModel(
+            onboardingUseCase: try dependencyContainer.makeOnboardingUseCase(),
+            sampleRepository: try dependencyContainer.makeSampleCVRepository()
+        )
+    }
+    
+    @MainActor
     func makeTemplateSelectionViewModel() throws -> TemplateSelectionViewModel {
         return TemplateSelectionViewModel(
-            templateRepository: try dependencyContainer.makeTemplateRepository()
+            sampleRepository: try dependencyContainer.makeSampleCVRepository()
         )
     }
     

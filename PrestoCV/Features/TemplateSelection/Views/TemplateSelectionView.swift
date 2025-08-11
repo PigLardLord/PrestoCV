@@ -135,8 +135,8 @@ struct TemplateSelectionView_Previews: PreviewProvider {
     private static func createMockViewModel() -> TemplateSelectionViewModel {
         let container = DependencyContainer()
         do {
-            let templateRepository = try container.makeTemplateRepository()
-            return TemplateSelectionViewModel(templateRepository: templateRepository)
+            let sampleRepository = try container.makeSampleCVRepository()
+            return TemplateSelectionViewModel(sampleRepository: sampleRepository)
         } catch {
             fatalError("Failed to create mock view model: \(error)")
         }

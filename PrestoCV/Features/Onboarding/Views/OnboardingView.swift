@@ -89,20 +89,17 @@ extension OnboardingView {
 
 struct OnboardingView_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationStack {
-            OnboardingView(viewModel: createMockViewModel())
-        }
-        .environmentObject(AppRouter())
+        OnboardingView(viewModel: createMockViewModel())
     }
     
     private static func createMockViewModel() -> OnboardingViewModel {
         let container = DependencyContainer()
         do {
             let onboardingUseCase = try container.makeOnboardingUseCase()
-            let templateRepository = try container.makeTemplateRepository()
+            let sampleRepository = try container.makeSampleCVRepository()
             return OnboardingViewModel(
                 onboardingUseCase: onboardingUseCase,
-                templateRepository: templateRepository
+                sampleRepository: sampleRepository
             )
         } catch {
             fatalError("Failed to create mock view model: \(error)")

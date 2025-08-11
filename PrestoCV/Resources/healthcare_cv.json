@@ -1,0 +1,102 @@
+{
+  "name": "Dr. Michael Thompson",
+  "title": "Senior Emergency Medicine Physician",
+  "location": "Boston, MA",
+  "email": "m.thompson@hospital.edu",
+  "phone": "+1 (555) 357-9123",
+  "portfolio": "",
+  "profile": "Board-certified emergency medicine physician with 10+ years of experience providing critical care in high-volume trauma centers. Expert in emergency procedures, crisis management, and medical education. Committed to patient safety, quality improvement, and training the next generation of emergency physicians.",
+  "relevant_experience": [
+    {
+      "title": "Attending Physician",
+      "company": "Boston Medical Center",
+      "location": "Boston, MA",
+      "period": "July 2018 – Present",
+      "description": "Provide leadership in Level 1 trauma center serving 90K+ patients annually. • Serve as residency program director mentoring 20+ residents yearly • Implemented sepsis protocol reducing mortality by 25% • Lead quality improvement initiatives and hospital safety committees"
+    },
+    {
+      "title": "Emergency Medicine Resident",
+      "company": "Johns Hopkins Hospital",
+      "location": "Baltimore, MD",
+      "period": "July 2015 – June 2018",
+      "description": "Completed comprehensive training in emergency medicine and critical care. • Rotated through cardiology, trauma, pediatrics, and toxicology • First responder for mass casualty incidents and disaster drills • Published research on emergency department efficiency metrics"
+    },
+    {
+      "title": "Medical Student",
+      "company": "Harvard Medical School",
+      "location": "Boston, MA",
+      "period": "August 2011 – May 2015",
+      "description": "Graduated with honors and Alpha Omega Alpha recognition. • Completed clinical rotations in surgery, internal medicine, and psychiatry • Research assistant in emergency medicine department • Volunteer at community health centers serving underserved populations"
+    }
+  ],
+  "education": [
+    {
+      "degree": "M.D.",
+      "school": "Harvard Medical School",
+      "period": "2015",
+      "description": "Graduated magna cum laude. Alpha Omega Alpha Honor Society. Research thesis on emergency cardiac care protocols."
+    },
+    {
+      "degree": "B.S. in Biology",
+      "school": "Stanford University",
+      "period": "2011",
+      "description": "Focus on molecular biology and pre-medical studies. Graduated with distinction. NCAA Division I swim team captain."
+    }
+  ],
+  "skills": [
+    { "name": "Emergency Medicine", "level": 5 },
+    { "name": "Trauma Care", "level": 5 },
+    { "name": "Advanced Cardiac Life Support", "level": 5 },
+    { "name": "Pediatric Advanced Life Support", "level": 5 },
+    { "name": "Medical Education", "level": 4 },
+    { "name": "Crisis Management", "level": 5 },
+    { "name": "Electronic Health Records", "level": 4 },
+    { "name": "Quality Improvement", "level": 4 },
+    { "name": "Research", "level": 4 },
+    { "name": "Leadership", "level": 4 }
+  ],
+  "languages": [
+    { "name": "English", "level": "Native" },
+    { "name": "Spanish", "level": "Fluent" }
+  ],
+  "certifications": [
+    {
+      "name": "American Board of Emergency Medicine - Certification",
+      "issuer": "American Board of Emergency Medicine",
+      "year": 2018,
+      "url": "https://www.abem.org/",
+      "description": "Board certification in Emergency Medicine demonstrating expertise and commitment to continuing education."
+    },
+    {
+      "name": "Advanced Trauma Life Support (ATLS)",
+      "issuer": "American College of Surgeons",
+      "year": 2017,
+      "url": "https://www.amtrauma.org/",
+      "description": "Advanced certification in trauma care and emergency treatment protocols."
+    },
+    {
+      "name": "Basic Life Support (BLS) Instructor",
+      "issuer": "American Heart Association",
+      "year": 2019,
+      "url": "https://www.heart.org/",
+      "description": "Certified instructor for Basic Life Support courses for healthcare professionals."
+    }
+  ],
+  "interests": [
+    "Medical Education",
+    "Global Health",
+    "Marathon Running",
+    "Cooking",
+    "Volunteer Medical Missions"
+  ],
+  "social": [
+    {
+      "platform": "LinkedIn",
+      "url": "https://linkedin.com/in/dr-michael-thompson"
+    },
+    {
+      "platform": "Professional Society",
+      "url": "https://www.acep.org/michael-thompson"
+    }
+  ]
+}
