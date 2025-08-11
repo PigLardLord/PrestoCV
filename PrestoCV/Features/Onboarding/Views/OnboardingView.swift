@@ -6,35 +6,46 @@ struct OnboardingView: View {
     @EnvironmentObject var router: AppRouter
     
     var body: some View {
-        VStack(spacing: DesignTokens.Spacing.xxl) {
-            Spacer()
-            
-            // Welcome Section
-            welcomeSection
-            
-            // Action Section
-            actionSection
-            
-            Spacer()
+        ScrollView {
+            VStack(spacing: DesignTokens.Spacing.xxl) {
+                headerSection
+                contentSection
+                actionSection
+            }
+            .padding(DesignTokens.Spacing.xl)
         }
-        .padding(.horizontal, DesignTokens.Spacing.xl)
-        .background(DesignTokens.Colors.background)
-        .navigationTitle("Welcome")
-        .navigationBarTitleDisplayMode(.large)
+        .alert("Error", isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
+            Button("OK") {
+                viewModel.errorMessage = ""
+            }
+        } message: {
+            Text(viewModel.errorMessage)
+        }
     }
     
-    private var welcomeSection: some View {
-        VStack(spacing: DesignTokens.Spacing.lg) {
+    // MARK: - View Sections
+    
+    private var headerSection: some View {
+        VStack(spacing: DesignTokens.Spacing.md) {
             Image(systemName: "doc.text.fill")
                 .font(DesignTokens.IconSize.hero.font)
                 .foregroundColor(DesignTokens.Colors.accent)
             
             Text("Welcome to PrestoCV")
-                .typography(.largeTitle)
+                .typography(.title1)
+                .foregroundColor(DesignTokens.Colors.primary)
+                .multilineTextAlignment(.center)
+        }
+    }
+    
+    private var contentSection: some View {
+        VStack(spacing: DesignTokens.Spacing.lg) {
+            Text("Create professional CVs in minutes")
+                .typography(.title2)
                 .foregroundColor(DesignTokens.Colors.primary)
                 .multilineTextAlignment(.center)
             
-            Text("Create professional CVs easily and manage all your career documents in one place.")
+            Text("Build, customize, and export beautiful CVs tailored to your career goals. Start by creating your first CV or browse our templates.")
                 .typography(.body)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)
@@ -57,9 +68,9 @@ struct OnboardingView: View {
                 }
             )
             
-            // Skip for now - placeholder for future feature
-            SecondaryButton.text(title: "Skip for now") {
-                router.replace(with: .cvList)
+            // Browse templates first
+            SecondaryButton.text(title: "Browse templates first") {
+                router.navigate(to: .templateSelection)
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.md)
@@ -85,8 +96,6 @@ struct OnboardingView_Previews: PreviewProvider {
     }
     
     private static func createMockViewModel() -> OnboardingViewModel {
-        // This is a simplified mock for preview purposes
-        // In a real implementation, we'd want proper mock dependencies
         let container = DependencyContainer()
         do {
             let onboardingUseCase = try container.makeOnboardingUseCase()

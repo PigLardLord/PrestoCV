@@ -1,26 +1,39 @@
 import SwiftUI
 
 // MARK: - Secondary Button Component
-/// A reusable secondary button component with multiple styles
-/// for less prominent actions throughout the app
+/// A secondary button style with multiple configurations following design system standards
 struct SecondaryButton: View {
     let title: String
-    let icon: String?
     let style: Style
-    let isDisabled: Bool
+    let icon: String?
     let action: () -> Void
     
-    init(
-        title: String,
-        icon: String? = nil,
-        style: Style = .outline,
-        isDisabled: Bool = false,
-        action: @escaping () -> Void
-    ) {
+    enum Style {
+        case text
+        case compact
+        case outlined
+        
+        var textStyle: DesignTokens.Typography {
+            switch self {
+            case .text: return .callout
+            case .compact: return .footnote
+            case .outlined: return .callout
+            }
+        }
+        
+        var padding: EdgeInsets {
+            switch self {
+            case .text: return EdgeInsets(top: DesignTokens.Spacing.xs, leading: 0, bottom: DesignTokens.Spacing.xs, trailing: 0)
+            case .compact: return EdgeInsets(top: DesignTokens.Spacing.xxs, leading: DesignTokens.Spacing.xs, bottom: DesignTokens.Spacing.xxs, trailing: DesignTokens.Spacing.xs)
+            case .outlined: return EdgeInsets(top: DesignTokens.Spacing.sm, leading: DesignTokens.Spacing.lg, bottom: DesignTokens.Spacing.sm, trailing: DesignTokens.Spacing.lg)
+            }
+        }
+    }
+    
+    init(title: String, style: Style = .outlined, icon: String? = nil, action: @escaping () -> Void) {
         self.title = title
-        self.icon = icon
         self.style = style
-        self.isDisabled = isDisabled
+        self.icon = icon
         self.action = action
     }
     
@@ -29,196 +42,96 @@ struct SecondaryButton: View {
             HStack(spacing: DesignTokens.Spacing.xs) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(DesignTokens.IconSize.medium.font)
+                        .font(style.textStyle.font)
                 }
-                
                 Text(title)
                     .typography(style.textStyle)
             }
-            .foregroundColor(foregroundColor)
-            .frame(maxWidth: style.fillsWidth ? .infinity : nil)
-            .frame(minHeight: style.height)
-            .padding(.horizontal, style.horizontalPadding)
-            .background(backgroundColor)
-            .cornerRadius(style.cornerRadius)
-            .overlay(
-                RoundedRectangle(cornerRadius: style.cornerRadius)
-                    .stroke(borderColor, lineWidth: style.borderWidth)
-            )
+            .padding(style.padding)
         }
-        .disabled(isDisabled)
+        .buttonStyle(SecondaryButtonStyle(style: style))
         .accessibilityLabel(title)
-        .accessibilityAddTraits(accessibilityTraits)
-        .opacity(isDisabled ? 0.6 : 1.0)
-        .animation(.easeInOut(duration: 0.2), value: isDisabled)
+        .accessibilityAddTraits(.isButton)
     }
+}
+
+// MARK: - Button Style Implementation
+
+private struct SecondaryButtonStyle: ButtonStyle {
+    let style: SecondaryButton.Style
     
-    // MARK: - Style Options
-    enum Style {
-        case outline    // Border with transparent background
-        case filled     // Filled background with accent color
-        case text       // Text-only button (no border/background)
-        case compact    // Smaller padding for inline use
-        
-        var textStyle: DesignTokens.Typography {
-            switch self {
-            case .text: return .callout
-            case .compact: return .footnote
-            default: return .buttonText
-            }
-        }
-        
-        var height: CGFloat {
-            switch self {
-            case .compact: return 32
-            case .text: return 44
-            default: return 48
-            }
-        }
-        
-        var horizontalPadding: CGFloat {
-            switch self {
-            case .text: return DesignTokens.Spacing.sm
-            case .compact: return DesignTokens.Spacing.md
-            default: return DesignTokens.Spacing.lg
-            }
-        }
-        
-        var cornerRadius: CGFloat {
-            switch self {
-            case .text: return 0
-            case .compact: return DesignTokens.CornerRadius.sm
-            default: return DesignTokens.CornerRadius.md
-            }
-        }
-        
-        var borderWidth: CGFloat {
-            switch self {
-            case .outline: return 1
-            default: return 0
-            }
-        }
-        
-        var fillsWidth: Bool {
-            switch self {
-            case .text, .compact: return false
-            default: return true
-            }
-        }
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundColor(foregroundColor)
+            .background(backgroundColor)
+            .cornerRadius(cornerRadius)
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
     }
-    
-    // MARK: - Computed Properties
     
     private var foregroundColor: Color {
         switch style {
-        case .filled:
-            return DesignTokens.Colors.primaryButtonText
-        case .outline, .text, .compact:
+        case .text, .compact:
             return DesignTokens.Colors.secondaryButtonText
+        case .outlined:
+            return DesignTokens.Colors.accent
         }
     }
     
     private var backgroundColor: Color {
         switch style {
-        case .filled:
-            return DesignTokens.Colors.accent
-        case .outline, .text, .compact:
+        case .text, .compact:
+            return .clear
+        case .outlined:
             return .clear
         }
     }
     
-    private var borderColor: Color {
+    private var cornerRadius: CGFloat {
         switch style {
-        case .outline:
-            return DesignTokens.Colors.secondaryButtonText
-        default:
-            return .clear
+        case .text, .compact:
+            return 0
+        case .outlined:
+            return DesignTokens.CornerRadius.md
         }
-    }
-    
-    private var accessibilityTraits: AccessibilityTraits {
-        let traits: AccessibilityTraits = [.isButton]
-        // Note: In iOS 16+, disabled buttons are handled automatically
-        // Older versions may need explicit trait management
-        return traits
     }
 }
 
 // MARK: - Convenience Initializers
+
 extension SecondaryButton {
-    
-    /// Creates a text-only secondary button
-    static func text(title: String, action: @escaping () -> Void) -> SecondaryButton {
-        SecondaryButton(title: title, style: .text, action: action)
+    static func text(title: String, icon: String? = nil, action: @escaping () -> Void) -> SecondaryButton {
+        SecondaryButton(title: title, style: .text, icon: icon, action: action)
     }
     
-    /// Creates a compact secondary button for inline use
     static func compact(title: String, icon: String? = nil, action: @escaping () -> Void) -> SecondaryButton {
-        SecondaryButton(title: title, icon: icon, style: .compact, action: action)
+        SecondaryButton(title: title, style: .compact, icon: icon, action: action)
     }
     
-    /// Creates a filled secondary button
-    static func filled(title: String, icon: String? = nil, action: @escaping () -> Void) -> SecondaryButton {
-        SecondaryButton(title: title, icon: icon, style: .filled, action: action)
+    static func outlined(title: String, icon: String? = nil, action: @escaping () -> Void) -> SecondaryButton {
+        SecondaryButton(title: title, style: .outlined, icon: icon, action: action)
     }
 }
 
 // MARK: - Previews
+
 struct SecondaryButton_Previews: PreviewProvider {
     static var previews: some View {
-        VStack(spacing: DesignTokens.Spacing.lg) {
-            // Outline style (default)
-            SecondaryButton(title: "Cancel", action: {})
+        Group {
+            // Text Style
+            SecondaryButton.text(title: "Skip for now") {}
+                .previewDisplayName("Text Style")
             
-            // With icon
-            SecondaryButton(
-                title: "Skip for now",
-                icon: "arrow.right",
-                action: {}
-            )
+            // Compact Style
+            SecondaryButton.compact(title: "Edit", icon: "pencil") {}
+                .previewDisplayName("Compact Style")
             
-            // Filled style
-            SecondaryButton.filled(
-                title: "Save Draft",
-                icon: "square.and.arrow.down",
-                action: {}
-            )
-            
-            // Text style
-            SecondaryButton.text(title: "Learn More", action: {})
-            
-            // Compact style
-            HStack {
-                SecondaryButton.compact(title: "Edit", action: {})
-                SecondaryButton.compact(
-                    title: "Delete",
-                    icon: "trash",
-                    action: {}
-                )
-            }
-            
-            // Disabled state
-            SecondaryButton(
-                title: "Disabled",
-                isDisabled: true,
-                action: {}
-            )
+            // Outlined Style
+            SecondaryButton.outlined(title: "Cancel", icon: "xmark") {}
+                .previewDisplayName("Outlined Style")
         }
-        .padding()
-        .background(DesignTokens.Colors.background)
         .previewLayout(.sizeThatFits)
+        .padding()
         .preferredColorScheme(.light)
-        
-        // Dark mode preview
-        VStack(spacing: DesignTokens.Spacing.lg) {
-            SecondaryButton(title: "Cancel", action: {})
-            SecondaryButton.filled(title: "Save Draft", action: {})
-            SecondaryButton.text(title: "Learn More", action: {})
-        }
-        .padding()
-        .background(DesignTokens.Colors.background)
-        .previewLayout(.sizeThatFits)
-        .preferredColorScheme(.dark)
-        .previewDisplayName("Dark Mode")
     }
 }

@@ -5,8 +5,13 @@ struct AppRootView: View {
     @StateObject private var router = AppRouter()
     @StateObject private var onboardingViewModel: OnboardingViewModel
     @StateObject private var cvListViewModel: CVListViewModel
+    private let dependencyContainer: DependencyContainer
+    private let viewModelFactory: ViewModelFactory
     
     init(dependencyContainer: DependencyContainer) {
+        self.dependencyContainer = dependencyContainer
+        self.viewModelFactory = ViewModelFactory(dependencyContainer: dependencyContainer)
+        
         // Create dependencies using factory methods with error handling
         do {
             let onboardingUseCase = try dependencyContainer.makeOnboardingUseCase()
@@ -34,18 +39,25 @@ struct AppRootView: View {
     
     var body: some View {
         NavigationStack(path: $router.navigationPath) {
-            Group {
-                switch onboardingViewModel.onboardingState {
-                case .loading:
-                    LoadingView.fullscreen(message: "Checking your account...")
-                case .firstTime:
-                    OnboardingView(viewModel: onboardingViewModel)
-                case .returning:
-                    CVListView(viewModel: cvListViewModel)
-                case .error:
-                    ErrorView.generic(
-                        message: onboardingViewModel.errorMessage
-                    )
+            VStack {
+                Group {
+                    switch onboardingViewModel.onboardingState {
+                    case .loading:
+                        LoadingView.fullscreen(message: "Checking your account...")
+                    case .firstTime:
+                        OnboardingView(viewModel: onboardingViewModel)
+                    case .returning:
+                        CVListView(viewModel: cvListViewModel)
+                    case .error:
+                        ErrorView.generic(
+                            message: onboardingViewModel.errorMessage,
+                            onRetry: {
+                                Task {
+                                    await onboardingViewModel.checkOnboardingStatus()
+                                }
+                            }
+                        )
+                    }
                 }
             }
             .navigationDestination(for: Route.self) { route in
@@ -66,29 +78,37 @@ struct AppRootView: View {
         case .cvList:
             CVListView(viewModel: cvListViewModel)
         case .cvEditor(let cvId):
-            CVEditorView(cvId: cvId)
+            templateSelectionView(route: .cvEditor(cvId: cvId))
         case .templateSelection:
-            TemplateSelectionView()
+            templateSelectionView(route: .templateSelection)
         }
     }
-}
-
-// MARK: - Placeholder Views
-// LoadingView and ErrorView are now imported from DesignSystem
-
-// OnboardingView is now in its own file
-
-
-private struct CVEditorView: View {
-    let cvId: String?
     
-    var body: some View {
-        Text("CV Editor - Placeholder")
-    }
-}
-
-private struct TemplateSelectionView: View {
-    var body: some View {
-        Text("Template Selection - Placeholder")
+    @ViewBuilder
+    @MainActor
+    private func templateSelectionView(route: Route) -> some View {
+        // Try to create the view model, fallback to error view if it fails
+        switch route {
+        case .templateSelection:
+            if let viewModel = try? viewModelFactory.makeTemplateSelectionViewModel() {
+                TemplateSelectionView(viewModel: viewModel)
+            } else {
+                ErrorView.generic(
+                    message: "Failed to load template selection. Please try again.",
+                    onRetry: {}
+                )
+            }
+        case .cvEditor(let cvId):
+            if let viewModel = try? viewModelFactory.makeCVEditorViewModel(cvId: cvId) {
+                CVEditorView(viewModel: viewModel)
+            } else {
+                ErrorView.generic(
+                    message: "Failed to load CV editor. Please try again.",
+                    onRetry: {}
+                )
+            }
+        default:
+            Text("Unknown route")
+        }
     }
 }
