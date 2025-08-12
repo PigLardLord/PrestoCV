@@ -10,8 +10,8 @@ public final class TestDependencyContainer: DependencyContainerProtocol, @unchec
         return CVRepository(storageService: mockStorageService)
     }()
     
-    private lazy var templateRepository: TemplateRepositoryProtocol = {
-        return TemplateRepository(storageService: mockStorageService)
+    private lazy var sampleRepository: SampleCVRepositoryProtocol = {
+        return SampleCVRepository(storageService: mockStorageService)
     }()
     
     private lazy var onboardingRepository: OnboardingRepositoryProtocol = {
@@ -21,12 +21,12 @@ public final class TestDependencyContainer: DependencyContainerProtocol, @unchec
     public func makeOnboardingUseCase() throws -> OnboardingUseCaseProtocol {
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         return OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
     }
@@ -34,8 +34,16 @@ public final class TestDependencyContainer: DependencyContainerProtocol, @unchec
     public func makeCVManagementUseCase() throws -> CVManagementUseCaseProtocol {
         return CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
+    }
+    
+    public func makeSampleCVRepository() throws -> SampleCVRepositoryProtocol {
+        return sampleRepository
+    }
+    
+    public func makeTemplateCategoryService() throws -> TemplateCategoryServiceProtocol {
+        return TemplateCategoryService()
     }
     
     // Test helper method to reset state
