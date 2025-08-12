@@ -28,6 +28,11 @@ final class CVEditorViewModel: ObservableObject {
     ) {
         self.cvId = cvId
         self.cvManagementUseCase = cvManagementUseCase
+        
+        // For new CVs, initialize with loaded state
+        if cvId == nil {
+            viewState = .loaded(cv)
+        }
     }
     
     // MARK: - Public Methods
@@ -35,7 +40,11 @@ final class CVEditorViewModel: ObservableObject {
     func loadCV() async {
         // If no CV ID, we're creating a new CV, so leave the default empty CV
         guard let cvId = cvId,
-              let uuid = UUID(uuidString: cvId) else { return }
+              let uuid = UUID(uuidString: cvId) else { 
+            // For new CVs, set state to loaded with empty CV
+            viewState = .loaded(cv)
+            return 
+        }
         
         viewState = .loading
         
@@ -43,7 +52,8 @@ final class CVEditorViewModel: ObservableObject {
             try await loadExistingCV(with: uuid)
             viewState = .loaded(cv)
         } catch {
-            viewState = .error(error.localizedDescription)
+            let appError = error as? AppError ?? AppError.unknown(error.localizedDescription)
+            viewState = .error(appError.localizedDescription)
         }
     }
     
@@ -52,17 +62,21 @@ final class CVEditorViewModel: ObservableObject {
         viewState = .loading
         
         do {
+            let savedCV: CVModel
             if isNewCV {
                 // Create new CV from current data
-                let _ = try await cvManagementUseCase.createCV(from: cv)
+                savedCV = try await cvManagementUseCase.createCV(from: cv)
             } else {
                 // Update existing CV
-                let _ = try await cvManagementUseCase.updateCV(cv)
+                savedCV = try await cvManagementUseCase.updateCV(cv)
             }
+            // Update the local CV with the saved one (might have updated ID or timestamps)
+            cv = savedCV
             viewState = .loaded(cv)
             return true
         } catch {
-            viewState = .error(error.localizedDescription)
+            let appError = error as? AppError ?? AppError.unknown(error.localizedDescription)
+            viewState = .error(appError.localizedDescription)
             return false
         }
     }
@@ -95,12 +109,8 @@ final class CVEditorViewModel: ObservableObject {
     // MARK: - Private Methods
     private func loadExistingCV(with uuid: UUID) async throws {
         guard let loadedCV = try await cvManagementUseCase.getCV(by: uuid) else {
-            throw CVLoadingError.cvNotFound
+            throw AppError.notFound("CV with id \(uuid)")
         }
         cv = loadedCV
-    }
-    
-    private enum CVLoadingError: Error {
-        case cvNotFound
     }
 }

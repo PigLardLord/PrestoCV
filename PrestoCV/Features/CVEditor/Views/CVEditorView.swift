@@ -40,6 +40,10 @@ struct CVEditorView: View {
                 .disabled(viewModel.cv.name.isEmpty)
             }
         }
+        .task {
+            // Load CV data when the view appears
+            await viewModel.loadCV()
+        }
         .alert("Error", isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
             Button("OK") {
                 viewModel.clearError()
