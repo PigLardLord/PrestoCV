@@ -21,6 +21,80 @@ final class CVEditorViewModel: ObservableObject {
         viewState.errorMessage ?? ""
     }
     
+    /// Determines if the CV has meaningful content beyond just the name
+    var hasMeaningfulContent: Bool {
+        // Check if any essential fields have content
+        !cv.personalInfo.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !cv.personalInfo.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !cv.personalInfo.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !cv.personalInfo.profile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !cv.skills.isEmpty ||
+        !cv.relevant_experience.isEmpty ||
+        !cv.education.isEmpty ||
+        !cv.languages.isEmpty ||
+        !cv.certifications.isEmpty ||
+        !cv.social.isEmpty ||
+        !cv.interests.isEmpty
+    }
+    
+    /// Calculates completion percentage based on filled sections
+    var completionPercentage: Double {
+        var filledSections = 0
+        let totalSections = 8 // Total number of main sections
+        
+        // CV Name (weight: 1)
+        if !cv.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            filledSections += 1
+        }
+        
+        // Personal Info (weight: 1) - any field counts
+        if !cv.personalInfo.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+           !cv.personalInfo.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+           !cv.personalInfo.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+           !cv.personalInfo.profile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            filledSections += 1
+        }
+        
+        // Skills (weight: 1)
+        if !cv.skills.isEmpty {
+            filledSections += 1
+        }
+        
+        // Experience (weight: 1)
+        if !cv.relevant_experience.isEmpty {
+            filledSections += 1
+        }
+        
+        // Education (weight: 1)
+        if !cv.education.isEmpty {
+            filledSections += 1
+        }
+        
+        // Languages (weight: 1)
+        if !cv.languages.isEmpty {
+            filledSections += 1
+        }
+        
+        // Certifications (weight: 1)
+        if !cv.certifications.isEmpty {
+            filledSections += 1
+        }
+        
+        // Social/Interests combined (weight: 1)
+        if !cv.social.isEmpty || !cv.interests.isEmpty {
+            filledSections += 1
+        }
+        
+        return Double(filledSections) / Double(totalSections)
+    }
+    
+    /// Indicates if there are unsaved changes (for future implementation)
+    var hasUnsavedChanges: Bool {
+        // For now, assume there are always unsaved changes if meaningful content exists
+        // This could be enhanced with a proper dirty tracking system
+        hasMeaningfulContent
+    }
+    
     // MARK: - Initialization
     init(
         cvId: String?,
@@ -59,6 +133,10 @@ final class CVEditorViewModel: ObservableObject {
     
     @MainActor
     func saveCV() async -> Bool {
+        // Don't save if no meaningful content
+        guard hasMeaningfulContent else {
+            return false
+        }
         viewState = .loading
         
         do {
