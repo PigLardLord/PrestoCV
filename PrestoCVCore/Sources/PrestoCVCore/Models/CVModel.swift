@@ -4,13 +4,8 @@ import Foundation
 
 public struct CVModel: Codable, Identifiable, Sendable {
     public var id: UUID
-    public var name: String
-    public var title: String
-    public var location: String
-    public var email: String
-    public var phone: String
-    public var portfolio: String
-    public var profile: String
+    public var name: String           // Job-specific CV name (e.g., "iOS Developer - Apple")
+    public var personalInfo: PersonalInfo
     public var relevant_experience: [Experience]
     public var education: [Education]
     public var skills: [Skill]
@@ -23,12 +18,7 @@ public struct CVModel: Codable, Identifiable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id
         case name
-        case title
-        case location
-        case email
-        case phone
-        case portfolio
-        case profile
+        case personalInfo
         case relevant_experience
         case education
         case skills
@@ -41,12 +31,7 @@ public struct CVModel: Codable, Identifiable, Sendable {
     public init(
         id: UUID = UUID(),
         name: String = "",
-        title: String = "",
-        location: String = "",
-        email: String = "",
-        phone: String = "",
-        portfolio: String = "",
-        profile: String = "",
+        personalInfo: PersonalInfo = PersonalInfo(),
         relevant_experience: [Experience] = [],
         education: [Education] = [],
         skills: [Skill] = [],
@@ -57,12 +42,7 @@ public struct CVModel: Codable, Identifiable, Sendable {
     ) {
         self.id = id
         self.name = name
-        self.title = title
-        self.location = location
-        self.email = email
-        self.phone = phone
-        self.portfolio = portfolio
-        self.profile = profile
+        self.personalInfo = personalInfo
         self.relevant_experience = relevant_experience
         self.education = education
         self.skills = skills
@@ -101,12 +81,7 @@ public struct CVModel: Codable, Identifiable, Sendable {
         // For id, generate a new UUID if not present in JSON
         self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         self.name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
-        self.title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
-        self.location = try container.decodeIfPresent(String.self, forKey: .location) ?? ""
-        self.email = try container.decodeIfPresent(String.self, forKey: .email) ?? ""
-        self.phone = try container.decodeIfPresent(String.self, forKey: .phone) ?? ""
-        self.portfolio = try container.decodeIfPresent(String.self, forKey: .portfolio) ?? ""
-        self.profile = try container.decodeIfPresent(String.self, forKey: .profile) ?? ""
+        self.personalInfo = try container.decodeIfPresent(PersonalInfo.self, forKey: .personalInfo) ?? PersonalInfo()
         self.relevant_experience = try container.decodeIfPresent([Experience].self, forKey: .relevant_experience) ?? []
         self.education = try container.decodeIfPresent([Education].self, forKey: .education) ?? []
         self.skills = try container.decodeIfPresent([Skill].self, forKey: .skills) ?? []

@@ -1,11 +1,14 @@
 {
-  "name": "Maya Chen",
-  "title": "Senior UX/UI Designer",
-  "location": "Brooklyn, NY",
-  "email": "maya.chen@example.com",
-  "phone": "+1 (555) 987-6543",
-  "portfolio": "https://mayachen.design",
-  "profile": "Creative designer with 7+ years of experience crafting intuitive digital experiences for startups and Fortune 500 companies. Specialized in user-centered design, design systems, and cross-platform experiences. Passionate about accessibility and creating beautiful, functional interfaces that solve real user problems.",
+  "name": "Senior UX/UI Designer Application - DesignForward Agency",
+  "personalInfo": {
+    "name": "Maya Chen",
+    "title": "Senior UX/UI Designer",
+    "location": "Brooklyn, NY",
+    "email": "maya.chen@example.com",
+    "phone": "+1 (555) 987-6543",
+    "portfolio": "https://mayachen.design",
+    "profile": "Creative designer with 7+ years of experience crafting intuitive digital experiences for startups and Fortune 500 companies. Specialized in user-centered design, design systems, and cross-platform experiences. Passionate about accessibility and creating beautiful, functional interfaces that solve real user problems."
+  },
   "relevant_experience": [
     {
       "title": "Senior UX/UI Designer",

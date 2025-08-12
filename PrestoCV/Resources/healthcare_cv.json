@@ -1,11 +1,14 @@
 {
-  "name": "Dr. Michael Thompson",
-  "title": "Senior Emergency Medicine Physician",
-  "location": "Boston, MA",
-  "email": "m.thompson@hospital.edu",
-  "phone": "+1 (555) 357-9123",
-  "portfolio": "",
-  "profile": "Board-certified emergency medicine physician with 10+ years of experience providing critical care in high-volume trauma centers. Expert in emergency procedures, crisis management, and medical education. Committed to patient safety, quality improvement, and training the next generation of emergency physicians.",
+  "name": "Senior Emergency Medicine Physician Application - Boston Medical Center",
+  "personalInfo": {
+    "name": "Dr. Michael Thompson",
+    "title": "Senior Emergency Medicine Physician",
+    "location": "Boston, MA",
+    "email": "m.thompson@hospital.edu",
+    "phone": "+1 (555) 357-9123",
+    "portfolio": "",
+    "profile": "Board-certified emergency medicine physician with 10+ years of experience providing critical care in high-volume trauma centers. Expert in emergency procedures, crisis management, and medical education. Committed to patient safety, quality improvement, and training the next generation of emergency physicians."
+  },
   "relevant_experience": [
     {
       "title": "Attending Physician",

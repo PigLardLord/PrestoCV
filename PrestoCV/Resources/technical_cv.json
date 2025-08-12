@@ -1,11 +1,14 @@
 {
-  "name": "Alex Morgan",
-  "title": "Senior Software Engineer",
-  "location": "San Francisco, CA",
-  "email": "alex.morgan@example.com",
-  "phone": "+1 (555) 123-4567",
-  "portfolio": "https://alex-morgan.dev",
-  "profile": "Senior Software Engineer with 8+ years of experience in building scalable distributed systems and cloud-native applications. Expertise in microservices architecture, DevOps practices, and leading engineering teams. Passionate about clean code, system design, and mentoring junior developers.",
+  "name": "Senior Software Engineer - TechFlow Inc. Application",
+  "personalInfo": {
+    "name": "Alex Morgan",
+    "title": "Senior Software Engineer",
+    "location": "San Francisco, CA",
+    "email": "alex.morgan@example.com",
+    "phone": "+1 (555) 123-4567",
+    "portfolio": "https://alex-morgan.dev",
+    "profile": "Senior Software Engineer with 8+ years of experience in building scalable distributed systems and cloud-native applications. Expertise in microservices architecture, DevOps practices, and leading engineering teams. Passionate about clean code, system design, and mentoring junior developers."
+  },
   "relevant_experience": [
     {
       "title": "Senior Software Engineer",

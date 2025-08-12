@@ -79,21 +79,22 @@ struct CVEditorView: View {
     
     private var editorView: some View {
         Form {
-            Section(header: Text("Basic Information")) {
+            Section("Basic Information") {
                 TextField("CV Name", text: $viewModel.cv.name)
-                TextField("Professional Title", text: $viewModel.cv.title)
-                TextField("Location", text: $viewModel.cv.location)
-                TextField("Email", text: $viewModel.cv.email)
+                TextField("Full Name", text: $viewModel.cv.personalInfo.name)
+                TextField("Professional Title", text: $viewModel.cv.personalInfo.title)
+                TextField("Location", text: $viewModel.cv.personalInfo.location)
+                TextField("Email", text: $viewModel.cv.personalInfo.email)
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
-                TextField("Phone", text: $viewModel.cv.phone)
+                TextField("Phone", text: $viewModel.cv.personalInfo.phone)
                     .textContentType(.telephoneNumber)
                     .keyboardType(.phonePad)
-                TextField("Portfolio URL", text: $viewModel.cv.portfolio)
+                TextField("Portfolio URL", text: $viewModel.cv.personalInfo.portfolio)
                     .textContentType(.URL)
                     .keyboardType(.URL)
                 
-                TextEditor(text: $viewModel.cv.profile)
+                TextEditor(text: $viewModel.cv.personalInfo.profile)
                     .frame(height: 100)
                     .overlay(
                         RoundedRectangle(cornerRadius: 4)
@@ -102,7 +103,7 @@ struct CVEditorView: View {
                     .padding(.vertical, 4)
             }
             
-            Section(header: Text("Skills")) {
+            Section("Skills") {
                 ForEach(viewModel.cv.skills.indices, id: \.self) { index in
                     TextField("Skill", text: $viewModel.cv.skills[index].name)
                 }
@@ -115,7 +116,7 @@ struct CVEditorView: View {
                 }
             }
             
-            Section(header: Text("Experience")) {
+            Section("Experience") {
                 ForEach(viewModel.cv.relevant_experience.indices, id: \.self) { index in
                     VStack(alignment: .leading, spacing: 8) {
                         TextField("Job Title", text: $viewModel.cv.relevant_experience[index].title)

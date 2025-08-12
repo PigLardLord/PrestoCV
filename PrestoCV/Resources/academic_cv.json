@@ -1,11 +1,14 @@
 {
-  "name": "Dr. Sarah Johnson",
-  "title": "Associate Professor of Computer Science",
-  "location": "Cambridge, MA",
-  "email": "s.johnson@university.edu",
-  "phone": "+1 (555) 246-8101",
-  "portfolio": "https://sarahjohnson.academic.edu",
-  "profile": "Tenured associate professor with 10+ years of experience in artificial intelligence research and education. Published extensively in top-tier conferences and journals with over 50 peer-reviewed publications. Principal investigator on $3M in research grants. Dedicated to mentoring graduate students and advancing the field through innovative research.",
+  "name": "Associate Professor Application - MIT CS Department",
+  "personalInfo": {
+    "name": "Dr. Sarah Johnson",
+    "title": "Associate Professor of Computer Science",
+    "location": "Cambridge, MA",
+    "email": "s.johnson@university.edu",
+    "phone": "+1 (555) 246-8101",
+    "portfolio": "https://sarahjohnson.academic.edu",
+    "profile": "Tenured associate professor with 10+ years of experience in artificial intelligence research and education. Published extensively in top-tier conferences and journals with over 50 peer-reviewed publications. Principal investigator on $3M in research grants. Dedicated to mentoring graduate students and advancing the field through innovative research."
+  },
   "relevant_experience": [
     {
       "title": "Associate Professor",

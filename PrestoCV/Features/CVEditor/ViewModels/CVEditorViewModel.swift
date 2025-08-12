@@ -107,6 +107,7 @@ final class CVEditorViewModel: ObservableObject {
     }
     
     // MARK: - Private Methods
+    @MainActor
     private func loadExistingCV(with uuid: UUID) async throws {
         guard let loadedCV = try await cvManagementUseCase.getCV(by: uuid) else {
             throw AppError.notFound("CV with id \(uuid)")

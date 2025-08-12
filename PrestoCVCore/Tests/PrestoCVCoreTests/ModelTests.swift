@@ -13,12 +13,13 @@ struct ModelTests {
         
         #expect(cv.id != UUID())  // Should have a unique ID
         #expect(cv.name == "")
-        #expect(cv.title == "")
-        #expect(cv.location == "")
-        #expect(cv.email == "")
-        #expect(cv.phone == "")
-        #expect(cv.portfolio == "")
-        #expect(cv.profile == "")
+        #expect(cv.personalInfo.name == "")
+        #expect(cv.personalInfo.title == "")
+        #expect(cv.personalInfo.location == "")
+        #expect(cv.personalInfo.email == "")
+        #expect(cv.personalInfo.phone == "")
+        #expect(cv.personalInfo.portfolio == "")
+        #expect(cv.personalInfo.profile == "")
         #expect(cv.relevant_experience.isEmpty)
         #expect(cv.education.isEmpty)
         #expect(cv.skills.isEmpty)
@@ -31,8 +32,7 @@ struct ModelTests {
     @Test("CVModel initializes with provided values")
     func cvModelInitializationWithValues() {
         let id = UUID()
-        let cv = CVModel(
-            id: id,
+        let personalInfo = PersonalInfo(
             name: "John Doe",
             title: "iOS Developer",
             location: "San Francisco",
@@ -41,15 +41,21 @@ struct ModelTests {
             portfolio: "https://johndoe.dev",
             profile: "Experienced developer"
         )
+        let cv = CVModel(
+            id: id,
+            name: "iOS Developer - Apple Position",
+            personalInfo: personalInfo
+        )
         
         #expect(cv.id == id)
-        #expect(cv.name == "John Doe")
-        #expect(cv.title == "iOS Developer")
-        #expect(cv.location == "San Francisco")
-        #expect(cv.email == "john@example.com")
-        #expect(cv.phone == "555-1234")
-        #expect(cv.portfolio == "https://johndoe.dev")
-        #expect(cv.profile == "Experienced developer")
+        #expect(cv.name == "iOS Developer - Apple Position")
+        #expect(cv.personalInfo.name == "John Doe")
+        #expect(cv.personalInfo.title == "iOS Developer")
+        #expect(cv.personalInfo.location == "San Francisco")
+        #expect(cv.personalInfo.email == "john@example.com")
+        #expect(cv.personalInfo.phone == "555-1234")
+        #expect(cv.personalInfo.portfolio == "https://johndoe.dev")
+        #expect(cv.personalInfo.profile == "Experienced developer")
     }
     
     @Test("CVModel conforms to Identifiable")
@@ -61,7 +67,19 @@ struct ModelTests {
     
     @Test("CVModel JSON serialization and deserialization")
     func cvModelJSONSerialization() throws {
-        let originalCV = CVTestDataBuilder.completeCV().build()
+        let personalInfo = PersonalInfo(
+            name: "Alex Johnson",
+            title: "Senior Software Engineer",
+            location: "Seattle, WA",
+            email: "alex@example.com",
+            phone: "+1-555-0123",
+            portfolio: "https://alexjohnson.dev",
+            profile: "Passionate about creating exceptional user experiences"
+        )
+        let originalCV = CVModel(
+            name: "Senior Developer Application",
+            personalInfo: personalInfo
+        )
         
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -73,8 +91,9 @@ struct ModelTests {
         
         #expect(decodedCV.id == originalCV.id)
         #expect(decodedCV.name == originalCV.name)
-        #expect(decodedCV.title == originalCV.title)
-        #expect(decodedCV.email == originalCV.email)
+        #expect(decodedCV.personalInfo.name == originalCV.personalInfo.name)
+        #expect(decodedCV.personalInfo.title == originalCV.personalInfo.title)
+        #expect(decodedCV.personalInfo.email == originalCV.personalInfo.email)
         #expect(decodedCV.skills.count == originalCV.skills.count)
         #expect(decodedCV.relevant_experience.count == originalCV.relevant_experience.count)
     }
@@ -168,7 +187,7 @@ struct ModelTests {
         
         #expect(skill.id != UUID())
         #expect(skill.name == "")
-        #expect(skill.level == 1)
+        #expect(skill.level == 0)
     }
     
     @Test("Skill level validation through initialization")
@@ -211,7 +230,7 @@ struct ModelTests {
         #expect(certification.id != UUID())
         #expect(certification.name == "")
         #expect(certification.issuer == "")
-        #expect(certification.year == nil)
+        #expect(certification.year == 0)
         #expect(certification.url == "")
         #expect(certification.description == "")
     }
@@ -219,10 +238,10 @@ struct ModelTests {
     @Test("Certification handles optional year field")
     func certificationOptionalYear() {
         let certWithYear = Certification(name: "iOS Cert", issuer: "Apple", year: 2023)
-        let certWithoutYear = Certification(name: "Swift Cert", issuer: "Apple")
+        let certWithoutYear = Certification(name: "Swift Cert", issuer: "Apple", year: 0)
         
         #expect(certWithYear.year == 2023)
-        #expect(certWithoutYear.year == nil)
+        #expect(certWithoutYear.year == 0)
     }
     
     @Test("Certification JSON serialization with nil year")
@@ -230,7 +249,7 @@ struct ModelTests {
         let original = Certification(
             name: "Swift Development",
             issuer: "Apple",
-            year: nil,
+            year: 0,
             url: "https://apple.com/cert",
             description: "Advanced Swift certification"
         )
@@ -239,7 +258,7 @@ struct ModelTests {
         let decoded = try JSONDecoder().decode(Certification.self, from: data)
         
         #expect(decoded.name == original.name)
-        #expect(decoded.year == nil)
+        #expect(decoded.year == 0)
     }
     
     // MARK: - Social Tests
@@ -272,9 +291,9 @@ struct ModelTests {
         #expect(OnboardingState.firstTime == OnboardingState.firstTime)
         #expect(OnboardingState.returning == OnboardingState.returning)
         
-        let error1 = AppError.templateNotFound
-        let error2 = AppError.templateNotFound
-        let error3 = AppError.invalidCVData
+        let error1 = AppError.unknown("error1")
+        let error2 = AppError.unknown("error1")
+        let error3 = AppError.unknown("error3")
         
         #expect(OnboardingState.error(error1) == OnboardingState.error(error2))
         #expect(OnboardingState.error(error1) != OnboardingState.error(error3))
@@ -285,36 +304,124 @@ struct ModelTests {
     
     @Test("AppError equality comparison")
     func appErrorEquality() {
-        #expect(AppError.templateNotFound == AppError.templateNotFound)
-        #expect(AppError.invalidCVData == AppError.invalidCVData)
-        #expect(AppError.templateNotFound != AppError.invalidCVData)
+        #expect(AppError.unknown("error1") == AppError.unknown("error1"))
+        #expect(AppError.invalidData("data1") == AppError.invalidData("data1"))
+        #expect(AppError.unknown("error1") != AppError.invalidData("data1"))
         
-        let error1 = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "Test error"])
-        let error2 = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "Test error"])
-        let error3 = NSError(domain: "other", code: 2, userInfo: [NSLocalizedDescriptionKey: "Other error"])
-        
-        #expect(AppError.fileSystemError(error1) == AppError.fileSystemError(error2))
-        #expect(AppError.fileSystemError(error1) != AppError.fileSystemError(error3))
-        
-        #expect(AppError.storageError("message1") == AppError.storageError("message1"))
-        #expect(AppError.storageError("message1") != AppError.storageError("message2"))
+        #expect(AppError.unknown("message1") == AppError.unknown("message1"))
+        #expect(AppError.unknown("message1") != AppError.unknown("message2"))
     }
     
     @Test("AppError provides meaningful descriptions")
     func appErrorDescriptions() {
-        let fsError = NSError(domain: "TestDomain", code: 123, userInfo: [NSLocalizedDescriptionKey: "File not found"])
+        #expect(AppError.unknown("Something went wrong").localizedDescription == "Something went wrong")
+        #expect(AppError.invalidData("Invalid input").localizedDescription == "Invalid data: Invalid input")
+        #expect(AppError.notFound("User").localizedDescription == "User not found")
+    }
+    
+    // MARK: - PersonalInfo Tests
+    
+    @Test("PersonalInfo initializes with default values")
+    func personalInfoInitialization() {
+        let personalInfo = PersonalInfo()
         
-        #expect(AppError.templateNotFound.errorDescription == "CV template not found")
-        #expect(AppError.invalidCVData.errorDescription == "Invalid CV data format")
-        #expect(AppError.storageError("Database connection failed").errorDescription == "Storage error: Database connection failed")
-        #expect(AppError.fileSystemError(fsError).errorDescription?.contains("File not found") == true)
+        #expect(personalInfo.name == "")
+        #expect(personalInfo.title == "")
+        #expect(personalInfo.location == "")
+        #expect(personalInfo.email == "")
+        #expect(personalInfo.phone == "")
+        #expect(personalInfo.portfolio == "")
+        #expect(personalInfo.profile == "")
+    }
+    
+    @Test("PersonalInfo initializes with provided values")
+    func personalInfoInitializationWithValues() {
+        let personalInfo = PersonalInfo(
+            name: "Jane Smith",
+            title: "Product Designer",
+            location: "Portland, OR",
+            email: "jane@example.com",
+            phone: "+1-555-0456",
+            portfolio: "https://janesmith.design",
+            profile: "Creative problem solver with 5+ years of experience"
+        )
+        
+        #expect(personalInfo.name == "Jane Smith")
+        #expect(personalInfo.title == "Product Designer")
+        #expect(personalInfo.location == "Portland, OR")
+        #expect(personalInfo.email == "jane@example.com")
+        #expect(personalInfo.phone == "+1-555-0456")
+        #expect(personalInfo.portfolio == "https://janesmith.design")
+        #expect(personalInfo.profile == "Creative problem solver with 5+ years of experience")
+    }
+    
+    @Test("PersonalInfo JSON serialization and deserialization")
+    func personalInfoJSONSerialization() throws {
+        let original = PersonalInfo(
+            name: "John Developer",
+            title: "Full Stack Engineer",
+            location: "Austin, TX",
+            email: "john@dev.com",
+            phone: "+1-555-0789",
+            portfolio: "https://john.dev",
+            profile: "Full-stack developer specializing in modern web technologies"
+        )
+        
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(PersonalInfo.self, from: data)
+        
+        #expect(decoded.name == original.name)
+        #expect(decoded.title == original.title)
+        #expect(decoded.email == original.email)
+        #expect(decoded.phone == original.phone)
+        #expect(decoded.profile == original.profile)
     }
     
     // MARK: - Complex Model Integration Tests
     
     @Test("Complete CVModel with all nested models serializes correctly")
     func completeModelSerialization() throws {
-        let completeCV = CVTestDataBuilder.completeCV().build()
+        let personalInfo = PersonalInfo(
+            name: "Alex Johnson",
+            title: "Senior Software Engineer",
+            location: "Seattle, WA",
+            email: "alex@example.com",
+            phone: "+1-555-0123",
+            portfolio: "https://alexjohnson.dev",
+            profile: "Passionate about creating exceptional user experiences with 8+ years of experience in software development"
+        )
+        
+        let experience = [
+            Experience(
+                title: "Senior Software Engineer",
+                company: "TechCorp",
+                location: "Seattle, WA",
+                period: "2020-Present",
+                description: "Lead development of microservices architecture serving 1M+ users"
+            )
+        ]
+        
+        let skills = [
+            Skill(name: "Swift", level: 5),
+            Skill(name: "React", level: 4)
+        ]
+        
+        let education = [
+            Education(
+                degree: "M.S. Computer Science",
+                school: "Stanford University",
+                period: "2015-2017",
+                description: "Specialized in Distributed Systems"
+            )
+        ]
+        
+        let completeCV = CVModel(
+            name: "Senior Developer - TechCorp Application",
+            personalInfo: personalInfo,
+            relevant_experience: experience,
+            education: education,
+            skills: skills
+        )
         
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
@@ -339,11 +446,16 @@ struct ModelTests {
         #expect(decoded.skills.first?.name == completeCV.skills.first?.name)
         #expect(decoded.relevant_experience.first?.company == completeCV.relevant_experience.first?.company)
         #expect(decoded.education.first?.degree == completeCV.education.first?.degree)
+        
+        // Verify PersonalInfo details
+        #expect(decoded.personalInfo.name == completeCV.personalInfo.name)
+        #expect(decoded.personalInfo.title == completeCV.personalInfo.title)
+        #expect(decoded.personalInfo.email == completeCV.personalInfo.email)
     }
     
     @Test("CVModel handles empty arrays correctly")
     func cvModelEmptyArrays() {
-        let cv = CVTestDataBuilder.minimalCV().build()
+        let cv = CVModel()
         
         #expect(cv.relevant_experience.isEmpty)
         #expect(cv.education.isEmpty)

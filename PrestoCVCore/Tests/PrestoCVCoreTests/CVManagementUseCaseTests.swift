@@ -11,11 +11,11 @@ struct CVManagementUseCaseTests {
     func useCaseInitialization() {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         #expect(type(of: useCase) == CVManagementUseCase.self)
@@ -27,11 +27,11 @@ struct CVManagementUseCaseTests {
     func getAllCVsReturnsEmptyWhenNoCVs() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let cvs = try await useCase.getAllCVs()
@@ -42,11 +42,11 @@ struct CVManagementUseCaseTests {
     func getAllCVsReturnsAllStoredCVs() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         // Create and save CVs directly through repository
@@ -67,11 +67,11 @@ struct CVManagementUseCaseTests {
     func getAllCVsDelegatesToCVRepository() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let cv = CVTestDataBuilder.completeCV().build()
@@ -90,11 +90,11 @@ struct CVManagementUseCaseTests {
     func createCVCreatesNewCVFromTemplate() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let template = CVTestDataBuilder.completeCV().build()
@@ -103,8 +103,9 @@ struct CVManagementUseCaseTests {
         // New CV should have different ID but same content
         #expect(createdCV.id != template.id)
         #expect(createdCV.name == template.name)
-        #expect(createdCV.title == template.title)
-        #expect(createdCV.email == template.email)
+        #expect(createdCV.personalInfo.name == template.personalInfo.name)
+        #expect(createdCV.personalInfo.title == template.personalInfo.title)
+        #expect(createdCV.personalInfo.email == template.personalInfo.email)
         #expect(createdCV.skills.count == template.skills.count)
     }
     
@@ -112,11 +113,11 @@ struct CVManagementUseCaseTests {
     func createCVSavesCVToRepository() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let template = CVTestDataBuilder.minimalCV().withName("Test CV").build()
@@ -133,11 +134,11 @@ struct CVManagementUseCaseTests {
     func createCVCopiesAllTemplateFields() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let template = CVTestDataBuilder.completeCV().build()
@@ -145,12 +146,13 @@ struct CVManagementUseCaseTests {
         
         // Verify all fields are copied
         #expect(createdCV.name == template.name)
-        #expect(createdCV.title == template.title)
-        #expect(createdCV.location == template.location)
-        #expect(createdCV.email == template.email)
-        #expect(createdCV.phone == template.phone)
-        #expect(createdCV.portfolio == template.portfolio)
-        #expect(createdCV.profile == template.profile)
+        #expect(createdCV.personalInfo.name == template.personalInfo.name)
+        #expect(createdCV.personalInfo.title == template.personalInfo.title)
+        #expect(createdCV.personalInfo.location == template.personalInfo.location)
+        #expect(createdCV.personalInfo.email == template.personalInfo.email)
+        #expect(createdCV.personalInfo.phone == template.personalInfo.phone)
+        #expect(createdCV.personalInfo.portfolio == template.personalInfo.portfolio)
+        #expect(createdCV.personalInfo.profile == template.personalInfo.profile)
         
         // Verify collections are copied
         #expect(createdCV.relevant_experience.count == template.relevant_experience.count)
@@ -168,11 +170,11 @@ struct CVManagementUseCaseTests {
     func updateCVSavesUpdatedCV() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         // Create initial CV
@@ -180,15 +182,20 @@ struct CVManagementUseCaseTests {
         _ = try await cvRepository.saveCV(originalCV)
         
         // Update CV
+        let updatedPersonalInfo = PersonalInfo(
+            name: originalCV.personalInfo.name,
+            title: "Senior Developer",
+            location: originalCV.personalInfo.location,
+            email: originalCV.personalInfo.email,
+            phone: originalCV.personalInfo.phone,
+            portfolio: originalCV.personalInfo.portfolio,
+            profile: originalCV.personalInfo.profile
+        )
+        
         let updatedCV = CVModel(
             id: originalCV.id,
             name: "Updated Name",
-            title: originalCV.title,
-            location: originalCV.location,
-            email: originalCV.email,
-            phone: originalCV.phone,
-            portfolio: originalCV.portfolio,
-            profile: originalCV.profile,
+            personalInfo: updatedPersonalInfo,
             relevant_experience: originalCV.relevant_experience,
             education: originalCV.education,
             skills: originalCV.skills,
@@ -202,47 +209,67 @@ struct CVManagementUseCaseTests {
         
         #expect(result.id == updatedCV.id)
         #expect(result.name == "Updated Name")
+        #expect(result.personalInfo.title == "Senior Developer")
         
         // Verify update was persisted
         let retrievedCV = try await cvRepository.getCV(by: originalCV.id)
         #expect(retrievedCV?.name == "Updated Name")
+        #expect(retrievedCV?.personalInfo.title == "Senior Developer")
     }
     
     @Test("UpdateCV returns the updated CV")
     func updateCVReturnsUpdatedCV() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let cv = CVTestDataBuilder.completeCV().build()
         _ = try await cvRepository.saveCV(cv)
         
-        let updatedCV = CVTestDataBuilder.completeCV()
-            .withName("New Name")
-            .withEmail("new@email.com")
-            .build(id: cv.id)
+        let updatedPersonalInfo = PersonalInfo(
+            name: cv.personalInfo.name,
+            title: cv.personalInfo.title,
+            location: cv.personalInfo.location,
+            email: "new@email.com",
+            phone: cv.personalInfo.phone,
+            portfolio: cv.personalInfo.portfolio,
+            profile: cv.personalInfo.profile
+        )
+        
+        let updatedCV = CVModel(
+            id: cv.id,
+            name: "New Name",
+            personalInfo: updatedPersonalInfo,
+            relevant_experience: cv.relevant_experience,
+            education: cv.education,
+            skills: cv.skills,
+            languages: cv.languages,
+            certifications: cv.certifications,
+            interests: cv.interests,
+            social: cv.social
+        )
         
         let result = try await useCase.updateCV(updatedCV)
         
         #expect(result.id == updatedCV.id)
         #expect(result.name == "New Name")
-        #expect(result.email == "new@email.com")
+        #expect(result.personalInfo.email == "new@email.com")
     }
     
     @Test("UpdateCV handles complex field updates")
     func updateCVHandlesComplexFieldUpdates() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let originalCV = CVTestDataBuilder.completeCV().build()
@@ -264,15 +291,20 @@ struct CVManagementUseCaseTests {
             )
         ]
         
+        let updatedPersonalInfo = PersonalInfo(
+            name: originalCV.personalInfo.name,
+            title: "Senior Software Engineer",
+            location: originalCV.personalInfo.location,
+            email: originalCV.personalInfo.email,
+            phone: originalCV.personalInfo.phone,
+            portfolio: originalCV.personalInfo.portfolio,
+            profile: "Updated profile"
+        )
+        
         let updatedCV = CVModel(
             id: originalCV.id,
             name: originalCV.name,
-            title: "Senior Software Engineer",
-            location: originalCV.location,
-            email: originalCV.email,
-            phone: originalCV.phone,
-            portfolio: originalCV.portfolio,
-            profile: "Updated profile",
+            personalInfo: updatedPersonalInfo,
             relevant_experience: newExperience,
             education: originalCV.education,
             skills: newSkills,
@@ -284,8 +316,8 @@ struct CVManagementUseCaseTests {
         
         let result = try await useCase.updateCV(updatedCV)
         
-        #expect(result.title == "Senior Software Engineer")
-        #expect(result.profile == "Updated profile")
+        #expect(result.personalInfo.title == "Senior Software Engineer")
+        #expect(result.personalInfo.profile == "Updated profile")
         #expect(result.skills.count == 2)
         #expect(result.skills.first?.name == "Python")
         #expect(result.relevant_experience.count == 1)
@@ -298,11 +330,11 @@ struct CVManagementUseCaseTests {
     func deleteCVRemovesCVFromRepository() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let cv = CVTestDataBuilder.minimalCV().build()
@@ -323,11 +355,11 @@ struct CVManagementUseCaseTests {
     func deleteCVHandlesNonExistentCV() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let nonExistentId = UUID()
@@ -340,11 +372,11 @@ struct CVManagementUseCaseTests {
     func deleteCVDelegatesToCVRepository() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let cv1 = CVTestDataBuilder.minimalCV().withName("CV 1").build()
@@ -371,11 +403,11 @@ struct CVManagementUseCaseTests {
     func duplicateCVCreatesExactCopy() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let originalCV = CVTestDataBuilder.completeCV().withName("Original CV").build()
@@ -386,8 +418,9 @@ struct CVManagementUseCaseTests {
         // Should have different ID but same content (with modified name)
         #expect(duplicatedCV.id != originalCV.id)
         #expect(duplicatedCV.name == "Original CV (Copy)")
-        #expect(duplicatedCV.title == originalCV.title)
-        #expect(duplicatedCV.email == originalCV.email)
+        #expect(duplicatedCV.personalInfo.name == originalCV.personalInfo.name)
+        #expect(duplicatedCV.personalInfo.title == originalCV.personalInfo.title)
+        #expect(duplicatedCV.personalInfo.email == originalCV.personalInfo.email)
         #expect(duplicatedCV.skills.count == originalCV.skills.count)
         #expect(duplicatedCV.relevant_experience.count == originalCV.relevant_experience.count)
     }
@@ -396,11 +429,11 @@ struct CVManagementUseCaseTests {
     func duplicateCVSavesDuplicatedCV() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let originalCV = CVTestDataBuilder.minimalCV().withName("Test CV").build()
@@ -421,11 +454,11 @@ struct CVManagementUseCaseTests {
     func duplicateCVAppendsCoypToName() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let originalCV = CVTestDataBuilder.minimalCV().withName("My Professional CV").build()
@@ -440,11 +473,11 @@ struct CVManagementUseCaseTests {
     func duplicateCVHandlesEmptyName() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let originalCV = CVTestDataBuilder.minimalCV().withName("").build()
@@ -459,11 +492,11 @@ struct CVManagementUseCaseTests {
     func duplicateCVThrowsErrorForNonExistentCV() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let nonExistentId = UUID()
@@ -477,11 +510,11 @@ struct CVManagementUseCaseTests {
     func duplicateCVCopiesAllFields() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let originalCV = CVTestDataBuilder.completeCV().build()
@@ -490,12 +523,13 @@ struct CVManagementUseCaseTests {
         let duplicatedCV = try await useCase.duplicateCV(id: originalCV.id)
         
         // Verify all fields except name and ID are identical
-        #expect(duplicatedCV.title == originalCV.title)
-        #expect(duplicatedCV.location == originalCV.location)
-        #expect(duplicatedCV.email == originalCV.email)
-        #expect(duplicatedCV.phone == originalCV.phone)
-        #expect(duplicatedCV.portfolio == originalCV.portfolio)
-        #expect(duplicatedCV.profile == originalCV.profile)
+        #expect(duplicatedCV.personalInfo.name == originalCV.personalInfo.name)
+        #expect(duplicatedCV.personalInfo.title == originalCV.personalInfo.title)
+        #expect(duplicatedCV.personalInfo.location == originalCV.personalInfo.location)
+        #expect(duplicatedCV.personalInfo.email == originalCV.personalInfo.email)
+        #expect(duplicatedCV.personalInfo.phone == originalCV.personalInfo.phone)
+        #expect(duplicatedCV.personalInfo.portfolio == originalCV.personalInfo.portfolio)
+        #expect(duplicatedCV.personalInfo.profile == originalCV.personalInfo.profile)
         
         // Verify collections are copied
         #expect(duplicatedCV.relevant_experience.count == originalCV.relevant_experience.count)
@@ -522,11 +556,11 @@ struct CVManagementUseCaseTests {
     func cvManagementUseCaseFullCRUDWorkflow() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         // 1. Start with empty state
@@ -549,15 +583,20 @@ struct CVManagementUseCaseTests {
         #expect(allCVs.count == 2)
         
         // 4. Update first CV
+        let updatedPersonalInfo = PersonalInfo(
+            name: firstCV.personalInfo.name,
+            title: "Updated Title",
+            location: firstCV.personalInfo.location,
+            email: firstCV.personalInfo.email,
+            phone: firstCV.personalInfo.phone,
+            portfolio: firstCV.personalInfo.portfolio,
+            profile: firstCV.personalInfo.profile
+        )
+        
         let updatedFirstCV = CVModel(
             id: firstCV.id,
             name: "Updated First CV",
-            title: firstCV.title,
-            location: firstCV.location,
-            email: firstCV.email,
-            phone: firstCV.phone,
-            portfolio: firstCV.portfolio,
-            profile: firstCV.profile,
+            personalInfo: updatedPersonalInfo,
             relevant_experience: firstCV.relevant_experience,
             education: firstCV.education,
             skills: firstCV.skills,
@@ -572,6 +611,7 @@ struct CVManagementUseCaseTests {
         allCVs = try await useCase.getAllCVs()
         let updatedCV = allCVs.first { $0.id == firstCV.id }
         #expect(updatedCV?.name == "Updated First CV")
+        #expect(updatedCV?.personalInfo.title == "Updated Title")
         
         // 5. Duplicate second CV
         let duplicatedCV = try await useCase.duplicateCV(id: secondCV.id)
@@ -603,11 +643,11 @@ struct CVManagementUseCaseTests {
     func cvManagementUseCaseHandlesConcurrentOperations() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let template1 = CVTestDataBuilder.minimalCV().withName("CV 1").build()
@@ -641,11 +681,11 @@ struct CVManagementUseCaseTests {
     func cvManagementUseCasePropagatesRepositoryErrors() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         // Test error propagation for duplicate operation on non-existent CV

@@ -25,12 +25,13 @@ struct SampleCVRepositoryTests {
         let sample = try await repository.getDefaultSample()
         
         #expect(sample.name == "")
-        #expect(sample.title == "")
-        #expect(sample.email == "")
-        #expect(sample.phone == "")
-        #expect(sample.location == "")
-        #expect(sample.portfolio == "")
-        #expect(sample.profile == "")
+        #expect(sample.personalInfo.name == "")
+        #expect(sample.personalInfo.title == "")
+        #expect(sample.personalInfo.email == "")
+        #expect(sample.personalInfo.phone == "")
+        #expect(sample.personalInfo.location == "")
+        #expect(sample.personalInfo.portfolio == "")
+        #expect(sample.personalInfo.profile == "")
         #expect(sample.relevant_experience.isEmpty)
         #expect(sample.education.isEmpty)
         #expect(sample.skills.isEmpty)
@@ -50,8 +51,9 @@ struct SampleCVRepositoryTests {
         
         // Samples should have same structure but different IDs (since UUID() generates new ones)
         #expect(sample1.name == sample2.name)
-        #expect(sample1.title == sample2.title)
-        #expect(sample1.email == sample2.email)
+        #expect(sample1.personalInfo.name == sample2.personalInfo.name)
+        #expect(sample1.personalInfo.title == sample2.personalInfo.title)
+        #expect(sample1.personalInfo.email == sample2.personalInfo.email)
         #expect(sample1.relevant_experience.count == sample2.relevant_experience.count)
         #expect(sample1.skills.count == sample2.skills.count)
         
@@ -72,6 +74,7 @@ struct SampleCVRepositoryTests {
         
         // Sample should be returned successfully without any storage operations
         #expect(sample.name == "")
+        #expect(sample.personalInfo.name == "")
         
         // Storage should still be empty - no read or write operations occurred
         #expect(mockStorage.isEmpty())
@@ -90,7 +93,8 @@ struct SampleCVRepositoryTests {
         
         let sample = samples.first!
         #expect(sample.name == "")
-        #expect(sample.title == "")
+        #expect(sample.personalInfo.name == "")
+        #expect(sample.personalInfo.title == "")
         #expect(sample.relevant_experience.isEmpty)
         #expect(sample.skills.isEmpty)
     }
@@ -109,8 +113,8 @@ struct SampleCVRepositoryTests {
         // But it should exist in the collection
         let containsDefault = allSamples.contains { sample in
             sample.name == defaultSample.name &&
-            sample.title == defaultSample.title &&
-            sample.email == defaultSample.email
+            sample.personalInfo.name == defaultSample.personalInfo.name &&
+            sample.personalInfo.email == defaultSample.personalInfo.email
         }
         
         #expect(containsDefault)
@@ -127,7 +131,8 @@ struct SampleCVRepositoryTests {
         
         #expect(sample != nil)
         #expect(sample?.name == "")
-        #expect(sample?.title == "")
+        #expect(sample?.personalInfo.name == "")
+        #expect(sample?.personalInfo.title == "")
         #expect(sample?.relevant_experience.isEmpty == true)
         #expect(sample?.skills.isEmpty == true)
     }
@@ -154,8 +159,9 @@ struct SampleCVRepositoryTests {
         
         #expect(namedDefault != nil)
         #expect(namedDefault?.name == defaultSample.name)
-        #expect(namedDefault?.title == defaultSample.title)
-        #expect(namedDefault?.email == defaultSample.email)
+        #expect(namedDefault?.personalInfo.name == defaultSample.personalInfo.name)
+        #expect(namedDefault?.personalInfo.title == defaultSample.personalInfo.title)
+        #expect(namedDefault?.personalInfo.email == defaultSample.personalInfo.email)
         #expect(namedDefault?.relevant_experience.count == defaultSample.relevant_experience.count)
     }
     
@@ -219,8 +225,8 @@ struct SampleCVRepositoryTests {
         #expect(namedSample?.name.isEmpty == true)
         
         // Samples should be structurally identical
-        #expect(sample1.title == sample2.title)
-        #expect(sample1.email == sample2.email)
+        #expect(sample1.personalInfo.title == sample2.personalInfo.title)
+        #expect(sample1.personalInfo.email == sample2.personalInfo.email)
         
         // Test with actual concurrent operations using separate repository instances
         try await withThrowingTaskGroup(of: CVModel.self) { group in

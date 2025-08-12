@@ -1,11 +1,14 @@
 {
-  "name": "James Rodriguez",
-  "title": "Director of Operations",
-  "location": "Chicago, IL",
-  "email": "james.rodriguez@example.com",
-  "phone": "+1 (555) 456-7890",
-  "portfolio": "",
-  "profile": "Results-driven operations executive with 12+ years of experience driving organizational efficiency and growth in Fortune 500 companies. Expert in process optimization, strategic planning, and cross-functional leadership. Proven track record of delivering double-digit improvements in operational metrics and leading teams of 100+ employees.",
+  "name": "Director of Operations Application - Global Manufacturing Corp",
+  "personalInfo": {
+    "name": "James Rodriguez",
+    "title": "Director of Operations",
+    "location": "Chicago, IL",
+    "email": "james.rodriguez@example.com",
+    "phone": "+1 (555) 456-7890",
+    "portfolio": "",
+    "profile": "Results-driven operations executive with 12+ years of experience driving organizational efficiency and growth in Fortune 500 companies. Expert in process optimization, strategic planning, and cross-functional leadership. Proven track record of delivering double-digit improvements in operational metrics and leading teams of 100+ employees."
+  },
   "relevant_experience": [
     {
       "title": "Director of Operations",

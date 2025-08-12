@@ -89,15 +89,15 @@ private struct CVRowView: View {
                         .foregroundColor(DesignTokens.Colors.primary)
                         .lineLimit(1)
                     
-                    if !cv.title.isEmpty {
-                        Text(cv.title)
+                    if !cv.personalInfo.title.isEmpty {
+                        Text(cv.personalInfo.title)
                             .typography(.subheadline)
                             .foregroundColor(DesignTokens.Colors.secondary)
                             .lineLimit(1)
                     }
                     
-                    if !cv.location.isEmpty {
-                        Text(cv.location)
+                    if !cv.personalInfo.location.isEmpty {
+                        Text(cv.personalInfo.location)
                             .typography(.caption1)
                             .foregroundColor(DesignTokens.Colors.secondary)
                             .lineLimit(1)
