@@ -178,7 +178,7 @@ struct CVRepositoryTests {
         
         #expect(savedCV.id == originalCV.id)
         #expect(savedCV.name == originalCV.name)
-        #expect(savedCV.email == originalCV.email)
+        #expect(savedCV.personalInfo.email == originalCV.personalInfo.email)
         #expect(savedCV.skills.count == originalCV.skills.count)
     }
     

@@ -87,7 +87,7 @@ struct FileStorageServiceTests {
         #expect(loadedCV != nil)
         #expect(loadedCV?.id == originalCV.id)
         #expect(loadedCV?.name == originalCV.name)
-        #expect(loadedCV?.email == originalCV.email)
+        #expect(loadedCV?.personalInfo.email == originalCV.personalInfo.email)
     }
     
     @Test("Load operation returns nil for non-existent file")
@@ -493,12 +493,15 @@ struct FileStorageServiceTests {
         let complexCV = CVModel(
             id: largeCV.id,
             name: largeCV.name,
-            title: largeCV.title,
-            location: largeCV.location,
-            email: largeCV.email,
-            phone: largeCV.phone,
-            portfolio: largeCV.portfolio,
-            profile: largeCV.profile,
+            personalInfo: PersonalInfo(
+                name: largeCV.personalInfo.name,
+                title: largeCV.personalInfo.title,
+                location: largeCV.personalInfo.location,
+                email: largeCV.personalInfo.email,
+                phone: largeCV.personalInfo.phone,
+                portfolio: largeCV.personalInfo.portfolio,
+                profile: largeCV.personalInfo.profile
+            ),
             relevant_experience: experiences,
             education: largeCV.education,
             skills: skills,
@@ -530,12 +533,15 @@ struct FileStorageServiceTests {
             let cv = CVModel(
                 id: baseCV.id,
                 name: "CV Version \(i)",
-                title: baseCV.title,
-                location: baseCV.location,
-                email: baseCV.email,
-                phone: baseCV.phone,
-                portfolio: baseCV.portfolio,
-                profile: "Profile updated in iteration \(i)",
+                personalInfo: PersonalInfo(
+                    name: baseCV.personalInfo.name,
+                    title: baseCV.personalInfo.title,
+                    location: baseCV.personalInfo.location,
+                    email: baseCV.personalInfo.email,
+                    phone: baseCV.personalInfo.phone,
+                    portfolio: baseCV.personalInfo.portfolio,
+                    profile: "Profile updated in iteration \(i)"
+                ),
                 relevant_experience: baseCV.relevant_experience,
                 education: baseCV.education,
                 skills: baseCV.skills,
@@ -548,7 +554,7 @@ struct FileStorageServiceTests {
             try await service.save(cv, to: "rapid_test")
             let loaded = try await service.load(CVModel.self, from: "rapid_test")
             #expect(loaded?.name == "CV Version \(i)")
-            #expect(loaded?.profile == "Profile updated in iteration \(i)")
+            #expect(loaded?.personalInfo.profile == "Profile updated in iteration \(i)")
         }
         
         // Verify final state
