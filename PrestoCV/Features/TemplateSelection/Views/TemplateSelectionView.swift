@@ -129,7 +129,10 @@ struct TemplateSelectionView: View {
             .padding(DesignTokens.Spacing.sm)
             .background(DesignTokens.Colors.background)
             .cornerRadius(DesignTokens.CornerRadius.lg)
-            .shadow(color: DesignTokens.Colors.shadow, radius: DesignTokens.Shadow.radius)
+            .shadow(
+                color: DesignTokens.Colors.shadow,
+                radius: DesignTokens.Shadow.medium.radius,
+            )
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -182,7 +185,7 @@ private struct TemplateCardView: View {
             .padding(DesignTokens.Spacing.sm)
             .background(DesignTokens.Colors.background)
             .cornerRadius(DesignTokens.CornerRadius.lg)
-            .shadow(color: DesignTokens.Colors.shadow, radius: DesignTokens.Shadow.radius)
+            .shadow(color: DesignTokens.Colors.shadow, radius: DesignTokens.Shadow.medium.radius)
         }
         .buttonStyle(PlainButtonStyle())
     }

@@ -53,7 +53,7 @@ struct LoadingView: View {
         var tintColor: Color {
             switch self {
             case .default, .compact, .fullscreen: return DesignTokens.Colors.accent
-            case .button: return DesignTokens.Colors.primaryButtonText
+                case .button: return DesignTokens.Colors.primaryButtonForeground
             }
         }
         

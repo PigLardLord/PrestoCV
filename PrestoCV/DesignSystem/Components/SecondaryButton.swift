@@ -72,7 +72,7 @@ private struct SecondaryButtonStyle: ButtonStyle {
     private var foregroundColor: Color {
         switch style {
         case .text, .compact:
-            return DesignTokens.Colors.secondaryButtonText
+            return DesignTokens.Colors.secondaryButtonForeground
         case .outlined:
             return DesignTokens.Colors.accent
         }
