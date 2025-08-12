@@ -30,14 +30,14 @@ final class MockOnboardingUseCase: OnboardingUseCaseProtocol {
 }
 
 @MainActor
-final class MockTemplateRepository: TemplateRepositoryProtocol {
-    var getDefaultTemplateResult: Result<CVModel, Error> = .success(CVModel(name: "Default Template"))
+final class MockSampleCVRepository: SampleCVRepositoryProtocol {
+    var getDefaultSampleResult: Result<CVModel, Error> = .success(CVModel(name: "Default Template"))
     
-    private(set) var getDefaultTemplateCalled = false
+    private(set) var getDefaultSampleCalled = false
     
-    func getDefaultTemplate() async throws -> CVModel {
-        getDefaultTemplateCalled = true
-        switch getDefaultTemplateResult {
+    func getDefaultSample() async throws -> CVModel {
+        getDefaultSampleCalled = true
+        switch getDefaultSampleResult {
         case .success(let template):
             return template
         case .failure(let error):
@@ -45,13 +45,13 @@ final class MockTemplateRepository: TemplateRepositoryProtocol {
         }
     }
     
-    func getAllTemplates() async throws -> [CVModel] {
-        return [try await getDefaultTemplate()]
+    func getAllSamples() async throws -> [CVModel] {
+        return [try await getDefaultSample()]
     }
     
-    func getTemplate(by name: String) async throws -> CVModel? {
+    func getSample(by name: String) async throws -> CVModel? {
         if name == "default" {
-            return try await getDefaultTemplate()
+            return try await getDefaultSample()
         }
         return nil
     }
@@ -66,11 +66,11 @@ struct OnboardingViewModelTests {
     @Test("ViewModel initializes with loading state")
     func viewModelInitializesWithLoadingState() {
         let mockOnboardingUseCase = MockOnboardingUseCase()
-        let mockTemplateRepository = MockTemplateRepository()
+        let mockSampleRepository = MockSampleCVRepository()
         
         let viewModel = OnboardingViewModel(
             onboardingUseCase: mockOnboardingUseCase,
-            templateRepository: mockTemplateRepository
+            sampleRepository: mockSampleRepository
         )
         
         #expect(viewModel.onboardingState == .loading)
@@ -81,12 +81,12 @@ struct OnboardingViewModelTests {
     @Test("checkOnboardingStatus updates state to firstTime")
     func checkOnboardingStatusUpdatesStateToFirstTime() async {
         let mockOnboardingUseCase = MockOnboardingUseCase()
-        let mockTemplateRepository = MockTemplateRepository()
+        let mockSampleRepository = MockSampleCVRepository()
         mockOnboardingUseCase.checkOnboardingRequiredResult = .firstTime
         
         let viewModel = OnboardingViewModel(
             onboardingUseCase: mockOnboardingUseCase,
-            templateRepository: mockTemplateRepository
+            sampleRepository: mockSampleRepository
         )
         
         await viewModel.checkOnboardingStatus()
@@ -98,12 +98,12 @@ struct OnboardingViewModelTests {
     @Test("checkOnboardingStatus updates state to returning")
     func checkOnboardingStatusUpdatesStateToReturning() async {
         let mockOnboardingUseCase = MockOnboardingUseCase()
-        let mockTemplateRepository = MockTemplateRepository()
+        let mockSampleRepository = MockSampleCVRepository()
         mockOnboardingUseCase.checkOnboardingRequiredResult = .returning
         
         let viewModel = OnboardingViewModel(
             onboardingUseCase: mockOnboardingUseCase,
-            templateRepository: mockTemplateRepository
+            sampleRepository: mockSampleRepository
         )
         
         await viewModel.checkOnboardingStatus()
@@ -115,11 +115,11 @@ struct OnboardingViewModelTests {
     @Test("createFirstCV succeeds and updates state")
     func createFirstCVSucceedsAndUpdatesState() async {
         let mockOnboardingUseCase = MockOnboardingUseCase()
-        let mockTemplateRepository = MockTemplateRepository()
+        let mockSampleRepository = MockSampleCVRepository()
         
         let viewModel = OnboardingViewModel(
             onboardingUseCase: mockOnboardingUseCase,
-            templateRepository: mockTemplateRepository
+            sampleRepository: mockSampleRepository
         )
         viewModel.onboardingState = .firstTime
         
@@ -128,19 +128,19 @@ struct OnboardingViewModelTests {
         #expect(viewModel.onboardingState == .returning)
         #expect(viewModel.isCreatingCV == false)
         #expect(viewModel.errorMessage.isEmpty)
-        #expect(mockTemplateRepository.getDefaultTemplateCalled)
+        #expect(mockSampleRepository.getDefaultSampleCalled)
         #expect(mockOnboardingUseCase.createFirstCVCalled)
     }
     
     @Test("createFirstCV handles template error")
     func createFirstCVHandlesTemplateError() async {
         let mockOnboardingUseCase = MockOnboardingUseCase()
-        let mockTemplateRepository = MockTemplateRepository()
-        mockTemplateRepository.getDefaultTemplateResult = .failure(AppError.templateNotFound)
+        let mockSampleRepository = MockSampleCVRepository()
+        mockSampleRepository.getDefaultSampleResult = .failure(AppError.notFound("Template"))
         
         let viewModel = OnboardingViewModel(
             onboardingUseCase: mockOnboardingUseCase,
-            templateRepository: mockTemplateRepository
+            sampleRepository: mockSampleRepository
         )
         viewModel.onboardingState = .firstTime
         
@@ -149,19 +149,19 @@ struct OnboardingViewModelTests {
         #expect(viewModel.onboardingState == .firstTime) // Should remain unchanged
         #expect(viewModel.isCreatingCV == false)
         #expect(!viewModel.errorMessage.isEmpty)
-        #expect(mockTemplateRepository.getDefaultTemplateCalled)
+        #expect(mockSampleRepository.getDefaultSampleCalled)
         #expect(!mockOnboardingUseCase.createFirstCVCalled)
     }
     
     @Test("createFirstCV handles use case error")
     func createFirstCVHandlesUseCaseError() async {
         let mockOnboardingUseCase = MockOnboardingUseCase()
-        let mockTemplateRepository = MockTemplateRepository()
-        mockOnboardingUseCase.createFirstCVResult = .failure(AppError.storageError("Test error"))
+        let mockSampleRepository = MockSampleCVRepository()
+        mockOnboardingUseCase.createFirstCVResult = .failure(AppError.fileSystemError("Test error"))
         
         let viewModel = OnboardingViewModel(
             onboardingUseCase: mockOnboardingUseCase,
-            templateRepository: mockTemplateRepository
+            sampleRepository: mockSampleRepository
         )
         viewModel.onboardingState = .firstTime
         
@@ -170,25 +170,25 @@ struct OnboardingViewModelTests {
         #expect(viewModel.onboardingState == .firstTime) // Should remain unchanged
         #expect(viewModel.isCreatingCV == false)
         #expect(!viewModel.errorMessage.isEmpty)
-        #expect(mockTemplateRepository.getDefaultTemplateCalled)
+        #expect(mockSampleRepository.getDefaultSampleCalled)
         #expect(mockOnboardingUseCase.createFirstCVCalled)
     }
     
     @Test("createFirstCV does nothing when not in firstTime state")
     func createFirstCVDoesNothingWhenNotInFirstTimeState() async {
         let mockOnboardingUseCase = MockOnboardingUseCase()
-        let mockTemplateRepository = MockTemplateRepository()
+        let mockSampleRepository = MockSampleCVRepository()
         
         let viewModel = OnboardingViewModel(
             onboardingUseCase: mockOnboardingUseCase,
-            templateRepository: mockTemplateRepository
+            sampleRepository: mockSampleRepository
         )
         viewModel.onboardingState = .returning
         
         await viewModel.createFirstCV()
         
         #expect(viewModel.onboardingState == .returning)
-        #expect(!mockTemplateRepository.getDefaultTemplateCalled)
+        #expect(!mockSampleRepository.getDefaultSampleCalled)
         #expect(!mockOnboardingUseCase.createFirstCVCalled)
     }
 }
