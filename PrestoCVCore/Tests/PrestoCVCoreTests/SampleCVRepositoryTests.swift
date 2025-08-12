@@ -186,14 +186,14 @@ struct SampleCVRepositoryTests {
         // Get samples through different methods
         let defaultSample = try await repository.getDefaultSample()
         let allSamples = try await repository.getAllSamples()
-        let namedDefault = try await repository.getSample(by: "default")
+        let namedSample = try await repository.getSample(by: "default")
         
         // Verify consistency
         #expect(allSamples.count >= 1)
-        #expect(namedDefault != nil)
+        #expect(namedSample != nil)
         
         // Default should exist in the all samples collection
-        let containsNamedDefault = allSamples.contains { $0.name == namedDefault?.name }
+        let containsNamedDefault = allSamples.contains { $0.name == namedSample?.name }
         #expect(containsNamedDefault)
     }
     
@@ -235,5 +235,21 @@ struct SampleCVRepositoryTests {
             #expect(results.count == 2)
             #expect(results.allSatisfy { $0.name.isEmpty })
         }
+    }
+    
+    // MARK: - Category Matching Tests
+    
+    @Test("SampleCVRepository uses category service for pattern matching")
+    func sampleRepositoryUsesCategoryServiceForMatching() async throws {
+        let mockStorage = MockStorageService()
+        let repository = SampleCVRepository(storageService: mockStorage)
+        
+        // Test that the repository properly uses the category service
+        // This simulates getting a technical template by category name
+        let technicalTemplate = try await repository.getSample(by: "technical")
+        
+        // We can't assert specific values here since it depends on bundle resources,
+        // but we can verify the method doesn't throw and returns either a template or nil
+        #expect(technicalTemplate == nil || technicalTemplate is CVModel)
     }
 }

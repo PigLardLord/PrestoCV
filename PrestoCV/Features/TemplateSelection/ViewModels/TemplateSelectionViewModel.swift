@@ -4,13 +4,13 @@ import PrestoCVCore
 final class TemplateSelectionViewModel: ObservableObject {
     
     // MARK: - State Management
-    enum TemplateSelectionState {
+    enum TemplateSelectionState: Equatable {
         case idle
         case loadingTemplates
         case loadingTemplate(CVModel)  // When creating CV from template
         case creatingEmptyCV           // When creating empty CV
         case loaded([CVModel])
-        case error(String)
+        case error(AppError)
         
         var isLoading: Bool {
             switch self {
@@ -21,9 +21,9 @@ final class TemplateSelectionViewModel: ObservableObject {
             }
         }
         
-        var errorMessage: String? {
-            if case .error(let message) = self {
-                return message
+        var appError: AppError? {
+            if case .error(let error) = self {
+                return error
             }
             return nil
         }
@@ -33,6 +33,23 @@ final class TemplateSelectionViewModel: ObservableObject {
                 return templates
             }
             return nil
+        }
+        
+        static func == (lhs: TemplateSelectionState, rhs: TemplateSelectionState) -> Bool {
+            switch (lhs, rhs) {
+            case (.idle, .idle),
+                 (.loadingTemplates, .loadingTemplates),
+                 (.creatingEmptyCV, .creatingEmptyCV):
+                return true
+            case (.loadingTemplate(let lhsTemplate), .loadingTemplate(let rhsTemplate)):
+                return lhsTemplate.id == rhsTemplate.id
+            case (.loaded(let lhsTemplates), .loaded(let rhsTemplates)):
+                return lhsTemplates.count == rhsTemplates.count
+            case (.error(let lhsError), .error(let rhsError)):
+                return lhsError.localizedDescription == rhsError.localizedDescription
+            default:
+                return false
+            }
         }
     }
     
@@ -53,7 +70,7 @@ final class TemplateSelectionViewModel: ObservableObject {
     }
     
     var errorMessage: String {
-        viewState.errorMessage ?? ""
+        viewState.appError?.localizedDescription ?? ""
     }
     
     // MARK: - Initialization
@@ -74,7 +91,8 @@ final class TemplateSelectionViewModel: ObservableObject {
             let loadedTemplates = try await sampleRepository.getAllSamples()
             viewState = .loaded(loadedTemplates)
         } catch {
-            viewState = .error(error.localizedDescription)
+            let appError = error as? AppError ?? AppError.unknown(error.localizedDescription)
+            viewState = .error(appError)
         }
     }
     
@@ -89,7 +107,8 @@ final class TemplateSelectionViewModel: ObservableObject {
             await loadTemplates()
             return createdCV.id.uuidString
         } catch {
-            viewState = .error(error.localizedDescription)
+            let appError = error as? AppError ?? AppError.unknown(error.localizedDescription)
+            viewState = .error(appError)
             return nil
         }
     }
@@ -104,7 +123,8 @@ final class TemplateSelectionViewModel: ObservableObject {
             await loadTemplates()
             return createdCV.id.uuidString
         } catch {
-            viewState = .error(error.localizedDescription)
+            let appError = error as? AppError ?? AppError.unknown(error.localizedDescription)
+            viewState = .error(appError)
             return nil
         }
     }

@@ -39,9 +39,10 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
                 let data = try Data(contentsOf: url)
                 let cv = try JSONDecoder().decode(CVModel.self, from: data)
                 samples.append(cv)
-            } catch {
+            } catch let decodingError {
                 // Log error but continue loading other samples
-                print("Failed to load sample CV from \(url.lastPathComponent): \(error)")
+                print("Failed to load sample CV from \(url.lastPathComponent): \(decodingError)")
+                // Don't throw here, just continue with other samples
             }
         }
         
@@ -67,8 +68,9 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
             do {
                 let data = try Data(contentsOf: url)
                 return try JSONDecoder().decode(CVModel.self, from: data)
-            } catch {
-                print("Failed to load sample CV from \(name).json: \(error)")
+            } catch let decodingError {
+                print("Failed to load sample CV from \(name).json: \(decodingError)")
+                throw AppError.decodingError("Failed to decode \(name).json: \(decodingError.localizedDescription)")
             }
         }
         
@@ -89,8 +91,9 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
                 do {
                     let data = try Data(contentsOf: url)
                     return try JSONDecoder().decode(CVModel.self, from: data)
-                } catch {
-                    print("Failed to load sample CV from \(url.lastPathComponent): \(error)")
+                } catch let decodingError {
+                    print("Failed to load sample CV from \(url.lastPathComponent): \(decodingError)")
+                    throw AppError.decodingError("Failed to decode \(url.lastPathComponent): \(decodingError.localizedDescription)")
                 }
             }
         }

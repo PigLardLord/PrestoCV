@@ -1,5 +1,7 @@
 import Foundation
 
+// MARK: - Onboarding Use Case Implementation
+
 public final class OnboardingUseCase: OnboardingUseCaseProtocol, Sendable {
     private let onboardingRepository: OnboardingRepositoryProtocol
     private let sampleRepository: SampleCVRepositoryProtocol
@@ -16,10 +18,30 @@ public final class OnboardingUseCase: OnboardingUseCaseProtocol, Sendable {
     }
     
     public func checkOnboardingRequired() async -> OnboardingState {
-        return await onboardingRepository.getOnboardingState()
+        let hasExistingCVs = await onboardingRepository.hasExistingCVs()
+        let onboardingState = await onboardingRepository.getOnboardingState()
+        
+        // If user has existing CVs, they're returning
+        if hasExistingCVs {
+            return .returning
+        }
+        
+        // Otherwise, return the actual onboarding state
+        return onboardingState
     }
     
     public func createFirstCV(from template: CVModel) async throws -> CVModel {
-        return try await cvManagementUseCase.createCV(from: template)
+        // Create the first CV
+        do {
+            let createdCV = try await cvManagementUseCase.createCV(from: template)
+            return createdCV
+        } catch {
+            // Re-throw with more context if it's already an AppError, otherwise wrap it
+            if let appError = error as? AppError {
+                throw appError
+            } else {
+                throw AppError.unknown(error.localizedDescription)
+            }
+        }
     }
 }
