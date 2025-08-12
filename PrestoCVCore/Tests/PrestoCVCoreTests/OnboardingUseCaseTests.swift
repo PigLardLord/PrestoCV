@@ -11,16 +11,16 @@ struct OnboardingUseCaseTests {
     func useCaseInitialization() {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
@@ -33,16 +33,16 @@ struct OnboardingUseCaseTests {
     func checkOnboardingRequiredReturnsFirstTimeWhenNoCVs() async {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
@@ -54,16 +54,16 @@ struct OnboardingUseCaseTests {
     func checkOnboardingRequiredReturnsReturningWhenCVsExist() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
@@ -79,16 +79,16 @@ struct OnboardingUseCaseTests {
     func checkOnboardingRequiredDelegatesToRepository() async {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
@@ -104,16 +104,16 @@ struct OnboardingUseCaseTests {
     func createFirstCVCreatesNewCVFromTemplate() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
@@ -133,16 +133,16 @@ struct OnboardingUseCaseTests {
     func createFirstCVSavesCVToRepository() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
@@ -160,16 +160,16 @@ struct OnboardingUseCaseTests {
     func createFirstCVReturnsTheSavedCV() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
@@ -187,16 +187,16 @@ struct OnboardingUseCaseTests {
     func createFirstCVCopiesAllTemplateFields() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
@@ -235,16 +235,16 @@ struct OnboardingUseCaseTests {
     func createFirstCVHandlesEmptyTemplate() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
@@ -268,16 +268,16 @@ struct OnboardingUseCaseTests {
     func createFirstCVChangesOnboardingState() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
@@ -298,16 +298,16 @@ struct OnboardingUseCaseTests {
     func onboardingUseCaseCompleteFirstTimeUserFlow() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
@@ -316,7 +316,7 @@ struct OnboardingUseCaseTests {
         #expect(onboardingState == .firstTime)
         
         // 2. Get default template from template repository
-        let defaultTemplate = try await templateRepository.getDefaultTemplate()
+        let defaultTemplate = try await sampleRepository.getDefaultTemplate()
         
         // 3. Create first CV from template
         let firstCV = try await useCase.createFirstCV(from: defaultTemplate)
@@ -344,16 +344,16 @@ struct OnboardingUseCaseTests {
     func createFirstCVPropagatesRepositorySaveErrors() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
@@ -373,16 +373,16 @@ struct OnboardingUseCaseTests {
     func onboardingUseCaseHandlesConcurrentOperations() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
@@ -399,16 +399,16 @@ struct OnboardingUseCaseTests {
     func onboardingUseCaseHandlesConcurrentCVCreation() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
@@ -444,16 +444,16 @@ struct OnboardingUseCaseTests {
     func onboardingUseCaseHandlesMultipleCreateFirstCVCalls() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let useCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         

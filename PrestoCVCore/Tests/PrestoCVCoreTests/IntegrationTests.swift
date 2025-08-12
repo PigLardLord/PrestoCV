@@ -22,9 +22,9 @@ struct IntegrationTests {
             // 3. User creates first CV from default template
             let container = TestDependencyContainer()
             defer { container.reset() }
-            let templateRepository = TemplateRepository(storageService: MockStorageService())
+            let sampleRepository = SampleCVRepository(storageService: MockStorageService())
             
-            let defaultTemplate = try await templateRepository.getDefaultTemplate()
+            let defaultTemplate = try await sampleRepository.getDefaultTemplate()
             let firstCV = try await onboardingUseCase.createFirstCV(from: defaultTemplate)
             
             // 4. User is now a returning user
@@ -158,16 +158,16 @@ struct IntegrationTests {
     @Test("Template system integration with user workflows")
     func templateSystemIntegrationWorkflow() async throws {
         try await TestHelpers.withTestContainer { container in
-            let templateRepository = TemplateRepository(storageService: MockStorageService())
+            let sampleRepository = SampleCVRepository(storageService: MockStorageService())
             let onboardingUseCase = try container.makeOnboardingUseCase()
             let cvManagementUseCase = try container.makeCVManagementUseCase()
             
             // 1. Get available templates
-            let availableTemplates = try await templateRepository.getAllTemplates()
+            let availableTemplates = try await sampleRepository.getAllTemplates()
             #expect(availableTemplates.count == 1) // Default template
             
-            let defaultTemplate = try await templateRepository.getDefaultTemplate()
-            let namedDefaultTemplate = try await templateRepository.getTemplate(by: "default")
+            let defaultTemplate = try await sampleRepository.getDefaultTemplate()
+            let namedDefaultTemplate = try await sampleRepository.getTemplate(by: "default")
             
             #expect(namedDefaultTemplate != nil)
             
@@ -199,22 +199,22 @@ struct IntegrationTests {
         // Use same mock storage across all components to test persistence
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
-        let templateRepository = TemplateRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
         let cvManagementUseCase = CVManagementUseCase(
             cvRepository: cvRepository,
-            templateRepository: templateRepository
+            sampleRepository: sampleRepository
         )
         
         let onboardingUseCase = OnboardingUseCase(
             onboardingRepository: onboardingRepository,
-            templateRepository: templateRepository,
+            sampleRepository: sampleRepository,
             cvManagementUseCase: cvManagementUseCase
         )
         
         // 1. Create CV through onboarding
-        let template = try await templateRepository.getDefaultTemplate()
+        let template = try await sampleRepository.getDefaultTemplate()
         let cv1 = try await onboardingUseCase.createFirstCV(from: template)
         
         // 2. Verify persistence - CV should be accessible through different paths
@@ -229,12 +229,15 @@ struct IntegrationTests {
         let updatedCV = CVModel(
             id: cv1.id,
             name: "Updated through management",
-            title: cv1.title,
-            location: cv1.location,
-            email: cv1.email,
-            phone: cv1.phone,
-            portfolio: cv1.portfolio,
-            profile: cv1.profile,
+            personalInfo: PersonalInfo(
+                name: cv1.personalInfo.name,
+                title: cv1.personalInfo.title,
+                location: cv1.personalInfo.location,
+                email: cv1.personalInfo.email,
+                phone: cv1.personalInfo.phone,
+                portfolio: cv1.personalInfo.portfolio,
+                profile: cv1.personalInfo.profile
+            ),
             relevant_experience: cv1.relevant_experience,
             education: cv1.education,
             skills: cv1.skills,
@@ -430,12 +433,15 @@ struct IntegrationTests {
             let modifiedCV = CVModel(
                 id: complexCV.id,
                 name: complexCV.name,
-                title: "Senior Full Stack Developer",
-                location: complexCV.location,
-                email: complexCV.email,
-                phone: complexCV.phone,
-                portfolio: complexCV.portfolio,
-                profile: complexCV.profile,
+                personalInfo: PersonalInfo(
+                    name: complexCV.personalInfo.name,
+                    title: "Senior Full Stack Developer",
+                    location: complexCV.personalInfo.location,
+                    email: complexCV.personalInfo.email,
+                    phone: complexCV.personalInfo.phone,
+                    portfolio: complexCV.personalInfo.portfolio,
+                    profile: complexCV.personalInfo.profile
+                ),
                 relevant_experience: complexCV.relevant_experience,
                 education: complexCV.education,
                 skills: modifiedSkills,
