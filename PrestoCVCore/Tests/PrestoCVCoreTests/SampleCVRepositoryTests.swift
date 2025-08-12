@@ -28,9 +28,9 @@ struct SampleCVRepositoryTests {
         #expect(template.personalInfo.title == "")
         #expect(template.personalInfo.email == "")
         #expect(template.personalInfo.phone == "")
-        #expect(template.location == "")
-        #expect(template.portfolio == "")
-        #expect(template.profile == "")
+        #expect(template.personalInfo.location == "")
+        #expect(template.personalInfo.portfolio == "")
+        #expect(template.personalInfo.profile == "")
         #expect(template.relevant_experience.isEmpty)
         #expect(template.education.isEmpty)
         #expect(template.skills.isEmpty)
@@ -50,8 +50,8 @@ struct SampleCVRepositoryTests {
         
         // Templates should have same structure but different IDs (since UUID() generates new ones)
         #expect(template1.name == template2.name)
-        #expect(template1.title == template2.title)
-        #expect(template1.email == template2.email)
+        #expect(template1.personalInfo.title == template2.personalInfo.title)
+        #expect(template1.personalInfo.email == template2.personalInfo.email)
         #expect(template1.relevant_experience.count == template2.relevant_experience.count)
         #expect(template1.skills.count == template2.skills.count)
         
@@ -90,7 +90,7 @@ struct SampleCVRepositoryTests {
         
         let template = templates.first!
         #expect(template.name == "")
-        #expect(template.title == "")
+        #expect(template.personalInfo.title == "")
         #expect(template.relevant_experience.isEmpty)
         #expect(template.skills.isEmpty)
     }
@@ -109,8 +109,8 @@ struct SampleCVRepositoryTests {
         
         // Should have same structure (but different IDs due to separate CVModel() calls)
         #expect(templateFromAll.name == defaultTemplate.name)
-        #expect(templateFromAll.title == defaultTemplate.title)
-        #expect(templateFromAll.email == defaultTemplate.email)
+        #expect(templateFromAll.personalInfo.title == defaultTemplate.personalInfo.title)
+        #expect(templateFromAll.personalInfo.email == defaultTemplate.personalInfo.email)
         #expect(templateFromAll.relevant_experience.count == defaultTemplate.relevant_experience.count)
     }
     
@@ -140,7 +140,7 @@ struct SampleCVRepositoryTests {
         
         #expect(template != nil)
         #expect(template?.name == "")
-        #expect(template?.title == "")
+        #expect(template?.personalInfo.title == "")
         #expect(template?.relevant_experience.isEmpty == true)
         #expect(template?.skills.isEmpty == true)
     }
@@ -184,8 +184,8 @@ struct SampleCVRepositoryTests {
         
         #expect(namedDefaultTemplate != nil)
         #expect(namedDefaultTemplate?.name == defaultTemplate.name)
-        #expect(namedDefaultTemplate?.title == defaultTemplate.title)
-        #expect(namedDefaultTemplate?.email == defaultTemplate.email)
+        #expect(namedDefaultTemplate?.personalInfo.title == defaultTemplate.personalInfo.title)
+        #expect(namedDefaultTemplate?.personalInfo.email == defaultTemplate.personalInfo.email)
         #expect(namedDefaultTemplate?.relevant_experience.count == defaultTemplate.relevant_experience.count)
     }
     
@@ -211,8 +211,8 @@ struct SampleCVRepositoryTests {
         // All should have same structure (different IDs due to separate instantiation)
         #expect(defaultTemplate.name == allTemplate.name)
         #expect(defaultTemplate.name == namedTemplate.name)
-        #expect(allTemplate.title == namedTemplate.title)
-        #expect(defaultTemplate.email == allTemplate.email)
+        #expect(allTemplate.personalInfo.title == namedTemplate.personalInfo.title)
+        #expect(defaultTemplate.personalInfo.email == allTemplate.personalInfo.email)
     }
     
     // MARK: - Concurrency Tests
@@ -237,8 +237,8 @@ struct SampleCVRepositoryTests {
         #expect(namedTemplate?.name.isEmpty == true)
         
         // Templates should be structurally identical
-        #expect(template1.title == template2.title)
-        #expect(template1.email == template2.email)
+        #expect(template1.personalInfo.title == template2.personalInfo.title)
+        #expect(template1.personalInfo.email == template2.personalInfo.email)
         
         // Test with actual concurrent operations using separate repository instances
         try await withThrowingTaskGroup(of: CVModel.self) { group in
@@ -346,12 +346,12 @@ struct SampleCVRepositoryTests {
         
         // String fields should be empty by default
         #expect(template.name.isEmpty)
-        #expect(template.title.isEmpty)
-        #expect(template.location.isEmpty)
-        #expect(template.email.isEmpty)
-        #expect(template.phone.isEmpty)
-        #expect(template.portfolio.isEmpty)
-        #expect(template.profile.isEmpty)
+        #expect(template.personalInfo.title.isEmpty)
+        #expect(template.personalInfo.location.isEmpty)
+        #expect(template.personalInfo.email.isEmpty)
+        #expect(template.personalInfo.phone.isEmpty)
+        #expect(template.personalInfo.portfolio.isEmpty)
+        #expect(template.personalInfo.profile.isEmpty)
     }
     
     @Test("Template can be serialized and deserialized")

@@ -24,7 +24,7 @@ struct IntegrationTests {
             defer { container.reset() }
             let sampleRepository = SampleCVRepository(storageService: MockStorageService())
             
-            let defaultTemplate = try await sampleRepository.getDefaultTemplate()
+            let defaultTemplate = try await sampleRepository.getDefaultSample()
             let firstCV = try await onboardingUseCase.createFirstCV(from: defaultTemplate)
             
             // 4. User is now a returning user
@@ -40,12 +40,15 @@ struct IntegrationTests {
             let updatedCV = CVModel(
                 id: firstCV.id,
                 name: "John Doe",
-                title: "iOS Developer",
-                location: "San Francisco, CA",
-                email: "john.doe@example.com",
-                phone: "+1-555-123-4567",
-                portfolio: "https://johndoe.dev",
-                profile: "Experienced iOS developer with passion for SwiftUI",
+                personalInfo: PersonalInfo(
+                    name: "John Doe",
+                    title: "iOS Developer",
+                    location: "San Francisco, CA",
+                    email: "john.doe@example.com",
+                    phone: "+1-555-123-4567",
+                    portfolio: "https://johndoe.dev",
+                    profile: "Experienced iOS developer with passion for SwiftUI"
+                ),
                 relevant_experience: [
                     Experience(
                         title: "iOS Developer",
@@ -126,12 +129,15 @@ struct IntegrationTests {
             let modifiedCV = CVModel(
                 id: duplicatedCV.id,
                 name: "Specialized CV for Startups",
-                title: duplicatedCV.title,
-                location: duplicatedCV.location,
-                email: duplicatedCV.email,
-                phone: duplicatedCV.phone,
-                portfolio: duplicatedCV.portfolio,
-                profile: "Startup-focused developer with entrepreneurial mindset",
+                personalInfo: PersonalInfo(
+                    name: duplicatedCV.personalInfo.name,
+                    title: duplicatedCV.personalInfo.title,
+                    location: duplicatedCV.personalInfo.location,
+                    email: duplicatedCV.personalInfo.email,
+                    phone: duplicatedCV.personalInfo.phone,
+                    portfolio: duplicatedCV.personalInfo.portfolio,
+                    profile: "Startup-focused developer with entrepreneurial mindset"
+                ),
                 relevant_experience: duplicatedCV.relevant_experience,
                 education: duplicatedCV.education,
                 skills: duplicatedCV.skills,
@@ -163,11 +169,11 @@ struct IntegrationTests {
             let cvManagementUseCase = try container.makeCVManagementUseCase()
             
             // 1. Get available templates
-            let availableTemplates = try await sampleRepository.getAllTemplates()
+            let availableTemplates = try await sampleRepository.getAllSamples()
             #expect(availableTemplates.count == 1) // Default template
             
-            let defaultTemplate = try await sampleRepository.getDefaultTemplate()
-            let namedDefaultTemplate = try await sampleRepository.getTemplate(by: "default")
+            let defaultTemplate = try await sampleRepository.getDefaultSample()
+            let namedDefaultTemplate = try await sampleRepository.getSample(by: "default")
             
             #expect(namedDefaultTemplate != nil)
             
@@ -214,7 +220,7 @@ struct IntegrationTests {
         )
         
         // 1. Create CV through onboarding
-        let template = try await sampleRepository.getDefaultTemplate()
+        let template = try await sampleRepository.getDefaultSample()
         let cv1 = try await onboardingUseCase.createFirstCV(from: template)
         
         // 2. Verify persistence - CV should be accessible through different paths
@@ -457,7 +463,7 @@ struct IntegrationTests {
             let finalCVs = try await cvManagementUseCase.getAllCVs()
             let finalCV = finalCVs.first { $0.id == complexCV.id }
             
-            #expect(finalCV?.title == "Senior Full Stack Developer")
+            #expect(finalCV?.personalInfo.title == "Senior Full Stack Developer")
             #expect(finalCV?.skills.count == modifiedSkills.count)
             #expect(finalCV?.skills.contains { $0.name == "Docker" } == true)
         }

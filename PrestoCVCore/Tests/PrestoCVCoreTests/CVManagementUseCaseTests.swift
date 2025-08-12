@@ -485,7 +485,7 @@ struct CVManagementUseCaseTests {
         
         let duplicatedCV = try await useCase.duplicateCV(id: originalCV.id)
         
-        #expect(duplicatedCV.name == " (Copy)")
+        #expect(duplicatedCV.name == "Copy")
     }
     
     @Test("DuplicateCV throws error for non-existent CV")

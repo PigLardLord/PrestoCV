@@ -123,8 +123,8 @@ struct OnboardingUseCaseTests {
         // New CV should have a different ID but same content
         #expect(createdCV.id != template.id)
         #expect(createdCV.name == template.name)
-        #expect(createdCV.title == template.title)
-        #expect(createdCV.email == template.email)
+        #expect(createdCV.personalInfo.title == template.personalInfo.title)
+        #expect(createdCV.personalInfo.email == template.personalInfo.email)
         #expect(createdCV.skills.count == template.skills.count)
         #expect(createdCV.relevant_experience.count == template.relevant_experience.count)
     }
@@ -180,7 +180,7 @@ struct OnboardingUseCaseTests {
         let retrievedCV = try await cvRepository.getCV(by: createdCV.id)
         #expect(retrievedCV?.id == createdCV.id)
         #expect(retrievedCV?.name == createdCV.name)
-        #expect(retrievedCV?.email == createdCV.email)
+        #expect(retrievedCV?.personalInfo.email == createdCV.personalInfo.email)
     }
     
     @Test("CreateFirstCV creates CV with all template fields copied")
@@ -205,12 +205,12 @@ struct OnboardingUseCaseTests {
         
         // Verify all fields are copied
         #expect(createdCV.name == template.name)
-        #expect(createdCV.title == template.title)
-        #expect(createdCV.location == template.location)
-        #expect(createdCV.email == template.email)
-        #expect(createdCV.phone == template.phone)
-        #expect(createdCV.portfolio == template.portfolio)
-        #expect(createdCV.profile == template.profile)
+        #expect(createdCV.personalInfo.title == template.personalInfo.title)
+        #expect(createdCV.personalInfo.location == template.personalInfo.location)
+        #expect(createdCV.personalInfo.email == template.personalInfo.email)
+        #expect(createdCV.personalInfo.phone == template.personalInfo.phone)
+        #expect(createdCV.personalInfo.portfolio == template.personalInfo.portfolio)
+        #expect(createdCV.personalInfo.profile == template.personalInfo.profile)
         
         // Verify collections are copied
         #expect(createdCV.relevant_experience.count == template.relevant_experience.count)
@@ -253,7 +253,7 @@ struct OnboardingUseCaseTests {
         
         #expect(createdCV.id != emptyTemplate.id)
         #expect(createdCV.name == "")
-        #expect(createdCV.title == "")
+        #expect(createdCV.personalInfo.title == "")
         #expect(createdCV.relevant_experience.isEmpty)
         #expect(createdCV.skills.isEmpty)
         
@@ -316,7 +316,7 @@ struct OnboardingUseCaseTests {
         #expect(onboardingState == .firstTime)
         
         // 2. Get default template from template repository
-        let defaultTemplate = try await sampleRepository.getDefaultTemplate()
+        let defaultTemplate = try await sampleRepository.getDefaultSample()
         
         // 3. Create first CV from template
         let firstCV = try await useCase.createFirstCV(from: defaultTemplate)
