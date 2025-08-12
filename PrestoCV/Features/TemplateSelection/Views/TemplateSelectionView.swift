@@ -53,14 +53,27 @@ struct TemplateSelectionView: View {
     private var templateListView: some View {
         ScrollView {
             LazyVStack(spacing: DesignTokens.Spacing.lg) {
-                Section(header: templatesHeader) {
-                    ForEach(viewModel.templates) { template in
-                        TemplateCardView(
-                            template: template,
-                            onTap: {
-                                router.navigate(to: .cvEditor(cvId: nil))
-                            }
-                        )
+                // Create New Section
+                Section(header: createNewHeader) {
+                    createNewCard
+                }
+                
+                // Sample Templates Section
+                if !viewModel.templates.isEmpty {
+                    Section(header: templatesHeader) {
+                        ForEach(viewModel.templates) { template in
+                            TemplateCardView(
+                                template: template,
+                                onTap: {
+                                    Task {
+                                        let cvId = await viewModel.createCVFromTemplate(template)
+                                        if let cvId = cvId {
+                                            router.navigate(to: .cvEditor(cvId: cvId))
+                                        }
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -68,9 +81,62 @@ struct TemplateSelectionView: View {
         }
     }
     
+    private var createNewHeader: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+            Text("Create New")
+                .typography(.title1)
+                .foregroundColor(DesignTokens.Colors.primary)
+            
+            Text("Start with a blank canvas to create your CV from scratch.")
+                .typography(.body)
+                .foregroundColor(DesignTokens.Colors.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, DesignTokens.Spacing.sm)
+    }
+    
+    private var createNewCard: some View {
+        Button(action: {
+            Task {
+                let cvId = await viewModel.createNewEmptyCV()
+                if let cvId = cvId {
+                    router.navigate(to: .cvEditor(cvId: cvId))
+                }
+            }
+        }) {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+                // Empty template preview
+                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
+                    .fill(DesignTokens.Colors.backgroundSecondary)
+                    .aspectRatio(1.0, contentMode: .fit)
+                    .overlay(
+                        Image(systemName: "plus.rectangle.on.rectangle")
+                            .font(DesignTokens.IconSize.hero.font)
+                            .foregroundColor(DesignTokens.Colors.primary)
+                    )
+                
+                // Template info
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                    Text("Empty CV")
+                        .typography(.headline)
+                        .foregroundColor(DesignTokens.Colors.primary)
+                    
+                    Text("Start from scratch with a blank template")
+                        .typography(.caption1)
+                        .foregroundColor(DesignTokens.Colors.secondary)
+                }
+            }
+            .padding(DesignTokens.Spacing.sm)
+            .background(DesignTokens.Colors.background)
+            .cornerRadius(DesignTokens.CornerRadius.lg)
+            .shadow(color: DesignTokens.Colors.shadow, radius: DesignTokens.Shadow.radius)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
     private var templatesHeader: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-            Text("Select a Template")
+            Text("Sample Templates")
                 .typography(.title1)
                 .foregroundColor(DesignTokens.Colors.primary)
             
@@ -136,7 +202,11 @@ struct TemplateSelectionView_Previews: PreviewProvider {
         let container = DependencyContainer()
         do {
             let sampleRepository = try container.makeSampleCVRepository()
-            return TemplateSelectionViewModel(sampleRepository: sampleRepository)
+            let cvManagementUseCase = try container.makeCVManagementUseCase()
+            return TemplateSelectionViewModel(
+                sampleRepository: sampleRepository,
+                cvManagementUseCase: cvManagementUseCase
+            )
         } catch {
             fatalError("Failed to create mock view model: \(error)")
         }

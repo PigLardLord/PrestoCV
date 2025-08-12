@@ -6,9 +6,11 @@ import Foundation
 
 public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
     private let storageService: StorageServiceProtocol
+    private let categoryService: TemplateCategoryServiceProtocol
     
     public init(storageService: StorageServiceProtocol) {
         self.storageService = storageService
+        self.categoryService = TemplateCategoryService()
     }
     
     public func getDefaultSample() async throws -> CVModel {
@@ -17,7 +19,7 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
     }
     
     public func getAllSamples() async throws -> [CVModel] {
-        // Return all available CV samples (pre-filled examples for users)
+        // Since the JSON files are in the app's Resources folder, we should use the main bundle
         let bundle = Bundle.main
         
         // Get all JSON files from the bundle
@@ -57,8 +59,10 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
             return try await getDefaultSample()
         }
         
-        // Try to load by exact file name first
+        // Since the JSON files are in the app's Resources folder, we should use the main bundle
         let bundle = Bundle.main
+        
+        // Try to load by exact file name first
         if let url = bundle.url(forResource: name, withExtension: "json") {
             do {
                 let data = try Data(contentsOf: url)
@@ -69,27 +73,19 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
         }
         
         // Try to match by category keywords in file names
-        let categoryKeywords = [
-            "technical": ["technical", "developer", "engineer", "software"],
-            "creative": ["creative", "design", "artist", "ux", "ui"],
-            "business": ["business", "manager", "executive", "operations"],
-            "academic": ["academic", "research", "professor", "scientist"],
-            "healthcare": ["healthcare", "medical", "doctor", "nurse"]
-        ]
-        
         let resources = bundle.paths(forResourcesOfType: "json", inDirectory: nil)
         
         for resourcePath in resources {
             let url = URL(fileURLWithPath: resourcePath)
-            let fileName = url.deletingPathExtension().lastPathComponent.lowercased()
+            let fileName = url.deletingPathExtension().lastPathComponent
             
             // Skip the default template
             if fileName == "default" {
                 continue
             }
             
-            // Check if the file name contains keywords for the requested category
-            if let keywords = categoryKeywords[name], keywords.contains(where: { fileName.contains($0.lowercased()) }) {
+            // Use the category service to check for matches
+            if categoryService.matchTemplateCategory(for: fileName, to: name) {
                 do {
                     let data = try Data(contentsOf: url)
                     return try JSONDecoder().decode(CVModel.self, from: data)

@@ -57,6 +57,10 @@ public final class DependencyContainer: DependencyContainerProtocol {
         return SampleCVRepository(storageService: storageService)
     }
     
+    private func getTemplateCategoryService() -> TemplateCategoryServiceProtocol {
+        return TemplateCategoryService()
+    }
+    
     // MARK: - Public Methods
     
     public init() {}
@@ -84,5 +88,9 @@ public final class DependencyContainer: DependencyContainerProtocol {
     public func makeSampleCVRepository() throws -> SampleCVRepositoryProtocol {
         let storageService = try getStorageService()
         return SampleCVRepository(storageService: storageService)
+    }
+    
+    public func makeTemplateCategoryService() throws -> TemplateCategoryServiceProtocol {
+        return TemplateCategoryService()
     }
 }

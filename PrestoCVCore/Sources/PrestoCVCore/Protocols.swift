@@ -22,6 +22,13 @@ public protocol SampleCVRepositoryProtocol: Sendable {
     func getSample(by name: String) async throws -> CVModel?
 }
 
+// MARK: - Service Protocols
+
+public protocol TemplateCategoryServiceProtocol: Sendable {
+    func matchTemplateCategory(for fileName: String, to category: String) -> Bool
+    func getCategoryKeywords() -> [String: [String]]
+}
+
 // MARK: - Use Case Protocols
 
 public protocol OnboardingUseCaseProtocol: Sendable {
@@ -68,4 +75,5 @@ public protocol DependencyContainerProtocol {
     func makeOnboardingUseCase() throws -> OnboardingUseCaseProtocol
     func makeCVManagementUseCase() throws -> CVManagementUseCaseProtocol
     func makeSampleCVRepository() throws -> SampleCVRepositoryProtocol
+    func makeTemplateCategoryService() throws -> TemplateCategoryServiceProtocol
 }

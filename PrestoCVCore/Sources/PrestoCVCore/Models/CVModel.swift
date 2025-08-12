@@ -19,6 +19,25 @@ public struct CVModel: Codable, Identifiable, Sendable {
     public var interests: [String]
     public var social: [Social]
     
+    // Custom CodingKeys to handle JSON field naming
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case title
+        case location
+        case email
+        case phone
+        case portfolio
+        case profile
+        case relevant_experience
+        case education
+        case skills
+        case languages
+        case certifications
+        case interests
+        case social
+    }
+    
     public init(
         id: UUID = UUID(),
         name: String = "",
@@ -72,5 +91,28 @@ public struct CVModel: Codable, Identifiable, Sendable {
             copy.name = nameModifier(copy.name)
         }
         return copy
+    }
+    
+    // MARK: - Codable Implementation
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // For id, generate a new UUID if not present in JSON
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        self.title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
+        self.location = try container.decodeIfPresent(String.self, forKey: .location) ?? ""
+        self.email = try container.decodeIfPresent(String.self, forKey: .email) ?? ""
+        self.phone = try container.decodeIfPresent(String.self, forKey: .phone) ?? ""
+        self.portfolio = try container.decodeIfPresent(String.self, forKey: .portfolio) ?? ""
+        self.profile = try container.decodeIfPresent(String.self, forKey: .profile) ?? ""
+        self.relevant_experience = try container.decodeIfPresent([Experience].self, forKey: .relevant_experience) ?? []
+        self.education = try container.decodeIfPresent([Education].self, forKey: .education) ?? []
+        self.skills = try container.decodeIfPresent([Skill].self, forKey: .skills) ?? []
+        self.languages = try container.decodeIfPresent([Language].self, forKey: .languages) ?? []
+        self.certifications = try container.decodeIfPresent([Certification].self, forKey: .certifications) ?? []
+        self.interests = try container.decodeIfPresent([String].self, forKey: .interests) ?? []
+        self.social = try container.decodeIfPresent([Social].self, forKey: .social) ?? []
     }
 }
