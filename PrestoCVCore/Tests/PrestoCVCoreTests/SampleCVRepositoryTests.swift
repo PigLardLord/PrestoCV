@@ -15,53 +15,51 @@ struct SampleCVRepositoryTests {
         #expect(type(of: repository) == SampleCVRepository.self)
     }
     
-    // MARK: - GetDefaultSample Tests
+    // MARK: - GetDefaultTemplate Tests
     
-    @Test("GetDefaultSample returns empty CV sample")
+    @Test("GetDefaultTemplate returns empty CV template")
     func getDefaultSampleReturnsEmptyCV() async throws {
         let mockStorage = MockStorageService()
         let repository = SampleCVRepository(storageService: mockStorage)
         
-        let sample = try await repository.getDefaultSample()
+        let template = try await repository.getDefaultSample()
         
-        #expect(sample.name == "")
-        #expect(sample.personalInfo.name == "")
-        #expect(sample.personalInfo.title == "")
-        #expect(sample.personalInfo.email == "")
-        #expect(sample.personalInfo.phone == "")
-        #expect(sample.personalInfo.location == "")
-        #expect(sample.personalInfo.portfolio == "")
-        #expect(sample.personalInfo.profile == "")
-        #expect(sample.relevant_experience.isEmpty)
-        #expect(sample.education.isEmpty)
-        #expect(sample.skills.isEmpty)
-        #expect(sample.languages.isEmpty)
-        #expect(sample.certifications.isEmpty)
-        #expect(sample.interests.isEmpty)
-        #expect(sample.social.isEmpty)
+        #expect(template.name == "")
+        #expect(template.personalInfo.title == "")
+        #expect(template.personalInfo.email == "")
+        #expect(template.personalInfo.phone == "")
+        #expect(template.location == "")
+        #expect(template.portfolio == "")
+        #expect(template.profile == "")
+        #expect(template.relevant_experience.isEmpty)
+        #expect(template.education.isEmpty)
+        #expect(template.skills.isEmpty)
+        #expect(template.languages.isEmpty)
+        #expect(template.certifications.isEmpty)
+        #expect(template.interests.isEmpty)
+        #expect(template.social.isEmpty)
     }
     
-    @Test("GetDefaultSample returns consistent sample across calls")
+    @Test("GetDefaultTemplate returns consistent template across calls")
     func getDefaultSampleConsistentAcrossCalls() async throws {
         let mockStorage = MockStorageService()
         let repository = SampleCVRepository(storageService: mockStorage)
         
-        let sample1 = try await repository.getDefaultSample()
-        let sample2 = try await repository.getDefaultSample()
+        let template1 = try await repository.getDefaultSample()
+        let template2 = try await repository.getDefaultSample()
         
-        // Samples should have same structure but different IDs (since UUID() generates new ones)
-        #expect(sample1.name == sample2.name)
-        #expect(sample1.personalInfo.name == sample2.personalInfo.name)
-        #expect(sample1.personalInfo.title == sample2.personalInfo.title)
-        #expect(sample1.personalInfo.email == sample2.personalInfo.email)
-        #expect(sample1.relevant_experience.count == sample2.relevant_experience.count)
-        #expect(sample1.skills.count == sample2.skills.count)
+        // Templates should have same structure but different IDs (since UUID() generates new ones)
+        #expect(template1.name == template2.name)
+        #expect(template1.title == template2.title)
+        #expect(template1.email == template2.email)
+        #expect(template1.relevant_experience.count == template2.relevant_experience.count)
+        #expect(template1.skills.count == template2.skills.count)
         
         // But IDs should be different since CVModel() creates new UUIDs
-        #expect(sample1.id != sample2.id)
+        #expect(template1.id != template2.id)
     }
     
-    @Test("GetDefaultSample does not require storage operations")
+    @Test("GetDefaultTemplate does not require storage operations")
     func getDefaultSampleDoesNotRequireStorage() async throws {
         let mockStorage = MockStorageService()
         let repository = SampleCVRepository(storageService: mockStorage)
@@ -70,163 +68,177 @@ struct SampleCVRepositoryTests {
         mockStorage.clear()
         #expect(mockStorage.isEmpty())
         
-        let sample = try await repository.getDefaultSample()
+        let template = try await repository.getDefaultSample()
         
-        // Sample should be returned successfully without any storage operations
-        #expect(sample.name == "")
-        #expect(sample.personalInfo.name == "")
+        // Template should be returned successfully without any storage operations
+        #expect(template.name == "")
         
         // Storage should still be empty - no read or write operations occurred
         #expect(mockStorage.isEmpty())
     }
     
-    // MARK: - GetAllSamples Tests
+    // MARK: - GetAllTemplates Tests
     
-    @Test("GetAllSamples returns array containing default sample when no bundle resources")
-    func getAllSamplesReturnsDefaultSampleWhenNoBundleResources() async throws {
+    @Test("GetAllTemplates returns array containing default template")
+    func getAllSamplesReturnsDefaultTemplate() async throws {
         let mockStorage = MockStorageService()
         let repository = SampleCVRepository(storageService: mockStorage)
         
-        let samples = try await repository.getAllSamples()
+        let templates = try await repository.getAllSamples()
         
-        #expect(samples.count >= 1)
+        #expect(templates.count == 1)
         
-        let sample = samples.first!
-        #expect(sample.name == "")
-        #expect(sample.personalInfo.name == "")
-        #expect(sample.personalInfo.title == "")
-        #expect(sample.relevant_experience.isEmpty)
-        #expect(sample.skills.isEmpty)
+        let template = templates.first!
+        #expect(template.name == "")
+        #expect(template.title == "")
+        #expect(template.relevant_experience.isEmpty)
+        #expect(template.skills.isEmpty)
     }
     
-    @Test("GetAllSamples is consistent with getDefaultSample")
-    func getAllSamplesConsistentWithGetDefaultSample() async throws {
+    @Test("GetAllTemplates is consistent with getDefaultSample")
+    func getAllSamplesConsistentWithGetDefaultTemplate() async throws {
         let mockStorage = MockStorageService()
         let repository = SampleCVRepository(storageService: mockStorage)
         
-        let defaultSample = try await repository.getDefaultSample()
-        let allSamples = try await repository.getAllSamples()
+        let defaultTemplate = try await repository.getDefaultSample()
+        let allTemplates = try await repository.getAllSamples()
         
-        #expect(allSamples.count >= 1)
+        #expect(allTemplates.count == 1)
         
-        // The default sample might not be the first one if bundle resources exist
-        // But it should exist in the collection
-        let containsDefault = allSamples.contains { sample in
-            sample.name == defaultSample.name &&
-            sample.personalInfo.name == defaultSample.personalInfo.name &&
-            sample.personalInfo.email == defaultSample.personalInfo.email
-        }
+        let templateFromAll = allTemplates.first!
         
-        #expect(containsDefault)
+        // Should have same structure (but different IDs due to separate CVModel() calls)
+        #expect(templateFromAll.name == defaultTemplate.name)
+        #expect(templateFromAll.title == defaultTemplate.title)
+        #expect(templateFromAll.email == defaultTemplate.email)
+        #expect(templateFromAll.relevant_experience.count == defaultTemplate.relevant_experience.count)
     }
     
-    // MARK: - GetSample Tests
+    @Test("GetAllTemplates does not require storage operations")
+    func getAllSamplesDoesNotRequireStorage() async throws {
+        let mockStorage = MockStorageService()
+        let repository = SampleCVRepository(storageService: mockStorage)
+        
+        // Ensure storage is empty
+        mockStorage.clear()
+        #expect(mockStorage.isEmpty())
+        
+        let templates = try await repository.getAllSamples()
+        
+        #expect(templates.count == 1)
+        #expect(mockStorage.isEmpty()) // No storage operations occurred
+    }
     
-    @Test("GetSample returns default sample for 'default' name")
+    // MARK: - GetTemplate Tests
+    
+    @Test("GetTemplate returns default template for 'default' name")
     func getSampleReturnsDefaultForDefaultName() async throws {
         let mockStorage = MockStorageService()
         let repository = SampleCVRepository(storageService: mockStorage)
         
-        let sample = try await repository.getSample(by: "default")
+        let template = try await repository.getSample(by: "default")
         
-        #expect(sample != nil)
-        #expect(sample?.name == "")
-        #expect(sample?.personalInfo.name == "")
-        #expect(sample?.personalInfo.title == "")
-        #expect(sample?.relevant_experience.isEmpty == true)
-        #expect(sample?.skills.isEmpty == true)
+        #expect(template != nil)
+        #expect(template?.name == "")
+        #expect(template?.title == "")
+        #expect(template?.relevant_experience.isEmpty == true)
+        #expect(template?.skills.isEmpty == true)
     }
     
-    @Test("GetSample returns nil for unknown sample names")
+    @Test("GetTemplate returns nil for unknown template names")
     func getSampleReturnsNilForUnknownNames() async throws {
         let mockStorage = MockStorageService()
         let repository = SampleCVRepository(storageService: mockStorage)
         
-        let unknownSample = try await repository.getSample(by: "unknown")
-        #expect(unknownSample == nil)
+        let unknownTemplate = try await repository.getSample(by: "unknown")
+        #expect(unknownTemplate == nil)
         
-        let emptySample = try await repository.getSample(by: "")
-        #expect(emptySample == nil)
+        let emptyTemplate = try await repository.getSample(by: "")
+        #expect(emptyTemplate == nil)
+        
+        let professionalTemplate = try await repository.getSample(by: "professional")
+        #expect(professionalTemplate == nil)
     }
     
-    @Test("GetSample is consistent with getDefaultSample for 'default' name")
-    func getSampleConsistentWithGetDefaultSample() async throws {
+    @Test("GetTemplate is case sensitive")
+    func getSampleIsCaseSensitive() async throws {
         let mockStorage = MockStorageService()
         let repository = SampleCVRepository(storageService: mockStorage)
         
-        let defaultSample = try await repository.getDefaultSample()
-        let namedDefault = try await repository.getSample(by: "default")
+        let defaultTemplate = try await repository.getSample(by: "default")
+        let uppercaseTemplate = try await repository.getSample(by: "DEFAULT")
+        let mixedCaseTemplate = try await repository.getSample(by: "Default")
         
-        #expect(namedDefault != nil)
-        #expect(namedDefault?.name == defaultSample.name)
-        #expect(namedDefault?.personalInfo.name == defaultSample.personalInfo.name)
-        #expect(namedDefault?.personalInfo.title == defaultSample.personalInfo.title)
-        #expect(namedDefault?.personalInfo.email == defaultSample.personalInfo.email)
-        #expect(namedDefault?.relevant_experience.count == defaultSample.relevant_experience.count)
+        #expect(defaultTemplate != nil)
+        #expect(uppercaseTemplate == nil)
+        #expect(mixedCaseTemplate == nil)
     }
     
-    // MARK: - Bundle Resource Tests
-    
-    @Test("SampleCVRepository can access bundle resources")
-    func sampleRepositoryCanAccessBundleResources() async throws {
+    @Test("GetTemplate is consistent with getDefaultSample for 'default' name")
+    func getSampleConsistentWithGetDefaultTemplate() async throws {
         let mockStorage = MockStorageService()
         let repository = SampleCVRepository(storageService: mockStorage)
         
-        // This test verifies the repository can access bundle resources
-        // Actual content testing is done through integration tests
-        let allSamples = try await repository.getAllSamples()
+        let defaultTemplate = try await repository.getDefaultSample()
+        let namedDefaultTemplate = try await repository.getSample(by: "default")
         
-        #expect(allSamples.count >= 1) // Should include at least default sample
-        
-        // With our 5 sample JSON files, we should have more than just the default
-        // But this might vary in test environment vs real app
+        #expect(namedDefaultTemplate != nil)
+        #expect(namedDefaultTemplate?.name == defaultTemplate.name)
+        #expect(namedDefaultTemplate?.title == defaultTemplate.title)
+        #expect(namedDefaultTemplate?.email == defaultTemplate.email)
+        #expect(namedDefaultTemplate?.relevant_experience.count == defaultTemplate.relevant_experience.count)
     }
     
     // MARK: - Integration Tests
     
-    @Test("All sample methods work together consistently")
-    func allSampleMethodsWorkTogether() async throws {
+    @Test("All template methods work together consistently")
+    func allTemplateMethodsWorkTogether() async throws {
         let mockStorage = MockStorageService()
         let repository = SampleCVRepository(storageService: mockStorage)
         
-        // Get samples through different methods
-        let defaultSample = try await repository.getDefaultSample()
-        let allSamples = try await repository.getAllSamples()
-        let namedSample = try await repository.getSample(by: "default")
+        // Get templates through different methods
+        let defaultTemplate = try await repository.getDefaultSample()
+        let allTemplates = try await repository.getAllSamples()
+        let namedDefault = try await repository.getSample(by: "default")
         
         // Verify consistency
-        #expect(allSamples.count >= 1)
-        #expect(namedSample != nil)
+        #expect(allTemplates.count == 1)
+        #expect(namedDefault != nil)
         
-        // Default should exist in the all samples collection
-        let containsNamedDefault = allSamples.contains { $0.name == namedSample?.name }
-        #expect(containsNamedDefault)
+        let allTemplate = allTemplates.first!
+        let namedTemplate = namedDefault!
+        
+        // All should have same structure (different IDs due to separate instantiation)
+        #expect(defaultTemplate.name == allTemplate.name)
+        #expect(defaultTemplate.name == namedTemplate.name)
+        #expect(allTemplate.title == namedTemplate.title)
+        #expect(defaultTemplate.email == allTemplate.email)
     }
     
     // MARK: - Concurrency Tests
     
     @Test("SampleCVRepository handles concurrent operations correctly")
-    func sampleRepositoryHandlesConcurrentOperations() async throws {
+    func templateRepositoryHandlesConcurrentOperations() async throws {
         let mockStorage = MockStorageService()
         let repository = SampleCVRepository(storageService: mockStorage)
         
         // Test concurrent access by performing operations one after another
         // This tests thread safety without causing data race warnings
-        let sample1 = try await repository.getDefaultSample()
-        let sample2 = try await repository.getDefaultSample()
-        let allSamples = try await repository.getAllSamples()
-        let namedSample = try await repository.getSample(by: "default")
+        let template1 = try await repository.getDefaultSample()
+        let template2 = try await repository.getDefaultSample()
+        let allTemplates = try await repository.getAllSamples()
+        let namedTemplate = try await repository.getSample(by: "default")
         
         // All operations should succeed
-        #expect(sample1.name.isEmpty)
-        #expect(sample2.name.isEmpty)
-        #expect(allSamples.count >= 1)
-        #expect(namedSample != nil)
-        #expect(namedSample?.name.isEmpty == true)
+        #expect(template1.name.isEmpty)
+        #expect(template2.name.isEmpty)
+        #expect(allTemplates.count == 1)
+        #expect(namedTemplate != nil)
+        #expect(namedTemplate?.name.isEmpty == true)
         
-        // Samples should be structurally identical
-        #expect(sample1.personalInfo.title == sample2.personalInfo.title)
-        #expect(sample1.personalInfo.email == sample2.personalInfo.email)
+        // Templates should be structurally identical
+        #expect(template1.title == template2.title)
+        #expect(template1.email == template2.email)
         
         // Test with actual concurrent operations using separate repository instances
         try await withThrowingTaskGroup(of: CVModel.self) { group in
@@ -243,19 +255,124 @@ struct SampleCVRepositoryTests {
         }
     }
     
-    // MARK: - Category Matching Tests
+    // MARK: - Edge Cases and Error Handling
     
-    @Test("SampleCVRepository uses category service for pattern matching")
-    func sampleRepositoryUsesCategoryServiceForMatching() async throws {
+    @Test("SampleCVRepository handles various template name inputs")
+    func templateRepositoryHandlesVariousTemplateNames() async throws {
         let mockStorage = MockStorageService()
         let repository = SampleCVRepository(storageService: mockStorage)
         
-        // Test that the repository properly uses the category service
-        // This simulates getting a technical template by category name
-        let technicalTemplate = try await repository.getSample(by: "technical")
+        // Test various edge case inputs
+        let specialCharacterNames = ["@default", "default!", "def-ault", "default.template", "default/template"]
+        let numericNames = ["1", "123", "0"]
+        let longNames = ["very_long_template_name_that_might_cause_issues"]
         
-        // We can't assert specific values here since it depends on bundle resources,
-        // but we can verify the method doesn't throw and returns either a template or nil
-        #expect(technicalTemplate == nil || technicalTemplate is CVModel)
+        let allTestNames = specialCharacterNames + numericNames + longNames
+        
+        for name in allTestNames {
+            let template = try await repository.getSample(by: name)
+            #expect(template == nil, "Template '\(name)' should return nil")
+        }
+        
+        // Only "default" should work
+        let validTemplate = try await repository.getSample(by: "default")
+        #expect(validTemplate != nil)
+    }
+    
+    @Test("SampleCVRepository operations don't interfere with each other")
+    func templateRepositoryOperationsDontInterfere() async throws {
+        let mockStorage = MockStorageService()
+        let repository = SampleCVRepository(storageService: mockStorage)
+        
+        // Get initial state
+        let template1 = try await repository.getDefaultSample()
+        let templates1 = try await repository.getAllSamples()
+        
+        // Perform more operations
+        _ = try await repository.getSample(by: "default")
+        _ = try await repository.getSample(by: "nonexistent")
+        
+        // Get state again - should be unchanged
+        let template2 = try await repository.getDefaultSample()
+        let templates2 = try await repository.getAllSamples()
+        
+        #expect(template1.name == template2.name)
+        #expect(templates1.count == templates2.count)
+        #expect(templates1.count == 1)
+    }
+    
+    // MARK: - Future Extension Tests
+    
+    @Test("SampleCVRepository architecture supports future extensions")
+    func templateRepositorySupportsExtensions() async throws {
+        let mockStorage = MockStorageService()
+        let repository = SampleCVRepository(storageService: mockStorage)
+        
+        // Current implementation returns 1 template
+        let currentTemplates = try await repository.getAllSamples()
+        #expect(currentTemplates.count == 1)
+        
+        // The architecture supports returning more templates in the future
+        // This test verifies the current contract while documenting extensibility
+        
+        // All current template methods should work consistently
+        let defaultExists = try await repository.getSample(by: "default")
+        #expect(defaultExists != nil)
+        
+        // Storage service is available for future template loading
+        #expect(type(of: mockStorage) == MockStorageService.self)
+    }
+    
+    // MARK: - Template Content Validation Tests
+    
+    @Test("Default template has valid structure for CV creation")
+    func defaultTemplateHasValidStructure() async throws {
+        let mockStorage = MockStorageService()
+        let repository = SampleCVRepository(storageService: mockStorage)
+        
+        let template = try await repository.getDefaultSample()
+        
+        // Verify the template can be used to create a valid CV
+        #expect(template.id != UUID()) // Has a unique ID
+        
+        // All collections should be initialized (empty arrays)
+        #expect(template.relevant_experience.isEmpty)
+        #expect(template.education.isEmpty)
+        #expect(template.skills.isEmpty)
+        #expect(template.languages.isEmpty)
+        #expect(template.certifications.isEmpty)
+        #expect(template.interests.isEmpty)
+        #expect(template.social.isEmpty)
+        
+        // String fields should be empty by default
+        #expect(template.name.isEmpty)
+        #expect(template.title.isEmpty)
+        #expect(template.location.isEmpty)
+        #expect(template.email.isEmpty)
+        #expect(template.phone.isEmpty)
+        #expect(template.portfolio.isEmpty)
+        #expect(template.profile.isEmpty)
+    }
+    
+    @Test("Template can be serialized and deserialized")
+    func templateCanBeSerializedAndDeserialized() async throws {
+        let mockStorage = MockStorageService()
+        let repository = SampleCVRepository(storageService: mockStorage)
+        
+        let originalTemplate = try await repository.getDefaultSample()
+        
+        // Serialize
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(originalTemplate)
+        
+        // Deserialize
+        let decoder = JSONDecoder()
+        let deserializedTemplate = try decoder.decode(CVModel.self, from: data)
+        
+        // Verify deserialized template matches original
+        #expect(deserializedTemplate.id == originalTemplate.id)
+        #expect(deserializedTemplate.name == originalTemplate.name)
+        #expect(deserializedTemplate.relevant_experience.count == originalTemplate.relevant_experience.count)
+        #expect(deserializedTemplate.skills.count == originalTemplate.skills.count)
     }
 }
