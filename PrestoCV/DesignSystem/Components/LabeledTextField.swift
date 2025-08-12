@@ -9,50 +9,150 @@ struct LabeledTextField: View {
     var keyboardType: UIKeyboardType = .default
     var textContentType: UITextContentType? = nil
     var isSecure: Bool = false
+    var isRequired: Bool = false
+    var validationState: ValidationState = .none
+    var errorMessage: String? = nil
+    var helpText: String? = nil
     var onEditingChanged: ((Bool) -> Void)? = nil
     var onCommit: (() -> Void)? = nil
+    
+    @FocusState private var isFocused: Bool
+    
+    enum ValidationState {
+        case none
+        case valid
+        case invalid
+        case warning
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
             if !label.isEmpty {
-                Text(label)
-                    .font(DesignTokens.Typography.footnote.font)
-                    .foregroundColor(DesignTokens.Colors.secondary)
+                HStack(spacing: DesignTokens.Spacing.xxs) {
+                    Text(label)
+                        .font(DesignTokens.Typography.footnote.font)
+                        .foregroundColor(labelColor)
+                    
+                    if isRequired {
+                        Text("*")
+                            .font(DesignTokens.Typography.footnote.font)
+                            .foregroundColor(DesignTokens.Colors.error)
+                    }
+                    
+                    Spacer()
+                    
+                    // Validation icon
+                    if validationState != .none {
+                        Image(systemName: validationIcon)
+                            .font(DesignTokens.Typography.caption1.font)
+                            .foregroundColor(validationColor)
+                    }
+                }
             }
             
-            if isSecure {
-                SecureField(placeholder, text: $text)
-                    .padding(.horizontal, DesignTokens.Spacing.sm)
-                    .padding(.vertical, DesignTokens.Spacing.xs)
-                    .background(DesignTokens.Colors.backgroundTertiary)
-                    .cornerRadius(DesignTokens.CornerRadius.sm)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
-                            .stroke(DesignTokens.Colors.border, lineWidth: 1)
-                    )
-                    .keyboardType(keyboardType)
-                    .textContentType(textContentType)
-                    .onSubmit {
-                        onCommit?()
-                    }
-            } else {
-                TextField(placeholder, text: $text)
-                    .padding(.horizontal, DesignTokens.Spacing.sm)
-                    .padding(.vertical, DesignTokens.Spacing.xs)
-                    .background(DesignTokens.Colors.backgroundTertiary)
-                    .cornerRadius(DesignTokens.CornerRadius.sm)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
-                            .stroke(DesignTokens.Colors.border, lineWidth: 1)
-                    )
-                    .keyboardType(keyboardType)
-                    .textContentType(textContentType)
-                    .onSubmit {
-                        onCommit?()
-                    }
+            Group {
+                if isSecure {
+                    SecureField(placeholder, text: $text)
+                        .focused($isFocused)
+                } else {
+                    TextField(placeholder, text: $text, onEditingChanged: { editing in
+                        isFocused = editing
+                        onEditingChanged?(editing)
+                    })
+                    .focused($isFocused)
+                }
+            }
+            .padding(.horizontal, DesignTokens.Spacing.sm)
+            .padding(.vertical, DesignTokens.Spacing.xs)
+            .background(backgroundColor)
+            .cornerRadius(DesignTokens.CornerRadius.sm)
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
+                    .stroke(borderColor, lineWidth: borderWidth)
+                    .animation(.easeInOut(duration: 0.2), value: isFocused)
+            )
+            .keyboardType(keyboardType)
+            .textContentType(textContentType)
+            .onSubmit {
+                onCommit?()
+            }
+            
+            // Help text or error message
+            if let errorMessage = errorMessage, validationState == .invalid {
+                Text(errorMessage)
+                    .font(DesignTokens.Typography.caption1.font)
+                    .foregroundColor(DesignTokens.Colors.error)
+                    .padding(.top, DesignTokens.Spacing.xxxs)
+            } else if let helpText = helpText {
+                Text(helpText)
+                    .font(DesignTokens.Typography.caption1.font)
+                    .foregroundColor(DesignTokens.Colors.tertiary)
+                    .padding(.top, DesignTokens.Spacing.xxxs)
             }
         }
         .padding(.vertical, DesignTokens.Spacing.xs)
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var labelColor: Color {
+        switch validationState {
+        case .invalid:
+            return DesignTokens.Colors.error
+        case .valid:
+            return DesignTokens.Colors.success
+        case .warning:
+            return DesignTokens.Colors.warning
+        case .none:
+            return isFocused ? DesignTokens.Colors.accent : DesignTokens.Colors.secondary
+        }
+    }
+    
+    private var borderColor: Color {
+        switch validationState {
+        case .invalid:
+            return DesignTokens.Colors.error
+        case .valid:
+            return DesignTokens.Colors.success
+        case .warning:
+            return DesignTokens.Colors.warning
+        case .none:
+            return isFocused ? DesignTokens.Colors.accent : DesignTokens.Colors.border
+        }
+    }
+    
+    private var borderWidth: CGFloat {
+        isFocused || validationState != .none ? 1.5 : 1
+    }
+    
+    private var backgroundColor: Color {
+        isFocused ? DesignTokens.Colors.background : DesignTokens.Colors.backgroundTertiary
+    }
+    
+    private var validationIcon: String {
+        switch validationState {
+        case .valid:
+            return "checkmark.circle.fill"
+        case .invalid:
+            return "exclamationmark.circle.fill"
+        case .warning:
+            return "exclamationmark.triangle.fill"
+        case .none:
+            return ""
+        }
+    }
+    
+    private var validationColor: Color {
+        switch validationState {
+        case .valid:
+            return DesignTokens.Colors.success
+        case .invalid:
+            return DesignTokens.Colors.error
+        case .warning:
+            return DesignTokens.Colors.warning
+        case .none:
+            return DesignTokens.Colors.tertiary
+        }
     }
 }
 
@@ -62,14 +162,25 @@ extension LabeledTextField {
         label: String = "Email",
         text: Binding<String>,
         placeholder: String = "Enter your email",
+        isRequired: Bool = false,
         onCommit: (() -> Void)? = nil
     ) -> LabeledTextField {
-        LabeledTextField(
+        let validationState: ValidationState = {
+            let email = text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if email.isEmpty { return .none }
+            return email.contains("@") && email.contains(".") ? .valid : .invalid
+        }()
+        
+        return LabeledTextField(
             label: label,
             text: text,
             placeholder: placeholder,
             keyboardType: .emailAddress,
             textContentType: .emailAddress,
+            isRequired: isRequired,
+            validationState: validationState,
+            errorMessage: validationState == .invalid ? "Please enter a valid email address" : nil,
+            helpText: isRequired ? "Required field" : "We'll use this for professional contact",
             onCommit: onCommit
         )
     }
@@ -93,6 +204,7 @@ extension LabeledTextField {
         label: String = "Phone",
         text: Binding<String>,
         placeholder: String = "Enter your phone number",
+        isRequired: Bool = false,
         onCommit: (() -> Void)? = nil
     ) -> LabeledTextField {
         LabeledTextField(
@@ -101,6 +213,8 @@ extension LabeledTextField {
             placeholder: placeholder,
             keyboardType: .phonePad,
             textContentType: .telephoneNumber,
+            isRequired: isRequired,
+            helpText: "Include country code for international contacts",
             onCommit: onCommit
         )
     }
@@ -108,15 +222,24 @@ extension LabeledTextField {
     static func url(
         label: String = "URL",
         text: Binding<String>,
-        placeholder: String = "Enter URL",
+        placeholder: String = "https://example.com",
+        helpText: String? = "Include https:// for web links",
         onCommit: (() -> Void)? = nil
     ) -> LabeledTextField {
-        LabeledTextField(
+        let validationState: ValidationState = {
+            let url = text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if url.isEmpty { return .none }
+            return url.lowercased().hasPrefix("http") ? .valid : .warning
+        }()
+        
+        return LabeledTextField(
             label: label,
             text: text,
             placeholder: placeholder,
             keyboardType: .URL,
             textContentType: .URL,
+            validationState: validationState,
+            helpText: helpText,
             onCommit: onCommit
         )
     }

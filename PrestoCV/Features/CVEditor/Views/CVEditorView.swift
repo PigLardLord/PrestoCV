@@ -202,18 +202,20 @@ struct CVEditorView: View {
                     LabeledTextField(label: "Location", text: $viewModel.cv.personalInfo.location)
                     
                     HStack(spacing: DesignTokens.Spacing.sm) {
-                        LabeledTextField(label: "Email", text: $viewModel.cv.personalInfo.email)
-                            .textContentType(.emailAddress)
-                            .keyboardType(.emailAddress)
+                        LabeledTextField.email(
+                            text: $viewModel.cv.personalInfo.email,
+                            isRequired: true
+                        )
                         
-                        LabeledTextField(label: "Phone", text: $viewModel.cv.personalInfo.phone)
-                            .textContentType(.telephoneNumber)
-                            .keyboardType(.phonePad)
+                        LabeledTextField.phone(
+                            text: $viewModel.cv.personalInfo.phone
+                        )
                     }
                     
-                    LabeledTextField(label: "Portfolio URL", text: $viewModel.cv.personalInfo.portfolio)
-                        .textContentType(.URL)
-                        .keyboardType(.URL)
+                    LabeledTextField.url(
+                        label: "Portfolio URL",
+                        text: $viewModel.cv.personalInfo.portfolio
+                    )
                 }
             } header: {
                 Text("Personal Information")
