@@ -1,5 +1,4 @@
 import SwiftUI
-import PrestoCVCore
 
 struct SkillLevelView: View {
     @Binding var level: Int

@@ -84,165 +84,398 @@ struct CVEditorView: View {
             }
             
             Section("Personal Information") {
-                TextField("Full Name", text: $viewModel.cv.personalInfo.name)
-                TextField("Professional Title", text: $viewModel.cv.personalInfo.title)
-                TextField("Location", text: $viewModel.cv.personalInfo.location)
-                TextField("Email", text: $viewModel.cv.personalInfo.email)
+                // These benefit from labels since they're grouped together
+                LabeledTextField(label: "Full Name", text: $viewModel.cv.personalInfo.name)
+                LabeledTextField(label: "Professional Title", text: $viewModel.cv.personalInfo.title)
+                LabeledTextField(label: "Location", text: $viewModel.cv.personalInfo.location)
+                LabeledTextField(label: "Email", text: $viewModel.cv.personalInfo.email)
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
-                TextField("Phone", text: $viewModel.cv.personalInfo.phone)
+                LabeledTextField(label: "Phone", text: $viewModel.cv.personalInfo.phone)
                     .textContentType(.telephoneNumber)
                     .keyboardType(.phonePad)
-                TextField("Portfolio URL", text: $viewModel.cv.personalInfo.portfolio)
+                LabeledTextField(label: "Portfolio URL", text: $viewModel.cv.personalInfo.portfolio)
                     .textContentType(.URL)
                     .keyboardType(.URL)
                 
-                TextEditor(text: $viewModel.cv.personalInfo.profile)
-                    .frame(height: 100)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
-                            .stroke(DesignTokens.Colors.tertiary, lineWidth: 1)
-                    )
-                    .padding(.vertical, DesignTokens.Spacing.xxs)
+                // Description fields benefit from labels
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                    Text("Professional Summary")
+                        .font(DesignTokens.Typography.footnote.font)
+                        .foregroundColor(DesignTokens.Colors.secondary)
+                    
+                    TextEditor(text: $viewModel.cv.personalInfo.profile)
+                        .frame(height: 120)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
+                                .stroke(DesignTokens.Colors.tertiary, lineWidth: 1)
+                        )
+                        .padding(.vertical, DesignTokens.Spacing.xxs)
+                }
             }
             
             Section("Skills") {
-                ForEach(viewModel.cv.skills.indices, id: \.self) { index in
-                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                        TextField("Skill", text: $viewModel.cv.skills[index].name)
+                if viewModel.cv.skills.isEmpty {
+                    Text("No skills added")
+                        .foregroundColor(DesignTokens.Colors.tertiary)
+                        .padding(.vertical, DesignTokens.Spacing.xs)
+                } else {
+                    ForEach(viewModel.cv.skills.indices, id: \.self) { index in
+                        HStack {
+                            TextField("Skill", text: $viewModel.cv.skills[index].name)
+                            Spacer()
+                            Button(action: {
+                                withAnimation {
+                                    viewModel.removeSkill(at: index)
+                                }
+                            }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(DesignTokens.Colors.error)
+                            }
+                        }
                         SkillLevelView(
                             level: $viewModel.cv.skills[index].level,
                             maxLevel: 5
                         )
                         .padding(.bottom, DesignTokens.Spacing.xs)
                     }
-                }
-                .onDelete { indices in
-                    viewModel.cv.skills.remove(atOffsets: indices)
+                    .onDelete { indices in
+                        withAnimation {
+                            viewModel.cv.skills.remove(atOffsets: indices)
+                        }
+                    }
                 }
                 
-                Button("Add Skill") {
-                    viewModel.addSkill()
+                Button(action: {
+                    withAnimation {
+                        viewModel.addSkill()
+                    }
+                }) {
+                    Label("Add Skill", systemImage: "plus")
                 }
+                .padding(.vertical, DesignTokens.Spacing.xs)
             }
             
             Section("Experience") {
-                ForEach(viewModel.cv.relevant_experience.indices, id: \.self) { index in
-                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                        TextField("Job Title", text: $viewModel.cv.relevant_experience[index].title)
-                        TextField("Company", text: $viewModel.cv.relevant_experience[index].company)
-                        TextField("Location", text: $viewModel.cv.relevant_experience[index].location)
-                        TextField("Period", text: $viewModel.cv.relevant_experience[index].period)
-                        TextEditor(text: $viewModel.cv.relevant_experience[index].description)
-                            .frame(height: DesignTokens.Spacing.xxl)
+                if viewModel.cv.relevant_experience.isEmpty {
+                    Text("No experience added")
+                        .foregroundColor(DesignTokens.Colors.tertiary)
+                        .padding(.vertical, DesignTokens.Spacing.xs)
+                } else {
+                    ForEach(viewModel.cv.relevant_experience.indices, id: \.self) { index in
+                        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                            HStack {
+                                TextField("Job Title", text: $viewModel.cv.relevant_experience[index].title)
+                                Spacer()
+                                Button(action: {
+                                    withAnimation {
+                                        viewModel.removeExperience(at: index)
+                                    }
+                                }) {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(DesignTokens.Colors.error)
+                                }
+                            }
+                            
+                            TextField("Company", text: $viewModel.cv.relevant_experience[index].company)
+                            
+                            HStack {
+                                TextField("Location", text: $viewModel.cv.relevant_experience[index].location)
+                                TextField("Period", text: $viewModel.cv.relevant_experience[index].period)
+                                    .multilineTextAlignment(.trailing)
+                            }
+                            
+                            // Description fields benefit from labels
+                            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                                Text("Description")
+                                    .font(DesignTokens.Typography.footnote.font)
+                                    .foregroundColor(DesignTokens.Colors.secondary)
+                                
+                                TextEditor(text: $viewModel.cv.relevant_experience[index].description)
+                                    .frame(height: 100)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
+                                            .stroke(DesignTokens.Colors.tertiary, lineWidth: 1)
+                                    )
+                            }
+                        }
+                        .padding(.vertical, DesignTokens.Spacing.xs)
+                    }
+                    .onDelete { indices in
+                        withAnimation {
+                            viewModel.cv.relevant_experience.remove(atOffsets: indices)
+                        }
                     }
                 }
-                .onDelete { indices in
-                    viewModel.cv.relevant_experience.remove(atOffsets: indices)
-                }
                 
-                Button("Add Experience") {
-                    viewModel.addExperience()
+                Button(action: {
+                    withAnimation {
+                        viewModel.addExperience()
+                    }
+                }) {
+                    Label("Add Experience", systemImage: "plus")
                 }
+                .padding(.vertical, DesignTokens.Spacing.xs)
             }
             
             Section("Education") {
-                ForEach(viewModel.cv.education.indices, id: \.self) { index in
-                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                        TextField("Degree", text: $viewModel.cv.education[index].degree)
-                        TextField("School", text: $viewModel.cv.education[index].school)
-                        TextField("Period", text: $viewModel.cv.education[index].period)
-                        TextEditor(text: $viewModel.cv.education[index].description)
-                            .frame(height: DesignTokens.Spacing.xxl)
+                if viewModel.cv.education.isEmpty {
+                    Text("No education added")
+                        .foregroundColor(DesignTokens.Colors.tertiary)
+                        .padding(.vertical, DesignTokens.Spacing.xs)
+                } else {
+                    ForEach(viewModel.cv.education.indices, id: \.self) { index in
+                        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                            HStack {
+                                TextField("Degree", text: $viewModel.cv.education[index].degree)
+                                Spacer()
+                                Button(action: {
+                                    withAnimation {
+                                        viewModel.removeEducation(at: index)
+                                    }
+                                }) {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(DesignTokens.Colors.error)
+                                }
+                            }
+                            
+                            TextField("School", text: $viewModel.cv.education[index].school)
+                            
+                            HStack {
+                                TextField("Period", text: $viewModel.cv.education[index].period)
+                                Spacer()
+                            }
+                            
+                            // Description fields benefit from labels
+                            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                                Text("Description")
+                                    .font(DesignTokens.Typography.footnote.font)
+                                    .foregroundColor(DesignTokens.Colors.secondary)
+                                
+                                TextEditor(text: $viewModel.cv.education[index].description)
+                                    .frame(height: 100)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
+                                            .stroke(DesignTokens.Colors.tertiary, lineWidth: 1)
+                                    )
+                            }
+                        }
+                        .padding(.vertical, DesignTokens.Spacing.xs)
+                    }
+                    .onDelete { indices in
+                        withAnimation {
+                            viewModel.cv.education.remove(atOffsets: indices)
+                        }
                     }
                 }
-                .onDelete { indices in
-                    viewModel.cv.education.remove(atOffsets: indices)
-                }
                 
-                Button("Add Education") {
-                    viewModel.addEducation()
+                Button(action: {
+                    withAnimation {
+                        viewModel.addEducation()
+                    }
+                }) {
+                    Label("Add Education", systemImage: "plus")
                 }
+                .padding(.vertical, DesignTokens.Spacing.xs)
             }
             
             Section("Languages") {
-                ForEach(viewModel.cv.languages.indices, id: \.self) { index in
-                    HStack {
-                        TextField("Language", text: $viewModel.cv.languages[index].name)
-                        TextField("Level", text: $viewModel.cv.languages[index].level)
+                if viewModel.cv.languages.isEmpty {
+                    Text("No languages added")
+                        .foregroundColor(DesignTokens.Colors.tertiary)
+                        .padding(.vertical, DesignTokens.Spacing.xs)
+                } else {
+                    ForEach(viewModel.cv.languages.indices, id: \.self) { index in
+                        HStack {
+                            TextField("Language", text: $viewModel.cv.languages[index].name)
+                            TextField("Level", text: $viewModel.cv.languages[index].level)
+                                .multilineTextAlignment(.trailing)
+                            
+                            Button(action: {
+                                withAnimation {
+                                    viewModel.removeLanguage(at: index)
+                                }
+                            }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(DesignTokens.Colors.error)
+                            }
+                        }
+                        .padding(.vertical, DesignTokens.Spacing.xs)
+                    }
+                    .onDelete { indices in
+                        withAnimation {
+                            viewModel.cv.languages.remove(atOffsets: indices)
+                        }
                     }
                 }
-                .onDelete { indices in
-                    viewModel.cv.languages.remove(atOffsets: indices)
-                }
                 
-                Button("Add Language") {
-                    viewModel.addLanguage()
+                Button(action: {
+                    withAnimation {
+                        viewModel.addLanguage()
+                    }
+                }) {
+                    Label("Add Language", systemImage: "plus")
                 }
+                .padding(.vertical, DesignTokens.Spacing.xs)
             }
             
             Section("Certifications") {
-                ForEach(viewModel.cv.certifications.indices, id: \.self) { index in
-                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                        TextField("Name", text: $viewModel.cv.certifications[index].name)
-                        TextField("Issuer", text: $viewModel.cv.certifications[index].issuer)
-                        TextField("Year", text: Binding(
-                            get: { String(viewModel.cv.certifications[index].year) },
-                            set: { newValue in
-                                viewModel.cv.certifications[index].year = Int(newValue) ?? 0
+                if viewModel.cv.certifications.isEmpty {
+                    Text("No certifications added")
+                        .foregroundColor(DesignTokens.Colors.tertiary)
+                        .padding(.vertical, DesignTokens.Spacing.xs)
+                } else {
+                    ForEach(viewModel.cv.certifications.indices, id: \.self) { index in
+                        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                            HStack {
+                                TextField("Certification Name", text: $viewModel.cv.certifications[index].name)
+                                Spacer()
+                                Button(action: {
+                                    withAnimation {
+                                        viewModel.removeCertification(at: index)
+                                    }
+                                }) {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(DesignTokens.Colors.error)
+                                }
                             }
-                        ))
-                        .keyboardType(.numberPad)
-                        TextField("URL", text: $viewModel.cv.certifications[index].url)
-                            .textContentType(.URL)
-                            .keyboardType(.URL)
-                        TextEditor(text: $viewModel.cv.certifications[index].description)
-                            .frame(height: DesignTokens.Spacing.xl)
+                            
+                            TextField("Issuer", text: $viewModel.cv.certifications[index].issuer)
+                            
+                            HStack {
+                                TextField("Year", text: Binding(
+                                    get: { String(viewModel.cv.certifications[index].year) },
+                                    set: { newValue in
+                                        viewModel.cv.certifications[index].year = Int(newValue) ?? 0
+                                    }
+                                ))
+                                .keyboardType(.numberPad)
+                                .frame(maxWidth: 100)
+                                
+                                Spacer()
+                                
+                                TextField("URL", text: $viewModel.cv.certifications[index].url)
+                                    .textContentType(.URL)
+                                    .keyboardType(.URL)
+                            }
+                            
+                            // Description fields benefit from labels
+                            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                                Text("Description")
+                                    .font(DesignTokens.Typography.footnote.font)
+                                    .foregroundColor(DesignTokens.Colors.secondary)
+                                
+                                TextEditor(text: $viewModel.cv.certifications[index].description)
+                                    .frame(height: 100)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
+                                            .stroke(DesignTokens.Colors.tertiary, lineWidth: 1)
+                                    )
+                            }
+                        }
+                        .padding(.vertical, DesignTokens.Spacing.xs)
+                    }
+                    .onDelete { indices in
+                        withAnimation {
+                            viewModel.cv.certifications.remove(atOffsets: indices)
+                        }
                     }
                 }
-                .onDelete { indices in
-                    viewModel.cv.certifications.remove(atOffsets: indices)
-                }
                 
-                Button("Add Certification") {
-                    viewModel.addCertification()
+                Button(action: {
+                    withAnimation {
+                        viewModel.addCertification()
+                    }
+                }) {
+                    Label("Add Certification", systemImage: "plus")
                 }
+                .padding(.vertical, DesignTokens.Spacing.xs)
             }
             
             Section("Social Links") {
-                ForEach(viewModel.cv.social.indices, id: \.self) { index in
-                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                        TextField("Platform", text: $viewModel.cv.social[index].platform)
-                        TextField("URL", text: $viewModel.cv.social[index].url)
-                            .textContentType(.URL)
-                            .keyboardType(.URL)
+                if viewModel.cv.social.isEmpty {
+                    Text("No social links added")
+                        .foregroundColor(DesignTokens.Colors.tertiary)
+                        .padding(.vertical, DesignTokens.Spacing.xs)
+                } else {
+                    ForEach(viewModel.cv.social.indices, id: \.self) { index in
+                        HStack {
+                            TextField("Platform", text: $viewModel.cv.social[index].platform)
+                            TextField("URL", text: $viewModel.cv.social[index].url)
+                                .textContentType(.URL)
+                                .keyboardType(.URL)
+                            
+                            Button(action: {
+                                withAnimation {
+                                    viewModel.removeSocial(at: index)
+                                }
+                            }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(DesignTokens.Colors.error)
+                            }
+                        }
+                        .padding(.vertical, DesignTokens.Spacing.xs)
+                    }
+                    .onDelete { indices in
+                        withAnimation {
+                            viewModel.cv.social.remove(atOffsets: indices)
+                        }
                     }
                 }
-                .onDelete { indices in
-                    viewModel.cv.social.remove(atOffsets: indices)
-                }
                 
-                Button("Add Social Link") {
-                    viewModel.addSocial()
+                Button(action: {
+                    withAnimation {
+                        viewModel.addSocial()
+                    }
+                }) {
+                    Label("Add Social Link", systemImage: "plus")
                 }
+                .padding(.vertical, DesignTokens.Spacing.xs)
             }
             
             Section("Interests") {
-                ForEach(viewModel.cv.interests.indices, id: \.self) { index in
-                    TextField("Interest", text: Binding(
-                        get: { viewModel.cv.interests[index] },
-                        set: { newValue in
-                            viewModel.cv.interests[index] = newValue
+                if viewModel.cv.interests.isEmpty {
+                    Text("No interests added")
+                        .foregroundColor(DesignTokens.Colors.tertiary)
+                        .padding(.vertical, DesignTokens.Spacing.xs)
+                } else {
+                    ForEach(viewModel.cv.interests.indices, id: \.self) { index in
+                        HStack {
+                            TextField("Interest", text: Binding(
+                                get: { viewModel.cv.interests[index] },
+                                set: { newValue in
+                                    viewModel.cv.interests[index] = newValue
+                                }
+                            ))
+                            
+                            Spacer()
+                            
+                            Button(action: {
+                                withAnimation {
+                                    viewModel.removeInterest(at: index)
+                                }
+                            }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(DesignTokens.Colors.error)
+                            }
                         }
-                    ))
-                }
-                .onDelete { indices in
-                    viewModel.cv.interests.remove(atOffsets: indices)
+                        .padding(.vertical, DesignTokens.Spacing.xs)
+                    }
+                    .onDelete { indices in
+                        withAnimation {
+                            viewModel.cv.interests.remove(atOffsets: indices)
+                        }
+                    }
                 }
                 
-                Button("Add Interest") {
-                    viewModel.addInterest()
+                Button(action: {
+                    withAnimation {
+                        viewModel.addInterest()
+                    }
+                }) {
+                    Label("Add Interest", systemImage: "plus")
                 }
+                .padding(.vertical, DesignTokens.Spacing.xs)
             }
         }
     }
