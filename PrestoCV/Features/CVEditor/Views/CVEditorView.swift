@@ -79,8 +79,11 @@ struct CVEditorView: View {
     
     private var editorView: some View {
         Form {
-            Section("Basic Information") {
+            Section("CV Details") {
                 TextField("CV Name", text: $viewModel.cv.name)
+            }
+            
+            Section("Personal Information") {
                 TextField("Full Name", text: $viewModel.cv.personalInfo.name)
                 TextField("Professional Title", text: $viewModel.cv.personalInfo.title)
                 TextField("Location", text: $viewModel.cv.personalInfo.location)
@@ -105,7 +108,14 @@ struct CVEditorView: View {
             
             Section("Skills") {
                 ForEach(viewModel.cv.skills.indices, id: \.self) { index in
-                    TextField("Skill", text: $viewModel.cv.skills[index].name)
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                        TextField("Skill", text: $viewModel.cv.skills[index].name)
+                        SkillLevelView(
+                            level: $viewModel.cv.skills[index].level,
+                            maxLevel: 5
+                        )
+                        .padding(.bottom, DesignTokens.Spacing.xs)
+                    }
                 }
                 .onDelete { indices in
                     viewModel.cv.skills.remove(atOffsets: indices)
