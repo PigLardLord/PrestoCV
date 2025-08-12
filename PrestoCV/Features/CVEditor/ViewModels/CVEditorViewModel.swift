@@ -106,6 +106,56 @@ final class CVEditorViewModel: ObservableObject {
         cv.relevant_experience.remove(at: index)
     }
     
+    @MainActor
+    func addEducation() {
+        cv.education.append(Education())
+    }
+    
+    @MainActor
+    func removeEducation(at index: Int) {
+        cv.education.remove(at: index)
+    }
+    
+    @MainActor
+    func addLanguage() {
+        cv.languages.append(Language())
+    }
+    
+    @MainActor
+    func removeLanguage(at index: Int) {
+        cv.languages.remove(at: index)
+    }
+    
+    @MainActor
+    func addCertification() {
+        cv.certifications.append(Certification())
+    }
+    
+    @MainActor
+    func removeCertification(at index: Int) {
+        cv.certifications.remove(at: index)
+    }
+    
+    @MainActor
+    func addSocial() {
+        cv.social.append(Social())
+    }
+    
+    @MainActor
+    func removeSocial(at index: Int) {
+        cv.social.remove(at: index)
+    }
+    
+    @MainActor
+    func addInterest() {
+        cv.interests.append("")
+    }
+    
+    @MainActor
+    func removeInterest(at index: Int) {
+        cv.interests.remove(at: index)
+    }
+
     // MARK: - Private Methods
     @MainActor
     private func loadExistingCV(with uuid: UUID) async throws {

@@ -100,10 +100,10 @@ struct CVEditorView: View {
                 TextEditor(text: $viewModel.cv.personalInfo.profile)
                     .frame(height: 100)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 4)
-                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
+                            .stroke(DesignTokens.Colors.tertiary, lineWidth: 1)
                     )
-                    .padding(.vertical, 4)
+                    .padding(.vertical, DesignTokens.Spacing.xxs)
             }
             
             Section("Skills") {
@@ -128,12 +128,13 @@ struct CVEditorView: View {
             
             Section("Experience") {
                 ForEach(viewModel.cv.relevant_experience.indices, id: \.self) { index in
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
                         TextField("Job Title", text: $viewModel.cv.relevant_experience[index].title)
                         TextField("Company", text: $viewModel.cv.relevant_experience[index].company)
                         TextField("Location", text: $viewModel.cv.relevant_experience[index].location)
-                        TextField("Description", text: $viewModel.cv.relevant_experience[index].description)
-                            .frame(height: 60)
+                        TextField("Period", text: $viewModel.cv.relevant_experience[index].period)
+                        TextEditor(text: $viewModel.cv.relevant_experience[index].description)
+                            .frame(height: DesignTokens.Spacing.xxl)
                     }
                 }
                 .onDelete { indices in
@@ -142,6 +143,105 @@ struct CVEditorView: View {
                 
                 Button("Add Experience") {
                     viewModel.addExperience()
+                }
+            }
+            
+            Section("Education") {
+                ForEach(viewModel.cv.education.indices, id: \.self) { index in
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                        TextField("Degree", text: $viewModel.cv.education[index].degree)
+                        TextField("School", text: $viewModel.cv.education[index].school)
+                        TextField("Period", text: $viewModel.cv.education[index].period)
+                        TextEditor(text: $viewModel.cv.education[index].description)
+                            .frame(height: DesignTokens.Spacing.xxl)
+                    }
+                }
+                .onDelete { indices in
+                    viewModel.cv.education.remove(atOffsets: indices)
+                }
+                
+                Button("Add Education") {
+                    viewModel.addEducation()
+                }
+            }
+            
+            Section("Languages") {
+                ForEach(viewModel.cv.languages.indices, id: \.self) { index in
+                    HStack {
+                        TextField("Language", text: $viewModel.cv.languages[index].name)
+                        TextField("Level", text: $viewModel.cv.languages[index].level)
+                    }
+                }
+                .onDelete { indices in
+                    viewModel.cv.languages.remove(atOffsets: indices)
+                }
+                
+                Button("Add Language") {
+                    viewModel.addLanguage()
+                }
+            }
+            
+            Section("Certifications") {
+                ForEach(viewModel.cv.certifications.indices, id: \.self) { index in
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                        TextField("Name", text: $viewModel.cv.certifications[index].name)
+                        TextField("Issuer", text: $viewModel.cv.certifications[index].issuer)
+                        TextField("Year", text: Binding(
+                            get: { String(viewModel.cv.certifications[index].year) },
+                            set: { newValue in
+                                viewModel.cv.certifications[index].year = Int(newValue) ?? 0
+                            }
+                        ))
+                        .keyboardType(.numberPad)
+                        TextField("URL", text: $viewModel.cv.certifications[index].url)
+                            .textContentType(.URL)
+                            .keyboardType(.URL)
+                        TextEditor(text: $viewModel.cv.certifications[index].description)
+                            .frame(height: DesignTokens.Spacing.xl)
+                    }
+                }
+                .onDelete { indices in
+                    viewModel.cv.certifications.remove(atOffsets: indices)
+                }
+                
+                Button("Add Certification") {
+                    viewModel.addCertification()
+                }
+            }
+            
+            Section("Social Links") {
+                ForEach(viewModel.cv.social.indices, id: \.self) { index in
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                        TextField("Platform", text: $viewModel.cv.social[index].platform)
+                        TextField("URL", text: $viewModel.cv.social[index].url)
+                            .textContentType(.URL)
+                            .keyboardType(.URL)
+                    }
+                }
+                .onDelete { indices in
+                    viewModel.cv.social.remove(atOffsets: indices)
+                }
+                
+                Button("Add Social Link") {
+                    viewModel.addSocial()
+                }
+            }
+            
+            Section("Interests") {
+                ForEach(viewModel.cv.interests.indices, id: \.self) { index in
+                    TextField("Interest", text: Binding(
+                        get: { viewModel.cv.interests[index] },
+                        set: { newValue in
+                            viewModel.cv.interests[index] = newValue
+                        }
+                    ))
+                }
+                .onDelete { indices in
+                    viewModel.cv.interests.remove(atOffsets: indices)
+                }
+                
+                Button("Add Interest") {
+                    viewModel.addInterest()
                 }
             }
         }
