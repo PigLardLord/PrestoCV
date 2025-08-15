@@ -47,14 +47,12 @@ struct CVEditableSection<Item, RowContent: View>: View where Item: Identifiable 
                     subtitle: emptyStateSubtitle
                 )
             } else {
-                ForEach(items.indices, id: \.self) { index in
-                    rowContent(
-                        $items[index],
-                        { animatedRemove(at: index) }
-                    )
-                    .padding(.vertical, addVerticalPadding ? DesignTokens.Spacing.xs : 0)
-                }
-                .onDelete(perform: animatedDelete)
+                EditableItemsList(
+                    items: $items,
+                    verticalPadding: addVerticalPadding ? DesignTokens.Spacing.xs : 0,
+                    rowContent: rowContent,
+                    onRemove: onRemove
+                )
             }
             
             AddButton(
@@ -70,18 +68,6 @@ struct CVEditableSection<Item, RowContent: View>: View where Item: Identifiable 
     private func animatedAdd() {
         withAnimation(DesignTokens.Animations.standardEaseInOut) {
             onAdd()
-        }
-    }
-    
-    private func animatedRemove(at index: Int) {
-        withAnimation(DesignTokens.Animations.standardEaseInOut) {
-            onRemove(index)
-        }
-    }
-    
-    private func animatedDelete(at indices: IndexSet) {
-        withAnimation(DesignTokens.Animations.standardEaseInOut) {
-            items.remove(atOffsets: indices)
         }
     }
 }

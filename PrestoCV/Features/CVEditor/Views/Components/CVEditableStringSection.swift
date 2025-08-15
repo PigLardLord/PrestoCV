@@ -44,13 +44,11 @@ struct CVEditableStringSection<RowContent: View>: View {
                     subtitle: emptyStateSubtitle
                 )
             } else {
-                ForEach(items.indices, id: \.self) { index in
-                    rowContent(
-                        $items[index],
-                        { animatedRemove(at: index) }
-                    )
-                }
-                .onDelete(perform: animatedDelete)
+                EditableStringsList(
+                    items: $items,
+                    rowContent: rowContent,
+                    onRemove: onRemove
+                )
             }
             
             AddButton(
@@ -66,18 +64,6 @@ struct CVEditableStringSection<RowContent: View>: View {
     private func animatedAdd() {
         withAnimation(DesignTokens.Animations.standardEaseInOut) {
             onAdd()
-        }
-    }
-    
-    private func animatedRemove(at index: Int) {
-        withAnimation(DesignTokens.Animations.standardEaseInOut) {
-            onRemove(index)
-        }
-    }
-    
-    private func animatedDelete(at indices: IndexSet) {
-        withAnimation(DesignTokens.Animations.standardEaseInOut) {
-            items.remove(atOffsets: indices)
         }
     }
 }
