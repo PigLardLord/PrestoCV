@@ -48,19 +48,11 @@ struct CVEditableSection<Item, RowContent: View>: View where Item: Identifiable 
                 )
             } else {
                 ForEach(items.indices, id: \.self) { index in
-                    let content = rowContent(
-                        Binding(
-                            get: { items[index] },
-                            set: { items[index] = $0 }
-                        ),
+                    rowContent(
+                        $items[index],
                         { animatedRemove(at: index) }
                     )
-                    
-                    if addVerticalPadding {
-                        content.padding(.vertical, DesignTokens.Spacing.xs)
-                    } else {
-                        content
-                    }
+                    .padding(.vertical, addVerticalPadding ? DesignTokens.Spacing.xs : 0)
                 }
                 .onDelete(perform: animatedDelete)
             }

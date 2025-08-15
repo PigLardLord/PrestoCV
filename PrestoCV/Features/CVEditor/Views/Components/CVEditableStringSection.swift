@@ -46,10 +46,7 @@ struct CVEditableStringSection<RowContent: View>: View {
             } else {
                 ForEach(items.indices, id: \.self) { index in
                     rowContent(
-                        Binding(
-                            get: { items[index] },
-                            set: { items[index] = $0 }
-                        ),
+                        $items[index],
                         { animatedRemove(at: index) }
                     )
                 }
