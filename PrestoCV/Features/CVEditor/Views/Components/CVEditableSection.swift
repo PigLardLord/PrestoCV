@@ -37,19 +37,14 @@ struct CVEditableSection<Item, RowContent: View>: View where Item: Identifiable 
     
     var body: some View {
         Section {
-            if items.isEmpty {
-                CVEmptyStateView(
-                    icon: icon,
-                    title: emptyStateTitle,
-                    subtitle: emptyStateSubtitle
-                )
-            } else {
-                EditableItemsList(
-                    items: $items,
-                    rowContent: rowContent,
-                    onRemove: onRemove
-                )
-            }
+            EditableContent(
+                items: $items,
+                icon: icon,
+                emptyStateTitle: emptyStateTitle,
+                emptyStateSubtitle: emptyStateSubtitle,
+                rowContent: rowContent,
+                onRemove: onRemove
+            )
             
             AddButton(
                 title: addButtonTitle,
