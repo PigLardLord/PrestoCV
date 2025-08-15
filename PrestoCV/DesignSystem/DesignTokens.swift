@@ -66,6 +66,13 @@ enum DesignTokens {
         }
     }
     
+    // MARK: - Indicator Sizes
+    enum IndicatorSize {
+        static let small: CGFloat = 6
+        static let medium: CGFloat = 8
+        static let large: CGFloat = 12
+    }
+    
     // MARK: - Colors
     enum Colors {
         // Text colors
