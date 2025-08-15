@@ -95,7 +95,7 @@ struct InterestsSubsection: View {
     @ObservedObject var viewModel: CVEditorViewModel
     
     var body: some View {
-        CVEditableStringSection(
+        CVEditableSection(
             title: "Interests",
             icon: "heart.circle",
             emptyStateTitle: "No Interests Added",

@@ -1,7 +1,7 @@
 import SwiftUI
 import PrestoCVCore
 
-struct CVEditableSection<Item, RowContent: View>: View where Item: Identifiable {
+struct CVEditableSection<Item, RowContent: View>: View {
     let title: String
     let icon: String
     let emptyStateTitle: String
