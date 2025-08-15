@@ -23,46 +23,23 @@ struct WorkExperienceSubsection: View {
     @ObservedObject var viewModel: CVEditorViewModel
     
     var body: some View {
-        Section {
-            if viewModel.cv.relevant_experience.isEmpty {
-                CVEmptyStateView(
-                    icon: "briefcase",
-                    title: "No Experience Added",
-                    subtitle: "Add your work experience to showcase your professional background"
+        CVEditableSection(
+            title: "Work Experience",
+            icon: "briefcase",
+            emptyStateTitle: "No Experience Added",
+            emptyStateSubtitle: "Add your work experience to showcase your professional background",
+            addButtonTitle: "Add Experience",
+            items: $viewModel.cv.relevant_experience,
+            addVerticalPadding: true,
+            rowContent: { experience, onDelete in
+                ExperienceRowView(
+                    experience: experience,
+                    onDelete: onDelete
                 )
-            } else {
-                ForEach(viewModel.cv.relevant_experience.indices, id: \.self) { index in
-                    ExperienceRowView(
-                        experience: $viewModel.cv.relevant_experience[index],
-                        onDelete: { animatedRemoveExperience(at: index) }
-                    )
-                    .padding(.vertical, DesignTokens.Spacing.xs)
-                }
-                .onDelete(perform: animatedDeleteExperiences)
-            }
-            
-            AddButton(title: "Add Experience", icon: "plus.circle.fill", action: animatedAddExperience)
-        } header: {
-            SectionHeader(title: "Work Experience")
-        }
-    }
-    
-    private func animatedAddExperience() {
-        withAnimation(DesignTokens.Animations.standardEaseInOut) {
-            viewModel.addExperience()
-        }
-    }
-    
-    private func animatedRemoveExperience(at index: Int) {
-        withAnimation(DesignTokens.Animations.standardEaseInOut) {
-            viewModel.removeExperience(at: index)
-        }
-    }
-    
-    private func animatedDeleteExperiences(at indices: IndexSet) {
-        withAnimation(DesignTokens.Animations.standardEaseInOut) {
-            viewModel.cv.relevant_experience.remove(atOffsets: indices)
-        }
+            },
+            onAdd: viewModel.addExperience,
+            onRemove: { viewModel.removeExperience(at: $0) }
+        )
     }
 }
 
@@ -70,45 +47,22 @@ struct SkillsSubsection: View {
     @ObservedObject var viewModel: CVEditorViewModel
     
     var body: some View {
-        Section {
-            if viewModel.cv.skills.isEmpty {
-                CVEmptyStateView(
-                    icon: "star.circle",
-                    title: "No Skills Added",
-                    subtitle: "Add your technical and professional skills"
+        CVEditableSection(
+            title: "Skills",
+            icon: "star.circle",
+            emptyStateTitle: "No Skills Added",
+            emptyStateSubtitle: "Add your technical and professional skills",
+            addButtonTitle: "Add Skill",
+            items: $viewModel.cv.skills,
+            rowContent: { skill, onDelete in
+                SkillRowView(
+                    skill: skill,
+                    onDelete: onDelete
                 )
-            } else {
-                ForEach(viewModel.cv.skills.indices, id: \.self) { index in
-                    SkillRowView(
-                        skill: $viewModel.cv.skills[index],
-                        onDelete: { animatedRemoveSkill(at: index) }
-                    )
-                }
-                .onDelete(perform: animatedDeleteSkills)
-            }
-            
-            AddButton(title: "Add Skill", icon: "plus.circle.fill", action: animatedAddSkill)
-        } header: {
-            SectionHeader(title: "Skills")
-        }
-    }
-    
-    private func animatedAddSkill() {
-        withAnimation(DesignTokens.Animations.standardEaseInOut) {
-            viewModel.addSkill()
-        }
-    }
-    
-    private func animatedRemoveSkill(at index: Int) {
-        withAnimation(DesignTokens.Animations.standardEaseInOut) {
-            viewModel.removeSkill(at: index)
-        }
-    }
-    
-    private func animatedDeleteSkills(at indices: IndexSet) {
-        withAnimation(DesignTokens.Animations.standardEaseInOut) {
-            viewModel.cv.skills.remove(atOffsets: indices)
-        }
+            },
+            onAdd: viewModel.addSkill,
+            onRemove: { viewModel.removeSkill(at: $0) }
+        )
     }
 }
 
@@ -116,46 +70,23 @@ struct EducationSubsection: View {
     @ObservedObject var viewModel: CVEditorViewModel
     
     var body: some View {
-        Section {
-            if viewModel.cv.education.isEmpty {
-                CVEmptyStateView(
-                    icon: "graduationcap.circle",
-                    title: "No Education Added",
-                    subtitle: "Add your educational background and qualifications"
+        CVEditableSection(
+            title: "Education",
+            icon: "graduationcap.circle",
+            emptyStateTitle: "No Education Added",
+            emptyStateSubtitle: "Add your educational background and qualifications",
+            addButtonTitle: "Add Education",
+            items: $viewModel.cv.education,
+            addVerticalPadding: true,
+            rowContent: { education, onDelete in
+                EducationRowView(
+                    education: education,
+                    onDelete: onDelete
                 )
-            } else {
-                ForEach(viewModel.cv.education.indices, id: \.self) { index in
-                    EducationRowView(
-                        education: $viewModel.cv.education[index],
-                        onDelete: { animatedRemoveEducation(at: index) }
-                    )
-                    .padding(.vertical, DesignTokens.Spacing.xs)
-                }
-                .onDelete(perform: animatedDeleteEducation)
-            }
-            
-            AddButton(title: "Add Education", icon: "plus.circle.fill", action: animatedAddEducation)
-        } header: {
-            SectionHeader(title: "Education")
-        }
-    }
-    
-    private func animatedAddEducation() {
-        withAnimation(DesignTokens.Animations.standardEaseInOut) {
-            viewModel.addEducation()
-        }
-    }
-    
-    private func animatedRemoveEducation(at index: Int) {
-        withAnimation(DesignTokens.Animations.standardEaseInOut) {
-            viewModel.removeEducation(at: index)
-        }
-    }
-    
-    private func animatedDeleteEducation(at indices: IndexSet) {
-        withAnimation(DesignTokens.Animations.standardEaseInOut) {
-            viewModel.cv.education.remove(atOffsets: indices)
-        }
+            },
+            onAdd: viewModel.addEducation,
+            onRemove: { viewModel.removeEducation(at: $0) }
+        )
     }
 }
 
