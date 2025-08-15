@@ -7,10 +7,12 @@ struct CVListView: View {
     
     var body: some View {
         NavigationView {
-            Group {
-                if viewModel.isLoading {
-                    loadingView
-                } else if viewModel.cvs.isEmpty {
+            StateAwareView(
+                isLoading: viewModel.isLoading,
+                errorMessage: "",  // We handle errors separately with alerts
+                loadingMessage: "Loading your CVs..."
+            ) {
+                if viewModel.cvs.isEmpty {
                     emptyStateView
                 } else {
                     cvListView
@@ -45,10 +47,6 @@ struct CVListView: View {
     
     // MARK: - View Components
     
-    private var loadingView: some View {
-        LoadingView.fullscreen(message: "Loading your CVs...")
-    }
-    
     private var emptyStateView: some View {
         EmptyStateView.noCVs {
             router.navigate(to: .templateSelection)
@@ -56,21 +54,18 @@ struct CVListView: View {
     }
     
     private var cvListView: some View {
-        List {
-            ForEach(viewModel.cvs) { cv in
-                CVRowView(cv: cv) {
-                    router.navigate(to: .cvEditor(cvId: cv.id.uuidString))
+        DeletableList(
+            items: viewModel.cvs,
+            onDelete: { indexSet in
+                for index in indexSet {
+                    await viewModel.deleteCV(withId: viewModel.cvs[index].id)
                 }
             }
-            .onDelete { indexSet in
-                Task {
-                    for index in indexSet {
-                        await viewModel.deleteCV(withId: viewModel.cvs[index].id)
-                    }
-                }
+        ) { cv in
+            CVRowView(cv: cv) {
+                router.navigate(to: .cvEditor(cvId: cv.id.uuidString))
             }
         }
-        .listStyle(InsetGroupedListStyle())
     }
 }
 
@@ -81,40 +76,12 @@ private struct CVRowView: View {
     let onTap: () -> Void
     
     var body: some View {
-        Button(action: onTap) {
-            HStack {
-                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                    Text(cv.name.isEmpty ? "Untitled CV" : cv.name)
-                        .typography(.headline)
-                        .foregroundColor(DesignTokens.Colors.primary)
-                        .lineLimit(1)
-                    
-                    if !cv.personalInfo.title.isEmpty {
-                        Text(cv.personalInfo.title)
-                            .typography(.subheadline)
-                            .foregroundColor(DesignTokens.Colors.secondary)
-                            .lineLimit(1)
-                    }
-                    
-                    if !cv.personalInfo.location.isEmpty {
-                        Text(cv.personalInfo.location)
-                            .typography(.caption1)
-                            .foregroundColor(DesignTokens.Colors.secondary)
-                            .lineLimit(1)
-                    }
-                }
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(DesignTokens.IconSize.small.font)
-                    .foregroundColor(DesignTokens.Colors.secondary)
-            }
-            .padding(.vertical, DesignTokens.Spacing.xxs)
-        }
-        .buttonStyle(PlainButtonStyle())
-        .accessibilityLabel("CV: \(cv.name.isEmpty ? "Untitled" : cv.name)")
-        .accessibilityAddTraits(.isButton)
+        NavigationRow(
+            title: cv.name.isEmpty ? "Untitled CV" : cv.name,
+            subtitle: cv.personalInfo.title.isEmpty ? nil : cv.personalInfo.title,
+            caption: cv.personalInfo.location.isEmpty ? nil : cv.personalInfo.location,
+            action: onTap
+        )
     }
 }
 

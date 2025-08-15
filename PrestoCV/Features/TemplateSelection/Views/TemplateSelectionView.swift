@@ -10,14 +10,13 @@ struct TemplateSelectionView: View {
     }
     
     var body: some View {
-        Group {
-            if viewModel.isLoading {
-                loadingView
-            } else if !viewModel.errorMessage.isEmpty {
-                errorView
-            } else {
-                templateListView
-            }
+        StateAwareView(
+            isLoading: viewModel.isLoading,
+            errorMessage: viewModel.errorMessage,
+            loadingMessage: "Loading templates...",
+            onRetry: viewModel.loadTemplates
+        ) {
+            templateListView
         }
         .navigationTitle("Choose Template")
         .navigationBarTitleDisplayMode(.large)
@@ -34,21 +33,6 @@ struct TemplateSelectionView: View {
     }
     
     // MARK: - View Components
-    
-    private var loadingView: some View {
-        LoadingView.fullscreen(message: "Loading templates...")
-    }
-    
-    private var errorView: some View {
-        ErrorView.generic(
-            message: viewModel.errorMessage,
-            onRetry: {
-                Task {
-                    await viewModel.loadTemplates()
-                }
-            }
-        )
-    }
     
     private var templateListView: some View {
         ScrollView {
