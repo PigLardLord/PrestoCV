@@ -56,7 +56,6 @@ struct CertificationsSubsection: View {
             emptyStateSubtitle: "Add professional certifications and achievements",
             addButtonTitle: "Add Certification",
             items: $viewModel.cv.certifications,
-            addVerticalPadding: true,
             rowContent: { certification, onDelete in
                 CertificationRowView(
                     certification: certification,

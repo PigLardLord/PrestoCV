@@ -30,7 +30,6 @@ struct WorkExperienceSubsection: View {
             emptyStateSubtitle: "Add your work experience to showcase your professional background",
             addButtonTitle: "Add Experience",
             items: $viewModel.cv.relevant_experience,
-            addVerticalPadding: true,
             rowContent: { experience, onDelete in
                 ExperienceRowView(
                     experience: experience,
@@ -77,7 +76,6 @@ struct EducationSubsection: View {
             emptyStateSubtitle: "Add your educational background and qualifications",
             addButtonTitle: "Add Education",
             items: $viewModel.cv.education,
-            addVerticalPadding: true,
             rowContent: { education, onDelete in
                 EducationRowView(
                     education: education,

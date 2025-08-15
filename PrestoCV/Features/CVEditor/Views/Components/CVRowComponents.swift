@@ -47,6 +47,7 @@ struct ExperienceRowView: View {
             }
         }
         .cardStyle()
+        .padding(.vertical, DesignTokens.Spacing.xs)
     }
 }
 
@@ -111,6 +112,7 @@ struct EducationRowView: View {
             }
         }
         .cardStyle()
+        .padding(.vertical, DesignTokens.Spacing.xs)
     }
 }
 
@@ -190,6 +192,7 @@ struct CertificationRowView: View {
             }
         }
         .cardStyle()
+        .padding(.vertical, DesignTokens.Spacing.xs)
     }
 }
 

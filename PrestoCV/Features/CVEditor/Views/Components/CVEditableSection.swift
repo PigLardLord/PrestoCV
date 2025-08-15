@@ -12,7 +12,6 @@ struct CVEditableSection<Item, RowContent: View>: View where Item: Identifiable 
     let rowContent: (Binding<Item>, @escaping () -> Void) -> RowContent
     let onAdd: () -> Void
     let onRemove: (Int) -> Void
-    let addVerticalPadding: Bool
     
     init(
         title: String,
@@ -21,7 +20,6 @@ struct CVEditableSection<Item, RowContent: View>: View where Item: Identifiable 
         emptyStateSubtitle: String,
         addButtonTitle: String,
         items: Binding<[Item]>,
-        addVerticalPadding: Bool = false,
         @ViewBuilder rowContent: @escaping (Binding<Item>, @escaping () -> Void) -> RowContent,
         onAdd: @escaping () -> Void,
         onRemove: @escaping (Int) -> Void
@@ -32,7 +30,6 @@ struct CVEditableSection<Item, RowContent: View>: View where Item: Identifiable 
         self.emptyStateSubtitle = emptyStateSubtitle
         self.addButtonTitle = addButtonTitle
         self._items = items
-        self.addVerticalPadding = addVerticalPadding
         self.rowContent = rowContent
         self.onAdd = onAdd
         self.onRemove = onRemove
@@ -49,7 +46,6 @@ struct CVEditableSection<Item, RowContent: View>: View where Item: Identifiable 
             } else {
                 EditableItemsList(
                     items: $items,
-                    verticalPadding: addVerticalPadding ? DesignTokens.Spacing.xs : 0,
                     rowContent: rowContent,
                     onRemove: onRemove
                 )

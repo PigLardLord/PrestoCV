@@ -3,7 +3,6 @@ import PrestoCVCore
 
 struct EditableItemsList<Item: Identifiable, RowContent: View>: View {
     @Binding var items: [Item]
-    let verticalPadding: CGFloat
     let rowContent: (Binding<Item>, @escaping () -> Void) -> RowContent
     let onRemove: (Int) -> Void
     
@@ -13,7 +12,6 @@ struct EditableItemsList<Item: Identifiable, RowContent: View>: View {
                 $items[index],
                 { animatedRemove(at: index) }
             )
-            .padding(.vertical, verticalPadding)
         }
         .onDelete(perform: animatedDelete)
     }
