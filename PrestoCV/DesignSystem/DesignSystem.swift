@@ -20,6 +20,7 @@ extension View {
     /// Applies a card-like appearance with shadow and corner radius
     func cardStyle() -> some View {
         self
+            .padding(DesignTokens.Spacing.md)
             .background(DesignTokens.Colors.backgroundTertiary)
             .cornerRadius(DesignTokens.CornerRadius.md)
             .shadow(

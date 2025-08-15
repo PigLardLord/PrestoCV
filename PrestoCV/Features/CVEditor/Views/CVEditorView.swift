@@ -37,35 +37,6 @@ struct CVEditorView: View {
                 .foregroundColor(DesignTokens.Colors.accent)
             }
             
-            // Principal: Progress indicator (subtle)
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: DesignTokens.Spacing.xxxs) {
-                    Text(viewModel.cv.name.isEmpty ? "New CV" : viewModel.cv.name)
-                        .font(DesignTokens.Typography.headline.font)
-                        .fontWeight(DesignTokens.Typography.headline.fontWeight)
-                        .lineLimit(1)
-                    
-                    // Progress bar - only show if there's meaningful content
-                    if viewModel.hasMeaningfulContent {
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                // Background
-                                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
-                                    .fill(DesignTokens.Colors.backgroundTertiary)
-                                    .frame(height: 2)
-                                
-                                // Progress fill
-                                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
-                                    .fill(DesignTokens.Colors.accent)
-                                    .frame(width: geometry.size.width * viewModel.completionPercentage, height: 2)
-                                    .animation(.easeInOut(duration: 0.3), value: viewModel.completionPercentage)
-                            }
-                        }
-                        .frame(height: 2)
-                    }
-                }
-            }
-            
             // Trailing: Save button with smart state and visual indicator
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: DesignTokens.Spacing.xs) {
@@ -172,6 +143,10 @@ struct CVEditorView: View {
                 }
         }
         .background(DesignTokens.Colors.background)
+        .scrollDismissesKeyboard(.interactively)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("CV Editor")
+        .accessibilityHint("Swipe between tabs to edit different sections of your CV")
     }
     
     // MARK: - Basics Tab Content
@@ -201,7 +176,7 @@ struct CVEditorView: View {
                     
                     LabeledTextField(label: "Location", text: $viewModel.cv.personalInfo.location)
                     
-                    HStack(spacing: DesignTokens.Spacing.sm) {
+                    HStack(alignment: .top, spacing: DesignTokens.Spacing.sm) {
                         LabeledTextField.email(
                             text: $viewModel.cv.personalInfo.email,
                             isRequired: true
