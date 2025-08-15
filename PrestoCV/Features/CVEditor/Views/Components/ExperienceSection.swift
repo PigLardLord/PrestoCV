@@ -38,9 +38,7 @@ struct WorkExperienceSubsection: View {
                     )
                     .padding(.vertical, DesignTokens.Spacing.xs)
                 }
-                .onDelete { indices in
-                    viewModel.cv.relevant_experience.remove(atOffsets: indices)
-                }
+                .onDelete(perform: animatedDeleteExperiences)
             }
             
             AddButton(title: "Add Experience", icon: "plus.circle.fill", action: animatedAddExperience)
@@ -58,6 +56,12 @@ struct WorkExperienceSubsection: View {
     private func animatedRemoveExperience(at index: Int) {
         withAnimation(DesignTokens.Animations.standardEaseInOut) {
             viewModel.removeExperience(at: index)
+        }
+    }
+    
+    private func animatedDeleteExperiences(at indices: IndexSet) {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.cv.relevant_experience.remove(atOffsets: indices)
         }
     }
 }
@@ -80,9 +84,7 @@ struct SkillsSubsection: View {
                         onDelete: { animatedRemoveSkill(at: index) }
                     )
                 }
-                .onDelete { indices in
-                    viewModel.cv.skills.remove(atOffsets: indices)
-                }
+                .onDelete(perform: animatedDeleteSkills)
             }
             
             AddButton(title: "Add Skill", icon: "plus.circle.fill", action: animatedAddSkill)
@@ -100,6 +102,12 @@ struct SkillsSubsection: View {
     private func animatedRemoveSkill(at index: Int) {
         withAnimation(DesignTokens.Animations.standardEaseInOut) {
             viewModel.removeSkill(at: index)
+        }
+    }
+    
+    private func animatedDeleteSkills(at indices: IndexSet) {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.cv.skills.remove(atOffsets: indices)
         }
     }
 }
@@ -123,9 +131,7 @@ struct EducationSubsection: View {
                     )
                     .padding(.vertical, DesignTokens.Spacing.xs)
                 }
-                .onDelete { indices in
-                    viewModel.cv.education.remove(atOffsets: indices)
-                }
+                .onDelete(perform: animatedDeleteEducation)
             }
             
             AddButton(title: "Add Education", icon: "plus.circle.fill", action: animatedAddEducation)
@@ -143,6 +149,12 @@ struct EducationSubsection: View {
     private func animatedRemoveEducation(at index: Int) {
         withAnimation(DesignTokens.Animations.standardEaseInOut) {
             viewModel.removeEducation(at: index)
+        }
+    }
+    
+    private func animatedDeleteEducation(at indices: IndexSet) {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.cv.education.remove(atOffsets: indices)
         }
     }
 }

@@ -40,11 +40,7 @@ struct LanguagesSubsection: View {
                         onDelete: { animatedRemoveLanguage(at: index) }
                     )
                 }
-                .onDelete { indices in
-                    withAnimation(DesignTokens.Animations.standardEaseInOut) {
-                        viewModel.cv.languages.remove(atOffsets: indices)
-                    }
-                }
+                .onDelete(perform: animatedDeleteLanguages)
             }
             
             AddButton(title: "Add Language", icon: "plus.circle.fill", action: animatedAddLanguage)
@@ -66,6 +62,12 @@ struct LanguagesSubsection: View {
             viewModel.removeLanguage(at: index)
         }
     }
+    
+    private func animatedDeleteLanguages(at indices: IndexSet) {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.cv.languages.remove(atOffsets: indices)
+        }
+    }
 }
 
 struct CertificationsSubsection: View {
@@ -83,28 +85,36 @@ struct CertificationsSubsection: View {
                 ForEach(viewModel.cv.certifications.indices, id: \.self) { index in
                     CertificationRowView(
                         certification: $viewModel.cv.certifications[index],
-                        onDelete: {
-                            withAnimation(DesignTokens.Animations.standardEaseInOut) {
-                                viewModel.removeCertification(at: index)
-                            }
-                        }
+                        onDelete: { animatedRemoveCertification(at: index) }
                     )
                     .padding(.vertical, DesignTokens.Spacing.xs)
                 }
-                .onDelete { indices in
-                    withAnimation(DesignTokens.Animations.standardEaseInOut) {
-                        viewModel.cv.certifications.remove(atOffsets: indices)
-                    }
-                }
+                .onDelete(perform: animatedDeleteCertifications)
             }
             
-            AddButton(title: "Add Certification", icon: "plus.circle.fill") {
-                withAnimation(DesignTokens.Animations.standardEaseInOut) {
-                    viewModel.addCertification()
-                }
-            }
+            AddButton(title: "Add Certification", icon: "plus.circle.fill", action: animatedAddCertification)
         } header: {
             SectionHeader(title: "Certifications")
+        }
+    }
+    
+    // MARK: - Animation Helpers
+    
+    private func animatedAddCertification() {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.addCertification()
+        }
+    }
+    
+    private func animatedRemoveCertification(at index: Int) {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.removeCertification(at: index)
+        }
+    }
+    
+    private func animatedDeleteCertifications(at indices: IndexSet) {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.cv.certifications.remove(atOffsets: indices)
         }
     }
 }
@@ -124,27 +134,35 @@ struct SocialLinksSubsection: View {
                 ForEach(viewModel.cv.social.indices, id: \.self) { index in
                     SocialLinkRowView(
                         social: $viewModel.cv.social[index],
-                        onDelete: {
-                            withAnimation(DesignTokens.Animations.standardEaseInOut) {
-                                viewModel.removeSocial(at: index)
-                            }
-                        }
+                        onDelete: { animatedRemoveSocial(at: index) }
                     )
                 }
-                .onDelete { indices in
-                    withAnimation(DesignTokens.Animations.standardEaseInOut) {
-                        viewModel.cv.social.remove(atOffsets: indices)
-                    }
-                }
+                .onDelete(perform: animatedDeleteSocial)
             }
             
-            AddButton(title: "Add Social Link", icon: "plus.circle.fill") {
-                withAnimation(DesignTokens.Animations.standardEaseInOut) {
-                    viewModel.addSocial()
-                }
-            }
+            AddButton(title: "Add Social Link", icon: "plus.circle.fill", action: animatedAddSocial)
         } header: {
             SectionHeader(title: "Social Links")
+        }
+    }
+    
+    // MARK: - Animation Helpers
+    
+    private func animatedAddSocial() {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.addSocial()
+        }
+    }
+    
+    private func animatedRemoveSocial(at index: Int) {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.removeSocial(at: index)
+        }
+    }
+    
+    private func animatedDeleteSocial(at indices: IndexSet) {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.cv.social.remove(atOffsets: indices)
         }
     }
 }
@@ -164,27 +182,35 @@ struct InterestsSubsection: View {
                 ForEach(viewModel.cv.interests.indices, id: \.self) { index in
                     InterestRowView(
                         interest: $viewModel.cv.interests[index],
-                        onDelete: {
-                            withAnimation(DesignTokens.Animations.standardEaseInOut) {
-                                viewModel.removeInterest(at: index)
-                            }
-                        }
+                        onDelete: { animatedRemoveInterest(at: index) }
                     )
                 }
-                .onDelete { indices in
-                    withAnimation(DesignTokens.Animations.standardEaseInOut) {
-                        viewModel.cv.interests.remove(atOffsets: indices)
-                    }
-                }
+                .onDelete(perform: animatedDeleteInterests)
             }
             
-            AddButton(title: "Add Interest", icon: "plus.circle.fill") {
-                withAnimation(DesignTokens.Animations.standardEaseInOut) {
-                    viewModel.addInterest()
-                }
-            }
+            AddButton(title: "Add Interest", icon: "plus.circle.fill", action: animatedAddInterest)
         } header: {
             SectionHeader(title: "Interests")
+        }
+    }
+    
+    // MARK: - Animation Helpers
+    
+    private func animatedAddInterest() {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.addInterest()
+        }
+    }
+    
+    private func animatedRemoveInterest(at index: Int) {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.removeInterest(at: index)
+        }
+    }
+    
+    private func animatedDeleteInterests(at indices: IndexSet) {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.cv.interests.remove(atOffsets: indices)
         }
     }
 }
