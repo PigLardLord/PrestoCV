@@ -4,9 +4,6 @@ import PrestoCVCore
 struct CVEditorView: View {
     @EnvironmentObject var router: AppRouter
     @StateObject private var viewModel: CVEditorViewModel
-    @State private var showingSaveConfirmation = false
-    @State private var showingCancelConfirmation = false
-    @State private var saveSuccessTimer: Timer?
     
     init(viewModel: CVEditorViewModel) {
         self._viewModel = StateObject(wrappedValue: viewModel)
@@ -28,9 +25,7 @@ struct CVEditorView: View {
             // Leading: Cancel button with confirmation if unsaved changes
             ToolbarItem(placement: .navigationBarLeading) {
                 Button("Cancel") {
-                    if viewModel.hasUnsavedChanges {
-                        showingCancelConfirmation = true
-                    } else {
+                    if viewModel.handleCancelButtonTap() {
                         router.navigateBack()
                     }
                 }
@@ -49,21 +44,13 @@ struct CVEditorView: View {
                     
                     Button("Save") {
                         Task {
-                            if await viewModel.saveCV() {
-                                showingSaveConfirmation = true
-                                
-                                // Auto-dismiss after 2 seconds
-                                saveSuccessTimer?.invalidate()
-                                saveSuccessTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { _ in
-                                    showingSaveConfirmation = false
-                                    router.navigateBack()
-                                }
+                            await viewModel.handleSaveButtonTap {
+                                router.navigateBack()
                             }
                         }
                     }
-                    .disabled(!viewModel.hasMeaningfulContent || viewModel.isLoading)
-                    .foregroundColor(viewModel.hasMeaningfulContent && !viewModel.isLoading ? 
-                                   DesignTokens.Colors.accent : DesignTokens.Colors.disabledButtonForeground)
+                    .disabled(!viewModel.isSaveButtonEnabled)
+                    .foregroundColor(viewModel.saveButtonColor)
                     .fontWeight(.semibold)
                 }
             }
@@ -79,29 +66,25 @@ struct CVEditorView: View {
         } message: {
             Text(viewModel.errorMessage)
         }
-        .alert("Discard Changes?", isPresented: $showingCancelConfirmation) {
+        .alert("Discard Changes?", isPresented: $viewModel.showingCancelConfirmation) {
             Button("Discard", role: .destructive) {
+                viewModel.confirmCancel()
                 router.navigateBack()
             }
             Button("Keep Editing", role: .cancel) { }
         } message: {
             Text("You have unsaved changes that will be lost if you continue.")
         }
-        .alert("CV Saved Successfully", isPresented: $showingSaveConfirmation) {
+        .alert("CV Saved Successfully", isPresented: $viewModel.showingSaveConfirmation) {
             Button("Continue Editing") {
-                saveSuccessTimer?.invalidate()
-                showingSaveConfirmation = false
+                viewModel.dismissSaveConfirmation()
             }
             Button("Done") {
-                saveSuccessTimer?.invalidate()
+                viewModel.finishEditingAndNavigateBack()
                 router.navigateBack()
             }
         } message: {
             Text("Your changes have been saved.")
-        }
-        .onDisappear {
-            // Clean up timer when view disappears
-            saveSuccessTimer?.invalidate()
         }
     }
     

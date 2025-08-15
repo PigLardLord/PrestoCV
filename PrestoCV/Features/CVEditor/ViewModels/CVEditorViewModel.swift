@@ -6,11 +6,14 @@ final class CVEditorViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var cv: CVModel = CVModel()
     @Published var viewState: ViewState<CVModel> = .idle
+    @Published var showingSaveConfirmation = false
+    @Published var showingCancelConfirmation = false
     
     // MARK: - Private Properties
     private let cvManagementUseCase: CVManagementUseCaseProtocol
     private let cvId: String?
     private var isNewCV: Bool { cvId == nil }
+    private var saveSuccessTimer: Timer?
     
     // MARK: - Computed Properties
     var isLoading: Bool {
@@ -95,6 +98,16 @@ final class CVEditorViewModel: ObservableObject {
         hasMeaningfulContent
     }
     
+    /// Computed property for save button enabled state
+    var isSaveButtonEnabled: Bool {
+        hasMeaningfulContent && !isLoading
+    }
+    
+    /// Computed property for save button color
+    var saveButtonColor: Color {
+        isSaveButtonEnabled ? DesignTokens.Colors.accent : DesignTokens.Colors.disabledButtonForeground
+    }
+    
     // MARK: - Initialization
     init(
         cvId: String?,
@@ -107,6 +120,10 @@ final class CVEditorViewModel: ObservableObject {
         if cvId == nil {
             viewState = .loaded(cv)
         }
+    }
+    
+    deinit {
+        cleanup()
     }
     
     // MARK: - Public Methods
@@ -157,6 +174,55 @@ final class CVEditorViewModel: ObservableObject {
             viewState = .error(appError.localizedDescription)
             return false
         }
+    }
+    
+    @MainActor
+    func handleSaveButtonTap(onNavigate: @escaping () -> Void) async {
+        if await saveCV() {
+            showingSaveConfirmation = true
+            
+            // Auto-dismiss after 2 seconds
+            saveSuccessTimer?.invalidate()
+            saveSuccessTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
+                Task { @MainActor in
+                    self?.showingSaveConfirmation = false
+                    onNavigate()
+                }
+            }
+        }
+    }
+    
+    @MainActor
+    func handleCancelButtonTap() -> Bool {
+        if hasUnsavedChanges {
+            showingCancelConfirmation = true
+            return false
+        } else {
+            cleanup()
+            return true
+        }
+    }
+    
+    @MainActor
+    func confirmCancel() {
+        cleanup()
+    }
+    
+    @MainActor
+    func dismissSaveConfirmation() {
+        saveSuccessTimer?.invalidate()
+        showingSaveConfirmation = false
+    }
+    
+    @MainActor
+    func finishEditingAndNavigateBack() {
+        saveSuccessTimer?.invalidate()
+        cleanup()
+    }
+    
+    private func cleanup() {
+        saveSuccessTimer?.invalidate()
+        saveSuccessTimer = nil
     }
     
     @MainActor
