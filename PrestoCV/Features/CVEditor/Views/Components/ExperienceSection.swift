@@ -35,7 +35,7 @@ struct WorkExperienceSubsection: View {
                     ExperienceRowView(
                         experience: $viewModel.cv.relevant_experience[index],
                         onDelete: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
+                            withAnimation(DesignTokens.Animations.standardEaseInOut) {
                                 viewModel.removeExperience(at: index)
                             }
                         }
@@ -43,14 +43,14 @@ struct WorkExperienceSubsection: View {
                     .padding(.vertical, DesignTokens.Spacing.xs)
                 }
                 .onDelete { indices in
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(DesignTokens.Animations.standardEaseInOut) {
                         viewModel.cv.relevant_experience.remove(atOffsets: indices)
                     }
                 }
             }
             
             AddButton(title: "Add Experience", icon: "plus.circle.fill") {
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(DesignTokens.Animations.standardEaseInOut) {
                     viewModel.addExperience()
                 }
             }
@@ -76,21 +76,21 @@ struct SkillsSubsection: View {
                     SkillRowView(
                         skill: $viewModel.cv.skills[index],
                         onDelete: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
+                            withAnimation(DesignTokens.Animations.standardEaseInOut) {
                                 viewModel.removeSkill(at: index)
                             }
                         }
                     )
                 }
                 .onDelete { indices in
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(DesignTokens.Animations.standardEaseInOut) {
                         viewModel.cv.skills.remove(atOffsets: indices)
                     }
                 }
             }
             
             AddButton(title: "Add Skill", icon: "plus.circle.fill") {
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(DesignTokens.Animations.standardEaseInOut) {
                     viewModel.addSkill()
                 }
             }
@@ -116,7 +116,7 @@ struct EducationSubsection: View {
                     EducationRowView(
                         education: $viewModel.cv.education[index],
                         onDelete: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
+                            withAnimation(DesignTokens.Animations.standardEaseInOut) {
                                 viewModel.removeEducation(at: index)
                             }
                         }
@@ -124,14 +124,14 @@ struct EducationSubsection: View {
                     .padding(.vertical, DesignTokens.Spacing.xs)
                 }
                 .onDelete { indices in
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(DesignTokens.Animations.standardEaseInOut) {
                         viewModel.cv.education.remove(atOffsets: indices)
                     }
                 }
             }
             
             AddButton(title: "Add Education", icon: "plus.circle.fill") {
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(DesignTokens.Animations.standardEaseInOut) {
                     viewModel.addEducation()
                 }
             }

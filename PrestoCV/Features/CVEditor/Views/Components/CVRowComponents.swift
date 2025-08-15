@@ -36,13 +36,13 @@ struct ExperienceRowView: View {
                     .foregroundColor(DesignTokens.Colors.secondary)
                 
                 TextEditor(text: $experience.description)
-                    .frame(minHeight: 100)
+                    .frame(minHeight: DesignTokens.InputSize.textEditorMinHeight)
                     .scrollContentBackground(.hidden)
                     .background(DesignTokens.Colors.backgroundTertiary)
                     .cornerRadius(DesignTokens.CornerRadius.sm)
                     .overlay(
                         RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
-                            .stroke(DesignTokens.Colors.border, lineWidth: 1)
+                            .stroke(DesignTokens.Colors.border, lineWidth: DesignTokens.BorderWidth.thin)
                     )
             }
         }
@@ -100,13 +100,13 @@ struct EducationRowView: View {
                     .foregroundColor(DesignTokens.Colors.secondary)
                 
                 TextEditor(text: $education.description)
-                    .frame(minHeight: 100)
+                    .frame(minHeight: DesignTokens.InputSize.textEditorMinHeight)
                     .scrollContentBackground(.hidden)
                     .background(DesignTokens.Colors.backgroundTertiary)
                     .cornerRadius(DesignTokens.CornerRadius.sm)
                     .overlay(
                         RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
-                            .stroke(DesignTokens.Colors.border, lineWidth: 1)
+                            .stroke(DesignTokens.Colors.border, lineWidth: DesignTokens.BorderWidth.thin)
                     )
             }
         }
@@ -127,7 +127,7 @@ struct LanguageRowView: View {
                 .multilineTextAlignment(.trailing)
                 .font(DesignTokens.Typography.callout.font)
                 .foregroundColor(DesignTokens.Colors.secondary)
-                .frame(maxWidth: 100)
+                .frame(maxWidth: DesignTokens.InputSize.textFieldMaxWidth)
             
             DeleteButton(action: onDelete)
         }
@@ -162,7 +162,7 @@ struct CertificationRowView: View {
                 ))
                 .keyboardType(.numberPad)
                 .font(DesignTokens.Typography.callout.font)
-                .frame(maxWidth: 80)
+                .frame(maxWidth: DesignTokens.InputSize.textFieldWidth)
                 
                 Spacer()
                 
@@ -179,13 +179,13 @@ struct CertificationRowView: View {
                     .foregroundColor(DesignTokens.Colors.secondary)
                 
                 TextEditor(text: $certification.description)
-                    .frame(minHeight: 100)
+                    .frame(minHeight: DesignTokens.InputSize.textEditorMinHeight)
                     .scrollContentBackground(.hidden)
                     .background(DesignTokens.Colors.backgroundTertiary)
                     .cornerRadius(DesignTokens.CornerRadius.sm)
                     .overlay(
                         RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
-                            .stroke(DesignTokens.Colors.border, lineWidth: 1)
+                            .stroke(DesignTokens.Colors.border, lineWidth: DesignTokens.BorderWidth.thin)
                     )
             }
         }
@@ -201,7 +201,7 @@ struct SocialLinkRowView: View {
         HStack(spacing: DesignTokens.Spacing.md) {
             TextField("Platform", text: $social.platform)
                 .font(DesignTokens.Typography.body.font)
-                .frame(maxWidth: 100)
+                .frame(maxWidth: DesignTokens.InputSize.textFieldMaxWidth)
             
             TextField("URL", text: $social.url)
                 .textContentType(.URL)

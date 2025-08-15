@@ -73,6 +73,36 @@ enum DesignTokens {
         static let large: CGFloat = 12
     }
     
+    // MARK: - Input Sizes
+    enum InputSize {
+        static let textEditorMinHeight: CGFloat = 100
+        static let textFieldWidth: CGFloat = 80
+        static let textFieldMaxWidth: CGFloat = 100
+    }
+    
+    // MARK: - Border Widths
+    enum BorderWidth {
+        static let thin: CGFloat = 1
+        static let medium: CGFloat = 2
+        static let thick: CGFloat = 3
+    }
+    
+    // MARK: - Animation Durations
+    enum AnimationDuration {
+        static let fast: Double = 0.2
+        static let standard: Double = 0.3
+        static let slow: Double = 0.5
+    }
+    
+    // MARK: - Animations
+    enum Animations {
+        static let fastEaseInOut = Animation.easeInOut(duration: AnimationDuration.fast)
+        static let standardEaseInOut = Animation.easeInOut(duration: AnimationDuration.standard)
+        static let slowEaseInOut = Animation.easeInOut(duration: AnimationDuration.slow)
+        static let spring = Animation.spring()
+        static let bouncy = Animation.bouncy()
+    }
+    
     // MARK: - Colors
     enum Colors {
         // Text colors

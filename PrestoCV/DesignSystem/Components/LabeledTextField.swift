@@ -69,7 +69,7 @@ struct LabeledTextField: View {
             .overlay(
                 RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
                     .stroke(borderColor, lineWidth: borderWidth)
-                    .animation(.easeInOut(duration: 0.2), value: isFocused)
+                    .animation(DesignTokens.Animations.fastEaseInOut, value: isFocused)
             )
             .keyboardType(keyboardType)
             .textContentType(textContentType)

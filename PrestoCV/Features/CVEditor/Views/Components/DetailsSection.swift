@@ -38,21 +38,21 @@ struct LanguagesSubsection: View {
                     LanguageRowView(
                         language: $viewModel.cv.languages[index],
                         onDelete: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
+                            withAnimation(DesignTokens.Animations.standardEaseInOut) {
                                 viewModel.removeLanguage(at: index)
                             }
                         }
                     )
                 }
                 .onDelete { indices in
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(DesignTokens.Animations.standardEaseInOut) {
                         viewModel.cv.languages.remove(atOffsets: indices)
                     }
                 }
             }
             
             AddButton(title: "Add Language", icon: "plus.circle.fill") {
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(DesignTokens.Animations.standardEaseInOut) {
                     viewModel.addLanguage()
                 }
             }
@@ -78,7 +78,7 @@ struct CertificationsSubsection: View {
                     CertificationRowView(
                         certification: $viewModel.cv.certifications[index],
                         onDelete: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
+                            withAnimation(DesignTokens.Animations.standardEaseInOut) {
                                 viewModel.removeCertification(at: index)
                             }
                         }
@@ -86,14 +86,14 @@ struct CertificationsSubsection: View {
                     .padding(.vertical, DesignTokens.Spacing.xs)
                 }
                 .onDelete { indices in
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(DesignTokens.Animations.standardEaseInOut) {
                         viewModel.cv.certifications.remove(atOffsets: indices)
                     }
                 }
             }
             
             AddButton(title: "Add Certification", icon: "plus.circle.fill") {
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(DesignTokens.Animations.standardEaseInOut) {
                     viewModel.addCertification()
                 }
             }
@@ -119,21 +119,21 @@ struct SocialLinksSubsection: View {
                     SocialLinkRowView(
                         social: $viewModel.cv.social[index],
                         onDelete: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
+                            withAnimation(DesignTokens.Animations.standardEaseInOut) {
                                 viewModel.removeSocial(at: index)
                             }
                         }
                     )
                 }
                 .onDelete { indices in
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(DesignTokens.Animations.standardEaseInOut) {
                         viewModel.cv.social.remove(atOffsets: indices)
                     }
                 }
             }
             
             AddButton(title: "Add Social Link", icon: "plus.circle.fill") {
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(DesignTokens.Animations.standardEaseInOut) {
                     viewModel.addSocial()
                 }
             }
@@ -159,21 +159,21 @@ struct InterestsSubsection: View {
                     InterestRowView(
                         interest: $viewModel.cv.interests[index],
                         onDelete: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
+                            withAnimation(DesignTokens.Animations.standardEaseInOut) {
                                 viewModel.removeInterest(at: index)
                             }
                         }
                     )
                 }
                 .onDelete { indices in
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    withAnimation(DesignTokens.Animations.standardEaseInOut) {
                         viewModel.cv.interests.remove(atOffsets: indices)
                     }
                 }
             }
             
             AddButton(title: "Add Interest", icon: "plus.circle.fill") {
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(DesignTokens.Animations.standardEaseInOut) {
                     viewModel.addInterest()
                 }
             }

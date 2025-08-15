@@ -72,13 +72,13 @@ struct ProfessionalSummaryView: View {
                 .padding(.bottom, DesignTokens.Spacing.xs)
             
             TextEditor(text: $profile)
-                .frame(minHeight: 120)
+                .frame(minHeight: DesignTokens.InputSize.textEditorMinHeight + DesignTokens.Spacing.lg)
                 .scrollContentBackground(.hidden)
                 .background(DesignTokens.Colors.backgroundTertiary)
                 .cornerRadius(DesignTokens.CornerRadius.md)
                 .overlay(
                     RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
-                        .stroke(DesignTokens.Colors.border, lineWidth: 1)
+                        .stroke(DesignTokens.Colors.border, lineWidth: DesignTokens.BorderWidth.thin)
                 )
         }
     }
