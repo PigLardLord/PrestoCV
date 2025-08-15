@@ -34,28 +34,30 @@ struct WorkExperienceSubsection: View {
                 ForEach(viewModel.cv.relevant_experience.indices, id: \.self) { index in
                     ExperienceRowView(
                         experience: $viewModel.cv.relevant_experience[index],
-                        onDelete: {
-                            self.animated {
-                                viewModel.removeExperience(at: index)
-                            }
-                        }
+                        onDelete: { animatedRemoveExperience(at: index) }
                     )
                     .padding(.vertical, DesignTokens.Spacing.xs)
                 }
                 .onDelete { indices in
-                    self.animated {
-                        viewModel.cv.relevant_experience.remove(atOffsets: indices)
-                    }
+                    viewModel.cv.relevant_experience.remove(atOffsets: indices)
                 }
             }
             
-            AddButton(title: "Add Experience", icon: "plus.circle.fill") {
-                self.animated {
-                    viewModel.addExperience()
-                }
-            }
+            AddButton(title: "Add Experience", icon: "plus.circle.fill", action: animatedAddExperience)
         } header: {
             SectionHeader(title: "Work Experience")
+        }
+    }
+    
+    private func animatedAddExperience() {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.addExperience()
+        }
+    }
+    
+    private func animatedRemoveExperience(at index: Int) {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.removeExperience(at: index)
         }
     }
 }
@@ -75,27 +77,29 @@ struct SkillsSubsection: View {
                 ForEach(viewModel.cv.skills.indices, id: \.self) { index in
                     SkillRowView(
                         skill: $viewModel.cv.skills[index],
-                        onDelete: {
-                            self.animated {
-                                viewModel.removeSkill(at: index)
-                            }
-                        }
+                        onDelete: { animatedRemoveSkill(at: index) }
                     )
                 }
                 .onDelete { indices in
-                    self.animated {
-                        viewModel.cv.skills.remove(atOffsets: indices)
-                    }
+                    viewModel.cv.skills.remove(atOffsets: indices)
                 }
             }
             
-            AddButton(title: "Add Skill", icon: "plus.circle.fill") {
-                self.animated {
-                    viewModel.addSkill()
-                }
-            }
+            AddButton(title: "Add Skill", icon: "plus.circle.fill", action: animatedAddSkill)
         } header: {
             SectionHeader(title: "Skills")
+        }
+    }
+    
+    private func animatedAddSkill() {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.addSkill()
+        }
+    }
+    
+    private func animatedRemoveSkill(at index: Int) {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.removeSkill(at: index)
         }
     }
 }
@@ -115,28 +119,30 @@ struct EducationSubsection: View {
                 ForEach(viewModel.cv.education.indices, id: \.self) { index in
                     EducationRowView(
                         education: $viewModel.cv.education[index],
-                        onDelete: {
-                            self.animated {
-                                viewModel.removeEducation(at: index)
-                            }
-                        }
+                        onDelete: { animatedRemoveEducation(at: index) }
                     )
                     .padding(.vertical, DesignTokens.Spacing.xs)
                 }
                 .onDelete { indices in
-                    self.animated {
-                        viewModel.cv.education.remove(atOffsets: indices)
-                    }
+                    viewModel.cv.education.remove(atOffsets: indices)
                 }
             }
             
-            AddButton(title: "Add Education", icon: "plus.circle.fill") {
-                self.animated {
-                    viewModel.addEducation()
-                }
-            }
+            AddButton(title: "Add Education", icon: "plus.circle.fill", action: animatedAddEducation)
         } header: {
             SectionHeader(title: "Education")
+        }
+    }
+    
+    private func animatedAddEducation() {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.addEducation()
+        }
+    }
+    
+    private func animatedRemoveEducation(at index: Int) {
+        withAnimation(DesignTokens.Animations.standardEaseInOut) {
+            viewModel.removeEducation(at: index)
         }
     }
 }
