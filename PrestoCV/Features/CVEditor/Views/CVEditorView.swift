@@ -7,12 +7,15 @@ struct CVEditorView: View {
     
     var body: some View {
         Group {
-            if viewModel.isLoading {
-                loadingView
-            } else if !viewModel.errorMessage.isEmpty {
-                errorView
-            } else {
+            switch viewModel.viewState {
+            case .idle:
                 editorView
+            case .loading:
+                loadingView
+            case .loaded:
+                editorView
+            case .error:
+                errorView
             }
         }
         .navigationTitle(viewModel.cv.name.isEmpty ? "New CV" : viewModel.cv.name)
@@ -39,7 +42,7 @@ struct CVEditorView: View {
             // Load CV data when the view appears
             await viewModel.loadCV()
         }
-        .alert("Error", isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
+        .alert("Error", isPresented: .constant(viewModel.isShowingError)) {
             Button("OK", action: viewModel.clearError)
         } message: {
             Text(viewModel.errorMessage)

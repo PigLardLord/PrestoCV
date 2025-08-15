@@ -16,9 +16,6 @@ final class CVEditorViewModel: ObservableObject {
     private var saveSuccessTimer: Timer?
     
     // MARK: - Computed Properties
-    var isLoading: Bool {
-        viewState.isLoading
-    }
     
     var errorMessage: String {
         viewState.errorMessage ?? ""
@@ -100,12 +97,20 @@ final class CVEditorViewModel: ObservableObject {
     
     /// Computed property for save button enabled state
     var isSaveButtonEnabled: Bool {
-        hasMeaningfulContent && !isLoading
+        hasMeaningfulContent && !viewState.isLoading
     }
     
     /// Computed property for save button color
     var saveButtonColor: Color {
         isSaveButtonEnabled ? DesignTokens.Colors.accent : DesignTokens.Colors.disabledButtonForeground
+    }
+    
+    /// Computed property for error alert binding
+    var isShowingError: Bool {
+        if case .error = viewState {
+            return true
+        }
+        return false
     }
     
     // MARK: - Initialization
