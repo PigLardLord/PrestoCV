@@ -13,7 +13,7 @@ final class CVEditorViewModel: ObservableObject {
     private let cvManagementUseCase: CVManagementUseCaseProtocol
     private let cvId: String?
     private var isNewCV: Bool { cvId == nil }
-    private var saveSuccessTimer: Timer?
+    private var saveTask: Task<Void, Never>?
     
     // MARK: - Computed Properties
     
@@ -186,13 +186,13 @@ final class CVEditorViewModel: ObservableObject {
         if await saveCV() {
             showingSaveConfirmation = true
             
-            // Auto-dismiss after 2 seconds
-            saveSuccessTimer?.invalidate()
-            saveSuccessTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
-                Task { @MainActor in
-                    self?.showingSaveConfirmation = false
-                    onNavigate()
-                }
+            // Auto-dismiss after 2 seconds using async/await
+            saveTask?.cancel()
+            saveTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                guard let self = self, !Task.isCancelled else { return }
+                self.showingSaveConfirmation = false
+                onNavigate()
             }
         }
     }
@@ -215,19 +215,19 @@ final class CVEditorViewModel: ObservableObject {
     
     @MainActor
     func dismissSaveConfirmation() {
-        saveSuccessTimer?.invalidate()
+        saveTask?.cancel()
         showingSaveConfirmation = false
     }
     
     @MainActor
     func finishEditingAndNavigateBack() {
-        saveSuccessTimer?.invalidate()
+        saveTask?.cancel()
         cleanup()
     }
     
     private func cleanup() {
-        saveSuccessTimer?.invalidate()
-        saveSuccessTimer = nil
+        saveTask?.cancel()
+        saveTask = nil
     }
     
     @MainActor
