@@ -10,7 +10,7 @@ struct StateAwareView<Content: View>: View {
     
     init(
         isLoading: Bool,
-        errorMessage: String,
+        errorMessage: String = "",
         loadingMessage: String = "Loading...",
         onRetry: (() async -> Void)? = nil,
         @ViewBuilder content: @escaping () -> Content

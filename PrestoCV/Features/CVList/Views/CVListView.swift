@@ -9,14 +9,13 @@ struct CVListView: View {
         NavigationView {
             StateAwareView(
                 isLoading: viewModel.isLoading,
-                errorMessage: "",  // We handle errors separately with alerts
                 loadingMessage: "Loading your CVs..."
             ) {
-                if viewModel.cvs.isEmpty {
-                    emptyStateView
-                } else {
-                    cvListView
-                }
+                ConditionalContentView(
+                    isEmpty: viewModel.cvs.isEmpty,
+                    content: { cvListView },
+                    emptyContent: { emptyStateView }
+                )
             }
             .navigationTitle("My CVs")
             .navigationBarTitleDisplayMode(.large)
