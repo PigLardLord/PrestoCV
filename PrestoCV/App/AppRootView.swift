@@ -75,38 +75,30 @@ struct AppRootView: View {
             OnboardingView(viewModel: onboardingViewModel)
         case .cvList:
             CVListView(viewModel: cvListViewModel)
-        case .cvEditor(let cvId):
-            templateSelectionView(route: .cvEditor(cvId: cvId))
         case .templateSelection:
-            templateSelectionView(route: .templateSelection)
+            viewWithErrorHandling {
+                TemplateSelectionView(viewModel: try viewModelFactory.makeTemplateSelectionViewModel())
+            }
+        case .cvEditor(let cvId):
+            viewWithErrorHandling {
+                CVEditorView(viewModel: try viewModelFactory.makeCVEditorViewModel(cvId: cvId))
+            }
         }
     }
     
     @ViewBuilder
-    @MainActor
-    private func templateSelectionView(route: Route) -> some View {
-        // Try to create the view model, fallback to error view if it fails
-        switch route {
-        case .templateSelection:
-            if let viewModel = try? viewModelFactory.makeTemplateSelectionViewModel() {
-                TemplateSelectionView(viewModel: viewModel)
+    private func viewWithErrorHandling<Content: View>(content: () throws -> Content) -> some View {
+        Group {
+            if let view = try? content() {
+                view
             } else {
                 ErrorView.generic(
-                    message: "Failed to load template selection. Please try again.",
-                    onRetry: {}
+                    message: "Failed to load view. Please try again.",
+                    onRetry: {
+                        router.navigateBack()
+                    }
                 )
             }
-        case .cvEditor(let cvId):
-            if let viewModel = try? viewModelFactory.makeCVEditorViewModel(cvId: cvId) {
-                CVEditorView(viewModel: viewModel)
-            } else {
-                ErrorView.generic(
-                    message: "Failed to load CV editor. Please try again.",
-                    onRetry: {}
-                )
-            }
-        default:
-            Text("Unknown route")
         }
     }
 }
