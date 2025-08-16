@@ -69,4 +69,14 @@ final class CVListViewModel: ObservableObject {
     func clearError() {
         viewState = viewState.clearingError()
     }
+    
+    // MARK: - View Action Methods (Synchronous wrappers)
+    
+    func performDeleteCVs(at indexSet: IndexSet) {
+        Task {
+            for index in indexSet {
+                await deleteCV(withId: cvs[index].id)
+            }
+        }
+    }
 }

@@ -49,11 +49,7 @@ struct CVListView: View {
     private var cvListView: some View {
         DeletableList(
             items: viewModel.cvs,
-            onDelete: { indexSet in
-                for index in indexSet {
-                    await viewModel.deleteCV(withId: viewModel.cvs[index].id)
-                }
-            }
+            onDelete: viewModel.performDeleteCVs
         ) { cv in
             CVRowView(cv: cv) {
                 router.navigate(to: .cvEditor(cvId: cv.id.uuidString))

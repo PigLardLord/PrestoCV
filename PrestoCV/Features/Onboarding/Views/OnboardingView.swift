@@ -60,7 +60,7 @@ struct OnboardingView: View {
                 title: viewModel.isCreatingCV ? "Creating..." : "Create Your First CV",
                 icon: viewModel.isCreatingCV ? nil : "plus.circle.fill",
                 isLoading: viewModel.isCreatingCV,
-                action: createFirstCV
+                action: viewModel.performCreateFirstCV
             )
             
             // Browse templates first
@@ -69,15 +69,6 @@ struct OnboardingView: View {
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.md)
-    }
-    
-    // MARK: - Actions
-    
-    private func createFirstCV() {
-        Task {
-            await viewModel.createFirstCV()
-            // Navigation will be handled automatically via state change
-        }
     }
 }
 

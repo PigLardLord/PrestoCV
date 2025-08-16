@@ -49,4 +49,18 @@ final class OnboardingViewModel: ObservableObject {
         
         isCreatingCV = false
     }
+    
+    // MARK: - View Action Methods (Synchronous wrappers)
+    
+    func performCreateFirstCV() {
+        Task {
+            await createFirstCV()
+        }
+    }
+    
+    func performCheckOnboardingStatus() {
+        Task {
+            await checkOnboardingStatus()
+        }
+    }
 }
