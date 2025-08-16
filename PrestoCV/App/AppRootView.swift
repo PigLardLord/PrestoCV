@@ -50,11 +50,7 @@ struct AppRootView: View {
                 case .error:
                     ErrorView.generic(
                         message: onboardingViewModel.errorMessage,
-                        onRetry: {
-                            Task {
-                                await onboardingViewModel.checkOnboardingStatus()
-                            }
-                        }
+                        onRetry: retryOnboardingCheck
                     )
                 }
             }
@@ -99,6 +95,14 @@ struct AppRootView: View {
                     }
                 )
             }
+        }
+    }
+    
+    // MARK: - Actions
+    
+    private func retryOnboardingCheck() {
+        Task {
+            await onboardingViewModel.checkOnboardingStatus()
         }
     }
 }

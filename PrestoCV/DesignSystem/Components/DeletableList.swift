@@ -21,12 +21,14 @@ struct DeletableList<Item: Identifiable, RowContent: View>: View {
             ForEach(items) { item in
                 rowContent(item)
             }
-            .onDelete { indexSet in
-                Task {
-                    await onDelete(indexSet)
-                }
-            }
+            .onDelete(perform: deleteItems)
         }
         .listStyle(InsetGroupedListStyle())
+    }
+    
+    private func deleteItems(at offsets: IndexSet) {
+        Task {
+            await onDelete(offsets)
+        }
     }
 }
