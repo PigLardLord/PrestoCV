@@ -6,17 +6,12 @@ struct CVEditorView: View {
     @ObservedObject var viewModel: CVEditorViewModel
     
     var body: some View {
-        Group {
-            switch viewModel.viewState {
-            case .idle:
-                editorView
-            case .loading:
-                loadingView
-            case .loaded:
-                editorView
-            case .error:
-                errorView
-            }
+        ViewStateContainer(
+            viewState: viewModel.viewState,
+            loadingMessage: "Loading CV...",
+            onRetry: viewModel.loadCV
+        ) { _ in
+            editorView
         }
         .navigationTitle(viewModel.cv.name.isEmpty ? "New CV" : viewModel.cv.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -62,21 +57,6 @@ struct CVEditorView: View {
     }
     
     // MARK: - View Components
-    
-    private var loadingView: some View {
-        LoadingView.fullscreen(message: "Loading...")
-    }
-    
-    private var errorView: some View {
-        ErrorView.generic(
-            message: viewModel.errorMessage,
-            onRetry: {
-                Task {
-                    await viewModel.loadCV()
-                }
-            }
-        )
-    }
     
     private var editorView: some View {
         TabView {

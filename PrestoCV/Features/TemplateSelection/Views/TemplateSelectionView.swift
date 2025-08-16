@@ -10,14 +10,16 @@ struct TemplateSelectionView: View {
     }
     
     var body: some View {
-        StateAwareView(
-            isLoading: viewModel.isLoading,
-            errorMessage: viewModel.errorMessage,
+        ViewStateContainer(
+            viewState: viewModel.viewState,
             loadingMessage: "Loading templates...",
             onRetry: viewModel.loadTemplates
-        ) {
+        ) { templates in
             templateListView
         }
+        .overlay(
+            viewModel.isCreatingCV ? LoadingView.fullscreen(message: "Creating CV...") : nil
+        )
         .navigationTitle("Choose Template")
         .navigationBarTitleDisplayMode(.large)
         .task {

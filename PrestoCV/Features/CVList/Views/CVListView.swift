@@ -7,12 +7,13 @@ struct CVListView: View {
     
     var body: some View {
         NavigationView {
-            StateAwareView(
-                isLoading: viewModel.isLoading,
-                loadingMessage: "Loading your CVs..."
-            ) {
+            ViewStateContainer(
+                viewState: viewModel.viewState,
+                loadingMessage: "Loading your CVs...",
+                onRetry: viewModel.loadCVs
+            ) { cvs in
                 ConditionalContentView(
-                    isEmpty: viewModel.cvs.isEmpty,
+                    isEmpty: cvs.isEmpty,
                     content: { cvListView },
                     emptyContent: { emptyStateView }
                 )
@@ -34,13 +35,6 @@ struct CVListView: View {
             .refreshable {
                 await viewModel.loadCVs()
             }
-        }
-        .alert("Error", isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
-            Button("OK") {
-                viewModel.clearError()
-            }
-        } message: {
-            Text(viewModel.errorMessage)
         }
     }
     

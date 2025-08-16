@@ -39,25 +39,23 @@ struct AppRootView: View {
     
     var body: some View {
         NavigationStack(path: $router.navigationPath) {
-            VStack {
-                Group {
-                    switch onboardingViewModel.onboardingState {
-                    case .loading:
-                        LoadingView.fullscreen(message: "Checking your account...")
-                    case .firstTime:
-                        OnboardingView(viewModel: onboardingViewModel)
-                    case .returning:
-                        CVListView(viewModel: cvListViewModel)
-                    case .error:
-                        ErrorView.generic(
-                            message: onboardingViewModel.errorMessage,
-                            onRetry: {
-                                Task {
-                                    await onboardingViewModel.checkOnboardingStatus()
-                                }
+            Group {
+                switch onboardingViewModel.onboardingState {
+                case .loading:
+                    LoadingView.fullscreen(message: "Checking your account...")
+                case .firstTime:
+                    OnboardingView(viewModel: onboardingViewModel)
+                case .returning:
+                    CVListView(viewModel: cvListViewModel)
+                case .error:
+                    ErrorView.generic(
+                        message: onboardingViewModel.errorMessage,
+                        onRetry: {
+                            Task {
+                                await onboardingViewModel.checkOnboardingStatus()
                             }
-                        )
-                    }
+                        }
+                    )
                 }
             }
             .navigationDestination(for: Route.self) { route in
