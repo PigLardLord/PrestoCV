@@ -19,12 +19,7 @@ struct CardView<ContentView: View>: View {
             .padding(EdgeInsets(top: paddingAmount, leading: paddingAmount, bottom: paddingAmount, trailing: paddingAmount))
             .background(DesignTokens.Colors.backgroundTertiary)
             .cornerRadius(DesignTokens.CornerRadius.md)
-            .shadow(
-                color: DesignTokens.Colors.shadow,
-                radius: 4, // Using direct value instead of tuple access
-                x: 0,      // Using direct value instead of tuple access
-                y: 2       // Using direct value instead of tuple access
-            )
+            .defaultShadow()
     }
 }
 

@@ -17,17 +17,22 @@ extension View {
         self.modifier(TypographyModifier(style: style))
     }
     
+    /// Applies the standard app shadow
+    func defaultShadow() -> some View {
+        self.shadow(
+            color: DesignTokens.Colors.shadow,
+            radius: DesignTokens.Shadow.medium.radius,
+            x: DesignTokens.Shadow.medium.x,
+            y: DesignTokens.Shadow.medium.y
+        )
+    }
+    
     /// Applies a card-like appearance with shadow and corner radius
     func cardStyle() -> some View {
         self
             .padding(DesignTokens.Spacing.md)
             .background(DesignTokens.Colors.backgroundTertiary)
             .cornerRadius(DesignTokens.CornerRadius.md)
-            .shadow(
-                color: DesignTokens.Colors.shadow,
-                radius: 4,
-                x: 0,
-                y: 2
-            )
+            .defaultShadow()
     }
 }
