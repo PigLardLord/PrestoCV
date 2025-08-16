@@ -5,21 +5,30 @@ import SwiftUI
 struct SectionHeaderView: View {
     let title: String
     let subtitle: String?
+    let titleStyle: DesignTokens.Typography
+    let subtitleStyle: DesignTokens.Typography
     
-    init(title: String, subtitle: String? = nil) {
+    init(
+        title: String, 
+        subtitle: String? = nil,
+        titleStyle: DesignTokens.Typography = .headline,
+        subtitleStyle: DesignTokens.Typography = .footnote
+    ) {
         self.title = title
         self.subtitle = subtitle
+        self.titleStyle = titleStyle
+        self.subtitleStyle = subtitleStyle
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
             Text(title)
-                .typography(.headline)
+                .typography(titleStyle)
                 .foregroundColor(DesignTokens.Colors.primary)
             
             if let subtitle = subtitle {
                 Text(subtitle)
-                    .typography(.footnote)
+                    .typography(subtitleStyle)
                     .foregroundColor(DesignTokens.Colors.secondary)
             }
         }
@@ -36,6 +45,13 @@ struct SectionHeaderView_Previews: PreviewProvider {
             SectionHeaderView(
                 title: "Skills",
                 subtitle: "Add skills and rate your proficiency"
+            )
+            
+            SectionHeaderView(
+                title: "Create New",
+                subtitle: "Start with a blank canvas to create your CV from scratch.",
+                titleStyle: .title1,
+                subtitleStyle: .body
             )
         }
         .padding()

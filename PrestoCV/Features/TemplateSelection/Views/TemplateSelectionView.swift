@@ -40,13 +40,31 @@ struct TemplateSelectionView: View {
         ScrollView {
             LazyVStack(spacing: DesignTokens.Spacing.lg) {
                 // Create New Section
-                Section(header: createNewHeader) {
+                Section(header: 
+                    SectionHeaderView(
+                        title: "Create New",
+                        subtitle: "Start with a blank canvas to create your CV from scratch.",
+                        titleStyle: .title1,
+                        subtitleStyle: .body
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, DesignTokens.Spacing.sm)
+                ) {
                     createNewCard
                 }
                 
                 // Sample Templates Section
                 if !viewModel.templates.isEmpty {
-                    Section(header: templatesHeader) {
+                    Section(header: 
+                        SectionHeaderView(
+                            title: "Sample Templates",
+                            subtitle: "Choose a template to start creating your professional CV.",
+                            titleStyle: .title1,
+                            subtitleStyle: .body
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.bottom, DesignTokens.Spacing.sm)
+                    ) {
                         ForEach(viewModel.templates) { template in
                             TemplateCardView(
                                 template: template,
@@ -67,19 +85,6 @@ struct TemplateSelectionView: View {
         }
     }
     
-    private var createNewHeader: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-            Text("Create New")
-                .typography(.title1)
-                .foregroundColor(DesignTokens.Colors.primary)
-            
-            Text("Start with a blank canvas to create your CV from scratch.")
-                .typography(.body)
-                .foregroundColor(DesignTokens.Colors.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, DesignTokens.Spacing.sm)
-    }
     
     private var createNewCard: some View {
         Button(action: {
@@ -90,52 +95,34 @@ struct TemplateSelectionView: View {
                 }
             }
         }) {
-            VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-                // Empty template preview
-                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
-                    .fill(DesignTokens.Colors.backgroundSecondary)
-                    .aspectRatio(1.0, contentMode: .fit)
-                    .overlay(
-                        Image(systemName: "plus.rectangle.on.rectangle")
-                            .font(DesignTokens.IconSize.hero.font)
-                            .foregroundColor(DesignTokens.Colors.primary)
-                    )
-                
-                // Template info
-                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                    Text("Empty CV")
-                        .typography(.headline)
-                        .foregroundColor(DesignTokens.Colors.primary)
+            CardView(padding: DesignTokens.Spacing.sm) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+                    // Empty template preview
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
+                        .fill(DesignTokens.Colors.backgroundSecondary)
+                        .aspectRatio(1.0, contentMode: .fit)
+                        .overlay(
+                            Image(systemName: "plus.rectangle.on.rectangle")
+                                .font(DesignTokens.IconSize.hero.font)
+                                .foregroundColor(DesignTokens.Colors.primary)
+                        )
                     
-                    Text("Start from scratch with a blank template")
-                        .typography(.caption1)
-                        .foregroundColor(DesignTokens.Colors.secondary)
+                    // Template info
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                        Text("Empty CV")
+                            .typography(.headline)
+                            .foregroundColor(DesignTokens.Colors.primary)
+                        
+                        Text("Start from scratch with a blank template")
+                            .typography(.caption1)
+                            .foregroundColor(DesignTokens.Colors.secondary)
+                    }
                 }
             }
-            .padding(DesignTokens.Spacing.sm)
-            .background(DesignTokens.Colors.background)
-            .cornerRadius(DesignTokens.CornerRadius.lg)
-            .shadow(
-                color: DesignTokens.Colors.shadow,
-                radius: DesignTokens.Shadow.medium.radius,
-            )
         }
         .buttonStyle(PlainButtonStyle())
     }
     
-    private var templatesHeader: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-            Text("Sample Templates")
-                .typography(.title1)
-                .foregroundColor(DesignTokens.Colors.primary)
-            
-            Text("Choose a template to start creating your professional CV.")
-                .typography(.body)
-                .foregroundColor(DesignTokens.Colors.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, DesignTokens.Spacing.sm)
-    }
 }
 
 // MARK: - Template Card View
@@ -146,32 +133,30 @@ private struct TemplateCardView: View {
     
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-                // Template preview image
-                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
-                    .fill(DesignTokens.Colors.backgroundSecondary)
-                    .aspectRatio(1.0, contentMode: .fit)
-                    .overlay(
-                        Image(systemName: "doc.text")
-                            .font(DesignTokens.IconSize.hero.font)
-                            .foregroundColor(DesignTokens.Colors.secondary)
-                    )
-                
-                // Template info
-                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                    Text(template.name.isEmpty ? "Default Template" : template.name)
-                        .typography(.headline)
-                        .foregroundColor(DesignTokens.Colors.primary)
+            CardView(padding: DesignTokens.Spacing.sm) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+                    // Template preview image
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
+                        .fill(DesignTokens.Colors.backgroundSecondary)
+                        .aspectRatio(1.0, contentMode: .fit)
+                        .overlay(
+                            Image(systemName: "doc.text")
+                                .font(DesignTokens.IconSize.hero.font)
+                                .foregroundColor(DesignTokens.Colors.secondary)
+                        )
                     
-                    Text("Professional • Modern • Easy to customize")
-                        .typography(.caption1)
-                        .foregroundColor(DesignTokens.Colors.secondary)
+                    // Template info
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                        Text(template.name.isEmpty ? "Default Template" : template.name)
+                            .typography(.headline)
+                            .foregroundColor(DesignTokens.Colors.primary)
+                        
+                        Text("Professional • Modern • Easy to customize")
+                            .typography(.caption1)
+                            .foregroundColor(DesignTokens.Colors.secondary)
+                    }
                 }
             }
-            .padding(DesignTokens.Spacing.sm)
-            .background(DesignTokens.Colors.background)
-            .cornerRadius(DesignTokens.CornerRadius.lg)
-            .shadow(color: DesignTokens.Colors.shadow, radius: DesignTokens.Shadow.medium.radius)
         }
         .buttonStyle(PlainButtonStyle())
     }
