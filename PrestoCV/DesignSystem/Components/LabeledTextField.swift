@@ -18,141 +18,36 @@ struct LabeledTextField: View {
     
     @FocusState private var isFocused: Bool
     
-    enum ValidationState {
-        case none
-        case valid
-        case invalid
-        case warning
-    }
+    typealias ValidationState = FieldLabel.ValidationState
     
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-            if !label.isEmpty {
-                HStack(spacing: DesignTokens.Spacing.xxs) {
-                    Text(label)
-                        .font(DesignTokens.Typography.footnote.font)
-                        .foregroundColor(labelColor)
-                    
-                    if isRequired {
-                        Text("*")
-                            .font(DesignTokens.Typography.footnote.font)
-                            .foregroundColor(DesignTokens.Colors.error)
-                    }
-                    
-                    Spacer()
-                    
-                    // Validation icon
-                    if validationState != .none {
-                        Image(systemName: validationIcon)
-                            .font(DesignTokens.Typography.caption1.font)
-                            .foregroundColor(validationColor)
-                    }
-                }
-            }
-            
-            Group {
-                if isSecure {
-                    SecureField(placeholder, text: $text)
-                        .focused($isFocused)
-                } else {
-                    TextField(placeholder, text: $text, onEditingChanged: { editing in
-                        isFocused = editing
-                        onEditingChanged?(editing)
-                    })
-                    .focused($isFocused)
-                }
-            }
-            .padding(.horizontal, DesignTokens.Spacing.sm)
-            .padding(.vertical, DesignTokens.Spacing.xs)
-            .background(backgroundColor)
-            .cornerRadius(DesignTokens.CornerRadius.sm)
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
-                    .stroke(borderColor, lineWidth: borderWidth)
-                    .animation(DesignTokens.Animations.fastEaseInOut, value: isFocused)
+            FieldLabel.conditional(
+                text: label,
+                isRequired: isRequired,
+                validationState: validationState,
+                isFocused: isFocused
             )
-            .keyboardType(keyboardType)
-            .textContentType(textContentType)
-            .onSubmit {
-                onCommit?()
-            }
             
-            // Help text or error message
-            if let errorMessage = errorMessage, validationState == .invalid {
-                Text(errorMessage)
-                    .font(DesignTokens.Typography.caption1.font)
-                    .foregroundColor(DesignTokens.Colors.error)
-                    .padding(.top, DesignTokens.Spacing.xxxs)
-            } else if let helpText = helpText {
-                Text(helpText)
-                    .font(DesignTokens.Typography.caption1.font)
-                    .foregroundColor(DesignTokens.Colors.tertiary)
-                    .padding(.top, DesignTokens.Spacing.xxxs)
-            }
+            FieldInput(
+                text: $text,
+                placeholder: placeholder,
+                isSecure: isSecure,
+                keyboardType: keyboardType,
+                textContentType: textContentType,
+                validationState: validationState,
+                isFocused: $isFocused,
+                onEditingChanged: onEditingChanged,
+                onCommit: onCommit
+            )
+            
+            FieldMessage.conditional(
+                validationState: validationState,
+                errorMessage: errorMessage,
+                helpText: helpText
+            )
         }
         .padding(.vertical, DesignTokens.Spacing.xs)
-    }
-    
-    // MARK: - Computed Properties
-    
-    private var labelColor: Color {
-        switch validationState {
-        case .invalid:
-            return DesignTokens.Colors.error
-        case .valid:
-            return DesignTokens.Colors.success
-        case .warning:
-            return DesignTokens.Colors.warning
-        case .none:
-            return isFocused ? DesignTokens.Colors.accent : DesignTokens.Colors.secondary
-        }
-    }
-    
-    private var borderColor: Color {
-        switch validationState {
-        case .invalid:
-            return DesignTokens.Colors.error
-        case .valid:
-            return DesignTokens.Colors.success
-        case .warning:
-            return DesignTokens.Colors.warning
-        case .none:
-            return isFocused ? DesignTokens.Colors.accent : DesignTokens.Colors.border
-        }
-    }
-    
-    private var borderWidth: CGFloat {
-        isFocused || validationState != .none ? 1.5 : 1
-    }
-    
-    private var backgroundColor: Color {
-        isFocused ? DesignTokens.Colors.background : DesignTokens.Colors.backgroundTertiary
-    }
-    
-    private var validationIcon: String {
-        switch validationState {
-        case .valid:
-            return "checkmark.circle.fill"
-        case .invalid:
-            return "exclamationmark.circle.fill"
-        case .warning:
-            return "exclamationmark.triangle.fill"
-        case .none:
-            return ""
-        }
-    }
-    
-    private var validationColor: Color {
-        switch validationState {
-        case .valid:
-            return DesignTokens.Colors.success
-        case .invalid:
-            return DesignTokens.Colors.error
-        case .warning:
-            return DesignTokens.Colors.warning
-        case .none:
-            return DesignTokens.Colors.tertiary
-        }
     }
 }
 
