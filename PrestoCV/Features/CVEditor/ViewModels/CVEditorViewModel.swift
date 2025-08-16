@@ -13,7 +13,6 @@ final class CVEditorViewModel: ObservableObject {
     private let cvManagementUseCase: CVManagementUseCaseProtocol
     private let cvId: String?
     private var isNewCV: Bool { cvId == nil }
-    private var saveTask: Task<Void, Never>?
     
     // MARK: - Computed Properties
     
@@ -127,9 +126,6 @@ final class CVEditorViewModel: ObservableObject {
         }
     }
     
-    deinit {
-        cleanup()
-    }
     
     // MARK: - Public Methods
     @MainActor
@@ -185,15 +181,6 @@ final class CVEditorViewModel: ObservableObject {
     func handleSaveButtonTap(onNavigate: @escaping () -> Void) async {
         if await saveCV() {
             showingSaveConfirmation = true
-            
-            // Auto-dismiss after 2 seconds using async/await
-            saveTask?.cancel()
-            saveTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-                guard let self = self, !Task.isCancelled else { return }
-                self.showingSaveConfirmation = false
-                onNavigate()
-            }
         }
     }
     
@@ -203,31 +190,23 @@ final class CVEditorViewModel: ObservableObject {
             showingCancelConfirmation = true
             return false
         } else {
-            cleanup()
             return true
         }
     }
     
     @MainActor
     func confirmCancel() {
-        cleanup()
+        // No cleanup needed anymore
     }
     
     @MainActor
     func dismissSaveConfirmation() {
-        saveTask?.cancel()
         showingSaveConfirmation = false
     }
     
     @MainActor
     func finishEditingAndNavigateBack() {
-        saveTask?.cancel()
-        cleanup()
-    }
-    
-    private func cleanup() {
-        saveTask?.cancel()
-        saveTask = nil
+        // No cleanup needed anymore
     }
     
     @MainActor
