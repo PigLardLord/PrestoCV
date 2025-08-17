@@ -4,6 +4,7 @@ import Foundation
 
 public final class CVRepository: CVRepositoryProtocol, Sendable {
     private let storageService: StorageServiceProtocol
+    private let parallelSearchService = ParallelSearchService()
     
     public init(storageService: StorageServiceProtocol) {
         self.storageService = storageService
@@ -29,14 +30,28 @@ public final class CVRepository: CVRepositoryProtocol, Sendable {
         // This handles legacy data or non-standard naming
         let identifiers = try await storageService.getAllIdentifiers()
         
-        for identifier in identifiers {
-            if let cv = try await storageService.load(CVModel.self, from: identifier) {
-                if cv.id == id {
-                    return cv
-                }
-            }
+        // Delegate parallel search to dedicated service
+        return try await parallelSearchService.findFirst(
+            in: identifiers,
+            loader: loadCVFromIdentifier,
+            matcher: createCVIdMatcher(for: id)
+        )
+    }
+    
+    /// Loads a CV model from a storage identifier
+    /// - Parameter identifier: The storage identifier to load from
+    /// - Returns: The CV model if found and valid, nil otherwise
+    private func loadCVFromIdentifier(_ identifier: String) async throws -> CVModel? {
+        return try await storageService.load(CVModel.self, from: identifier)
+    }
+    
+    /// Creates a matcher function that checks if a CV has the specified ID
+    /// - Parameter targetId: The UUID to match against
+    /// - Returns: A function that returns true if the CV's ID matches the target
+    private func createCVIdMatcher(for targetId: UUID) -> @Sendable (CVModel) -> Bool {
+        return { cv in
+            cv.id == targetId
         }
-        return nil
     }
     
     public func saveCV(_ cv: CVModel) async throws -> CVModel {
@@ -51,20 +66,16 @@ public final class CVRepository: CVRepositoryProtocol, Sendable {
     }
     
     public func cvExists() async -> Bool {
-        do {
-            let cvs = try await getAllCVs()
-            return !cvs.isEmpty
-        } catch {
-            return false
-        }
+        return !(await isEmpty())
+    }
+    
+    private func isEmpty() async -> Bool {
+        let cvs = try? await getAllCVs()
+        return cvs?.isEmpty ?? true
     }
     
     public func getCVsCount() async -> Int {
-        do {
-            let cvs = try await getAllCVs()
-            return cvs.count
-        } catch {
-            return 0
-        }
+        let cvs = try? await getAllCVs()
+        return cvs?.count ?? 0
     }
 }
