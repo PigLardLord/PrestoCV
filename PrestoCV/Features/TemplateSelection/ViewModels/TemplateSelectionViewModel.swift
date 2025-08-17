@@ -42,7 +42,7 @@ final class TemplateSelectionViewModel: ObservableObject {
             let loadedTemplates = try await sampleRepository.getAllSamples()
             viewState = .loaded(loadedTemplates)
         } catch {
-            viewState = .error(error.localizedDescription)
+            viewState = .error(error.localizedAppErrorDescription)
         }
     }
     
@@ -56,7 +56,7 @@ final class TemplateSelectionViewModel: ObservableObject {
             let createdCV = try await cvManagementUseCase.createCV(from: emptyCV)
             return createdCV.id.uuidString
         } catch {
-            viewState = .error(error.localizedDescription)
+            viewState = .error(error.localizedAppErrorDescription)
             return nil
         }
     }
@@ -70,7 +70,7 @@ final class TemplateSelectionViewModel: ObservableObject {
             let createdCV = try await cvManagementUseCase.createCV(from: template)
             return createdCV.id.uuidString
         } catch {
-            viewState = .error(error.localizedDescription)
+            viewState = .error(error.localizedAppErrorDescription)
             return nil
         }
     }

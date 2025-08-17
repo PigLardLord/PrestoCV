@@ -44,7 +44,7 @@ final class OnboardingViewModel: ObservableObject {
             // Update state to reflect successful CV creation
             onboardingState = .returning
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.localizedAppErrorDescription
         }
         
         isCreatingCV = false

@@ -38,25 +38,32 @@ public enum AppError: Error, LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .unknown(let message):
-            return message
+            return message.isEmpty ? String(localized: "error.unknown") : message
         case .invalidData(let description):
-            return "Invalid data: \(description)"
+            let localizedTemplate = String(localized: "error.invalid_data")
+            return String(format: localizedTemplate, description)
         case .notFound(let item):
-            return "\(item) not found"
+            let localizedTemplate = String(localized: "error.not_found")
+            return String(format: localizedTemplate, item)
         case .networkError(let description):
-            return "Network error: \(description)"
+            let localizedTemplate = String(localized: "error.network")
+            return String(format: localizedTemplate, description)
         case .validationError(let description):
-            return "Validation error: \(description)"
+            let localizedTemplate = String(localized: "error.validation")
+            return String(format: localizedTemplate, description)
         case .decodingError(let description):
-            return "Failed to decode data: \(description)"
+            let localizedTemplate = String(localized: "error.decoding")
+            return String(format: localizedTemplate, description)
         case .encodingError(let description):
-            return "Failed to encode data: \(description)"
+            let localizedTemplate = String(localized: "error.encoding")
+            return String(format: localizedTemplate, description)
         case .fileSystemError(let description):
-            return "File system error: \(description)"
+            let localizedTemplate = String(localized: "error.file_system")
+            return String(format: localizedTemplate, description)
         }
     }
     
     public var localizedDescription: String {
-        return errorDescription ?? "An unknown error occurred"
+        return errorDescription ?? String(localized: "error.unknown")
     }
 }

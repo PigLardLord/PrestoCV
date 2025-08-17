@@ -36,7 +36,7 @@ final class CVListViewModel: ObservableObject {
             let loadedCVs = try await cvManagementUseCase.getAllCVs()
             viewState = .loaded(loadedCVs)
         } catch {
-            viewState = .error(error.localizedDescription)
+            viewState = .error(error.localizedAppErrorDescription)
         }
     }
     
@@ -49,7 +49,7 @@ final class CVListViewModel: ObservableObject {
                 viewState = .loaded(currentCVs)
             }
         } catch {
-            viewState = .error(error.localizedDescription)
+            viewState = .error(error.localizedAppErrorDescription)
         }
     }
     
@@ -62,7 +62,7 @@ final class CVListViewModel: ObservableObject {
                 viewState = .loaded(currentCVs)
             }
         } catch {
-            viewState = .error(error.localizedDescription)
+            viewState = .error(error.localizedAppErrorDescription)
         }
     }
     
