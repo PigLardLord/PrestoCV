@@ -8,22 +8,22 @@ struct PersonalInfoSection: View {
         Form {
             // CV Name Section - Most Important
             Section {
-                TextField("CV Name", text: $cv.name)
+                TextField(LocalizedStringKey("personal_info_cv_name"), text: $cv.name)
                     .font(DesignTokens.Typography.headline.font)
                     .fontWeight(DesignTokens.Typography.headline.fontWeight)
             } header: {
-                SectionHeader(title: "CV Details")
+                SectionHeader(title: LocalizedString("personal_info_cv_details"))
             }
             .listRowBackground(DesignTokens.Colors.backgroundSecondary)
             
             // Personal Information - High Priority
             Section {
                 VStack(spacing: DesignTokens.Spacing.sm) {
-                    LabeledTextField(label: "Full Name", text: $cv.personalInfo.name)
+                    LabeledTextField(label: LocalizedString("personal_info_full_name"), text: $cv.personalInfo.name)
                     
-                    LabeledTextField(label: "Professional Title", text: $cv.personalInfo.title)
+                    LabeledTextField(label: LocalizedString("personal_info_professional_title"), text: $cv.personalInfo.title)
                     
-                    LabeledTextField(label: "Location", text: $cv.personalInfo.location)
+                    LabeledTextField(label: LocalizedString("personal_info_location"), text: $cv.personalInfo.location)
                     
                     HStack(alignment: .top, spacing: DesignTokens.Spacing.sm) {
                         LabeledTextField.email(
@@ -37,19 +37,19 @@ struct PersonalInfoSection: View {
                     }
                     
                     LabeledTextField.url(
-                        label: "Portfolio URL",
+                        label: LocalizedString("personal_info_portfolio_url"),
                         text: $cv.personalInfo.portfolio
                     )
                 }
             } header: {
-                SectionHeader(title: "Personal Information")
+                SectionHeader(title: LocalizedString("personal_info_section_title"))
             }
             
             // Professional Summary - High Priority
             Section {
                 ProfessionalSummaryView(profile: $cv.personalInfo.profile)
             } header: {
-                SectionHeader(title: "Summary")
+                SectionHeader(title: LocalizedString("personal_info_summary_section_title"))
             }
         }
         .scrollDismissesKeyboard(.interactively)
@@ -61,12 +61,12 @@ struct ProfessionalSummaryView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-            Text("Professional Summary")
+            Text(LocalizedStringKey("personal_info_professional_summary_title"))
                 .font(DesignTokens.Typography.subheadline.font)
                 .fontWeight(.medium)
                 .foregroundColor(DesignTokens.Colors.primary)
             
-            Text("Describe your professional background, key skills, and career objectives")
+            Text(LocalizedStringKey("personal_info_professional_summary_placeholder"))
                 .font(DesignTokens.Typography.caption1.font)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .padding(.bottom, DesignTokens.Spacing.xs)

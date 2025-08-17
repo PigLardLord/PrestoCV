@@ -23,7 +23,7 @@ struct SkillLevelView: View {
         }
         .font(DesignTokens.Typography.headline.font)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Skill level selector")
+        .accessibilityLabel(String(localized: "Skill level selector"))
         .accessibilityValue("\(level) out of \(maxLevel) stars selected")
     }
 }

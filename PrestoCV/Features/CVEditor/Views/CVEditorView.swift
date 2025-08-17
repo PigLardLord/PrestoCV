@@ -13,12 +13,12 @@ struct CVEditorView: View {
         ) { _ in
             editorView
         }
-        .navigationTitle(viewModel.cv.name.isEmpty ? "New CV" : viewModel.cv.name)
+        .navigationTitle(viewModel.cv.name.isEmpty ? String(localized: "New CV") : viewModel.cv.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             // Leading: Cancel button with confirmation if unsaved changes
             ToolbarItem(placement: .navigationBarLeading) {
-                Button("Cancel", action: handleCancelTap)
+                Button(String(localized: "Cancel"), action: handleCancelTap)
                     .foregroundColor(DesignTokens.Colors.accent)
             }
             
@@ -26,7 +26,7 @@ struct CVEditorView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: DesignTokens.Spacing.xs) {
                     UnsavedChangesIndicator.warning(isVisible: viewModel.hasUnsavedChanges)
-                    Button("Save", action: handleSaveTap)
+                    Button(String(localized: "Save"), action: handleSaveTap)
                     .disabled(!viewModel.isSaveButtonEnabled)
                     .foregroundColor(viewModel.saveButtonColor)
                     .fontWeight(.semibold)
@@ -37,22 +37,22 @@ struct CVEditorView: View {
             // Load CV data when the view appears
             await viewModel.loadCV()
         }
-        .alert("Error", isPresented: .constant(viewModel.isShowingError)) {
-            Button("OK", action: viewModel.clearError)
+        .alert(String(localized: "Error"), isPresented: .constant(viewModel.isShowingError)) {
+            Button(String(localized: "OK"), action: viewModel.clearError)
         } message: {
             Text(viewModel.errorMessage)
         }
-        .alert("Discard Changes?", isPresented: $viewModel.showingCancelConfirmation) {
-            Button("Discard", role: .destructive, action: handleDiscardChanges)
-            Button("Keep Editing", role: .cancel) { }
+        .alert(String(localized: "Discard Changes?"), isPresented: $viewModel.showingCancelConfirmation) {
+            Button(String(localized: "Discard"), role: .destructive, action: handleDiscardChanges)
+            Button(String(localized: "Keep Editing"), role: .cancel) { }
         } message: {
-            Text("You have unsaved changes that will be lost if you continue.")
+            Text(String(localized: "You have unsaved changes that will be lost if you continue."))
         }
-        .alert("CV Saved Successfully", isPresented: $viewModel.showingSaveConfirmation) {
-            Button("Continue Editing", action: viewModel.dismissSaveConfirmation)
-            Button("Done", action: handleSaveConfirmationDone)
+        .alert(String(localized: "CV Saved Successfully"), isPresented: $viewModel.showingSaveConfirmation) {
+            Button(String(localized: "Continue Editing"), action: viewModel.dismissSaveConfirmation)
+            Button(String(localized: "Done"), action: handleSaveConfirmationDone)
         } message: {
-            Text("Your changes have been saved.")
+            Text(String(localized: "Your changes have been saved."))
         }
     }
     
@@ -63,26 +63,26 @@ struct CVEditorView: View {
             // MARK: - Basics Tab
             PersonalInfoSection(cv: $viewModel.cv)
                 .tabItem {
-                    Label("Basics", systemImage: "person.circle")
+                    Label(String(localized: "Basics"), systemImage: "person.circle")
                 }
             
             // MARK: - Experience Tab
             ExperienceSection(viewModel: viewModel)
                 .tabItem {
-                    Label("Experience", systemImage: "briefcase")
+                    Label(String(localized: "Experience"), systemImage: "briefcase")
                 }
             
             // MARK: - Details Tab
             DetailsSection(viewModel: viewModel)
                 .tabItem {
-                    Label("Details", systemImage: "list.bullet.circle")
+                    Label(String(localized: "Details"), systemImage: "list.bullet.circle")
                 }
         }
         .background(DesignTokens.Colors.background)
         .scrollDismissesKeyboard(.interactively)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("CV Editor")
-        .accessibilityHint("Swipe between tabs to edit different sections of your CV")
+        .accessibilityLabel(String(localized: "CV Editor"))
+        .accessibilityHint(String(localized: "Swipe between tabs to edit different sections of your CV"))
     }
     
     // MARK: - Action Handlers

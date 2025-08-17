@@ -27,11 +27,11 @@ struct LanguagesSubsection: View {
     
     var body: some View {
         CVEditableSection(
-            title: "Languages",
+            title: String(localized: "Languages"),
             icon: "globe",
-            emptyStateTitle: "No Languages Added",
-            emptyStateSubtitle: "Add languages you speak and your proficiency level",
-            addButtonTitle: "Add Language",
+            emptyStateTitle: String(localized: "No Languages Added"),
+            emptyStateSubtitle: String(localized: "Add languages you speak and your proficiency level"),
+            addButtonTitle: String(localized: "Add Language"),
             items: $viewModel.cv.languages,
             rowContent: { language, onDelete in
                 LanguageRowView(
@@ -50,11 +50,11 @@ struct CertificationsSubsection: View {
     
     var body: some View {
         CVEditableSection(
-            title: "Certifications",
+            title: String(localized: "Certifications"),
             icon: "rosette",
-            emptyStateTitle: "No Certifications Added",
-            emptyStateSubtitle: "Add professional certifications and achievements",
-            addButtonTitle: "Add Certification",
+            emptyStateTitle: String(localized: "No Certifications Added"),
+            emptyStateSubtitle: String(localized: "Add professional certifications and achievements"),
+            addButtonTitle: String(localized: "Add Certification"),
             items: $viewModel.cv.certifications,
             rowContent: { certification, onDelete in
                 CertificationRowView(
@@ -73,11 +73,11 @@ struct SocialLinksSubsection: View {
     
     var body: some View {
         CVEditableSection(
-            title: "Social Links",
+            title: String(localized: "Social Links"),
             icon: "link.circle",
-            emptyStateTitle: "No Social Links Added",
-            emptyStateSubtitle: "Add professional social media profiles and websites",
-            addButtonTitle: "Add Social Link",
+            emptyStateTitle: String(localized: "No Social Links Added"),
+            emptyStateSubtitle: String(localized: "Add professional social media profiles and websites"),
+            addButtonTitle: String(localized: "Add Social Link"),
             items: $viewModel.cv.social,
             rowContent: { social, onDelete in
                 SocialLinkRowView(
@@ -96,11 +96,11 @@ struct InterestsSubsection: View {
     
     var body: some View {
         CVEditableSection(
-            title: "Interests",
+            title: String(localized: "Interests"),
             icon: "heart.circle",
-            emptyStateTitle: "No Interests Added",
-            emptyStateSubtitle: "Add personal interests and hobbies",
-            addButtonTitle: "Add Interest",
+            emptyStateTitle: String(localized: "No Interests Added"),
+            emptyStateSubtitle: String(localized: "Add personal interests and hobbies"),
+            addButtonTitle: String(localized: "Add Interest"),
             items: $viewModel.cv.interests,
             rowContent: { interest, onDelete in
                 InterestRowView(

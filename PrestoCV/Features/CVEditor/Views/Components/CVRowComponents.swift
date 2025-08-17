@@ -10,28 +10,28 @@ struct ExperienceRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
             HStack {
-                TextField("Job Title", text: $experience.title)
+                TextField(String(localized: "Job Title"), text: $experience.title)
                     .font(DesignTokens.Typography.subheadline.font)
                     .fontWeight(.semibold)
                 Spacer()
                 DeleteButton(action: onDelete)
             }
             
-            TextField("Company", text: $experience.company)
+            TextField(String(localized: "Company"), text: $experience.company)
                 .font(DesignTokens.Typography.body.font)
                 .foregroundColor(DesignTokens.Colors.secondary)
             
             HStack {
-                TextField("Location", text: $experience.location)
+                TextField(String(localized: "Location"), text: $experience.location)
                 Spacer()
-                TextField("Period", text: $experience.period)
+                TextField(String(localized: "Period"), text: $experience.period)
                     .multilineTextAlignment(.trailing)
             }
             .font(DesignTokens.Typography.callout.font)
             .foregroundColor(DesignTokens.Colors.tertiary)
             
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                Text("Description")
+                Text(String(localized: "Description"))
                     .font(DesignTokens.Typography.footnote.font)
                     .foregroundColor(DesignTokens.Colors.secondary)
                 
@@ -58,7 +58,7 @@ struct SkillRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
             HStack {
-                TextField("Skill", text: $skill.name)
+                TextField(String(localized: "Skill"), text: $skill.name)
                     .font(DesignTokens.Typography.subheadline.font)
                 Spacer()
                 DeleteButton(action: onDelete)
@@ -80,23 +80,23 @@ struct EducationRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
             HStack {
-                TextField("Degree", text: $education.degree)
+                TextField(String(localized: "Degree"), text: $education.degree)
                     .font(DesignTokens.Typography.subheadline.font)
                     .fontWeight(.semibold)
                 Spacer()
                 DeleteButton(action: onDelete)
             }
             
-            TextField("School", text: $education.school)
+            TextField(String(localized: "School"), text: $education.school)
                 .font(DesignTokens.Typography.body.font)
                 .foregroundColor(DesignTokens.Colors.secondary)
             
-            TextField("Period", text: $education.period)
+            TextField(String(localized: "Period"), text: $education.period)
                 .font(DesignTokens.Typography.callout.font)
                 .foregroundColor(DesignTokens.Colors.tertiary)
             
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                Text("Description")
+                Text(String(localized: "Description"))
                     .font(DesignTokens.Typography.footnote.font)
                     .foregroundColor(DesignTokens.Colors.secondary)
                 
@@ -122,10 +122,10 @@ struct LanguageRowView: View {
     
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
-            TextField("Language", text: $language.name)
+            TextField(String(localized: "Language"), text: $language.name)
                 .font(DesignTokens.Typography.body.font)
             
-            TextField("Level", text: $language.level)
+            TextField(String(localized: "Level"), text: $language.level)
                 .multilineTextAlignment(.trailing)
                 .font(DesignTokens.Typography.callout.font)
                 .foregroundColor(DesignTokens.Colors.secondary)
@@ -144,19 +144,19 @@ struct CertificationRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
             HStack {
-                TextField("Certification Name", text: $certification.name)
+                TextField(String(localized: "Certification Name"), text: $certification.name)
                     .font(DesignTokens.Typography.subheadline.font)
                     .fontWeight(.semibold)
                 Spacer()
                 DeleteButton(action: onDelete)
             }
             
-            TextField("Issuer", text: $certification.issuer)
+            TextField(String(localized: "Issuer"), text: $certification.issuer)
                 .font(DesignTokens.Typography.body.font)
                 .foregroundColor(DesignTokens.Colors.secondary)
             
             HStack {
-                TextField("Year", text: Binding(
+                TextField(String(localized: "Year"), text: Binding(
                     get: { String(certification.year) },
                     set: { newValue in
                         certification.year = Int(newValue) ?? 0
@@ -168,7 +168,7 @@ struct CertificationRowView: View {
                 
                 Spacer()
                 
-                TextField("URL", text: $certification.url)
+                TextField(String(localized: "URL"), text: $certification.url)
                     .textContentType(.URL)
                     .keyboardType(.URL)
                     .font(DesignTokens.Typography.callout.font)
@@ -176,7 +176,7 @@ struct CertificationRowView: View {
             }
             
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                Text("Description")
+                Text(String(localized: "Description"))
                     .font(DesignTokens.Typography.footnote.font)
                     .foregroundColor(DesignTokens.Colors.secondary)
                 
@@ -202,11 +202,11 @@ struct SocialLinkRowView: View {
     
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
-            TextField("Platform", text: $social.platform)
+            TextField(String(localized: "Platform"), text: $social.platform)
                 .font(DesignTokens.Typography.body.font)
                 .frame(maxWidth: DesignTokens.InputSize.textFieldMaxWidth)
             
-            TextField("URL", text: $social.url)
+            TextField(String(localized: "URL"), text: $social.url)
                 .textContentType(.URL)
                 .keyboardType(.URL)
                 .font(DesignTokens.Typography.callout.font)
@@ -224,7 +224,7 @@ struct InterestRowView: View {
     
     var body: some View {
         HStack {
-            TextField("Interest", text: $interest)
+            TextField(String(localized: "Interest"), text: $interest)
                 .font(DesignTokens.Typography.body.font)
             
             Spacer()

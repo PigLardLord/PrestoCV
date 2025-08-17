@@ -127,7 +127,7 @@ struct SecondaryButton_Previews: PreviewProvider {
                 .previewDisplayName("Compact Style")
             
             // Outlined Style
-            SecondaryButton.outlined(title: "Cancel", icon: "xmark") {}
+            SecondaryButton.outlined(title: String(localized: "Cancel"), icon: "xmark") {}
                 .previewDisplayName("Outlined Style")
         }
         .previewLayout(.sizeThatFits)

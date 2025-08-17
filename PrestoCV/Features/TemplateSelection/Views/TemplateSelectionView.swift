@@ -12,21 +12,21 @@ struct TemplateSelectionView: View {
     var body: some View {
         ViewStateContainer(
             viewState: viewModel.viewState,
-            loadingMessage: "Loading templates...",
+            loadingMessage: LocalizedStringKey("template.loading"),
             onRetry: viewModel.loadTemplates
         ) { templates in
             templateListView
         }
         .overlay(
-            viewModel.isCreatingCV ? LoadingView.fullscreen(message: "Creating CV...") : nil
+            viewModel.isCreatingCV ? LoadingView.fullscreen(message: LocalizedStringKey("cv.creating")) : nil
         )
-        .navigationTitle("Choose Template")
+        .navigationTitle(LocalizedString("template.choose.title"))
         .navigationBarTitleDisplayMode(.large)
         .task {
             await viewModel.loadTemplates()
         }
-        .alert("Error", isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
-            Button("OK") {
+        .alert(LocalizedString("common.error"), isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
+            Button(LocalizedString("common.ok")) {
                 viewModel.clearError()
             }
         } message: {
@@ -42,8 +42,8 @@ struct TemplateSelectionView: View {
                 // Create New Section
                 Section(header: 
                     SectionHeaderView(
-                        title: "Create New",
-                        subtitle: "Start with a blank canvas to create your CV from scratch.",
+                        title: LocalizedString("template.create.new"),
+                        subtitle: LocalizedString("template.create.new.subtitle"),
                         titleStyle: .title1,
                         subtitleStyle: .body
                     )
@@ -57,8 +57,8 @@ struct TemplateSelectionView: View {
                 if !viewModel.templates.isEmpty {
                     Section(header: 
                         SectionHeaderView(
-                            title: "Sample Templates",
-                            subtitle: "Choose a template to start creating your professional CV.",
+                            title: LocalizedString("template.sample.title"),
+                            subtitle: LocalizedString("template.sample.subtitle"),
                             titleStyle: .title1,
                             subtitleStyle: .body
                         )
@@ -109,11 +109,11 @@ struct TemplateSelectionView: View {
                     
                     // Template info
                     VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                        Text("Empty CV")
+                        Text(LocalizedString("template.empty.title"))
                             .typography(.headline)
                             .foregroundColor(DesignTokens.Colors.primary)
                         
-                        Text("Start from scratch with a blank template")
+                        Text(LocalizedString("template.empty.description"))
                             .typography(.caption1)
                             .foregroundColor(DesignTokens.Colors.secondary)
                     }
@@ -147,11 +147,11 @@ private struct TemplateCardView: View {
                     
                     // Template info
                     VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                        Text(template.name.isEmpty ? "Default Template" : template.name)
+                        Text(template.name.isEmpty ? LocalizedString("template.default.name") : template.name)
                             .typography(.headline)
                             .foregroundColor(DesignTokens.Colors.primary)
                         
-                        Text("Professional • Modern • Easy to customize")
+                        Text(LocalizedString("template.tags"))
                             .typography(.caption1)
                             .foregroundColor(DesignTokens.Colors.secondary)
                     }

@@ -4,13 +4,13 @@ import SwiftUI
 /// Works with the existing ViewState enum
 struct ViewStateContainer<T, Content: View>: View {
     let viewState: ViewState<T>
-    let loadingMessage: String
+    let loadingMessage: LocalizedStringKey
     let onRetry: (() async -> Void)?
     @ViewBuilder let content: (T) -> Content
     
     init(
         viewState: ViewState<T>,
-        loadingMessage: String = "Loading...",
+        loadingMessage: LocalizedStringKey = "common.processing",
         onRetry: (() async -> Void)? = nil,
         @ViewBuilder content: @escaping (T) -> Content
     ) {
@@ -61,7 +61,7 @@ struct ViewStateContainer<T, Content: View>: View {
         } else {
             ErrorView(
                 icon: "exclamationmark.triangle",
-                title: "Error",
+                title: String(localized: "Error"),
                 message: message
             )
         }
@@ -88,7 +88,7 @@ struct ViewStateContainer<T, Content: View>: View {
 extension ViewStateContainer where T == Void {
     init(
         viewState: ViewState<T>,
-        loadingMessage: String = "Loading...",
+        loadingMessage: LocalizedStringKey = "common.processing",
         onRetry: (() async -> Void)? = nil,
         @ViewBuilder content: @escaping () -> Content
     ) {

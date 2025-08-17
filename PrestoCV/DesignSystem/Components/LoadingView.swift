@@ -4,11 +4,11 @@ import SwiftUI
 /// A consistent loading view component used throughout the app
 /// with proper accessibility support and design token integration
 struct LoadingView: View {
-    let message: String
+    let message: LocalizedStringKey
     let style: Style
     
     init(
-        message: String = "Loading...",
+        message: LocalizedStringKey = LocalizedStringKey("common.processing"),
         style: Style = .default
     ) {
         self.message = message
@@ -21,17 +21,15 @@ struct LoadingView: View {
                 .scaleEffect(style.progressViewScale)
                 .progressViewStyle(CircularProgressViewStyle(tint: style.tintColor))
             
-            if !message.isEmpty {
-                Text(message)
-                    .typography(.callout)
-                    .foregroundColor(DesignTokens.Colors.secondary)
-                    .multilineTextAlignment(.center)
-                    .accessibilityLabel("Loading. \(message)")
-            }
+            Text(message)
+                .typography(.callout)
+                .foregroundColor(DesignTokens.Colors.secondary)
+                .multilineTextAlignment(.center)
+                .accessibilityLabel(LocalizedStringKey("common.processing"))
         }
         .frame(maxWidth: .infinity, maxHeight: style.fillsContainer ? .infinity : nil)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Loading")
+        .accessibilityLabel(LocalizedStringKey("common.processing"))
         .accessibilityAddTraits(.updatesFrequently)
     }
     
@@ -70,18 +68,18 @@ struct LoadingView: View {
 extension LoadingView {
     
     /// Creates a fullscreen loading view
-    static func fullscreen(message: String = "Loading...") -> LoadingView {
+    static func fullscreen(message: LocalizedStringKey = LocalizedStringKey("common.processing")) -> LoadingView {
         LoadingView(message: message, style: .fullscreen)
     }
     
     /// Creates a compact loading view for inline use
-    static func compact(message: String = "") -> LoadingView {
+    static func compact(message: LocalizedStringKey = LocalizedStringKey("")) -> LoadingView {
         LoadingView(message: message, style: .compact)
     }
     
     /// Creates a loading view for use inside buttons
     static func button() -> LoadingView {
-        LoadingView(message: "", style: .button)
+        LoadingView(message: LocalizedStringKey(""), style: .button)
     }
 }
 
@@ -95,18 +93,18 @@ struct LoadingView_Previews: PreviewProvider {
                 .padding()
             
             // Fullscreen style
-            LoadingView.fullscreen(message: "Loading your CVs...")
+            LoadingView.fullscreen(message: LocalizedStringKey("cv.creating"))
                 .previewDisplayName("Fullscreen")
             
             // Compact style
-            LoadingView.compact(message: "Saving...")
+            LoadingView.compact(message: LocalizedStringKey("common.save"))
                 .previewDisplayName("Compact")
                 .padding()
             
             // Button style
             HStack {
                 LoadingView.button()
-                Text("Processing...")
+                Text(LocalizedStringKey("common.processing"))
             }
             .foregroundColor(.white)
             .padding()
@@ -115,7 +113,7 @@ struct LoadingView_Previews: PreviewProvider {
             .previewDisplayName("Button Style")
             
             // Custom message
-            LoadingView(message: "Creating your first CV...")
+            LoadingView(message: LocalizedStringKey("onboarding.create.button"))
                 .previewDisplayName("Custom Message")
                 .padding()
         }

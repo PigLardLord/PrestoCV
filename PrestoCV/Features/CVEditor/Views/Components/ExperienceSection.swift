@@ -24,11 +24,11 @@ struct WorkExperienceSubsection: View {
     
     var body: some View {
         CVEditableSection(
-            title: "Work Experience",
+            title: String(localized: "Work Experience"),
             icon: "briefcase",
-            emptyStateTitle: "No Experience Added",
-            emptyStateSubtitle: "Add your work experience to showcase your professional background",
-            addButtonTitle: "Add Experience",
+            emptyStateTitle: String(localized: "No Experience Added"),
+            emptyStateSubtitle: String(localized: "Add your work experience to showcase your professional background"),
+            addButtonTitle: String(localized: "Add Experience"),
             items: $viewModel.cv.relevant_experience,
             rowContent: { experience, onDelete in
                 ExperienceRowView(
@@ -47,11 +47,11 @@ struct SkillsSubsection: View {
     
     var body: some View {
         CVEditableSection(
-            title: "Skills",
+            title: String(localized: "Skills"),
             icon: "star.circle",
-            emptyStateTitle: "No Skills Added",
-            emptyStateSubtitle: "Add your technical and professional skills",
-            addButtonTitle: "Add Skill",
+            emptyStateTitle: String(localized: "No Skills Added"),
+            emptyStateSubtitle: String(localized: "Add your technical and professional skills"),
+            addButtonTitle: String(localized: "Add Skill"),
             items: $viewModel.cv.skills,
             rowContent: { skill, onDelete in
                 SkillRowView(
@@ -70,11 +70,11 @@ struct EducationSubsection: View {
     
     var body: some View {
         CVEditableSection(
-            title: "Education",
+            title: String(localized: "Education"),
             icon: "graduationcap.circle",
-            emptyStateTitle: "No Education Added",
-            emptyStateSubtitle: "Add your educational background and qualifications",
-            addButtonTitle: "Add Education",
+            emptyStateTitle: String(localized: "No Education Added"),
+            emptyStateSubtitle: String(localized: "Add your educational background and qualifications"),
+            addButtonTitle: String(localized: "Add Education"),
             items: $viewModel.cv.education,
             rowContent: { education, onDelete in
                 EducationRowView(
