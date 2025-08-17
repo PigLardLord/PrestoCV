@@ -7,6 +7,9 @@ import Foundation
 public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
     private let storageService: StorageServiceProtocol
     private let categoryService: TemplateCategoryServiceProtocol
+    private let bundleResourceService = BundleResourceService()
+    private let templateLoader = JSONTemplateLoader()
+    private let parallelSearchService = ParallelSearchService()
     
     public init(storageService: StorageServiceProtocol) {
         self.storageService = storageService
@@ -19,85 +22,82 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
     }
     
     public func getAllSamples() async throws -> [CVModel] {
-        // Since the JSON files are in the app's Resources folder, we should use the main bundle
-        let bundle = Bundle.main
+        let resourcePaths = await bundleResourceService.getResourcePaths(ofType: "json")
+        let validPaths = await bundleResourceService.filterPaths(resourcePaths, excluding: ["default"])
+        let samples = await templateLoader.loadTemplates(from: validPaths)
         
-        // Get all JSON files from the bundle
-        let resources = bundle.paths(forResourcesOfType: "json", inDirectory: nil)
-        
-        var samples: [CVModel] = []
-        
-        // Load each JSON file that represents a CV
-        for resourcePath in resources {
-            let url = URL(fileURLWithPath: resourcePath)
-            // Skip the default empty template
-            if url.lastPathComponent == "default.json" {
-                continue
-            }
-            
-            do {
-                let data = try Data(contentsOf: url)
-                let cv = try JSONDecoder().decode(CVModel.self, from: data)
-                samples.append(cv)
-            } catch let decodingError {
-                // Log error but continue loading other samples
-                print("Failed to load sample CV from \(url.lastPathComponent): \(decodingError)")
-                // Don't throw here, just continue with other samples
-            }
-        }
-        
-        // If no samples loaded, return default
-        if samples.isEmpty {
-            samples.append(try await getDefaultSample())
-        }
-        
-        return samples
+        return samples.isEmpty ? [try await getDefaultSample()] : samples
     }
     
     public func getSample(by name: String) async throws -> CVModel? {
-        // Retrieve a specific CV sample by name
+        // Handle default case early
         if name == "default" {
             return try await getDefaultSample()
         }
         
-        // Since the JSON files are in the app's Resources folder, we should use the main bundle
-        let bundle = Bundle.main
-        
-        // Try to load by exact file name first
-        if let url = bundle.url(forResource: name, withExtension: "json") {
-            do {
-                let data = try Data(contentsOf: url)
-                return try JSONDecoder().decode(CVModel.self, from: data)
-            } catch let decodingError {
-                print("Failed to load sample CV from \(name).json: \(decodingError)")
-                throw AppError.decodingError("Failed to decode \(name).json: \(decodingError.localizedDescription)")
-            }
+        // Try exact name match first
+        if let sample = try await loadSampleByExactName(name) {
+            return sample
         }
         
-        // Try to match by category keywords in file names
-        let resources = bundle.paths(forResourcesOfType: "json", inDirectory: nil)
-        
-        for resourcePath in resources {
-            let url = URL(fileURLWithPath: resourcePath)
-            let fileName = url.deletingPathExtension().lastPathComponent
-            
-            // Skip the default template
-            if fileName == "default" {
-                continue
-            }
-            
-            // Use the category service to check for matches
-            if categoryService.matchTemplateCategory(for: fileName, to: name) {
-                do {
-                    let data = try Data(contentsOf: url)
-                    return try JSONDecoder().decode(CVModel.self, from: data)
-                } catch let decodingError {
-                    print("Failed to load sample CV from \(url.lastPathComponent): \(decodingError)")
-                    throw AppError.decodingError("Failed to decode \(url.lastPathComponent): \(decodingError.localizedDescription)")
-                }
-            }
+        // Fall back to category matching
+        return try await loadSampleByCategoryMatch(name)
+    }
+    
+    /// Loads a sample by exact file name match
+    /// - Parameter name: The exact name to match
+    /// - Returns: CV model if found and loaded successfully
+    /// - Throws: AppError if decoding fails
+    private func loadSampleByExactName(_ name: String) async throws -> CVModel? {
+        guard let url = await bundleResourceService.getResourceURL(forResource: name, withExtension: "json") else {
+            return nil
         }
         
-        return nil
+        return try await templateLoader.loadTemplate(from: url)
+    }
+    
+    /// Loads a sample by matching category keywords
+    /// - Parameter name: The category name to match
+    /// - Returns: CV model if a matching category is found
+    /// - Throws: AppError if decoding fails
+    private func loadSampleByCategoryMatch(_ name: String) async throws -> CVModel? {
+        let resourcePaths = await bundleResourceService.getResourcePaths(ofType: "json")
+        let validPaths = await bundleResourceService.filterPaths(resourcePaths, excluding: ["default"])
+        
+        return try await findFirstMatchingTemplate(in: validPaths, matching: name)
+    }
+    
+    /// Finds the first template that matches the category name using ParallelSearchService
+    /// - Parameters:
+    ///   - paths: Array of file paths to search
+    ///   - name: Category name to match
+    /// - Returns: CV model if a match is found
+    /// - Throws: AppError if decoding fails
+    private func findFirstMatchingTemplate(in paths: [String], matching name: String) async throws -> CVModel? {
+        return try await parallelSearchService.findFirst(
+            in: paths,
+            loader: createTemplateLoader(for: name)
+            // Using default matcher that always returns true
+        )
+    }
+    
+    /// Creates a template loader function for the specified category
+    /// - Parameter categoryName: The category name to match against
+    /// - Returns: A loader function that loads templates matching the category
+    private func createTemplateLoader(for categoryName: String) -> @Sendable (String) async throws -> CVModel? {
+        let categoryMatcher = createCategoryMatcher(for: categoryName)
+        
+        return { [templateLoader] path in
+            try await templateLoader.loadTemplateIfMatches(path: path, matcher: categoryMatcher)
+        }
+    }
+    
+    /// Creates a matcher function for category-based template matching
+    /// - Parameter categoryName: The category name to match against
+    /// - Returns: A function that checks if a filename matches the category
+    private func createCategoryMatcher(for categoryName: String) -> @Sendable (String) -> Bool {
+        return { [categoryService] fileName in
+            categoryService.matchTemplateCategory(for: fileName, to: categoryName)
+        }
     }
 }
