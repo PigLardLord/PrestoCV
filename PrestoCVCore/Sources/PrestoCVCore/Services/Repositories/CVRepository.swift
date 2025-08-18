@@ -18,11 +18,6 @@ public final class CVRepository: CVRepositoryProtocol, Sendable {
         return try await storageService.loadAll(CVModel.self)
     }
     
-    /// Retrieves a CV by its unique identifier
-    /// - Parameter id: The UUID of the CV to retrieve
-    /// - Returns: The CV if found, nil otherwise
-    /// - Throws: Storage errors during the search process
-    /// - Note: First attempts to load using a standard identifier pattern before falling back to full search
     public func getCV(by id: UUID) async throws -> CVModel? {
         // First try the standard identifier pattern for efficiency
         let standardIdentifier = "cv_\(id.uuidString)"
@@ -42,16 +37,10 @@ public final class CVRepository: CVRepositoryProtocol, Sendable {
         )
     }
     
-    /// Loads a CV model from a storage identifier
-    /// - Parameter identifier: The storage identifier to load from
-    /// - Returns: The CV model if found and valid, nil otherwise
     private func loadCVFromIdentifier(_ identifier: String) async throws -> CVModel? {
         return try await storageService.load(CVModel.self, from: identifier)
     }
     
-    /// Creates a matcher function that checks if a CV has the specified ID
-    /// - Parameter targetId: The UUID to match against
-    /// - Returns: A function that returns true if the CV's ID matches the target
     private func createCVIdMatcher(for targetId: UUID) -> @Sendable (CVModel) -> Bool {
         return { cv in
             cv.id == targetId
