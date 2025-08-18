@@ -61,7 +61,7 @@ struct ViewStateContainer<T, Content: View>: View {
         } else {
             ErrorView(
                 icon: "exclamationmark.triangle",
-                title: String(localized: "Error"),
+                title: String(localized: "common.error"),
                 message: message
             )
         }
