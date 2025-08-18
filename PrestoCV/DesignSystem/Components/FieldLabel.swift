@@ -74,7 +74,7 @@ private struct RequiredIndicator: View {
     
     var body: some View {
         if isVisible {
-            Text("*")
+            Text("format.required_indicator")
                 .font(DesignTokens.Typography.footnote.font)
                 .foregroundColor(DesignTokens.Colors.error)
         }
