@@ -17,26 +17,9 @@ actor ParallelSearchService: ParallelSearchServiceProtocol {
         matcher: @escaping @Sendable (Item) -> Bool = { _ in true }
     ) async throws -> Item? where Source: Sendable, Item: Sendable {
         
-        return try await withThrowingTaskGroup(of: Item?.self) { group in
-            // Schedule parallel loading tasks
-            for source in sources {
-                group.addTask {
-                    guard let item = try await loader(source) else {
-                        return nil
-                    }
-                    return matcher(item) ? item : nil
-                }
-            }
-            
-            // Return first matching item and cancel remaining tasks
-            for try await result in group {
-                if let item = result {
-                    group.cancelAll()
-                    return item
-                }
-            }
-            
-            return nil
+        return await withThrowingTaskGroup(of: Item?.self) { group in
+            scheduleParallelSearchTasks(in: &group, sources: sources, loader: loader, matcher: matcher)
+            return await waitForFirstMatch(in: group)
         }
     }
     
@@ -53,26 +36,93 @@ actor ParallelSearchService: ParallelSearchServiceProtocol {
         matcher: @escaping @Sendable (Item) -> Bool = { _ in true }
     ) async throws -> [Item] where Source: Sendable, Item: Sendable {
         
-        return try await withThrowingTaskGroup(of: Item?.self) { group in
-            // Schedule parallel loading tasks
-            for source in sources {
-                group.addTask {
-                    guard let item = try await loader(source) else {
-                        return nil
-                    }
-                    return matcher(item) ? item : nil
+        return await withThrowingTaskGroup(of: Item?.self) { group in
+            scheduleParallelSearchTasks(in: &group, sources: sources, loader: loader, matcher: matcher)
+            return await collectAllMatches(from: group)
+        }
+    }
+    
+    // MARK: - Private Helper Methods
+    
+    /// Schedules parallel search tasks for each source in the task group
+    /// - Parameters:
+    ///   - group: The task group to add tasks to
+    ///   - sources: Array of source identifiers to search
+    ///   - loader: Function to load items from sources
+    ///   - matcher: Function to validate loaded items
+    private func scheduleParallelSearchTasks<Source, Item>(
+        in group: inout ThrowingTaskGroup<Item?, Error>,
+        sources: [Source],
+        loader: @escaping @Sendable (Source) async throws -> Item?,
+        matcher: @escaping @Sendable (Item) -> Bool
+    ) where Source: Sendable, Item: Sendable {
+        for source in sources {
+            group.addTask {
+                await self.loadAndValidateItem(from: source, loader: loader, matcher: matcher)
+            }
+        }
+    }
+    
+    /// Loads an item from a source and validates it against the matcher
+    /// - Parameters:
+    ///   - source: The source to load from
+    ///   - loader: Function to load the item
+    ///   - matcher: Function to validate the item
+    /// - Returns: The item if it matches, nil otherwise
+    private func loadAndValidateItem<Source, Item>(
+        from source: Source,
+        loader: @Sendable (Source) async throws -> Item?,
+        matcher: @Sendable (Item) -> Bool
+    ) async -> Item? where Source: Sendable, Item: Sendable {
+        do {
+            guard let item = try await loader(source) else {
+                return nil
+            }
+            return matcher(item) ? item : nil
+        } catch {
+            // Silently ignore errors and continue with other sources
+            return nil
+        }
+    }
+    
+    /// Waits for the first matching item and cancels remaining tasks
+    /// - Parameter group: The task group to wait on
+    /// - Returns: The first matching item found, or nil if none found
+    private func waitForFirstMatch<Item>(
+        in group: ThrowingTaskGroup<Item?, Error>
+    ) async -> Item? where Item: Sendable {
+        do {
+            for try await result in group {
+                if let item = result {
+                    group.cancelAll()
+                    return item
                 }
             }
-            
-            // Collect all matching items
-            var matchingItems: [Item] = []
+            return nil
+        } catch {
+            // If any task throws, cancel all and return nil
+            group.cancelAll()
+            return nil
+        }
+    }
+    
+    /// Collects all matching items from the task group
+    /// - Parameter group: The task group to collect from
+    /// - Returns: Array of all matching items found
+    private func collectAllMatches<Item>(
+        from group: ThrowingTaskGroup<Item?, Error>
+    ) async -> [Item] where Item: Sendable {
+        var matchingItems: [Item] = []
+        do {
             for try await result in group {
                 if let item = result {
                     matchingItems.append(item)
                 }
             }
-            
-            return matchingItems
+        } catch {
+            // If any task throws, continue collecting from remaining tasks
+            // but don't add the failed result
         }
+        return matchingItems
     }
 }
