@@ -467,4 +467,187 @@ struct ModelTests {
         #expect(cv.interests.isEmpty)
         #expect(cv.social.isEmpty)
     }
+    
+    // MARK: - Model Custom Decoder Tests
+    
+    @Test("Education handles missing JSON fields gracefully")
+    func educationHandlesMissingFields() throws {
+        let json = """
+        {
+            "degree": "Computer Science",
+            "school": "MIT"
+        }
+        """.data(using: .utf8)!
+        
+        let decoded = try JSONDecoder().decode(Education.self, from: json)
+        
+        #expect(decoded.degree == "Computer Science")
+        #expect(decoded.school == "MIT")
+        #expect(decoded.period == "")  // Missing field should default
+        #expect(decoded.description == "")  // Missing field should default
+        #expect(decoded.id != UUID())  // Should generate new UUID
+    }
+    
+    @Test("Education initializes with provided values")
+    func educationInitializationWithValues() {
+        let id = UUID()
+        let education = Education(
+            id: id,
+            degree: "Master of Science",
+            school: "Stanford University",
+            period: "2018-2020",
+            description: "Focus on AI and Machine Learning"
+        )
+        
+        #expect(education.id == id)
+        #expect(education.degree == "Master of Science")
+        #expect(education.school == "Stanford University")
+        #expect(education.period == "2018-2020")
+        #expect(education.description == "Focus on AI and Machine Learning")
+    }
+    
+    @Test("Skill handles missing JSON fields gracefully")
+    func skillHandlesMissingFields() throws {
+        let json = """
+        {
+            "name": "SwiftUI"
+        }
+        """.data(using: .utf8)!
+        
+        let decoded = try JSONDecoder().decode(Skill.self, from: json)
+        
+        #expect(decoded.name == "SwiftUI")
+        #expect(decoded.level == 0)  // Missing field should default
+        #expect(decoded.id != UUID())  // Should generate new UUID
+    }
+    
+    @Test("Skill initializes with provided values")
+    func skillInitializationWithValues() {
+        let id = UUID()
+        let skill = Skill(id: id, name: "iOS Development", level: 8)
+        
+        #expect(skill.id == id)
+        #expect(skill.name == "iOS Development")
+        #expect(skill.level == 8)
+    }
+    
+    @Test("Skill JSON serialization")
+    func skillJSONSerialization() throws {
+        let original = Skill(name: "Swift", level: 9)
+        
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(Skill.self, from: data)
+        
+        #expect(decoded.id == original.id)
+        #expect(decoded.name == original.name)
+        #expect(decoded.level == original.level)
+    }
+    
+    @Test("Language handles missing JSON fields gracefully")
+    func languageHandlesMissingFields() throws {
+        let json = """
+        {
+            "name": "French"
+        }
+        """.data(using: .utf8)!
+        
+        let decoded = try JSONDecoder().decode(Language.self, from: json)
+        
+        #expect(decoded.name == "French")
+        #expect(decoded.level == "")  // Missing field should default
+        #expect(decoded.id != UUID())  // Should generate new UUID
+    }
+    
+    @Test("Language initializes with provided values")
+    func languageInitializationWithValues() {
+        let id = UUID()
+        let language = Language(id: id, name: "Spanish", level: "Fluent")
+        
+        #expect(language.id == id)
+        #expect(language.name == "Spanish")
+        #expect(language.level == "Fluent")
+    }
+    
+    @Test("Certification handles missing JSON fields gracefully")
+    func certificationHandlesMissingFields() throws {
+        let json = """
+        {
+            "name": "AWS Certified Developer",
+            "issuer": "Amazon"
+        }
+        """.data(using: .utf8)!
+        
+        let decoded = try JSONDecoder().decode(Certification.self, from: json)
+        
+        #expect(decoded.name == "AWS Certified Developer")
+        #expect(decoded.issuer == "Amazon")
+        #expect(decoded.year == 0)  // Missing field should default
+        #expect(decoded.url == "")  // Missing field should default
+        #expect(decoded.description == "")  // Missing field should default
+        #expect(decoded.id != UUID())  // Should generate new UUID
+    }
+    
+    @Test("Certification initializes with provided values")
+    func certificationInitializationWithValues() {
+        let id = UUID()
+        let certification = Certification(
+            id: id,
+            name: "iOS Development Certificate",
+            issuer: "Apple",
+            year: 2023,
+            url: "https://developer.apple.com/cert/123",
+            description: "Advanced iOS development certification"
+        )
+        
+        #expect(certification.id == id)
+        #expect(certification.name == "iOS Development Certificate")
+        #expect(certification.issuer == "Apple")
+        #expect(certification.year == 2023)
+        #expect(certification.url == "https://developer.apple.com/cert/123")
+        #expect(certification.description == "Advanced iOS development certification")
+    }
+    
+    @Test("Social handles missing JSON fields gracefully")
+    func socialHandlesMissingFields() throws {
+        let json = """
+        {
+            "platform": "LinkedIn"
+        }
+        """.data(using: .utf8)!
+        
+        let decoded = try JSONDecoder().decode(Social.self, from: json)
+        
+        #expect(decoded.platform == "LinkedIn")
+        #expect(decoded.url == "")  // Missing field should default
+        #expect(decoded.id != UUID())  // Should generate new UUID
+    }
+    
+    @Test("Social initializes with provided values")
+    func socialInitializationWithValues() {
+        let id = UUID()
+        let social = Social(id: id, platform: "Twitter", url: "https://twitter.com/user")
+        
+        #expect(social.id == id)
+        #expect(social.platform == "Twitter")
+        #expect(social.url == "https://twitter.com/user")
+    }
+    
+    @Test("Experience handles missing JSON fields gracefully")
+    func experienceHandlesMissingFields() throws {
+        let json = """
+        {
+            "title": "Software Engineer",
+            "company": "Apple Inc"
+        }
+        """.data(using: .utf8)!
+        
+        let decoded = try JSONDecoder().decode(Experience.self, from: json)
+        
+        #expect(decoded.title == "Software Engineer")
+        #expect(decoded.company == "Apple Inc")
+        #expect(decoded.location == "")  // Missing field should default
+        #expect(decoded.period == "")  // Missing field should default
+        #expect(decoded.description == "")  // Missing field should default
+        #expect(decoded.id != UUID())  // Should generate new UUID
+    }
 }
