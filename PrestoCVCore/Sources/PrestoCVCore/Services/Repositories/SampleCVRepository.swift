@@ -22,25 +22,61 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
     }
     
     public func getAllSamples() async throws -> [CVModel] {
-        let resourcePaths = await bundleResourceService.getResourcePaths(ofType: "json")
-        let validPaths = await bundleResourceService.filterPaths(resourcePaths, excluding: ["default"])
-        let samples = await templateLoader.loadTemplates(from: validPaths)
+        let validTemplatePaths = await getValidTemplatePaths()
+        let loadedSamples = await loadSamplesFromPaths(validTemplatePaths)
         
-        return samples.isEmpty ? [try await getDefaultSample()] : samples
+        return try await ensureAtLeastOneTemplate(samples: loadedSamples)
+    }
+    
+    /// Gets all valid template paths (excluding default template)
+    /// - Returns: Array of file paths for valid templates
+    private func getValidTemplatePaths() async -> [String] {
+        let allPaths = await bundleResourceService.getResourcePaths(ofType: "json")
+        return await bundleResourceService.filterPaths(allPaths, excluding: ["default"])
+    }
+    
+    /// Loads samples from the provided file paths
+    /// - Parameter paths: Array of file paths to load from
+    /// - Returns: Array of successfully loaded CV models
+    private func loadSamplesFromPaths(_ paths: [String]) async -> [CVModel] {
+        return await templateLoader.loadTemplates(from: paths)
+    }
+    
+    /// Ensures at least one template is returned, adding default if needed
+    /// - Parameter samples: Array of loaded samples
+    /// - Returns: Array with at least one template
+    private func ensureAtLeastOneTemplate(samples: [CVModel]) async throws -> [CVModel] {
+        if samples.isEmpty {
+            return [try await getDefaultSample()]
+        }
+        return samples
     }
     
     public func getSample(by name: String) async throws -> CVModel? {
-        // Handle default case early
-        if name == "default" {
+        if await isDefaultTemplateName(name) {
             return try await getDefaultSample()
         }
         
-        // Try exact name match first
-        if let sample = try await loadSampleByExactName(name) {
-            return sample
+        return try await findSampleUsingSearchStrategies(name)
+    }
+    
+    /// Checks if the provided name refers to the default template
+    /// - Parameter name: Template name to check
+    /// - Returns: True if this is the default template name
+    private func isDefaultTemplateName(_ name: String) async -> Bool {
+        return name == "default"
+    }
+    
+    /// Attempts to find a sample using multiple search strategies
+    /// - Parameter name: Template name to search for
+    /// - Returns: CV model if found, nil otherwise
+    private func findSampleUsingSearchStrategies(_ name: String) async throws -> CVModel? {
+        // Strategy 1: Try exact name match
+        if let exactMatch = try await loadSampleByExactName(name) {
+            return exactMatch
         }
         
-        // Fall back to category matching
+        // Strategy 2: Fall back to category matching
         return try await loadSampleByCategoryMatch(name)
     }
     
@@ -61,10 +97,24 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
     /// - Returns: CV model if a matching category is found
     /// - Throws: AppError if decoding fails
     private func loadSampleByCategoryMatch(_ name: String) async throws -> CVModel? {
-        let resourcePaths = await bundleResourceService.getResourcePaths(ofType: "json")
-        let validPaths = await bundleResourceService.filterPaths(resourcePaths, excluding: ["default"])
-        
-        return try await findFirstMatchingTemplate(in: validPaths, matching: name)
+        let searchablePaths = await getSearchableTemplatePaths()
+        return try await searchForCategoryMatch(in: searchablePaths, categoryName: name)
+    }
+    
+    /// Gets template paths that can be searched (excluding defaults)
+    /// - Returns: Array of searchable file paths
+    private func getSearchableTemplatePaths() async -> [String] {
+        let allPaths = await bundleResourceService.getResourcePaths(ofType: "json")
+        return await bundleResourceService.filterPaths(allPaths, excluding: ["default"])
+    }
+    
+    /// Searches for a template matching the category name
+    /// - Parameters:
+    ///   - paths: Paths to search through
+    ///   - categoryName: Category name to match
+    /// - Returns: First matching template found
+    private func searchForCategoryMatch(in paths: [String], categoryName: String) async throws -> CVModel? {
+        return try await findFirstMatchingTemplate(in: paths, matching: categoryName)
     }
     
     /// Finds the first template that matches the category name using ParallelSearchService
