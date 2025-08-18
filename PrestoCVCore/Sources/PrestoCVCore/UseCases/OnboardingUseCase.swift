@@ -36,12 +36,7 @@ public final class OnboardingUseCase: OnboardingUseCaseProtocol, Sendable {
             let createdCV = try await cvManagementUseCase.createCV(from: template)
             return createdCV
         } catch {
-            // Re-throw with more context if it's already an AppError, otherwise wrap it
-            if let appError = error as? AppError {
-                throw appError
-            } else {
-                throw AppError.unknown(error.localizedDescription)
-            }
+            throw AppError.from(error)
         }
     }
 }

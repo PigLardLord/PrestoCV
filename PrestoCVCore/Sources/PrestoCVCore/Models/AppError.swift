@@ -67,3 +67,18 @@ public enum AppError: Error, LocalizedError, Equatable, Sendable {
         return errorDescription ?? String(localized: "error.unknown")
     }
 }
+
+// MARK: - Error Conversion Helpers
+
+extension AppError {
+    /// Converts a generic error to AppError, preserving AppError instances
+    /// - Parameter error: The error to convert
+    /// - Returns: AppError instance
+    public static func from(_ error: Error) -> AppError {
+        if let appError = error as? AppError {
+            return appError
+        } else {
+            return AppError.unknown(error.localizedDescription)
+        }
+    }
+}

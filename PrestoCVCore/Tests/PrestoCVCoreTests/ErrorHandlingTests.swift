@@ -39,4 +39,24 @@ struct ErrorHandlingTests {
         
         #expect(appError.localizedDescription == "Generic error")
     }
+    
+    @Test("AppError.from preserves AppError instances")
+    func appErrorFromPreservesAppErrorInstances() {
+        let originalAppError = AppError.invalidData("Invalid JSON")
+        let preservedError = AppError.from(originalAppError)
+        
+        #expect(preservedError == originalAppError)
+    }
+    
+    @Test("AppError.from converts generic errors to AppError.unknown")
+    func appErrorFromConvertsGenericErrors() {
+        let genericError = NSError(domain: "TestDomain", code: 404, userInfo: [NSLocalizedDescriptionKey: "Not found"])
+        let convertedError = AppError.from(genericError)
+        
+        if case .unknown(let message) = convertedError {
+            #expect(message == "Not found")
+        } else {
+            #expect(Bool(false), "Expected AppError.unknown")
+        }
+    }
 }
