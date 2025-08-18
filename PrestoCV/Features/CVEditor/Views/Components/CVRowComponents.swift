@@ -91,7 +91,7 @@ struct EducationRowView: View {
                 .font(DesignTokens.Typography.body.font)
                 .foregroundColor(DesignTokens.Colors.secondary)
             
-            TextField(String(localized: "Period"), text: $education.period)
+            TextField(String(localized: "field.period"), text: $education.period)
                 .font(DesignTokens.Typography.callout.font)
                 .foregroundColor(DesignTokens.Colors.tertiary)
             
@@ -138,7 +138,7 @@ struct LanguageRowView: View {
                 
                 Spacer()
                 
-                Picker("", selection: $language.level) {
+                Picker("field.language_level", selection: $language.level) {
                     ForEach(LanguageProficiencyLevel.allCases, id: \.self) { level in
                         Text(String(localized: String.LocalizationValue(level.localizationKey)))
                             .tag(level)

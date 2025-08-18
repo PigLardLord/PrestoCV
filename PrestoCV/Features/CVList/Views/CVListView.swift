@@ -9,7 +9,7 @@ struct CVListView: View {
         NavigationView {
             ViewStateContainer(
                 viewState: viewModel.viewState,
-                loadingMessage: "Loading your CVs...",
+                loadingMessage: LocalizedStringKey("common.loading_cvs"),
                 onRetry: viewModel.loadCVs
             ) { cvs in
                 ConditionalContentView(
@@ -18,7 +18,7 @@ struct CVListView: View {
                     emptyContent: { emptyStateView }
                 )
             }
-            .navigationTitle("My CVs")
+            .navigationTitle(String(localized: "navigation.my_cvs"))
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

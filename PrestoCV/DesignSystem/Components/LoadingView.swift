@@ -73,13 +73,13 @@ extension LoadingView {
     }
     
     /// Creates a compact loading view for inline use
-    static func compact(message: LocalizedStringKey = LocalizedStringKey("")) -> LoadingView {
-        LoadingView(message: message, style: .compact)
+    static func compact() -> LoadingView {
+        LoadingView(style: .compact)
     }
     
     /// Creates a loading view for use inside buttons
     static func button() -> LoadingView {
-        LoadingView(message: LocalizedStringKey(""), style: .button)
+        LoadingView(style: .button)
     }
 }
 
@@ -97,7 +97,7 @@ struct LoadingView_Previews: PreviewProvider {
                 .previewDisplayName("Fullscreen")
             
             // Compact style
-            LoadingView.compact(message: LocalizedStringKey("common.save"))
+            LoadingView.compact()
                 .previewDisplayName("Compact")
                 .padding()
             

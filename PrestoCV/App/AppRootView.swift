@@ -42,7 +42,7 @@ struct AppRootView: View {
             Group {
                 switch onboardingViewModel.onboardingState {
                 case .loading:
-                    LoadingView.fullscreen(message: "Checking your account...")
+                    LoadingView.fullscreen(message: LocalizedStringKey("common.checking_account"))
                 case .firstTime:
                     OnboardingView(viewModel: onboardingViewModel)
                 case .returning:
