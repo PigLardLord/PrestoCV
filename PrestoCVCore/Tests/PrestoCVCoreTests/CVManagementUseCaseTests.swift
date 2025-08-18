@@ -417,7 +417,7 @@ struct CVManagementUseCaseTests {
         
         // Should have different ID but same content (with modified name)
         #expect(duplicatedCV.id != originalCV.id)
-        #expect(duplicatedCV.name == "Original CV (Copy)")
+        #expect(duplicatedCV.name == "Original CV action.copy_suffix")
         #expect(duplicatedCV.personalInfo.name == originalCV.personalInfo.name)
         #expect(duplicatedCV.personalInfo.title == originalCV.personalInfo.title)
         #expect(duplicatedCV.personalInfo.email == originalCV.personalInfo.email)
@@ -447,7 +447,7 @@ struct CVManagementUseCaseTests {
         
         let retrievedDuplicate = try await cvRepository.getCV(by: duplicatedCV.id)
         #expect(retrievedDuplicate != nil)
-        #expect(retrievedDuplicate?.name == "Test CV (Copy)")
+        #expect(retrievedDuplicate?.name == "Test CV action.copy_suffix")
     }
     
     @Test("DuplicateCV appends '(Copy)' to name")
@@ -466,7 +466,7 @@ struct CVManagementUseCaseTests {
         
         let duplicatedCV = try await useCase.duplicateCV(id: originalCV.id)
         
-        #expect(duplicatedCV.name == "My Professional CV (Copy)")
+        #expect(duplicatedCV.name == "My Professional CV action.copy_suffix")
     }
     
     @Test("DuplicateCV handles empty name correctly")
@@ -485,7 +485,7 @@ struct CVManagementUseCaseTests {
         
         let duplicatedCV = try await useCase.duplicateCV(id: originalCV.id)
         
-        #expect(duplicatedCV.name == "Copy")
+        #expect(duplicatedCV.name == "action.copy")
     }
     
     @Test("DuplicateCV throws error for non-existent CV")
@@ -618,7 +618,7 @@ struct CVManagementUseCaseTests {
         
         allCVs = try await useCase.getAllCVs()
         #expect(allCVs.count == 3)
-        #expect(duplicatedCV.name == "Second CV (Copy)")
+        #expect(duplicatedCV.name == "Second CV action.copy_suffix")
         
         // 6. Delete original second CV
         try await useCase.deleteCV(id: secondCV.id)
@@ -627,7 +627,7 @@ struct CVManagementUseCaseTests {
         #expect(allCVs.count == 2)
         
         let remainingNames = allCVs.map { $0.name }.sorted()
-        #expect(remainingNames == ["Second CV (Copy)", "Updated First CV"])
+        #expect(remainingNames == ["Second CV action.copy_suffix", "Updated First CV"])
         
         // 7. Delete all remaining CVs
         try await useCase.deleteCV(id: firstCV.id)

@@ -74,7 +74,7 @@ struct IntegrationTests {
             
             // 7. User creates a second CV by duplicating the first
             let duplicatedCV = try await cvManagementUseCase.duplicateCV(id: firstCV.id)
-            #expect(duplicatedCV.name == "John Doe (Copy)")
+            #expect(duplicatedCV.name == "John Doe action.copy_suffix")
             
             // 8. User now has 2 CVs
             let finalCVs = try await cvManagementUseCase.getAllCVs()
@@ -85,7 +85,7 @@ struct IntegrationTests {
             let copyCV = finalCVs.first { $0.id == duplicatedCV.id }
             
             #expect(originalCV?.name == "John Doe")
-            #expect(copyCV?.name == "John Doe (Copy)")
+            #expect(copyCV?.name == "John Doe action.copy_suffix")
             #expect(originalCV?.skills.count == 3)
             #expect(copyCV?.skills.count == 3)
             
@@ -342,7 +342,7 @@ struct IntegrationTests {
             let randomCV = createdCVs.randomElement()!
             let duplicatedCV = try await cvManagementUseCase.duplicateCV(id: randomCV.id)
             
-            #expect(duplicatedCV.name.hasSuffix("(Copy)"))
+            #expect(duplicatedCV.name.hasSuffix("action.copy_suffix"))
             
             let finalCount = try await cvManagementUseCase.getAllCVs()
             #expect(finalCount.count == cvCount + 2) // +1 onboarding, +1 duplicate
@@ -387,7 +387,7 @@ struct IntegrationTests {
             // 3. Verify all operations succeeded
             #expect(createResult1.name == "Concurrent CV 1")
             #expect(createResult2.name == "Concurrent CV 2")
-            #expect(duplicateResult.name == "Initial CV (Copy)")
+            #expect(duplicateResult.name == "Initial CV action.copy_suffix")
             #expect(stateResult == .returning)
             #expect(getAllResult.count >= 1) // At least the initial CV
             
