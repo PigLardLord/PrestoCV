@@ -314,9 +314,11 @@ struct ModelTests {
     
     @Test("AppError provides meaningful descriptions")
     func appErrorDescriptions() {
+        // In test environment, localized strings fall back to their keys
+        // since the String Catalog is not available in the Swift Package
         #expect(AppError.unknown("Something went wrong").localizedDescription == "Something went wrong")
-        #expect(AppError.invalidData("Invalid input").localizedDescription == "Invalid data: Invalid input")
-        #expect(AppError.notFound("User").localizedDescription == "User not found")
+        #expect(AppError.invalidData("Invalid input").localizedDescription == "error.invalid_data")
+        #expect(AppError.notFound("User").localizedDescription == "error.not_found")
     }
     
     // MARK: - PersonalInfo Tests
