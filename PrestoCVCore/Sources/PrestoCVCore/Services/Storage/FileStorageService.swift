@@ -8,11 +8,6 @@ public actor FileStorageService: StorageServiceProtocol{
     private let fileExtension = "json"
     private let parallelSearchService = ParallelSearchService()
     
-    /// Creates a new FileStorageService instance
-    /// - Parameters:
-    ///   - fileManager: The file manager to use for file operations
-    ///   - baseDirectory: The directory where files will be stored
-    /// - Throws: An error if the base directory cannot be created
     public init(fileManager: FileManager = .default, baseDirectory: URL) throws {
         self.fileManager = fileManager
         self.baseDirectory = baseDirectory
@@ -45,11 +40,6 @@ public actor FileStorageService: StorageServiceProtocol{
         return try decoder.decode(type, from: data)
     }
     
-    /// Loads all objects of the specified type from storage
-    /// - Parameter type: The type of objects to load
-    /// - Returns: An array of successfully loaded objects
-    /// - Throws: Storage error if directory cannot be read
-    /// - Note: Invalid files are silently skipped to ensure partial success
     public func loadAll<T: Codable & Sendable>(_ type: T.Type) async throws -> [T] {
         let urls = try getStoredFileURLs()
         return await loadObjectsFromURLs(urls, type: type)

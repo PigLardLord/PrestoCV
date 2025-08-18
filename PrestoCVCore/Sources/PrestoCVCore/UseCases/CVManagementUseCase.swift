@@ -6,6 +6,8 @@ public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
     private let cvRepository: CVRepositoryProtocol
     private let sampleRepository: SampleCVRepositoryProtocol
     
+    // MARK: - Initialization
+    
     public init(
         cvRepository: CVRepositoryProtocol,
         sampleRepository: SampleCVRepositoryProtocol
@@ -13,6 +15,8 @@ public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
         self.cvRepository = cvRepository
         self.sampleRepository = sampleRepository
     }
+    
+    // MARK: - Public Protocol Implementation
     
     public func getAllCVs() async throws -> [CVModel] {
         return try await cvRepository.getAllCVs()
@@ -43,6 +47,17 @@ public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
         return try await cvRepository.saveCV(duplicatedCV)
     }
     
+    public func getCV(by id: UUID) async throws -> CVModel? {
+        return try await cvRepository.getCV(by: id)
+    }
+}
+
+// MARK: - Private Helper Methods
+
+extension CVManagementUseCase {
+    
+    // MARK: Name Generation
+    
     /// Creates a name modifier function that appends localized copy suffix to existing names or returns localized copy text for empty names
     /// - Parameter name: The original name to modify
     /// - Returns: The modified name with localized copy indicator
@@ -50,9 +65,5 @@ public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
         let copyText = String(localized: "action.copy")
         let copySuffix = String(localized: "action.copy_suffix")
         return name.isEmpty ? copyText : "\(name) \(copySuffix)"
-    }
-    
-    public func getCV(by id: UUID) async throws -> CVModel? {
-        return try await cvRepository.getCV(by: id)
     }
 }

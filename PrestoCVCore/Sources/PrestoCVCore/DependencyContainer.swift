@@ -17,7 +17,8 @@ public enum DependencyError: Error, LocalizedError {
 
 public final class DependencyContainer: DependencyContainerProtocol {
     
-    // MARK: - Service Creation Results
+    // MARK: - Properties
+    
     private lazy var storageServiceResult: Result<StorageServiceProtocol, Error> = {
         do {
             // Get iOS Documents directory for CV storage
@@ -30,7 +31,47 @@ public final class DependencyContainer: DependencyContainerProtocol {
         }
     }()
     
-    // MARK: - Service Factory Methods
+    // MARK: - Initialization
+    
+    public init() {}
+    
+    // MARK: - Public Protocol Implementation
+    
+    public func makeOnboardingUseCase() throws -> OnboardingUseCaseProtocol {
+        let onboardingRepo = try getOnboardingRepository()
+        let sampleRepo = try getSampleRepository()
+        let cvManagementUseCase = try makeCVManagementUseCase()
+        return OnboardingUseCase(
+            onboardingRepository: onboardingRepo,
+            sampleRepository: sampleRepo,
+            cvManagementUseCase: cvManagementUseCase
+        )
+    }
+    
+    public func makeCVManagementUseCase() throws -> CVManagementUseCaseProtocol {
+        let cvRepo = try getCVRepository()
+        let sampleRepo = try getSampleRepository()
+        return CVManagementUseCase(
+            cvRepository: cvRepo,
+            sampleRepository: sampleRepo
+        )
+    }
+    
+    public func makeSampleCVRepository() throws -> SampleCVRepositoryProtocol {
+        return try getSampleRepository()
+    }
+    
+    public func makeTemplateCategoryService() throws -> TemplateCategoryServiceProtocol {
+        return TemplateCategoryService()
+    }
+}
+
+// MARK: - Private Helper Methods
+
+extension DependencyContainer {
+    
+    // MARK: Service Factory Methods
+    
     private func getStorageService() throws -> StorageServiceProtocol {
         switch storageServiceResult {
         case .success(let service):
@@ -39,8 +80,6 @@ public final class DependencyContainer: DependencyContainerProtocol {
             throw DependencyError.serviceCreationFailed("StorageService", error)
         }
     }
-    
-    // MARK: - Private Methods
     
     private func getCVRepository() throws -> CVRepositoryProtocol {
         let storageService = try getStorageService()
@@ -85,37 +124,5 @@ public final class DependencyContainer: DependencyContainerProtocol {
     
     private func getJSONTemplateLoader() -> JSONTemplateLoaderProtocol {
         return JSONTemplateLoader()
-    }
-    
-    // MARK: - Public Methods
-    
-    public init() {}
-    
-    public func makeOnboardingUseCase() throws -> OnboardingUseCaseProtocol {
-        let onboardingRepo = try getOnboardingRepository()
-        let sampleRepo = try getSampleRepository()
-        let cvManagementUseCase = try makeCVManagementUseCase()
-        return OnboardingUseCase(
-            onboardingRepository: onboardingRepo,
-            sampleRepository: sampleRepo,
-            cvManagementUseCase: cvManagementUseCase
-        )
-    }
-    
-    public func makeCVManagementUseCase() throws -> CVManagementUseCaseProtocol {
-        let cvRepo = try getCVRepository()
-        let sampleRepo = try getSampleRepository()
-        return CVManagementUseCase(
-            cvRepository: cvRepo,
-            sampleRepository: sampleRepo
-        )
-    }
-    
-    public func makeSampleCVRepository() throws -> SampleCVRepositoryProtocol {
-        return try getSampleRepository()
-    }
-    
-    public func makeTemplateCategoryService() throws -> TemplateCategoryServiceProtocol {
-        return TemplateCategoryService()
     }
 }

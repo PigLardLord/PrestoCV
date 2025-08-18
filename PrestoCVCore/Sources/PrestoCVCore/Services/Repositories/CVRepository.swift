@@ -6,6 +6,8 @@ public final class CVRepository: CVRepositoryProtocol, Sendable {
     private let storageService: StorageServiceProtocol
     private let parallelSearchService: ParallelSearchServiceProtocol
     
+    // MARK: - Initialization
+    
     public init(
         storageService: StorageServiceProtocol,
         parallelSearchService: ParallelSearchServiceProtocol
@@ -13,6 +15,8 @@ public final class CVRepository: CVRepositoryProtocol, Sendable {
         self.storageService = storageService
         self.parallelSearchService = parallelSearchService
     }
+    
+    // MARK: - Public Protocol Implementation
     
     public func getAllCVs() async throws -> [CVModel] {
         return try await storageService.loadAll(CVModel.self)
@@ -37,16 +41,6 @@ public final class CVRepository: CVRepositoryProtocol, Sendable {
         )
     }
     
-    private func loadCVFromIdentifier(_ identifier: String) async throws -> CVModel? {
-        return try await storageService.load(CVModel.self, from: identifier)
-    }
-    
-    private func createCVIdMatcher(for targetId: UUID) -> @Sendable (CVModel) -> Bool {
-        return { cv in
-            cv.id == targetId
-        }
-    }
-    
     public func saveCV(_ cv: CVModel) async throws -> CVModel {
         let identifier = "cv_\(cv.id.uuidString)"
         try await storageService.save(cv, to: identifier)
@@ -62,13 +56,32 @@ public final class CVRepository: CVRepositoryProtocol, Sendable {
         return !(await isEmpty())
     }
     
+    public func getCVsCount() async -> Int {
+        let cvs = try? await getAllCVs()
+        return cvs?.count ?? 0
+    }
+}
+
+// MARK: - Private Helper Methods
+
+extension CVRepository {
+    
+    // MARK: Data Loading
+    
+    private func loadCVFromIdentifier(_ identifier: String) async throws -> CVModel? {
+        return try await storageService.load(CVModel.self, from: identifier)
+    }
+    
     private func isEmpty() async -> Bool {
         let cvs = try? await getAllCVs()
         return cvs?.isEmpty ?? true
     }
     
-    public func getCVsCount() async -> Int {
-        let cvs = try? await getAllCVs()
-        return cvs?.count ?? 0
+    // MARK: Function Factories
+    
+    private func createCVIdMatcher(for targetId: UUID) -> @Sendable (CVModel) -> Bool {
+        return { cv in
+            cv.id == targetId
+        }
     }
 }

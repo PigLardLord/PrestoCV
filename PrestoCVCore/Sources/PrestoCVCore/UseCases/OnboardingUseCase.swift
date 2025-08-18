@@ -7,6 +7,8 @@ public final class OnboardingUseCase: OnboardingUseCaseProtocol, Sendable {
     private let sampleRepository: SampleCVRepositoryProtocol
     private let cvManagementUseCase: CVManagementUseCaseProtocol
     
+    // MARK: - Initialization
+    
     public init(
         onboardingRepository: OnboardingRepositoryProtocol,
         sampleRepository: SampleCVRepositoryProtocol,
@@ -16,6 +18,8 @@ public final class OnboardingUseCase: OnboardingUseCaseProtocol, Sendable {
         self.sampleRepository = sampleRepository
         self.cvManagementUseCase = cvManagementUseCase
     }
+    
+    // MARK: - Public Protocol Implementation
     
     public func checkOnboardingRequired() async -> OnboardingState {
         let hasExistingCVs = await onboardingRepository.hasExistingCVs()
