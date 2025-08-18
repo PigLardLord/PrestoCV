@@ -22,7 +22,7 @@ struct IntegrationTests {
             // 3. User creates first CV from default template
             let container = TestDependencyContainer()
             defer { container.reset() }
-            let sampleRepository = SampleCVRepository(storageService: MockStorageService())
+            let sampleRepository = SampleCVRepository(storageService: MockStorageService(), categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
             
             let defaultTemplate = try await sampleRepository.getDefaultSample()
             let firstCV = try await onboardingUseCase.createFirstCV(from: defaultTemplate)
@@ -164,7 +164,7 @@ struct IntegrationTests {
     @Test("Template system integration with user workflows")
     func templateSystemIntegrationWorkflow() async throws {
         try await TestHelpers.withTestContainer { container in
-            let sampleRepository = SampleCVRepository(storageService: MockStorageService())
+            let sampleRepository = SampleCVRepository(storageService: MockStorageService(), categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
             let onboardingUseCase = try container.makeOnboardingUseCase()
             let cvManagementUseCase = try container.makeCVManagementUseCase()
             
@@ -204,8 +204,14 @@ struct IntegrationTests {
     func dataPersistenceIntegration() async throws {
         // Use same mock storage across all components to test persistence
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
         let cvManagementUseCase = CVManagementUseCase(

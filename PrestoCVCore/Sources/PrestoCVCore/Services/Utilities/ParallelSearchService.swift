@@ -2,7 +2,7 @@ import Foundation
 
 /// A service that performs parallel searches across multiple data sources
 /// Provides efficient concurrent searching with early termination upon finding a match
-actor ParallelSearchService {
+actor ParallelSearchService: ParallelSearchServiceProtocol {
     
     /// Searches for an item across multiple sources in parallel
     /// - Parameters:

@@ -10,8 +10,8 @@ struct CVManagementUseCaseTests {
     @Test("CVManagementUseCase initializes with required dependencies")
     func useCaseInitialization() {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -26,8 +26,8 @@ struct CVManagementUseCaseTests {
     @Test("GetAllCVs returns empty array when no CVs exist")
     func getAllCVsReturnsEmptyWhenNoCVs() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -41,8 +41,8 @@ struct CVManagementUseCaseTests {
     @Test("GetAllCVs returns all stored CVs")
     func getAllCVsReturnsAllStoredCVs() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -66,8 +66,8 @@ struct CVManagementUseCaseTests {
     @Test("GetAllCVs delegates to CV repository")
     func getAllCVsDelegatesToCVRepository() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -89,8 +89,8 @@ struct CVManagementUseCaseTests {
     @Test("CreateCV creates new CV from template")
     func createCVCreatesNewCVFromTemplate() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -112,8 +112,8 @@ struct CVManagementUseCaseTests {
     @Test("CreateCV saves CV to repository")
     func createCVSavesCVToRepository() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -133,8 +133,8 @@ struct CVManagementUseCaseTests {
     @Test("CreateCV copies all template fields")
     func createCVCopiesAllTemplateFields() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -169,8 +169,8 @@ struct CVManagementUseCaseTests {
     @Test("UpdateCV saves updated CV to repository")
     func updateCVSavesUpdatedCV() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -220,8 +220,8 @@ struct CVManagementUseCaseTests {
     @Test("UpdateCV returns the updated CV")
     func updateCVReturnsUpdatedCV() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -264,8 +264,8 @@ struct CVManagementUseCaseTests {
     @Test("UpdateCV handles complex field updates")
     func updateCVHandlesComplexFieldUpdates() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -329,8 +329,8 @@ struct CVManagementUseCaseTests {
     @Test("DeleteCV removes CV from repository")
     func deleteCVRemovesCVFromRepository() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -354,8 +354,8 @@ struct CVManagementUseCaseTests {
     @Test("DeleteCV handles non-existent CV gracefully")
     func deleteCVHandlesNonExistentCV() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -371,8 +371,8 @@ struct CVManagementUseCaseTests {
     @Test("DeleteCV delegates to CV repository")
     func deleteCVDelegatesToCVRepository() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -402,8 +402,8 @@ struct CVManagementUseCaseTests {
     @Test("DuplicateCV creates copy of existing CV")
     func duplicateCVCreatesExactCopy() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -428,8 +428,8 @@ struct CVManagementUseCaseTests {
     @Test("DuplicateCV saves duplicated CV to repository")
     func duplicateCVSavesDuplicatedCV() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -453,8 +453,8 @@ struct CVManagementUseCaseTests {
     @Test("DuplicateCV appends '(Copy)' to name")
     func duplicateCVAppendsCoypToName() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -472,8 +472,8 @@ struct CVManagementUseCaseTests {
     @Test("DuplicateCV handles empty name correctly")
     func duplicateCVHandlesEmptyName() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -491,8 +491,8 @@ struct CVManagementUseCaseTests {
     @Test("DuplicateCV throws error for non-existent CV")
     func duplicateCVThrowsErrorForNonExistentCV() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -509,8 +509,8 @@ struct CVManagementUseCaseTests {
     @Test("DuplicateCV copies all fields including collections")
     func duplicateCVCopiesAllFields() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -555,8 +555,8 @@ struct CVManagementUseCaseTests {
     @Test("CVManagementUseCase full CRUD workflow")
     func cvManagementUseCaseFullCRUDWorkflow() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -642,8 +642,8 @@ struct CVManagementUseCaseTests {
     @Test("CVManagementUseCase handles concurrent operations correctly")
     func cvManagementUseCaseHandlesConcurrentOperations() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,
@@ -680,8 +680,8 @@ struct CVManagementUseCaseTests {
     @Test("CVManagementUseCase propagates repository errors correctly")
     func cvManagementUseCasePropagatesRepositoryErrors() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage)
+        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         
         let useCase = CVManagementUseCase(
             cvRepository: cvRepository,

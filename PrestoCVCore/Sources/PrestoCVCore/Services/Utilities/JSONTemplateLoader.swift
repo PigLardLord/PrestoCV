@@ -1,14 +1,14 @@
 import Foundation
 
 /// Service for loading and decoding JSON template files
-actor JSONTemplateLoader {
+actor JSONTemplateLoader: JSONTemplateLoaderProtocol {
     
     private let decoder = JSONDecoder()
     
     /// Loads a single CV model from a file path
     /// - Parameter path: File path to load from
     /// - Returns: CV model if successful, nil if failed
-    func loadTemplate(from path: String) -> CVModel? {
+    func loadTemplate(from path: String) async -> CVModel? {
         let url = URL(fileURLWithPath: path)
         
         guard let data = try? Data(contentsOf: url),
@@ -24,7 +24,7 @@ actor JSONTemplateLoader {
     /// - Parameter url: URL to load from
     /// - Returns: CV model if successful
     /// - Throws: AppError if loading or decoding fails
-    func loadTemplate(from url: URL) throws -> CVModel {
+    func loadTemplate(from url: URL) async throws -> CVModel {
         do {
             let data = try Data(contentsOf: url)
             return try decoder.decode(CVModel.self, from: data)
@@ -36,10 +36,14 @@ actor JSONTemplateLoader {
     /// Loads multiple templates from file paths, skipping invalid ones
     /// - Parameter paths: Array of file paths to load from
     /// - Returns: Array of successfully loaded CV models
-    func loadTemplates(from paths: [String]) -> [CVModel] {
-        return paths.compactMap { path in
-            loadTemplate(from: path)
+    func loadTemplates(from paths: [String]) async -> [CVModel] {
+        var templates: [CVModel] = []
+        for path in paths {
+            if let template = await loadTemplate(from: path) {
+                templates.append(template)
+            }
         }
+        return templates
     }
     
     /// Loads a template if it matches the given criteria
@@ -51,7 +55,7 @@ actor JSONTemplateLoader {
     func loadTemplateIfMatches(
         path: String,
         matcher: @Sendable (String) -> Bool
-    ) throws -> CVModel? {
+    ) async throws -> CVModel? {
         let url = URL(fileURLWithPath: path)
         let fileName = url.deletingPathExtension().lastPathComponent
         
@@ -59,6 +63,6 @@ actor JSONTemplateLoader {
             return nil
         }
         
-        return try loadTemplate(from: url)
+        return try await loadTemplate(from: url)
     }
 }

@@ -10,7 +10,13 @@ struct SampleCVRepositoryTests {
     @Test("SampleCVRepository initializes with storage service")
     func repositoryInitialization() {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         #expect(type(of: repository) == SampleCVRepository.self)
     }
@@ -20,7 +26,13 @@ struct SampleCVRepositoryTests {
     @Test("GetDefaultTemplate returns empty CV template")
     func getDefaultSampleReturnsEmptyCV() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         let template = try await repository.getDefaultSample()
         
@@ -43,7 +55,13 @@ struct SampleCVRepositoryTests {
     @Test("GetDefaultTemplate returns consistent template across calls")
     func getDefaultSampleConsistentAcrossCalls() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         let template1 = try await repository.getDefaultSample()
         let template2 = try await repository.getDefaultSample()
@@ -62,7 +80,13 @@ struct SampleCVRepositoryTests {
     @Test("GetDefaultTemplate does not require storage operations")
     func getDefaultSampleDoesNotRequireStorage() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         // Clear mock storage to ensure it's empty
         mockStorage.clear()
@@ -82,7 +106,13 @@ struct SampleCVRepositoryTests {
     @Test("GetAllTemplates returns array containing default template")
     func getAllSamplesReturnsDefaultTemplate() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         let templates = try await repository.getAllSamples()
         
@@ -98,7 +128,13 @@ struct SampleCVRepositoryTests {
     @Test("GetAllTemplates is consistent with getDefaultSample")
     func getAllSamplesConsistentWithGetDefaultTemplate() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         let defaultTemplate = try await repository.getDefaultSample()
         let allTemplates = try await repository.getAllSamples()
@@ -117,7 +153,13 @@ struct SampleCVRepositoryTests {
     @Test("GetAllTemplates does not require storage operations")
     func getAllSamplesDoesNotRequireStorage() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         // Ensure storage is empty
         mockStorage.clear()
@@ -134,7 +176,13 @@ struct SampleCVRepositoryTests {
     @Test("GetTemplate returns default template for 'default' name")
     func getSampleReturnsDefaultForDefaultName() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         let template = try await repository.getSample(by: "default")
         
@@ -148,7 +196,13 @@ struct SampleCVRepositoryTests {
     @Test("GetTemplate returns nil for unknown template names")
     func getSampleReturnsNilForUnknownNames() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         let unknownTemplate = try await repository.getSample(by: "unknown")
         #expect(unknownTemplate == nil)
@@ -163,7 +217,13 @@ struct SampleCVRepositoryTests {
     @Test("GetTemplate is case sensitive")
     func getSampleIsCaseSensitive() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         let defaultTemplate = try await repository.getSample(by: "default")
         let uppercaseTemplate = try await repository.getSample(by: "DEFAULT")
@@ -177,7 +237,13 @@ struct SampleCVRepositoryTests {
     @Test("GetTemplate is consistent with getDefaultSample for 'default' name")
     func getSampleConsistentWithGetDefaultTemplate() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         let defaultTemplate = try await repository.getDefaultSample()
         let namedDefaultTemplate = try await repository.getSample(by: "default")
@@ -194,7 +260,13 @@ struct SampleCVRepositoryTests {
     @Test("All template methods work together consistently")
     func allTemplateMethodsWorkTogether() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         // Get templates through different methods
         let defaultTemplate = try await repository.getDefaultSample()
@@ -220,7 +292,13 @@ struct SampleCVRepositoryTests {
     @Test("SampleCVRepository handles concurrent operations correctly")
     func templateRepositoryHandlesConcurrentOperations() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         // Test concurrent access by performing operations one after another
         // This tests thread safety without causing data race warnings
@@ -242,8 +320,24 @@ struct SampleCVRepositoryTests {
         
         // Test with actual concurrent operations using separate repository instances
         try await withThrowingTaskGroup(of: CVModel.self) { group in
-            group.addTask { try await SampleCVRepository(storageService: MockStorageService()).getDefaultSample() }
-            group.addTask { try await SampleCVRepository(storageService: MockStorageService()).getDefaultSample() }
+            group.addTask { 
+                try await SampleCVRepository(
+                    storageService: MockStorageService(),
+                    categoryService: TemplateCategoryService(),
+                    bundleResourceService: MockBundleResourceService(),
+                    templateLoader: MockJSONTemplateLoader(),
+                    parallelSearchService: MockParallelSearchService()
+                ).getDefaultSample() 
+            }
+            group.addTask { 
+                try await SampleCVRepository(
+                    storageService: MockStorageService(),
+                    categoryService: TemplateCategoryService(),
+                    bundleResourceService: MockBundleResourceService(),
+                    templateLoader: MockJSONTemplateLoader(),
+                    parallelSearchService: MockParallelSearchService()
+                ).getDefaultSample() 
+            }
             
             var results: [CVModel] = []
             for try await result in group {
@@ -260,7 +354,13 @@ struct SampleCVRepositoryTests {
     @Test("SampleCVRepository handles various template name inputs")
     func templateRepositoryHandlesVariousTemplateNames() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         // Test various edge case inputs
         let specialCharacterNames = ["@default", "default!", "def-ault", "default.template", "default/template"]
@@ -282,7 +382,13 @@ struct SampleCVRepositoryTests {
     @Test("SampleCVRepository operations don't interfere with each other")
     func templateRepositoryOperationsDontInterfere() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         // Get initial state
         let template1 = try await repository.getDefaultSample()
@@ -306,7 +412,13 @@ struct SampleCVRepositoryTests {
     @Test("SampleCVRepository architecture supports future extensions")
     func templateRepositorySupportsExtensions() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         // Current implementation returns 1 template
         let currentTemplates = try await repository.getAllSamples()
@@ -328,7 +440,13 @@ struct SampleCVRepositoryTests {
     @Test("Default template has valid structure for CV creation")
     func defaultTemplateHasValidStructure() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         let template = try await repository.getDefaultSample()
         
@@ -357,7 +475,13 @@ struct SampleCVRepositoryTests {
     @Test("Template can be serialized and deserialized")
     func templateCanBeSerializedAndDeserialized() async throws {
         let mockStorage = MockStorageService()
-        let repository = SampleCVRepository(storageService: mockStorage)
+        let repository = SampleCVRepository(
+            storageService: mockStorage,
+            categoryService: TemplateCategoryService(),
+            bundleResourceService: MockBundleResourceService(),
+            templateLoader: MockJSONTemplateLoader(),
+            parallelSearchService: MockParallelSearchService()
+        )
         
         let originalTemplate = try await repository.getDefaultSample()
         

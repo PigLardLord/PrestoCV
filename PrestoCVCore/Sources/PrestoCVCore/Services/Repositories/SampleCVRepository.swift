@@ -7,13 +7,22 @@ import Foundation
 public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
     private let storageService: StorageServiceProtocol
     private let categoryService: TemplateCategoryServiceProtocol
-    private let bundleResourceService = BundleResourceService()
-    private let templateLoader = JSONTemplateLoader()
-    private let parallelSearchService = ParallelSearchService()
+    private let bundleResourceService: BundleResourceServiceProtocol
+    private let templateLoader: JSONTemplateLoaderProtocol
+    private let parallelSearchService: ParallelSearchServiceProtocol
     
-    public init(storageService: StorageServiceProtocol) {
+    public init(
+        storageService: StorageServiceProtocol,
+        categoryService: TemplateCategoryServiceProtocol,
+        bundleResourceService: BundleResourceServiceProtocol,
+        templateLoader: JSONTemplateLoaderProtocol,
+        parallelSearchService: ParallelSearchServiceProtocol
+    ) {
         self.storageService = storageService
-        self.categoryService = TemplateCategoryService()
+        self.categoryService = categoryService
+        self.bundleResourceService = bundleResourceService
+        self.templateLoader = templateLoader
+        self.parallelSearchService = parallelSearchService
     }
     
     public func getDefaultSample() async throws -> CVModel {
@@ -31,8 +40,8 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
     /// Gets all valid template paths (excluding default template)
     /// - Returns: Array of file paths for valid templates
     private func getValidTemplatePaths() async -> [String] {
-        let allPaths = await bundleResourceService.getResourcePaths(ofType: "json")
-        return await bundleResourceService.filterPaths(allPaths, excluding: ["default"])
+        let allPaths = await bundleResourceService.getResourcePaths(ofType: "json", inDirectory: nil)
+        return await bundleResourceService.filterPaths(allPaths, excluding: Set(["default"]))
     }
     
     /// Loads samples from the provided file paths
@@ -104,8 +113,8 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
     /// Gets template paths that can be searched (excluding defaults)
     /// - Returns: Array of searchable file paths
     private func getSearchableTemplatePaths() async -> [String] {
-        let allPaths = await bundleResourceService.getResourcePaths(ofType: "json")
-        return await bundleResourceService.filterPaths(allPaths, excluding: ["default"])
+        let allPaths = await bundleResourceService.getResourcePaths(ofType: "json", inDirectory: nil)
+        return await bundleResourceService.filterPaths(allPaths, excluding: Set(["default"]))
     }
     
     /// Searches for a template matching the category name
@@ -126,8 +135,8 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
     private func findFirstMatchingTemplate(in paths: [String], matching name: String) async throws -> CVModel? {
         return try await parallelSearchService.findFirst(
             in: paths,
-            loader: createTemplateLoader(for: name)
-            // Using default matcher that always returns true
+            loader: createTemplateLoader(for: name),
+            matcher: { _ in true } // Default matcher that always returns true
         )
     }
     

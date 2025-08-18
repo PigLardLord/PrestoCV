@@ -10,7 +10,7 @@ struct CVRepositoryTests {
     @Test("CVRepository initializes with storage service")
     func repositoryInitialization() {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         #expect(type(of: repository) == CVRepository.self)
     }
@@ -20,7 +20,7 @@ struct CVRepositoryTests {
     @Test("GetAllCVs returns empty array when no CVs exist")
     func getAllCVsEmptyStorage() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let cvs = try await repository.getAllCVs()
         #expect(cvs.isEmpty)
@@ -29,7 +29,7 @@ struct CVRepositoryTests {
     @Test("GetAllCVs returns all stored CVs")
     func getAllCVsWithStoredData() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let cv1 = CVTestDataBuilder.minimalCV().withName("CV 1").build()
         let cv2 = CVTestDataBuilder.minimalCV().withName("CV 2").build()
@@ -48,7 +48,7 @@ struct CVRepositoryTests {
     @Test("GetAllCVs propagates storage errors")
     func getAllCVsPropagatesStorageErrors() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         // Create a scenario where storage throws an error
         // We'll simulate this by having the storage service in an invalid state
@@ -63,7 +63,7 @@ struct CVRepositoryTests {
     @Test("GetCV returns CV when found by ID with standard identifier")
     func getCVByIdStandardIdentifier() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let originalCV = CVTestDataBuilder.completeCV().build()
         let standardIdentifier = "cv_\(originalCV.id.uuidString)"
@@ -80,7 +80,7 @@ struct CVRepositoryTests {
     @Test("GetCV falls back to full search when standard identifier not found")
     func getCVByIdFallbackSearch() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let originalCV = CVTestDataBuilder.completeCV().build()
         // Use a non-standard identifier to test fallback
@@ -98,7 +98,7 @@ struct CVRepositoryTests {
     @Test("GetCV returns nil when CV not found")
     func getCVByIdNotFound() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let nonExistentId = UUID()
         let foundCV = try await repository.getCV(by: nonExistentId)
@@ -109,7 +109,7 @@ struct CVRepositoryTests {
     @Test("GetCV handles multiple CVs and returns correct one")
     func getCVByIdFromMultipleCVs() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let cv1 = CVTestDataBuilder.minimalCV().withName("First CV").build()
         let cv2 = CVTestDataBuilder.minimalCV().withName("Second CV").build()
@@ -129,7 +129,7 @@ struct CVRepositoryTests {
     @Test("GetCV skips invalid data during fallback search")
     func getCVByIdSkipsInvalidDataDuringFallback() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let validCV = CVTestDataBuilder.completeCV().build()
         
@@ -153,7 +153,7 @@ struct CVRepositoryTests {
     @Test("SaveCV stores CV with standard identifier format")
     func saveCVUsesStandardIdentifier() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let originalCV = CVTestDataBuilder.minimalCV().build()
         let savedCV = try await repository.saveCV(originalCV)
@@ -171,7 +171,7 @@ struct CVRepositoryTests {
     @Test("SaveCV returns the same CV that was saved")
     func saveCVReturnsCorrectCV() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let originalCV = CVTestDataBuilder.completeCV().build()
         let savedCV = try await repository.saveCV(originalCV)
@@ -185,7 +185,7 @@ struct CVRepositoryTests {
     @Test("SaveCV overwrites existing CV")
     func saveCVOverwritesExisting() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let cvId = UUID()
         let originalCV = CVTestDataBuilder.minimalCV().withName("Original Name").build(id: cvId)
@@ -203,7 +203,7 @@ struct CVRepositoryTests {
     @Test("DeleteCV removes CV from storage")
     func deleteCVRemovesFromStorage() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let cv = CVTestDataBuilder.minimalCV().build()
         _ = try await repository.saveCV(cv)
@@ -222,7 +222,7 @@ struct CVRepositoryTests {
     @Test("DeleteCV handles non-existent CV gracefully")
     func deleteCVHandlesNonExistent() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let nonExistentId = UUID()
         
@@ -235,7 +235,7 @@ struct CVRepositoryTests {
     @Test("CVExists returns false when no CVs exist")
     func cvExistsReturnsFalseWhenEmpty() async {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         // Ensure storage is completely empty
         #expect(mockStorage.isEmpty())
@@ -257,7 +257,7 @@ struct CVRepositoryTests {
     @Test("CVExists returns true when CVs exist")
     func cvExistsReturnsTrueWhenCVsExist() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let cv = CVTestDataBuilder.minimalCV().build()
         _ = try await repository.saveCV(cv)
@@ -271,7 +271,7 @@ struct CVRepositoryTests {
         // Create a mock that would fail on getAllCVs
         // Since our MockStorageService doesn't throw, we'll test the error handling pattern
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let exists = await repository.cvExists()
         #expect(exists == false) // Empty storage should return false
@@ -282,7 +282,7 @@ struct CVRepositoryTests {
     @Test("GetCVsCount returns zero when no CVs exist")
     func getCVsCountReturnsZeroWhenEmpty() async {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         // Ensure storage is completely empty
         #expect(mockStorage.isEmpty())
@@ -304,7 +304,7 @@ struct CVRepositoryTests {
     @Test("GetCVsCount returns correct count when CVs exist")
     func getCVsCountReturnsCorrectCount() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let cv1 = CVTestDataBuilder.minimalCV().withName("CV 1").build()
         let cv2 = CVTestDataBuilder.minimalCV().withName("CV 2").build()
@@ -321,7 +321,7 @@ struct CVRepositoryTests {
     @Test("GetCVsCount returns zero on storage error")
     func getCVsCountReturnsZeroOnStorageError() async {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let count = await repository.getCVsCount()
         #expect(count == 0) // Empty storage should return 0
@@ -332,7 +332,7 @@ struct CVRepositoryTests {
     @Test("Repository operations work together correctly")
     func repositoryOperationsIntegration() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         // Initially empty
         #expect(await repository.getCVsCount() == 0)
@@ -385,7 +385,7 @@ struct CVRepositoryTests {
     @Test("Repository handles CV with complex nested data")
     func repositoryHandlesComplexCVData() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         let complexCV = CVTestDataBuilder.completeCV().build()
         _ = try await repository.saveCV(complexCV)
@@ -405,7 +405,7 @@ struct CVRepositoryTests {
     @Test("Repository handles UUID edge cases correctly")
     func repositoryHandlesUUIDEdgeCases() async throws {
         let mockStorage = MockStorageService()
-        let repository = CVRepository(storageService: mockStorage)
+        let repository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
         
         // Test with known UUID patterns
         let knownUUID = UUID(uuidString: "12345678-1234-1234-1234-123456789ABC")!

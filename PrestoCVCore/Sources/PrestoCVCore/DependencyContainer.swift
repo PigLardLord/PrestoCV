@@ -44,7 +44,11 @@ public final class DependencyContainer: DependencyContainerProtocol {
     
     private func getCVRepository() throws -> CVRepositoryProtocol {
         let storageService = try getStorageService()
-        return CVRepository(storageService: storageService)
+        let parallelSearchService = getParallelSearchService()
+        return CVRepository(
+            storageService: storageService,
+            parallelSearchService: parallelSearchService
+        )
     }
     
     private func getOnboardingRepository() throws -> OnboardingRepositoryProtocol {
@@ -54,11 +58,33 @@ public final class DependencyContainer: DependencyContainerProtocol {
     
     private func getSampleRepository() throws -> SampleCVRepositoryProtocol {
         let storageService = try getStorageService()
-        return SampleCVRepository(storageService: storageService)
+        let categoryService = getTemplateCategoryService()
+        let bundleResourceService = getBundleResourceService()
+        let templateLoader = getJSONTemplateLoader()
+        let parallelSearchService = getParallelSearchService()
+        return SampleCVRepository(
+            storageService: storageService,
+            categoryService: categoryService,
+            bundleResourceService: bundleResourceService,
+            templateLoader: templateLoader,
+            parallelSearchService: parallelSearchService
+        )
     }
     
     private func getTemplateCategoryService() -> TemplateCategoryServiceProtocol {
         return TemplateCategoryService()
+    }
+    
+    private func getParallelSearchService() -> ParallelSearchServiceProtocol {
+        return ParallelSearchService()
+    }
+    
+    private func getBundleResourceService() -> BundleResourceServiceProtocol {
+        return BundleResourceService()
+    }
+    
+    private func getJSONTemplateLoader() -> JSONTemplateLoaderProtocol {
+        return JSONTemplateLoader()
     }
     
     // MARK: - Public Methods
@@ -86,8 +112,7 @@ public final class DependencyContainer: DependencyContainerProtocol {
     }
     
     public func makeSampleCVRepository() throws -> SampleCVRepositoryProtocol {
-        let storageService = try getStorageService()
-        return SampleCVRepository(storageService: storageService)
+        return try getSampleRepository()
     }
     
     public func makeTemplateCategoryService() throws -> TemplateCategoryServiceProtocol {

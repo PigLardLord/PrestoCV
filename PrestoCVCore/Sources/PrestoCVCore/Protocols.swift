@@ -29,6 +29,36 @@ public protocol TemplateCategoryServiceProtocol: Sendable {
     func getCategoryKeywords() -> [String: [String]]
 }
 
+public protocol ParallelSearchServiceProtocol: Sendable {
+    func findFirst<Source, Item>(
+        in sources: [Source],
+        loader: @escaping @Sendable (Source) async throws -> Item?,
+        matcher: @escaping @Sendable (Item) -> Bool
+    ) async throws -> Item? where Source: Sendable, Item: Sendable
+    
+    func findAll<Source, Item>(
+        in sources: [Source],
+        loader: @escaping @Sendable (Source) async throws -> Item?,
+        matcher: @escaping @Sendable (Item) -> Bool
+    ) async throws -> [Item] where Source: Sendable, Item: Sendable
+}
+
+public protocol BundleResourceServiceProtocol: Sendable {
+    func getResourcePaths(ofType type: String, inDirectory directory: String?) async -> [String]
+    func getResourceURL(forResource name: String, withExtension ext: String) async -> URL?
+    func filterPaths(_ paths: [String], excluding excludedNames: Set<String>) async -> [String]
+}
+
+public protocol JSONTemplateLoaderProtocol: Sendable {
+    func loadTemplate(from path: String) async -> CVModel?
+    func loadTemplate(from url: URL) async throws -> CVModel
+    func loadTemplates(from paths: [String]) async -> [CVModel]
+    func loadTemplateIfMatches(
+        path: String,
+        matcher: @Sendable (String) -> Bool
+    ) async throws -> CVModel?
+}
+
 // MARK: - Use Case Protocols
 
 public protocol OnboardingUseCaseProtocol: Sendable {

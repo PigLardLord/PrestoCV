@@ -5,13 +5,26 @@ import Foundation
 /// A test dependency container that uses mocked services
 public final class TestDependencyContainer: DependencyContainerProtocol, @unchecked Sendable {
     private let mockStorageService = MockStorageService()
+    private let mockParallelSearchService = MockParallelSearchService()
+    private let mockBundleResourceService = MockBundleResourceService()
+    private let mockJSONTemplateLoader = MockJSONTemplateLoader()
+    private let mockCategoryService = TemplateCategoryService()
     
     private lazy var cvRepository: CVRepositoryProtocol = {
-        return CVRepository(storageService: mockStorageService)
+        return CVRepository(
+            storageService: mockStorageService,
+            parallelSearchService: mockParallelSearchService
+        )
     }()
     
     private lazy var sampleRepository: SampleCVRepositoryProtocol = {
-        return SampleCVRepository(storageService: mockStorageService)
+        return SampleCVRepository(
+            storageService: mockStorageService,
+            categoryService: mockCategoryService,
+            bundleResourceService: mockBundleResourceService,
+            templateLoader: mockJSONTemplateLoader,
+            parallelSearchService: mockParallelSearchService
+        )
     }()
     
     private lazy var onboardingRepository: OnboardingRepositoryProtocol = {

@@ -4,10 +4,14 @@ import Foundation
 
 public final class CVRepository: CVRepositoryProtocol, Sendable {
     private let storageService: StorageServiceProtocol
-    private let parallelSearchService = ParallelSearchService()
+    private let parallelSearchService: ParallelSearchServiceProtocol
     
-    public init(storageService: StorageServiceProtocol) {
+    public init(
+        storageService: StorageServiceProtocol,
+        parallelSearchService: ParallelSearchServiceProtocol
+    ) {
         self.storageService = storageService
+        self.parallelSearchService = parallelSearchService
     }
     
     public func getAllCVs() async throws -> [CVModel] {

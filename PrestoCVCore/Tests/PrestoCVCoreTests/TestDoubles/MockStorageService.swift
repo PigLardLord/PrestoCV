@@ -97,3 +97,79 @@ public final class MockStorageService: StorageServiceProtocol, @unchecked Sendab
         }
     }
 }
+
+// MARK: - Mock Service Implementations
+
+public final class MockParallelSearchService: ParallelSearchServiceProtocol, @unchecked Sendable {
+    public func findFirst<Source, Item>(
+        in sources: [Source],
+        loader: @escaping @Sendable (Source) async throws -> Item?,
+        matcher: @escaping @Sendable (Item) -> Bool
+    ) async throws -> Item? where Source: Sendable, Item: Sendable {
+        // Simple implementation for testing - just try each source sequentially
+        for source in sources {
+            if let item = try await loader(source), matcher(item) {
+                return item
+            }
+        }
+        return nil
+    }
+    
+    public func findAll<Source, Item>(
+        in sources: [Source],
+        loader: @escaping @Sendable (Source) async throws -> Item?,
+        matcher: @escaping @Sendable (Item) -> Bool
+    ) async throws -> [Item] where Source: Sendable, Item: Sendable {
+        var results: [Item] = []
+        for source in sources {
+            if let item = try await loader(source), matcher(item) {
+                results.append(item)
+            }
+        }
+        return results
+    }
+}
+
+public final class MockBundleResourceService: BundleResourceServiceProtocol, @unchecked Sendable {
+    public func getResourcePaths(ofType type: String, inDirectory directory: String?) async -> [String] {
+        // Return empty array for tests
+        return []
+    }
+    
+    public func getResourceURL(forResource name: String, withExtension ext: String) async -> URL? {
+        // Return nil for tests
+        return nil
+    }
+    
+    public func filterPaths(_ paths: [String], excluding excludedNames: Set<String>) async -> [String] {
+        return paths.filter { path in
+            let fileName = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+            return !excludedNames.contains(fileName)
+        }
+    }
+}
+
+public final class MockJSONTemplateLoader: JSONTemplateLoaderProtocol, @unchecked Sendable {
+    public func loadTemplate(from path: String) async -> CVModel? {
+        // Return a default CV for tests
+        return CVModel()
+    }
+    
+    public func loadTemplate(from url: URL) async throws -> CVModel {
+        // Return a default CV for tests
+        return CVModel()
+    }
+    
+    public func loadTemplates(from paths: [String]) async -> [CVModel] {
+        // Return default CVs for each path
+        return paths.map { _ in CVModel() }
+    }
+    
+    public func loadTemplateIfMatches(
+        path: String,
+        matcher: @Sendable (String) -> Bool
+    ) async throws -> CVModel? {
+        let fileName = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+        return matcher(fileName) ? CVModel() : nil
+    }
+}
