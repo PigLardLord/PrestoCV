@@ -74,15 +74,7 @@ actor ParallelSearchService: ParallelSearchServiceProtocol {
         loader: @Sendable (Source) async throws -> Item?,
         matcher: @Sendable (Item) -> Bool
     ) async -> Item? where Source: Sendable, Item: Sendable {
-        do {
-            guard let item = try await loader(source) else {
-                return nil
-            }
-            return matcher(item) ? item : nil
-        } catch {
-            // Silently ignore errors and continue with other sources
-            return nil
-        }
+        return (try? await loader(source)).flatMap { matcher($0) ? $0 : nil }
     }
     
     /// Waits for the first matching item and cancels remaining tasks
@@ -98,12 +90,10 @@ actor ParallelSearchService: ParallelSearchServiceProtocol {
                     return item
                 }
             }
-            return nil
         } catch {
-            // If any task throws, cancel all and return nil
             group.cancelAll()
-            return nil
         }
+        return nil
     }
     
     /// Collects all matching items from the task group
@@ -119,10 +109,7 @@ actor ParallelSearchService: ParallelSearchServiceProtocol {
                     matchingItems.append(item)
                 }
             }
-        } catch {
-            // If any task throws, continue collecting from remaining tasks
-            // but don't add the failed result
-        }
+        } catch {}
         return matchingItems
     }
 }
