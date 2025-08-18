@@ -207,12 +207,12 @@ struct ModelTests {
         
         #expect(language.id != UUID())
         #expect(language.name == "")
-        #expect(language.level == "")
+        #expect(language.level == .b1)
     }
     
     @Test("Language JSON serialization")
     func languageJSONSerialization() throws {
-        let original = Language(name: "Spanish", level: "Fluent")
+        let original = Language(name: "Spanish", level: .c1)
         
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(Language.self, from: data)
@@ -554,18 +554,56 @@ struct ModelTests {
         let decoded = try JSONDecoder().decode(Language.self, from: json)
         
         #expect(decoded.name == "French")
-        #expect(decoded.level == "")  // Missing field should default
+        #expect(decoded.level == .b1)  // Missing field should default to B1
         #expect(decoded.id != UUID())  // Should generate new UUID
     }
     
     @Test("Language initializes with provided values")
     func languageInitializationWithValues() {
         let id = UUID()
-        let language = Language(id: id, name: "Spanish", level: "Fluent")
+        let language = Language(id: id, name: "Spanish", level: .c1)
         
         #expect(language.id == id)
         #expect(language.name == "Spanish")
-        #expect(language.level == "Fluent")
+        #expect(language.level == .c1)
+    }
+    
+    @Test("Language handles backward compatibility with string levels")
+    func languageBackwardCompatibility() throws {
+        // Test with old string format
+        let json = """
+        {
+            "name": "German",
+            "level": "Advanced"
+        }
+        """.data(using: .utf8)!
+        
+        let decoded = try JSONDecoder().decode(Language.self, from: json)
+        
+        #expect(decoded.name == "German")
+        #expect(decoded.level == .c1)  // "Advanced" should map to C1
+        
+        // Test with native string variations
+        let nativeJson = """
+        {
+            "name": "English",
+            "level": "Native Speaker"
+        }
+        """.data(using: .utf8)!
+        
+        let nativeDecoded = try JSONDecoder().decode(Language.self, from: nativeJson)
+        #expect(nativeDecoded.level == .native)
+        
+        // Test with exact CEFR format
+        let cefrJson = """
+        {
+            "name": "French",
+            "level": "B2"
+        }
+        """.data(using: .utf8)!
+        
+        let cefrDecoded = try JSONDecoder().decode(Language.self, from: cefrJson)
+        #expect(cefrDecoded.level == .b2)
     }
     
     @Test("Certification handles missing JSON fields gracefully")

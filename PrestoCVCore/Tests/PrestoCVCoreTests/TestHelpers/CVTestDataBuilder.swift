@@ -149,8 +149,8 @@ public struct CVTestDataBuilder {
             )
         ]
         builder.languages = [
-            Language(name: "English", level: "Native"),
-            Language(name: "Spanish", level: "Conversational")
+            Language(name: "English", level: .native),
+            Language(name: "Spanish", level: .b2)
         ]
         builder.certifications = [
             Certification(

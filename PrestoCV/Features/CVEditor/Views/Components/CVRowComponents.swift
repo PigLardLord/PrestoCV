@@ -121,17 +121,33 @@ struct LanguageRowView: View {
     let onDelete: () -> Void
     
     var body: some View {
-        HStack(spacing: DesignTokens.Spacing.md) {
-            TextField(String(localized: "field.language"), text: $language.name)
-                .font(DesignTokens.Typography.body.font)
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+            HStack {
+                TextField(String(localized: "field.language"), text: $language.name)
+                    .font(DesignTokens.Typography.body.font)
+                
+                Spacer()
+                
+                DeleteButton(action: onDelete)
+            }
             
-            TextField(String(localized: "field.level"), text: $language.level)
-                .multilineTextAlignment(.trailing)
+            HStack {
+                Text(String(localized: "field.level"))
+                    .font(DesignTokens.Typography.callout.font)
+                    .foregroundColor(DesignTokens.Colors.secondary)
+                
+                Spacer()
+                
+                Picker("", selection: $language.level) {
+                    ForEach(LanguageProficiencyLevel.allCases, id: \.self) { level in
+                        Text(String(localized: String.LocalizationValue(level.localizationKey)))
+                            .tag(level)
+                    }
+                }
+                .pickerStyle(MenuPickerStyle())
                 .font(DesignTokens.Typography.callout.font)
-                .foregroundColor(DesignTokens.Colors.secondary)
-                .frame(maxWidth: DesignTokens.InputSize.textFieldMaxWidth)
-            
-            DeleteButton(action: onDelete)
+                .tint(DesignTokens.Colors.accent)
+            }
         }
         .padding(.vertical, DesignTokens.Spacing.xs)
     }
