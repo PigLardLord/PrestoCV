@@ -84,21 +84,83 @@
       }
     },
     "accessibility.skill_level_value": {
+      "extractionState": "manual",
       "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fertigkeitsstufe %1$lld von %2$lld"
+          }
+        },
         "en": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Skill level %1$lld out of %2$lld"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nivel de habilidad %1$lld de %2$lld"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niveau de compétence %1$lld sur %2$lld"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Livello di abilità %1$lld su %2$lld"
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nível de habilidade %1$lld de %2$lld"
           }
         }
       }
     },
     "accessibility.stars_selected": {
+      "extractionState": "manual",
       "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld von %2$lld Sternen ausgewählt"
+          }
+        },
         "en": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "%1$lld out of %2$lld stars selected"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld de %2$lld estrellas seleccionadas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld étoiles sélectionnées sur %2$lld"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld stelle selezionate su %2$lld"
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld de %2$lld estrelas selecionadas"
           }
         }
       }

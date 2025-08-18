@@ -14,7 +14,7 @@ struct SkillLevelView: View {
                         // If tapping the same star, toggle it off (set to 0)
                         level = (index + 1) == level ? 0 : index + 1
                     }
-                    .accessibilityLabel(String(localized: "accessibility.skill_level", defaultValue: "Skill level \(index + 1) out of \(maxLevel)"))
+                    .accessibilityLabel(String(localized: "accessibility.skill_level_value", defaultValue: "Skill level \(index + 1) out of \(maxLevel)"))
                     .accessibilityRemoveTraits(.isImage)
                     .accessibilityAddTraits(
                         (index + 1) <= level ? .isSelected : .isButton
