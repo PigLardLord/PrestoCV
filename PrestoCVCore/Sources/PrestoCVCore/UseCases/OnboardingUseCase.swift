@@ -31,12 +31,6 @@ public final class OnboardingUseCase: OnboardingUseCaseProtocol, Sendable {
     }
     
     public func createFirstCV(from template: CVModel) async throws -> CVModel {
-        // Create the first CV
-        do {
-            let createdCV = try await cvManagementUseCase.createCV(from: template)
-            return createdCV
-        } catch {
-            throw AppError.from(error)
-        }
+        return try await cvManagementUseCase.createCV(from: template)
     }
 }
