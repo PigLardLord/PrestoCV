@@ -19,6 +19,7 @@ enum DesignTokens {
     
     // MARK: - Corner Radius
     enum CornerRadius {
+        static let xs: CGFloat = 2
         static let sm: CGFloat = 4
         static let md: CGFloat = 8
         static let lg: CGFloat = 12
@@ -85,6 +86,15 @@ enum DesignTokens {
         static let thin: CGFloat = 1
         static let medium: CGFloat = 2
         static let thick: CGFloat = 3
+    }
+    
+    // MARK: - Opacity
+    enum Opacity {
+        static let disabled: Double = 0.3
+        static let subtle: Double = 0.5
+        static let medium: Double = 0.7
+        static let prominent: Double = 0.9
+        static let opaque: Double = 1.0
     }
     
     // MARK: - Animation Durations

@@ -8,46 +8,58 @@ struct ExperienceRowView: View {
     let onDelete: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-            HStack {
-                TextField(String(localized: "field.job_title"), text: $experience.title)
-                    .font(DesignTokens.Typography.subheadline.font)
-                    .fontWeight(.semibold)
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+            // Title and Delete button
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                    TextField(String(localized: "field.job_title"), text: $experience.title)
+                        .font(.headline)
+                        .foregroundColor(DesignTokens.Colors.primary)
+                    
+                    TextField(String(localized: "field.company"), text: $experience.company)
+                        .font(.subheadline)
+                        .foregroundColor(DesignTokens.Colors.secondary)
+                }
+                
                 Spacer()
-                DeleteButton(action: onDelete)
+                
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.caption)
+                        .foregroundColor(DesignTokens.Colors.error)
+                }
+                .buttonStyle(.plain)
             }
             
-            TextField(String(localized: "field.company"), text: $experience.company)
-                .font(DesignTokens.Typography.body.font)
-                .foregroundColor(DesignTokens.Colors.secondary)
-            
+            // Location and Period
             HStack {
                 TextField(String(localized: "field.location"), text: $experience.location)
+                    .font(.caption)
+                    .foregroundColor(DesignTokens.Colors.tertiary)
+                
                 Spacer()
+                
                 TextField(String(localized: "field.period"), text: $experience.period)
+                    .font(.caption)
+                    .foregroundColor(DesignTokens.Colors.tertiary)
                     .multilineTextAlignment(.trailing)
             }
-            .font(DesignTokens.Typography.callout.font)
-            .foregroundColor(DesignTokens.Colors.tertiary)
             
-            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                Text(String(localized: "field.description"))
-                    .font(DesignTokens.Typography.footnote.font)
-                    .foregroundColor(DesignTokens.Colors.secondary)
-                
-                TextEditor(text: $experience.description)
-                    .frame(minHeight: DesignTokens.InputSize.textEditorMinHeight)
-                    .scrollContentBackground(.hidden)
-                    .background(DesignTokens.Colors.backgroundTertiary)
-                    .cornerRadius(DesignTokens.CornerRadius.sm)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
-                            .stroke(DesignTokens.Colors.border, lineWidth: DesignTokens.BorderWidth.thin)
-                    )
-            }
+            // Description
+            Divider()
+                .padding(.vertical, DesignTokens.Spacing.xxs)
+            
+            Text(String(localized: "field.description"))
+                .font(.caption2)
+                .foregroundColor(DesignTokens.Colors.tertiary)
+            
+            TextEditor(text: $experience.description)
+                .font(.body)
+                .frame(minHeight: DesignTokens.InputSize.textEditorMinHeight)
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
         }
-        .cardStyle()
-        .padding(.vertical, DesignTokens.Spacing.xs)
+        .padding(.vertical, DesignTokens.Spacing.sm)
     }
 }
 
@@ -78,41 +90,50 @@ struct EducationRowView: View {
     let onDelete: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-            HStack {
-                TextField(String(localized: "field.degree"), text: $education.degree)
-                    .font(DesignTokens.Typography.subheadline.font)
-                    .fontWeight(.semibold)
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+            // Degree and Delete button
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                    TextField(String(localized: "field.degree"), text: $education.degree)
+                        .font(.headline)
+                        .foregroundColor(DesignTokens.Colors.primary)
+                    
+                    TextField(String(localized: "field.school"), text: $education.school)
+                        .font(.subheadline)
+                        .foregroundColor(DesignTokens.Colors.secondary)
+                    
+                    TextField(String(localized: "field.period"), text: $education.period)
+                        .font(.caption)
+                        .foregroundColor(DesignTokens.Colors.tertiary)
+                }
+                
                 Spacer()
-                DeleteButton(action: onDelete)
+                
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.caption)
+                        .foregroundColor(DesignTokens.Colors.error)
+                }
+                .buttonStyle(.plain)
             }
             
-            TextField(String(localized: "field.school"), text: $education.school)
-                .font(DesignTokens.Typography.body.font)
-                .foregroundColor(DesignTokens.Colors.secondary)
-            
-            TextField(String(localized: "field.period"), text: $education.period)
-                .font(DesignTokens.Typography.callout.font)
-                .foregroundColor(DesignTokens.Colors.tertiary)
-            
-            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+            // Description
+            if !education.description.isEmpty {
+                Divider()
+                    .padding(.vertical, DesignTokens.Spacing.xxs)
+                
                 Text(String(localized: "field.description"))
-                    .font(DesignTokens.Typography.footnote.font)
-                    .foregroundColor(DesignTokens.Colors.secondary)
+                    .font(.caption2)
+                    .foregroundColor(DesignTokens.Colors.tertiary)
                 
                 TextEditor(text: $education.description)
+                    .font(.body)
                     .frame(minHeight: DesignTokens.InputSize.textEditorMinHeight)
                     .scrollContentBackground(.hidden)
-                    .background(DesignTokens.Colors.backgroundTertiary)
-                    .cornerRadius(DesignTokens.CornerRadius.sm)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
-                            .stroke(DesignTokens.Colors.border, lineWidth: DesignTokens.BorderWidth.thin)
-                    )
+                    .background(Color.clear)
             }
         }
-        .cardStyle()
-        .padding(.vertical, DesignTokens.Spacing.xs)
+        .padding(.vertical, DesignTokens.Spacing.sm)
     }
 }
 
