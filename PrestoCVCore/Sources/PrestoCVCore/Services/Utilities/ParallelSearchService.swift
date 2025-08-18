@@ -19,7 +19,7 @@ actor ParallelSearchService: ParallelSearchServiceProtocol {
         
         return await withThrowingTaskGroup(of: Item?.self) { group in
             scheduleParallelSearchTasks(in: &group, sources: sources, loader: loader, matcher: matcher)
-            return await waitForFirstMatch(in: group)
+            return await waitForFirstMatch(in: &group)
         }
     }
     
@@ -38,7 +38,7 @@ actor ParallelSearchService: ParallelSearchServiceProtocol {
         
         return await withThrowingTaskGroup(of: Item?.self) { group in
             scheduleParallelSearchTasks(in: &group, sources: sources, loader: loader, matcher: matcher)
-            return await collectAllMatches(from: group)
+            return await collectAllMatches(from: &group)
         }
     }
     
@@ -81,17 +81,13 @@ actor ParallelSearchService: ParallelSearchServiceProtocol {
     /// - Parameter group: The task group to wait on
     /// - Returns: The first matching item found, or nil if none found
     private func waitForFirstMatch<Item>(
-        in group: ThrowingTaskGroup<Item?, Error>
+        in group: inout ThrowingTaskGroup<Item?, Error>
     ) async -> Item? where Item: Sendable {
-        do {
-            for try await result in group {
-                if let item = result {
-                    group.cancelAll()
-                    return item
-                }
+        defer { group.cancelAll() }
+        while let result = await group.nextResult() {
+            if case .success(let value) = result, let item = value {
+                return item
             }
-        } catch {
-            group.cancelAll()
         }
         return nil
     }
@@ -100,16 +96,14 @@ actor ParallelSearchService: ParallelSearchServiceProtocol {
     /// - Parameter group: The task group to collect from
     /// - Returns: Array of all matching items found
     private func collectAllMatches<Item>(
-        from group: ThrowingTaskGroup<Item?, Error>
+        from group: inout ThrowingTaskGroup<Item?, Error>
     ) async -> [Item] where Item: Sendable {
-        var matchingItems: [Item] = []
-        do {
-            for try await result in group {
-                if let item = result {
-                    matchingItems.append(item)
-                }
+        var items: [Item] = []
+        while let result = await group.nextResult() {
+            if case .success(let value) = result, let item = value {
+                items.append(item)
             }
-        } catch {}
-        return matchingItems
+        }
+        return items
     }
 }
