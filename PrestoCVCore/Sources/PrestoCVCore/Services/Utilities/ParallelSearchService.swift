@@ -77,6 +77,31 @@ actor ParallelSearchService: ParallelSearchServiceProtocol {
         return (try? await loader(source)).flatMap { matcher($0) ? $0 : nil }
     }
     
+    /// Extracts successful value from a task group result
+    /// - Parameter result: The result from a task group
+    /// - Returns: The unwrapped value if successful, nil otherwise
+    private func extractSuccessValue<Item>(
+        from result: Result<Item?, Error>
+    ) -> Item? where Item: Sendable {
+        guard case .success(let value) = result else { return nil }
+        return value
+    }
+    
+    /// Processes task group results with a handler that can control iteration
+    /// - Parameters:
+    ///   - group: The task group to iterate through
+    ///   - handler: Function called for each successful item; return true to continue, false to stop
+    private func processSuccessfulResults<Item>(
+        in group: inout ThrowingTaskGroup<Item?, Error>,
+        handler: (Item) -> Bool
+    ) async where Item: Sendable {
+        while let result = await group.nextResult() {
+            if let item = extractSuccessValue(from: result) {
+                if !handler(item) { return }
+            }
+        }
+    }
+    
     /// Waits for the first matching item and cancels remaining tasks
     /// - Parameter group: The task group to wait on
     /// - Returns: The first matching item found, or nil if none found
@@ -84,12 +109,12 @@ actor ParallelSearchService: ParallelSearchServiceProtocol {
         in group: inout ThrowingTaskGroup<Item?, Error>
     ) async -> Item? where Item: Sendable {
         defer { group.cancelAll() }
-        while let result = await group.nextResult() {
-            if case .success(let value) = result, let item = value {
-                return item
-            }
+        var foundItem: Item?
+        await processSuccessfulResults(in: &group) { item in
+            foundItem = item
+            return false // Stop after finding first item
         }
-        return nil
+        return foundItem
     }
     
     /// Collects all matching items from the task group
@@ -99,10 +124,9 @@ actor ParallelSearchService: ParallelSearchServiceProtocol {
         from group: inout ThrowingTaskGroup<Item?, Error>
     ) async -> [Item] where Item: Sendable {
         var items: [Item] = []
-        while let result = await group.nextResult() {
-            if case .success(let value) = result, let item = value {
-                items.append(item)
-            }
+        await processSuccessfulResults(in: &group) { item in
+            items.append(item)
+            return true // Continue collecting all items
         }
         return items
     }
