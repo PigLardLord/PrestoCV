@@ -38,15 +38,18 @@ public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
         }
         
         // Create a copy with a new ID and modified name
-        let duplicatedCV = existingCV.copy(nameModifier: { name in
-            if name.isEmpty {
-                return "Copy"
-            } else {
-                return "\(name) (Copy)"
-            }
-        })
+        let duplicatedCV = existingCV.copy(nameModifier: createCopyNameModifier)
         
         return try await cvRepository.saveCV(duplicatedCV)
+    }
+    
+    /// Creates a name modifier function that appends localized copy suffix to existing names or returns localized copy text for empty names
+    /// - Parameter name: The original name to modify
+    /// - Returns: The modified name with localized copy indicator
+    private func createCopyNameModifier(_ name: String) -> String {
+        let copyText = String(localized: "action.copy")
+        let copySuffix = String(localized: "action.copy_suffix")
+        return name.isEmpty ? copyText : "\(name) \(copySuffix)"
     }
     
     public func getCV(by id: UUID) async throws -> CVModel? {
