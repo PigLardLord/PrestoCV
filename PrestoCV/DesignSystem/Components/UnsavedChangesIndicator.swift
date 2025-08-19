@@ -22,8 +22,8 @@ struct UnsavedChangesIndicator: View {
                 Circle()
                     .fill(color)
                     .frame(width: size, height: size)
-                    .accessibilityLabel(String(localized: "editor.unsaved_changes"))
-                    .accessibilityHint(String(localized: "accessibility.unsaved_changes_hint"))
+                    .accessibilityLabel("editor.unsaved_changes".localized)
+                    .accessibilityHint("accessibility.unsaved_changes_hint".localized)
             }
         }
     }
@@ -62,12 +62,12 @@ extension UnsavedChangesIndicator {
 #Preview {
     VStack(spacing: DesignTokens.Spacing.md) {
         HStack {
-            Text(String(localized: "common.save"))
+            Text("common.save".localized)
             UnsavedChangesIndicator.warning(isVisible: true)
         }
         
         HStack {
-            Text(String(localized: "common.error"))
+            Text("common.error".localized)
             UnsavedChangesIndicator.error(isVisible: true)
         }
         

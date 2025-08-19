@@ -12,18 +12,18 @@ struct PersonalInfoSection: View {
                     .font(DesignTokens.Typography.headline.font)
                     .fontWeight(DesignTokens.Typography.headline.fontWeight)
             } header: {
-                SectionHeader(title: LocalizedString("section.cv_details"))
+                SectionHeader(title: "section.cv_details".localized)
             }
             .listRowBackground(DesignTokens.Colors.backgroundSecondary)
             
             // Personal Information - High Priority
             Section {
                 VStack(spacing: DesignTokens.Spacing.sm) {
-                    LabeledTextField(label: LocalizedString("field.full_name"), text: $cv.personalInfo.name)
+                    LabeledTextField(label: "field.full_name".localized, text: $cv.personalInfo.name)
                     
-                    LabeledTextField(label: LocalizedString("field.professional_title"), text: $cv.personalInfo.title)
+                    LabeledTextField(label: "field.professional_title".localized, text: $cv.personalInfo.title)
                     
-                    LabeledTextField(label: LocalizedString("field.location"), text: $cv.personalInfo.location)
+                    LabeledTextField(label: "field.location".localized, text: $cv.personalInfo.location)
                     
                     HStack(alignment: .top, spacing: DesignTokens.Spacing.sm) {
                         LabeledTextField.email(
@@ -37,19 +37,19 @@ struct PersonalInfoSection: View {
                     }
                     
                     LabeledTextField.url(
-                        label: LocalizedString("field.portfolio_url"),
+                        label: "field.portfolio_url".localized,
                         text: $cv.personalInfo.portfolio
                     )
                 }
             } header: {
-                SectionHeader(title: LocalizedString("section.personal_info"))
+                SectionHeader(title: "section.personal_info".localized)
             }
             
             // Professional Summary - High Priority
             Section {
                 ProfessionalSummaryView(profile: $cv.personalInfo.profile)
             } header: {
-                SectionHeader(title: LocalizedString("section.summary"))
+                SectionHeader(title: "section.summary".localized)
             }
         }
         .scrollDismissesKeyboard(.interactively)

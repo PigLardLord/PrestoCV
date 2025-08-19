@@ -13,12 +13,12 @@ struct CVEditorView: View {
         ) { _ in
             editorView
         }
-        .navigationTitle(viewModel.cv.name.isEmpty ? String(localized: "editor.new_cv") : viewModel.cv.name)
+        .navigationTitle(viewModel.cv.name.isEmpty ? "editor.new_cv".localized : viewModel.cv.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             // Leading: Cancel button with confirmation if unsaved changes
             ToolbarItem(placement: .navigationBarLeading) {
-                Button(String(localized: "common.cancel"), action: handleCancelTap)
+                Button("common.cancel".localized, action: handleCancelTap)
                     .foregroundColor(DesignTokens.Colors.accent)
             }
             
@@ -26,7 +26,7 @@ struct CVEditorView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: DesignTokens.Spacing.xs) {
                     UnsavedChangesIndicator.warning(isVisible: viewModel.hasUnsavedChanges)
-                    Button(String(localized: "common.save"), action: handleSaveTap)
+                    Button("common.save".localized, action: handleSaveTap)
                     .disabled(!viewModel.isSaveButtonEnabled)
                     .foregroundColor(viewModel.saveButtonColor)
                     .fontWeight(.semibold)
@@ -37,22 +37,22 @@ struct CVEditorView: View {
             // Load CV data when the view appears
             await viewModel.loadCV()
         }
-        .alert(String(localized: "common.error"), isPresented: .constant(viewModel.isShowingError)) {
-            Button(String(localized: "common.ok"), action: viewModel.clearError)
+        .alert("common.error".localized, isPresented: .constant(viewModel.isShowingError)) {
+            Button("common.ok".localized, action: viewModel.clearError)
         } message: {
             Text(viewModel.errorMessage)
         }
-        .alert(String(localized: "dialog.discard_changes.title"), isPresented: $viewModel.showingCancelConfirmation) {
-            Button(String(localized: "common.discard"), role: .destructive, action: handleDiscardChanges)
-            Button(String(localized: "editor.keep_editing"), role: .cancel) { }
+        .alert("dialog.discard_changes.title".localized, isPresented: $viewModel.showingCancelConfirmation) {
+            Button("common.discard".localized, role: .destructive, action: handleDiscardChanges)
+            Button("editor.keep_editing".localized, role: .cancel) { }
         } message: {
-            Text(String(localized: "dialog.discard_changes.message"))
+            Text("dialog.discard_changes.message".asLoclizedKey)
         }
-        .alert(String(localized: "editor.save_success"), isPresented: $viewModel.showingSaveConfirmation) {
-            Button(String(localized: "editor.continue_editing"), action: viewModel.dismissSaveConfirmation)
-            Button(String(localized: "common.done"), action: handleSaveConfirmationDone)
+        .alert("editor.save_success".localized, isPresented: $viewModel.showingSaveConfirmation) {
+            Button("editor.continue_editing".localized, action: viewModel.dismissSaveConfirmation)
+            Button("common.done".localized, action: handleSaveConfirmationDone)
         } message: {
-            Text(String(localized: "dialog.save_success.message"))
+            Text("dialog.save_success.message".asLoclizedKey)
         }
     }
     
@@ -63,26 +63,26 @@ struct CVEditorView: View {
             // MARK: - Basics Tab
             PersonalInfoSection(cv: $viewModel.cv)
                 .tabItem {
-                    Label(String(localized: "section.basics"), systemImage: "person.circle")
+                    Label("section.basics".localized, systemImage: "person.circle")
                 }
             
             // MARK: - Experience Tab
             ExperienceSection(viewModel: viewModel)
                 .tabItem {
-                    Label(String(localized: "section.experience"), systemImage: "briefcase")
+                    Label("section.experience".localized, systemImage: "briefcase")
                 }
             
             // MARK: - Details Tab
             DetailsSection(viewModel: viewModel)
                 .tabItem {
-                    Label(String(localized: "section.details"), systemImage: "list.bullet.circle")
+                    Label("section.details".localized, systemImage: "list.bullet.circle")
                 }
         }
         .background(DesignTokens.Colors.background)
         .scrollDismissesKeyboard(.interactively)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "editor.title"))
-        .accessibilityHint(String(localized: "accessibility.editor_hint"))
+        .accessibilityLabel("editor.title".localized)
+        .accessibilityHint("accessibility.editor_hint".localized)
     }
     
     // MARK: - Action Handlers

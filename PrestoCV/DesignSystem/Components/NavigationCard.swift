@@ -77,7 +77,7 @@ struct NavigationRow: View {
             }
         }
         .padding(.vertical, DesignTokens.Spacing.xxs)
-        .accessibilityLabel(String(format: String(localized: "accessibility.navigate_to"), title))
+        .accessibilityLabel("accessibility.navigate_to".localizedWithArgs(title))
         .accessibilityAddTraits(.isButton)
     }
 }

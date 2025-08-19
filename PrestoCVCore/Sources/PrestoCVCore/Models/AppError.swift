@@ -1,5 +1,17 @@
 import Foundation
 
+// MARK: - Localization Helper
+
+private extension String {
+    var localized: String {
+        String(localized: String.LocalizationValue(self))
+    }
+    
+    func localizedWithArgs(_ arguments: CVarArg...) -> String {
+        String(format: self.localized, arguments: arguments)
+    }
+}
+
 // MARK: - App Error Definition
 
 public enum AppError: Error, LocalizedError, Equatable, Sendable {
@@ -38,33 +50,26 @@ public enum AppError: Error, LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .unknown(let message):
-            return message.isEmpty ? String(localized: "error.unknown") : message
+            return message.isEmpty ? "error.unknown".localized : message
         case .invalidData(let description):
-            let localizedTemplate = String(localized: "error.invalid_data")
-            return String(format: localizedTemplate, description)
+            return "error.invalid_data".localizedWithArgs(description)
         case .notFound(let item):
-            let localizedTemplate = String(localized: "error.not_found")
-            return String(format: localizedTemplate, item)
+            return "error.not_found".localizedWithArgs(item)
         case .networkError(let description):
-            let localizedTemplate = String(localized: "error.network")
-            return String(format: localizedTemplate, description)
+            return "error.network".localizedWithArgs(description)
         case .validationError(let description):
-            let localizedTemplate = String(localized: "error.validation")
-            return String(format: localizedTemplate, description)
+            return "error.validation".localizedWithArgs(description)
         case .decodingError(let description):
-            let localizedTemplate = String(localized: "error.decoding")
-            return String(format: localizedTemplate, description)
+            return "error.decoding".localizedWithArgs(description)
         case .encodingError(let description):
-            let localizedTemplate = String(localized: "error.encoding")
-            return String(format: localizedTemplate, description)
+            return "error.encoding".localizedWithArgs(description)
         case .fileSystemError(let description):
-            let localizedTemplate = String(localized: "error.file_system")
-            return String(format: localizedTemplate, description)
+            return "error.file_system".localizedWithArgs(description)
         }
     }
     
     public var localizedDescription: String {
-        return errorDescription ?? String(localized: "error.unknown")
+        return errorDescription ?? "error.unknown".localized
     }
 }
 

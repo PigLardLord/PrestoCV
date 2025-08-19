@@ -14,8 +14,8 @@ struct OnboardingView: View {
             }
             .padding(DesignTokens.Spacing.xl)
         }
-        .alert(LocalizedString("common.error"), isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
-            Button(LocalizedString("common.ok")) {
+        .alert("common.error".localized, isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
+            Button("common.ok".localized) {
                 viewModel.errorMessage = ""
             }
         } message: {
@@ -31,7 +31,7 @@ struct OnboardingView: View {
                 .font(DesignTokens.IconSize.hero.font)
                 .foregroundColor(DesignTokens.Colors.accent)
             
-            Text(LocalizedString("welcome.title"))
+            Text("welcome.title".localized)
                 .typography(.title1)
                 .foregroundColor(DesignTokens.Colors.primary)
                 .multilineTextAlignment(.center)
@@ -40,12 +40,12 @@ struct OnboardingView: View {
     
     private var contentSection: some View {
         VStack(spacing: DesignTokens.Spacing.lg) {
-            Text(LocalizedString("welcome.subtitle"))
+            Text("welcome.subtitle".localized)
                 .typography(.title2)
                 .foregroundColor(DesignTokens.Colors.primary)
                 .multilineTextAlignment(.center)
             
-            Text(LocalizedString("welcome.description"))
+            Text("welcome.description".localized)
                 .typography(.body)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)
@@ -57,14 +57,14 @@ struct OnboardingView: View {
         VStack(spacing: DesignTokens.Spacing.lg) {
             // Create First CV Button
             PrimaryButton(
-                title: viewModel.isCreatingCV ? LocalizedString("onboarding.creating") : LocalizedString("onboarding.create.button"),
+                title: viewModel.isCreatingCV ? "onboarding.creating".localized : "onboarding.create.button".localized,
                 icon: viewModel.isCreatingCV ? nil : "plus.circle.fill",
                 isLoading: viewModel.isCreatingCV,
                 action: viewModel.performCreateFirstCV
             )
             
             // Browse templates first
-            SecondaryButton.text(title: LocalizedString("onboarding.browse.templates")) {
+            SecondaryButton.text(title: "onboarding.browse.templates".localized) {
                 router.navigate(to: .templateSelection)
             }
         }
@@ -76,7 +76,7 @@ struct OnboardingView: View {
 
 extension OnboardingView {
     private var errorAlert: some View {
-        Text(LocalizedString("error.alert.todo"))
+        Text("error.alert.todo".localized)
     }
 }
 

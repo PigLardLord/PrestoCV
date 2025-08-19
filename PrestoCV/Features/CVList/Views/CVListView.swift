@@ -9,7 +9,7 @@ struct CVListView: View {
         NavigationView {
             ViewStateContainer(
                 viewState: viewModel.viewState,
-                loadingMessage: LocalizedStringKey("common.loading_cvs"),
+                loadingMessage: "common.loading_cvs".asLoclizedKey,
                 onRetry: viewModel.loadCVs
             ) { cvs in
                 ConditionalContentView(
@@ -18,7 +18,7 @@ struct CVListView: View {
                     emptyContent: { emptyStateView }
                 )
             }
-            .navigationTitle(String(localized: "navigation.my_cvs"))
+            .navigationTitle("navigation.my_cvs".localized)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -66,7 +66,7 @@ private struct CVRowView: View {
     
     var body: some View {
         NavigationRow(
-            title: cv.name.isEmpty ? "Untitled CV" : cv.name,
+            title: cv.name.isEmpty ? "cv.untitled".localized : cv.name,
             subtitle: cv.personalInfo.title.isEmpty ? nil : cv.personalInfo.title,
             caption: cv.personalInfo.location.isEmpty ? nil : cv.personalInfo.location,
             action: onTap

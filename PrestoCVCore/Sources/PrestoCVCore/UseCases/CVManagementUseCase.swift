@@ -1,5 +1,17 @@
 import Foundation
 
+// MARK: - Localization Helper
+
+private extension String {
+    var localized: String {
+        String(localized: String.LocalizationValue(self))
+    }
+    
+    func localizedWithArgs(_ arguments: CVarArg...) -> String {
+        String(format: self.localized, arguments: arguments)
+    }
+}
+
 // MARK: - CV Management Use Case Implementation
 
 public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
@@ -62,8 +74,8 @@ extension CVManagementUseCase {
     /// - Parameter name: The original name to modify
     /// - Returns: The modified name with localized copy indicator
     private func createCopyNameModifier(_ name: String) -> String {
-        let copyText = String(localized: "action.copy")
-        let copySuffix = String(localized: "action.copy_suffix")
+        let copyText = "action.copy".localized
+        let copySuffix = "action.copy_suffix".localized
         return name.isEmpty ? copyText : "\(name) \(copySuffix)"
     }
 }

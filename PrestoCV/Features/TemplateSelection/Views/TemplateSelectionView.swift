@@ -12,21 +12,21 @@ struct TemplateSelectionView: View {
     var body: some View {
         ViewStateContainer(
             viewState: viewModel.viewState,
-            loadingMessage: LocalizedStringKey("template.loading"),
+            loadingMessage: "template.loading".asLoclizedKey,
             onRetry: viewModel.loadTemplates
         ) { templates in
             templateListView
         }
         .overlay(
-            viewModel.isCreatingCV ? LoadingView.fullscreen(message: LocalizedStringKey("cv.creating")) : nil
+            viewModel.isCreatingCV ? LoadingView.fullscreen(message: "cv.creating".asLoclizedKey) : nil
         )
-        .navigationTitle(LocalizedString("template.choose.title"))
+        .navigationTitle("template.choose.title".localized)
         .navigationBarTitleDisplayMode(.large)
         .task {
             await viewModel.loadTemplates()
         }
-        .alert(LocalizedString("common.error"), isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
-            Button(LocalizedString("common.ok")) {
+        .alert("common.error".localized, isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
+            Button("common.ok".localized) {
                 viewModel.clearError()
             }
         } message: {
@@ -42,8 +42,8 @@ struct TemplateSelectionView: View {
                 // Create New Section
                 Section(header: 
                     SectionHeaderView(
-                        title: LocalizedString("template.create.new"),
-                        subtitle: LocalizedString("template.create.new.subtitle"),
+                        title: "template.create.new".localized,
+                        subtitle: "template.create.new.subtitle".localized,
                         titleStyle: .title1,
                         subtitleStyle: .body
                     )
@@ -57,8 +57,8 @@ struct TemplateSelectionView: View {
                 if !viewModel.templates.isEmpty {
                     Section(header: 
                         SectionHeaderView(
-                            title: LocalizedString("template.sample.title"),
-                            subtitle: LocalizedString("template.sample.subtitle"),
+                            title: "template.sample.title".localized,
+                            subtitle: "template.sample.subtitle".localized,
                             titleStyle: .title1,
                             subtitleStyle: .body
                         )
@@ -109,11 +109,11 @@ struct TemplateSelectionView: View {
                     
                     // Template info
                     VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                        Text(LocalizedString("template.empty.title"))
+                        Text("template.empty.title".localized)
                             .typography(.headline)
                             .foregroundColor(DesignTokens.Colors.primary)
                         
-                        Text(LocalizedString("template.empty.description"))
+                        Text("template.empty.description".localized)
                             .typography(.caption1)
                             .foregroundColor(DesignTokens.Colors.secondary)
                     }
@@ -147,11 +147,11 @@ private struct TemplateCardView: View {
                     
                     // Template info
                     VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                        Text(template.name.isEmpty ? LocalizedString("template.default.name") : template.name)
+                        Text(template.name.isEmpty ? "template.default.name".localized : template.name)
                             .typography(.headline)
                             .foregroundColor(DesignTokens.Colors.primary)
                         
-                        Text(LocalizedString("template.tags"))
+                        Text("template.tags".localized)
                             .typography(.caption1)
                             .foregroundColor(DesignTokens.Colors.secondary)
                     }

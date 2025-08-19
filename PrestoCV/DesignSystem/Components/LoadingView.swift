@@ -8,7 +8,7 @@ struct LoadingView: View {
     let style: Style
     
     init(
-        message: LocalizedStringKey = LocalizedStringKey("common.processing"),
+        message: LocalizedStringKey = "common.processing".asLoclizedKey,
         style: Style = .default
     ) {
         self.message = message
@@ -25,7 +25,7 @@ struct LoadingView: View {
                 .typography(.callout)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)
-                .accessibilityLabel(LocalizedStringKey("common.processing"))
+                .accessibilityLabel("common.processing".asLoclizedKey)
         }
         .frame(maxWidth: .infinity, maxHeight: style.fillsContainer ? .infinity : nil)
         .accessibilityElement(children: .ignore)
@@ -68,7 +68,7 @@ struct LoadingView: View {
 extension LoadingView {
     
     /// Creates a fullscreen loading view
-    static func fullscreen(message: LocalizedStringKey = LocalizedStringKey("common.processing")) -> LoadingView {
+    static func fullscreen(message: LocalizedStringKey = "common.processing".asLoclizedKey) -> LoadingView {
         LoadingView(message: message, style: .fullscreen)
     }
     
@@ -93,7 +93,7 @@ struct LoadingView_Previews: PreviewProvider {
                 .padding()
             
             // Fullscreen style
-            LoadingView.fullscreen(message: LocalizedStringKey("cv.creating"))
+            LoadingView.fullscreen(message: "cv.creating".asLoclizedKey)
                 .previewDisplayName("Fullscreen")
             
             // Compact style
@@ -104,7 +104,7 @@ struct LoadingView_Previews: PreviewProvider {
             // Button style
             HStack {
                 LoadingView.button()
-                Text(LocalizedStringKey("common.processing"))
+                Text("common.processing".asLoclizedKey)
             }
             .foregroundColor(.white)
             .padding()
@@ -113,7 +113,7 @@ struct LoadingView_Previews: PreviewProvider {
             .previewDisplayName("Button Style")
             
             // Custom message
-            LoadingView(message: LocalizedStringKey("onboarding.create.button"))
+            LoadingView(message: "onboarding.create.button".asLoclizedKey)
                 .previewDisplayName("Custom Message")
                 .padding()
         }

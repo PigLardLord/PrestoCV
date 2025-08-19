@@ -24,11 +24,11 @@ struct WorkExperienceSubsection: View {
     
     var body: some View {
         CVEditableSection(
-            title: String(localized: "section.work_experience"),
+            title: "section.work_experience".localized,
             icon: "briefcase",
-            emptyStateTitle: String(localized: "empty.no_experience"),
-            emptyStateSubtitle: String(localized: "empty.experience_subtitle"),
-            addButtonTitle: String(localized: "action.add_experience"),
+            emptyStateTitle: "empty.no_experience".localized,
+            emptyStateSubtitle: "empty.experience_subtitle".localized,
+            addButtonTitle: "action.add_experience".localized,
             items: $viewModel.cv.relevant_experience,
             rowContent: { experience, onDelete in
                 ExperienceRowView(
@@ -47,11 +47,11 @@ struct SkillsSubsection: View {
     
     var body: some View {
         CVEditableSection(
-            title: String(localized: "section.skills"),
+            title: "section.skills".localized,
             icon: "star.circle",
-            emptyStateTitle: String(localized: "empty.no_skills"),
-            emptyStateSubtitle: String(localized: "empty.skills_subtitle"),
-            addButtonTitle: String(localized: "action.add_skill"),
+            emptyStateTitle: "empty.no_skills".localized,
+            emptyStateSubtitle: "empty.skills_subtitle".localized,
+            addButtonTitle: "action.add_skill".localized,
             items: $viewModel.cv.skills,
             rowContent: { skill, onDelete in
                 SkillRowView(
@@ -70,11 +70,11 @@ struct EducationSubsection: View {
     
     var body: some View {
         CVEditableSection(
-            title: String(localized: "section.education"),
+            title: "section.education".localized,
             icon: "graduationcap.circle",
-            emptyStateTitle: String(localized: "empty.no_education"),
-            emptyStateSubtitle: String(localized: "empty.education_subtitle"),
-            addButtonTitle: String(localized: "action.add_education"),
+            emptyStateTitle: "empty.no_education".localized,
+            emptyStateSubtitle: "empty.education_subtitle".localized,
+            addButtonTitle: "action.add_education".localized,
             items: $viewModel.cv.education,
             rowContent: { education, onDelete in
                 EducationRowView(
