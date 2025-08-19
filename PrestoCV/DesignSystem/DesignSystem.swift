@@ -45,31 +45,5 @@ extension View {
             .cornerRadius(DesignTokens.CornerRadius.sm)
     }
     
-    /// Applies a material-inspired list row style with no elevation
-    func flatRowStyle() -> some View {
-        self
-            .padding(.vertical, DesignTokens.Spacing.md)
-            .padding(.horizontal, DesignTokens.Spacing.sm)
-            .background(
-                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
-                    .fill(DesignTokens.Colors.backgroundSecondary.opacity(DesignTokens.Opacity.disabled))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.sm)
-                    .stroke(DesignTokens.Colors.border.opacity(DesignTokens.Opacity.subtle), lineWidth: DesignTokens.BorderWidth.thin)
-            )
-    }
-    
-    /// Applies iOS HIG-compliant list item style
-    func iOSListItemStyle() -> some View {
-        self
-            .padding(.vertical, DesignTokens.Spacing.sm)
-            .background(Color.clear)
-            .listRowInsets(EdgeInsets(top: DesignTokens.Spacing.xs, 
-                                     leading: DesignTokens.Spacing.md, 
-                                     bottom: DesignTokens.Spacing.xs, 
-                                     trailing: DesignTokens.Spacing.md))
-            .listRowBackground(Color.clear)
-    }
 }
 
