@@ -1,21 +1,79 @@
 import XCTest
 @testable import CVPDFExporter
 
+// Mock renderer for testing
+final class MockPDFRenderer: HTMLToPDFRenderer, @unchecked Sendable {
+    var renderCallCount = 0
+    var lastHTMLInput: String?
+    var lastOptionsInput: ExportOptions?
+    var shouldThrow = false
+
+    func renderToPDF(html: String, options: ExportOptions) async throws -> Data {
+        renderCallCount += 1
+        lastHTMLInput = html
+        lastOptionsInput = options
+
+        if shouldThrow {
+            throw PDFExportError.renderingFailed("Mock error")
+        }
+
+        // Return minimal valid PDF
+        return Data([0x25, 0x50, 0x44, 0x46]) // %PDF header
+    }
+}
+
 // Platform-agnostic tests for PDFExportEngine
 final class PDFExportEngineCoreTests: XCTestCase {
 
     // MARK: - Factory Tests
 
     func testPDFExportEngineFactoryCreatesInstance() {
-        #if canImport(UIKit)
-        let engine = PDFExportEngineFactory.create()
+        // Test with dependency injection - platform agnostic
+        let mockRenderer = MockPDFRenderer()
+        let engine = PDFExportEngineFactory.create(with: mockRenderer)
+
         XCTAssertNotNil(engine)
         XCTAssertTrue(engine is PDFExportEngineImpl)
-        #else
-        // On macOS, we should still be able to create an engine
-        // even if it's a stub or different implementation
-        XCTSkip("PDF engine tests require platform-specific implementation")
-        #endif
+    }
+
+    func testPDFExportEngineWithMockRenderer() async throws {
+        // Given
+        let mockRenderer = MockPDFRenderer()
+        let engine = PDFExportEngineFactory.create(with: mockRenderer)
+        let document = createSampleDocument()
+        let options = ExportOptions.default
+
+        // When
+        let pdfData = try await engine.exportToPDF(document: document, options: options)
+
+        // Then
+        XCTAssertFalse(pdfData.isEmpty)
+        XCTAssertEqual(mockRenderer.renderCallCount, 1)
+        XCTAssertNotNil(mockRenderer.lastHTMLInput)
+        XCTAssertTrue(mockRenderer.lastHTMLInput?.contains("John Doe") ?? false)
+    }
+
+    // MARK: - Helper Methods
+
+    private func createSampleDocument() -> CVDocument {
+        let personalInfo = PersonalInfo(
+            name: "Test User",
+            email: "test@example.com"
+        )
+
+        let workSection = CVSection(
+            id: "work",
+            type: .work,
+            title: "Experience",
+            items: [],
+            order: 1
+        )
+
+        return CVDocument(
+            personalInfo: personalInfo,
+            sections: [workSection],
+            metadata: DocumentMetadata()
+        )
     }
 
     // MARK: - Model Tests

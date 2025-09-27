@@ -31,7 +31,8 @@ let package = Package(
         .executableTarget(
             name: "CVPDFExporterDemo",
             dependencies: ["CVPDFExporter"],
-            path: "Demo"
+            path: "Demo",
+            swiftSettings: [.unsafeFlags(["-parse-as-library"])]
         )
     ]
 )

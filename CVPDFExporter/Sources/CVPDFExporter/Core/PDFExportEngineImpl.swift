@@ -4,23 +4,17 @@ import Foundation
 
 /// Concrete implementation of PDFExportEngine
 /// Sprint 0: Basic implementation with static template
-@MainActor
-public class PDFExportEngineImpl: PDFExportEngine {
+/// Platform-agnostic with dependency injection for renderer
+public final class PDFExportEngineImpl: PDFExportEngine, Sendable {
 
     private let renderer: HTMLToPDFRenderer
     private let adapter: PrestoCVCoreAdapter
 
-    public init() {
+    /// Initialize with an injected renderer
+    /// - Parameter renderer: Platform-specific PDF renderer implementation
+    public init(renderer: HTMLToPDFRenderer) {
+        self.renderer = renderer
         self.adapter = PrestoCVCoreAdapter()
-
-        // Choose renderer based on platform
-        #if canImport(UIKit)
-        self.renderer = WKWebViewPDFRenderer()
-        #elseif canImport(AppKit)
-        self.renderer = NSViewPDFRenderer()
-        #else
-        fatalError("PDF rendering is not supported on this platform")
-        #endif
     }
 
     /// Export CV to PDF using static professional template
@@ -213,37 +207,13 @@ public class PDFExportEngineImpl: PDFExportEngine {
 
 // MARK: - Public Factory
 
-/// Factory for creating PDF export engine
+/// Factory for creating PDF export engine with dependency injection
 public struct PDFExportEngineFactory {
 
-    /// Create a new PDF export engine instance
-    @MainActor
-    public static func create() -> PDFExportEngine {
-        return PDFExportEngineImpl()
-    }
-}
-
-// MARK: - Platform Support Check
-
-public struct PDFExportCapabilities {
-
-    /// Check if PDF export is available on the current platform
-    public static var isAvailable: Bool {
-        #if canImport(UIKit) || canImport(AppKit)
-        return true
-        #else
-        return false
-        #endif
-    }
-
-    /// Get the current platform renderer name
-    public static var rendererName: String {
-        #if canImport(UIKit)
-        return "WKWebViewPDFRenderer (iOS/iPadOS)"
-        #elseif canImport(AppKit)
-        return "NSViewPDFRenderer (macOS)"
-        #else
-        return "No renderer available"
-        #endif
+    /// Create a new PDF export engine instance with a specific renderer
+    /// - Parameter renderer: The HTML to PDF renderer implementation
+    /// - Returns: Configured PDFExportEngine instance
+    public static func create(with renderer: HTMLToPDFRenderer) -> PDFExportEngine {
+        return PDFExportEngineImpl(renderer: renderer)
     }
 }

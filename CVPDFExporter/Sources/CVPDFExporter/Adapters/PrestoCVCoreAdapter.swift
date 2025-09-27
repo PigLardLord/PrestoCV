@@ -4,7 +4,7 @@ import Foundation
 
 /// Adapter to convert PrestoCVCore data to CVDocument format
 /// Sprint 0: Basic implementation with sample data
-public struct PrestoCVCoreAdapter {
+public struct PrestoCVCoreAdapter: Sendable {
 
     public init() {}
 

@@ -5,8 +5,8 @@ import CoreGraphics
 
 /// Main entry point for PDF export functionality
 /// Sprint 0: Basic implementation with static template
-@MainActor
-public protocol PDFExportEngine {
+/// Platform-agnostic - renderer is injected
+public protocol PDFExportEngine: Sendable {
 
     /// Export CV to PDF using static template
     func exportToPDF(document: CVDocument, options: ExportOptions) async throws -> Data
