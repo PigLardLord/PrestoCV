@@ -4,7 +4,7 @@ import Foundation
 
 /// Simplified internal CV document structure
 /// Used for internal processing and conversion to/from JSON Resume
-public struct CVDocument: Codable, Equatable {
+public struct CVDocument: Codable, Equatable, Sendable {
     public let personalInfo: PersonalInfo
     public let sections: [CVSection]
     public let metadata: DocumentMetadata
@@ -23,7 +23,7 @@ public struct CVDocument: Codable, Equatable {
 // MARK: - Personal Information
 
 /// Personal information section of CV
-public struct PersonalInfo: Codable, Equatable {
+public struct PersonalInfo: Codable, Equatable, Sendable {
     public let name: String
     public let email: String
     public let phone: String?
@@ -54,7 +54,7 @@ public struct PersonalInfo: Codable, Equatable {
 // MARK: - CV Sections
 
 /// Generic CV section that can hold various types of content
-public struct CVSection: Codable, Equatable, Identifiable {
+public struct CVSection: Codable, Equatable, Identifiable, Sendable {
     public let id: String
     public let type: SectionType
     public let title: String
@@ -80,7 +80,7 @@ public struct CVSection: Codable, Equatable, Identifiable {
 }
 
 /// Types of CV sections
-public enum SectionType: String, CaseIterable, Codable {
+public enum SectionType: String, CaseIterable, Codable, Sendable {
     case work = "work"
     case education = "education"
     case skills = "skills"
@@ -115,7 +115,7 @@ public enum SectionType: String, CaseIterable, Codable {
 // MARK: - CV Items
 
 /// Individual items within CV sections
-public struct CVItem: Codable, Equatable, Identifiable {
+public struct CVItem: Codable, Equatable, Identifiable, Sendable {
     public let id: String
     public let title: String
     public let subtitle: String?
@@ -155,7 +155,7 @@ public struct CVItem: Codable, Equatable, Identifiable {
 // MARK: - Document Metadata
 
 /// Metadata about the CV document itself
-public struct DocumentMetadata: Codable, Equatable {
+public struct DocumentMetadata: Codable, Equatable, Sendable {
     public let version: String
     public let createdAt: Date
     public let updatedAt: Date

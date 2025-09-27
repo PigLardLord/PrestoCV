@@ -5,6 +5,7 @@ import CoreGraphics
 
 /// Protocol for converting HTML to PDF
 /// Sprint 0: Basic protocol definition
+@MainActor
 public protocol HTMLToPDFRenderer {
 
     /// Convert HTML string to PDF data

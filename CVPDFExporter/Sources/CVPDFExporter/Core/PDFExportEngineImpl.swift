@@ -1,6 +1,4 @@
-#if canImport(UIKit)
 import Foundation
-import UIKit
 
 // MARK: - PDF Export Engine Implementation
 
@@ -13,8 +11,16 @@ public class PDFExportEngineImpl: PDFExportEngine {
     private let adapter: PrestoCVCoreAdapter
 
     public init() {
-        self.renderer = WKWebViewPDFRenderer()
         self.adapter = PrestoCVCoreAdapter()
+
+        // Choose renderer based on platform
+        #if canImport(UIKit)
+        self.renderer = WKWebViewPDFRenderer()
+        #elseif canImport(AppKit)
+        self.renderer = NSViewPDFRenderer()
+        #else
+        fatalError("PDF rendering is not supported on this platform")
+        #endif
     }
 
     /// Export CV to PDF using static professional template
@@ -211,9 +217,33 @@ public class PDFExportEngineImpl: PDFExportEngine {
 public struct PDFExportEngineFactory {
 
     /// Create a new PDF export engine instance
+    @MainActor
     public static func create() -> PDFExportEngine {
         return PDFExportEngineImpl()
     }
 }
 
-#endif
+// MARK: - Platform Support Check
+
+public struct PDFExportCapabilities {
+
+    /// Check if PDF export is available on the current platform
+    public static var isAvailable: Bool {
+        #if canImport(UIKit) || canImport(AppKit)
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    /// Get the current platform renderer name
+    public static var rendererName: String {
+        #if canImport(UIKit)
+        return "WKWebViewPDFRenderer (iOS/iPadOS)"
+        #elseif canImport(AppKit)
+        return "NSViewPDFRenderer (macOS)"
+        #else
+        return "No renderer available"
+        #endif
+    }
+}

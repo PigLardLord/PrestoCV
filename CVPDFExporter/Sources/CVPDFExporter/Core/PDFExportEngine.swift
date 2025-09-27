@@ -5,6 +5,7 @@ import CoreGraphics
 
 /// Main entry point for PDF export functionality
 /// Sprint 0: Basic implementation with static template
+@MainActor
 public protocol PDFExportEngine {
 
     /// Export CV to PDF using static template
