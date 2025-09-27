@@ -128,14 +128,96 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
     private func processTemplate(_ template: String, with context: [String: Any]) -> String {
         var result = template
 
-        // Process loops first ({{#array}}...{{/array}})
-        result = processLoops(result, context: context)
-
-        // Process conditionals ({{#key}}...{{/key}} and {{^key}}...{{/key}})
-        result = processConditionals(result, context: context)
+        // Process both conditionals and loops in a unified way
+        result = processBlocks(result, context: context)
 
         // Process simple variables ({{key}})
         result = processVariables(result, context: context)
+
+        return result
+    }
+
+    private func processBlocks(_ template: String, context: [String: Any]) -> String {
+        var result = template
+
+        // Process {{#key}}...{{/key}} blocks (both conditionals and loops)
+        let blockPattern = #"\{\{#(\w+)\}\}(.*?)\{\{/\1\}\}"#
+        if let regex = try? NSRegularExpression(pattern: blockPattern, options: [.dotMatchesLineSeparators]) {
+            var hasChanges = true
+            while hasChanges {
+                hasChanges = false
+                let matches = regex.matches(in: result, range: NSRange(result.startIndex..., in: result))
+
+                for match in matches.reversed() {
+                    if let keyRange = Range(match.range(at: 1), in: result),
+                       let contentRange = Range(match.range(at: 2), in: result),
+                       let fullRange = Range(match.range, in: result) {
+                        let key = String(result[keyRange])
+                        let content = String(result[contentRange])
+
+                        if let value = context[key] {
+                            if let arrayValue = value as? [[String: Any]] {
+                                // It's an array - process as loop
+                                var loopResult = ""
+                                for item in arrayValue {
+                                    var itemContent = content
+                                    // Replace variables in item template
+                                    for (itemKey, itemValue) in item {
+                                        itemContent = itemContent.replacingOccurrences(
+                                            of: "{{\(itemKey)}}",
+                                            with: String(describing: itemValue)
+                                        )
+                                    }
+                                    loopResult += itemContent
+                                }
+                                result.replaceSubrange(fullRange, with: loopResult)
+                                hasChanges = true
+                            } else if let boolValue = value as? Bool {
+                                // It's a boolean conditional
+                                result.replaceSubrange(fullRange, with: boolValue ? content : "")
+                                hasChanges = true
+                            } else {
+                                // Non-nil, non-array, non-bool means true
+                                result.replaceSubrange(fullRange, with: content)
+                                hasChanges = true
+                            }
+                        } else {
+                            // Key doesn't exist - remove block
+                            result.replaceSubrange(fullRange, with: "")
+                            hasChanges = true
+                        }
+
+                        if hasChanges {
+                            break // Start over with updated content
+                        }
+                    }
+                }
+            }
+        }
+
+        // Process negative conditionals {{^key}}...{{/key}}
+        let negativePattern = #"\{\{\^(\w+)\}\}(.*?)\{\{/\1\}\}"#
+        if let regex = try? NSRegularExpression(pattern: negativePattern, options: [.dotMatchesLineSeparators]) {
+            let matches = regex.matches(in: result, range: NSRange(result.startIndex..., in: result))
+            for match in matches.reversed() {
+                if let keyRange = Range(match.range(at: 1), in: result),
+                   let contentRange = Range(match.range(at: 2), in: result),
+                   let fullRange = Range(match.range, in: result) {
+                    let key = String(result[keyRange])
+                    let content = String(result[contentRange])
+
+                    if let value = context[key] {
+                        if let boolValue = value as? Bool {
+                            result.replaceSubrange(fullRange, with: !boolValue ? content : "")
+                        } else {
+                            result.replaceSubrange(fullRange, with: "")
+                        }
+                    } else {
+                        result.replaceSubrange(fullRange, with: content)
+                    }
+                }
+            }
+        }
 
         return result
     }
@@ -158,8 +240,8 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                         if let boolValue = value as? Bool {
                             result.replaceSubrange(fullRange, with: boolValue ? content : "")
                         } else if value is [[String: Any]] {
-                            // Skip arrays - they're handled by processLoops
-                            continue
+                            // Arrays are handled by processLoops, don't touch them here
+                            // Just leave the content as is
                         } else {
                             // Non-nil value means condition is true
                             result.replaceSubrange(fullRange, with: content)

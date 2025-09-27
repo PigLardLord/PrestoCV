@@ -93,26 +93,7 @@ public final class BundledTemplateRepository: TemplateRepository, @unchecked Sen
     }
 
     private static func loadModernTemplate() -> String {
-        // Placeholder for Modern template
-        return """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-                h1 { color: #2c3e50; }
-                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>{{name}}</h1>
-                <p>{{email}}</p>
-            </div>
-        </body>
-        </html>
-        """
+        return ModernHTMLTemplate.html
     }
 
     private static func loadMinimalTemplate() -> String {
