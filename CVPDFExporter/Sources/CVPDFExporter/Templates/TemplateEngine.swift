@@ -4,7 +4,7 @@ import Foundation
 
 /// Protocol for rendering templates with CV data
 public protocol TemplateEngine: Sendable {
-    func render(template: Template, data: CVDocument) async throws -> String
+    func render(template: Template, data: CVDocument, customization: CustomizationOptions) async throws -> String
 }
 
 // MARK: - Mustache Template Engine
@@ -14,11 +14,11 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
 
     public init() {}
 
-    public func render(template: Template, data: CVDocument) async throws -> String {
+    public func render(template: Template, data: CVDocument, customization: CustomizationOptions = CustomizationOptions()) async throws -> String {
         var html = template.htmlContent
 
-        // Prepare context from CV data
-        let context = prepareContext(from: data)
+        // Prepare context from CV data and customization
+        let context = prepareContext(from: data, customization: customization)
 
         // Process template
         html = processTemplate(html, with: context)
@@ -28,7 +28,7 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
 
     // MARK: - Private Methods
 
-    private func prepareContext(from document: CVDocument) -> [String: Any] {
+    private func prepareContext(from document: CVDocument, customization: CustomizationOptions) -> [String: Any] {
         var context: [String: Any] = [:]
 
         // Personal info
@@ -109,17 +109,30 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
             context["hasSkills"] = false
         }
 
+        // Add customization values
+        let colors = customization.colorPalette.colors
+        context["colorPrimary"] = colors.primary
+        context["colorSecondary"] = colors.secondary
+        context["colorAccent"] = colors.accent
+        context["colorBackground"] = colors.background
+        context["colorText"] = colors.text
+
+        let fonts = customization.fontScheme.fonts
+        context["fontHeading"] = fonts.heading
+        context["fontBody"] = fonts.body
+        context["fontSize"] = fonts.size
+
         return context
     }
 
     private func processTemplate(_ template: String, with context: [String: Any]) -> String {
         var result = template
 
-        // Process conditionals first ({{#key}}...{{/key}} and {{^key}}...{{/key}})
-        result = processConditionals(result, context: context)
-
-        // Process loops ({{#array}}...{{/array}})
+        // Process loops first ({{#array}}...{{/array}})
         result = processLoops(result, context: context)
+
+        // Process conditionals ({{#key}}...{{/key}} and {{^key}}...{{/key}})
+        result = processConditionals(result, context: context)
 
         // Process simple variables ({{key}})
         result = processVariables(result, context: context)
@@ -144,9 +157,9 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                     if let value = context[key] {
                         if let boolValue = value as? Bool {
                             result.replaceSubrange(fullRange, with: boolValue ? content : "")
-                        } else if let arrayValue = value as? [[String: Any]], !arrayValue.isEmpty {
-                            // Keep content for non-empty arrays (will be processed by loops)
-                            result.replaceSubrange(fullRange, with: content)
+                        } else if value is [[String: Any]] {
+                            // Skip arrays - they're handled by processLoops
+                            continue
                         } else {
                             // Non-nil value means condition is true
                             result.replaceSubrange(fullRange, with: content)

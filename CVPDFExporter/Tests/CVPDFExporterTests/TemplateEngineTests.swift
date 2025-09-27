@@ -1,93 +1,60 @@
-import XCTest
+import Testing
+import Foundation
 @testable import CVPDFExporter
 
 // MARK: - Template Engine Tests (Sprint 1)
 
-final class TemplateEngineTests: XCTestCase {
-
-    // MARK: - Template Protocol Tests
-
-    func testTemplateProtocolDefinition() {
-        // This test documents the expected Template protocol
-        // When implemented, Template should have:
-        // - id: String
-        // - name: String
-        // - description: String
-        // - htmlContent: String
-        // - supportedVariables: [String]
-    }
-
-    func testTemplateEngineProtocol() {
-        // This test documents the expected TemplateEngine protocol
-        // Should have method: render(template: Template, data: CVDocument) -> String
-    }
+@Suite("Template Engine")
+struct TemplateEngineTests {
 
     // MARK: - Template Loading Tests
 
-    func testLoadBundledTemplate() throws {
+    @Test("Load bundled template")
+    func loadBundledTemplate() throws {
         // Given
-        let repository = MockTemplateRepository()
-        repository.templates = [
-            Template(
-                id: "professional",
-                name: "Professional",
-                description: "Clean professional template",
-                htmlContent: "<html>{{name}}</html>",
-                supportedVariables: ["name"]
-            )
-        ]
+        let repository = BundledTemplateRepository()
 
         // When
         let template = try repository.loadTemplate(id: "professional")
 
         // Then
-        XCTAssertEqual(template.id, "professional")
-        XCTAssertEqual(template.name, "Professional")
-        XCTAssertTrue(template.htmlContent.contains("{{name}}"))
+        #expect(template.id == "professional")
+        #expect(template.name == "Professional")
+        #expect(template.htmlContent.contains("<!DOCTYPE html>"))
     }
 
-    func testLoadNonExistentTemplate() {
+    @Test("Load non-existent template throws error")
+    func loadNonExistentTemplate() {
         // Given
-        let repository = MockTemplateRepository()
+        let repository = BundledTemplateRepository()
 
         // When/Then
-        XCTAssertThrowsError(try repository.loadTemplate(id: "nonexistent")) { error in
-            XCTAssertTrue(error is TemplateError)
-            if let templateError = error as? TemplateError {
-                switch templateError {
-                case .templateNotFound(let id):
-                    XCTAssertEqual(id, "nonexistent")
-                default:
-                    XCTFail("Wrong error type")
-                }
-            }
+        #expect(throws: TemplateError.self) {
+            _ = try repository.loadTemplate(id: "nonexistent")
         }
     }
 
-    func testListAvailableTemplates() {
+    @Test("List available templates")
+    func listAvailableTemplates() {
         // Given
-        let repository = MockTemplateRepository()
-        repository.templates = [
-            Template(id: "professional", name: "Professional", description: "", htmlContent: "", supportedVariables: []),
-            Template(id: "modern", name: "Modern", description: "", htmlContent: "", supportedVariables: []),
-            Template(id: "minimal", name: "Minimal", description: "", htmlContent: "", supportedVariables: [])
-        ]
+        let repository = BundledTemplateRepository()
 
         // When
         let available = repository.availableTemplates()
 
         // Then
-        XCTAssertEqual(available.count, 3)
-        XCTAssertTrue(available.contains { $0.id == "professional" })
-        XCTAssertTrue(available.contains { $0.id == "modern" })
-        XCTAssertTrue(available.contains { $0.id == "minimal" })
+        #expect(available.count >= 3)
+        #expect(available.contains { $0.id == "professional" })
+        #expect(available.contains { $0.id == "modern" })
+        #expect(available.contains { $0.id == "minimal" })
     }
 
     // MARK: - Mustache Rendering Tests
 
-    func testSimpleVariableReplacement() async throws {
+    @Test("Simple variable replacement")
+    func simpleVariableReplacement() async throws {
         // Given
-        let engine = MockTemplateEngine()
+        let engine = MustacheTemplateEngine()
         let template = Template(
             id: "test",
             name: "Test",
@@ -100,19 +67,21 @@ final class TemplateEngineTests: XCTestCase {
             sections: [],
             metadata: DocumentMetadata()
         )
+        let customization = CustomizationOptions()
 
         // When
-        let rendered = try await engine.render(template: template, data: document)
+        let rendered = try await engine.render(template: template, data: document, customization: customization)
 
         // Then
-        XCTAssertTrue(rendered.contains("John Doe"))
-        XCTAssertTrue(rendered.contains("john@example.com"))
-        XCTAssertFalse(rendered.contains("{{"))  // No unreplaced variables
+        #expect(rendered.contains("John Doe"))
+        #expect(rendered.contains("john@example.com"))
+        #expect(!rendered.contains("{{"))  // No unreplaced variables
     }
 
-    func testConditionalSections() async throws {
+    @Test("Conditional sections")
+    func conditionalSections() async throws {
         // Given
-        let engine = MockTemplateEngine()
+        let engine = MustacheTemplateEngine()
         let template = Template(
             id: "test",
             name: "Test",
@@ -127,6 +96,7 @@ final class TemplateEngineTests: XCTestCase {
             """,
             supportedVariables: ["hasSummary", "summary"]
         )
+        let customization = CustomizationOptions()
 
         // Test with summary
         let docWithSummary = CVDocument(
@@ -134,9 +104,9 @@ final class TemplateEngineTests: XCTestCase {
             sections: [],
             metadata: DocumentMetadata()
         )
-        let rendered1 = try await engine.render(template: template, data: docWithSummary)
-        XCTAssertTrue(rendered1.contains("Expert developer"))
-        XCTAssertFalse(rendered1.contains("No summary provided"))
+        let rendered1 = try await engine.render(template: template, data: docWithSummary, customization: customization)
+        #expect(rendered1.contains("Expert developer"))
+        #expect(!rendered1.contains("No summary provided"))
 
         // Test without summary
         let docWithoutSummary = CVDocument(
@@ -144,14 +114,15 @@ final class TemplateEngineTests: XCTestCase {
             sections: [],
             metadata: DocumentMetadata()
         )
-        let rendered2 = try await engine.render(template: template, data: docWithoutSummary)
-        XCTAssertTrue(rendered2.contains("No summary provided"))
-        XCTAssertFalse(rendered2.contains("Expert developer"))
+        let rendered2 = try await engine.render(template: template, data: docWithoutSummary, customization: customization)
+        #expect(rendered2.contains("No summary provided"))
+        #expect(!rendered2.contains("Expert developer"))
     }
 
-    func testLoopingSections() async throws {
+    @Test("Looping sections")
+    func loopingSections() async throws {
         // Given
-        let engine = MockTemplateEngine()
+        let engine = MustacheTemplateEngine()
         let template = Template(
             id: "test",
             name: "Test",
@@ -166,6 +137,7 @@ final class TemplateEngineTests: XCTestCase {
             """,
             supportedVariables: ["workExperience"]
         )
+        let customization = CustomizationOptions()
 
         let document = CVDocument(
             personalInfo: PersonalInfo(name: "John", email: "john@example.com"),
@@ -184,26 +156,28 @@ final class TemplateEngineTests: XCTestCase {
         )
 
         // When
-        let rendered = try await engine.render(template: template, data: document)
+        let rendered = try await engine.render(template: template, data: document, customization: customization)
 
         // Then
-        XCTAssertTrue(rendered.contains("Developer"))
-        XCTAssertTrue(rendered.contains("Tech Corp"))
-        XCTAssertTrue(rendered.contains("Built apps"))
-        XCTAssertTrue(rendered.contains("Engineer"))
-        XCTAssertTrue(rendered.contains("StartupXYZ"))
+        #expect(rendered.contains("Developer"))
+        #expect(rendered.contains("Tech Corp"))
+        #expect(rendered.contains("Built apps"))
+        #expect(rendered.contains("Engineer"))
+        #expect(rendered.contains("StartupXYZ"))
     }
 
-    func testHTMLEscaping() async throws {
+    @Test("HTML escaping")
+    func htmlEscaping() async throws {
         // Given
-        let engine = MockTemplateEngine()
+        let engine = MustacheTemplateEngine()
         let template = Template(
             id: "test",
             name: "Test",
             description: "",
-            htmlContent: "<p>{{description}}</p><div>{{{htmlContent}}}</div>",
-            supportedVariables: ["description", "htmlContent"]
+            htmlContent: "<p>{{summary}}</p>",
+            supportedVariables: ["summary"]
         )
+        let customization = CustomizationOptions()
 
         let document = CVDocument(
             personalInfo: PersonalInfo(
@@ -216,119 +190,80 @@ final class TemplateEngineTests: XCTestCase {
         )
 
         // When
-        let rendered = try await engine.render(template: template, data: document)
+        let rendered = try await engine.render(template: template, data: document, customization: customization)
 
         // Then
         // Normal variable should be escaped
-        XCTAssertTrue(rendered.contains("&lt;script&gt;"))
-        // Triple mustache should not escape (if we have HTML content)
-    }
-}
-
-// MARK: - Mock Implementations for Testing
-
-// These mocks define the expected interfaces that will be implemented
-
-struct Template {
-    let id: String
-    let name: String
-    let description: String
-    let htmlContent: String
-    let supportedVariables: [String]
-}
-
-enum TemplateError: Error, Equatable {
-    case templateNotFound(String)
-    case renderingFailed(String)
-    case invalidTemplate(String)
-}
-
-protocol TemplateRepository {
-    func loadTemplate(id: String) throws -> Template
-    func availableTemplates() -> [Template]
-}
-
-protocol TemplateEngine {
-    func render(template: Template, data: CVDocument) async throws -> String
-}
-
-// Mock implementations
-class MockTemplateRepository: TemplateRepository {
-    var templates: [Template] = []
-
-    func loadTemplate(id: String) throws -> Template {
-        guard let template = templates.first(where: { $0.id == id }) else {
-            throw TemplateError.templateNotFound(id)
-        }
-        return template
+        #expect(rendered.contains("&lt;script&gt;"))
+        #expect(rendered.contains("&amp;"))
     }
 
-    func availableTemplates() -> [Template] {
-        return templates
-    }
-}
-
-class MockTemplateEngine: TemplateEngine {
-    func render(template: Template, data: CVDocument) async throws -> String {
-        // Simple mock rendering for tests
-        var html = template.htmlContent
-
-        // Replace basic variables
-        html = html.replacingOccurrences(of: "{{name}}", with: data.personalInfo.name)
-        html = html.replacingOccurrences(of: "{{email}}", with: data.personalInfo.email)
-
-        // Handle conditionals
-        if let summary = data.personalInfo.summary {
-            // Process positive conditional - keep content
-            if let regex = try? NSRegularExpression(pattern: #"\{\{#hasSummary\}\}(.*?)\{\{/hasSummary\}\}"#, options: [.dotMatchesLineSeparators]) {
-                html = regex.stringByReplacingMatches(in: html, range: NSRange(html.startIndex..., in: html), withTemplate: "$1")
-            }
-            // Process negative conditional - remove content
-            if let regex = try? NSRegularExpression(pattern: #"\{\{\^hasSummary\}\}(.*?)\{\{/hasSummary\}\}"#, options: [.dotMatchesLineSeparators]) {
-                html = regex.stringByReplacingMatches(in: html, range: NSRange(html.startIndex..., in: html), withTemplate: "")
-            }
-            html = html.replacingOccurrences(of: "{{summary}}", with: summary)
-        } else {
-            // Process positive conditional - remove content
-            if let regex = try? NSRegularExpression(pattern: #"\{\{#hasSummary\}\}(.*?)\{\{/hasSummary\}\}"#, options: [.dotMatchesLineSeparators]) {
-                html = regex.stringByReplacingMatches(in: html, range: NSRange(html.startIndex..., in: html), withTemplate: "")
-            }
-            // Process negative conditional - keep content
-            if let regex = try? NSRegularExpression(pattern: #"\{\{\^hasSummary\}\}(.*?)\{\{/hasSummary\}\}"#, options: [.dotMatchesLineSeparators]) {
-                html = regex.stringByReplacingMatches(in: html, range: NSRange(html.startIndex..., in: html), withTemplate: "$1")
-            }
-        }
-
-        // Handle loops (simplified)
-        if template.htmlContent.contains("{{#workExperience}}") {
-            var workHtml = ""
-            for section in data.sections where section.type == .work {
-                for item in section.items {
-                    var itemHtml = template.htmlContent
-                    itemHtml = itemHtml.replacingOccurrences(of: "{{title}}", with: item.title)
-                    itemHtml = itemHtml.replacingOccurrences(of: "{{company}}", with: item.subtitle ?? "")
-                    itemHtml = itemHtml.replacingOccurrences(of: "{{description}}", with: item.description ?? "")
-                    workHtml += itemHtml
+    @Test("Customization colors are applied")
+    func customizationColorsApplied() async throws {
+        // Given
+        let engine = MustacheTemplateEngine()
+        let template = Template(
+            id: "test",
+            name: "Test",
+            description: "",
+            htmlContent: """
+            <style>
+                :root {
+                    --color-primary: {{colorPrimary}};
+                    --color-accent: {{colorAccent}};
                 }
-            }
-            if !workHtml.isEmpty {
-                html = workHtml
-            }
-        }
+            </style>
+            """,
+            supportedVariables: ["colorPrimary", "colorAccent"]
+        )
+        let document = CVDocument(
+            personalInfo: PersonalInfo(name: "John", email: "john@example.com"),
+            sections: [],
+            metadata: DocumentMetadata()
+        )
+        let customization = CustomizationOptions(colorPalette: .modern)
 
-        // Handle HTML escaping
-        if data.personalInfo.summary?.contains("<") ?? false {
-            html = html.replacingOccurrences(
-                of: "{{description}}",
-                with: data.personalInfo.summary?.replacingOccurrences(of: "<", with: "&lt;")
-                    .replacingOccurrences(of: ">", with: "&gt;") ?? ""
-            )
-        }
+        // When
+        let rendered = try await engine.render(template: template, data: document, customization: customization)
 
-        // Clean up mustache tags
-        html = html.replacingOccurrences(of: "{{#workExperience}}", with: "")
-        html = html.replacingOccurrences(of: "{{/workExperience}}", with: "")
+        // Then
+        #expect(rendered.contains("#1E293B"))  // Modern primary color
+        #expect(rendered.contains("#0EA5E9"))  // Modern accent color
+    }
 
-        return html
+    @Test("Customization fonts are applied")
+    func customizationFontsApplied() async throws {
+        // Given
+        let engine = MustacheTemplateEngine()
+        let template = Template(
+            id: "test",
+            name: "Test",
+            description: "",
+            htmlContent: """
+            <style>
+                body {
+                    font-family: {{fontBody}};
+                    font-size: {{fontSize}};
+                }
+                h1 {
+                    font-family: {{fontHeading}};
+                }
+            </style>
+            """,
+            supportedVariables: ["fontBody", "fontHeading", "fontSize"]
+        )
+        let document = CVDocument(
+            personalInfo: PersonalInfo(name: "John", email: "john@example.com"),
+            sections: [],
+            metadata: DocumentMetadata()
+        )
+        let customization = CustomizationOptions(fontScheme: .serif)
+
+        // When
+        let rendered = try await engine.render(template: template, data: document, customization: customization)
+
+        // Then
+        #expect(rendered.contains("Georgia"))  // Serif font
+        #expect(rendered.contains("12pt"))     // Serif font size
     }
 }

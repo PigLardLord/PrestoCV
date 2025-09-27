@@ -4,19 +4,26 @@ import Foundation
 
 /// Export configuration for PDF generation
 /// Sprint 1: Added template selection support
+/// Sprint 2: Added customization options and page limit
 public struct ExportOptions: Sendable {
     public let pageSize: PageSize
     public let margins: EdgeInsets
     public let templateId: String?
+    public let customization: CustomizationOptions
+    public let maxPages: Int
 
     public init(
         pageSize: PageSize = .a4,
         margins: EdgeInsets = .default,
-        templateId: String? = nil
+        templateId: String? = nil,
+        customization: CustomizationOptions = CustomizationOptions(),
+        maxPages: Int = 4
     ) {
         self.pageSize = pageSize
         self.margins = margins
         self.templateId = templateId
+        self.customization = customization
+        self.maxPages = maxPages
     }
 
     public static let `default` = ExportOptions()

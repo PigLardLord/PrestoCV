@@ -24,12 +24,17 @@ public final class PDFExportEngineImpl: PDFExportEngine, Sendable {
     /// Export CV to PDF using template system
     public func exportToPDF(document: CVDocument, options: ExportOptions) async throws -> Data {
         // Sprint 1: Use template system with Mustache rendering
+        // Sprint 2: Apply customization options
         // Default to professional template if not specified
         let templateId = options.templateId ?? "professional"
 
         do {
             let template = try templateRepository.loadTemplate(id: templateId)
-            let html = try await templateEngine.render(template: template, data: document)
+            let html = try await templateEngine.render(
+                template: template,
+                data: document,
+                customization: options.customization
+            )
             return try await renderer.renderToPDF(html: html, options: options)
         } catch let error as TemplateError {
             throw PDFExportError.templateError(error.localizedDescription)

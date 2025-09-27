@@ -17,14 +17,15 @@ struct ProfessionalHTMLTemplate {
             }
 
             :root {
-                --color-primary: #2C3E50;
-                --color-secondary: #34495E;
-                --color-accent: #3498DB;
-                --color-background: #FFFFFF;
-                --color-text: #2C3E50;
+                --color-primary: {{colorPrimary}};
+                --color-secondary: {{colorSecondary}};
+                --color-accent: {{colorAccent}};
+                --color-background: {{colorBackground}};
+                --color-text: {{colorText}};
                 --color-text-light: #7F8C8D;
-                --font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-                --font-size-base: 11pt;
+                --font-heading: {{fontHeading}};
+                --font-body: {{fontBody}};
+                --font-size: {{fontSize}};
                 --spacing-sm: 10pt;
                 --spacing-md: 15pt;
                 --spacing-lg: 20pt;
@@ -32,8 +33,8 @@ struct ProfessionalHTMLTemplate {
             }
 
             body {
-                font-family: var(--font-family);
-                font-size: var(--font-size-base);
+                font-family: var(--font-body);
+                font-size: var(--font-size);
                 color: var(--color-text);
                 background: var(--color-background);
                 line-height: 1.6;
@@ -47,6 +48,7 @@ struct ProfessionalHTMLTemplate {
             }
 
             h1 {
+                font-family: var(--font-heading);
                 color: var(--color-primary);
                 font-size: 24pt;
                 font-weight: 700;
@@ -77,6 +79,7 @@ struct ProfessionalHTMLTemplate {
             }
 
             h2 {
+                font-family: var(--font-heading);
                 color: var(--color-primary);
                 font-size: 14pt;
                 font-weight: 600;

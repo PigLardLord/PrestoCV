@@ -45,7 +45,9 @@ public final class BundledTemplateRepository: TemplateRepository, @unchecked Sen
                 "hasSummary", "hasPhone", "hasLocation", "hasWebsite",
                 "workExperience", "hasWorkExperience",
                 "education", "hasEducation",
-                "skills", "hasSkills"
+                "skills", "hasSkills",
+                "colorPrimary", "colorSecondary", "colorAccent", "colorBackground", "colorText",
+                "fontHeading", "fontBody", "fontSize"
             ]
         ))
 
@@ -60,7 +62,9 @@ public final class BundledTemplateRepository: TemplateRepository, @unchecked Sen
                 "hasSummary", "hasPhone", "hasLocation", "hasWebsite",
                 "workExperience", "hasWorkExperience",
                 "education", "hasEducation",
-                "skills", "hasSkills"
+                "skills", "hasSkills",
+                "colorPrimary", "colorSecondary", "colorAccent", "colorBackground", "colorText",
+                "fontHeading", "fontBody", "fontSize"
             ]
         ))
 
