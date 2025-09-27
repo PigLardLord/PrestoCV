@@ -97,22 +97,6 @@ public final class BundledTemplateRepository: TemplateRepository, @unchecked Sen
     }
 
     private static func loadMinimalTemplate() -> String {
-        // Placeholder for Minimal template
-        return """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                body { font-family: Georgia, serif; max-width: 800px; margin: 0 auto; }
-                h1 { font-weight: normal; border-bottom: 1px solid #ddd; }
-            </style>
-        </head>
-        <body>
-            <h1>{{name}}</h1>
-            <p>{{email}}</p>
-        </body>
-        </html>
-        """
+        return MinimalHTMLTemplate.html
     }
 }
