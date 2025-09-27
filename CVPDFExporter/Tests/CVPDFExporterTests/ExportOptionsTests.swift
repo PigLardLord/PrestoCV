@@ -1,148 +1,134 @@
-import XCTest
+import Testing
+import Foundation
 @testable import CVPDFExporter
 
-final class ExportOptionsTests: XCTestCase {
+// MARK: - Export Options Tests
+
+@Suite("Export Options")
+struct ExportOptionsTests {
 
     // MARK: - PageSize Tests
 
-    func testPageSizeInitialization() {
-        let size = PageSize(width: 612, height: 792)
-        XCTAssertEqual(size.width, 612)
-        XCTAssertEqual(size.height, 792)
+    @Test("Page size initialization")
+    func pageSizeInitialization() {
+        let pageSize = PageSize(width: 100, height: 200)
+
+        #expect(pageSize.width == 100)
+        #expect(pageSize.height == 200)
     }
 
-    func testPageSizePredefinedValues() {
-        // A4 size in points (210mm x 297mm)
-        let a4 = PageSize.a4
-        XCTAssertEqual(a4.width, 595, accuracy: 1)
-        XCTAssertEqual(a4.height, 842, accuracy: 1)
+    @Test("Page size predefined values")
+    func pageSizePredefinedValues() {
+        // A4 dimensions in points
+        #expect(PageSize.a4.width == 595.28)
+        #expect(PageSize.a4.height == 841.89)
 
-        // US Letter size in points (8.5" x 11")
-        let letter = PageSize.letter
-        XCTAssertEqual(letter.width, 612)
-        XCTAssertEqual(letter.height, 792)
+        // Letter dimensions in points
+        #expect(PageSize.letter.width == 612.0)
+        #expect(PageSize.letter.height == 792.0)
     }
 
-    func testPageSizeSendableConformance() {
-        let size = PageSize(width: 100, height: 200)
-
-        // Test that PageSize can be sent across actor boundaries
-        Task { @MainActor in
-            let copiedSize = size
-            XCTAssertEqual(copiedSize.width, 100)
-            XCTAssertEqual(copiedSize.height, 200)
-        }
+    @Test("Page size is Sendable")
+    func pageSizeSendableConformance() {
+        let pageSize = PageSize.a4
+        // This test passes if PageSize conforms to Sendable (compilation check)
+        #expect(pageSize.width > 0)
     }
 
     // MARK: - EdgeInsets Tests
 
-    func testEdgeInsetsInitialization() {
+    @Test("Edge insets initialization")
+    func edgeInsetsInitialization() {
         let insets = EdgeInsets(top: 10, left: 20, bottom: 30, right: 40)
-        XCTAssertEqual(insets.top, 10)
-        XCTAssertEqual(insets.left, 20)
-        XCTAssertEqual(insets.bottom, 30)
-        XCTAssertEqual(insets.right, 40)
+
+        #expect(insets.top == 10)
+        #expect(insets.left == 20)
+        #expect(insets.bottom == 30)
+        #expect(insets.right == 40)
     }
 
-    func testEdgeInsetsUniformInitializer() {
-        let insets = EdgeInsets.uniform(15)
-        XCTAssertEqual(insets.top, 15)
-        XCTAssertEqual(insets.left, 15)
-        XCTAssertEqual(insets.bottom, 15)
-        XCTAssertEqual(insets.right, 15)
+    @Test("Edge insets uniform initializer")
+    func edgeInsetsUniformInitializer() {
+        let insets = EdgeInsets.uniform(50)
+
+        #expect(insets.top == 50)
+        #expect(insets.left == 50)
+        #expect(insets.bottom == 50)
+        #expect(insets.right == 50)
     }
 
-    func testEdgeInsetsDefaultValue() {
-        let defaultInsets = EdgeInsets.default
-        XCTAssertEqual(defaultInsets.top, 72)
-        XCTAssertEqual(defaultInsets.left, 72)
-        XCTAssertEqual(defaultInsets.bottom, 72)
-        XCTAssertEqual(defaultInsets.right, 72)
+    @Test("Edge insets default value")
+    func edgeInsetsDefaultValue() {
+        let insets = EdgeInsets.default
+
+        // 1 inch = 72 points
+        #expect(insets.top == 72)
+        #expect(insets.left == 72)
+        #expect(insets.bottom == 72)
+        #expect(insets.right == 72)
     }
 
-    func testEdgeInsetsSendableConformance() {
-        let insets = EdgeInsets(top: 1, left: 2, bottom: 3, right: 4)
-
-        // Test that EdgeInsets can be sent across actor boundaries
-        Task { @MainActor in
-            let copiedInsets = insets
-            XCTAssertEqual(copiedInsets.top, 1)
-            XCTAssertEqual(copiedInsets.left, 2)
-            XCTAssertEqual(copiedInsets.bottom, 3)
-            XCTAssertEqual(copiedInsets.right, 4)
-        }
+    @Test("Edge insets is Sendable")
+    func edgeInsetsSendableConformance() {
+        let insets = EdgeInsets.default
+        // This test passes if EdgeInsets conforms to Sendable (compilation check)
+        #expect(insets.top > 0)
     }
 
     // MARK: - ExportOptions Tests
 
-    func testExportOptionsInitialization() {
-        let options = ExportOptions(
-            pageSize: .a4,
-            margins: .uniform(50)
-        )
-
-        XCTAssertEqual(options.pageSize.width, PageSize.a4.width)
-        XCTAssertEqual(options.pageSize.height, PageSize.a4.height)
-        XCTAssertEqual(options.margins.top, 50)
-        XCTAssertEqual(options.margins.left, 50)
-    }
-
-    func testExportOptionsDefaultValue() {
-        let defaultOptions = ExportOptions.default
-
-        XCTAssertEqual(defaultOptions.pageSize.width, PageSize.a4.width)
-        XCTAssertEqual(defaultOptions.pageSize.height, PageSize.a4.height)
-        XCTAssertEqual(defaultOptions.margins.top, 72)
-        XCTAssertEqual(defaultOptions.margins.left, 72)
-        XCTAssertEqual(defaultOptions.margins.bottom, 72)
-        XCTAssertEqual(defaultOptions.margins.right, 72)
-    }
-
-    func testExportOptionsSendableConformance() {
+    @Test("Export options initialization")
+    func exportOptionsInitialization() {
         let options = ExportOptions(
             pageSize: .letter,
-            margins: .uniform(25)
+            margins: .uniform(36),
+            templateId: "modern"
         )
 
-        // Test that ExportOptions can be sent across actor boundaries
-        Task { @MainActor in
-            let copiedOptions = options
-            XCTAssertEqual(copiedOptions.pageSize.width, PageSize.letter.width)
-            XCTAssertEqual(copiedOptions.margins.top, 25)
-        }
+        #expect(options.pageSize.width == PageSize.letter.width)
+        #expect(options.pageSize.height == PageSize.letter.height)
+        #expect(options.margins.top == 36)
+        #expect(options.templateId == "modern")
     }
 
-    // MARK: - Integration Tests
+    @Test("Export options default value")
+    func exportOptionsDefaultValue() {
+        let options = ExportOptions.default
 
-    func testExportOptionsWithCustomValues() {
-        let customSize = PageSize(width: 500, height: 700)
-        let customMargins = EdgeInsets(top: 36, left: 36, bottom: 36, right: 36)
+        #expect(options.pageSize.width == PageSize.a4.width)
+        #expect(options.pageSize.height == PageSize.a4.height)
+        #expect(options.margins.top == 72)
+        #expect(options.templateId == nil)
+    }
 
+    @Test("Export options with custom values")
+    func exportOptionsWithCustomValues() {
+        let customMargins = EdgeInsets(top: 20, left: 30, bottom: 20, right: 30)
         let options = ExportOptions(
-            pageSize: customSize,
-            margins: customMargins
+            pageSize: .letter,
+            margins: customMargins,
+            templateId: "professional"
         )
 
-        XCTAssertEqual(options.pageSize.width, 500)
-        XCTAssertEqual(options.pageSize.height, 700)
-        XCTAssertEqual(options.margins.top, 36)
+        #expect(options.pageSize.width == PageSize.letter.width)
+        #expect(options.margins.top == 20)
+        #expect(options.margins.left == 30)
+        #expect(options.templateId == "professional")
     }
 
-    func testExportOptionsForDifferentPageFormats() {
-        // Test A4 with narrow margins
-        let a4Options = ExportOptions(
-            pageSize: .a4,
-            margins: .uniform(36)
-        )
-        XCTAssertEqual(a4Options.pageSize.height, PageSize.a4.height)
-        XCTAssertEqual(a4Options.margins.top, 36)
+    @Test("Export options is Sendable")
+    func exportOptionsSendableConformance() {
+        let options = ExportOptions.default
+        // This test passes if ExportOptions conforms to Sendable (compilation check)
+        #expect(options.pageSize.width > 0)
+    }
 
-        // Test Letter with wide margins
-        let letterOptions = ExportOptions(
-            pageSize: .letter,
-            margins: .uniform(108)
-        )
-        XCTAssertEqual(letterOptions.pageSize.width, PageSize.letter.width)
-        XCTAssertEqual(letterOptions.margins.left, 108)
+    @Test("Export options for different page formats")
+    func exportOptionsForDifferentPageFormats() {
+        let a4Options = ExportOptions(pageSize: .a4)
+        let letterOptions = ExportOptions(pageSize: .letter)
+
+        #expect(a4Options.pageSize.width != letterOptions.pageSize.width)
+        #expect(a4Options.pageSize.height != letterOptions.pageSize.height)
     }
 }

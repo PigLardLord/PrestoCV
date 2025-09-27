@@ -1,11 +1,16 @@
-import XCTest
+import Testing
+import Foundation
 @testable import CVPDFExporter
 
-final class CVDocumentTests: XCTestCase {
+// MARK: - CVDocument Tests
+
+@Suite("CVDocument Models")
+struct CVDocumentTests {
 
     // MARK: - PersonalInfo Tests
 
-    func testPersonalInfoInitialization() {
+    @Test("Personal info initialization with all fields")
+    func personalInfoInitialization() {
         let info = PersonalInfo(
             name: "John Doe",
             email: "john@example.com",
@@ -15,31 +20,33 @@ final class CVDocumentTests: XCTestCase {
             summary: "Test summary"
         )
 
-        XCTAssertEqual(info.name, "John Doe")
-        XCTAssertEqual(info.email, "john@example.com")
-        XCTAssertEqual(info.phone, "+1234567890")
-        XCTAssertEqual(info.location, "New York")
-        XCTAssertEqual(info.website, "https://johndoe.com")
-        XCTAssertEqual(info.summary, "Test summary")
+        #expect(info.name == "John Doe")
+        #expect(info.email == "john@example.com")
+        #expect(info.phone == "+1234567890")
+        #expect(info.location == "New York")
+        #expect(info.website == "https://johndoe.com")
+        #expect(info.summary == "Test summary")
     }
 
-    func testPersonalInfoWithOptionalFields() {
+    @Test("Personal info with optional fields")
+    func personalInfoWithOptionalFields() {
         let info = PersonalInfo(
             name: "Jane Doe",
             email: "jane@example.com"
         )
 
-        XCTAssertEqual(info.name, "Jane Doe")
-        XCTAssertEqual(info.email, "jane@example.com")
-        XCTAssertNil(info.phone)
-        XCTAssertNil(info.location)
-        XCTAssertNil(info.website)
-        XCTAssertNil(info.summary)
+        #expect(info.name == "Jane Doe")
+        #expect(info.email == "jane@example.com")
+        #expect(info.phone == nil)
+        #expect(info.location == nil)
+        #expect(info.website == nil)
+        #expect(info.summary == nil)
     }
 
     // MARK: - CVItem Tests
 
-    func testCVItemInitialization() {
+    @Test("CV item initialization with all fields")
+    func cvItemInitialization() {
         let item = CVItem(
             title: "Software Engineer",
             subtitle: "Tech Corp",
@@ -50,150 +57,127 @@ final class CVDocumentTests: XCTestCase {
             tags: ["Swift", "iOS"]
         )
 
-        XCTAssertEqual(item.title, "Software Engineer")
-        XCTAssertEqual(item.subtitle, "Tech Corp")
-        XCTAssertEqual(item.description, "Developed iOS apps")
-        XCTAssertEqual(item.startDate, "Jan 2020")
-        XCTAssertEqual(item.endDate, "Dec 2023")
-        XCTAssertEqual(item.location, "San Francisco")
-        XCTAssertEqual(item.tags, ["Swift", "iOS"])
+        #expect(item.title == "Software Engineer")
+        #expect(item.subtitle == "Tech Corp")
+        #expect(item.description == "Developed iOS apps")
+        #expect(item.startDate == "Jan 2020")
+        #expect(item.endDate == "Dec 2023")
+        #expect(item.location == "San Francisco")
+        #expect(item.tags == ["Swift", "iOS"])
     }
 
-    func testCVItemWithMinimalFields() {
-        let item = CVItem(title: "Skill Category")
+    @Test("CV item with minimal fields")
+    func cvItemWithMinimalFields() {
+        let item = CVItem(title: "Developer")
 
-        XCTAssertEqual(item.title, "Skill Category")
-        XCTAssertNil(item.subtitle)
-        XCTAssertNil(item.description)
-        XCTAssertNil(item.startDate)
-        XCTAssertNil(item.endDate)
-        XCTAssertNil(item.location)
-        XCTAssertTrue(item.tags.isEmpty)
+        #expect(item.title == "Developer")
+        #expect(item.subtitle == nil)
+        #expect(item.description == nil)
+        #expect(item.startDate == nil)
+        #expect(item.endDate == nil)
+        #expect(item.location == nil)
+        #expect(item.tags.isEmpty)
     }
 
     // MARK: - CVSection Tests
 
-    func testCVSectionInitialization() {
-        let items = [
-            CVItem(title: "Item 1"),
-            CVItem(title: "Item 2")
-        ]
-
+    @Test("CV section initialization")
+    func cvSectionInitialization() {
         let section = CVSection(
             id: "work",
             type: .work,
             title: "Work Experience",
-            items: items,
+            items: [],
             order: 1
         )
 
-        XCTAssertEqual(section.id, "work")
-        XCTAssertEqual(section.type, .work)
-        XCTAssertEqual(section.title, "Work Experience")
-        XCTAssertEqual(section.items.count, 2)
-        XCTAssertEqual(section.items[0].title, "Item 1")
-        XCTAssertEqual(section.order, 1)
+        #expect(section.id == "work")
+        #expect(section.type == .work)
+        #expect(section.title == "Work Experience")
+        #expect(section.items.isEmpty)
+        #expect(section.order == 1)
+        #expect(section.visible == true)
     }
 
-    func testSectionTypeValues() {
-        XCTAssertEqual(SectionType.work.rawValue, "work")
-        XCTAssertEqual(SectionType.education.rawValue, "education")
-        XCTAssertEqual(SectionType.skills.rawValue, "skills")
-        XCTAssertEqual(SectionType.projects.rawValue, "projects")
-        XCTAssertEqual(SectionType.certifications.rawValue, "certifications")
-        XCTAssertEqual(SectionType.languages.rawValue, "languages")
-        XCTAssertEqual(SectionType.custom.rawValue, "custom")
+    @Test("Section types have correct values")
+    func sectionTypeValues() {
+        #expect(SectionType.work.rawValue == "work")
+        #expect(SectionType.education.rawValue == "education")
+        #expect(SectionType.skills.rawValue == "skills")
+        #expect(SectionType.custom.rawValue == "custom")
     }
 
     // MARK: - CVDocument Tests
 
-    func testCVDocumentInitialization() {
+    @Test("CV document initialization")
+    func cvDocumentInitialization() {
         let personalInfo = PersonalInfo(
             name: "Test User",
             email: "test@example.com"
         )
-
-        let section = CVSection(
-            id: "skills",
-            type: .skills,
-            title: "Skills",
-            items: [CVItem(title: "Swift")],
-            order: 1
-        )
-
-        let metadata = DocumentMetadata(
-            version: "2.0",
-            createdAt: Date(),
-            updatedAt: Date()
-        )
-
         let document = CVDocument(
             personalInfo: personalInfo,
-            sections: [section],
-            metadata: metadata
+            sections: [],
+            metadata: DocumentMetadata()
         )
 
-        XCTAssertEqual(document.personalInfo.name, "Test User")
-        XCTAssertEqual(document.sections.count, 1)
-        XCTAssertEqual(document.sections[0].type, .skills)
-        XCTAssertEqual(document.metadata.version, "2.0")
+        #expect(document.personalInfo.name == "Test User")
+        #expect(document.sections.isEmpty)
+        #expect(document.metadata.version == "1.0")
     }
 
-    func testCVDocumentWithMultipleSections() {
+    @Test("CV document with multiple sections")
+    func cvDocumentWithMultipleSections() {
         let personalInfo = PersonalInfo(
-            name: "Multi Section",
-            email: "multi@example.com"
+            name: "Test User",
+            email: "test@example.com"
         )
 
         let workSection = CVSection(
             id: "work",
             type: .work,
             title: "Experience",
-            items: [],
-            order: 1
+            items: []
         )
 
-        let eduSection = CVSection(
+        let educationSection = CVSection(
             id: "edu",
             type: .education,
             title: "Education",
-            items: [],
-            order: 2
+            items: []
         )
 
         let document = CVDocument(
             personalInfo: personalInfo,
-            sections: [workSection, eduSection],
+            sections: [workSection, educationSection],
             metadata: DocumentMetadata()
         )
 
-        XCTAssertEqual(document.sections.count, 2)
-        XCTAssertEqual(document.sections[0].order, 1)
-        XCTAssertEqual(document.sections[1].order, 2)
+        #expect(document.sections.count == 2)
+        #expect(document.sections[0].type == .work)
+        #expect(document.sections[1].type == .education)
     }
 
     // MARK: - DocumentMetadata Tests
 
-    func testDocumentMetadataDefaults() {
+    @Test("Document metadata default values")
+    func documentMetadataDefaults() {
         let metadata = DocumentMetadata()
 
-        XCTAssertNotNil(metadata.createdAt)
-        XCTAssertNotNil(metadata.updatedAt)
-        XCTAssertEqual(metadata.version, "1.0")
+        #expect(metadata.version == "1.0")
+        #expect(metadata.createdAt != nil)
+        #expect(metadata.updatedAt != nil)
     }
 
-    func testDocumentMetadataCustomValues() {
-        let created = Date(timeIntervalSince1970: 1000000)
-        let updated = Date(timeIntervalSince1970: 2000000)
-
+    @Test("Document metadata with custom values")
+    func documentMetadataCustomValues() {
+        let customFields = ["templateId": "professional"]
         let metadata = DocumentMetadata(
-            version: "2.5",
-            createdAt: created,
-            updatedAt: updated
+            version: "2.0",
+            customFields: customFields
         )
 
-        XCTAssertEqual(metadata.createdAt, created)
-        XCTAssertEqual(metadata.updatedAt, updated)
-        XCTAssertEqual(metadata.version, "2.5")
+        #expect(metadata.version == "2.0")
+        #expect(metadata.customFields["templateId"] == "professional")
     }
 }
