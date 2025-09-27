@@ -7,7 +7,22 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0021C487C2C7D0B32D11CE43 /* PDFExportEngineCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1699997B52408520F589B487 /* PDFExportEngineCoreTests.swift */; };
+		04E24F62CDF138C49412A006 /* TemplateEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90197078A381ACFD036FCAD4 /* TemplateEngine.swift */; };
+		21E522CF38CF397BF3E6BD9C /* TemplateRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607EFDA4C91053FAA6C8BB32 /* TemplateRepository.swift */; };
 		23A94C0D2E1D78F20066CE9A /* PrestoCVCore in Frameworks */ = {isa = PBXBuildFile; productRef = 23A94C0E2E1D78F20066CE9A /* PrestoCVCore */; };
+		8016E305A9C6647B163639EB /* ExportOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AB604023D6694A1834D8120 /* ExportOptions.swift */; };
+		887D5E53BEAECD7B5D7273E4 /* PDFExportEngineImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30DE219B0676309BCD006ADE /* PDFExportEngineImpl.swift */; };
+		8A96AEAE1A399BCCC7A69B20 /* PrestoCVCoreAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A72E38177E959901B0705468 /* PrestoCVCoreAdapter.swift */; };
+		8E3E8667DF9AB70F1DFE8B1F /* PrestoCVCoreAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EE58B85E1F6E2EE4727034B /* PrestoCVCoreAdapterTests.swift */; };
+		8FC5AD555331A611AC3F2599 /* TemplateEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74982159ACD8ED56A31D1513 /* TemplateEngineTests.swift */; };
+		939EC617A9BBF85E9F941C50 /* PDFExportEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B5524BD6FA886FE0C197DCE /* PDFExportEngine.swift */; };
+		AA40EF28024ECC05AF5F55D3 /* Template.swift in Sources */ = {isa = PBXBuildFile; fileRef = 368CEAA291009856C59C2FED /* Template.swift */; };
+		D5B73F652733708327ED478A /* ExportOptionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D1104BB848ACC5D6F29CAE9 /* ExportOptionsTests.swift */; };
+		E8AB920123FA42F24190A852 /* CVDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2AC2D266FF65478628498B1 /* CVDocument.swift */; };
+		EA9C8FE5D6D2F64F1D06D3B0 /* CVDocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F8187A0DEAA74E34363C565 /* CVDocumentTests.swift */; };
+		EAF78526A99155EEA24B9706 /* ProfessionalHTMLTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95D1E2892BA45BAE470D6697 /* ProfessionalHTMLTemplate.swift */; };
+		FDBB4B21ABE6C081857E55C2 /* HTMLToPDFRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16C0BA3BEFDD50BD67A3C89 /* HTMLToPDFRenderer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -28,17 +43,62 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		1699997B52408520F589B487 /* PDFExportEngineCoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PDFExportEngineCoreTests.swift; path = CVPDFExporterTests/PDFExportEngineCoreTests.swift; sourceTree = "<group>"; };
 		23A94C0C2E1D78F20066CE9A /* PrestoCVCore */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = PrestoCVCore; sourceTree = SOURCE_ROOT; };
 		23BFFEA62E8833AD004464D3 /* CVPDFExporter */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = CVPDFExporter; sourceTree = "<group>"; };
 		23E2E8A427562C01000F2E5D /* PrestoCV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PrestoCV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		23E2E8B427562C02000F2E5D /* PrestoCVTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrestoCVTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		23E2E8BE27562C02000F2E5D /* PrestoCVUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrestoCVUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		30DE219B0676309BCD006ADE /* PDFExportEngineImpl.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PDFExportEngineImpl.swift; path = CVPDFExporterLib/Core/PDFExportEngineImpl.swift; sourceTree = "<group>"; };
+		368CEAA291009856C59C2FED /* Template.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Template.swift; path = CVPDFExporterLib/Templates/Template.swift; sourceTree = "<group>"; };
+		4B5524BD6FA886FE0C197DCE /* PDFExportEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PDFExportEngine.swift; path = CVPDFExporterLib/Core/PDFExportEngine.swift; sourceTree = "<group>"; };
+		4F8187A0DEAA74E34363C565 /* CVDocumentTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CVDocumentTests.swift; path = CVPDFExporterTests/CVDocumentTests.swift; sourceTree = "<group>"; };
+		607EFDA4C91053FAA6C8BB32 /* TemplateRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TemplateRepository.swift; path = CVPDFExporterLib/Templates/TemplateRepository.swift; sourceTree = "<group>"; };
+		6EE58B85E1F6E2EE4727034B /* PrestoCVCoreAdapterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PrestoCVCoreAdapterTests.swift; path = CVPDFExporterTests/PrestoCVCoreAdapterTests.swift; sourceTree = "<group>"; };
+		74982159ACD8ED56A31D1513 /* TemplateEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TemplateEngineTests.swift; path = CVPDFExporterTests/TemplateEngineTests.swift; sourceTree = "<group>"; };
+		7AB604023D6694A1834D8120 /* ExportOptions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExportOptions.swift; path = CVPDFExporterLib/Models/ExportOptions.swift; sourceTree = "<group>"; };
+		7D1104BB848ACC5D6F29CAE9 /* ExportOptionsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExportOptionsTests.swift; path = CVPDFExporterTests/ExportOptionsTests.swift; sourceTree = "<group>"; };
+		90197078A381ACFD036FCAD4 /* TemplateEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TemplateEngine.swift; path = CVPDFExporterLib/Templates/TemplateEngine.swift; sourceTree = "<group>"; };
+		95D1E2892BA45BAE470D6697 /* ProfessionalHTMLTemplate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ProfessionalHTMLTemplate.swift; path = CVPDFExporterLib/Templates/ProfessionalHTMLTemplate.swift; sourceTree = "<group>"; };
+		A16C0BA3BEFDD50BD67A3C89 /* HTMLToPDFRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HTMLToPDFRenderer.swift; path = CVPDFExporterLib/Rendering/HTMLToPDFRenderer.swift; sourceTree = "<group>"; };
+		A72E38177E959901B0705468 /* PrestoCVCoreAdapter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PrestoCVCoreAdapter.swift; path = CVPDFExporterLib/Adapters/PrestoCVCoreAdapter.swift; sourceTree = "<group>"; };
+		E2AC2D266FF65478628498B1 /* CVDocument.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CVDocument.swift; path = CVPDFExporterLib/Models/CVDocument.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		23AE8FE92E46671800A86F6E /* PrestoCVTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = PrestoCVTests; sourceTree = "<group>"; };
-		23AE8FED2E46671B00A86F6E /* PrestoCVUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = PrestoCVUITests; sourceTree = "<group>"; };
-		23AE90052E46676F00A86F6E /* PrestoCV */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = PrestoCV; sourceTree = "<group>"; };
+		23AE8FE92E46671800A86F6E /* PrestoCVTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = PrestoCVTests;
+			sourceTree = "<group>";
+		};
+		23AE8FED2E46671B00A86F6E /* PrestoCVUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = PrestoCVUITests;
+			sourceTree = "<group>";
+		};
+		23AE90052E46676F00A86F6E /* PrestoCV */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = PrestoCV;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,6 +136,8 @@
 				23AE8FE92E46671800A86F6E /* PrestoCVTests */,
 				23AE8FED2E46671B00A86F6E /* PrestoCVUITests */,
 				23E2E8A527562C01000F2E5D /* Products */,
+				3A4329EF8979A32825E00C69 /* CVPDFExporterLib */,
+				A1584785D1162D1101A209D0 /* CVPDFExporterTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -87,6 +149,75 @@
 				23E2E8BE27562C02000F2E5D /* PrestoCVUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		3A4329EF8979A32825E00C69 /* CVPDFExporterLib */ = {
+			isa = PBXGroup;
+			children = (
+				743AF23F2A28A630C3C752BA /* Adapters */,
+				D3A5EA1352EA8E7E2D2F9494 /* Core */,
+				B33D862B203703297516305B /* Models */,
+				6556A424059785C78012A99F /* Rendering */,
+				8960CB4E4706027EE33E2452 /* Templates */,
+			);
+			name = CVPDFExporterLib;
+			sourceTree = "<group>";
+		};
+		6556A424059785C78012A99F /* Rendering */ = {
+			isa = PBXGroup;
+			children = (
+				A16C0BA3BEFDD50BD67A3C89 /* HTMLToPDFRenderer.swift */,
+			);
+			name = Rendering;
+			sourceTree = "<group>";
+		};
+		743AF23F2A28A630C3C752BA /* Adapters */ = {
+			isa = PBXGroup;
+			children = (
+				A72E38177E959901B0705468 /* PrestoCVCoreAdapter.swift */,
+			);
+			name = Adapters;
+			sourceTree = "<group>";
+		};
+		8960CB4E4706027EE33E2452 /* Templates */ = {
+			isa = PBXGroup;
+			children = (
+				95D1E2892BA45BAE470D6697 /* ProfessionalHTMLTemplate.swift */,
+				368CEAA291009856C59C2FED /* Template.swift */,
+				90197078A381ACFD036FCAD4 /* TemplateEngine.swift */,
+				607EFDA4C91053FAA6C8BB32 /* TemplateRepository.swift */,
+			);
+			name = Templates;
+			sourceTree = "<group>";
+		};
+		A1584785D1162D1101A209D0 /* CVPDFExporterTests */ = {
+			isa = PBXGroup;
+			children = (
+				4F8187A0DEAA74E34363C565 /* CVDocumentTests.swift */,
+				7D1104BB848ACC5D6F29CAE9 /* ExportOptionsTests.swift */,
+				6EE58B85E1F6E2EE4727034B /* PrestoCVCoreAdapterTests.swift */,
+				1699997B52408520F589B487 /* PDFExportEngineCoreTests.swift */,
+				74982159ACD8ED56A31D1513 /* TemplateEngineTests.swift */,
+			);
+			name = CVPDFExporterTests;
+			sourceTree = "<group>";
+		};
+		B33D862B203703297516305B /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				E2AC2D266FF65478628498B1 /* CVDocument.swift */,
+				7AB604023D6694A1834D8120 /* ExportOptions.swift */,
+			);
+			name = Models;
+			sourceTree = "<group>";
+		};
+		D3A5EA1352EA8E7E2D2F9494 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				4B5524BD6FA886FE0C197DCE /* PDFExportEngine.swift */,
+				30DE219B0676309BCD006ADE /* PDFExportEngineImpl.swift */,
+			);
+			name = Core;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -233,6 +364,16 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8A96AEAE1A399BCCC7A69B20 /* PrestoCVCoreAdapter.swift in Sources */,
+				939EC617A9BBF85E9F941C50 /* PDFExportEngine.swift in Sources */,
+				887D5E53BEAECD7B5D7273E4 /* PDFExportEngineImpl.swift in Sources */,
+				E8AB920123FA42F24190A852 /* CVDocument.swift in Sources */,
+				8016E305A9C6647B163639EB /* ExportOptions.swift in Sources */,
+				FDBB4B21ABE6C081857E55C2 /* HTMLToPDFRenderer.swift in Sources */,
+				EAF78526A99155EEA24B9706 /* ProfessionalHTMLTemplate.swift in Sources */,
+				AA40EF28024ECC05AF5F55D3 /* Template.swift in Sources */,
+				04E24F62CDF138C49412A006 /* TemplateEngine.swift in Sources */,
+				21E522CF38CF397BF3E6BD9C /* TemplateRepository.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -240,6 +381,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EA9C8FE5D6D2F64F1D06D3B0 /* CVDocumentTests.swift in Sources */,
+				D5B73F652733708327ED478A /* ExportOptionsTests.swift in Sources */,
+				8E3E8667DF9AB70F1DFE8B1F /* PrestoCVCoreAdapterTests.swift in Sources */,
+				0021C487C2C7D0B32D11CE43 /* PDFExportEngineCoreTests.swift in Sources */,
+				8FC5AD555331A611AC3F2599 /* TemplateEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
