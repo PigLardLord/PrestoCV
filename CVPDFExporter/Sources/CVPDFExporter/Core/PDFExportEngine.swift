@@ -16,6 +16,7 @@ public protocol PDFExportEngine: Sendable {
 public enum PDFExportError: LocalizedError {
     case renderingFailed(String)
     case invalidContent(String)
+    case templateError(String)
 
     public var errorDescription: String? {
         switch self {
@@ -23,6 +24,8 @@ public enum PDFExportError: LocalizedError {
             return "PDF rendering failed: \(reason)"
         case .invalidContent(let reason):
             return "Invalid content: \(reason)"
+        case .templateError(let reason):
+            return "Template error: \(reason)"
         }
     }
 }

@@ -3,29 +3,36 @@ import Foundation
 // MARK: - PDF Export Engine Implementation
 
 /// Concrete implementation of PDFExportEngine
-/// Sprint 0: Basic implementation with static template
+/// Sprint 1: Enhanced with Template System support
 /// Platform-agnostic with dependency injection for renderer
 public final class PDFExportEngineImpl: PDFExportEngine, Sendable {
 
     private let renderer: HTMLToPDFRenderer
     private let adapter: PrestoCVCoreAdapter
+    private let templateRepository: TemplateRepository
+    private let templateEngine: TemplateEngine
 
     /// Initialize with an injected renderer
     /// - Parameter renderer: Platform-specific PDF renderer implementation
     public init(renderer: HTMLToPDFRenderer) {
         self.renderer = renderer
         self.adapter = PrestoCVCoreAdapter()
+        self.templateRepository = BundledTemplateRepository()
+        self.templateEngine = MustacheTemplateEngine()
     }
 
-    /// Export CV to PDF using static professional template
+    /// Export CV to PDF using template system
     public func exportToPDF(document: CVDocument, options: ExportOptions) async throws -> Data {
-        // Sprint 0: Use static HTML template
-        // In future sprints, this will use Mustache templating
-
-        let html = loadStaticTemplate()
+        // Sprint 1: Use template system with Mustache rendering
+        // Default to professional template if not specified
+        let templateId = options.templateId ?? "professional"
 
         do {
+            let template = try templateRepository.loadTemplate(id: templateId)
+            let html = try await templateEngine.render(template: template, data: document)
             return try await renderer.renderToPDF(html: html, options: options)
+        } catch let error as TemplateError {
+            throw PDFExportError.templateError(error.localizedDescription)
         } catch {
             throw PDFExportError.renderingFailed(error.localizedDescription)
         }

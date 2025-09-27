@@ -3,17 +3,20 @@ import Foundation
 // MARK: - Export Options
 
 /// Export configuration for PDF generation
-/// Sprint 0: Minimal options for MVP
+/// Sprint 1: Added template selection support
 public struct ExportOptions: Sendable {
     public let pageSize: PageSize
     public let margins: EdgeInsets
+    public let templateId: String?
 
     public init(
         pageSize: PageSize = .a4,
-        margins: EdgeInsets = .default
+        margins: EdgeInsets = .default,
+        templateId: String? = nil
     ) {
         self.pageSize = pageSize
         self.margins = margins
+        self.templateId = templateId
     }
 
     public static let `default` = ExportOptions()

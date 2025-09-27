@@ -50,7 +50,7 @@ final class PDFExportEngineCoreTests: XCTestCase {
         XCTAssertFalse(pdfData.isEmpty)
         XCTAssertEqual(mockRenderer.renderCallCount, 1)
         XCTAssertNotNil(mockRenderer.lastHTMLInput)
-        XCTAssertTrue(mockRenderer.lastHTMLInput?.contains("John Doe") ?? false)
+        XCTAssertTrue(mockRenderer.lastHTMLInput?.contains("Test User") ?? false)
     }
 
     // MARK: - Helper Methods

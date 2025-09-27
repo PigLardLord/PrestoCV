@@ -1,0 +1,133 @@
+import Foundation
+
+// MARK: - Template Repository Protocol
+
+/// Protocol for loading and managing templates
+public protocol TemplateRepository: Sendable {
+    func loadTemplate(id: String) throws -> Template
+    func availableTemplates() -> [Template]
+}
+
+// MARK: - Bundled Template Repository
+
+/// Repository for built-in templates
+public final class BundledTemplateRepository: TemplateRepository, @unchecked Sendable {
+    private let templates: [Template]
+
+    public init() {
+        self.templates = Self.loadBundledTemplates()
+    }
+
+    public func loadTemplate(id: String) throws -> Template {
+        guard let template = templates.first(where: { $0.id == id }) else {
+            throw TemplateError.templateNotFound(id)
+        }
+        return template
+    }
+
+    public func availableTemplates() -> [Template] {
+        return templates
+    }
+
+    // MARK: - Private Methods
+
+    private static func loadBundledTemplates() -> [Template] {
+        var templates: [Template] = []
+
+        // Professional Template
+        templates.append(Template(
+            id: "professional",
+            name: "Professional",
+            description: "Clean and professional template suitable for corporate positions",
+            htmlContent: loadProfessionalTemplate(),
+            supportedVariables: [
+                "name", "email", "phone", "location", "website", "summary",
+                "hasSummary", "hasPhone", "hasLocation", "hasWebsite",
+                "workExperience", "hasWorkExperience",
+                "education", "hasEducation",
+                "skills", "hasSkills"
+            ]
+        ))
+
+        // Modern Template
+        templates.append(Template(
+            id: "modern",
+            name: "Modern",
+            description: "Contemporary design with clean lines and modern typography",
+            htmlContent: loadModernTemplate(),
+            supportedVariables: [
+                "name", "email", "phone", "location", "website", "summary",
+                "hasSummary", "hasPhone", "hasLocation", "hasWebsite",
+                "workExperience", "hasWorkExperience",
+                "education", "hasEducation",
+                "skills", "hasSkills"
+            ]
+        ))
+
+        // Minimal Template
+        templates.append(Template(
+            id: "minimal",
+            name: "Minimal",
+            description: "Simple and clean design focusing on content",
+            htmlContent: loadMinimalTemplate(),
+            supportedVariables: [
+                "name", "email", "phone", "location", "summary",
+                "hasSummary", "hasPhone", "hasLocation",
+                "workExperience", "hasWorkExperience",
+                "education", "hasEducation",
+                "skills", "hasSkills"
+            ]
+        ))
+
+        return templates
+    }
+
+    private static func loadProfessionalTemplate() -> String {
+        // For now, return the existing Professional.html content
+        // In future, this will load from bundled resources
+        return ProfessionalHTMLTemplate.html
+    }
+
+    private static func loadModernTemplate() -> String {
+        // Placeholder for Modern template
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+                h1 { color: #2c3e50; }
+                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>{{name}}</h1>
+                <p>{{email}}</p>
+            </div>
+        </body>
+        </html>
+        """
+    }
+
+    private static func loadMinimalTemplate() -> String {
+        // Placeholder for Minimal template
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: Georgia, serif; max-width: 800px; margin: 0 auto; }
+                h1 { font-weight: normal; border-bottom: 1px solid #ddd; }
+            </style>
+        </head>
+        <body>
+            <h1>{{name}}</h1>
+            <p>{{email}}</p>
+        </body>
+        </html>
+        """
+    }
+}
