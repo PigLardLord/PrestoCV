@@ -906,6 +906,49 @@ public enum CVPDFExportError: LocalizedError {
 
 ---
 
+## Testing Strategy
+
+### Comprehensive Testing Approach
+CVPDFExporter uses a multi-layered testing strategy to ensure quality:
+
+1. **Unit Tests** (70% coverage minimum)
+   - Model validation (CVDocument, ExportOptions)
+   - Component isolation (PDFExportEngine, Renderers)
+   - Data transformation (Adapters)
+
+2. **Integration Tests**
+   - End-to-end PDF generation
+   - Template rendering verification
+   - Performance benchmarks
+
+3. **Demo Application**
+   - Manual visual verification
+   - Performance metrics collection
+   - Export quality assessment
+
+### Test Coverage Requirements
+- **Sprint 0**: Core functionality (>70% coverage)
+- **Sprint 1**: Template system (>80% coverage)
+- **Sprint 2**: Customization (>85% coverage)
+- **Sprint 3+**: Maintain >85% coverage
+
+### Testing Before Each Commit
+```bash
+# 1. Run all tests
+swift test
+
+# 2. Check coverage
+swift test --enable-code-coverage
+
+# 3. Run demo for visual verification
+swift run CVPDFExporterDemo
+
+# 4. Verify no warnings
+swift build -Xswiftc -warnings-as-errors
+```
+
+---
+
 ## Build Commands
 
 ```bash
@@ -913,6 +956,13 @@ public enum CVPDFExportError: LocalizedError {
 cd CVPDFExporter
 swift build
 swift test
+
+# Run full test suite with coverage
+swift test --enable-code-coverage
+swift test --show-code-coverage
+
+# Run demo app
+swift run CVPDFExporterDemo
 
 # Check for warnings
 swift build -Xswiftc -warnings-as-errors

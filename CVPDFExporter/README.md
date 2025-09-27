@@ -64,6 +64,9 @@ swift test
 # Build to ensure no compilation errors
 swift build
 
+# Run the demo app for manual testing
+swift run CVPDFExporterDemo
+
 # For iOS specific features
 xcodebuild -scheme CVPDFExporter -sdk iphonesimulator test
 ```
@@ -141,13 +144,21 @@ swift test
 # 2. Verify no build warnings
 swift build -Xswiftc -warnings-as-errors
 
-# 3. Check formatting (if swift-format is installed)
+# 3. Run demo app to verify functionality
+swift run CVPDFExporterDemo
+
+# 4. Check test coverage (aim for >70%)
+swift test --enable-code-coverage
+
+# 5. Check formatting (if swift-format is installed)
 swift-format lint -r Sources/
 ```
 
 **Never commit if**:
 - Tests are failing
 - Build has errors or warnings
+- Demo app crashes or shows errors
+- Code coverage drops below 70%
 - Code doesn't match the style guide
 
 ### 5. Git Commit Rules
@@ -257,6 +268,12 @@ When all tasks in a sprint are complete:
 
 ## 🧪 Testing
 
+### Testing Strategy
+CVPDFExporter uses a comprehensive testing approach:
+1. **Unit Tests** - Test individual components in isolation
+2. **Integration Tests** - Test component interactions
+3. **Demo App** - Manual testing and visual verification
+
 ### Running Tests
 ```bash
 # All tests
@@ -265,15 +282,33 @@ swift test
 # Specific test file
 swift test --filter PDFExportTests
 
-# With coverage (if using Xcode)
-xcodebuild test -scheme CVPDFExporter -enableCodeCoverage YES
+# With coverage
+swift test --enable-code-coverage
+
+# View coverage report
+swift test --show-code-coverage
+
+# Demo app for manual testing
+swift run CVPDFExporterDemo
+
+# iOS-specific tests
+xcodebuild test -scheme CVPDFExporter -sdk iphonesimulator -enableCodeCoverage YES
 ```
+
+### Test Coverage Areas
+- **CVDocument Models** - Data structure validation
+- **ExportOptions** - Configuration testing
+- **PDFExportEngine** - Core export functionality
+- **WKWebViewPDFRenderer** - HTML to PDF conversion
+- **PrestoCVCoreAdapter** - Data transformation
 
 ### Test Requirements
 - Each new feature needs a test
 - Maintain > 70% code coverage
 - Tests must be deterministic (no random failures)
 - Use mock data, not real network calls
+- Test both success and failure paths
+- Include performance tests for critical paths
 
 ### Test Structure
 ```swift
@@ -289,6 +324,14 @@ func testFeatureName() {
     XCTAssertEqual(result, expectedOutput)
 }
 ```
+
+### Manual Testing with Demo App
+The demo app (`swift run CVPDFExporterDemo`) provides:
+- Export with different page sizes (A4, Letter)
+- Various margin configurations
+- Performance metrics
+- Output file inspection
+- Visual verification of PDF quality
 
 ---
 

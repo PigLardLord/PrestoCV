@@ -20,7 +20,18 @@ let package = Package(
         .target(
             name: "CVPDFExporter",
             dependencies: [],
-            path: "Sources/CVPDFExporter"
+            path: "Sources/CVPDFExporter",
+            exclude: ["Templates/Bundled/Professional.html"]
+        ),
+        .testTarget(
+            name: "CVPDFExporterTests",
+            dependencies: ["CVPDFExporter"],
+            path: "Tests/CVPDFExporterTests"
+        ),
+        .executableTarget(
+            name: "CVPDFExporterDemo",
+            dependencies: ["CVPDFExporter"],
+            path: "Demo"
         )
     ]
 )

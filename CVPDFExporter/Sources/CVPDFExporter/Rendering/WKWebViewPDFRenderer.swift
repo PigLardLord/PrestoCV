@@ -21,9 +21,8 @@ public class WKWebViewPDFRenderer: NSObject, HTMLToPDFRenderer {
         let configuration = WKWebViewConfiguration()
         configuration.suppressesIncrementalRendering = true
 
-        // Create web view with A4 size frame
-        let pageSize = options.pageSize.dimensions
-        let frame = CGRect(x: 0, y: 0, width: pageSize.width, height: pageSize.height)
+        // Create web view with page size frame
+        let frame = CGRect(x: 0, y: 0, width: options.pageSize.width, height: options.pageSize.height)
         let webView = WKWebView(frame: frame, configuration: configuration)
         webView.navigationDelegate = self
         self.webView = webView
@@ -40,12 +39,12 @@ public class WKWebViewPDFRenderer: NSObject, HTMLToPDFRenderer {
         renderer.addPrintFormatter(printFormatter, startingAtPageAt: 0)
 
         // Configure page rect and printable rect
-        let paperRect = CGRect(x: 0, y: 0, width: pageSize.width, height: pageSize.height)
+        let paperRect = CGRect(x: 0, y: 0, width: options.pageSize.width, height: options.pageSize.height)
         let printableRect = CGRect(
             x: options.margins.left,
             y: options.margins.top,
-            width: pageSize.width - options.margins.left - options.margins.right,
-            height: pageSize.height - options.margins.top - options.margins.bottom
+            width: options.pageSize.width - options.margins.left - options.margins.right,
+            height: options.pageSize.height - options.margins.top - options.margins.bottom
         )
 
         renderer.setValue(paperRect, forKey: "paperRect")

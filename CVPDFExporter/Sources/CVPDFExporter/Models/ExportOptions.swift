@@ -21,38 +21,38 @@ public struct ExportOptions: Sendable {
 
 // MARK: - Page Size
 
-public enum PageSize: Sendable {
-    case a4
-    case letter
+public struct PageSize: Sendable {
+    public let width: Double
+    public let height: Double
 
-    public var dimensions: (width: Double, height: Double) {
-        switch self {
-        case .a4:
-            return (595.28, 841.89) // Points
-        case .letter:
-            return (612.0, 792.0) // Points
-        }
+    public init(width: Double, height: Double) {
+        self.width = width
+        self.height = height
     }
+
+    // Predefined page sizes
+    public static let a4 = PageSize(width: 595.28, height: 841.89) // Points
+    public static let letter = PageSize(width: 612.0, height: 792.0) // Points
 }
 
 // MARK: - Edge Insets
 
 public struct EdgeInsets: Sendable {
     public let top: Double
-    public let right: Double
-    public let bottom: Double
     public let left: Double
+    public let bottom: Double
+    public let right: Double
 
-    public init(top: Double, right: Double, bottom: Double, left: Double) {
+    public init(top: Double, left: Double, bottom: Double, right: Double) {
         self.top = top
-        self.right = right
-        self.bottom = bottom
         self.left = left
+        self.bottom = bottom
+        self.right = right
     }
 
-    public init(all: Double) {
-        self.init(top: all, right: all, bottom: all, left: all)
+    public static func uniform(_ value: Double) -> EdgeInsets {
+        return EdgeInsets(top: value, left: value, bottom: value, right: value)
     }
 
-    public static let `default` = EdgeInsets(all: 36.0) // 0.5 inch
+    public static let `default` = EdgeInsets(top: 72, left: 72, bottom: 72, right: 72) // 1 inch
 }
