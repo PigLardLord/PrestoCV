@@ -2,32 +2,32 @@
 
 ## Current Status
 - **Sprint**: 0
-- **Day**: 1
-- **Checkpoint**: Starting
-- **Last Commit**: "Create new ROADMAP with recovery checkpoints"
+- **Day**: 2
+- **Checkpoint**: Core Infrastructure
+- **Last Commit**: "[Sprint 0] PDFExportUseCase: Add use case with tests"
 - **Date**: 2024-09-28
 
 ## Completed Tasks:
 - [x] Create new ROADMAP with recovery checkpoints
-- [ ] Add RECOVERY_LOG.md for tracking progress
-- [ ] Add domain layer protocols
-- [ ] Add PDFExportUseCase with tests
+- [x] Add RECOVERY_LOG.md for tracking progress
+- [x] Add domain layer protocols
+- [x] Add PDFExportUseCase with tests
 - [ ] Complete PrestoCVCoreToCVDocumentAdapter
 - [ ] Add adapter tests
 
 ## Sprint Progress:
 ### Sprint 0: Foundation & Recovery Setup
 - [x] Commit 1: Create new ROADMAP
-- [ ] Commit 2: Add domain layer protocols
-- [ ] Commit 3: Add PDFExportUseCase with tests
+- [x] Commit 2: Add domain layer protocols
+- [x] Commit 3: Add PDFExportUseCase with tests
 - [ ] Commit 4: Complete PrestoCVCoreToCVDocumentAdapter
 - [ ] Commit 5: Add adapter tests
 
 ## Next Task:
-**Commit 2**: "Add domain layer protocols"
-- Create PDFRendererProtocol
-- Create CVTailoringServiceProtocol
-- Create ExportRepositoryProtocol
+**Commit 4**: "Complete PrestoCVCoreToCVDocumentAdapter"
+- Map CVModel to CVDocument
+- Map PersonalInfo correctly
+- Map all sections (experience, education, skills)
 
 ## Test Status:
 - **All tests passing**: YES
