@@ -4,7 +4,7 @@ import Foundation
 
 /// Test implementation of HTMLToPDFRenderer for testing
 /// Sprint 4: Platform-agnostic testing renderer
-public final class TestPDFRenderer: HTMLToPDFRenderer, @unchecked Sendable {
+public final class TestPDFRenderer: HTMLToPDFRenderer, PDFRendererProtocol, @unchecked Sendable {
 
     /// Debug mode flag for testing configuration
     public var debugMode: Bool = false
@@ -111,5 +111,15 @@ public final class TestPDFRenderer: HTMLToPDFRenderer, @unchecked Sendable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         return stripped.isEmpty ? "Mock PDF" : String(stripped.prefix(50))
+    }
+
+    // MARK: - PDFRendererProtocol Conformance
+
+    public var isAvailable: Bool {
+        true
+    }
+
+    public var maxPages: Int {
+        10
     }
 }

@@ -2,7 +2,7 @@ import Foundation
 
 /// Protocol defining PDF rendering capabilities
 /// Following Interface Segregation Principle - focused on single responsibility
-public protocol PDFRendererProtocol: Sendable {
+public protocol PDFRendererProtocol: AnyObject, Sendable {
     /// Renders HTML content to PDF data
     /// - Parameters:
     ///   - html: The HTML string to render
