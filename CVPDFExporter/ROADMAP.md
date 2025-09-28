@@ -732,9 +732,12 @@ final class PDFExportIntegrationTests: XCTestCase {
   - [x] TestPDFRenderer for platform-agnostic testing
   - [x] Page break management with smart CSS rules
   - [x] Template caching with actor-based thread safety
+- **Sprint 5**: Export formats support ✅
+  - [x] JSON Resume model implementation
+  - [x] JSONResumeAdapter for bidirectional conversion
+  - [x] ExportManager for import/export operations
 
-### Upcoming
-- **Sprint 5**: Export formats support
+### Current Sprint
 - **Sprint 6**: Performance optimization
 
 ---
@@ -952,6 +955,7 @@ CVPDFExporter uses a multi-layered testing strategy to ensure quality:
 - **Sprint 2**: Customization (>85% coverage) ✅
 - **Sprint 3**: Templates implementation (>85% coverage) ✅
 - **Sprint 4**: Platform renderer & utilities (>85% coverage) ✅
+- **Sprint 5**: Export formats support (>85% coverage) ✅
 
 ### Testing Before Each Commit
 ```bash
