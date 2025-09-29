@@ -95,10 +95,13 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
             for section in skillSections {
                 for item in section.items {
                     var skillGroup: [String: Any] = [
-                        "category": item.title
+                        "category": item.title,
+                        "hasSkills": !item.tags.isEmpty  // Add flag for nested conditional
                     ]
                     if !item.tags.isEmpty {
-                        skillGroup["skills"] = item.tags
+                        // Convert tags to array of dictionaries for easier template processing
+                        let skillTags = item.tags.map { ["name": $0] }
+                        skillGroup["skillList"] = skillTags
                     }
                     skillGroups.append(skillGroup)
                 }
@@ -107,6 +110,44 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
             context["hasSkills"] = !skillGroups.isEmpty
         } else {
             context["hasSkills"] = false
+        }
+
+        // Certifications
+        let certSections = document.sections.filter { $0.type == .certifications }
+        if !certSections.isEmpty {
+            var certItems: [[String: String]] = []
+            for section in certSections {
+                for item in section.items {
+                    certItems.append([
+                        "title": item.title,
+                        "issuer": item.subtitle ?? "",
+                        "description": item.description ?? "",
+                        "date": item.startDate ?? ""
+                    ])
+                }
+            }
+            context["certifications"] = certItems
+            context["hasCertifications"] = !certItems.isEmpty
+        } else {
+            context["hasCertifications"] = false
+        }
+
+        // Languages
+        let langSections = document.sections.filter { $0.type == .languages }
+        if !langSections.isEmpty {
+            var langItems: [[String: String]] = []
+            for section in langSections {
+                for item in section.items {
+                    langItems.append([
+                        "language": item.title,
+                        "level": item.subtitle ?? ""
+                    ])
+                }
+            }
+            context["languages"] = langItems
+            context["hasLanguages"] = !langItems.isEmpty
+        } else {
+            context["hasLanguages"] = false
         }
 
         // Add customization values
@@ -161,13 +202,19 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                                 var loopResult = ""
                                 for item in arrayValue {
                                     var itemContent = content
-                                    // Replace variables in item template
+
+                                    // Create a merged context with both parent and item data
+                                    var mergedContext = context
                                     for (itemKey, itemValue) in item {
-                                        itemContent = itemContent.replacingOccurrences(
-                                            of: "{{\(itemKey)}}",
-                                            with: String(describing: itemValue)
-                                        )
+                                        mergedContext[itemKey] = itemValue
                                     }
+
+                                    // Process nested blocks recursively with merged context
+                                    itemContent = processBlocks(itemContent, context: mergedContext)
+
+                                    // Then process any remaining variables
+                                    itemContent = processVariables(itemContent, context: mergedContext)
+
                                     loopResult += itemContent
                                 }
                                 result.replaceSubrange(fullRange, with: loopResult)
@@ -308,6 +355,41 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                             loopResult += itemContent
                         }
                         result.replaceSubrange(fullRange, with: loopResult)
+                    }
+                }
+            }
+        }
+
+        return result
+    }
+
+    private func processNestedConditionals(_ template: String, context: [String: Any]) -> String {
+        var result = template
+
+        // Process {{#key}}...{{/key}} conditionals for non-empty strings
+        let conditionalPattern = #"\{\{#(\w+)\}\}(.*?)\{\{/\1\}\}"#
+        if let regex = try? NSRegularExpression(pattern: conditionalPattern, options: [.dotMatchesLineSeparators]) {
+            let matches = regex.matches(in: result, range: NSRange(result.startIndex..., in: result))
+
+            for match in matches.reversed() {
+                if let keyRange = Range(match.range(at: 1), in: result),
+                   let contentRange = Range(match.range(at: 2), in: result),
+                   let fullRange = Range(match.range, in: result) {
+                    let key = String(result[keyRange])
+                    let content = String(result[contentRange])
+
+                    if let value = context[key] {
+                        // Check if value is non-empty
+                        if let stringValue = value as? String, !stringValue.isEmpty {
+                            result.replaceSubrange(fullRange, with: content)
+                        } else if value is Bool {
+                            let boolValue = value as! Bool
+                            result.replaceSubrange(fullRange, with: boolValue ? content : "")
+                        } else {
+                            result.replaceSubrange(fullRange, with: content)
+                        }
+                    } else {
+                        result.replaceSubrange(fullRange, with: "")
                     }
                 }
             }
