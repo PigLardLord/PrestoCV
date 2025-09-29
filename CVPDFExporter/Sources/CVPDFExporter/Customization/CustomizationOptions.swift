@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Customization Options
 
 /// Options for customizing the appearance of the exported PDF
-public struct CustomizationOptions: Sendable {
+public struct CustomizationOptions: Sendable, Hashable, Equatable {
     public let colorPalette: ColorPalette
     public let fontScheme: FontScheme
     
