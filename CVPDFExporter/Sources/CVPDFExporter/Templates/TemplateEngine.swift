@@ -95,11 +95,14 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
             for section in skillSections {
                 for item in section.items {
                     var skillGroup: [String: Any] = [
-                        "category": item.title,
+                        "title": item.title,      // Changed from "category" to "title"
+                        "category": item.title,   // Keep both for compatibility
                         "hasSkills": !item.tags.isEmpty  // Add flag for nested conditional
                     ]
                     if !item.tags.isEmpty {
-                        // Convert tags to array of dictionaries for easier template processing
+                        // Add tags directly as array of strings
+                        skillGroup["tags"] = item.tags
+                        // Also add as skillList for compatibility with different templates
                         let skillTags = item.tags.map { ["name": $0] }
                         skillGroup["skillList"] = skillTags
                     }
@@ -198,7 +201,7 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
 
                         if let value = context[key] {
                             if let arrayValue = value as? [[String: Any]] {
-                                // It's an array - process as loop
+                                // It's an array of dictionaries - process as loop
                                 var loopResult = ""
                                 for item in arrayValue {
                                     var itemContent = content
@@ -214,6 +217,19 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
 
                                     // Then process any remaining variables
                                     itemContent = processVariables(itemContent, context: mergedContext)
+
+                                    loopResult += itemContent
+                                }
+                                result.replaceSubrange(fullRange, with: loopResult)
+                                hasChanges = true
+                            } else if let stringArray = value as? [String] {
+                                // It's an array of strings - process as loop with {{.}} support
+                                var loopResult = ""
+                                for stringValue in stringArray {
+                                    var itemContent = content
+
+                                    // Replace {{.}} with the current string value
+                                    itemContent = itemContent.replacingOccurrences(of: "{{.}}", with: escapeHTML(stringValue))
 
                                     loopResult += itemContent
                                 }
@@ -413,6 +429,16 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                 // Only replace non-array values
                 result = result.replacingOccurrences(of: "{{\(key)}}", with: String(describing: value))
             }
+        }
+
+        // Remove any remaining unmatched variables
+        let variablePattern = #"\{\{[^}]+\}\}"#
+        if let regex = try? NSRegularExpression(pattern: variablePattern) {
+            result = regex.stringByReplacingMatches(
+                in: result,
+                range: NSRange(result.startIndex..., in: result),
+                withTemplate: ""
+            )
         }
 
         return result

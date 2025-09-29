@@ -8,7 +8,7 @@ public final class ExportViewModel: ObservableObject {
 
     // MARK: - Properties
 
-    private let container: PDFExportDependencyContainer
+    private let container: DependencyContainerProtocol
     private let exportUseCase: PDFExportUseCase
     private let templateSelectionUseCase: TemplateSelectionUseCase
     private let templatePreviewUseCase: TemplatePreviewUseCase
@@ -29,7 +29,7 @@ public final class ExportViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    public init(container: PDFExportDependencyContainer) {
+    public init(container: DependencyContainerProtocol) {
         self.container = container
         self.exportUseCase = container.makeExportUseCase()
         self.templateSelectionUseCase = container.makeTemplateSelectionUseCase()

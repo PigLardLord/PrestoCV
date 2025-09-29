@@ -9,7 +9,7 @@ struct ExportViewModelTests {
     @MainActor
     func test_init_selectsDefaultTemplate() async {
         // Given
-        let container = PDFExportDependencyContainer()
+        let container = MockDependencyContainer()
         let viewModel = ExportViewModel(container: container)
 
         // Then
@@ -23,7 +23,7 @@ struct ExportViewModelTests {
     @MainActor
     func test_init_loadsTemplates() async {
         // Given
-        let container = PDFExportDependencyContainer()
+        let container = MockDependencyContainer()
         let viewModel = ExportViewModel(container: container)
 
         // When - Give async initialization time to complete
@@ -39,7 +39,7 @@ struct ExportViewModelTests {
     @MainActor
     func test_updateCustomization_updatesOptions() {
         // Given
-        let container = PDFExportDependencyContainer()
+        let container = MockDependencyContainer()
         let viewModel = ExportViewModel(container: container)
 
         // When
@@ -57,7 +57,7 @@ struct ExportViewModelTests {
     @MainActor
     func test_selectTemplate_updatesSelection() {
         // Given
-        let container = PDFExportDependencyContainer()
+        let container = MockDependencyContainer()
         let viewModel = ExportViewModel(container: container)
 
         // When
@@ -71,7 +71,7 @@ struct ExportViewModelTests {
     @MainActor
     func test_exportToPDF_generatesData() async throws {
         // Given
-        let container = PDFExportDependencyContainer()
+        let container = MockDependencyContainer()
         let viewModel = ExportViewModel(container: container)
         let document = createSampleCV()
 
@@ -90,7 +90,7 @@ struct ExportViewModelTests {
     @MainActor
     func test_exportToPDF_handlesError() async {
         // Given
-        let container = PDFExportDependencyContainer()
+        let container = MockDependencyContainer()
         let viewModel = ExportViewModel(container: container)
         let invalidDocument = CVDocument(
             personalInfo: PersonalInfo(name: "", email: "")
@@ -113,7 +113,7 @@ struct ExportViewModelTests {
     @MainActor
     func test_generatePreview_createsHTMLPreview() async throws {
         // Given
-        let container = PDFExportDependencyContainer()
+        let container = MockDependencyContainer()
         let viewModel = ExportViewModel(container: container)
         let document = createSampleCV()
 
@@ -130,7 +130,7 @@ struct ExportViewModelTests {
     @MainActor
     func test_tailorForJob_appliesSuggestions() async throws {
         // Given
-        let container = PDFExportDependencyContainer()
+        let container = MockDependencyContainer()
         let viewModel = ExportViewModel(container: container)
         let document = createSampleCV()
         let jobDescription = "Senior iOS Developer with SwiftUI experience"
@@ -150,7 +150,7 @@ struct ExportViewModelTests {
     @MainActor
     func test_exportState_updatesCorrectly() async throws {
         // Given
-        let container = PDFExportDependencyContainer()
+        let container = MockDependencyContainer()
         let viewModel = ExportViewModel(container: container)
         let document = createSampleCV()
 
@@ -171,7 +171,7 @@ struct ExportViewModelTests {
     @MainActor
     func test_validateDocument_checksRequirements() {
         // Given
-        let container = PDFExportDependencyContainer()
+        let container = MockDependencyContainer()
         let viewModel = ExportViewModel(container: container)
 
         // When - Valid document
