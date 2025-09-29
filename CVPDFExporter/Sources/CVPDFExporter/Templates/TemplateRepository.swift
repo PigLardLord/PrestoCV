@@ -11,7 +11,7 @@ public protocol TemplateRepository: Sendable {
 // MARK: - Bundled Template Repository
 
 /// Repository for built-in templates
-public final class BundledTemplateRepository: TemplateRepository, @unchecked Sendable {
+public final class BundledTemplateRepository: TemplateRepository, TemplateRepositoryProtocol, @unchecked Sendable {
     private let templates: [Template]
 
     public init() {
@@ -27,6 +27,16 @@ public final class BundledTemplateRepository: TemplateRepository, @unchecked Sen
 
     public func availableTemplates() -> [Template] {
         return templates
+    }
+
+    // MARK: - TemplateRepositoryProtocol
+
+    public func getAllTemplates() async throws -> [Template] {
+        return templates
+    }
+
+    public func getTemplate(byId id: String) async throws -> Template? {
+        return templates.first { $0.id == id }
     }
 
     // MARK: - Private Methods

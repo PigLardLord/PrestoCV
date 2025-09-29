@@ -69,6 +69,11 @@ func runDemo() async throws {
 @main
 struct DemoApp {
     static func main() async {
+        // Run the new CV rendering demo
+        await RenderCVDemo.main()
+        return
+
+        // Original demo below (disabled)
         do {
             try await runDemo()
         } catch {

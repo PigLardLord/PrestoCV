@@ -32,7 +32,19 @@ let package = Package(
             name: "CVPDFExporterDemo",
             dependencies: ["CVPDFExporter"],
             path: "Demo",
+            sources: ["main.swift", "RenderCVDemo.swift", "PlatformRenderer.swift"],
             swiftSettings: [.unsafeFlags(["-parse-as-library"])]
+        ),
+        .executableTarget(
+            name: "CVExportDemoApp",
+            dependencies: ["CVPDFExporter"],
+            path: "Example"
+        ),
+        .executableTarget(
+            name: "TestExport",
+            dependencies: ["CVPDFExporter"],
+            path: "Demo",
+            sources: ["TestExport.swift"]
         )
     ]
 )

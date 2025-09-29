@@ -10,8 +10,8 @@ public enum PDFRendererFactory {
         // iOS/iPadOS - Use enhanced WKWebView renderer
         return EnhancedWKWebViewPDFRenderer()
         #elseif canImport(AppKit) && canImport(WebKit)
-        // macOS - Use test renderer for now (NSView renderer not yet implemented)
-        return TestPDFRenderer()
+        // macOS - Use proper macOS PDF renderer
+        return ProperMacOSPDFRenderer()
         #else
         // Fallback - Use test renderer
         return TestPDFRenderer()

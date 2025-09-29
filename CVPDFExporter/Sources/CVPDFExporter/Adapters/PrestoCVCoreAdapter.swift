@@ -148,7 +148,167 @@ public struct PrestoCVCoreAdapter: Sendable {
     }
     #endif
 
+    private func convertFromDictionary(_ dict: [String: Any]) -> CVDocument {
+        // Parse personal info
+        var personalInfo = PersonalInfo(
+            name: "Test User",
+            email: "test@example.com",
+            phone: nil,
+            location: nil,
+            website: nil,
+            summary: nil
+        )
+
+        if let info = dict["personalInfo"] as? [String: Any] {
+            personalInfo = PersonalInfo(
+                name: info["name"] as? String ?? "Test User",
+                email: info["email"] as? String ?? "test@example.com",
+                phone: info["phone"] as? String,
+                location: info["location"] as? String,
+                website: info["linkedIn"] as? String,
+                summary: info["summary"] as? String
+            )
+        }
+
+        var sections: [CVSection] = []
+
+        // Parse experience
+        if let experiences = dict["experience"] as? [[String: Any]] {
+            let items = experiences.compactMap { exp -> CVItem? in
+                guard let title = exp["title"] as? String,
+                      let company = exp["company"] as? String else { return nil }
+
+                return CVItem(
+                    title: title,
+                    subtitle: company,
+                    description: exp["description"] as? String,
+                    startDate: nil,
+                    endDate: exp["period"] as? String,
+                    location: exp["location"] as? String,
+                    tags: []
+                )
+            }
+            sections.append(CVSection(
+                id: "experience",
+                type: .work,
+                title: "Experience",
+                items: items,
+                order: 0
+            ))
+        }
+
+        // Parse education
+        if let education = dict["education"] as? [[String: Any]] {
+            let items = education.compactMap { edu -> CVItem? in
+                guard let degree = edu["degree"] as? String,
+                      let institution = edu["institution"] as? String else { return nil }
+
+                return CVItem(
+                    title: degree,
+                    subtitle: institution,
+                    description: edu["description"] as? String,
+                    startDate: nil,
+                    endDate: edu["period"] as? String,
+                    location: edu["location"] as? String,
+                    tags: []
+                )
+            }
+            sections.append(CVSection(
+                id: "education",
+                type: .education,
+                title: "Education",
+                items: items,
+                order: 1
+            ))
+        }
+
+        // Parse skills
+        if let skills = dict["skills"] as? [[String: Any]] {
+            let items = skills.compactMap { skill -> CVItem? in
+                guard let category = skill["category"] as? String else { return nil }
+                let tags = skill["tags"] as? [String] ?? []
+
+                return CVItem(
+                    title: category,
+                    subtitle: nil,
+                    description: nil,
+                    startDate: nil,
+                    endDate: nil,
+                    location: nil,
+                    tags: tags
+                )
+            }
+            sections.append(CVSection(
+                id: "skills",
+                type: .skills,
+                title: "Skills",
+                items: items,
+                order: 2
+            ))
+        }
+
+        // Parse languages
+        if let languages = dict["languages"] as? [[String: Any]] {
+            let items = languages.compactMap { lang -> CVItem? in
+                guard let name = lang["name"] as? String else { return nil }
+                let level = lang["level"] as? String ?? ""
+
+                return CVItem(
+                    title: name,
+                    subtitle: level,
+                    description: nil,
+                    startDate: nil,
+                    endDate: nil,
+                    location: nil,
+                    tags: []
+                )
+            }
+            sections.append(CVSection(
+                id: "languages",
+                type: .languages,
+                title: "Languages",
+                items: items,
+                order: 3
+            ))
+        }
+
+        // Parse certifications
+        if let certifications = dict["certifications"] as? [[String: Any]] {
+            let items = certifications.compactMap { cert -> CVItem? in
+                guard let name = cert["name"] as? String else { return nil }
+
+                return CVItem(
+                    title: name,
+                    subtitle: cert["issuer"] as? String,
+                    description: cert["description"] as? String,
+                    startDate: cert["date"] as? String,
+                    endDate: nil,
+                    location: nil,
+                    tags: []
+                )
+            }
+            sections.append(CVSection(
+                id: "certifications",
+                type: .certifications,
+                title: "Certifications",
+                items: items,
+                order: 4
+            ))
+        }
+
+        return CVDocument(
+            personalInfo: personalInfo,
+            sections: sections,
+            metadata: DocumentMetadata()
+        )
+    }
+
     private func convertFromMockData(_ mockData: Any) -> CVDocument {
+        // Handle dictionary-based mock data
+        if let dict = mockData as? [String: Any] {
+            return convertFromDictionary(dict)
+        }
+
         // Use reflection to map mock data for testing
         let mirror = Mirror(reflecting: mockData)
 
@@ -174,7 +334,7 @@ public struct PrestoCVCoreAdapter: Sendable {
                     default: break
                     }
                 }
-            case "experiences":
+            case "experiences", "experience":
                 sections.append(mapExperiencesFromMock(child.value))
             case "education":
                 sections.append(mapEducationFromMock(child.value))

@@ -10,7 +10,7 @@ struct PDFExportUseCaseTests {
         // Given
         let mockRenderer = TestPDFRenderer()
         let mockRepository = TestExportRepository()
-        let mockTemplateEngine = MockTemplateEngine()
+        let mockTemplateEngine = UseCaseMockTemplateEngine()
 
         let useCase = PDFExportUseCase(
             renderer: mockRenderer,
@@ -47,7 +47,7 @@ struct PDFExportUseCaseTests {
         // Given
         let mockRenderer = TestPDFRenderer()
         let mockRepository = TestExportRepository()
-        let mockTemplateEngine = MockTemplateEngine()
+        let mockTemplateEngine = UseCaseMockTemplateEngine()
 
         let useCase = PDFExportUseCase(
             renderer: mockRenderer,
@@ -84,7 +84,7 @@ struct PDFExportUseCaseTests {
         // Given
         let mockRenderer = TestPDFRenderer(simulatedPageCount: 10)
         let mockRepository = TestExportRepository()
-        let mockTemplateEngine = MockTemplateEngine()
+        let mockTemplateEngine = UseCaseMockTemplateEngine()
 
         let useCase = PDFExportUseCase(
             renderer: mockRenderer,
@@ -119,7 +119,7 @@ struct PDFExportUseCaseTests {
         // Given
         let mockRenderer = TestPDFRenderer()
         let mockRepository = TestExportRepository()
-        let mockTemplateEngine = MockTemplateEngine()
+        let mockTemplateEngine = UseCaseMockTemplateEngine()
 
         let useCase = PDFExportUseCase(
             renderer: mockRenderer,
@@ -244,7 +244,7 @@ private actor TestExportRepository: ExportRepositoryProtocol {
     nonisolated func clearAll() async throws {}
 }
 
-private actor MockTemplateEngine: TemplateEngine {
+private actor UseCaseMockTemplateEngine: TemplateEngine {
     func render(template: Template, data: CVDocument, customization: CustomizationOptions) async throws -> String {
         "<html><body>\(data.personalInfo.name)</body></html>"
     }

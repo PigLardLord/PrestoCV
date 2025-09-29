@@ -319,17 +319,52 @@ struct ModernHTMLTemplate {
                 {{#skills}}
                 <div class="skills-group">
                     <div class="skills-category">{{category}}</div>
-                    {{#skills}}
+                    {{#hasSkills}}
                     <div class="skills-tags">
-                        {{#.}}
-                        <span class="skill-tag">{{.}}</span>
-                        {{/.}}
+                        {{#skillList}}
+                        <span class="skill-tag">{{name}}</span>
+                        {{/skillList}}
                     </div>
-                    {{/skills}}
+                    {{/hasSkills}}
                 </div>
                 {{/skills}}
             </section>
             {{/hasSkills}}
+
+            {{#hasCertifications}}
+            <section class="section">
+                <h2>Certifications</h2>
+                {{#certifications}}
+                <div class="item">
+                    <div class="item-header">
+                        <div>
+                            <span class="item-title">{{title}}</span>
+                            {{#issuer}}
+                            <span class="item-subtitle">@ {{issuer}}</span>
+                            {{/issuer}}
+                        </div>
+                        {{#date}}
+                        <span class="item-date">{{date}}</span>
+                        {{/date}}
+                    </div>
+                    {{#description}}
+                    <div class="item-description">{{description}}</div>
+                    {{/description}}
+                </div>
+                {{/certifications}}
+            </section>
+            {{/hasCertifications}}
+
+            {{#hasLanguages}}
+            <section class="section">
+                <h2>Languages</h2>
+                <div class="skills-tags">
+                    {{#languages}}
+                    <span class="skill-tag">{{language}} - {{level}}</span>
+                    {{/languages}}
+                </div>
+            </section>
+            {{/hasLanguages}}
         </div>
     </body>
     </html>
