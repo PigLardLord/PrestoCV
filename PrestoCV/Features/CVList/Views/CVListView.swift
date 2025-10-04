@@ -5,6 +5,7 @@ struct CVListView: View {
     @ObservedObject var viewModel: CVListViewModel
     @EnvironmentObject var router: AppRouter
     @State private var exportTarget: CVModel?
+    @State private var deleteTarget: CVModel?
     
     var body: some View {
         NavigationView {
@@ -40,6 +41,26 @@ struct CVListView: View {
         .sheet(item: $exportTarget) { cv in
             CVExportSheetView(cv: cv)
         }
+        .confirmationDialog(
+            String(localized: "cv.delete.confirmation.title"),
+            isPresented: Binding(
+                get: { deleteTarget != nil },
+                set: { if !$0 { deleteTarget = nil } }
+            ),
+            presenting: deleteTarget,
+            actions: { target in
+                Button(String(localized: "common.delete"), role: .destructive) {
+                    Task { await viewModel.deleteCV(withId: target.id) }
+                    deleteTarget = nil
+                }
+                Button(String(localized: "common.cancel"), role: .cancel) {
+                    deleteTarget = nil
+                }
+            },
+            message: { _ in
+                Text(String(localized: "cv.delete.confirmation.message"))
+            }
+        )
     }
     
     // MARK: - View Components
@@ -62,6 +83,9 @@ struct CVListView: View {
                 },
                 onExport: {
                     exportTarget = cv
+                },
+                onDelete: {
+                    deleteTarget = cv
                 }
             )
         }
@@ -74,7 +98,8 @@ private struct CVRowView: View {
     let cv: CVModel
     let onTap: () -> Void
     let onExport: () -> Void
-    
+    let onDelete: () -> Void
+
     var body: some View {
         NavigationRow(
             title: cv.name.isEmpty ? "cv.untitled".localized : cv.name,
@@ -83,6 +108,9 @@ private struct CVRowView: View {
             action: onTap
         )
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive, action: onDelete) {
+                Label(String(localized: "common.delete"), systemImage: "trash")
+            }
             Button(action: onExport) {
                 Label(String(localized: "export.swipe.action"), systemImage: "square.and.arrow.up")
             }
