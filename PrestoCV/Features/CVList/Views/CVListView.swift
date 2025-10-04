@@ -4,6 +4,7 @@ import PrestoCVCore
 struct CVListView: View {
     @ObservedObject var viewModel: CVListViewModel
     @EnvironmentObject var router: AppRouter
+    @State private var exportTarget: CVModel?
     
     var body: some View {
         NavigationView {
@@ -36,6 +37,9 @@ struct CVListView: View {
                 await viewModel.loadCVs()
             }
         }
+        .sheet(item: $exportTarget) { cv in
+            CVExportSheetView(cv: cv)
+        }
     }
     
     // MARK: - View Components
@@ -51,9 +55,15 @@ struct CVListView: View {
             items: viewModel.cvs,
             onDelete: viewModel.performDeleteCVs
         ) { cv in
-            CVRowView(cv: cv) {
-                router.navigate(to: .cvEditor(cvId: cv.id.uuidString))
-            }
+            CVRowView(
+                cv: cv,
+                onTap: {
+                    router.navigate(to: .cvEditor(cvId: cv.id.uuidString))
+                },
+                onExport: {
+                    exportTarget = cv
+                }
+            )
         }
     }
 }
@@ -63,6 +73,7 @@ struct CVListView: View {
 private struct CVRowView: View {
     let cv: CVModel
     let onTap: () -> Void
+    let onExport: () -> Void
     
     var body: some View {
         NavigationRow(
@@ -71,6 +82,12 @@ private struct CVRowView: View {
             caption: cv.personalInfo.location.isEmpty ? nil : cv.personalInfo.location,
             action: onTap
         )
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(action: onExport) {
+                Label(String(localized: "export.swipe.action"), systemImage: "square.and.arrow.up")
+            }
+            .tint(DesignTokens.Colors.accent)
+        }
     }
 }
 

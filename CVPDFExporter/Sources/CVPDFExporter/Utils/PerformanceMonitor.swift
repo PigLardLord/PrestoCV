@@ -61,6 +61,12 @@ public struct PerformanceMetrics: Codable, Sendable {
     public let measurements: [ExportableMeasurement]
     public let statistics: [String: StatisticsSummary]
 
+    public var averageTime: TimeInterval {
+        guard !measurements.isEmpty else { return 0 }
+        let total = measurements.reduce(0) { $0 + $1.duration }
+        return total / Double(measurements.count)
+    }
+
     public struct ExportableMeasurement: Codable, Sendable {
         public let label: String
         public let duration: TimeInterval
@@ -85,6 +91,7 @@ public actor PerformanceMonitor {
 
     private var measurements: [PerformanceMeasurement] = []
     private var thresholds: [String: TimeInterval] = [:]
+    private var activeMeasurements: [UUID: (label: String, start: CFAbsoluteTime, memoryBefore: Int?)] = [:]
 
     public init() {}
 
@@ -160,6 +167,57 @@ public actor PerformanceMonitor {
         )
 
         return (result, alert)
+    }
+
+    /// Begin a measurement for manual lifecycle control.
+    public func startMeasurement(operation: String, trackMemory: Bool = false) -> UUID {
+        let id = UUID()
+        let memory = trackMemory ? getCurrentMemoryUsage() : nil
+        activeMeasurements[id] = (label: operation, start: CFAbsoluteTimeGetCurrent(), memoryBefore: memory)
+        return id
+    }
+
+    /// Complete a previously started measurement and record it.
+    public func endMeasurement(id: UUID) {
+        guard let active = activeMeasurements.removeValue(forKey: id) else { return }
+
+        let duration = CFAbsoluteTimeGetCurrent() - active.start
+        let measurement = PerformanceMeasurement(
+            label: active.label,
+            duration: duration,
+            memoryBefore: active.memoryBefore,
+            memoryAfter: active.memoryBefore == nil ? nil : getCurrentMemoryUsage()
+        )
+        measurements.append(measurement)
+    }
+
+    /// Aggregate metrics for all recorded measurements.
+    public func getMetrics() -> PerformanceMetrics {
+        let exportableMeasurements = measurements.map { measurement in
+            PerformanceMetrics.ExportableMeasurement(
+                label: measurement.label,
+                duration: measurement.duration,
+                timestamp: measurement.timestamp,
+                memoryBefore: measurement.memoryBefore,
+                memoryAfter: measurement.memoryAfter
+            )
+        }
+
+        let grouped = Dictionary(grouping: measurements) { $0.label }
+        let statistics = grouped.mapValues { measurements -> PerformanceMetrics.StatisticsSummary in
+            let stats = PerformanceStatistics(measurements: measurements)
+            return PerformanceMetrics.StatisticsSummary(
+                count: stats.count,
+                average: stats.average,
+                min: stats.min,
+                max: stats.max
+            )
+        }
+
+        return PerformanceMetrics(
+            measurements: exportableMeasurements,
+            statistics: statistics
+        )
     }
 
     // MARK: - Statistics

@@ -4,6 +4,7 @@ import PrestoCVCore
 struct CVEditorView: View {
     @EnvironmentObject var router: AppRouter
     @ObservedObject var viewModel: CVEditorViewModel
+    @State private var showingExportSheet = false
     
     var body: some View {
         ViewStateContainer(
@@ -54,12 +55,16 @@ struct CVEditorView: View {
         } message: {
             Text("dialog.save_success.message".asLoclizedKey)
         }
+        .sheet(isPresented: $showingExportSheet) {
+            CVExportSheetView(cv: viewModel.cv)
+        }
     }
     
     // MARK: - View Components
     
     private var editorView: some View {
-        TabView {
+        VStack(spacing: 0) {
+            TabView {
             // MARK: - Basics Tab
             PersonalInfoSection(cv: $viewModel.cv)
                 .tabItem {
@@ -77,12 +82,25 @@ struct CVEditorView: View {
                 .tabItem {
                     Label("section.details".localized, systemImage: "list.bullet.circle")
                 }
+            }
+            .background(DesignTokens.Colors.background)
+            .scrollDismissesKeyboard(.interactively)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("editor.title".localized)
+            .accessibilityHint("accessibility.editor_hint".localized)
+
+            Divider()
+
+            PrimaryButton.large(
+                title: String(localized: "export.button.title"),
+                icon: "square.and.arrow.up",
+                isDisabled: !viewModel.hasMeaningfulContent
+            ) {
+                showingExportSheet = true
+            }
+            .padding(DesignTokens.Spacing.lg)
+            .background(DesignTokens.Colors.background)
         }
-        .background(DesignTokens.Colors.background)
-        .scrollDismissesKeyboard(.interactively)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("editor.title".localized)
-        .accessibilityHint("accessibility.editor_hint".localized)
     }
     
     // MARK: - Action Handlers

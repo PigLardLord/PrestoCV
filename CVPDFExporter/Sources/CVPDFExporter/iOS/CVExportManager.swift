@@ -206,6 +206,19 @@ public final class CVExportManager: NSObject {
 
         viewController.present(previewController, animated: true)
     }
+
+    private func handlePreviewDismissal() {
+        logger.debug("QuickLook dismissed")
+
+        guard let url = exportedFileURL else { return }
+        exportedFileURL = nil
+
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            try? FileManager.default.removeItem(at: url)
+            logger.debug("Temporary PDF file cleaned up")
+        }
+    }
 }
 
 // MARK: - QLPreviewControllerDataSource
@@ -224,18 +237,11 @@ extension CVExportManager: QLPreviewControllerDataSource {
 // MARK: - QLPreviewControllerDelegate
 
 @MainActor
-extension CVExportManager: QLPreviewControllerDelegate {
+extension CVExportManager: @preconcurrency QLPreviewControllerDelegate {
 
-    public func previewControllerDidDismiss(_ controller: QLPreviewController) {
-        logger.debug("QuickLook dismissed")
-
-        // Clean up temporary file after a delay
-        if let url = exportedFileURL {
-            Task {
-                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-                try? FileManager.default.removeItem(at: url)
-                logger.debug("Temporary PDF file cleaned up")
-            }
+    nonisolated(unsafe) public func previewControllerDidDismiss(_ controller: QLPreviewController) {
+        Task { @MainActor [weak self] in
+            self?.handlePreviewDismissal()
         }
     }
 }

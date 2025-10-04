@@ -8,7 +8,9 @@ public enum PDFRendererFactory {
     public static func createRenderer() -> PDFRendererProtocol {
         #if canImport(UIKit) && canImport(WebKit)
         // iOS/iPadOS - Use enhanced WKWebView renderer
-        return EnhancedWKWebViewPDFRenderer()
+        return MainActor.assumeIsolated {
+            EnhancedWKWebViewPDFRenderer()
+        }
         #elseif canImport(AppKit) && canImport(WebKit)
         // macOS - Use proper macOS PDF renderer
         return ProperMacOSPDFRenderer()

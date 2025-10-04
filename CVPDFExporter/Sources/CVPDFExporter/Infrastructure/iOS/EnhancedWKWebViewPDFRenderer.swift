@@ -13,9 +13,8 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
     private let logger = Logger(subsystem: "CVPDFExporter", category: "PDFRenderer")
     private var webView: WKWebView?
     private var loadContinuation: CheckedContinuation<Void, Error>?
-    private var javascriptContinuation: CheckedContinuation<Any?, Error>?
+    private var javascriptContinuation: CheckedContinuation<String?, Error>?
     private let pageBreakManager: PageBreakManager
-    private let performanceMonitor: PerformanceMonitor
 
     // Configuration
     private let javascriptTimeout: TimeInterval = 5.0
@@ -25,7 +24,6 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
 
     public override init() {
         self.pageBreakManager = PageBreakManager()
-        self.performanceMonitor = PerformanceMonitor()
         super.init()
     }
 
@@ -33,39 +31,19 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
 
     /// Render HTML to PDF with enhanced features
     public func renderToPDF(html: String, options: ExportOptions) async throws -> Data {
-        let measurementId = await performanceMonitor.startMeasurement(operation: "pdf_render")
-
         do {
-            // Inject page break CSS
-            let enhancedHTML = await pageBreakManager.injectPageBreakCSS(into: html)
+            let enhancedHTML = pageBreakManager.insertPageBreaks(in: html)
 
-            // Configure and create web view
             let webView = try await createWebView(options: options)
             self.webView = webView
+            defer { self.webView = nil }
 
-            // Load HTML with timeout
             try await loadHTML(enhancedHTML, in: webView)
-
-            // Wait for JavaScript rendering
             try await waitForJavaScriptRendering(in: webView)
-
-            // Adjust content for optimal pagination
             try await adjustContentForPagination(in: webView, options: options)
 
-            // Generate PDF
-            let pdfData = try await generatePDF(from: webView, options: options)
-
-            // Record performance metrics
-            await performanceMonitor.endMeasurement(id: measurementId)
-            let metrics = await performanceMonitor.getMetrics()
-            logger.info("PDF generation completed in \(metrics.averageTime)ms")
-
-            // Cleanup
-            self.webView = nil
-
-            return pdfData
+            return try await generatePDF(from: webView, options: options)
         } catch {
-            await performanceMonitor.endMeasurement(id: measurementId)
             logger.error("PDF generation failed: \(error.localizedDescription)")
             throw PDFExportError.renderingFailed(error.localizedDescription)
         }
@@ -127,10 +105,11 @@ private extension EnhancedWKWebViewPDFRenderer {
             self.loadContinuation = continuation
 
             // Start timeout timer
-            Task {
+            Task { [weak self] in
+                guard let self else { return }
                 try await Task.sleep(nanoseconds: UInt64(pageLoadTimeout * 1_000_000_000))
-                if self.loadContinuation != nil {
-                    self.loadContinuation?.resume(throwing: PDFExportError.timeout)
+                if let continuation = self.loadContinuation {
+                    continuation.resume(throwing: PDFExportError.renderingFailed("HTML load timed out"))
                     self.loadContinuation = nil
                 }
             }
@@ -188,28 +167,39 @@ private extension EnhancedWKWebViewPDFRenderer {
         _ = try await evaluateJavaScript(paginationScript, in: webView)
     }
 
-    func evaluateJavaScript(_ script: String, in webView: WKWebView) async throws -> Any? {
-        try await withCheckedThrowingContinuation { continuation in
+    func evaluateJavaScript(_ script: String, in webView: WKWebView) async throws -> String? {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String?, Error>) in
             self.javascriptContinuation = continuation
 
             // Start timeout timer
-            Task {
+            Task { [weak self] in
+                guard let self else { return }
                 try await Task.sleep(nanoseconds: UInt64(javascriptTimeout * 1_000_000_000))
-                if self.javascriptContinuation != nil {
-                    self.javascriptContinuation?.resume(throwing: PDFExportError.timeout)
+                if let continuation = self.javascriptContinuation {
+                    continuation.resume(throwing: PDFExportError.renderingFailed("JavaScript rendering timed out"))
                     self.javascriptContinuation = nil
                 }
             }
 
-            webView.evaluateJavaScript(script) { result, error in
-                if let continuation = self.javascriptContinuation {
-                    if let error = error {
-                        continuation.resume(throwing: error)
-                    } else {
-                        continuation.resume(returning: result)
-                    }
+            webView.evaluateJavaScript(script) { [weak self] result, error in
+                guard let self else { return }
+                guard let continuation = self.javascriptContinuation else { return }
+
+                if let error = error {
+                    continuation.resume(throwing: error)
                     self.javascriptContinuation = nil
+                    return
                 }
+
+                if let stringResult = result as? String {
+                    continuation.resume(returning: stringResult)
+                } else if let convertible = result {
+                    continuation.resume(returning: String(describing: convertible))
+                } else {
+                    continuation.resume(returning: nil)
+                }
+
+                self.javascriptContinuation = nil
             }
         }
     }
@@ -220,7 +210,7 @@ private extension EnhancedWKWebViewPDFRenderer {
         let sizeResult = try await evaluateJavaScript(contentSizeScript, in: webView)
 
         var contentHeight = options.pageSize.height * 10 // Default
-        if let jsonString = sizeResult as? String,
+        if let jsonString = sizeResult,
            let data = jsonString.data(using: .utf8),
            let size = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let height = size["height"] as? Double {
