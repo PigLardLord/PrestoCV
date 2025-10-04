@@ -52,6 +52,11 @@ public final class LocalAIService: CVTailoringServiceProtocol, @unchecked Sendab
         )
     }
 
+    /// Parses a job description and returns inferred requirements without tailoring a CV
+    public func analyzeJobDescription(_ jobDescription: String) -> JobRequirements {
+        extractRequirements(from: jobDescription)
+    }
+
     // MARK: - Private Methods
 
     private func extractRequirements(from jobDescription: String) -> JobRequirements {

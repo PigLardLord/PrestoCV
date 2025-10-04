@@ -47,22 +47,7 @@ public final class CVTailoringUseCase: Sendable {
 
     /// Extracts requirements from a job posting
     public func analyzeJobPosting(_ jobDescription: String) async throws -> JobRequirements {
-        // For now, use the local service's extraction
-        let service = LocalAIService()
-        let result = try await service.tailorCV(
-            jobDescription: jobDescription,
-            cvDocument: createEmptyCV(),
-            targetRole: nil
-        )
-
-        return JobRequirements(
-            requiredSkills: result.relevantSkills,
-            preferredSkills: [],
-            yearsOfExperience: nil,
-            educationLevel: nil,
-            keywords: [],
-            responsibilities: []
-        )
+        LocalAIService().analyzeJobDescription(jobDescription)
     }
 
     /// Suggests improvements for a CV

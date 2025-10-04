@@ -14,12 +14,14 @@ let package = Package(
         )
     ],
     dependencies: [
-        // No external dependencies - pure Swift + system frameworks
+        .package(path: "../PrestoCVCore")
     ],
     targets: [
         .target(
             name: "CVPDFExporter",
-            dependencies: [],
+            dependencies: [
+                .product(name: "PrestoCVCore", package: "PrestoCVCore")
+            ],
             path: "Sources/CVPDFExporter",
             exclude: ["Templates/Bundled/Professional.html"]
         ),

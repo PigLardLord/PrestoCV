@@ -32,10 +32,10 @@ public struct PrestoCVCoreAdapter: Sendable {
         let personalInfo = PersonalInfo(
             name: model.personalInfo.name,
             email: model.personalInfo.email,
-            phone: model.personalInfo.phone,
-            location: model.personalInfo.location,
-            website: model.personalInfo.linkedIn,
-            summary: model.personalInfo.summary
+            phone: model.personalInfo.phone.isEmpty ? nil : model.personalInfo.phone,
+            location: model.personalInfo.location.isEmpty ? nil : model.personalInfo.location,
+            website: model.personalInfo.portfolio.isEmpty ? nil : model.personalInfo.portfolio,
+            summary: model.personalInfo.profile.isEmpty ? nil : model.personalInfo.profile
         )
 
         var sections: [CVSection] = []
@@ -64,11 +64,11 @@ public struct PrestoCVCoreAdapter: Sendable {
         let educationItems = model.education.map { edu in
             CVItem(
                 title: edu.degree,
-                subtitle: edu.institution,
+                subtitle: edu.school.isEmpty ? nil : edu.school,
                 description: edu.description,
                 startDate: extractStartDate(from: edu.period),
                 endDate: extractEndDate(from: edu.period),
-                location: edu.location,
+                location: nil,
                 tags: []
             )
         }
@@ -84,12 +84,13 @@ public struct PrestoCVCoreAdapter: Sendable {
         let skillItems = model.skills.map { skill in
             CVItem(
                 title: skill.name,
-                subtitle: skill.level,
+                subtitle: nil,
                 description: nil,
                 startDate: nil,
                 endDate: nil,
                 location: nil,
-                tags: [skill.level]
+                tags: [String(skill.level)],
+                metadata: ["level": String(skill.level)]
             )
         }
         sections.append(CVSection(
@@ -104,12 +105,12 @@ public struct PrestoCVCoreAdapter: Sendable {
         let languageItems = model.languages.map { lang in
             CVItem(
                 title: lang.name,
-                subtitle: lang.level,
+                subtitle: lang.level.rawValue,
                 description: nil,
                 startDate: nil,
                 endDate: nil,
                 location: nil,
-                tags: []
+                tags: [lang.level.rawValue]
             )
         }
         sections.append(CVSection(
@@ -126,10 +127,12 @@ public struct PrestoCVCoreAdapter: Sendable {
                 title: cert.name,
                 subtitle: cert.issuer,
                 description: cert.description,
-                startDate: cert.date,
+                startDate: cert.year > 0 ? String(cert.year) : nil,
                 endDate: nil,
                 location: nil,
-                tags: []
+                url: cert.url.isEmpty ? nil : cert.url,
+                tags: [],
+                metadata: cert.year > 0 ? ["year": String(cert.year)] : [:]
             )
         }
         sections.append(CVSection(
@@ -139,6 +142,45 @@ public struct PrestoCVCoreAdapter: Sendable {
             items: certificationItems,
             order: 5
         ))
+
+        if !model.interests.isEmpty {
+            let interestItems = model.interests.map { interest in
+                CVItem(title: interest)
+            }
+            sections.append(
+                CVSection(
+                    id: "interests",
+                    type: .interests,
+                    title: "Interests",
+                    items: interestItems,
+                    order: 6
+                )
+            )
+        }
+
+        if !model.social.isEmpty {
+            let socialItems = model.social.map { profile in
+                CVItem(
+                    title: profile.platform,
+                    subtitle: profile.url.isEmpty ? nil : profile.url,
+                    description: nil,
+                    startDate: nil,
+                    endDate: nil,
+                    location: nil,
+                    url: profile.url.isEmpty ? nil : profile.url,
+                    tags: []
+                )
+            }
+            sections.append(
+                CVSection(
+                    id: "social",
+                    type: .custom,
+                    title: "Online Profiles",
+                    items: socialItems,
+                    order: 7
+                )
+            )
+        }
 
         return CVDocument(
             personalInfo: personalInfo,
