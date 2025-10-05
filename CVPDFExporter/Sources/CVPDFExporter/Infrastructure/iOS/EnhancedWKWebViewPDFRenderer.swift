@@ -212,6 +212,43 @@ private extension EnhancedWKWebViewPDFRenderer {
                     // Task cancelled - ignore
                 }
             }
+
+            startRenderReadinessMonitoring(in: webView)
+        }
+    }
+
+    func startRenderReadinessMonitoring(in webView: WKWebView) {
+        let startScript = """
+            (function() {
+                if (window.__cvWaitForRender) {
+                    return window.__cvWaitForRender();
+                }
+
+                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.renderReady) {
+                    window.webkit.messageHandlers.renderReady.postMessage(null);
+                }
+
+                return true;
+            })();
+        """
+
+        webView.evaluateJavaScript(startScript) { [weak self] _, error in
+            guard let self else { return }
+            if let error {
+                self.handleRenderReadyScriptError(error)
+            }
+        }
+    }
+
+    @MainActor
+    func handleRenderReadyScriptError(_ error: Error) {
+        logger.error("Render readiness script failed: \(error.localizedDescription)")
+        renderReadyTimeoutTask?.cancel()
+        renderReadyTimeoutTask = nil
+
+        if let continuation = renderReadyContinuation {
+            renderReadyContinuation = nil
+            continuation.resume(throwing: error)
         }
     }
 
