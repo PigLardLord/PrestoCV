@@ -8,6 +8,7 @@ struct CVExportSheetView: View {
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = CVExportSheetViewModel()
+    @StateObject private var previewCoordinator = HTMLPreviewCoordinator()
     @State private var loadingTemplates = true
 
     var body: some View {
@@ -16,6 +17,7 @@ struct CVExportSheetView: View {
                 VStack(alignment: .leading, spacing: DesignTokens.Spacing.lg) {
                     templateSection
                     customizationSection
+                    previewSection
                     infoSection
                     exportButton
                 }
@@ -47,12 +49,22 @@ struct CVExportSheetView: View {
             })
             .task {
                 await viewModel.loadTemplates()
+                await viewModel.refreshPreview(for: cv)
                 loadingTemplates = false
             }
             .sheet(item: $viewModel.previewItem) { item in
                 QuickLookPreview(url: item.url)
                     .ignoresSafeArea()
                     .onDisappear { viewModel.handlePreviewDismiss() }
+            }
+            .onChange(of: viewModel.selectedTemplateId) { _ in
+                Task { await viewModel.refreshPreview(for: cv) }
+            }
+            .onChange(of: viewModel.selectedColorPalette) { _ in
+                Task { await viewModel.refreshPreview(for: cv) }
+            }
+            .onChange(of: viewModel.selectedFontScheme) { _ in
+                Task { await viewModel.refreshPreview(for: cv) }
             }
         }
     }
@@ -142,6 +154,60 @@ struct CVExportSheetView: View {
         }
     }
 
+    private var previewSection: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
+            SectionHeaderView(
+                title: String(localized: "export.preview.live_title"),
+                subtitle: String(localized: "export.preview.live_subtitle"),
+                titleStyle: .title2,
+                subtitleStyle: .body
+            )
+
+            Group {
+                if let html = viewModel.previewHTML {
+                    HTMLPreviewView(coordinator: previewCoordinator)
+                        .frame(minHeight: 400, maxHeight: 600)
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md))
+                        .overlay(
+                            Group {
+                                if previewCoordinator.isLoading {
+                                    ProgressView()
+                                }
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(Color.black.opacity(previewCoordinator.isLoading ? 0.1 : 0))
+                        )
+                        .task(id: html) {
+                            do {
+                                try await previewCoordinator.load(html: html)
+                            } catch is CancellationError {
+                                // Ignore
+                            } catch {
+                                viewModel.errorMessage = error.localizedDescription
+                            }
+                        }
+                } else if viewModel.isPreviewLoading || loadingTemplates {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .padding()
+                    .background(DesignTokens.Colors.backgroundSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md))
+                } else {
+                    Text(String(localized: "export.preview.no_content"))
+                        .typography(.body)
+                        .foregroundColor(DesignTokens.Colors.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding()
+                        .background(DesignTokens.Colors.backgroundSecondary)
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md))
+                }
+            }
+        }
+    }
+
     private var infoSection: some View {
         CardView(padding: DesignTokens.Spacing.md) {
             HStack(alignment: .top, spacing: DesignTokens.Spacing.md) {
@@ -167,9 +233,14 @@ struct CVExportSheetView: View {
             title: String(localized: "export.button.title"),
             icon: "square.and.arrow.up",
             isLoading: viewModel.isExporting,
-            isDisabled: viewModel.selectedTemplateId == nil
+            isDisabled: viewModel.selectedTemplateId == nil || viewModel.previewHTML == nil || previewCoordinator.isLoading || viewModel.isPreviewLoading
         ) {
-            Task { await viewModel.export(cv: cv) }
+            Task {
+                let options = viewModel.currentExportOptions()
+                await viewModel.export(cv: cv) {
+                    try await previewCoordinator.exportPDF(options: options)
+                }
+            }
         }
     }
 }

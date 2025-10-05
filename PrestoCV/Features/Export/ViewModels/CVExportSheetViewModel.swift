@@ -11,6 +11,8 @@ final class CVExportSheetViewModel: ObservableObject {
     @Published var isExporting = false
     @Published var errorMessage: String?
     @Published var previewItem: ExportPreviewItem?
+    @Published var previewHTML: String?
+    @Published var isPreviewLoading = false
 
     private let exportService: CVExportService
 
@@ -30,7 +32,36 @@ final class CVExportSheetViewModel: ObservableObject {
         }
     }
 
-    func export(cv: CVModel) async {
+    func refreshPreview(for cv: CVModel) async {
+        guard let templateId = selectedTemplateId else {
+            previewHTML = nil
+            return
+        }
+
+        isPreviewLoading = true
+        defer { isPreviewLoading = false }
+
+        let customization = CustomizationOptions(
+            colorPalette: selectedColorPalette,
+            fontScheme: selectedFontScheme
+        )
+
+        do {
+            let html = try await exportService.generatePreviewHTML(
+                cv: cv,
+                templateId: templateId,
+                customization: customization
+            )
+            previewHTML = html
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func export(
+        cv: CVModel,
+        pdfProducer: () async throws -> Data
+    ) async {
         guard let templateId = selectedTemplateId else {
             errorMessage = String(localized: "export.error.no_template")
             return
@@ -39,18 +70,12 @@ final class CVExportSheetViewModel: ObservableObject {
         isExporting = true
         defer { isExporting = false }
 
-        let customization = CustomizationOptions(
-            colorPalette: selectedColorPalette,
-            fontScheme: selectedFontScheme
-        )
-
         do {
-            let url = try await exportService.export(
-                cv: cv,
-                templateId: templateId,
-                customization: customization
-            )
+            let pdfData = try await pdfProducer()
+            let url = try await exportService.savePDF(pdfData)
             previewItem = ExportPreviewItem(url: url)
+        } catch is CancellationError {
+            // User-initiated cancellation; no need to surface error
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -75,5 +100,18 @@ final class CVExportSheetViewModel: ObservableObject {
     struct ExportPreviewItem: Identifiable {
         let id = UUID()
         let url: URL
+    }
+
+    func currentExportOptions() -> ExportOptions {
+        ExportOptions(
+            pageSize: .a4,
+            margins: .default,
+            templateId: selectedTemplateId,
+            customization: CustomizationOptions(
+                colorPalette: selectedColorPalette,
+                fontScheme: selectedFontScheme
+            ),
+            maxPages: 10
+        )
     }
 }
