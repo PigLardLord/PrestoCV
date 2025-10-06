@@ -205,90 +205,12 @@ public final class TemplatePreviewUseCase: Sendable {
         </style>
         """
 
-        let previewScript = """
-        <script id=\"cv-preview-script\">
-            (function() {
-                const applyScale = () => {
-                    try {
-                        const shell = document.querySelector('.cv-preview-shell');
-                        const stage = document.querySelector('.cv-preview-stage');
-                        const page = document.querySelector('.cv-preview-page');
-                        const content = document.querySelector('.cv-preview-content');
-                        if (!shell || !stage || !page || !content) {
-                            return;
-                        }
-
-                        if (!content.dataset.cvBaseWidth || !content.dataset.cvBaseHeight) {
-                            const rect = content.getBoundingClientRect();
-                            content.dataset.cvBaseWidth = rect.width;
-                            content.dataset.cvBaseHeight = rect.height;
-                        }
-
-                        const baseWidth = parseFloat(content.dataset.cvBaseWidth || '0');
-                        const baseHeight = parseFloat(content.dataset.cvBaseHeight || '0');
-                        if (baseWidth <= 0 || baseHeight <= 0) { return; }
-
-                        const availableWidth = shell.clientWidth;
-                        if (availableWidth <= 0) { return; }
-
-                        const padding = Math.max(16, Math.min(32, availableWidth * 0.05));
-                        const effectiveWidth = Math.max(100, availableWidth - padding * 2);
-                        const scale = Math.min(effectiveWidth / baseWidth, 1);
-                        const scaledWidth = baseWidth * scale;
-                        const viewportHeight = Math.max(200, baseHeight * scale);
-
-                        const root = document.documentElement;
-                        root.style.setProperty('--cv-preview-scale', scale.toString());
-                        root.style.setProperty('--cv-preview-stage-width', scaledWidth + 'px');
-                        root.style.setProperty('--cv-preview-viewport-height', viewportHeight + 'px');
-                        root.style.setProperty('--cv-preview-page-width', baseWidth + 'px');
-                        root.style.setProperty('--cv-preview-page-height', baseHeight + 'px');
-                        root.style.setProperty('--cv-preview-shell-padding', padding + 'px');
-
-                        stage.style.height = viewportHeight + 'px';
-                        stage.style.minHeight = viewportHeight + 'px';
-                    } catch (error) {
-                        console.error('cv-preview applyScale failed', error);
-                    }
-                };
-
-                window.__cvPreview = {
-                    applyScale,
-                    reset: () => {
-                        const content = document.querySelector('.cv-preview-content');
-                        const stage = document.querySelector('.cv-preview-stage');
-                        if (content) {
-                            delete content.dataset.cvBaseWidth;
-                            delete content.dataset.cvBaseHeight;
-                        }
-                        const root = document.documentElement;
-                        root.style.removeProperty('--cv-preview-scale');
-                        root.style.removeProperty('--cv-preview-stage-width');
-                        root.style.removeProperty('--cv-preview-viewport-height');
-                        root.style.removeProperty('--cv-preview-page-width');
-                        root.style.removeProperty('--cv-preview-page-height');
-                        root.style.removeProperty('--cv-preview-shell-padding');
-                        if (stage) {
-                            stage.style.removeProperty('height');
-                            stage.style.removeProperty('minHeight');
-                        }
-                        requestAnimationFrame(applyScale);
-                    }
-                };
-
-                window.addEventListener('resize', applyScale);
-                document.addEventListener('DOMContentLoaded', applyScale);
-                applyScale();
-            })();
-        </script>
-        """
-
         var result = html
 
         if let headRange = result.range(of: "</head>", options: [.caseInsensitive]) {
-            result.insert(contentsOf: previewStyling + previewScript, at: headRange.lowerBound)
+            result.insert(contentsOf: previewStyling + PreviewReadinessScript.bootstrap, at: headRange.lowerBound)
         } else {
-            result = "<head>\(previewStyling)\(previewScript)</head>" + result
+            result = "<head>\(previewStyling)\(PreviewReadinessScript.bootstrap)</head>" + result
         }
 
         if let bodyRange = result.range(of: "<body", options: [.caseInsensitive]),

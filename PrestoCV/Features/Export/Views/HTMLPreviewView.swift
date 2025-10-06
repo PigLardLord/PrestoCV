@@ -1,15 +1,13 @@
 import SwiftUI
-import WebKit
-#if canImport(UIKit)
 import UIKit
-#endif
+import WebKit
 import CVPDFExporter
 
 @MainActor
 final class HTMLPreviewCoordinator: NSObject, ObservableObject {
     let webView: WKWebView
 
-    @Published private(set) var isLoading: Bool = false
+    @Published private(set) var isLoading = false
 
     private var navigationContinuation: CheckedContinuation<Void, Error>?
 
@@ -17,6 +15,22 @@ final class HTMLPreviewCoordinator: NSObject, ObservableObject {
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.suppressesIncrementalRendering = false
+
+        let controller = configuration.userContentController
+        controller.addUserScript(
+            WKUserScript(
+                source: PreviewReadinessScript.bootstrap,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+        )
+        controller.addUserScript(
+            WKUserScript(
+                source: PreviewReadinessScript.scalingBootstrap,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+        )
 
         self.webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
@@ -34,96 +48,42 @@ final class HTMLPreviewCoordinator: NSObject, ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        do {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                navigationContinuation = continuation
-                webView.loadHTMLString(html, baseURL: baseURL)
-            }
-
-            if #available(iOS 15.0, *) {
-                let waitScript = """
-                    (function() {
-                        const awaitFonts = () => {
-                            if (document.fonts && document.fonts.ready) {
-                                return document.fonts.ready.catch(() => {});
-                            }
-                            return Promise.resolve();
-                        };
-
-                        const awaitImages = () => {
-                            const images = Array.from(document.images || []);
-                            if (images.length === 0) { return Promise.resolve(); }
-                            return Promise.all(images.map(image => {
-                                if (image.complete) { return Promise.resolve(); }
-                                return new Promise(resolve => {
-                                    image.addEventListener('load', resolve, { once: true });
-                                    image.addEventListener('error', resolve, { once: true });
-                                });
-                            }));
-                        };
-
-                        const awaitDom = () => {
-                            if (document.readyState === 'complete') {
-                                return Promise.resolve();
-                            }
-                            return new Promise(resolve => {
-                                window.addEventListener('load', () => resolve(), { once: true });
-                            });
-                        };
-
-                        return Promise.all([awaitDom(), awaitFonts(), awaitImages()])
-                            .then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-                    })();
-                """
-
-                _ = try? await webView.callAsyncJavaScript(
-                    waitScript,
-                    arguments: [:],
-                    in: nil,
-                    contentWorld: .page
-                )
-            } else {
-                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s grace period for older OS versions
-            }
-            #if DEBUG
-            dumpRenderedHTML()
-            #endif
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            navigationContinuation = continuation
+            webView.loadHTMLString(html, baseURL: baseURL)
         }
+
+        _ = try? await webView.callAsyncJavaScript(
+            PreviewReadinessScript.awaitReady,
+            arguments: [:],
+            in: nil,
+            contentWorld: .page
+        )
+
+        #if DEBUG
+        dumpRenderedHTML()
+        #endif
+
+        webView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.applyScale();", completionHandler: nil)
     }
 
-    func exportPDF(options: ExportOptions) async throws -> Data {
-        guard #available(iOS 14.0, *) else {
-            throw PDFExportError.renderingFailed("PDF export requires iOS 14 or later")
-        }
-
-        let configuration = WKPDFConfiguration()
-        return try await withCheckedThrowingContinuation { continuation in
-            webView.createPDF(configuration: configuration) { result in
-                continuation.resume(with: result)
-            }
-        }
-    }
     #if DEBUG
     private func dumpRenderedHTML() {
-        let script = "document.documentElement.outerHTML"
-        webView.evaluateJavaScript(script) { result, error in
+        webView.evaluateJavaScript("document.documentElement.outerHTML") { result, error in
             guard error == nil, let html = result as? String else {
                 if let error {
                     print("[PreviewDump] Failed to capture HTML: \(error)")
                 }
                 return
             }
+
             print("\n[PreviewDump] BEGIN HTML\n\(html)\n[PreviewDump] END HTML\n")
-            #if canImport(UIKit)
             UIPasteboard.general.string = html
             print("[PreviewDump] Copied HTML to pasteboard.")
-            #endif
         }
     }
     #endif
 }
-
-// MARK: - WKNavigationDelegate
 
 extension HTMLPreviewCoordinator: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -142,8 +102,6 @@ extension HTMLPreviewCoordinator: WKNavigationDelegate {
     }
 }
 
-// MARK: - SwiftUI Wrapper
-
 struct HTMLPreviewView: UIViewRepresentable {
     @ObservedObject var coordinator: HTMLPreviewCoordinator
 
@@ -155,5 +113,6 @@ struct HTMLPreviewView: UIViewRepresentable {
         #if DEBUG
         uiView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.reset();", completionHandler: nil)
         #endif
+        uiView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.applyScale();", completionHandler: nil)
     }
 }

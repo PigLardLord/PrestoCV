@@ -14,14 +14,10 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
     private var webView: WKWebView?
     private var loadContinuation: CheckedContinuation<Void, Error>?
     private var javascriptContinuation: CheckedContinuation<String?, Error>?
-    private var renderReadyContinuation: CheckedContinuation<Void, Error>?
-    private var renderReadyTimeoutTask: Task<Void, Never>?
-    private var isRenderReady = false
     private let pageBreakManager: PageBreakManager
 
     // Configuration
     private let javascriptTimeout: TimeInterval = 5.0
-    private let renderReadyTimeout: TimeInterval = 10.0
     private let pageLoadTimeout: TimeInterval = 30.0
 
     // MARK: - Initialization
@@ -39,15 +35,13 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
             let enhancedHTML = pageBreakManager.insertPageBreaks(in: html)
 
             let webView = try await createWebView(options: options)
-            prepareRenderReadiness()
             self.webView = webView
             defer {
-                cleanupRenderReadiness(for: webView)
                 self.webView = nil
             }
 
             try await loadHTML(enhancedHTML, in: webView)
-            try await waitForJavaScriptRendering(in: webView)
+            try await awaitContentReadiness(in: webView)
             try await adjustContentForPagination(in: webView, options: options)
 
             return try await generatePDF(from: webView, options: options)
@@ -90,72 +84,20 @@ private extension EnhancedWKWebViewPDFRenderer {
         )
         userContentController.addUserScript(printMediaUserScript)
 
-        // Inject render readiness helper
-        let readinessScript = """
-            (function() {
-                if (window.__cvWaitForRender) { return; }
-
-                window.__cvWaitForRender = function() {
-                    if (window.__cvRenderPromise) { return window.__cvRenderPromise; }
-
-                    window.__cvRenderPromise = new Promise((resolve) => {
-                        const notifyReady = () => {
-                            if (window.__cvRenderReadySignaled) { return; }
-                            window.__cvRenderReadySignaled = true;
-
-                            requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
-
-                            try {
-                                const handlers = window.webkit && window.webkit.messageHandlers;
-                                if (handlers && handlers.renderReady) {
-                                    handlers.renderReady.postMessage(null);
-                                }
-                            } catch (error) {
-                                // Ignore message handler failures
-                            }
-                        };
-
-                        const waitForImages = () => {
-                            const images = Array.from(document.images || []);
-                            if (images.length === 0) { return Promise.resolve(); }
-                            return Promise.all(images.map(image => {
-                                if (image.complete) { return Promise.resolve(); }
-                                return new Promise(innerResolve => {
-                                    image.addEventListener('load', innerResolve, { once: true });
-                                    image.addEventListener('error', innerResolve, { once: true });
-                                });
-                            }));
-                        };
-
-                        const domReady = new Promise(resolve => {
-                            if (document.readyState === 'complete') {
-                                resolve();
-                            } else {
-                                window.addEventListener('load', resolve, { once: true });
-                            }
-                        });
-
-                        const fontsReady = (document.fonts && document.fonts.ready)
-                            ? document.fonts.ready.catch(() => {})
-                            : Promise.resolve();
-
-                        Promise.all([domReady, fontsReady, waitForImages()])
-                            .then(notifyReady)
-                            .catch(notifyReady);
-                    });
-
-                    return window.__cvRenderPromise;
-                };
-            })();
-        """
-
-        let readinessUserScript = WKUserScript(
-            source: readinessScript,
-            injectionTime: .atDocumentEnd,
-            forMainFrameOnly: true
+        userContentController.addUserScript(
+            WKUserScript(
+                source: PreviewReadinessScript.bootstrap,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
         )
-        userContentController.addUserScript(readinessUserScript)
-        userContentController.add(self, name: "renderReady")
+        userContentController.addUserScript(
+            WKUserScript(
+                source: PreviewReadinessScript.scalingBootstrap,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+        )
 
         configuration.userContentController = userContentController
 
@@ -193,63 +135,13 @@ private extension EnhancedWKWebViewPDFRenderer {
         }
     }
 
-    func waitForJavaScriptRendering(in webView: WKWebView) async throws {
-        if isRenderReady {
-            isRenderReady = false
-            return
-        }
-
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            renderReadyContinuation = continuation
-
-            renderReadyTimeoutTask?.cancel()
-            renderReadyTimeoutTask = Task { [weak self] in
-                guard let self else { return }
-                do {
-                    try await Task.sleep(nanoseconds: UInt64(renderReadyTimeout * 1_000_000_000))
-                    await self.handleRenderTimeout()
-                } catch {
-                    // Task cancelled - ignore
-                }
-            }
-
-            startRenderReadinessMonitoring(in: webView)
-        }
-    }
-
-    func startRenderReadinessMonitoring(in webView: WKWebView) {
-        let startScript = """
-            (function() {
-                if (window.__cvWaitForRender) {
-                    return window.__cvWaitForRender();
-                }
-
-                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.renderReady) {
-                    window.webkit.messageHandlers.renderReady.postMessage(null);
-                }
-
-                return true;
-            })();
-        """
-
-        webView.evaluateJavaScript(startScript) { [weak self] _, error in
-            guard let self else { return }
-            if let error {
-                self.handleRenderReadyScriptError(error)
-            }
-        }
-    }
-
-    @MainActor
-    func handleRenderReadyScriptError(_ error: Error) {
-        logger.error("Render readiness script failed: \(error.localizedDescription)")
-        renderReadyTimeoutTask?.cancel()
-        renderReadyTimeoutTask = nil
-
-        if let continuation = renderReadyContinuation {
-            renderReadyContinuation = nil
-            continuation.resume(throwing: error)
-        }
+    func awaitContentReadiness(in webView: WKWebView) async throws {
+        _ = try? await webView.callAsyncJavaScript(
+            PreviewReadinessScript.awaitReady,
+            arguments: [:],
+            in: nil,
+            contentWorld: .page
+        )
     }
 
     func adjustContentForPagination(in webView: WKWebView, options: ExportOptions) async throws {
@@ -421,70 +313,6 @@ extension EnhancedWKWebViewPDFRenderer: PDFRendererProtocol {
 
     public nonisolated var maxPages: Int {
         100
-    }
-}
-
-// MARK: - WKScriptMessageHandler
-
-extension EnhancedWKWebViewPDFRenderer: WKScriptMessageHandler {
-
-    public nonisolated func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.name == "renderReady" else { return }
-
-        Task { @MainActor [weak self] in
-            self?.handleRenderReady()
-        }
-    }
-}
-
-// MARK: - Render Readiness Helpers
-
-private extension EnhancedWKWebViewPDFRenderer {
-
-    @MainActor
-    func prepareRenderReadiness() {
-        isRenderReady = false
-        renderReadyContinuation = nil
-        renderReadyTimeoutTask?.cancel()
-        renderReadyTimeoutTask = nil
-    }
-
-    @MainActor
-    func cleanupRenderReadiness(for webView: WKWebView) {
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "renderReady")
-
-        if let continuation = renderReadyContinuation {
-            renderReadyContinuation = nil
-            continuation.resume(throwing: PDFExportError.renderingFailed("Render pipeline interrupted"))
-        }
-
-        renderReadyTimeoutTask?.cancel()
-        renderReadyTimeoutTask = nil
-        isRenderReady = false
-    }
-
-    @MainActor
-    func handleRenderReady() {
-        renderReadyTimeoutTask?.cancel()
-        renderReadyTimeoutTask = nil
-
-        if let continuation = renderReadyContinuation {
-            renderReadyContinuation = nil
-            continuation.resume(returning: ())
-        } else {
-            isRenderReady = true
-        }
-    }
-
-    @MainActor
-    func handleRenderTimeout() {
-        guard let continuation = renderReadyContinuation else {
-            isRenderReady = false
-            return
-        }
-
-        renderReadyContinuation = nil
-        continuation.resume(throwing: PDFExportError.renderingFailed("Document preparation timed out"))
     }
 }
 
