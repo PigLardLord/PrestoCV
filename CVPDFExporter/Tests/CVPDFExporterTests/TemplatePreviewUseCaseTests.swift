@@ -71,6 +71,35 @@ final class TemplatePreviewUseCaseTests: XCTestCase {
         }
     }
 
+    func test_generatePreview_injectsReadinessScriptsIntoHead() async throws {
+        // Given
+        let baseHTML = """
+        <html>
+            <head><title>CV</title></head>
+            <body><p>Hello</p></body>
+        </html>
+        """
+        let template = Template(id: "preview", name: "Preview", htmlContent: baseHTML)
+        repository.templates = [template]
+        templateEngine.renderedHTML = baseHTML
+
+        let cv = createSampleCV()
+
+        // When
+        let preview = try await sut.generatePreview(
+            templateId: "preview",
+            cv: cv,
+            customization: CustomizationOptions()
+        )
+
+        // Then
+        let headSection = preview.html.components(separatedBy: "</head>").first ?? ""
+        let bodySection = preview.html.components(separatedBy: "</head>").dropFirst().joined(separator: "</head>")
+
+        XCTAssertTrue(headSection.contains("<script type=\"text/javascript\">"), "Readiness script tag should be inside <head>.")
+        XCTAssertFalse(bodySection.contains("(function() {"), "Readiness script should not render as body text.")
+    }
+
     func test_generateThumbnail_createsBase64Image() async throws {
         // Given
         let preview = TemplatePreview(

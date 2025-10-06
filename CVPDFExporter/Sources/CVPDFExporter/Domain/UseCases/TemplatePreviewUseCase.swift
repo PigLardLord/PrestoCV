@@ -205,12 +205,18 @@ public final class TemplatePreviewUseCase: Sendable {
         </style>
         """
 
+        let makeScriptTag: (String) -> String = { script in
+            "<script type=\"text/javascript\">\n\(script)\n</script>\n"
+        }
+
+        let readinessScripts = makeScriptTag(PreviewReadinessScript.bootstrap) + makeScriptTag(PreviewReadinessScript.scalingBootstrap)
+
         var result = html
 
         if let headRange = result.range(of: "</head>", options: [.caseInsensitive]) {
-            result.insert(contentsOf: previewStyling + PreviewReadinessScript.bootstrap, at: headRange.lowerBound)
+            result.insert(contentsOf: previewStyling + readinessScripts, at: headRange.lowerBound)
         } else {
-            result = "<head>\(previewStyling)\(PreviewReadinessScript.bootstrap)</head>" + result
+            result = "<head>\(previewStyling)\(readinessScripts)</head>" + result
         }
 
         if let bodyRange = result.range(of: "<body", options: [.caseInsensitive]),
