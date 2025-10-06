@@ -1,5 +1,8 @@
 import SwiftUI
 import WebKit
+#if canImport(UIKit)
+import UIKit
+#endif
 import CVPDFExporter
 
 @MainActor
@@ -82,6 +85,9 @@ final class HTMLPreviewCoordinator: NSObject, ObservableObject {
             } else {
                 try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s grace period for older OS versions
             }
+            #if DEBUG
+            dumpRenderedHTML()
+            #endif
         }
     }
 
@@ -97,6 +103,24 @@ final class HTMLPreviewCoordinator: NSObject, ObservableObject {
             }
         }
     }
+    #if DEBUG
+    private func dumpRenderedHTML() {
+        let script = "document.documentElement.outerHTML"
+        webView.evaluateJavaScript(script) { result, error in
+            guard error == nil, let html = result as? String else {
+                if let error {
+                    print("[PreviewDump] Failed to capture HTML: \(error)")
+                }
+                return
+            }
+            print("\n[PreviewDump] BEGIN HTML\n\(html)\n[PreviewDump] END HTML\n")
+            #if canImport(UIKit)
+            UIPasteboard.general.string = html
+            print("[PreviewDump] Copied HTML to pasteboard.")
+            #endif
+        }
+    }
+    #endif
 }
 
 // MARK: - WKNavigationDelegate
@@ -127,5 +151,9 @@ struct HTMLPreviewView: UIViewRepresentable {
         coordinator.webView
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        #if DEBUG
+        uiView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.reset();", completionHandler: nil)
+        #endif
+    }
 }

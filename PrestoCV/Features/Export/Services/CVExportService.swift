@@ -8,7 +8,7 @@ actor CVExportService {
     private let exportUseCase: PDFExportUseCase
     private let templateSelectionUseCase: TemplateSelectionUseCase
     private let templateRepository: BundledTemplateRepository
-    private let templateEngine: TemplateEngine
+    private let templatePreviewUseCase: TemplatePreviewUseCase
     private let adapter = PrestoCVCoreAdapter()
 
     init(container: PDFExportDependencyContainer = PDFExportDependencyContainer()) {
@@ -16,7 +16,7 @@ actor CVExportService {
         self.exportUseCase = container.makeExportUseCase()
         self.templateSelectionUseCase = container.makeTemplateSelectionUseCase()
         self.templateRepository = container.makeTemplateRepository()
-        self.templateEngine = container.makeTemplateEngine()
+        self.templatePreviewUseCase = container.makeTemplatePreviewUseCase()
     }
 
     func availableTemplates() async throws -> [Template] {
@@ -51,15 +51,16 @@ actor CVExportService {
     func generatePreviewHTML(
         cv: CVModel,
         templateId: String,
-        customization: CustomizationOptions
+        options: ExportOptions
     ) async throws -> String {
         let document = adapter.convertToCV(from: cv)
-        let template = try templateRepository.loadTemplate(id: templateId)
-        return try await templateEngine.render(
-            template: template,
-            data: document,
-            customization: customization
+        let preview = try await templatePreviewUseCase.generatePreview(
+            templateId: templateId,
+            cv: document,
+            customization: options.customization,
+            pageSize: options.pageSize
         )
+        return preview.html
     }
 
     func savePDF(_ data: Data) async throws -> URL {

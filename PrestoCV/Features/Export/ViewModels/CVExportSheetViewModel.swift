@@ -13,6 +13,7 @@ final class CVExportSheetViewModel: ObservableObject {
     @Published var previewItem: ExportPreviewItem?
     @Published var previewHTML: String?
     @Published var isPreviewLoading = false
+    @Published private(set) var previewOptions: ExportOptions?
 
     private let exportService: CVExportService
 
@@ -33,27 +34,27 @@ final class CVExportSheetViewModel: ObservableObject {
     }
 
     func refreshPreview(for cv: CVModel) async {
-        guard let templateId = selectedTemplateId else {
+        let options = currentExportOptions()
+
+        guard let templateId = options.templateId else {
             previewHTML = nil
+            previewOptions = nil
             return
         }
 
         isPreviewLoading = true
         defer { isPreviewLoading = false }
 
-        let customization = CustomizationOptions(
-            colorPalette: selectedColorPalette,
-            fontScheme: selectedFontScheme
-        )
-
         do {
             let html = try await exportService.generatePreviewHTML(
                 cv: cv,
                 templateId: templateId,
-                customization: customization
+                options: options
             )
+            previewOptions = options
             previewHTML = html
         } catch {
+            previewOptions = nil
             errorMessage = error.localizedDescription
         }
     }

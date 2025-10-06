@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import PrestoCVCore
 import CVPDFExporter
 import QuickLook
@@ -155,7 +156,16 @@ struct CVExportSheetView: View {
     }
 
     private var previewSection: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
+        let options = viewModel.previewOptions ?? viewModel.currentExportOptions()
+        let pageSize = options.pageSize
+        let pageWidth = CGFloat(pageSize.width)
+        let pageHeight = CGFloat(pageSize.height)
+        let aspectRatio = pageWidth / pageHeight
+        let screenWidth = UIScreen.main.bounds.width
+        let availableWidth = max(1, screenWidth - DesignTokens.Spacing.lg * 2)
+        let maxPreviewWidth = min(pageWidth, availableWidth)
+
+        return VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
             SectionHeaderView(
                 title: String(localized: "export.preview.live_title"),
                 subtitle: String(localized: "export.preview.live_subtitle"),
@@ -166,7 +176,9 @@ struct CVExportSheetView: View {
             Group {
                 if let html = viewModel.previewHTML {
                     HTMLPreviewView(coordinator: previewCoordinator)
-                        .frame(minHeight: 400, maxHeight: 600)
+                        .aspectRatio(aspectRatio, contentMode: .fit)
+                        .frame(maxWidth: maxPreviewWidth)
+                        .frame(maxWidth: .infinity, alignment: .center)
                         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md))
                         .overlay(
                             Group {

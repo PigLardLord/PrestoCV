@@ -47,7 +47,8 @@ final class TemplatePreviewUseCaseTests: XCTestCase {
         )
 
         // Then
-        XCTAssertEqual(preview.html, "<html>John Doe</html>")
+        XCTAssertTrue(preview.html.contains("John Doe"))
+        XCTAssertEqual(preview.rawHTML, "<html>John Doe</html>")
         XCTAssertEqual(preview.templateId, "modern")
         XCTAssertNotNil(preview.generatedAt)
     }
@@ -75,6 +76,7 @@ final class TemplatePreviewUseCaseTests: XCTestCase {
         let preview = TemplatePreview(
             templateId: "modern",
             html: "<html><body>Test</body></html>",
+            rawHTML: "<html><body>Test</body></html>",
             generatedAt: Date()
         )
         templateEngine.thumbnailData = Data([0xFF, 0xD8, 0xFF]) // JPEG header
@@ -116,6 +118,7 @@ final class TemplatePreviewUseCaseTests: XCTestCase {
         let preview = TemplatePreview(
             templateId: "modern",
             html: "<html>Cached</html>",
+            rawHTML: "<html>Cached</html>",
             generatedAt: Date()
         )
 
@@ -131,8 +134,8 @@ final class TemplatePreviewUseCaseTests: XCTestCase {
 
     func test_clearCache_removesAllCachedPreviews() async throws {
         // Given
-        let preview1 = TemplatePreview(templateId: "1", html: "HTML1", generatedAt: Date())
-        let preview2 = TemplatePreview(templateId: "2", html: "HTML2", generatedAt: Date())
+        let preview1 = TemplatePreview(templateId: "1", html: "HTML1", rawHTML: "HTML1", generatedAt: Date())
+        let preview2 = TemplatePreview(templateId: "2", html: "HTML2", rawHTML: "HTML2", generatedAt: Date())
 
         await sut.cachePreview(preview1, for: "key1")
         await sut.cachePreview(preview2, for: "key2")

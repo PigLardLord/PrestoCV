@@ -257,13 +257,13 @@ struct MinimalHTMLTemplate {
             {{#skills}}
             <div class="skills-group">
                 <span class="skills-category">{{category}}:</span>
+                {{#hasSkills}}
                 <span class="skills-list">
-                    {{#skills}}
-                    {{#.}}
-                    <span class="skill">{{.}}</span>
-                    {{/.}}
-                    {{/skills}}
+                    {{#skillList}}
+                    <span class="skill">{{name}}</span>
+                    {{/skillList}}
                 </span>
+                {{/hasSkills}}
             </div>
             {{/skills}}
         </section>

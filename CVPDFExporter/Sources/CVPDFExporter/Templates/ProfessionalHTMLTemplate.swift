@@ -224,11 +224,13 @@ struct ProfessionalHTMLTemplate {
             {{#skills}}
             <div class="skills-group">
                 <div class="skills-category">{{category}}</div>
+                {{#hasSkills}}
                 <div class="skills-list">
-                    {{#skills}}
-                    <span class="skill-tag">{{.}}</span>
-                    {{/skills}}
+                    {{#skillList}}
+                    <span class="skill-tag">{{name}}</span>
+                    {{/skillList}}
                 </div>
+                {{/hasSkills}}
             </div>
             {{/skills}}
         </section>
