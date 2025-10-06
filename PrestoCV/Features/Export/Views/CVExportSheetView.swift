@@ -248,10 +248,7 @@ struct CVExportSheetView: View {
             isDisabled: viewModel.selectedTemplateId == nil || viewModel.previewHTML == nil || previewCoordinator.isLoading || viewModel.isPreviewLoading
         ) {
             Task {
-                let options = viewModel.currentExportOptions()
-                await viewModel.export(cv: cv) {
-                    try await previewCoordinator.exportPDF(options: options)
-                }
+                await viewModel.export(cv: cv)
             }
         }
     }

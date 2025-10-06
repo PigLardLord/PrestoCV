@@ -59,11 +59,10 @@ final class CVExportSheetViewModel: ObservableObject {
         }
     }
 
-    func export(
-        cv: CVModel,
-        pdfProducer: () async throws -> Data
-    ) async {
-        guard let templateId = selectedTemplateId else {
+    func export(cv: CVModel) async {
+        let options = currentExportOptions()
+
+        guard let templateId = options.templateId else {
             errorMessage = String(localized: "export.error.no_template")
             return
         }
@@ -72,8 +71,11 @@ final class CVExportSheetViewModel: ObservableObject {
         defer { isExporting = false }
 
         do {
-            let pdfData = try await pdfProducer()
-            let url = try await exportService.savePDF(pdfData)
+            let url = try await exportService.export(
+                cv: cv,
+                templateId: templateId,
+                customization: options.customization
+            )
             previewItem = ExportPreviewItem(url: url)
         } catch is CancellationError {
             // User-initiated cancellation; no need to surface error

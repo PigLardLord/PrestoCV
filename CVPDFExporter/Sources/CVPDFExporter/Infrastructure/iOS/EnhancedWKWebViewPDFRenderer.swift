@@ -371,18 +371,7 @@ private extension EnhancedWKWebViewPDFRenderer {
 
         for pageIndex in 0..<min(pageCount, options.maxPages) {
             UIGraphicsBeginPDFPageWithInfo(paperRect, nil)
-            let context = UIGraphicsGetCurrentContext()
-
-            // Apply any custom transformations
-            context?.translateBy(x: 0, y: paperRect.height)
-            context?.scaleBy(x: 1.0, y: -1.0)
-
-            // Draw the page
             renderer.drawPage(at: pageIndex, in: paperRect)
-
-            // Reset transformations
-            context?.scaleBy(x: 1.0, y: -1.0)
-            context?.translateBy(x: 0, y: -paperRect.height)
         }
 
         UIGraphicsEndPDFContext()
