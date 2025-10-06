@@ -18,10 +18,11 @@ public final class TemplatePreviewUseCase: Sendable {
     public func generatePreview(
         templateId: String,
         cv: CVDocument,
-        customization: CustomizationOptions
+        customization: CustomizationOptions,
+        pageSize: PageSize = .a4
     ) async throws -> TemplatePreview {
         // Check cache first
-        let cacheKey = makeCacheKey(templateId: templateId, cv: cv, customization: customization)
+        let cacheKey = makeCacheKey(templateId: templateId, cv: cv, customization: customization, pageSize: pageSize)
         if let cached = await cache.get(key: cacheKey) {
             return cached
         }
@@ -32,16 +33,18 @@ public final class TemplatePreviewUseCase: Sendable {
         }
 
         // Render HTML
-        let html = try await templateEngine.render(
+        let rawHTML = try await templateEngine.render(
             template: template,
             data: cv,
             customization: customization
         )
+        let previewHTML = wrapHTMLForPreview(rawHTML, pageSize: pageSize)
 
         // Create preview
         let preview = TemplatePreview(
             templateId: templateId,
-            html: html,
+            html: previewHTML,
+            rawHTML: rawHTML,
             generatedAt: Date()
         )
 
@@ -55,7 +58,8 @@ public final class TemplatePreviewUseCase: Sendable {
     public func batchGeneratePreviews(
         templateIds: [String],
         cv: CVDocument,
-        customization: CustomizationOptions
+        customization: CustomizationOptions,
+        pageSize: PageSize = .a4
     ) async throws -> [TemplatePreview] {
         try await withThrowingTaskGroup(of: TemplatePreview.self) { group in
             for templateId in templateIds {
@@ -63,7 +67,8 @@ public final class TemplatePreviewUseCase: Sendable {
                     try await self.generatePreview(
                         templateId: templateId,
                         cv: cv,
-                        customization: customization
+                        customization: customization,
+                        pageSize: pageSize
                     )
                 }
             }
@@ -102,15 +107,213 @@ public final class TemplatePreviewUseCase: Sendable {
 
     // MARK: - Private Methods
 
+    private func wrapHTMLForPreview(_ html: String, pageSize: PageSize) -> String {
+        let pageWidth = pageSize.width
+        let pageHeight = pageSize.height
+
+        let previewStyling = """
+        <style id=\"cv-preview-sizing\">
+            :root {
+                --cv-preview-scale: 1;
+                --cv-preview-stage-width: \(pageWidth)pt;
+                --cv-preview-viewport-height: \(pageHeight)pt;
+                --cv-preview-page-width: \(pageWidth)pt;
+                --cv-preview-page-height: \(pageHeight)pt;
+                --cv-preview-shell-padding: 16px;
+            }
+
+            @media screen {
+                html {
+                    background-color: #f5f6f8;
+                }
+
+                body {
+                    margin: 0;
+                    padding: 24pt 0;
+                    display: flex;
+                    justify-content: center;
+                    box-sizing: border-box;
+                    background-color: #f5f6f8;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                }
+
+                .cv-preview-shell {
+                    width: calc(100% - 24pt);
+                    max-width: calc(var(--cv-preview-stage-width) + var(--cv-preview-shell-padding) * 2);
+                    padding: var(--cv-preview-shell-padding);
+                    box-sizing: border-box;
+                }
+
+                .cv-preview-stage {
+                    width: var(--cv-preview-stage-width);
+                    margin: 0 auto;
+                    overflow-y: auto;
+                    overflow-x: hidden;
+                    -webkit-overflow-scrolling: touch;
+                    background: transparent;
+                    position: relative;
+                }
+
+                .cv-preview-stage::-webkit-scrollbar {
+                    display: none;
+                }
+
+                .cv-preview-page {
+                    width: var(--cv-preview-page-width);
+                    min-height: var(--cv-preview-page-height);
+                    transform-origin: top left;
+                    transform: scale(var(--cv-preview-scale));
+                    background-color: var(--color-background, #ffffff);
+                    box-shadow: 0 18pt 48pt rgba(15, 23, 42, 0.12);
+                    border-radius: 12pt;
+                }
+
+                .cv-preview-content {
+                    width: var(--cv-preview-page-width);
+                    min-height: var(--cv-preview-page-height);
+                }
+            }
+
+            @media print {
+                html {
+                    background-color: initial !important;
+                }
+
+                body {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    display: block !important;
+                    background-color: inherit !important;
+                }
+
+                .cv-preview-shell,
+                .cv-preview-stage {
+                    width: auto !important;
+                    height: auto !important;
+                    padding: 0 !important;
+                    box-shadow: none !important;
+                    background-color: inherit !important;
+                    overflow: visible !important;
+                }
+
+                .cv-preview-page {
+                    transform: none !important;
+                    box-shadow: none !important;
+                    border-radius: 0 !important;
+                }
+            }
+        </style>
+        """
+
+        let previewScript = """
+        <script id=\"cv-preview-script\">
+            (function() {
+                const applyScale = () => {
+                    try {
+                        const shell = document.querySelector('.cv-preview-shell');
+                        const stage = document.querySelector('.cv-preview-stage');
+                        const page = document.querySelector('.cv-preview-page');
+                        const content = document.querySelector('.cv-preview-content');
+                        if (!shell || !stage || !page || !content) {
+                            return;
+                        }
+
+                        if (!content.dataset.cvBaseWidth || !content.dataset.cvBaseHeight) {
+                            const rect = content.getBoundingClientRect();
+                            content.dataset.cvBaseWidth = rect.width;
+                            content.dataset.cvBaseHeight = rect.height;
+                        }
+
+                        const baseWidth = parseFloat(content.dataset.cvBaseWidth || '0');
+                        const baseHeight = parseFloat(content.dataset.cvBaseHeight || '0');
+                        if (baseWidth <= 0 || baseHeight <= 0) { return; }
+
+                        const availableWidth = shell.clientWidth;
+                        if (availableWidth <= 0) { return; }
+
+                        const padding = Math.max(16, Math.min(32, availableWidth * 0.05));
+                        const effectiveWidth = Math.max(100, availableWidth - padding * 2);
+                        const scale = Math.min(effectiveWidth / baseWidth, 1);
+                        const scaledWidth = baseWidth * scale;
+                        const viewportHeight = Math.max(200, baseHeight * scale);
+
+                        const root = document.documentElement;
+                        root.style.setProperty('--cv-preview-scale', scale.toString());
+                        root.style.setProperty('--cv-preview-stage-width', scaledWidth + 'px');
+                        root.style.setProperty('--cv-preview-viewport-height', viewportHeight + 'px');
+                        root.style.setProperty('--cv-preview-page-width', baseWidth + 'px');
+                        root.style.setProperty('--cv-preview-page-height', baseHeight + 'px');
+                        root.style.setProperty('--cv-preview-shell-padding', padding + 'px');
+
+                        stage.style.height = viewportHeight + 'px';
+                        stage.style.minHeight = viewportHeight + 'px';
+                    } catch (error) {
+                        console.error('cv-preview applyScale failed', error);
+                    }
+                };
+
+                window.__cvPreview = {
+                    applyScale,
+                    reset: () => {
+                        const content = document.querySelector('.cv-preview-content');
+                        const stage = document.querySelector('.cv-preview-stage');
+                        if (content) {
+                            delete content.dataset.cvBaseWidth;
+                            delete content.dataset.cvBaseHeight;
+                        }
+                        const root = document.documentElement;
+                        root.style.removeProperty('--cv-preview-scale');
+                        root.style.removeProperty('--cv-preview-stage-width');
+                        root.style.removeProperty('--cv-preview-viewport-height');
+                        root.style.removeProperty('--cv-preview-page-width');
+                        root.style.removeProperty('--cv-preview-page-height');
+                        root.style.removeProperty('--cv-preview-shell-padding');
+                        if (stage) {
+                            stage.style.removeProperty('height');
+                            stage.style.removeProperty('minHeight');
+                        }
+                        requestAnimationFrame(applyScale);
+                    }
+                };
+
+                window.addEventListener('resize', applyScale);
+                document.addEventListener('DOMContentLoaded', applyScale);
+                applyScale();
+            })();
+        </script>
+        """
+
+        var result = html
+
+        if let headRange = result.range(of: "</head>", options: [.caseInsensitive]) {
+            result.insert(contentsOf: previewStyling + previewScript, at: headRange.lowerBound)
+        } else {
+            result = "<head>\(previewStyling)\(previewScript)</head>" + result
+        }
+
+        if let bodyRange = result.range(of: "<body", options: [.caseInsensitive]),
+           let closeIndex = result[bodyRange.upperBound...].firstIndex(of: ">") {
+            let insertionIndex = result.index(after: closeIndex)
+            result.insert(contentsOf: "<div class=\"cv-preview-shell\"><div class=\"cv-preview-stage\"><div class=\"cv-preview-page\"><div class=\"cv-preview-content\">", at: insertionIndex)
+        }
+
+        if let bodyClose = result.range(of: "</body>", options: [.caseInsensitive])?.lowerBound {
+            result.insert(contentsOf: "</div></div></div></div>", at: bodyClose)
+        }
+
+        return result
+    }
+
     private func makeCacheKey(
         templateId: String,
         cv: CVDocument,
-        customization: CustomizationOptions
+        customization: CustomizationOptions,
+        pageSize: PageSize
     ) -> String {
         // Create a unique key based on inputs
         let cvHash = String(cv.hashValue)
         let customizationHash = String(customization.hashValue)
-        return "\(templateId)-\(cvHash)-\(customizationHash)"
+        return "\(templateId)-\(cvHash)-\(customizationHash)-\(pageSize.width)-\(pageSize.height)"
     }
 }
 
@@ -119,17 +322,20 @@ public final class TemplatePreviewUseCase: Sendable {
 public struct TemplatePreview: Sendable, Equatable {
     public let templateId: String
     public let html: String
+    public let rawHTML: String
     public let generatedAt: Date
     public let thumbnail: String?
 
     public init(
         templateId: String,
         html: String,
+        rawHTML: String,
         generatedAt: Date,
         thumbnail: String? = nil
     ) {
         self.templateId = templateId
         self.html = html
+        self.rawHTML = rawHTML
         self.generatedAt = generatedAt
         self.thumbnail = thumbnail
     }
