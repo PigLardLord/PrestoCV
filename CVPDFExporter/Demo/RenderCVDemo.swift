@@ -1,5 +1,5 @@
 import Foundation
-@testable import CVPDFExporter
+import CVPDFExporter
 
 /// Demo app to render an actual CV to PDF
 struct RenderCVDemo {
