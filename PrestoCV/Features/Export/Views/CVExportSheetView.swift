@@ -232,12 +232,22 @@ struct CVExportSheetView: View {
                         isSelected: viewModel.selectedColorPalette == palette,
                         action: { viewModel.selectedColorPalette = palette }
                     ) {
-                        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-                            HStack(spacing: DesignTokens.Spacing.xs) {
-                                ForEach(palette.swatchHexValues, id: \.self) { hex in
-                                    Circle()
-                                        .fill(Color.fromHex(hex))
-                                        .frame(width: 28, height: 28)
+                        VStack(alignment: .center, spacing: DesignTokens.Spacing.sm) {
+                            VStack(spacing: DesignTokens.Spacing.xs) {
+                                HStack(spacing: DesignTokens.Spacing.xs) {
+                                    ForEach(palette.swatchHexValues.prefix(2), id: \.self) { hex in
+                                        Circle()
+                                            .fill(Color.fromHex(hex))
+                                            .frame(width: 28, height: 28)
+                                    }
+                                }
+
+                                HStack(spacing: DesignTokens.Spacing.xs) {
+                                    ForEach(palette.swatchHexValues.suffix(2), id: \.self) { hex in
+                                        Circle()
+                                            .fill(Color.fromHex(hex))
+                                            .frame(width: 28, height: 28)
+                                    }
                                 }
                             }
 
@@ -246,6 +256,7 @@ struct CVExportSheetView: View {
                                 .foregroundColor(DesignTokens.Colors.primary)
                                 .lineLimit(1)
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     .accessibilityLabel(Text(palette.localizedName))
                 }
@@ -274,24 +285,11 @@ struct CVExportSheetView: View {
     }
     
     private var isExportDisabled: Bool {
-        viewModel.selectedTemplateId == nil || 
-        viewModel.previewHTML == nil || 
-        previewCoordinator.isLoading || 
+        viewModel.selectedTemplateId == nil ||
+        viewModel.previewHTML == nil ||
+        previewCoordinator.isLoading ||
         viewModel.isPreviewLoading ||
         viewModel.isExporting
-    }
-
-    private var exportButton: some View {
-        PrimaryButton.small(
-            title: String(localized: "export.button.title"),
-            icon: "square.and.arrow.up",
-            isLoading: viewModel.isExporting,
-            isDisabled: viewModel.selectedTemplateId == nil || viewModel.previewHTML == nil || previewCoordinator.isLoading || viewModel.isPreviewLoading
-        ) {
-            Task {
-                await viewModel.export(cv: cv)
-            }
-        }
     }
 
     private struct OptionCarouselItem<Content: View>: View {
