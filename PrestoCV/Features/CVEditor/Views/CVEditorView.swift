@@ -65,23 +65,20 @@ struct CVEditorView: View {
     private var editorView: some View {
         VStack(spacing: 0) {
             TabView {
-            // MARK: - Basics Tab
-            PersonalInfoSection(cv: $viewModel.cv)
-                .tabItem {
-                    Label("section.basics".localized, systemImage: "person.circle")
-                }
-            
-            // MARK: - Experience Tab
-            ExperienceSection(viewModel: viewModel)
-                .tabItem {
-                    Label("section.experience".localized, systemImage: "briefcase")
-                }
-            
-            // MARK: - Details Tab
-            DetailsSection(viewModel: viewModel)
-                .tabItem {
-                    Label("section.details".localized, systemImage: "list.bullet.circle")
-                }
+                PersonalInfoSection(cv: $viewModel.cv)
+                    .tabItem {
+                        Label("section.basics".localized, systemImage: "person.circle")
+                    }
+
+                ExperienceSection(viewModel: viewModel)
+                    .tabItem {
+                        Label("section.experience".localized, systemImage: "briefcase")
+                    }
+
+                DetailsSection(viewModel: viewModel)
+                    .tabItem {
+                        Label("section.details".localized, systemImage: "list.bullet.circle")
+                    }
             }
             .background(DesignTokens.Colors.background)
             .scrollDismissesKeyboard(.interactively)

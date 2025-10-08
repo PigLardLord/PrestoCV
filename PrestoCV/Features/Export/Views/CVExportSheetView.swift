@@ -11,7 +11,6 @@ struct CVExportSheetView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var loadingTemplates = true
-    @State private var selectedCategory: OptionCategory = .templates
     
     // Convenience initializer with default dependencies
     init(cv: CVModel) {
@@ -32,9 +31,32 @@ struct CVExportSheetView: View {
             ZStack {
                 DesignTokens.Colors.background.ignoresSafeArea()
 
-                GeometryReader { geometry in
-                    contentLayout(in: geometry)
+                VStack(spacing: DesignTokens.Spacing.lg) {
+                    // Preview section takes up remaining space with A4 aspect ratio
+                    previewSection
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    // Fixed height section for options with native TabView
+                    TabView {
+                        templateCarousel
+                            .tabItem {
+                                Label(String(localized: "export.templates.tab"), systemImage: "doc.text")
+                            }
+
+                        fontCarousel
+                            .tabItem {
+                                Label(String(localized: "export.fonts.tab"), systemImage: "textformat")
+                            }
+
+                        colorCarousel
+                            .tabItem {
+                                Label(String(localized: "export.colors.tab"), systemImage: "paintpalette")
+                            }
+                    }
+                    .frame(height: 180)
+                    .padding(.bottom, DesignTokens.Spacing.lg)
                 }
+                .padding(.top, DesignTokens.Spacing.lg)
             }
             .navigationTitle(String(localized: "export.sheet.title"))
             .navigationBarTitleDisplayMode(.inline)
@@ -45,8 +67,7 @@ struct CVExportSheetView: View {
                 }
 
                 ToolbarItem(placement: .primaryAction) {
-                    exportButton
-                        .frame(maxWidth: 180)
+                    nativeExportButton
                 }
             }
             .overlay {
@@ -85,82 +106,16 @@ struct CVExportSheetView: View {
         }
     }
 
-    private enum OptionCategory: CaseIterable {
-        case templates
-        case fonts
-        case colors
-
-        var systemImageName: String {
-            switch self {
-            case .templates:
-                return "doc.text"
-            case .fonts:
-                return "textformat"
-            case .colors:
-                return "paintpalette"
-            }
-        }
-
-        var accessibilityLabel: LocalizedStringKey {
-            switch self {
-            case .templates:
-                return "export.templates.title"
-            case .fonts:
-                return "export.font.section"
-            case .colors:
-                return "export.color.section"
-            }
-        }
-    }
-    private func contentLayout(in geometry: GeometryProxy) -> some View {
-        let rawWidth = geometry.size.width - DesignTokens.Spacing.lg * 2
-        let rawHeight = geometry.size.height - DesignTokens.Spacing.xl * 2
-        let width = max(rawWidth, 180)
-        let availableHeight = max(rawHeight, 320)
-        let previewHeight = max(availableHeight * 0.55, 220)
-        let tabHeight = max(availableHeight * 0.28, 150)
-
-        return VStack(spacing: DesignTokens.Spacing.lg) {
-            previewSection(availableWidth: width, maxHeight: previewHeight)
-                .frame(maxWidth: .infinity)
-                .frame(height: previewHeight, alignment: .center)
-
-            TabView(selection: $selectedCategory) {
-                templateCarousel
-                    .tag(OptionCategory.templates)
-
-                fontCarousel
-                    .tag(OptionCategory.fonts)
-
-                colorCarousel
-                    .tag(OptionCategory.colors)
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: tabHeight)
-
-            categorySelector
-        }
-        .padding(.horizontal, DesignTokens.Spacing.lg)
-        .padding(.top, DesignTokens.Spacing.xl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
     @ViewBuilder
-    private func previewSection(availableWidth: CGFloat, maxHeight: CGFloat) -> some View {
+    private var previewSection: some View {
         let options = viewModel.previewOptions ?? viewModel.currentExportOptions()
         let pageSize = options.pageSize
-        let pageWidth = CGFloat(pageSize.width)
-        let pageHeight = CGFloat(pageSize.height)
-        let aspectRatio = pageWidth / pageHeight
-        let maxPreviewWidth = min(pageWidth, max(1, availableWidth))
+        let aspectRatio = CGFloat(pageSize.width) / CGFloat(pageSize.height)
 
         Group {
             if let html = viewModel.previewHTML {
                 HTMLPreviewView(coordinator: previewCoordinator)
                     .aspectRatio(aspectRatio, contentMode: .fit)
-                    .frame(maxWidth: maxPreviewWidth)
-                    .frame(maxHeight: maxHeight)
-                    .frame(maxWidth: .infinity, alignment: .center)
                     .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg))
                     .shadow(color: DesignTokens.Colors.shadow, radius: 12, x: 0, y: 8)
                     .overlay {
@@ -181,19 +136,20 @@ struct CVExportSheetView: View {
                     }
             } else if viewModel.isPreviewLoading || loadingTemplates {
                 ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: maxHeight)
+                    .aspectRatio(aspectRatio, contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg)
                     .fill(DesignTokens.Colors.backgroundSecondary)
+                    .aspectRatio(aspectRatio, contentMode: .fit)
                     .overlay(
                         Image(systemName: "doc.text.magnifyingglass")
                             .font(DesignTokens.IconSize.hero.font)
                             .foregroundColor(DesignTokens.Colors.secondary)
                     )
-                    .frame(maxWidth: maxPreviewWidth)
-                    .frame(maxHeight: maxHeight)
             }
         }
+        .padding(.horizontal, DesignTokens.Spacing.lg)
         .animation(DesignTokens.Animations.fastEaseInOut, value: viewModel.previewHTML)
     }
 
@@ -302,31 +258,31 @@ struct CVExportSheetView: View {
         }
     }
 
-    private var categorySelector: some View {
-        HStack(spacing: DesignTokens.Spacing.md) {
-            ForEach(OptionCategory.allCases, id: \.self) { category in
-                Button(action: {
-                    withAnimation(DesignTokens.Animations.fastEaseInOut) {
-                        selectedCategory = category
-                    }
-                }) {
-                    Image(systemName: category.systemImageName)
-                        .font(DesignTokens.IconSize.medium.font)
-                        .foregroundColor(category == selectedCategory ? DesignTokens.Colors.accent : DesignTokens.Colors.secondary)
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
-                                .fill(category == selectedCategory ? DesignTokens.Colors.accent.opacity(0.15) : DesignTokens.Colors.backgroundSecondary)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
-                                .stroke(category == selectedCategory ? DesignTokens.Colors.accent : Color.clear, lineWidth: 1)
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text(category.accessibilityLabel))
+    private var nativeExportButton: some View {
+        Button(action: {
+            Task {
+                await viewModel.export(cv: cv)
+            }
+        }) {
+            if viewModel.isExporting {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: DesignTokens.Colors.accent))
+                    .scaleEffect(0.8)
+            } else {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundColor(isExportDisabled ? DesignTokens.Colors.secondary : DesignTokens.Colors.accent)
             }
         }
+        .disabled(isExportDisabled)
+    }
+    
+    private var isExportDisabled: Bool {
+        viewModel.selectedTemplateId == nil || 
+        viewModel.previewHTML == nil || 
+        previewCoordinator.isLoading || 
+        viewModel.isPreviewLoading ||
+        viewModel.isExporting
     }
 
     private var exportButton: some View {
@@ -478,59 +434,7 @@ private extension Color {
     }
 }
 
-// SwiftUI-native document preview
-private struct DocumentPreview: View {
-    let url: URL
-    @State private var isLoading = true
-    @State private var loadError: String?
-    
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                WebViewRepresentable(url: url, isLoading: $isLoading, loadError: $loadError)
-                
-                if isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.black.opacity(0.05))
-                }
-                
-                if let error = loadError {
-                    VStack(spacing: 16) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 50))
-                            .foregroundColor(.orange)
-                        
-                        Text("Unable to preview document")
-                            .font(.headline)
-                        
-                        Text(error)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                        
-                        Button("Try Again") {
-                            loadError = nil
-                            isLoading = true
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    .padding()
-                    .background(Color(UIColor.systemBackground))
-                }
-            }
-            .navigationTitle(url.lastPathComponent)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    ShareLink(item: url) {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                }
-            }
-        }
-    }
-}
+
 
 #Preview("CV Export Sheet") {
     // Create a mock CV model for preview
