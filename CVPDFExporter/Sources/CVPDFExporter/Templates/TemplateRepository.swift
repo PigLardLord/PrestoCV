@@ -97,8 +97,6 @@ public final class BundledTemplateRepository: TemplateRepository, TemplateReposi
     }
 
     private static func loadProfessionalTemplate() -> String {
-        // For now, return the existing Professional.html content
-        // In future, this will load from bundled resources
         return ProfessionalHTMLTemplate.html
     }
 

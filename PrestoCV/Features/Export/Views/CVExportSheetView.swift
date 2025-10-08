@@ -431,80 +431,11 @@ private extension Color {
 
 
 #Preview("CV Export Sheet") {
-    // Create a mock CV model for preview
-    let mockCV = CVModel(
-        id: UUID(),
-        name: "Sample CV",
-        personalInfo: PersonalInfo(
-            name: "Maya Chen",
-            title: "Senior iOS Developer",
-            location: "San Francisco, CA",
-            email: "maya.chen@example.com",
-            phone: "+1 (555) 123-4567",
-            portfolio: "https://mayachen.dev",
-            profile: "Experienced iOS developer with a passion for creating intuitive and performant mobile applications."
-        ),
-        relevant_experience: [
-            Experience(
-                id: UUID(),
-                title: "Senior iOS Developer",
-                company: "Tech Innovations Inc.",
-                location: "San Francisco, CA",
-                period: "2022 - Present",
-                description: "Led development of flagship iOS application with 1M+ downloads. Implemented SwiftUI interfaces and Core Data persistence."
-            ),
-            Experience(
-                id: UUID(),
-                title: "iOS Developer",
-                company: "Startup Labs",
-                location: "Palo Alto, CA",
-                period: "2020 - 2022",
-                description: "Developed mobile applications for early-stage startups. Collaborated with design teams to create pixel-perfect user interfaces."
-            )
-        ],
-        education: [
-            Education(
-                id: UUID(),
-                degree: "Bachelor of Science in Computer Science",
-                school: "Stanford University",
-                period: "2016 - 2020",
-                description: "Graduated with honors, GPA: 3.8"
-            )
-        ],
-        skills: [
-            Skill(name: "Swift", level: 5),
-            Skill(name: "SwiftUI", level: 5),
-            Skill(name: "UIKit", level: 4),
-            Skill(name: "Core Data", level: 4),
-            Skill(name: "Combine", level: 3),
-            Skill(name: "iOS Development", level: 5),
-            Skill(name: "Xcode", level: 5),
-            Skill(name: "Git", level: 4),
-            Skill(name: "RESTful APIs", level: 4),
-            Skill(name: "Unit Testing", level: 3)
-        ],
-        languages: [
-            Language(name: "English", level: .native),
-            Language(name: "Spanish", level: .b2)
-        ],
-        certifications: [
-            Certification(
-                id: UUID(),
-                name: "iOS App Development with Swift",
-                issuer: "Apple",
-                year: 2023,
-                url: "https://developer.apple.com/certifications/",
-                description: "Comprehensive certification covering iOS development fundamentals"
-            )
-        ],
-        interests: ["Photography", "Hiking", "Open Source Contributions"],
-        social: [
-            Social(platform: "LinkedIn", url: "https://linkedin.com/in/mayachen"),
-            Social(platform: "GitHub", url: "https://github.com/mayachen")
-        ]
-    )
-    
-    CVExportSheetView(cv: mockCV)
+    // Use the comprehensive sample CV from CVPDFExporter
+    let adapter = CVDocumentAdapter()
+    let mockCV = adapter.convertToCVModel(from: SampleCVData.complete)
+
+    return CVExportSheetView(cv: mockCV)
 }
 
 

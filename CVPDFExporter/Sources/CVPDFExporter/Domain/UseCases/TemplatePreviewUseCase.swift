@@ -124,23 +124,21 @@ public final class TemplatePreviewUseCase: Sendable {
 
             @media screen {
                 html {
-                    background-color: #f5f6f8;
+                    background-color: var(--color-background, #ffffff);
                 }
 
                 body {
                     margin: 0;
-                    padding: 24pt 0;
-                    display: flex;
-                    justify-content: center;
+                    padding: 0;
+                    display: block;
                     box-sizing: border-box;
-                    background-color: #f5f6f8;
-                    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                    background-color: var(--color-background, #ffffff);
                 }
 
                 .cv-preview-shell {
-                    width: calc(100% - 24pt);
-                    max-width: calc(var(--cv-preview-stage-width) + var(--cv-preview-shell-padding) * 2);
-                    padding: var(--cv-preview-shell-padding);
+                    width: 100%;
+                    max-width: 100%;
+                    padding: 0;
                     box-sizing: border-box;
                 }
 
@@ -164,8 +162,6 @@ public final class TemplatePreviewUseCase: Sendable {
                     transform-origin: top left;
                     transform: scale(var(--cv-preview-scale));
                     background-color: var(--color-background, #ffffff);
-                    box-shadow: 0 18pt 48pt rgba(15, 23, 42, 0.12);
-                    border-radius: 12pt;
                 }
 
                 .cv-preview-content {

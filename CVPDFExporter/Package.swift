@@ -22,8 +22,7 @@ let package = Package(
             dependencies: [
                 .product(name: "PrestoCVCore", package: "PrestoCVCore")
             ],
-            path: "Sources/CVPDFExporter",
-            exclude: ["Templates/Bundled/Professional.html"]
+            path: "Sources/CVPDFExporter"
         ),
         .testTarget(
             name: "CVPDFExporterTests",
@@ -47,6 +46,11 @@ let package = Package(
             dependencies: ["CVPDFExporter"],
             path: "Demo",
             sources: ["TestExport.swift"]
+        ),
+        .executableTarget(
+            name: "TemplateViewer",
+            dependencies: ["CVPDFExporter"],
+            path: "TemplateViewer"
         )
     ]
 )
