@@ -17,6 +17,12 @@ final class CVExportSheetViewModel: ObservableObject {
 
     private let exportService: CVExportService
 
+    var aspectRatio: CGFloat {
+        let options = previewOptions ?? currentExportOptions()
+        let pageSize = options.pageSize
+        return CGFloat(pageSize.width) / CGFloat(pageSize.height)
+    }
+
     init(exportService: CVExportService = CVExportService()) {
         self.exportService = exportService
     }

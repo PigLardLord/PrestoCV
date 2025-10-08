@@ -61,25 +61,26 @@ final class HTMLPreviewCoordinator: NSObject, ObservableObject {
         )
 
         #if DEBUG
-        dumpRenderedHTML()
+        await dumpRenderedHTML()
         #endif
 
-        webView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.applyScale();", completionHandler: nil)
+        _ = try? await webView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.applyScale();")
     }
 
     #if DEBUG
-    private func dumpRenderedHTML() {
-        webView.evaluateJavaScript("document.documentElement.outerHTML") { result, error in
-            guard error == nil, let html = result as? String else {
-                if let error {
-                    print("[PreviewDump] Failed to capture HTML: \(error)")
-                }
+    private func dumpRenderedHTML() async {
+        do {
+            let html = try await webView.evaluateJavaScript("document.documentElement.outerHTML") as? String
+            guard let html else {
+                print("[PreviewDump] Failed to capture HTML: unexpected result type")
                 return
             }
-
+            
             print("\n[PreviewDump] BEGIN HTML\n\(html)\n[PreviewDump] END HTML\n")
             UIPasteboard.general.string = html
             print("[PreviewDump] Copied HTML to pasteboard.")
+        } catch {
+            print("[PreviewDump] Failed to capture HTML: \(error)")
         }
     }
     #endif
@@ -110,9 +111,11 @@ struct HTMLPreviewView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        #if DEBUG
-        uiView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.reset();", completionHandler: nil)
-        #endif
-        uiView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.applyScale();", completionHandler: nil)
+        Task {
+            #if DEBUG
+            _ = try? await uiView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.reset();")
+            #endif
+            _ = try? await uiView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.applyScale();")
+        }
     }
 }

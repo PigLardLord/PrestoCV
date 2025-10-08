@@ -53,10 +53,10 @@ struct CVExportSheetView: View {
                                 Label(String(localized: "export.colors.tab"), systemImage: "paintpalette")
                             }
                     }
-                    .frame(height: 180)
-                    .padding(.bottom, DesignTokens.Spacing.lg)
+                    .frame(height: 300)
                 }
                 .padding(.top, DesignTokens.Spacing.lg)
+                .ignoresSafeArea(edges: .bottom)
             }
             .navigationTitle(String(localized: "export.sheet.title"))
             .navigationBarTitleDisplayMode(.inline)
@@ -108,14 +108,10 @@ struct CVExportSheetView: View {
 
     @ViewBuilder
     private var previewSection: some View {
-        let options = viewModel.previewOptions ?? viewModel.currentExportOptions()
-        let pageSize = options.pageSize
-        let aspectRatio = CGFloat(pageSize.width) / CGFloat(pageSize.height)
-
         Group {
             if let html = viewModel.previewHTML {
                 HTMLPreviewView(coordinator: previewCoordinator)
-                    .aspectRatio(aspectRatio, contentMode: .fit)
+                    .aspectRatio(viewModel.aspectRatio, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg))
                     .shadow(color: DesignTokens.Colors.shadow, radius: 12, x: 0, y: 8)
                     .overlay {
@@ -136,12 +132,12 @@ struct CVExportSheetView: View {
                     }
             } else if viewModel.isPreviewLoading || loadingTemplates {
                 ProgressView()
-                    .aspectRatio(aspectRatio, contentMode: .fit)
+                    .aspectRatio(viewModel.aspectRatio, contentMode: .fit)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg)
                     .fill(DesignTokens.Colors.backgroundSecondary)
-                    .aspectRatio(aspectRatio, contentMode: .fit)
+                    .aspectRatio(viewModel.aspectRatio, contentMode: .fit)
                     .overlay(
                         Image(systemName: "doc.text.magnifyingglass")
                             .font(DesignTokens.IconSize.hero.font)
