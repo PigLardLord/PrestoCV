@@ -144,13 +144,13 @@ struct ContentView: View {
         .task {
             await viewModel.loadTemplates()
         }
-        .onChange(of: viewModel.selectedTemplateId) { _, _ in
+        .onChange(of: viewModel.selectedTemplateId) { _ in
             Task { await viewModel.refreshPreview() }
         }
-        .onChange(of: viewModel.selectedColorPalette) { _, _ in
+        .onChange(of: viewModel.selectedColorPalette) { _ in
             Task { await viewModel.refreshPreview() }
         }
-        .onChange(of: viewModel.selectedFontScheme) { _, _ in
+        .onChange(of: viewModel.selectedFontScheme) { _ in
             Task { await viewModel.refreshPreview() }
         }
         .alert("Export Successful", isPresented: $viewModel.showingExportSuccess) {

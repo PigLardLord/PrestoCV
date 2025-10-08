@@ -13,8 +13,6 @@ public struct SampleCVData {
                 phone: "+1 (555) 987-6543",
                 location: "Brooklyn, NY",
                 website: "https://mayachen.design",
-                linkedin: "linkedin.com/in/mayachen",
-                github: "github.com/mayachen",
                 summary: "Creative designer with 7+ years of experience crafting intuitive digital experiences for startups and Fortune 500 companies. Specialized in user-centered design, design systems, and cross-platform experiences. Passionate about accessibility and creating beautiful, functional interfaces that solve real user problems."
             ),
             sections: [
@@ -38,42 +36,28 @@ public struct SampleCVData {
             CVItem(
                 title: "Senior UX/UI Designer",
                 subtitle: "DesignForward Agency",
+                description: "Lead design for fintech platform used by 2M+ customers. • Created comprehensive design system adopted by 15+ product teams • Increased user engagement by 35% through UX optimization and A/B testing • Managed team of 4 designers and established design review process • Led accessibility initiative achieving WCAG 2.1 AA compliance",
+                startDate: "April 2021",
+                endDate: "Present",
                 location: "New York, NY",
-                dateRange: "April 2021 – Present",
-                description: "Lead design for fintech platform used by 2M+ customers.",
-                highlights: [
-                    "Created comprehensive design system adopted by 15+ product teams",
-                    "Increased user engagement by 35% through UX optimization and A/B testing",
-                    "Managed team of 4 designers and established design review process",
-                    "Led accessibility initiative achieving WCAG 2.1 AA compliance"
-                ],
                 tags: ["UX Design", "Design Systems", "Leadership", "Fintech"]
             ),
             CVItem(
                 title: "Product Designer",
                 subtitle: "EcoTech Solutions",
+                description: "Designed sustainable technology platform for environmental monitoring. • Led end-to-end design process from user research to final implementation • Created interactive prototypes that improved stakeholder alignment by 50% • Collaborated with engineering team to ensure design feasibility and quality • Won 'Best Product Design' award at GreenTech Conference 2020",
+                startDate: "August 2018",
+                endDate: "March 2021",
                 location: "San Francisco, CA",
-                dateRange: "August 2018 – March 2021",
-                description: "Designed sustainable technology platform for environmental monitoring.",
-                highlights: [
-                    "Led end-to-end design process from user research to final implementation",
-                    "Created interactive prototypes that improved stakeholder alignment by 50%",
-                    "Collaborated with engineering team to ensure design feasibility and quality",
-                    "Won 'Best Product Design' award at GreenTech Conference 2020"
-                ],
                 tags: ["Product Design", "Prototyping", "User Research"]
             ),
             CVItem(
                 title: "Junior Designer",
                 subtitle: "PixelPerfect Studio",
+                description: "Created visual assets and layouts for marketing campaigns. • Designed brand identities for 20+ clients across various industries • Developed wireframes and prototypes for mobile and web applications • Participated in user testing sessions and incorporated feedback into designs",
+                startDate: "June 2016",
+                endDate: "July 2018",
                 location: "Austin, TX",
-                dateRange: "June 2016 – July 2018",
-                description: "Created visual assets and layouts for marketing campaigns.",
-                highlights: [
-                    "Designed brand identities for 20+ clients across various industries",
-                    "Developed wireframes and prototypes for mobile and web applications",
-                    "Participated in user testing sessions and incorporated feedback into designs"
-                ],
                 tags: ["Visual Design", "Branding", "UI Design"]
             )
         ]
@@ -86,17 +70,19 @@ public struct SampleCVData {
             CVItem(
                 title: "M.F.A. in Graphic Design",
                 subtitle: "Rhode Island School of Design",
-                location: "Providence, RI",
-                dateRange: "2014 - 2016",
                 description: "Focus on digital interaction design and motion graphics. Thesis project on inclusive design for accessibility.",
+                startDate: "2014",
+                endDate: "2016",
+                location: "Providence, RI",
                 tags: ["GPA: 3.9/4.0", "Dean's List", "Teaching Assistant"]
             ),
             CVItem(
                 title: "B.F.A. in Visual Communication",
                 subtitle: "School of the Art Institute of Chicago",
-                location: "Chicago, IL",
-                dateRange: "2010 - 2014",
                 description: "Emphasis on typography and user experience design. Graduated with distinction. Led design team for senior capstone project.",
+                startDate: "2010",
+                endDate: "2014",
+                location: "Chicago, IL",
                 tags: ["Graduated with Honors", "Presidential Scholarship"]
             )
         ]
@@ -128,21 +114,24 @@ public struct SampleCVData {
             CVItem(
                 title: "UX Design Professional Certificate",
                 subtitle: "Google",
-                dateRange: "2023",
+                description: "Comprehensive certification covering UX research, prototyping, and testing",
+                startDate: "2023",
                 url: "https://grow.google/certificates/ux-design/",
-                description: "Comprehensive certification covering UX research, prototyping, and testing"
+                metadata: ["year": "2023"]
             ),
             CVItem(
                 title: "Certified Usability Analyst (CUA)",
                 subtitle: "Human Factors International",
-                dateRange: "2022",
-                description: "Advanced certification in usability evaluation and user research methodologies"
+                description: "Advanced certification in usability evaluation and user research methodologies",
+                startDate: "2022",
+                metadata: ["year": "2022"]
             ),
             CVItem(
                 title: "Accessibility Specialist Certification",
                 subtitle: "International Association of Accessibility Professionals (IAAP)",
-                dateRange: "2021",
-                url: "https://www.accessibilityassociation.org/"
+                startDate: "2021",
+                url: "https://www.accessibilityassociation.org/",
+                metadata: ["year": "2021"]
             )
         ]
     )
@@ -164,22 +153,18 @@ public struct SampleCVData {
             CVItem(
                 title: "AccessDesign Toolkit",
                 subtitle: "Open Source Project",
-                dateRange: "2022 - Present",
+                description: "Created open-source Figma plugin for accessibility testing with 10K+ downloads. • Featured in Figma's official plugin directory • Adopted by companies like Airbnb and Shopify • Active community with 50+ contributors",
+                startDate: "2022",
+                endDate: "Present",
                 url: "https://github.com/mayachen/accessdesign",
-                description: "Created open-source Figma plugin for accessibility testing with 10K+ downloads.",
-                highlights: [
-                    "Featured in Figma's official plugin directory",
-                    "Adopted by companies like Airbnb and Shopify",
-                    "Active community with 50+ contributors"
-                ],
                 tags: ["Open Source", "Accessibility", "Figma Plugin"]
             ),
             CVItem(
                 title: "Design System Handbook",
                 subtitle: "Published Work",
-                dateRange: "2023",
-                url: "https://designsystemhandbook.com",
                 description: "Co-authored comprehensive guide to building and maintaining design systems.",
+                startDate: "2023",
+                url: "https://designsystemhandbook.com",
                 tags: ["Publication", "Design Systems", "Education"]
             )
         ]

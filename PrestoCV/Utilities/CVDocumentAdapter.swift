@@ -31,7 +31,7 @@ struct CVDocumentAdapter {
             name: info.name,
             title: extractFirstJobTitle(from: sections),
             location: info.location ?? "",
-            email: info.email ?? "",
+            email: info.email,
             phone: info.phone ?? "",
             portfolio: info.website ?? "",
             profile: info.summary ?? ""
@@ -112,7 +112,7 @@ struct CVDocumentAdapter {
                 issuer: item.subtitle ?? "",
                 year: year,
                 url: item.url ?? "",
-                description: item.description
+                description: item.description ?? ""
             )
         }
     }
@@ -124,24 +124,14 @@ struct CVDocumentAdapter {
     }
 
     private func convertSocial(from document: CVDocument) -> [Social] {
-        var socials: [Social] = []
-
-        if let linkedin = document.personalInfo.linkedin {
-            socials.append(Social(platform: "LinkedIn", url: linkedin))
-        }
-        if let github = document.personalInfo.github {
-            socials.append(Social(platform: "GitHub", url: github))
-        }
-
-        return socials
+        // PersonalInfo in CVPDFExporter doesn't have dedicated social fields
+        // Social links should be extracted from a dedicated section or metadata if needed
+        return []
     }
 
     // MARK: - Helpers
 
     private func formatPeriod(_ item: CVItem) -> String {
-        if let range = item.dateRange, !range.isEmpty {
-            return range
-        }
         if let start = item.startDate, let end = item.endDate {
             return "\(start) - \(end)"
         }
@@ -152,17 +142,7 @@ struct CVDocumentAdapter {
     }
 
     private func formatDescription(_ item: CVItem) -> String {
-        var parts: [String] = []
-
-        if let desc = item.description {
-            parts.append(desc)
-        }
-
-        if !item.highlights.isEmpty {
-            parts.append(item.highlights.map { "• \($0)" }.joined(separator: " "))
-        }
-
-        return parts.joined(separator: " ")
+        return item.description ?? ""
     }
 
     private func extractSkillLevel(from item: CVItem) -> Int {
@@ -179,7 +159,7 @@ struct CVDocumentAdapter {
         return 3
     }
 
-    private func parseLanguageLevel(from tag: String) -> LanguageLevel {
+    private func parseLanguageLevel(from tag: String) -> LanguageProficiencyLevel {
         let lowercased = tag.lowercased()
         if lowercased.contains("native") { return .native }
         if lowercased.contains("c2") { return .c2 }
