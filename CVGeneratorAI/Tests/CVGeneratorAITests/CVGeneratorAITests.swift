@@ -208,7 +208,8 @@ struct MockServiceTests {
 
         #expect(result.cvData.personalInfo.name == "John Doe")
         #expect(result.confidence > 0)
-        #expect(!result.suggestions.isEmpty)
+        #expect(!result.cvData.experience.isEmpty)
+        #expect(!result.cvData.skills.isEmpty)
     }
 
     @Test("Mock service fails with empty prompt")
