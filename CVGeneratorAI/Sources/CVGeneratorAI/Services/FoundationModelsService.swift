@@ -91,18 +91,40 @@ public final class FoundationModelsService: CVGenerationService {
 
     private func buildPrompt(from request: CVGenerationRequest) -> String {
         var prompt = """
-        You are a professional CV/resume writer. Generate a comprehensive, well-structured CV in JSON format.
+        You are an expert CV writer creating PRODUCTION-QUALITY professional CVs. Your output must match senior-level professional standards.
 
-        IMPORTANT INSTRUCTIONS:
+        CRITICAL QUALITY REQUIREMENTS:
+        - Write CONCISE, IMPACTFUL descriptions using bullet points (•) for achievements
+        - Lead with QUANTIFIABLE RESULTS and CONCRETE OUTCOMES (numbers, metrics, impact)
+        - Use STRONG ACTION VERBS (Led, Built, Implemented, Delivered, Optimized, Designed)
+        - Focus on BUSINESS VALUE and REAL IMPACT, not generic responsibilities
+        - Keep descriptions SHORT and POWERFUL - avoid fluff or generic statements
+        - Professional summary: 3-4 sentences max, highlighting expertise and proven track record
+
+        EXTRACTION RULES (CRITICAL):
         - Extract ALL company names, university names, and locations EXACTLY as mentioned
-        - Use ONLY information provided - do not invent or assume details
-        - For companies: use the exact name given (e.g., "Acme Mobile Solution", not "Tech Corp")
-        - For universities: use the exact name given (e.g., "University of Ravenmoor", not "State University")
-        - For locations: use cities/countries mentioned (e.g., "Turin, Italy")
-        - Infer relevant skills and technologies from the role and context
-        - Format dates consistently (e.g., "2015", "2015-2020", "Jan 2020")
-        - Include quantifiable achievements when mentioned
-        - Use a \(request.preferences.tone.rawValue.lowercased()) tone
+        - Use ONLY information provided - NEVER invent or assume details
+        - Companies: exact name (e.g., "Acme Mobile Solutions", "Initech")
+        - Universities: exact institution name (e.g., "Università degli Studi di Esempio")
+        - Locations: cities/countries as mentioned (e.g., "Genoa, Italy", "Berlin, Germany")
+        - Dates: consistent format (e.g., "March 2019 – Present", "2015")
+        - Calculate experience duration (e.g., "6+ years", "3 years")
+
+        SKILLS & TECHNOLOGIES:
+        - Infer relevant technical skills from job roles and industry context
+        - Group skills by category (e.g., "Languages", "Frameworks", "Tools", "Architecture")
+        - Only include skills that make sense for the profession mentioned
+        - Be specific with technology names (e.g., "Swift", "SwiftUI", "Git", not just "programming")
+
+        LANGUAGE INFERENCE:
+        - If prompt is in English, add English with proficiency C2 or Fluent
+        - If user mentions native language, mark as Native
+        - Add other languages only if explicitly mentioned
+
+        PROFESSIONAL TONE:
+        - \(request.preferences.tone.rawValue) style
+        - Focus on achievements, not just duties
+        - Emphasize leadership, collaboration, and technical excellence where applicable
 
         """
 
@@ -140,6 +162,23 @@ public final class FoundationModelsService: CVGenerationService {
 
         Background Description:
         \(request.userPrompt)
+
+        QUALITY EXAMPLES (adapt style to user's profession):
+
+        Tech/Engineering:
+        - "Lead iOS development for a retail banking app. • Built and maintain 2 production apps • Mentor 3 junior engineers"
+
+        Healthcare:
+        - "Emergency Medicine Physician managing high-acuity cases in 400-bed trauma center. • Treated 2,000+ patients annually with 98% patient satisfaction rate • Led implementation of new triage protocol reducing wait times by 35% • Mentored 15 medical residents in emergency procedures"
+
+        UX/Design:
+        - "Lead UX Designer for fintech platform serving 500K+ users. • Redesigned checkout flow increasing conversion rate by 40% • Conducted 50+ user research sessions informing product roadmap • Established design system adopted across 8 product teams reducing development time by 25%"
+
+        HR/Management:
+        - "HR Manager overseeing talent acquisition and retention for 200+ employee tech company. • Reduced time-to-hire by 45% through streamlined recruitment process • Implemented employee development program improving retention rate from 75% to 92% • Led diversity initiative increasing underrepresented hires by 60%"
+
+        Business/Sales:
+        - "Regional Sales Director managing $5M revenue territory across EMEA. • Exceeded quota by 150% for 3 consecutive years • Built and led team of 12 sales representatives • Secured 20+ enterprise contracts with Fortune 500 companies worth $2M+ annually"
 
         Generate a CV with the following structure in JSON format:
         {
