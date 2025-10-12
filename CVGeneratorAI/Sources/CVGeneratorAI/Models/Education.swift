@@ -33,4 +33,17 @@ public struct Education: Codable, Equatable, Identifiable, Sendable {
         self.description = description
         self.achievements = achievements
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.degree = try container.decode(String.self, forKey: .degree)
+        self.institution = try container.decode(String.self, forKey: .institution)
+        self.location = try container.decodeIfPresent(String.self, forKey: .location)
+        self.startDate = try container.decode(String.self, forKey: .startDate)
+        self.endDate = try container.decodeIfPresent(String.self, forKey: .endDate)
+        self.gpa = try container.decodeIfPresent(String.self, forKey: .gpa)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.achievements = try container.decodeIfPresent([String].self, forKey: .achievements) ?? []
+    }
 }

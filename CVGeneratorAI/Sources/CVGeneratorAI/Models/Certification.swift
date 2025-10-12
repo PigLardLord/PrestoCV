@@ -27,4 +27,15 @@ public struct Certification: Codable, Equatable, Identifiable, Sendable {
         self.credentialId = credentialId
         self.url = url
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.name = try container.decode(String.self, forKey: .name)
+        self.issuer = try container.decode(String.self, forKey: .issuer)
+        self.date = try container.decode(String.self, forKey: .date)
+        self.expiryDate = try container.decodeIfPresent(String.self, forKey: .expiryDate)
+        self.credentialId = try container.decodeIfPresent(String.self, forKey: .credentialId)
+        self.url = try container.decodeIfPresent(String.self, forKey: .url)
+    }
 }

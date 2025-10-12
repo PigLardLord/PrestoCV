@@ -1,6 +1,5 @@
 import Foundation
 
-/// Work experience entry
 public struct Experience: Codable, Equatable, Identifiable, Sendable {
     public let id: UUID
     public let title: String
@@ -35,5 +34,19 @@ public struct Experience: Codable, Equatable, Identifiable, Sendable {
         self.description = description
         self.achievements = achievements
         self.technologies = technologies
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.title = try container.decode(String.self, forKey: .title)
+        self.company = try container.decode(String.self, forKey: .company)
+        self.location = try container.decodeIfPresent(String.self, forKey: .location)
+        self.startDate = try container.decode(String.self, forKey: .startDate)
+        self.endDate = try container.decodeIfPresent(String.self, forKey: .endDate)
+        self.current = try container.decode(Bool.self, forKey: .current)
+        self.description = try container.decode(String.self, forKey: .description)
+        self.achievements = try container.decodeIfPresent([String].self, forKey: .achievements) ?? []
+        self.technologies = try container.decodeIfPresent([String].self, forKey: .technologies) ?? []
     }
 }

@@ -38,10 +38,21 @@ public final class FoundationModelsService: CVGenerationService {
         // Build comprehensive prompt
         let prompt = buildPrompt(from: request)
 
+        #if DEBUG
+        print("🔍 DEBUG: Prompt length: \(prompt.count)")
+        print("🔍 DEBUG: Prompt preview: \(String(prompt.prefix(300)))")
+        #endif
+
         do {
             // Generate CV using structured output
             // Note: We'll get JSON back which we can decode to CVData
             let response = try await session.respond(to: prompt)
+
+            // Debug: Log response for troubleshooting
+            #if DEBUG
+            print("🔍 DEBUG: Response content length: \(response.content.count)")
+            print("🔍 DEBUG: Response preview: \(String(response.content.prefix(200)))")
+            #endif
 
             // Parse the JSON response into our CVData model
             let cvData = try parseResponse(response.content, request: request, startTime: startTime)
@@ -64,7 +75,11 @@ public final class FoundationModelsService: CVGenerationService {
 
         } catch {
             // Handle FoundationModels specific errors
-            throw CVGenerationError.unknown("Failed to generate CV: \(error.localizedDescription)")
+            #if DEBUG
+            print("🔍 DEBUG: Error type: \(type(of: error))")
+            print("🔍 DEBUG: Error: \(error)")
+            #endif
+            throw CVGenerationError.unknown("Failed to generate CV: \(error.localizedDescription) - Type: \(type(of: error))")
         }
 
         #else
@@ -175,7 +190,7 @@ public final class FoundationModelsService: CVGenerationService {
           "languages": [
             {
               "name": "language name",
-              "proficiency": "Native|C2|C1|B2|B1|A2|A1"
+              "proficiency": "Native|C2|C1|B2|B1|A2|A1 (MUST use exactly these values)"
             }
           ],
           "certifications": [
@@ -213,6 +228,10 @@ public final class FoundationModelsService: CVGenerationService {
         // Clean up the response - remove markdown code blocks if present
         var jsonString = content.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        #if DEBUG
+        print("🔍 DEBUG: Parsing response, original length: \(jsonString.count)")
+        #endif
+
         // Remove markdown JSON code blocks
         if jsonString.hasPrefix("```json") {
             jsonString = jsonString.replacingOccurrences(of: "```json", with: "")
@@ -224,6 +243,9 @@ public final class FoundationModelsService: CVGenerationService {
         }
 
         guard let jsonData = jsonString.data(using: .utf8) else {
+            #if DEBUG
+            print("🔍 DEBUG: Failed to convert string to data")
+            #endif
             throw CVGenerationError.invalidResponse
         }
 
@@ -232,11 +254,7 @@ public final class FoundationModelsService: CVGenerationService {
         decoder.dateDecodingStrategy = .iso8601
 
         do {
-            // Try to decode into our CVData model
-            // Note: We need a special decoding structure since AI won't generate id/metadata
             let response = try decoder.decode(AIGeneratedCV.self, from: jsonData)
-
-            // Use provided personal info or AI-generated
             let personalInfo = request.personalInfo ?? response.personalInfo
 
             return CVData(
@@ -257,6 +275,10 @@ public final class FoundationModelsService: CVGenerationService {
                 )
             )
         } catch {
+            #if DEBUG
+            print("🔍 DEBUG: JSON decode failed: \(error)")
+            print("🔍 DEBUG: JSON string (first 500 chars): \(String(jsonString.prefix(500)))")
+            #endif
             throw CVGenerationError.invalidResponse
         }
     }
@@ -297,8 +319,6 @@ public final class FoundationModelsService: CVGenerationService {
 
 // MARK: - AI Response Structure
 
-/// Temporary structure for decoding AI-generated JSON
-/// This matches what the AI returns (without id/metadata fields)
 private struct AIGeneratedCV: Codable {
     let personalInfo: PersonalInfo
     let summary: String?

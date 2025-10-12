@@ -7,73 +7,30 @@ struct CVGeneratorDemo {
         print("🤖 CVGeneratorAI Interactive Demo")
         print("=" * 60)
         print()
-
-        // Collect user input
-        print("Let's create your CV! Please provide the following information:")
+        print("Describe your professional background in detail.")
+        print("Include: name, email, experience, education, skills, achievements, etc.")
+        print()
+        print("Type your description (press Enter twice when done):")
         print()
 
-        let name = prompt("Your full name: ")
-        let email = prompt("Your email: ")
-        let phone = prompt("Your phone (optional, press Enter to skip): ", optional: true)
-        let location = prompt("Your location (e.g., 'San Francisco, CA'): ")
-        let title = prompt("Your current/desired job title: ")
+        let prompt = readMultiline()
 
-        print()
-        print("Now, please describe your professional background.")
-        print("Include your experience, skills, education, and achievements.")
-        print("(Type your description and press Enter):")
-        print()
-
-        let background = readMultiline()
-
-        print()
-        print("Great! A few more preferences...")
-        let targetRole = prompt("Target job role (e.g., 'iOS Developer'): ")
-
-        print()
-        print("Experience level:")
-        print("1) Entry Level")
-        print("2) Intermediate")
-        print("3) Senior")
-        print("4) Executive")
-        let levelChoice = prompt("Choose (1-4): ")
-        let experienceLevel = parseExperienceLevel(levelChoice)
-
-        print()
-        print("Tone preference:")
-        print("1) Professional")
-        print("2) Creative")
-        print("3) Technical")
-        print("4) Academic")
-        let toneChoice = prompt("Choose (1-4): ")
-        let tone = parseTone(toneChoice)
+        guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            print("❌ Please provide a description.")
+            return
+        }
 
         print()
         print("=" * 60)
         print()
 
-        // Create service - prefer real AI when available
         let (service, usingFoundationModels) = await selectBestService()
         let useCase = CVGeneratorUseCase(service: service)
 
-        // Create personal info
-        let personalInfo = PersonalInfo(
-            name: name,
-            email: email,
-            phone: phone.isEmpty ? nil : phone,
-            location: location,
-            title: title
-        )
-
-        // Create request
         let request = CVGenerationRequest(
-            userPrompt: background,
-            personalInfo: personalInfo,
-            preferences: GenerationPreferences(
-                targetRole: targetRole,
-                experienceLevel: experienceLevel,
-                tone: tone
-            )
+            userPrompt: prompt,
+            personalInfo: nil,
+            preferences: GenerationPreferences()
         )
 
         print("⏳ Generating your CV...")
@@ -167,26 +124,6 @@ struct CVGeneratorDemo {
             lines.append(line)
         }
         return lines.joined(separator: " ")
-    }
-
-    static func parseExperienceLevel(_ choice: String) -> ExperienceLevel {
-        switch choice {
-        case "1": return .entry
-        case "2": return .intermediate
-        case "3": return .senior
-        case "4": return .executive
-        default: return .intermediate
-        }
-    }
-
-    static func parseTone(_ choice: String) -> Tone {
-        switch choice {
-        case "1": return .professional
-        case "2": return .creative
-        case "3": return .technical
-        case "4": return .academic
-        default: return .professional
-        }
     }
 
     // MARK: - Display Helpers
