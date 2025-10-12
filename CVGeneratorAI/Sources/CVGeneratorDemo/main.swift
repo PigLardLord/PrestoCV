@@ -52,8 +52,8 @@ struct CVGeneratorDemo {
         print("=" * 60)
         print()
 
-        // Create service
-        let service = MockCVGenerationService(shouldSucceed: true, mockDelay: 1.5)
+        // Create service - prefer real AI when available
+        let (service, usingFoundationModels) = await selectBestService()
         let useCase = CVGeneratorUseCase(service: service)
 
         // Create personal info
@@ -88,9 +88,59 @@ struct CVGeneratorDemo {
 
         } catch let error as CVGenerationError {
             print("❌ Generation failed: \(error.errorDescription ?? "Unknown error")")
+
+            // If using FoundationModels failed, offer to retry with Mock service
+            if usingFoundationModels {
+                print()
+                print("ℹ️  This may be because:")
+                print("   • Apple Intelligence model not yet downloaded")
+                print("   • Model not fully initialized")
+                print("   • Network connectivity issues")
+                print()
+                print("💡 Retrying with Mock service for demonstration...")
+                print()
+
+                let mockService = MockCVGenerationService(shouldSucceed: true, mockDelay: 1.5)
+                let mockUseCase = CVGeneratorUseCase(service: mockService)
+
+                do {
+                    let result = try await mockUseCase.generateCV(from: request)
+                    print("✅ CV Generated Successfully (using Mock service)!")
+                    print()
+                    displayFullCV(result.cvData, result: result)
+                } catch {
+                    print("❌ Mock service also failed: \(error)")
+                }
+            }
         } catch {
             print("❌ Unexpected error: \(error)")
         }
+    }
+
+    // MARK: - Service Selection
+
+    static func selectBestService() async -> (CVGenerationService, Bool) {
+        // Try to use FoundationModels service if available
+        if #available(macOS 26, iOS 18.2, *) {
+            let foundationService = FoundationModelsService()
+            if await foundationService.isAvailable() {
+                print("🧠 Using Apple Intelligence (FoundationModels)")
+                print("   AI will extract exact details from your description")
+                print()
+                return (foundationService, true)
+            } else {
+                print("ℹ️  Apple Intelligence not available on this device")
+                print("   Falling back to Mock service for demonstration")
+                print()
+            }
+        } else {
+            print("ℹ️  Apple Intelligence requires macOS 26+ or iOS 18.2+")
+            print("   Falling back to Mock service for demonstration")
+            print()
+        }
+
+        // Fallback to mock service
+        return (MockCVGenerationService(shouldSucceed: true, mockDelay: 1.5), false)
     }
 
     // MARK: - Input Helpers
