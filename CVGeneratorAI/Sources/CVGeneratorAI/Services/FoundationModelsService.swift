@@ -1,26 +1,26 @@
 import Foundation
-#if canImport(FoundationIntelligence)
-import FoundationIntelligence
+#if canImport(FoundationModels)
+import FoundationModels
 #endif
 
 /// CV generation service using Apple's FoundationModels
-@available(iOS 18.2, macOS 15.2, *)
+/// Requires iOS 18.2+ / macOS 26+ and Apple Intelligence-capable device
+@available(iOS 18.2, macOS 26, *)
 public final class FoundationModelsService: CVGenerationService {
 
     public init() {}
 
     public func isAvailable() async -> Bool {
-        #if canImport(FoundationIntelligence)
-        // Check if FoundationModels is available on this device
-        // This will return false on simulator or unsupported devices
-        return true // TODO: Implement actual availability check
+        #if canImport(FoundationModels)
+        // Check if Apple Intelligence and the language model are available
+        return await SystemLanguageModel.default.isAvailable
         #else
         return false
         #endif
     }
 
     public func generateCV(from request: CVGenerationRequest) async throws -> CVGenerationResult {
-        #if canImport(FoundationIntelligence)
+        #if canImport(FoundationModels)
         guard await isAvailable() else {
             throw CVGenerationError.serviceUnavailable
         }
@@ -32,13 +32,40 @@ public final class FoundationModelsService: CVGenerationService {
 
         let startTime = Date()
 
-        // Build system prompt and user prompt
-        let systemPrompt = buildSystemPrompt(for: request.preferences)
-        let userPrompt = buildUserPrompt(from: request)
+        // Create language model session
+        let session = LanguageModelSession()
 
-        // TODO: Call FoundationModels API
-        // For now, throw not implemented
-        throw CVGenerationError.unknown("FoundationModels integration pending")
+        // Build comprehensive prompt
+        let prompt = buildPrompt(from: request)
+
+        do {
+            // Generate CV using structured output
+            // Note: We'll get JSON back which we can decode to CVData
+            let response = try await session.respond(to: prompt)
+
+            // Parse the JSON response into our CVData model
+            let cvData = try parseResponse(response.content, request: request, startTime: startTime)
+
+            // Calculate confidence based on response quality
+            let confidence = calculateConfidence(cvData: cvData)
+
+            let processingTime = Date().timeIntervalSince(startTime)
+
+            return CVGenerationResult(
+                cvData: cvData,
+                confidence: confidence,
+                suggestions: generateSuggestions(cvData: cvData),
+                metadata: ResultMetadata(
+                    generatedAt: Date(),
+                    processingTime: processingTime,
+                    modelVersion: "foundation-models-1.0"
+                )
+            )
+
+        } catch {
+            // Handle FoundationModels specific errors
+            throw CVGenerationError.unknown("Failed to generate CV: \(error.localizedDescription)")
+        }
 
         #else
         throw CVGenerationError.serviceUnavailable
@@ -47,48 +74,239 @@ public final class FoundationModelsService: CVGenerationService {
 
     // MARK: - Private Helpers
 
-    private func buildSystemPrompt(for preferences: GenerationPreferences) -> String {
+    private func buildPrompt(from request: CVGenerationRequest) -> String {
+        var prompt = """
+        You are a professional CV/resume writer. Generate a comprehensive, well-structured CV in JSON format.
+
+        IMPORTANT INSTRUCTIONS:
+        - Extract ALL company names, university names, and locations EXACTLY as mentioned
+        - Use ONLY information provided - do not invent or assume details
+        - For companies: use the exact name given (e.g., "Acme Mobile Solution", not "Tech Corp")
+        - For universities: use the exact name given (e.g., "University of Ravenmoor", not "State University")
+        - For locations: use cities/countries mentioned (e.g., "Turin, Italy")
+        - Infer relevant skills and technologies from the role and context
+        - Format dates consistently (e.g., "2015", "2015-2020", "Jan 2020")
+        - Include quantifiable achievements when mentioned
+        - Use a \(request.preferences.tone.rawValue.lowercased()) tone
+
         """
-        You are a professional CV/resume writing assistant. Your task is to generate a comprehensive, \
-        well-structured CV from the user's background description.
 
-        Guidelines:
-        - Extract all relevant information about work experience, education, skills, and achievements
-        - Format dates consistently (e.g., "Jan 2020", "2020-2023")
-        - Use professional language with a \(preferences.tone.rawValue.lowercased()) tone
-        - Focus on quantifiable achievements and impact
-        - Organize information logically and comprehensively
-
-        Return ONLY valid JSON matching the CVData structure. Do not include any explanatory text.
-        """
-    }
-
-    private func buildUserPrompt(from request: CVGenerationRequest) -> String {
-        var prompt = "Generate a CV from the following information:\n\n"
-
+        // Add personal information if provided
         if let personalInfo = request.personalInfo {
-            prompt += "Personal Information:\n"
-            prompt += "Name: \(personalInfo.name)\n"
-            prompt += "Email: \(personalInfo.email)\n"
+            prompt += "\nPersonal Information:\n"
+            prompt += "- Name: \(personalInfo.name)\n"
+            prompt += "- Email: \(personalInfo.email)\n"
             if let phone = personalInfo.phone {
-                prompt += "Phone: \(phone)\n"
+                prompt += "- Phone: \(phone)\n"
             }
             if let location = personalInfo.location {
-                prompt += "Location: \(location)\n"
+                prompt += "- Location: \(location)\n"
             }
-            prompt += "\n"
+            if let title = personalInfo.title {
+                prompt += "- Current/Desired Title: \(title)\n"
+            }
         }
 
+        // Add target role
         if let targetRole = request.preferences.targetRole {
-            prompt += "Target Role: \(targetRole)\n\n"
+            prompt += "\nTarget Role: \(targetRole)\n"
         }
 
-        prompt += "Background Description:\n\(request.userPrompt)\n\n"
+        // Add experience level context
+        prompt += "\nExperience Level: \(request.preferences.experienceLevel.rawValue)\n"
 
+        // Add focus areas if any
         if !request.preferences.focusAreas.isEmpty {
-            prompt += "Focus Areas: \(request.preferences.focusAreas.joined(separator: ", "))\n"
+            prompt += "\nFocus Areas: \(request.preferences.focusAreas.joined(separator: ", "))\n"
         }
+
+        // Add the user's background description
+        prompt += """
+
+        Background Description:
+        \(request.userPrompt)
+
+        Generate a CV with the following structure in JSON format:
+        {
+          "personalInfo": {
+            "name": "string",
+            "email": "string",
+            "phone": "string (optional)",
+            "location": "string (optional)",
+            "website": "string (optional)",
+            "linkedin": "string (optional)",
+            "github": "string (optional)",
+            "title": "string (optional)"
+          },
+          "summary": "string - professional summary paragraph",
+          "experience": [
+            {
+              "title": "job title",
+              "company": "EXACT company name from description",
+              "location": "city, country if mentioned",
+              "startDate": "year or month year",
+              "endDate": "year or 'Present' for current",
+              "current": boolean,
+              "description": "role description",
+              "achievements": ["achievement 1", "achievement 2"],
+              "technologies": ["tech1", "tech2"]
+            }
+          ],
+          "education": [
+            {
+              "degree": "degree type and field",
+              "institution": "EXACT university name from description",
+              "location": "city, country if mentioned",
+              "startDate": "year",
+              "endDate": "year",
+              "gpa": "if mentioned",
+              "description": "additional details",
+              "achievements": ["honor/award"]
+            }
+          ],
+          "skills": [
+            {
+              "name": "skill name",
+              "level": "Expert|Advanced|Intermediate|Beginner",
+              "category": "Programming Languages|Frameworks|Tools|etc",
+              "yearsOfExperience": number
+            }
+          ],
+          "languages": [
+            {
+              "name": "language name",
+              "proficiency": "Native|C2|C1|B2|B1|A2|A1"
+            }
+          ],
+          "certifications": [
+            {
+              "name": "certification name",
+              "issuer": "issuing organization",
+              "date": "year",
+              "expiryDate": "year (optional)",
+              "credentialId": "id (optional)",
+              "url": "url (optional)"
+            }
+          ],
+          "projects": [
+            {
+              "name": "project name",
+              "description": "project description",
+              "role": "your role",
+              "startDate": "year (optional)",
+              "endDate": "year (optional)",
+              "technologies": ["tech1", "tech2"],
+              "url": "url (optional)",
+              "achievements": ["achievement"]
+            }
+          ],
+          "interests": ["interest1", "interest2"]
+        }
+
+        Return ONLY the JSON object, no additional text or explanation.
+        """
 
         return prompt
     }
+
+    private func parseResponse(_ content: String, request: CVGenerationRequest, startTime: Date) throws -> CVData {
+        // Clean up the response - remove markdown code blocks if present
+        var jsonString = content.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Remove markdown JSON code blocks
+        if jsonString.hasPrefix("```json") {
+            jsonString = jsonString.replacingOccurrences(of: "```json", with: "")
+            jsonString = jsonString.replacingOccurrences(of: "```", with: "")
+            jsonString = jsonString.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else if jsonString.hasPrefix("```") {
+            jsonString = jsonString.replacingOccurrences(of: "```", with: "")
+            jsonString = jsonString.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        guard let jsonData = jsonString.data(using: .utf8) else {
+            throw CVGenerationError.invalidResponse
+        }
+
+        // Decode the JSON into a temporary structure
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        do {
+            // Try to decode into our CVData model
+            // Note: We need a special decoding structure since AI won't generate id/metadata
+            let response = try decoder.decode(AIGeneratedCV.self, from: jsonData)
+
+            // Use provided personal info or AI-generated
+            let personalInfo = request.personalInfo ?? response.personalInfo
+
+            return CVData(
+                id: UUID(),
+                personalInfo: personalInfo,
+                summary: response.summary,
+                experience: response.experience,
+                education: response.education,
+                skills: response.skills,
+                languages: response.languages,
+                certifications: response.certifications,
+                projects: response.projects,
+                interests: response.interests,
+                metadata: CVMetadata(
+                    generatedAt: Date(),
+                    generatedBy: "FoundationModels",
+                    version: "1.0"
+                )
+            )
+        } catch {
+            throw CVGenerationError.invalidResponse
+        }
+    }
+
+    private func calculateConfidence(cvData: CVData) -> Double {
+        var confidence = 0.7
+
+        // Increase confidence based on completeness
+        if !cvData.experience.isEmpty { confidence += 0.05 }
+        if !cvData.education.isEmpty { confidence += 0.05 }
+        if !cvData.skills.isEmpty { confidence += 0.05 }
+        if cvData.summary != nil && cvData.summary!.count > 100 { confidence += 0.05 }
+        if !cvData.certifications.isEmpty { confidence += 0.025 }
+        if !cvData.projects.isEmpty { confidence += 0.025 }
+
+        return min(confidence, 0.95)
+    }
+
+    private func generateSuggestions(cvData: CVData) -> [String] {
+        var suggestions: [String] = []
+
+        if cvData.certifications.isEmpty {
+            suggestions.append("Consider adding relevant certifications to strengthen your profile")
+        }
+        if cvData.projects.isEmpty {
+            suggestions.append("Include notable projects or contributions to demonstrate your skills")
+        }
+        if cvData.summary == nil || cvData.summary!.count < 100 {
+            suggestions.append("Expand your professional summary with more details about your expertise")
+        }
+        if cvData.experience.allSatisfy({ $0.achievements.isEmpty }) {
+            suggestions.append("Add quantifiable achievements to your work experience")
+        }
+
+        return suggestions
+    }
+}
+
+// MARK: - AI Response Structure
+
+/// Temporary structure for decoding AI-generated JSON
+/// This matches what the AI returns (without id/metadata fields)
+private struct AIGeneratedCV: Codable {
+    let personalInfo: PersonalInfo
+    let summary: String?
+    let experience: [Experience]
+    let education: [Education]
+    let skills: [Skill]
+    let languages: [Language]
+    let certifications: [Certification]
+    let projects: [Project]
+    let interests: [String]
 }
