@@ -58,7 +58,7 @@ final class AIGenerationViewModel: ObservableObject {
 
     private func mapToCVModel(_ cvData: CVData) -> CVModel {
         CVModel(
-            id: cvData.id,
+            id: UUID(), // Generate new UUID for the CV
             name: "\(cvData.personalInfo.name)'s CV",
             personalInfo: PrestoCVCore.PersonalInfo(
                 name: cvData.personalInfo.name,
@@ -71,7 +71,7 @@ final class AIGenerationViewModel: ObservableObject {
             ),
             relevant_experience: cvData.experience.map { exp in
                 Experience(
-                    id: exp.id,
+                    id: UUID(), // Generate new UUID for each experience
                     title: exp.title,
                     company: exp.company,
                     location: exp.location ?? "",
@@ -85,7 +85,7 @@ final class AIGenerationViewModel: ObservableObject {
             },
             education: cvData.education.map { edu in
                 Education(
-                    id: edu.id,
+                    id: UUID(), // Generate new UUID for each education
                     degree: edu.degree,
                     school: edu.institution,
                     period: formatEducationPeriod(startDate: edu.startDate, endDate: edu.endDate),
@@ -110,7 +110,7 @@ final class AIGenerationViewModel: ObservableObject {
             },
             certifications: cvData.certifications.map { cert in
                 Certification(
-                    id: cert.id,
+                    id: UUID(), // Generate new UUID for each certification
                     name: cert.name,
                     issuer: cert.issuer,
                     year: extractYear(from: cert.date),
