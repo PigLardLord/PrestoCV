@@ -1,7 +1,8 @@
 import Foundation
 
 /// Use case for generating CVs with validation
-public final class CVGeneratorUseCase: Sendable {
+@MainActor
+public final class CVGeneratorUseCase {
     private let service: CVGenerationService
     private let validator: CVValidator
 

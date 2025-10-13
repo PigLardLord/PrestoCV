@@ -6,6 +6,7 @@ import FoundationModels
 /// CV generation service using Apple's FoundationModels
 /// Requires iOS 26+ / macOS 26+ and Apple Intelligence-capable device
 @available(iOS 26, macOS 26, *)
+@MainActor
 public final class FoundationModelsService: CVGenerationService {
 
     public init() {}
@@ -168,6 +169,91 @@ public final class FoundationModelsService: CVGenerationService {
 
         #else
         throw CVGenerationError.serviceUnavailable
+        #endif
+    }
+
+    @available(iOS 26, macOS 26, *)
+    nonisolated public func generateCVStream(from request: CVGenerationRequest) -> AsyncThrowingStream<CVData.PartiallyGenerated, Error> {
+        #if canImport(FoundationModels)
+        return AsyncThrowingStream { continuation in
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    continuation.finish(throwing: CVGenerationError.serviceUnavailable)
+                    return
+                }
+
+                // Validate request - all within @MainActor context to avoid data races
+                guard !request.userPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    continuation.finish(throwing: CVGenerationError.invalidPrompt)
+                    return
+                }
+
+                guard await self.isAvailable() else {
+                    continuation.finish(throwing: CVGenerationError.serviceUnavailable)
+                    return
+                }
+
+                // Create language model session with system instructions
+                let session = LanguageModelSession(
+                    instructions: Instructions {
+                        "You are an expert CV writer creating PRODUCTION-QUALITY professional CVs matching senior-level standards."
+
+                        """
+                        CRITICAL REQUIREMENTS:
+                        - CONCISE, IMPACTFUL descriptions with quantifiable results
+                        - STRONG ACTION VERBS (Led, Built, Implemented, Delivered)
+                        - Extract company/university names EXACTLY as mentioned
+                        - Professional summary: 3-4 sentences max
+                        - Infer relevant technical skills from context
+                        """
+
+                        """
+                        LANGUAGE INFERENCE:
+                        - If prompt is in English, add English with C2 proficiency
+                        - Mark native language as Native
+                        """
+                    }
+                )
+
+                do {
+                    // Generate CV using guided generation
+                    let stream = session.streamResponse(
+                        generating: CVData.self,
+                        includeSchemaInPrompt: false,
+                        options: GenerationOptions(sampling: .greedy)
+                    ) {
+                        "PROFESSIONAL TONE: \(request.preferences.tone.rawValue) style"
+                        "Experience Level: \(request.preferences.experienceLevel.rawValue)"
+
+                        if let personalInfo = request.personalInfo {
+                            "Personal Info: \(personalInfo.name), \(personalInfo.email)"
+                        }
+
+                        if let targetRole = request.preferences.targetRole {
+                            "Target Role: \(targetRole)"
+                        }
+
+                        "Background Description:"
+                        request.userPrompt
+                    }
+
+                    // Forward partial responses to the continuation
+                    // PartiallyGenerated conforms to Sendable, safe to yield
+                    for try await partialResponse in stream {
+                        continuation.yield(partialResponse.content)
+                    }
+
+                    continuation.finish()
+
+                } catch {
+                    continuation.finish(throwing: CVGenerationError.unknown("Failed to generate CV: \(error.localizedDescription)"))
+                }
+            }
+        }
+        #else
+        return AsyncThrowingStream { continuation in
+            continuation.finish(throwing: CVGenerationError.serviceUnavailable)
+        }
         #endif
     }
 
