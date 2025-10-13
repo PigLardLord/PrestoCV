@@ -7,4 +7,5 @@ enum Route: Hashable, Sendable {
     case cvList
     case cvEditor(cvId: String?)
     case templateSelection
+    case aiGeneration
 }

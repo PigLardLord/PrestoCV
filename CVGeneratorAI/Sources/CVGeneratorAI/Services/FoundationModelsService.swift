@@ -4,21 +4,23 @@ import FoundationModels
 #endif
 
 /// CV generation service using Apple's FoundationModels
-/// Requires iOS 18.2+ / macOS 26+ and Apple Intelligence-capable device
-@available(iOS 18.2, macOS 26, *)
+/// Requires iOS 26+ / macOS 26+ and Apple Intelligence-capable device
+@available(iOS 26, macOS 26, *)
 public final class FoundationModelsService: CVGenerationService {
 
     public init() {}
 
+    @available(iOS 26, macOS 26, *)
     public func isAvailable() async -> Bool {
         #if canImport(FoundationModels)
         // Check if Apple Intelligence and the language model are available
-        return await SystemLanguageModel.default.isAvailable
+        return SystemLanguageModel.default.isAvailable
         #else
         return false
         #endif
     }
 
+    @available(iOS 26, macOS 26, *)
     public func generateCV(from request: CVGenerationRequest) async throws -> CVGenerationResult {
         #if canImport(FoundationModels)
         guard await isAvailable() else {

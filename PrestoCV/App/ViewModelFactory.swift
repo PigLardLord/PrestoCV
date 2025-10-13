@@ -1,5 +1,6 @@
 import Foundation
 import PrestoCVCore
+import CVGeneratorAI
 
 final class ViewModelFactory {
     private let dependencyContainer: DependencyContainer
@@ -30,5 +31,41 @@ final class ViewModelFactory {
             cvId: cvId,
             cvManagementUseCase: try dependencyContainer.makeCVManagementUseCase()
         )
+    }
+
+    @MainActor
+    func makeAIGenerationViewModel() throws -> AIGenerationViewModel {
+        guard let cvGenerationUseCase = makeCVGeneratorUseCase() else {
+            throw DependencyError.serviceCreationFailed("CVGeneratorUseCase", NSError(domain: "AI generation not available on this device", code: -1))
+        }
+        return AIGenerationViewModel(
+            cvGenerationUseCase: cvGenerationUseCase,
+            cvManagementUseCase: try dependencyContainer.makeCVManagementUseCase()
+        )
+    }
+
+    func isAIGenerationAvailable() -> Bool {
+        if #available(iOS 26, macOS 26, *) {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    // MARK: - Private Composition Root
+
+    private func makeCVGeneratorUseCase() -> CVGeneratorUseCase? {
+        guard let service = makeCVGenerationService() else {
+            return nil
+        }
+        return CVGeneratorUseCase(service: service)
+    }
+
+    private func makeCVGenerationService() -> CVGenerationService? {
+        if #available(iOS 26, macOS 26, *) {
+            return FoundationModelsService()
+        } else {
+            return nil
+        }
     }
 }

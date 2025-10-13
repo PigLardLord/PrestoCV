@@ -4,9 +4,11 @@ import PrestoCVCore
 struct TemplateSelectionView: View {
     @EnvironmentObject var router: AppRouter
     @StateObject private var viewModel: TemplateSelectionViewModel
-    
-    init(viewModel: TemplateSelectionViewModel) {
+    let isAIGenerationAvailable: Bool
+
+    init(viewModel: TemplateSelectionViewModel, isAIGenerationAvailable: Bool = false) {
         self._viewModel = StateObject(wrappedValue: viewModel)
+        self.isAIGenerationAvailable = isAIGenerationAvailable
     }
     
     var body: some View {
@@ -51,6 +53,10 @@ struct TemplateSelectionView: View {
                     .padding(.bottom, DesignTokens.Spacing.sm)
                 ) {
                     createNewCard
+
+                    if isAIGenerationAvailable {
+                        aiGenerationCard
+                    }
                 }
                 
                 // Sample Templates Section
@@ -122,7 +128,54 @@ struct TemplateSelectionView: View {
         }
         .buttonStyle(PlainButtonStyle())
     }
-    
+
+    private var aiGenerationCard: some View {
+        Button(action: {
+            router.navigate(to: .aiGeneration)
+        }) {
+            CardView(padding: DesignTokens.Spacing.sm) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+                    // AI generation preview
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    DesignTokens.Colors.accent.opacity(0.3),
+                                    DesignTokens.Colors.accent.opacity(0.1)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .aspectRatio(1.0, contentMode: .fit)
+                        .overlay(
+                            Image(systemName: "sparkles")
+                                .font(DesignTokens.IconSize.hero.font)
+                                .foregroundColor(DesignTokens.Colors.accent)
+                        )
+
+                    // AI generation info
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                        HStack(spacing: DesignTokens.Spacing.xs) {
+                            Text("AI CV Generation")
+                                .typography(.headline)
+                                .foregroundColor(DesignTokens.Colors.primary)
+
+                            Image(systemName: "sparkles")
+                                .font(.caption)
+                                .foregroundColor(DesignTokens.Colors.accent)
+                        }
+
+                        Text("Describe your background and let AI create your CV")
+                            .typography(.caption1)
+                            .foregroundColor(DesignTokens.Colors.secondary)
+                    }
+                }
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
 }
 
 // MARK: - Template Card View

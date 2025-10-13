@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		233199932E9C26E400412706 /* CVGeneratorAI in Frameworks */ = {isa = PBXBuildFile; productRef = 233199922E9C26E400412706 /* CVGeneratorAI */; };
 		23A94C0D2E1D78F20066CE9A /* PrestoCVCore in Frameworks */ = {isa = PBXBuildFile; productRef = 23A94C0E2E1D78F20066CE9A /* PrestoCVCore */; };
 		23F8A6C02F2347BF00ABCDEF /* CVPDFExporter in Frameworks */ = {isa = PBXBuildFile; productRef = 23F8A6C12F2347BF00ABCDEF /* CVPDFExporter */; };
 /* End PBXBuildFile section */
@@ -29,6 +30,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		233199942E9C26EF00412706 /* CVGeneratorAI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CVGeneratorAI; path = /Users/dev/PrestoCV/CVGeneratorAI; sourceTree = "<absolute>"; };
 		236C861B2E88457D003C8512 /* CVPDFExporter */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = CVPDFExporter; sourceTree = "<group>"; };
 		237D7D9E2E91379300212357 /* PrestoCV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PrestoCV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		237D7D9F2E91379300212357 /* PrestoCVTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrestoCVTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -49,6 +51,7 @@
 			files = (
 				23A94C0D2E1D78F20066CE9A /* PrestoCVCore in Frameworks */,
 				23F8A6C02F2347BF00ABCDEF /* CVPDFExporter in Frameworks */,
+				233199932E9C26E400412706 /* CVGeneratorAI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,6 +75,7 @@
 		23E2E89B27562C01000F2E5D = {
 			isa = PBXGroup;
 			children = (
+				233199942E9C26EF00412706 /* CVGeneratorAI */,
 				236C861B2E88457D003C8512 /* CVPDFExporter */,
 				23A94C0C2E1D78F20066CE9A /* PrestoCVCore */,
 				23AE90052E46676F00A86F6E /* PrestoCV */,
@@ -105,6 +109,7 @@
 			packageProductDependencies = (
 				23A94C0E2E1D78F20066CE9A /* PrestoCVCore */,
 				23F8A6C12F2347BF00ABCDEF /* CVPDFExporter */,
+				233199922E9C26E400412706 /* CVGeneratorAI */,
 			);
 			productName = PrestoCV;
 			productReference = 237D7D9E2E91379300212357 /* PrestoCV.app */;
@@ -187,6 +192,7 @@
 			packageReferences = (
 				23FC5F082E45FD3800C598FC /* XCLocalSwiftPackageReference "PrestoCVCore" */,
 				23BFFEA42E8832D8004464D3 /* XCLocalSwiftPackageReference "CVPDFExporter" */,
+				233199912E9C26E400412706 /* XCLocalSwiftPackageReference "CVGeneratorAI" */,
 			);
 			productRefGroup = 23E2E89B27562C01000F2E5D;
 			projectDirPath = "";
@@ -571,6 +577,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		233199912E9C26E400412706 /* XCLocalSwiftPackageReference "CVGeneratorAI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = CVGeneratorAI;
+		};
 		23BFFEA42E8832D8004464D3 /* XCLocalSwiftPackageReference "CVPDFExporter" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = CVPDFExporter;
@@ -582,6 +592,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		233199922E9C26E400412706 /* CVGeneratorAI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CVGeneratorAI;
+		};
 		23A94C0E2E1D78F20066CE9A /* PrestoCVCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PrestoCVCore;

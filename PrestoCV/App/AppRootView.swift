@@ -73,7 +73,14 @@ struct AppRootView: View {
             CVListView(viewModel: cvListViewModel)
         case .templateSelection:
             viewWithErrorHandling {
-                TemplateSelectionView(viewModel: try viewModelFactory.makeTemplateSelectionViewModel())
+                TemplateSelectionView(
+                    viewModel: try viewModelFactory.makeTemplateSelectionViewModel(),
+                    isAIGenerationAvailable: viewModelFactory.isAIGenerationAvailable()
+                )
+            }
+        case .aiGeneration:
+            viewWithErrorHandling {
+                AIGenerationView(viewModel: try viewModelFactory.makeAIGenerationViewModel())
             }
         case .cvEditor(let cvId):
             viewWithErrorHandling {
