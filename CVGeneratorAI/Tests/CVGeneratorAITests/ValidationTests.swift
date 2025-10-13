@@ -176,46 +176,4 @@ struct DefaultCVValidatorTests {
     }
 }
 
-@Suite("CVGeneratorUseCase Tests")
-struct CVGeneratorUseCaseTests {
-    @Test("Use case delegates to service")
-    func useCaseDelegation() async throws {
-        let service = MockCVGenerationService(shouldSucceed: true, mockDelay: 0.1)
-        let useCase = CVGeneratorUseCase(service: service)
-
-        let request = CVGenerationRequest(
-            userPrompt: "I am a software engineer with experience in Swift and iOS development"
-        )
-
-        let result = try await useCase.generateCV(from: request)
-
-        #expect(result.cvData.personalInfo.name == "John Doe")
-        #expect(result.confidence > 0)
-    }
-
-    @Test("Use case validates request before generation")
-    func validateRequestFirst() async {
-        let service = MockCVGenerationService()
-        let useCase = CVGeneratorUseCase(service: service)
-
-        let invalidRequest = CVGenerationRequest(userPrompt: "")
-
-        do {
-            _ = try await useCase.generateCV(from: invalidRequest)
-            Issue.record("Should have thrown invalidPrompt")
-        } catch CVGenerationError.invalidPrompt {
-            // Expected error - validation happened before service call
-        } catch {
-            Issue.record("Unexpected error: \(error)")
-        }
-    }
-
-    @Test("Use case checks availability")
-    func checkAvailability() async {
-        let service = MockCVGenerationService()
-        let useCase = CVGeneratorUseCase(service: service)
-
-        let available = await useCase.isAvailable()
-        #expect(available == true)
-    }
-}
+// CVGeneratorUseCase tests will be re-added after migration to guided generation

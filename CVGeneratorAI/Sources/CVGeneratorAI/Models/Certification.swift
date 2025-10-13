@@ -1,17 +1,29 @@
+#if canImport(FoundationModels)
 import Foundation
+import FoundationModels
 
 /// Certification entry
-public struct Certification: Codable, Equatable, Identifiable, Sendable {
-    public let id: UUID
+@Generable
+public struct Certification: Codable, Equatable, Sendable {
+    @Guide(description: "Certification name (e.g., 'AWS Certified Solutions Architect', 'PMP')")
     public let name: String
+
+    @Guide(description: "Issuing organization (e.g., 'Amazon Web Services', 'PMI')")
     public let issuer: String
+
+    @Guide(description: "Date obtained (e.g., '2023', 'June 2022')")
     public let date: String
+
+    @Guide(description: "Expiry date if applicable")
     public let expiryDate: String?
+
+    @Guide(description: "Credential ID if mentioned")
     public let credentialId: String?
+
+    @Guide(description: "Verification URL if mentioned")
     public let url: String?
 
     public init(
-        id: UUID = UUID(),
         name: String,
         issuer: String,
         date: String,
@@ -19,7 +31,6 @@ public struct Certification: Codable, Equatable, Identifiable, Sendable {
         credentialId: String? = nil,
         url: String? = nil
     ) {
-        self.id = id
         self.name = name
         self.issuer = issuer
         self.date = date
@@ -27,15 +38,5 @@ public struct Certification: Codable, Equatable, Identifiable, Sendable {
         self.credentialId = credentialId
         self.url = url
     }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
-        self.name = try container.decode(String.self, forKey: .name)
-        self.issuer = try container.decode(String.self, forKey: .issuer)
-        self.date = try container.decode(String.self, forKey: .date)
-        self.expiryDate = try container.decodeIfPresent(String.self, forKey: .expiryDate)
-        self.credentialId = try container.decodeIfPresent(String.self, forKey: .credentialId)
-        self.url = try container.decodeIfPresent(String.self, forKey: .url)
-    }
 }
+#endif

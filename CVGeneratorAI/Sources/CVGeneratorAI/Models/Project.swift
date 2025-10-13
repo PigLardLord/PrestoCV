@@ -1,19 +1,35 @@
+#if canImport(FoundationModels)
 import Foundation
+import FoundationModels
 
 /// Project entry
-public struct Project: Codable, Equatable, Identifiable, Sendable {
-    public let id: UUID
+@Generable
+public struct Project: Codable, Equatable, Sendable {
+    @Guide(description: "Project name")
     public let name: String
+
+    @Guide(description: "Brief project description")
     public let description: String
+
+    @Guide(description: "Your role in the project")
     public let role: String?
+
+    @Guide(description: "Start date (e.g., '2022')")
     public let startDate: String?
+
+    @Guide(description: "End date or null if ongoing")
     public let endDate: String?
+
+    @Guide(description: "Technologies used in the project")
     public let technologies: [String]
+
+    @Guide(description: "Project URL or repository link")
     public let url: String?
+
+    @Guide(description: "Key achievements or outcomes")
     public let achievements: [String]
 
     public init(
-        id: UUID = UUID(),
         name: String,
         description: String,
         role: String? = nil,
@@ -23,7 +39,6 @@ public struct Project: Codable, Equatable, Identifiable, Sendable {
         url: String? = nil,
         achievements: [String] = []
     ) {
-        self.id = id
         self.name = name
         self.description = description
         self.role = role
@@ -33,17 +48,5 @@ public struct Project: Codable, Equatable, Identifiable, Sendable {
         self.url = url
         self.achievements = achievements
     }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
-        self.name = try container.decode(String.self, forKey: .name)
-        self.description = try container.decode(String.self, forKey: .description)
-        self.role = try container.decodeIfPresent(String.self, forKey: .role)
-        self.startDate = try container.decodeIfPresent(String.self, forKey: .startDate)
-        self.endDate = try container.decodeIfPresent(String.self, forKey: .endDate)
-        self.technologies = try container.decodeIfPresent([String].self, forKey: .technologies) ?? []
-        self.url = try container.decodeIfPresent(String.self, forKey: .url)
-        self.achievements = try container.decodeIfPresent([String].self, forKey: .achievements) ?? []
-    }
 }
+#endif

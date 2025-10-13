@@ -34,44 +34,126 @@ public final class FoundationModelsService: CVGenerationService {
 
         let startTime = Date()
 
-        // Create language model session
-        let session = LanguageModelSession()
+        // Create language model session with system instructions
+        let session = LanguageModelSession(
+            instructions: Instructions {
+                "You are an expert CV writer creating PRODUCTION-QUALITY professional CVs matching senior-level standards."
 
-        // Build comprehensive prompt
-        let prompt = buildPrompt(from: request)
+                """
+                CRITICAL REQUIREMENTS:
+                - CONCISE, IMPACTFUL descriptions with quantifiable results
+                - STRONG ACTION VERBS (Led, Built, Implemented, Delivered)
+                - Extract company/university names EXACTLY as mentioned
+                - Professional summary: 3-4 sentences max
+                - Infer relevant technical skills from context
+                """
 
-        #if DEBUG
-        print("🔍 DEBUG: Prompt length: \(prompt.count)")
-        print("🔍 DEBUG: Prompt preview: \(String(prompt.prefix(300)))")
-        #endif
+                """
+                LANGUAGE INFERENCE:
+                - If prompt is in English, add English with C2 proficiency
+                - Mark native language as Native
+                """
+            }
+        )
 
         do {
-            // Generate CV using structured output
-            // Note: We'll get JSON back which we can decode to CVData
-            let response = try await session.respond(to: prompt)
+            // Generate CV using guided generation
+            let stream = session.streamResponse(
+                generating: CVData.self,
+                includeSchemaInPrompt: false,
+                options: GenerationOptions(sampling: .greedy)
+            ) {
+                "PROFESSIONAL TONE: \(request.preferences.tone.rawValue) style"
+                "Experience Level: \(request.preferences.experienceLevel.rawValue)"
 
-            // Debug: Log response for troubleshooting
-            #if DEBUG
-            print("🔍 DEBUG: Response content length: \(response.content.count)")
-            print("🔍 DEBUG: Response preview: \(String(response.content.prefix(200)))")
-            #endif
+                if let personalInfo = request.personalInfo {
+                    "Personal Info: \(personalInfo.name), \(personalInfo.email)"
+                }
 
-            // Parse the JSON response into our CVData model
-            let cvData = try parseResponse(response.content, request: request, startTime: startTime)
+                if let targetRole = request.preferences.targetRole {
+                    "Target Role: \(targetRole)"
+                }
+
+                "Background Description:"
+                request.userPrompt
+            }
+
+            // Collect final result - the last item in stream is the complete generation
+            var finalCVData: CVData?
+            for try await partialResponse in stream {
+                // Try to construct complete CVData from partial if all required fields are present
+                if let personalInfoPartial = partialResponse.content.personalInfo,
+                   let name = personalInfoPartial.name,
+                   let email = personalInfoPartial.email {
+
+                    let personalInfo = PersonalInfo(
+                        name: name,
+                        email: email,
+                        phone: personalInfoPartial.phone,
+                        location: personalInfoPartial.location,
+                        website: personalInfoPartial.website,
+                        linkedin: personalInfoPartial.linkedin,
+                        github: personalInfoPartial.github,
+                        title: personalInfoPartial.title
+                    )
+
+                    let experience = partialResponse.content.experience?.compactMap { expPartial in
+                        convertExperience(expPartial)
+                    } ?? []
+
+                    let education = partialResponse.content.education?.compactMap { eduPartial in
+                        convertEducation(eduPartial)
+                    } ?? []
+
+                    let skills = partialResponse.content.skills?.compactMap { skillPartial in
+                        convertSkill(skillPartial)
+                    } ?? []
+
+                    let languages = partialResponse.content.languages?.compactMap { langPartial in
+                        convertLanguage(langPartial)
+                    } ?? []
+
+                    let certifications = partialResponse.content.certifications?.compactMap { certPartial in
+                        convertCertification(certPartial)
+                    } ?? []
+
+                    let projects = partialResponse.content.projects?.compactMap { projPartial in
+                        convertProject(projPartial)
+                    } ?? []
+
+                    let interests = partialResponse.content.interests?.compactMap { $0 } ?? []
+
+                    finalCVData = CVData(
+                        personalInfo: personalInfo,
+                        summary: partialResponse.content.summary,
+                        experience: experience,
+                        education: education,
+                        skills: skills,
+                        languages: languages,
+                        certifications: certifications,
+                        projects: projects,
+                        interests: interests
+                    )
+                }
+            }
+
+            guard let completeCVData = finalCVData else {
+                throw CVGenerationError.invalidResponse
+            }
 
             // Calculate confidence based on response quality
-            let confidence = calculateConfidence(cvData: cvData)
+            let confidence = calculateConfidence(cvData: completeCVData)
 
             let processingTime = Date().timeIntervalSince(startTime)
 
             return CVGenerationResult(
-                cvData: cvData,
+                cvData: completeCVData,
                 confidence: confidence,
-                suggestions: generateSuggestions(cvData: cvData),
+                suggestions: generateSuggestions(cvData: completeCVData),
                 metadata: ResultMetadata(
                     generatedAt: Date(),
                     processingTime: processingTime,
-                    modelVersion: "foundation-models-1.0"
+                    modelVersion: "foundation-models-2.0"
                 )
             )
 
@@ -90,239 +172,6 @@ public final class FoundationModelsService: CVGenerationService {
     }
 
     // MARK: - Private Helpers
-
-    private func buildPrompt(from request: CVGenerationRequest) -> String {
-        var prompt = """
-        You are an expert CV writer creating PRODUCTION-QUALITY professional CVs. Your output must match senior-level professional standards.
-
-        CRITICAL QUALITY REQUIREMENTS:
-        - Write CONCISE, IMPACTFUL descriptions using bullet points (•) for achievements
-        - Lead with QUANTIFIABLE RESULTS and CONCRETE OUTCOMES (numbers, metrics, impact)
-        - Use STRONG ACTION VERBS (Led, Built, Implemented, Delivered, Optimized, Designed)
-        - Focus on BUSINESS VALUE and REAL IMPACT, not generic responsibilities
-        - Keep descriptions SHORT and POWERFUL - avoid fluff or generic statements
-        - Professional summary: 3-4 sentences max, highlighting expertise and proven track record
-
-        EXTRACTION RULES (CRITICAL):
-        - Extract ALL company names, university names, and locations EXACTLY as mentioned
-        - Use ONLY information provided - NEVER invent or assume details
-        - Companies: exact name (e.g., "Acme Mobile Solutions", "Initech")
-        - Universities: exact institution name (e.g., "Università degli Studi di Esempio")
-        - Locations: cities/countries as mentioned (e.g., "Genoa, Italy", "Berlin, Germany")
-        - Dates: consistent format (e.g., "March 2019 – Present", "2015")
-        - Calculate experience duration (e.g., "6+ years", "3 years")
-
-        SKILLS & TECHNOLOGIES:
-        - Infer relevant technical skills from job roles and industry context
-        - Group skills by category (e.g., "Languages", "Frameworks", "Tools", "Architecture")
-        - Only include skills that make sense for the profession mentioned
-        - Be specific with technology names (e.g., "Swift", "SwiftUI", "Git", not just "programming")
-
-        LANGUAGE INFERENCE:
-        - If prompt is in English, add English with proficiency C2 or Fluent
-        - If user mentions native language, mark as Native
-        - Add other languages only if explicitly mentioned
-
-        PROFESSIONAL TONE:
-        - \(request.preferences.tone.rawValue) style
-        - Focus on achievements, not just duties
-        - Emphasize leadership, collaboration, and technical excellence where applicable
-
-        """
-
-        // Add personal information if provided
-        if let personalInfo = request.personalInfo {
-            prompt += "\nPersonal Information:\n"
-            prompt += "- Name: \(personalInfo.name)\n"
-            prompt += "- Email: \(personalInfo.email)\n"
-            if let phone = personalInfo.phone {
-                prompt += "- Phone: \(phone)\n"
-            }
-            if let location = personalInfo.location {
-                prompt += "- Location: \(location)\n"
-            }
-            if let title = personalInfo.title {
-                prompt += "- Current/Desired Title: \(title)\n"
-            }
-        }
-
-        // Add target role
-        if let targetRole = request.preferences.targetRole {
-            prompt += "\nTarget Role: \(targetRole)\n"
-        }
-
-        // Add experience level context
-        prompt += "\nExperience Level: \(request.preferences.experienceLevel.rawValue)\n"
-
-        // Add focus areas if any
-        if !request.preferences.focusAreas.isEmpty {
-            prompt += "\nFocus Areas: \(request.preferences.focusAreas.joined(separator: ", "))\n"
-        }
-
-        // Add the user's background description
-        prompt += """
-
-        Background Description:
-        \(request.userPrompt)
-
-        QUALITY EXAMPLES (adapt style to user's profession):
-
-        Tech/Engineering:
-        - "Lead iOS development for a retail banking app. • Built and maintain 2 production apps • Mentor 3 junior engineers"
-
-        Healthcare:
-        - "Emergency Medicine Physician managing high-acuity cases in 400-bed trauma center. • Treated 2,000+ patients annually with 98% patient satisfaction rate • Led implementation of new triage protocol reducing wait times by 35% • Mentored 15 medical residents in emergency procedures"
-
-        UX/Design:
-        - "Lead UX Designer for fintech platform serving 500K+ users. • Redesigned checkout flow increasing conversion rate by 40% • Conducted 50+ user research sessions informing product roadmap • Established design system adopted across 8 product teams reducing development time by 25%"
-
-        HR/Management:
-        - "HR Manager overseeing talent acquisition and retention for 200+ employee tech company. • Reduced time-to-hire by 45% through streamlined recruitment process • Implemented employee development program improving retention rate from 75% to 92% • Led diversity initiative increasing underrepresented hires by 60%"
-
-        Business/Sales:
-        - "Regional Sales Director managing $5M revenue territory across EMEA. • Exceeded quota by 150% for 3 consecutive years • Built and led team of 12 sales representatives • Secured 20+ enterprise contracts with Fortune 500 companies worth $2M+ annually"
-
-        Generate a CV with the following structure in JSON format:
-        {
-          "personalInfo": {
-            "name": "string",
-            "email": "string",
-            "phone": "string (optional)",
-            "location": "string (optional)",
-            "website": "string (optional)",
-            "linkedin": "string (optional)",
-            "github": "string (optional)",
-            "title": "string (optional)"
-          },
-          "summary": "string - professional summary paragraph",
-          "experience": [
-            {
-              "title": "job title",
-              "company": "EXACT company name from description",
-              "location": "city, country if mentioned",
-              "startDate": "year or month year",
-              "endDate": "year or 'Present' for current",
-              "current": boolean,
-              "description": "role description",
-              "achievements": ["achievement 1", "achievement 2"],
-              "technologies": ["tech1", "tech2"]
-            }
-          ],
-          "education": [
-            {
-              "degree": "degree type and field",
-              "institution": "EXACT university name from description",
-              "location": "city, country if mentioned",
-              "startDate": "year",
-              "endDate": "year",
-              "gpa": "if mentioned",
-              "description": "additional details",
-              "achievements": ["honor/award"]
-            }
-          ],
-          "skills": [
-            {
-              "name": "skill name",
-              "level": "Expert|Advanced|Intermediate|Beginner",
-              "category": "Programming Languages|Frameworks|Tools|etc",
-              "yearsOfExperience": number
-            }
-          ],
-          "languages": [
-            {
-              "name": "language name",
-              "proficiency": "Native|C2|C1|B2|B1|A2|A1 (MUST use exactly these values)"
-            }
-          ],
-          "certifications": [
-            {
-              "name": "certification name",
-              "issuer": "issuing organization",
-              "date": "year",
-              "expiryDate": "year (optional)",
-              "credentialId": "id (optional)",
-              "url": "url (optional)"
-            }
-          ],
-          "projects": [
-            {
-              "name": "project name",
-              "description": "project description",
-              "role": "your role",
-              "startDate": "year (optional)",
-              "endDate": "year (optional)",
-              "technologies": ["tech1", "tech2"],
-              "url": "url (optional)",
-              "achievements": ["achievement"]
-            }
-          ],
-          "interests": ["interest1", "interest2"]
-        }
-
-        Return ONLY the JSON object, no additional text or explanation.
-        """
-
-        return prompt
-    }
-
-    private func parseResponse(_ content: String, request: CVGenerationRequest, startTime: Date) throws -> CVData {
-        // Clean up the response - remove markdown code blocks if present
-        var jsonString = content.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        #if DEBUG
-        print("🔍 DEBUG: Parsing response, original length: \(jsonString.count)")
-        #endif
-
-        // Remove markdown JSON code blocks
-        if jsonString.hasPrefix("```json") {
-            jsonString = jsonString.replacingOccurrences(of: "```json", with: "")
-            jsonString = jsonString.replacingOccurrences(of: "```", with: "")
-            jsonString = jsonString.trimmingCharacters(in: .whitespacesAndNewlines)
-        } else if jsonString.hasPrefix("```") {
-            jsonString = jsonString.replacingOccurrences(of: "```", with: "")
-            jsonString = jsonString.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        guard let jsonData = jsonString.data(using: .utf8) else {
-            #if DEBUG
-            print("🔍 DEBUG: Failed to convert string to data")
-            #endif
-            throw CVGenerationError.invalidResponse
-        }
-
-        // Decode the JSON into a temporary structure
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-
-        do {
-            let response = try decoder.decode(AIGeneratedCV.self, from: jsonData)
-            let personalInfo = request.personalInfo ?? response.personalInfo
-
-            return CVData(
-                id: UUID(),
-                personalInfo: personalInfo,
-                summary: response.summary,
-                experience: response.experience,
-                education: response.education,
-                skills: response.skills,
-                languages: response.languages,
-                certifications: response.certifications,
-                projects: response.projects,
-                interests: response.interests,
-                metadata: CVMetadata(
-                    generatedAt: Date(),
-                    generatedBy: "FoundationModels",
-                    version: "1.0"
-                )
-            )
-        } catch {
-            #if DEBUG
-            print("🔍 DEBUG: JSON decode failed: \(error)")
-            print("🔍 DEBUG: JSON string (first 500 chars): \(String(jsonString.prefix(500)))")
-            #endif
-            throw CVGenerationError.invalidResponse
-        }
-    }
 
     private func calculateConfidence(cvData: CVData) -> Double {
         var confidence = 0.7
@@ -356,18 +205,99 @@ public final class FoundationModelsService: CVGenerationService {
 
         return suggestions
     }
-}
 
-// MARK: - AI Response Structure
+    // MARK: - PartiallyGenerated Converters
 
-private struct AIGeneratedCV: Codable {
-    let personalInfo: PersonalInfo
-    let summary: String?
-    let experience: [Experience]
-    let education: [Education]
-    let skills: [Skill]
-    let languages: [Language]
-    let certifications: [Certification]
-    let projects: [Project]
-    let interests: [String]
+    private func convertExperience(_ partial: Experience.PartiallyGenerated) -> Experience? {
+        guard let title = partial.title,
+              let company = partial.company,
+              let startDate = partial.startDate else {
+            return nil
+        }
+        return Experience(
+            title: title,
+            company: company,
+            location: partial.location,
+            startDate: startDate,
+            endDate: partial.endDate,
+            current: partial.current ?? false,
+            description: partial.description ?? "",
+            achievements: partial.achievements?.compactMap { $0 } ?? [],
+            technologies: partial.technologies?.compactMap { $0 } ?? []
+        )
+    }
+
+    private func convertEducation(_ partial: Education.PartiallyGenerated) -> Education? {
+        guard let degree = partial.degree,
+              let institution = partial.institution else {
+            return nil
+        }
+        return Education(
+            degree: degree,
+            institution: institution,
+            location: partial.location,
+            startDate: partial.startDate ?? "",
+            endDate: partial.endDate,
+            gpa: partial.gpa,
+            description: partial.description,
+            achievements: partial.achievements?.compactMap { $0 } ?? []
+        )
+    }
+
+    private func convertSkill(_ partial: Skill.PartiallyGenerated) -> Skill? {
+        guard let name = partial.name,
+              let level = partial.level else {
+            return nil
+        }
+        return Skill(
+            name: name,
+            level: level,
+            category: partial.category,
+            yearsOfExperience: partial.yearsOfExperience
+        )
+    }
+
+    private func convertLanguage(_ partial: Language.PartiallyGenerated) -> Language? {
+        guard let name = partial.name,
+              let proficiency = partial.proficiency else {
+            return nil
+        }
+        return Language(
+            name: name,
+            proficiency: proficiency
+        )
+    }
+
+    private func convertCertification(_ partial: Certification.PartiallyGenerated) -> Certification? {
+        guard let name = partial.name,
+              let issuer = partial.issuer,
+              let date = partial.date else {
+            return nil
+        }
+        return Certification(
+            name: name,
+            issuer: issuer,
+            date: date,
+            expiryDate: partial.expiryDate,
+            credentialId: partial.credentialId,
+            url: partial.url
+        )
+    }
+
+    private func convertProject(_ partial: Project.PartiallyGenerated) -> Project? {
+        guard let name = partial.name,
+              let description = partial.description else {
+            return nil
+        }
+        return Project(
+            name: name,
+            description: description,
+            role: partial.role,
+            startDate: partial.startDate,
+            endDate: partial.endDate,
+            technologies: partial.technologies?.compactMap { $0 } ?? [],
+            url: partial.url,
+            achievements: partial.achievements?.compactMap { $0 } ?? []
+        )
+    }
 }

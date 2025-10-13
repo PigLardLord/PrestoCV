@@ -4,17 +4,13 @@ import PackageDescription
 let package = Package(
     name: "CVGeneratorAI",
     platforms: [
-        .iOS(.v18),
-        .macOS(.v15)
+        .iOS("26.0"),
+        .macOS("26.0")
     ],
     products: [
         .library(
             name: "CVGeneratorAI",
             targets: ["CVGeneratorAI"]
-        ),
-        .executable(
-            name: "CVGeneratorDemo",
-            targets: ["CVGeneratorDemo"]
         ),
     ],
     targets: [
@@ -22,11 +18,6 @@ let package = Package(
             name: "CVGeneratorAI",
             dependencies: [],
             path: "Sources/CVGeneratorAI"
-        ),
-        .executableTarget(
-            name: "CVGeneratorDemo",
-            dependencies: ["CVGeneratorAI"],
-            path: "Sources/CVGeneratorDemo"
         ),
         .testTarget(
             name: "CVGeneratorAITests",

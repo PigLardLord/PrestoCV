@@ -1,19 +1,36 @@
+#if canImport(FoundationModels)
 import Foundation
+import FoundationModels
 
 /// Education entry
-public struct Education: Codable, Equatable, Identifiable, Sendable {
-    public let id: UUID
+@Generable
+public struct Education: Codable, Equatable, Sendable {
+
+    @Guide(description: "Degree type and field (e.g., 'Bachelor of Science in Computer Science', 'Master of Business Administration')")
     public let degree: String
+
+    @Guide(description: "EXACT institution name - extract exactly as mentioned by user")
     public let institution: String
+
+    @Guide(description: "Location (city, country) if mentioned")
     public let location: String?
+
+    @Guide(description: "Start year (e.g., '2015')")
     public let startDate: String
+
+    @Guide(description: "End year (e.g., '2019') or null if still studying")
     public let endDate: String?
+
+    @Guide(description: "GPA if mentioned (e.g., '3.8/4.0', 'Summa Cum Laude')")
     public let gpa: String?
+
+    @Guide(description: "Additional details about the program")
     public let description: String?
+
+    @Guide(description: "Academic achievements, honors, awards")
     public let achievements: [String]
 
     public init(
-        id: UUID = UUID(),
         degree: String,
         institution: String,
         location: String? = nil,
@@ -23,7 +40,6 @@ public struct Education: Codable, Equatable, Identifiable, Sendable {
         description: String? = nil,
         achievements: [String] = []
     ) {
-        self.id = id
         self.degree = degree
         self.institution = institution
         self.location = location
@@ -33,17 +49,5 @@ public struct Education: Codable, Equatable, Identifiable, Sendable {
         self.description = description
         self.achievements = achievements
     }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
-        self.degree = try container.decode(String.self, forKey: .degree)
-        self.institution = try container.decode(String.self, forKey: .institution)
-        self.location = try container.decodeIfPresent(String.self, forKey: .location)
-        self.startDate = try container.decode(String.self, forKey: .startDate)
-        self.endDate = try container.decodeIfPresent(String.self, forKey: .endDate)
-        self.gpa = try container.decodeIfPresent(String.self, forKey: .gpa)
-        self.description = try container.decodeIfPresent(String.self, forKey: .description)
-        self.achievements = try container.decodeIfPresent([String].self, forKey: .achievements) ?? []
-    }
 }
+#endif

@@ -1,19 +1,38 @@
+#if canImport(FoundationModels)
 import Foundation
+import FoundationModels
 
-public struct Experience: Codable, Equatable, Identifiable, Sendable {
-    public let id: UUID
+@Generable
+public struct Experience: Codable, Equatable, Sendable {
+    @Guide(description: "Job title (e.g., 'Senior iOS Developer', 'Lead Engineer')")
     public let title: String
+
+    @Guide(description: "EXACT company name - extract exactly as mentioned by user")
     public let company: String
+
+    @Guide(description: "Location (city, country) if mentioned")
     public let location: String?
+
+    @Guide(description: "Start date in format like 'August 2018', '2018', or 'Jan 2020'")
     public let startDate: String
+
+    @Guide(description: "End date or null if current position")
     public let endDate: String?
+
+    @Guide(description: "Is this a current position?")
     public let current: Bool
+
+    @Guide(description: "Brief role description (1-2 sentences)")
     public let description: String
+
+    @Guide(description: "Concise achievements with metrics. Start with strong action verbs.")
+    @Guide(.count(2...5))
     public let achievements: [String]
+
+    @Guide(description: "Specific technologies used (e.g., 'Swift', 'SwiftUI', 'Combine')")
     public let technologies: [String]
 
     public init(
-        id: UUID = UUID(),
         title: String,
         company: String,
         location: String? = nil,
@@ -24,7 +43,6 @@ public struct Experience: Codable, Equatable, Identifiable, Sendable {
         achievements: [String] = [],
         technologies: [String] = []
     ) {
-        self.id = id
         self.title = title
         self.company = company
         self.location = location
@@ -35,18 +53,5 @@ public struct Experience: Codable, Equatable, Identifiable, Sendable {
         self.achievements = achievements
         self.technologies = technologies
     }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
-        self.title = try container.decode(String.self, forKey: .title)
-        self.company = try container.decode(String.self, forKey: .company)
-        self.location = try container.decodeIfPresent(String.self, forKey: .location)
-        self.startDate = try container.decode(String.self, forKey: .startDate)
-        self.endDate = try container.decodeIfPresent(String.self, forKey: .endDate)
-        self.current = try container.decode(Bool.self, forKey: .current)
-        self.description = try container.decode(String.self, forKey: .description)
-        self.achievements = try container.decodeIfPresent([String].self, forKey: .achievements) ?? []
-        self.technologies = try container.decodeIfPresent([String].self, forKey: .technologies) ?? []
-    }
 }
+#endif
