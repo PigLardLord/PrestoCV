@@ -35,27 +35,21 @@ public final class FoundationModelsService: CVGenerationService {
 
         let startTime = Date()
 
-        // Create language model session
+        // Create language model session (on-device, 4K token limit)
         let session = LanguageModelSession()
 
         do {
-            // Build comprehensive prompt with instructions
+            // Optimized prompt - concise to stay within 4K token limit
             var promptParts: [String] = [
-                "You are an expert CV writer creating PRODUCTION-QUALITY professional CVs matching senior-level standards.",
+                "Expert CV writer. Create professional CV:",
+                "- Concise, impactful descriptions with metrics",
+                "- Action verbs (Led, Built, Delivered)",
+                "- Extract names EXACTLY as mentioned",
+                "- Summary: 3-4 sentences max",
+                "- Infer skills from context",
+                "- If English: add English C2, native language: Native",
                 "",
-                "CRITICAL REQUIREMENTS:",
-                "- CONCISE, IMPACTFUL descriptions with quantifiable results",
-                "- STRONG ACTION VERBS (Led, Built, Implemented, Delivered)",
-                "- Extract company/university names EXACTLY as mentioned",
-                "- Professional summary: 3-4 sentences max",
-                "- Infer relevant technical skills from context",
-                "",
-                "LANGUAGE INFERENCE:",
-                "- If prompt is in English, add English with C2 proficiency",
-                "- Mark native language as Native",
-                "",
-                "PROFESSIONAL TONE: \(request.preferences.tone.rawValue) style",
-                "Experience Level: \(request.preferences.experienceLevel.rawValue)"
+                "Tone: \(request.preferences.tone.rawValue) | Level: \(request.preferences.experienceLevel.rawValue)"
             ]
 
             if let personalInfo = request.personalInfo {
@@ -160,13 +154,26 @@ public final class FoundationModelsService: CVGenerationService {
                 )
             )
 
-        } catch {
+        } catch let error as LanguageModelSession.GenerationError {
             // Handle FoundationModels specific errors
+            switch error {
+            case .exceededContextWindowSize(let context):
+                #if DEBUG
+                print("⚠️ Context window exceeded: \(context.debugDescription)")
+                #endif
+                throw CVGenerationError.unknown("Content too large for on-device model. Please provide a shorter description or fewer details.")
+            default:
+                #if DEBUG
+                print("🔍 DEBUG: Generation error: \(error)")
+                #endif
+                throw CVGenerationError.unknown("Failed to generate CV: \(error.localizedDescription)")
+            }
+        } catch {
+            // Handle other errors
             #if DEBUG
-            print("🔍 DEBUG: Error type: \(type(of: error))")
-            print("🔍 DEBUG: Error: \(error)")
+            print("🔍 DEBUG: Unexpected error: \(error)")
             #endif
-            throw CVGenerationError.unknown("Failed to generate CV: \(error.localizedDescription) - Type: \(type(of: error))")
+            throw CVGenerationError.unknown("Failed to generate CV: \(error.localizedDescription)")
         }
 
         #else
@@ -195,27 +202,21 @@ public final class FoundationModelsService: CVGenerationService {
                     return
                 }
 
-                // Create language model session
+                // Create language model session (on-device, 4K token limit)
                 let session = LanguageModelSession()
 
                 do {
-                    // Build comprehensive prompt with instructions
+                    // Optimized prompt - concise to stay within 4K token limit
                     var promptParts: [String] = [
-                        "You are an expert CV writer creating PRODUCTION-QUALITY professional CVs matching senior-level standards.",
+                        "Expert CV writer. Create professional CV:",
+                        "- Concise, impactful descriptions with metrics",
+                        "- Action verbs (Led, Built, Delivered)",
+                        "- Extract names EXACTLY as mentioned",
+                        "- Summary: 3-4 sentences max",
+                        "- Infer skills from context",
+                        "- If English: add English C2, native language: Native",
                         "",
-                        "CRITICAL REQUIREMENTS:",
-                        "- CONCISE, IMPACTFUL descriptions with quantifiable results",
-                        "- STRONG ACTION VERBS (Led, Built, Implemented, Delivered)",
-                        "- Extract company/university names EXACTLY as mentioned",
-                        "- Professional summary: 3-4 sentences max",
-                        "- Infer relevant technical skills from context",
-                        "",
-                        "LANGUAGE INFERENCE:",
-                        "- If prompt is in English, add English with C2 proficiency",
-                        "- Mark native language as Native",
-                        "",
-                        "PROFESSIONAL TONE: \(request.preferences.tone.rawValue) style",
-                        "Experience Level: \(request.preferences.experienceLevel.rawValue)"
+                        "Tone: \(request.preferences.tone.rawValue) | Level: \(request.preferences.experienceLevel.rawValue)"
                     ]
 
                     if let personalInfo = request.personalInfo {
@@ -249,6 +250,17 @@ public final class FoundationModelsService: CVGenerationService {
 
                     continuation.finish()
 
+                } catch let error as LanguageModelSession.GenerationError {
+                    // Handle FoundationModels specific errors
+                    switch error {
+                    case .exceededContextWindowSize(let context):
+                        #if DEBUG
+                        print("⚠️ Context window exceeded: \(context.debugDescription)")
+                        #endif
+                        continuation.finish(throwing: CVGenerationError.unknown("Content too large for on-device model. Please provide a shorter description or fewer details."))
+                    default:
+                        continuation.finish(throwing: CVGenerationError.unknown("Failed to generate CV: \(error.localizedDescription)"))
+                    }
                 } catch {
                     continuation.finish(throwing: CVGenerationError.unknown("Failed to generate CV: \(error.localizedDescription)"))
                 }

@@ -45,17 +45,17 @@ final class ViewModelFactory {
     }
 
     func isAIGenerationAvailable() -> Bool {
-        if #available(iOS 26, macOS 26, *) {
-            return true
-        } else {
-            return false
-        }
+        return FeatureFlags.isAIGenerationAvailable
     }
 
     // MARK: - Private Composition Root
 
     @MainActor
     private func makeCVGeneratorUseCase() -> CVGeneratorUseCase? {
+        guard FeatureFlags.isAIGenerationAvailable else {
+            return nil
+        }
+
         guard let service = makeCVGenerationService() else {
             return nil
         }
@@ -64,10 +64,16 @@ final class ViewModelFactory {
 
     @MainActor
     private func makeCVGenerationService() -> CVGenerationService? {
-        if #available(iOS 26, macOS 26, *) {
-            return FoundationModelsService()
-        } else {
+        guard FeatureFlags.isAIGenerationAvailable else {
             return nil
         }
+
+        #if canImport(FoundationModels)
+        if #available(iOS 26, macOS 26, *) {
+            return FoundationModelsService()
+        }
+        #endif
+
+        return nil
     }
 }
