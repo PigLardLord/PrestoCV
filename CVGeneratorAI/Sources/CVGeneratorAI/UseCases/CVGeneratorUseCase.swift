@@ -35,4 +35,19 @@ public final class CVGeneratorUseCase {
 
         return result
     }
+
+    #if canImport(FoundationModels)
+    /// Generate CV with streaming support for real-time UI updates
+    /// - Parameter request: The generation request
+    /// - Returns: AsyncThrowingStream of partially generated CV data
+    /// - Note: Request validation is performed before streaming begins
+    @available(iOS 26, macOS 26, *)
+    public func generateCVStream(from request: CVGenerationRequest) throws -> AsyncThrowingStream<CVData.PartiallyGenerated, Error> {
+        // Validate request upfront
+        try validator.validateRequest(request)
+
+        // Return the service's stream directly
+        return service.generateCVStream(from: request)
+    }
+    #endif
 }

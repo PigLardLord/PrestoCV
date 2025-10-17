@@ -54,6 +54,7 @@ final class ViewModelFactory {
 
     // MARK: - Private Composition Root
 
+    @MainActor
     private func makeCVGeneratorUseCase() -> CVGeneratorUseCase? {
         guard let service = makeCVGenerationService() else {
             return nil
@@ -61,6 +62,7 @@ final class ViewModelFactory {
         return CVGeneratorUseCase(service: service)
     }
 
+    @MainActor
     private func makeCVGenerationService() -> CVGenerationService? {
         if #available(iOS 26, macOS 26, *) {
             return FoundationModelsService()

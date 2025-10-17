@@ -9,6 +9,10 @@ final class AIGenerationViewModel: ObservableObject {
     @Published var errorMessage: String = ""
     @Published var generatedCVId: String?
 
+    #if canImport(FoundationModels)
+    @Published var partialCVData: CVGeneratorAI.CVData.PartiallyGenerated?
+    #endif
+
     private let cvGenerationUseCase: CVGeneratorUseCase
     private let cvManagementUseCase: CVManagementUseCaseProtocol
 
@@ -55,6 +59,167 @@ final class AIGenerationViewModel: ObservableObject {
     func clearError() {
         errorMessage = ""
     }
+
+    #if canImport(FoundationModels)
+    @available(iOS 26, macOS 26, *)
+    func generateCVWithStreaming() async {
+        guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = "Please provide a description of your professional background"
+            return
+        }
+
+        isGenerating = true
+        errorMessage = ""
+        partialCVData = nil
+
+        do {
+            let request = CVGenerationRequest(
+                userPrompt: prompt,
+                personalInfo: nil,
+                preferences: GenerationPreferences()
+            )
+
+            let stream = try cvGenerationUseCase.generateCVStream(from: request)
+
+            // Consume stream and update UI in real-time
+            for try await partial in stream {
+                partialCVData = partial
+            }
+
+            // Once stream completes, convert final partial to complete CVData
+            if let finalPartial = partialCVData,
+               let completeCVData = try? convertPartialToCVData(finalPartial) {
+
+                let cvModel = mapToCVModel(completeCVData)
+                try await cvManagementUseCase.createCV(from: cvModel)
+
+                generatedCVId = cvModel.id.uuidString
+            } else {
+                throw CVGenerationError.invalidResponse
+            }
+
+        } catch let error as CVGenerationError {
+            errorMessage = error.errorDescription ?? "Failed to generate CV"
+        } catch {
+            errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
+        }
+
+        isGenerating = false
+        partialCVData = nil
+    }
+
+    @available(iOS 26, macOS 26, *)
+    private func convertPartialToCVData(_ partial: CVGeneratorAI.CVData.PartiallyGenerated) throws -> CVData {
+        guard let personalInfo = partial.personalInfo,
+              let name = personalInfo.name,
+              let email = personalInfo.email else {
+            throw CVGenerationError.invalidResponse
+        }
+
+        return CVData(
+            personalInfo: PersonalInfo(
+                name: name,
+                email: email,
+                phone: personalInfo.phone,
+                location: personalInfo.location,
+                website: personalInfo.website,
+                linkedin: personalInfo.linkedin,
+                github: personalInfo.github,
+                title: personalInfo.title
+            ),
+            summary: partial.summary,
+            experience: convertExperienceArray(partial.experience),
+            education: convertEducationArray(partial.education),
+            skills: convertSkillArray(partial.skills),
+            languages: convertLanguageArray(partial.languages),
+            certifications: convertCertificationArray(partial.certifications),
+            projects: convertProjectArray(partial.projects),
+            interests: partial.interests?.compactMap { $0 } ?? []
+        )
+    }
+
+    private func convertExperienceArray(_ partial: [CVGeneratorAI.Experience.PartiallyGenerated]?) -> [CVGeneratorAI.Experience] {
+        partial?.compactMap { exp in
+            guard let title = exp.title, let company = exp.company, let startDate = exp.startDate else { return nil }
+            return CVGeneratorAI.Experience(
+                title: title,
+                company: company,
+                location: exp.location,
+                startDate: startDate,
+                endDate: exp.endDate,
+                current: exp.current ?? false,
+                description: exp.description ?? "",
+                achievements: exp.achievements?.compactMap { $0 } ?? [],
+                technologies: exp.technologies?.compactMap { $0 } ?? []
+            )
+        } ?? []
+    }
+
+    private func convertEducationArray(_ partial: [CVGeneratorAI.Education.PartiallyGenerated]?) -> [CVGeneratorAI.Education] {
+        partial?.compactMap { edu in
+            guard let degree = edu.degree, let institution = edu.institution else { return nil }
+            return CVGeneratorAI.Education(
+                degree: degree,
+                institution: institution,
+                location: edu.location,
+                startDate: edu.startDate ?? "",
+                endDate: edu.endDate,
+                gpa: edu.gpa,
+                description: edu.description,
+                achievements: edu.achievements?.compactMap { $0 } ?? []
+            )
+        } ?? []
+    }
+
+    private func convertSkillArray(_ partial: [CVGeneratorAI.Skill.PartiallyGenerated]?) -> [CVGeneratorAI.Skill] {
+        partial?.compactMap { skill in
+            guard let name = skill.name, let level = skill.level else { return nil }
+            return CVGeneratorAI.Skill(
+                name: name,
+                level: level,
+                category: skill.category,
+                yearsOfExperience: skill.yearsOfExperience
+            )
+        } ?? []
+    }
+
+    private func convertLanguageArray(_ partial: [CVGeneratorAI.Language.PartiallyGenerated]?) -> [CVGeneratorAI.Language] {
+        partial?.compactMap { lang in
+            guard let name = lang.name, let proficiency = lang.proficiency else { return nil }
+            return CVGeneratorAI.Language(name: name, proficiency: proficiency)
+        } ?? []
+    }
+
+    private func convertCertificationArray(_ partial: [CVGeneratorAI.Certification.PartiallyGenerated]?) -> [CVGeneratorAI.Certification] {
+        partial?.compactMap { cert in
+            guard let name = cert.name, let issuer = cert.issuer, let date = cert.date else { return nil }
+            return CVGeneratorAI.Certification(
+                name: name,
+                issuer: issuer,
+                date: date,
+                expiryDate: cert.expiryDate,
+                credentialId: cert.credentialId,
+                url: cert.url
+            )
+        } ?? []
+    }
+
+    private func convertProjectArray(_ partial: [CVGeneratorAI.Project.PartiallyGenerated]?) -> [CVGeneratorAI.Project] {
+        partial?.compactMap { proj in
+            guard let name = proj.name, let description = proj.description else { return nil }
+            return CVGeneratorAI.Project(
+                name: name,
+                description: description,
+                role: proj.role,
+                startDate: proj.startDate,
+                endDate: proj.endDate,
+                technologies: proj.technologies?.compactMap { $0 } ?? [],
+                url: proj.url,
+                achievements: proj.achievements?.compactMap { $0 } ?? []
+            )
+        } ?? []
+    }
+    #endif
 
     private func mapToCVModel(_ cvData: CVData) -> CVModel {
         CVModel(
