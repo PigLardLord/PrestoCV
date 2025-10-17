@@ -39,15 +39,23 @@ public final class FoundationModelsService: CVGenerationService {
         let session = LanguageModelSession()
 
         do {
-            // Optimized prompt - concise to stay within 4K token limit
+            // Improved prompt - ensures quality while staying within 4K token limit
             var promptParts: [String] = [
-                "Expert CV writer. Create professional CV:",
-                "- Concise, impactful descriptions with metrics",
-                "- Action verbs (Led, Built, Delivered)",
-                "- Extract names EXACTLY as mentioned",
-                "- Summary: 3-4 sentences max",
-                "- Infer skills from context",
-                "- If English: add English C2, native language: Native",
+                "Expert CV writer. Generate complete professional CV with:",
+                "",
+                "MANDATORY sections:",
+                "- Summary: 3-4 sentence professional overview (REQUIRED)",
+                "- Experience: chronological order, newest first",
+                "- Education, Skills, Languages",
+                "- Interests: extract hobbies/passions from description",
+                "",
+                "Date format:",
+                "- Current: \"2018 - Present\"",
+                "- Past: \"2015 - 2018\" or \"Aug 2015 - Mar 2018\"",
+                "- Single year: \"2008\"",
+                "",
+                "Style: Concise with metrics, action verbs (Led, Built, Delivered)",
+                "Extract company/university names EXACTLY as stated",
                 "",
                 "Tone: \(request.preferences.tone.rawValue) | Level: \(request.preferences.experienceLevel.rawValue)"
             ]
@@ -206,15 +214,23 @@ public final class FoundationModelsService: CVGenerationService {
                 let session = LanguageModelSession()
 
                 do {
-                    // Optimized prompt - concise to stay within 4K token limit
+                    // Improved prompt - ensures quality while staying within 4K token limit
                     var promptParts: [String] = [
-                        "Expert CV writer. Create professional CV:",
-                        "- Concise, impactful descriptions with metrics",
-                        "- Action verbs (Led, Built, Delivered)",
-                        "- Extract names EXACTLY as mentioned",
-                        "- Summary: 3-4 sentences max",
-                        "- Infer skills from context",
-                        "- If English: add English C2, native language: Native",
+                        "Expert CV writer. Generate complete professional CV with:",
+                        "",
+                        "MANDATORY sections:",
+                        "- Summary: 3-4 sentence professional overview (REQUIRED)",
+                        "- Experience: chronological order, newest first",
+                        "- Education, Skills, Languages",
+                        "- Interests: extract hobbies/passions from description",
+                        "",
+                        "Date format:",
+                        "- Current: \"2018 - Present\"",
+                        "- Past: \"2015 - 2018\" or \"Aug 2015 - Mar 2018\"",
+                        "- Single year: \"2008\"",
+                        "",
+                        "Style: Concise with metrics, action verbs (Led, Built, Delivered)",
+                        "Extract company/university names EXACTLY as stated",
                         "",
                         "Tone: \(request.preferences.tone.rawValue) | Level: \(request.preferences.experienceLevel.rawValue)"
                     ]
