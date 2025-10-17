@@ -660,6 +660,12 @@
         }
       }
     },
+    "AI CV Generation" : {
+
+    },
+    "AI-Powered CV Generation" : {
+
+    },
     "common.cancel" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1520,6 +1526,12 @@
           }
         }
       }
+    },
+    "Describe your background and let AI create your CV" : {
+
+    },
+    "Describe your professional background in detail, and AI will create a production-quality CV for you." : {
+
     },
     "dialog.checking_account" : {
       "extractionState" : "manual",
@@ -2956,6 +2968,9 @@
         }
       }
     },
+    "Error" : {
+
+    },
     "error.decoding" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3283,6 +3298,9 @@
           }
         }
       }
+    },
+    "Example" : {
+
     },
     "export.button.title" : {
       "extractionState" : "manual",
@@ -5302,6 +5320,15 @@
         }
       }
     },
+    "Generate CV with AI" : {
+
+    },
+    "I'm John Doe, email john@example.com, phone +1 234 567 890, from San Francisco. I'm a senior software engineer with 8 years of experience at Tech Corp building scalable web applications. I have expertise in Python, JavaScript, React, and AWS. I graduated from MIT with a Computer Science degree in 2015. My native language is English and I'm fluent in Spanish." : {
+
+    },
+    "Include: name, email, experience, education, skills, achievements, languages, etc." : {
+
+    },
     "language.level.a1" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5632,6 +5659,9 @@
           }
         }
       }
+    },
+    "OK" : {
+
     },
     "personal_info_cv_name" : {
       "extractionState" : "manual",
@@ -7031,6 +7061,9 @@
 
     },
     "Unable to preview document" : {
+
+    },
+    "Your Professional Background" : {
 
     }
   },

@@ -35,48 +35,50 @@ public final class FoundationModelsService: CVGenerationService {
 
         let startTime = Date()
 
-        // Create language model session with system instructions
-        let session = LanguageModelSession(
-            instructions: Instructions {
-                "You are an expert CV writer creating PRODUCTION-QUALITY professional CVs matching senior-level standards."
-
-                """
-                CRITICAL REQUIREMENTS:
-                - CONCISE, IMPACTFUL descriptions with quantifiable results
-                - STRONG ACTION VERBS (Led, Built, Implemented, Delivered)
-                - Extract company/university names EXACTLY as mentioned
-                - Professional summary: 3-4 sentences max
-                - Infer relevant technical skills from context
-                """
-
-                """
-                LANGUAGE INFERENCE:
-                - If prompt is in English, add English with C2 proficiency
-                - Mark native language as Native
-                """
-            }
-        )
+        // Create language model session
+        let session = LanguageModelSession()
 
         do {
+            // Build comprehensive prompt with instructions
+            var promptParts: [String] = [
+                "You are an expert CV writer creating PRODUCTION-QUALITY professional CVs matching senior-level standards.",
+                "",
+                "CRITICAL REQUIREMENTS:",
+                "- CONCISE, IMPACTFUL descriptions with quantifiable results",
+                "- STRONG ACTION VERBS (Led, Built, Implemented, Delivered)",
+                "- Extract company/university names EXACTLY as mentioned",
+                "- Professional summary: 3-4 sentences max",
+                "- Infer relevant technical skills from context",
+                "",
+                "LANGUAGE INFERENCE:",
+                "- If prompt is in English, add English with C2 proficiency",
+                "- Mark native language as Native",
+                "",
+                "PROFESSIONAL TONE: \(request.preferences.tone.rawValue) style",
+                "Experience Level: \(request.preferences.experienceLevel.rawValue)"
+            ]
+
+            if let personalInfo = request.personalInfo {
+                promptParts.append("Personal Info: \(personalInfo.name), \(personalInfo.email)")
+            }
+
+            if let targetRole = request.preferences.targetRole {
+                promptParts.append("Target Role: \(targetRole)")
+            }
+
+            promptParts.append("")
+            promptParts.append("Background Description:")
+            promptParts.append(request.userPrompt)
+
+            let fullPrompt = promptParts.joined(separator: "\n")
+
             // Generate CV using guided generation
             let stream = session.streamResponse(
                 generating: CVData.self,
                 includeSchemaInPrompt: false,
                 options: GenerationOptions(sampling: .greedy)
             ) {
-                "PROFESSIONAL TONE: \(request.preferences.tone.rawValue) style"
-                "Experience Level: \(request.preferences.experienceLevel.rawValue)"
-
-                if let personalInfo = request.personalInfo {
-                    "Personal Info: \(personalInfo.name), \(personalInfo.email)"
-                }
-
-                if let targetRole = request.preferences.targetRole {
-                    "Target Role: \(targetRole)"
-                }
-
-                "Background Description:"
-                request.userPrompt
+                fullPrompt
             }
 
             // Collect final result - the last item in stream is the complete generation
@@ -193,48 +195,50 @@ public final class FoundationModelsService: CVGenerationService {
                     return
                 }
 
-                // Create language model session with system instructions
-                let session = LanguageModelSession(
-                    instructions: Instructions {
-                        "You are an expert CV writer creating PRODUCTION-QUALITY professional CVs matching senior-level standards."
-
-                        """
-                        CRITICAL REQUIREMENTS:
-                        - CONCISE, IMPACTFUL descriptions with quantifiable results
-                        - STRONG ACTION VERBS (Led, Built, Implemented, Delivered)
-                        - Extract company/university names EXACTLY as mentioned
-                        - Professional summary: 3-4 sentences max
-                        - Infer relevant technical skills from context
-                        """
-
-                        """
-                        LANGUAGE INFERENCE:
-                        - If prompt is in English, add English with C2 proficiency
-                        - Mark native language as Native
-                        """
-                    }
-                )
+                // Create language model session
+                let session = LanguageModelSession()
 
                 do {
+                    // Build comprehensive prompt with instructions
+                    var promptParts: [String] = [
+                        "You are an expert CV writer creating PRODUCTION-QUALITY professional CVs matching senior-level standards.",
+                        "",
+                        "CRITICAL REQUIREMENTS:",
+                        "- CONCISE, IMPACTFUL descriptions with quantifiable results",
+                        "- STRONG ACTION VERBS (Led, Built, Implemented, Delivered)",
+                        "- Extract company/university names EXACTLY as mentioned",
+                        "- Professional summary: 3-4 sentences max",
+                        "- Infer relevant technical skills from context",
+                        "",
+                        "LANGUAGE INFERENCE:",
+                        "- If prompt is in English, add English with C2 proficiency",
+                        "- Mark native language as Native",
+                        "",
+                        "PROFESSIONAL TONE: \(request.preferences.tone.rawValue) style",
+                        "Experience Level: \(request.preferences.experienceLevel.rawValue)"
+                    ]
+
+                    if let personalInfo = request.personalInfo {
+                        promptParts.append("Personal Info: \(personalInfo.name), \(personalInfo.email)")
+                    }
+
+                    if let targetRole = request.preferences.targetRole {
+                        promptParts.append("Target Role: \(targetRole)")
+                    }
+
+                    promptParts.append("")
+                    promptParts.append("Background Description:")
+                    promptParts.append(request.userPrompt)
+
+                    let fullPrompt = promptParts.joined(separator: "\n")
+
                     // Generate CV using guided generation
                     let stream = session.streamResponse(
                         generating: CVData.self,
                         includeSchemaInPrompt: false,
                         options: GenerationOptions(sampling: .greedy)
                     ) {
-                        "PROFESSIONAL TONE: \(request.preferences.tone.rawValue) style"
-                        "Experience Level: \(request.preferences.experienceLevel.rawValue)"
-
-                        if let personalInfo = request.personalInfo {
-                            "Personal Info: \(personalInfo.name), \(personalInfo.email)"
-                        }
-
-                        if let targetRole = request.preferences.targetRole {
-                            "Target Role: \(targetRole)"
-                        }
-
-                        "Background Description:"
-                        request.userPrompt
+                        fullPrompt
                     }
 
                     // Forward partial responses to the continuation
