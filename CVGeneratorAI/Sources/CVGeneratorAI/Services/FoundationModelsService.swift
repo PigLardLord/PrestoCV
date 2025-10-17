@@ -49,10 +49,12 @@ public final class FoundationModelsService: CVGenerationService {
                 "- Education, Skills, Languages",
                 "- Interests: extract hobbies/passions from description",
                 "",
-                "Date format:",
-                "- Current: \"2018 - Present\"",
-                "- Past: \"2015 - 2018\" or \"Aug 2015 - Mar 2018\"",
-                "- Single year: \"2008\"",
+                "CRITICAL: Each entry must be UNIQUE. NO duplicate experiences or education.",
+                "",
+                "Date field format (NOT full range):",
+                "- startDate: \"2018\" or \"August 2018\" or \"Aug 2018\"",
+                "- endDate: \"2022\" or \"March 2022\" (null if current)",
+                "- current: true for ongoing roles, false otherwise",
                 "",
                 "Style: Concise with metrics, action verbs (Led, Built, Delivered)",
                 "Extract company/university names EXACTLY as stated",
@@ -102,13 +104,41 @@ public final class FoundationModelsService: CVGenerationService {
                         title: personalInfoPartial.title
                     )
 
-                    let experience = partialResponse.content.experience?.compactMap { expPartial in
+                    let experienceWithDuplicates = partialResponse.content.experience?.compactMap { expPartial in
                         convertExperience(expPartial)
                     } ?? []
 
-                    let education = partialResponse.content.education?.compactMap { eduPartial in
+                    // Deduplicate experience entries (AI sometimes generates duplicates)
+                    var seenExperience = Set<String>()
+                    let experience = experienceWithDuplicates.filter { exp in
+                        let key = "\(exp.title)|\(exp.company)"
+                        if seenExperience.contains(key) {
+                            #if DEBUG
+                            print("⚠️ Skipping duplicate experience: \(exp.title) at \(exp.company)")
+                            #endif
+                            return false
+                        }
+                        seenExperience.insert(key)
+                        return true
+                    }
+
+                    let educationWithDuplicates = partialResponse.content.education?.compactMap { eduPartial in
                         convertEducation(eduPartial)
                     } ?? []
+
+                    // Deduplicate education entries (AI sometimes generates duplicates)
+                    var seenEducation = Set<String>()
+                    let education = educationWithDuplicates.filter { edu in
+                        let key = "\(edu.degree)|\(edu.institution)"
+                        if seenEducation.contains(key) {
+                            #if DEBUG
+                            print("⚠️ Skipping duplicate education: \(edu.degree) at \(edu.institution)")
+                            #endif
+                            return false
+                        }
+                        seenEducation.insert(key)
+                        return true
+                    }
 
                     let skills = partialResponse.content.skills?.compactMap { skillPartial in
                         convertSkill(skillPartial)
@@ -224,10 +254,12 @@ public final class FoundationModelsService: CVGenerationService {
                         "- Education, Skills, Languages",
                         "- Interests: extract hobbies/passions from description",
                         "",
-                        "Date format:",
-                        "- Current: \"2018 - Present\"",
-                        "- Past: \"2015 - 2018\" or \"Aug 2015 - Mar 2018\"",
-                        "- Single year: \"2008\"",
+                        "CRITICAL: Each entry must be UNIQUE. NO duplicate experiences or education.",
+                        "",
+                        "Date field format (NOT full range):",
+                        "- startDate: \"2018\" or \"August 2018\" or \"Aug 2018\"",
+                        "- endDate: \"2022\" or \"March 2022\" (null if current)",
+                        "- current: true for ongoing roles, false otherwise",
                         "",
                         "Style: Concise with metrics, action verbs (Led, Built, Delivered)",
                         "Extract company/university names EXACTLY as stated",
