@@ -35,7 +35,8 @@ public struct PrestoCVCoreAdapter: Sendable {
             phone: model.personalInfo.phone.isEmpty ? nil : model.personalInfo.phone,
             location: model.personalInfo.location.isEmpty ? nil : model.personalInfo.location,
             website: model.personalInfo.portfolio.isEmpty ? nil : model.personalInfo.portfolio,
-            summary: model.personalInfo.profile.isEmpty ? nil : model.personalInfo.profile
+            summary: model.personalInfo.profile.isEmpty ? nil : model.personalInfo.profile,
+            title: model.personalInfo.title.isEmpty ? nil : model.personalInfo.title
         )
 
         var sections: [CVSection] = []

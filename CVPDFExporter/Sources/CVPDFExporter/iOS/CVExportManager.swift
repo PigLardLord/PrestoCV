@@ -75,10 +75,11 @@ public final class CVExportManager: NSObject {
             let template = try templateRepository.loadTemplate(id: templateId)
             logger.debug("Template loaded: \(template.name)")
 
-            // Configure export options
+            // Configure export options with tight margins to match reference PDF
+            // 0.5in = 36pt, 0.6in = 43.2pt
             let options = ExportOptions(
                 pageSize: .a4,
-                margins: EdgeInsets(top: 20, left: 20, bottom: 20, right: 20),
+                margins: EdgeInsets(top: 43, left: 36, bottom: 43, right: 36),
                 maxPages: 10
             )
 
@@ -128,10 +129,11 @@ public final class CVExportManager: NSObject {
         // Load template
         let template = try templateRepository.loadTemplate(id: templateId)
 
-        // Configure export options
+        // Configure export options with tight margins to match reference PDF
+        // 0.5in = 36pt, 0.6in = 43.2pt
         let options = ExportOptions(
             pageSize: .a4,
-            margins: EdgeInsets(top: 20, left: 20, bottom: 20, right: 20),
+            margins: EdgeInsets(top: 43, left: 36, bottom: 43, right: 36),
             maxPages: 10
         )
 
@@ -194,7 +196,7 @@ public final class CVExportManager: NSObject {
     }
 
     private func presentQuickLook() {
-        guard let url = exportedFileURL,
+        guard exportedFileURL != nil,
               let viewController = presentingViewController else {
             logger.error("Cannot present QuickLook: missing URL or view controller")
             return
@@ -236,10 +238,9 @@ extension CVExportManager: QLPreviewControllerDataSource {
 
 // MARK: - QLPreviewControllerDelegate
 
-@MainActor
-extension CVExportManager: @preconcurrency QLPreviewControllerDelegate {
+extension CVExportManager: QLPreviewControllerDelegate {
 
-    nonisolated(unsafe) public func previewControllerDidDismiss(_ controller: QLPreviewController) {
+    nonisolated public func previewControllerDidDismiss(_ controller: QLPreviewController) {
         Task { @MainActor [weak self] in
             self?.handlePreviewDismissal()
         }

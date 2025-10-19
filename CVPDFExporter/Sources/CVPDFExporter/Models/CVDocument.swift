@@ -30,8 +30,9 @@ public struct PersonalInfo: Codable, Equatable, Sendable, Hashable {
     public let location: String?
     public let website: String?
     public let summary: String?
+    public let title: String? // Professional title/role
     public let image: String? // URL or base64 data
-    
+
     public init(
         name: String,
         email: String,
@@ -39,6 +40,7 @@ public struct PersonalInfo: Codable, Equatable, Sendable, Hashable {
         location: String? = nil,
         website: String? = nil,
         summary: String? = nil,
+        title: String? = nil,
         image: String? = nil
     ) {
         self.name = name
@@ -47,6 +49,7 @@ public struct PersonalInfo: Codable, Equatable, Sendable, Hashable {
         self.location = location
         self.website = website
         self.summary = summary
+        self.title = title
         self.image = image
     }
 }

@@ -60,7 +60,11 @@ private extension EnhancedWKWebViewPDFRenderer {
         let configuration = WKWebViewConfiguration()
 
         // Enable JavaScript for dynamic content
-        configuration.preferences.javaScriptEnabled = true
+        if #available(iOS 14.0, *) {
+            configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        } else {
+            configuration.preferences.javaScriptEnabled = true
+        }
 
         // Suppress incremental rendering for better PDF output
         configuration.suppressesIncrementalRendering = true
@@ -68,14 +72,32 @@ private extension EnhancedWKWebViewPDFRenderer {
         // Allow inline media playback (for embedded content)
         configuration.allowsInlineMediaPlayback = true
 
+        // Disable text size adjustment to prevent font scaling
+        configuration.preferences.setValue(false, forKey: "textInteractionEnabled")
+
         // Create user content controller for JavaScript injection
         let userContentController = WKUserContentController()
 
-        // Add print media CSS
+        // Add print media CSS and disable text size adjustment
         let printMediaScript = """
-            var style = document.createElement('style');
-            style.innerHTML = '@media print { * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; } }';
-            document.head.appendChild(style);
+            (function() {
+                // Add print color adjustment
+                var style = document.createElement('style');
+                style.innerHTML = '@media print { * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; } }';
+                document.head.appendChild(style);
+
+                // Ensure viewport is set correctly for PDF rendering
+                var viewport = document.querySelector('meta[name="viewport"]');
+                if (viewport) {
+                    viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+                }
+
+                // Force text size adjustment to none
+                document.documentElement.style.webkitTextSizeAdjust = '100%';
+                document.documentElement.style.textSizeAdjust = '100%';
+                document.body.style.webkitTextSizeAdjust = '100%';
+                document.body.style.textSizeAdjust = '100%';
+            })();
         """
         let printMediaUserScript = WKUserScript(
             source: printMediaScript,
@@ -102,10 +124,12 @@ private extension EnhancedWKWebViewPDFRenderer {
         configuration.userContentController = userContentController
 
         // Create web view with appropriate frame
+        // Use printable width (page width minus margins) to ensure content fits without scaling
+        let printableWidth = options.pageSize.width - options.margins.left - options.margins.right
         let frame = CGRect(
             x: 0,
             y: 0,
-            width: options.pageSize.width,
+            width: printableWidth,
             height: options.pageSize.height * 10 // Allow for scrolling
         )
 
@@ -113,6 +137,17 @@ private extension EnhancedWKWebViewPDFRenderer {
         webView.navigationDelegate = self
         webView.scrollView.showsVerticalScrollIndicator = false
         webView.scrollView.showsHorizontalScrollIndicator = false
+
+        // Disable zoom and scaling
+        webView.scrollView.minimumZoomScale = 1.0
+        webView.scrollView.maximumZoomScale = 1.0
+        webView.scrollView.zoomScale = 1.0
+        webView.scrollView.bouncesZoom = false
+
+        // Ensure consistent text rendering
+        if #available(iOS 14.0, *) {
+            webView.configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        }
 
         return webView
     }
@@ -224,10 +259,14 @@ private extension EnhancedWKWebViewPDFRenderer {
             logger.debug("Estimated content height: \(height)")
         }
 
+        // Use UIPrintPageRenderer which properly handles A4 pagination with margins
+        // WKWebView.pdf() doesn't respect CSS @page rules reliably
+        return try generatePDFWithPrintRenderer(from: webView, options: options)
+    }
+
+    func generatePDFWithPrintRenderer(from webView: WKWebView, options: ExportOptions) throws -> Data {
         // Configure print formatter
         let printFormatter = webView.viewPrintFormatter()
-        let renderer = UIPrintPageRenderer()
-        renderer.addPrintFormatter(printFormatter, startingAtPageAt: 0)
 
         // Set up page dimensions
         let paperRect = CGRect(
@@ -243,6 +282,13 @@ private extension EnhancedWKWebViewPDFRenderer {
             width: options.pageSize.width - options.margins.left - options.margins.right,
             height: options.pageSize.height - options.margins.top - options.margins.bottom
         )
+
+        // Set the maximum content width to prevent scaling
+        // This ensures the content width matches the printable area
+        printFormatter.maximumContentWidth = printableRect.width
+
+        let renderer = UIPrintPageRenderer()
+        renderer.addPrintFormatter(printFormatter, startingAtPageAt: 0)
 
         renderer.setValue(paperRect, forKey: "paperRect")
         renderer.setValue(printableRect, forKey: "printableRect")

@@ -112,6 +112,8 @@ struct CVExportSheetView: View {
             if let html = viewModel.previewHTML {
                 HTMLPreviewView(coordinator: previewCoordinator)
                     .aspectRatio(viewModel.aspectRatio, contentMode: .fit)
+                    .padding(8) // Add padding around WebView for the white border
+                    .background(Color.white) // White background for the margin simulation
                     .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg))
                     .shadow(color: DesignTokens.Colors.shadow, radius: 12, x: 0, y: 8)
                     .overlay {

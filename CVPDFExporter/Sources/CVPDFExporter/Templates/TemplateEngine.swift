@@ -38,12 +38,14 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
         context["location"] = document.personalInfo.location ?? ""
         context["website"] = document.personalInfo.website ?? ""
         context["summary"] = document.personalInfo.summary ?? ""
+        context["title"] = document.personalInfo.title ?? ""
 
         // Conditionals
         context["hasSummary"] = document.personalInfo.summary != nil
         context["hasPhone"] = document.personalInfo.phone != nil
         context["hasLocation"] = document.personalInfo.location != nil
         context["hasWebsite"] = document.personalInfo.website != nil
+        context["hasTitle"] = document.personalInfo.title != nil
 
         // Work Experience
         let workSections = document.sections.filter { $0.type == .work }
@@ -103,7 +105,18 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                         // Add tags directly as array of strings
                         skillGroup["tags"] = item.tags
                         // Also add as skillList for compatibility with different templates
-                        let skillTags = item.tags.map { ["name": $0] }
+                        let skillTags = item.tags.map { tag -> [String: Any] in
+                            var skillDict: [String: Any] = ["name": tag]
+                            // Check if metadata contains skill level
+                            if let levelStr = item.metadata["level"], let level = Int(levelStr) {
+                                skillDict["level"] = level
+                                skillDict["hasLevel"] = true
+                                skillDict["levelDots"] = createLevelDots(level: level)
+                            } else {
+                                skillDict["hasLevel"] = false
+                            }
+                            return skillDict
+                        }
                         skillGroup["skillList"] = skillTags
                     }
                     skillGroups.append(skillGroup)
@@ -151,6 +164,21 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
             context["hasLanguages"] = !langItems.isEmpty
         } else {
             context["hasLanguages"] = false
+        }
+
+        // Interests
+        let interestSections = document.sections.filter { $0.type == .interests }
+        if !interestSections.isEmpty {
+            var interestItems: [String] = []
+            for section in interestSections {
+                for item in section.items {
+                    interestItems.append(item.title)
+                }
+            }
+            context["interests"] = interestItems
+            context["hasInterests"] = !interestItems.isEmpty
+        } else {
+            context["hasInterests"] = false
         }
 
         // Add customization values
@@ -451,5 +479,19 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
             .replacingOccurrences(of: ">", with: "&gt;")
             .replacingOccurrences(of: "\"", with: "&quot;")
             .replacingOccurrences(of: "'", with: "&#39;")
+    }
+
+    private func createLevelDots(level: Int) -> String {
+        let maxLevel = 5
+        let filledDot = "●"
+        let emptyDot = "○"
+        var dots = ""
+        for i in 1...maxLevel {
+            dots += i <= level ? filledDot : emptyDot
+            if i < maxLevel {
+                dots += " "
+            }
+        }
+        return dots
     }
 }

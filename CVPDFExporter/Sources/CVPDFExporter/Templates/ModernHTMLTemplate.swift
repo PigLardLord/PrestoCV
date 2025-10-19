@@ -7,364 +7,536 @@ struct ModernHTMLTemplate {
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>{{name}} - CV</title>
         <style>
+            html {
+                -webkit-text-size-adjust: 100%;
+                text-size-adjust: 100%;
+            }
             * {
                 margin: 0;
                 padding: 0;
                 box-sizing: border-box;
+                -webkit-print-color-adjust: exact !important;
+                color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
 
-            :root {
-                --color-primary: {{colorPrimary}};
-                --color-secondary: {{colorSecondary}};
-                --color-accent: {{colorAccent}};
-                --color-background: {{colorBackground}};
-                --color-text: {{colorText}};
-                --color-text-light: #94A3B8;
-                --font-heading: {{fontHeading}};
-                --font-body: {{fontBody}};
-                --font-size: {{fontSize}};
-                --spacing-xs: 5pt;
-                --spacing-sm: 10pt;
-                --spacing-md: 15pt;
-                --spacing-lg: 20pt;
-                --spacing-xl: 30pt;
+            @page {
+                size: A4;
+                margin: 0.6in 0.5in;
             }
 
             body {
-                font-family: var(--font-body);
-                font-size: var(--font-size);
-                color: var(--color-text);
-                background: var(--color-background);
-                line-height: 1.7;
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                font-size: 10pt;
+                line-height: 1.3;
+                color: #1f2937;
+                background: white;
             }
 
-            /* Modern gradient header */
-            .header {
-                background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-                color: white;
-                padding: var(--spacing-xl) var(--spacing-xl) var(--spacing-lg);
-                position: relative;
-                overflow: hidden;
+            .container {
+                padding: 0 4pt;
             }
 
-            .header::before {
-                content: '';
-                position: absolute;
-                top: -50%;
-                right: -50%;
-                width: 200%;
-                height: 200%;
-                background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            /* Hero Section */
+            .hero-section {
+                background: white;
+                padding: 0 0 10pt 0;
+                margin-bottom: 10pt;
+                border-bottom: 2pt solid #e5e7eb;
+                page-break-inside: avoid;
             }
 
-            .header-content {
-                position: relative;
-                z-index: 1;
+            .hero-content {
+                display: grid;
+                grid-template-columns: 2fr 1fr;
+                gap: 12pt;
+                align-items: start;
             }
 
-            h1 {
-                font-family: var(--font-heading);
-                font-size: 28pt;
-                font-weight: 300;
+            .hero-text {
+                padding-right: 4pt;
+            }
+
+            .hero-name {
+                font-size: 24pt;
+                font-weight: 800;
+                color: #1e40af;
+                margin-bottom: 3pt;
+                line-height: 1.0;
                 letter-spacing: -0.5pt;
-                margin-bottom: var(--spacing-xs);
             }
 
-            .tagline {
+            .hero-title {
                 font-size: 12pt;
-                opacity: 0.95;
-                margin-bottom: var(--spacing-md);
+                font-weight: 600;
+                color: #475569;
+                margin-bottom: 8pt;
+                text-transform: uppercase;
+                letter-spacing: 0.5pt;
             }
 
-            .contact-grid {
-                display: flex;
-                flex-wrap: wrap;
-                gap: var(--spacing-md);
+            .hero-summary {
                 font-size: 9pt;
+                line-height: 1.3;
+                color: #374151;
+            }
+
+            .hero-sidebar {
+                display: flex;
+                flex-direction: column;
+                gap: 8pt;
+            }
+
+            .contact-card {
+                background: #f8fafc;
+                border: 1pt solid #e5e7eb;
+                border-radius: 4pt;
+                padding: 8pt;
             }
 
             .contact-item {
+                margin-bottom: 4pt;
+                font-size: 8pt;
+                color: #374151;
                 display: flex;
                 align-items: center;
-                gap: var(--spacing-xs);
+                gap: 4pt;
+            }
+
+            .contact-item:last-child {
+                margin-bottom: 0;
             }
 
             .contact-icon {
-                width: 4pt;
-                height: 4pt;
+                font-size: 7pt;
+            }
+
+            /* Skills Spotlight */
+            .skills-spotlight {
                 background: white;
-                border-radius: 50%;
-                opacity: 0.7;
-            }
-
-            /* Content sections */
-            .content {
-                padding: var(--spacing-xl);
-                max-width: 800pt;
-            }
-
-            .summary {
-                background: linear-gradient(90deg, var(--color-background) 0%, rgba(var(--color-primary), 0.05) 100%);
-                border-left: 3pt solid var(--color-accent);
-                padding: var(--spacing-md);
-                margin-bottom: var(--spacing-xl);
-                font-style: italic;
-                color: var(--color-text);
-            }
-
-            .section {
-                margin-bottom: var(--spacing-xl);
+                padding: 8pt 0;
+                margin-bottom: 10pt;
+                border-bottom: 1pt solid #e5e7eb;
                 page-break-inside: avoid;
             }
 
-            h2 {
-                font-family: var(--font-heading);
-                color: var(--color-primary);
-                font-size: 13pt;
-                font-weight: 500;
-                letter-spacing: 2pt;
+            .spotlight-title {
+                text-align: center;
+                font-size: 10pt;
+                font-weight: 700;
+                color: #374151;
+                margin-bottom: 6pt;
                 text-transform: uppercase;
-                margin-bottom: var(--spacing-md);
-                padding-bottom: var(--spacing-xs);
-                border-bottom: 2pt solid var(--color-accent);
+                letter-spacing: 0.5pt;
             }
 
-            .item {
-                margin-bottom: var(--spacing-lg);
-                padding-left: var(--spacing-md);
-                position: relative;
+            .skills-showcase {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 4pt;
+            }
+
+            .skill-badge {
+                background: white;
+                border: 1pt solid #d1d5db;
+                border-radius: 3pt;
+                padding: 3pt 5pt;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .skill-name {
+                font-weight: 600;
+                color: #1f2937;
+                font-size: 8pt;
+            }
+
+            .skill-level {
+                font-family: monospace;
+                font-size: 8pt;
+                color: #1e40af;
+                letter-spacing: 0.3pt;
+            }
+
+            /* Main Content Grid */
+            .content-grid {
+                display: grid;
+                grid-template-columns: 62% 36%;
+                gap: 12pt;
+            }
+
+            /* Section Styling */
+            section {
+                margin-bottom: 12pt;
                 page-break-inside: avoid;
             }
 
-            .item::before {
-                content: '';
-                position: absolute;
-                left: 0;
-                top: 8pt;
-                width: 4pt;
-                height: 4pt;
-                background: var(--color-accent);
-                border-radius: 50%;
-            }
-
-            .item-header {
+            .section-title {
                 display: flex;
-                justify-content: space-between;
-                align-items: baseline;
-                margin-bottom: var(--spacing-xs);
+                align-items: center;
+                gap: 4pt;
+                margin-bottom: 6pt;
+                padding-bottom: 3pt;
+                border-bottom: 1pt solid #e5e7eb;
             }
 
-            .item-title {
+            .title-accent {
+                width: 2pt;
+                height: 12pt;
+                background: #1e40af;
+                border-radius: 1pt;
+            }
+
+            .section-title-text {
+                font-size: 9pt;
+                font-weight: 700;
+                color: #1f2937;
+                text-transform: uppercase;
+                letter-spacing: 0.25pt;
+            }
+
+            /* Experience Section */
+            .job-entry {
+                border-left: 2pt solid #e5e7eb;
+                padding: 6pt 0 6pt 8pt;
+                margin-bottom: 8pt;
+                page-break-inside: avoid;
+            }
+
+            .job-header {
+                margin-bottom: 2pt;
+            }
+
+            .job-title {
+                font-weight: 700;
+                color: #1e40af;
+                font-size: 9pt;
+            }
+
+            .job-company {
                 font-weight: 600;
-                color: var(--color-primary);
-                font-size: 11pt;
+                color: #1f2937;
+                font-size: 9pt;
             }
 
-            .item-subtitle {
-                color: var(--color-secondary);
+            .job-period {
+                font-size: 8pt;
+                color: #6b7280;
                 font-weight: 500;
+                margin-bottom: 4pt;
             }
 
-            .item-date {
-                color: var(--color-text-light);
-                font-size: 9pt;
-                font-weight: 300;
-            }
-
-            .item-location {
-                color: var(--color-text-light);
-                font-size: 9pt;
+            .job-location {
+                font-size: 8pt;
+                color: #6b7280;
                 font-style: italic;
+                margin-bottom: 4pt;
             }
 
-            .item-description {
-                margin-top: var(--spacing-xs);
-                color: var(--color-text);
-                text-align: justify;
+            .job-description {
+                color: #374151;
+                line-height: 1.3;
+                font-size: 8pt;
             }
 
-            /* Skills section with tags */
-            .skills-group {
-                margin-bottom: var(--spacing-md);
+            /* Education Section */
+            .edu-entry {
+                background: white;
+                border: 0.5pt solid #e5e7eb;
+                border-radius: 2pt;
+                padding: 6pt;
+                margin-bottom: 6pt;
+                page-break-inside: avoid;
             }
 
-            .skills-category {
+            .edu-degree {
+                font-weight: 700;
+                color: #1e40af;
+                margin-bottom: 1pt;
+                font-size: 8pt;
+            }
+
+            .edu-school {
                 font-weight: 600;
-                color: var(--color-primary);
-                margin-bottom: var(--spacing-xs);
+                color: #1f2937;
+                font-size: 8pt;
             }
 
-            .skills-tags {
+            .edu-period {
+                color: #6b7280;
+                font-size: 7pt;
+                margin-bottom: 3pt;
+            }
+
+            .edu-description {
+                color: #374151;
+                font-size: 7pt;
+                line-height: 1.2;
+                margin-top: 3pt;
+            }
+
+            /* Certifications */
+            .cert-entry {
+                background: #f8fafc;
+                border-radius: 2pt;
+                padding: 4pt;
+                margin-bottom: 3pt;
+                border-left: 2pt solid #3b82f6;
+                page-break-inside: avoid;
+                font-size: 8pt;
+            }
+
+            .cert-title {
+                color: #1e40af;
+                font-weight: 700;
+            }
+
+            .cert-issuer {
+                color: #1f2937;
+                font-weight: 600;
+            }
+
+            .cert-date {
+                color: #6b7280;
+                font-size: 7pt;
+            }
+
+            .cert-description {
+                display: block;
+                margin-top: 1pt;
+                font-size: 7pt;
+                color: #4b5563;
+                line-height: 1.2;
+            }
+
+            /* Languages */
+            .languages-list {
+                list-style: none;
+            }
+
+            .languages-list li {
+                padding: 3pt 0;
+                border-bottom: 0.5pt solid #f3f4f6;
+                font-size: 8pt;
+                color: #374151;
+            }
+
+            .languages-list li:last-child {
+                border-bottom: none;
+            }
+
+            /* Interests */
+            .interests-tags {
                 display: flex;
                 flex-wrap: wrap;
-                gap: var(--spacing-xs);
-                margin-top: var(--spacing-xs);
+                gap: 2pt;
             }
 
-            .skill-tag {
-                background: var(--color-secondary);
-                color: white;
-                padding: 2pt 8pt;
-                border-radius: 12pt;
-                font-size: 9pt;
+            .tag {
+                background: #e0e7ff;
+                color: #1e40af;
+                padding: 2pt 3pt;
+                border-radius: 2pt;
+                font-size: 7pt;
                 font-weight: 500;
+                border: 0.5pt solid #c7d2fe;
             }
 
-            /* Print styles */
-            @media print {
-                body {
-                    padding: 0;
-                }
+            /* Page Break Control */
+            .hero-section {
+                page-break-after: avoid;
+            }
 
-                .header {
-                    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%) !important;
-                    -webkit-print-color-adjust: exact;
-                    print-color-adjust: exact;
-                }
+            .skills-spotlight {
+                page-break-after: avoid;
+            }
 
-                .section {
-                    page-break-inside: avoid;
-                }
+            .content-grid {
+                page-break-before: avoid;
+            }
 
-                .item {
-                    page-break-inside: avoid;
-                }
+            h1, h2, h3 {
+                page-break-after: avoid;
+            }
+
+            p, li {
+                orphans: 2;
+                widows: 2;
             }
         </style>
     </head>
     <body>
-        <header class="header">
-            <div class="header-content">
-                <h1>{{name}}</h1>
-                {{#hasSummary}}
-                <p class="tagline">{{summary}}</p>
-                {{/hasSummary}}
-                <div class="contact-grid">
-                    <div class="contact-item">
-                        <span class="contact-icon"></span>
-                        <span>{{email}}</span>
+        <div class="container">
+            <!-- Hero Section -->
+            <header class="hero-section">
+                <div class="hero-content">
+                    <div class="hero-text">
+                        <h1 class="hero-name">{{name}}</h1>
+                        {{#hasTitle}}
+                        <h2 class="hero-title">{{title}}</h2>
+                        {{/hasTitle}}
+                        {{#hasSummary}}
+                        <p class="hero-summary">{{summary}}</p>
+                        {{/hasSummary}}
                     </div>
-                    {{#hasPhone}}
-                    <div class="contact-item">
-                        <span class="contact-icon"></span>
-                        <span>{{phone}}</span>
-                    </div>
-                    {{/hasPhone}}
-                    {{#hasLocation}}
-                    <div class="contact-item">
-                        <span class="contact-icon"></span>
-                        <span>{{location}}</span>
-                    </div>
-                    {{/hasLocation}}
-                    {{#hasWebsite}}
-                    <div class="contact-item">
-                        <span class="contact-icon"></span>
-                        <span>{{website}}</span>
-                    </div>
-                    {{/hasWebsite}}
-                </div>
-            </div>
-        </header>
-
-        <div class="content">
-            {{#hasWorkExperience}}
-            <section class="section">
-                <h2>Experience</h2>
-                {{#workExperience}}
-                <div class="item">
-                    <div class="item-header">
-                        <div>
-                            <span class="item-title">{{title}}</span>
-                            <span class="item-subtitle">@ {{company}}</span>
+                    <div class="hero-sidebar">
+                        <div class="contact-card">
+                            {{#hasLocation}}
+                            <div class="contact-item">
+                                <span class="contact-icon">📍</span>
+                                <span>{{location}}</span>
+                            </div>
+                            {{/hasLocation}}
+                            <div class="contact-item">
+                                <span class="contact-icon">✉️</span>
+                                <span>{{email}}</span>
+                            </div>
+                            {{#hasPhone}}
+                            <div class="contact-item">
+                                <span class="contact-icon">📱</span>
+                                <span>{{phone}}</span>
+                            </div>
+                            {{/hasPhone}}
+                            {{#hasWebsite}}
+                            <div class="contact-item">
+                                <span class="contact-icon">🌐</span>
+                                <span>{{website}}</span>
+                            </div>
+                            {{/hasWebsite}}
                         </div>
-                        <span class="item-date">{{startDate}} - {{endDate}}</span>
                     </div>
-                    {{#location}}
-                    <div class="item-location">{{location}}</div>
-                    {{/location}}
-                    {{#description}}
-                    <div class="item-description">{{description}}</div>
-                    {{/description}}
                 </div>
-                {{/workExperience}}
-            </section>
-            {{/hasWorkExperience}}
+            </header>
 
-            {{#hasEducation}}
-            <section class="section">
-                <h2>Education</h2>
-                {{#education}}
-                <div class="item">
-                    <div class="item-header">
-                        <div>
-                            <span class="item-title">{{degree}}</span>
-                            <span class="item-subtitle">@ {{school}}</span>
-                        </div>
-                        <span class="item-date">{{startDate}} - {{endDate}}</span>
-                    </div>
-                    {{#description}}
-                    <div class="item-description">{{description}}</div>
-                    {{/description}}
-                </div>
-                {{/education}}
-            </section>
-            {{/hasEducation}}
-
+            <!-- Skills Spotlight -->
             {{#hasSkills}}
-            <section class="section">
-                <h2>Skills</h2>
-                {{#skills}}
-                <div class="skills-group">
-                    <div class="skills-category">{{category}}</div>
-                    {{#hasSkills}}
-                    <div class="skills-tags">
-                        {{#skillList}}
-                        <span class="skill-tag">{{name}}</span>
-                        {{/skillList}}
+            <section class="skills-spotlight">
+                <h3 class="spotlight-title">Core Technologies</h3>
+                <div class="skills-showcase">
+                    {{#skills}}
+                    {{#skillList}}
+                    <div class="skill-badge">
+                        <span class="skill-name">{{name}}</span>
+                        {{#hasLevel}}
+                        <span class="skill-level">{{levelDots}}</span>
+                        {{/hasLevel}}
                     </div>
-                    {{/hasSkills}}
+                    {{/skillList}}
+                    {{/skills}}
                 </div>
-                {{/skills}}
             </section>
             {{/hasSkills}}
 
-            {{#hasCertifications}}
-            <section class="section">
-                <h2>Certifications</h2>
-                {{#certifications}}
-                <div class="item">
-                    <div class="item-header">
-                        <div>
-                            <span class="item-title">{{title}}</span>
-                            {{#issuer}}
-                            <span class="item-subtitle">@ {{issuer}}</span>
-                            {{/issuer}}
+            <!-- Main Content Grid -->
+            <main class="content-grid">
+                <!-- Primary Column -->
+                <div class="primary-column">
+                    {{#hasWorkExperience}}
+                    <section class="experience-section">
+                        <h3 class="section-title">
+                            <span class="title-accent"></span>
+                            <span class="section-title-text">Professional Experience</span>
+                        </h3>
+                        <div class="experience-content">
+                            {{#workExperience}}
+                            <div class="job-entry">
+                                <div class="job-header">
+                                    <span class="job-title">{{title}}</span>
+                                    <span class="job-company"> @ {{company}}</span>
+                                </div>
+                                <div class="job-period">{{startDate}}{{#endDate}} - {{endDate}}{{/endDate}}</div>
+                                {{#location}}
+                                <div class="job-location">{{location}}</div>
+                                {{/location}}
+                                {{#description}}
+                                <div class="job-description">{{description}}</div>
+                                {{/description}}
+                            </div>
+                            {{/workExperience}}
                         </div>
-                        {{#date}}
-                        <span class="item-date">{{date}}</span>
-                        {{/date}}
-                    </div>
-                    {{#description}}
-                    <div class="item-description">{{description}}</div>
-                    {{/description}}
-                </div>
-                {{/certifications}}
-            </section>
-            {{/hasCertifications}}
+                    </section>
+                    {{/hasWorkExperience}}
 
-            {{#hasLanguages}}
-            <section class="section">
-                <h2>Languages</h2>
-                <div class="skills-tags">
-                    {{#languages}}
-                    <span class="skill-tag">{{language}} - {{level}}</span>
-                    {{/languages}}
+                    {{#hasCertifications}}
+                    <section class="certifications-section">
+                        <h3 class="section-title">
+                            <span class="title-accent"></span>
+                            <span class="section-title-text">Certifications</span>
+                        </h3>
+                        {{#certifications}}
+                        <div class="cert-entry">
+                            <span class="cert-title">{{title}}</span>
+                            {{#issuer}}
+                            <span class="cert-issuer"> @ {{issuer}}</span>
+                            {{/issuer}}
+                            {{#date}}
+                            <div class="cert-date">{{date}}</div>
+                            {{/date}}
+                            {{#description}}
+                            <span class="cert-description">{{description}}</span>
+                            {{/description}}
+                        </div>
+                        {{/certifications}}
+                    </section>
+                    {{/hasCertifications}}
                 </div>
-            </section>
-            {{/hasLanguages}}
+
+                <!-- Secondary Column -->
+                <div class="secondary-column">
+                    {{#hasEducation}}
+                    <section class="education-section">
+                        <h3 class="section-title">
+                            <span class="title-accent"></span>
+                            <span class="section-title-text">Education</span>
+                        </h3>
+                        <div class="education-content">
+                            {{#education}}
+                            <div class="edu-entry">
+                                <div class="edu-degree">{{degree}}</div>
+                                <div class="edu-school">{{school}}</div>
+                                <div class="edu-period">{{startDate}}{{#endDate}} - {{endDate}}{{/endDate}}</div>
+                                {{#description}}
+                                <div class="edu-description">{{description}}</div>
+                                {{/description}}
+                            </div>
+                            {{/education}}
+                        </div>
+                    </section>
+                    {{/hasEducation}}
+
+                    {{#hasLanguages}}
+                    <section class="languages-section">
+                        <h3 class="section-title">
+                            <span class="title-accent"></span>
+                            <span class="section-title-text">Languages</span>
+                        </h3>
+                        <ul class="languages-list">
+                            {{#languages}}
+                            <li><strong>{{language}}</strong> - {{level}}</li>
+                            {{/languages}}
+                        </ul>
+                    </section>
+                    {{/hasLanguages}}
+
+                    {{#hasInterests}}
+                    <section class="interests-section">
+                        <h3 class="section-title">
+                            <span class="title-accent"></span>
+                            <span class="section-title-text">Interests</span>
+                        </h3>
+                        <div class="interests-tags">
+                            {{#interests}}
+                            <span class="tag">{{.}}</span>
+                            {{/interests}}
+                        </div>
+                    </section>
+                    {{/hasInterests}}
+                </div>
+            </main>
         </div>
     </body>
     </html>

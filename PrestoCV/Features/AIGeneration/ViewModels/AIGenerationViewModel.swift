@@ -43,7 +43,7 @@ final class AIGenerationViewModel: ObservableObject {
             let result = try await cvGenerationUseCase.generateCV(from: request)
 
             let cvModel = mapToCVModel(result.cvData)
-            try await cvManagementUseCase.createCV(from: cvModel)
+            _ = try await cvManagementUseCase.createCV(from: cvModel)
 
             generatedCVId = cvModel.id.uuidString
 
@@ -91,7 +91,7 @@ final class AIGenerationViewModel: ObservableObject {
                let completeCVData = try? convertPartialToCVData(finalPartial) {
 
                 let cvModel = mapToCVModel(completeCVData)
-                try await cvManagementUseCase.createCV(from: cvModel)
+                _ = try await cvManagementUseCase.createCV(from: cvModel)
 
                 generatedCVId = cvModel.id.uuidString
             } else {
