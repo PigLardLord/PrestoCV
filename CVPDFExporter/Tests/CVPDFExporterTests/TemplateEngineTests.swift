@@ -227,8 +227,8 @@ struct TemplateEngineTests {
         let rendered = try await engine.render(template: template, data: document, customization: customization)
 
         // Then
-        #expect(rendered.contains("#1E293B"))  // Modern primary color
-        #expect(rendered.contains("#0EA5E9"))  // Modern accent color
+        #expect(rendered.contains("#1e40af"))  // Modern primary color
+        #expect(rendered.contains("#3b82f6"))  // Modern accent color
     }
 
     @Test("Customization fonts are applied")

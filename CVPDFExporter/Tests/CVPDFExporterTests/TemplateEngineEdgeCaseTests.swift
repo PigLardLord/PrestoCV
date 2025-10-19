@@ -297,7 +297,7 @@ struct TemplateEngineEdgeCaseTests {
         )
 
         // Then
-        #expect(result.contains("#1E293B")) // Modern primary color (dark slate)
+        #expect(result.contains("#1e40af")) // Modern primary color (blue)
         #expect(result.contains("Georgia")) // Serif font
     }
 

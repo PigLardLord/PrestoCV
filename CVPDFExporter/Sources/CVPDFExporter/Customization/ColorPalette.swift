@@ -22,11 +22,11 @@ public enum ColorPalette: String, CaseIterable, Sendable {
             )
         case .modern:
             return (
-                primary: "#1E293B",      // Dark slate
-                secondary: "#475569",    // Gray
-                accent: "#0EA5E9",       // Sky blue
-                background: "#F8FAFC",   // Light gray
-                text: "#0F172A"         // Very dark slate
+                primary: "#1e40af",      // Blue
+                secondary: "#6b7280",    // Gray
+                accent: "#3b82f6",       // Lighter blue
+                background: "#e0e7ff",   // Light blue
+                text: "#1f2937"         // Dark gray
             )
         case .minimal:
             return (

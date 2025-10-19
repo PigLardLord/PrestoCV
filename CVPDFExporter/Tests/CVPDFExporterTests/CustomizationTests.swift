@@ -37,11 +37,11 @@ struct CustomizationTests {
         let palette = ColorPalette.modern
         let colors = palette.colors
 
-        #expect(colors.primary == "#1E293B")
-        #expect(colors.secondary == "#475569")
-        #expect(colors.accent == "#0EA5E9")
-        #expect(colors.background == "#F8FAFC")
-        #expect(colors.text == "#0F172A")
+        #expect(colors.primary == "#1e40af")
+        #expect(colors.secondary == "#6b7280")
+        #expect(colors.accent == "#3b82f6")
+        #expect(colors.background == "#e0e7ff")
+        #expect(colors.text == "#1f2937")
     }
 
     @Test("Minimal color palette values")
@@ -95,9 +95,9 @@ struct CustomizationTests {
         let scheme = FontScheme.modern
         let fonts = scheme.fonts
 
-        #expect(fonts.heading.contains("SF Pro Rounded"))
-        #expect(fonts.body.contains("SF Pro Text"))
-        #expect(fonts.size == "10.5pt")
+        #expect(fonts.heading.contains("Inter"))
+        #expect(fonts.body.contains("Inter"))
+        #expect(fonts.size == "10pt")
     }
 
     @Test("Serif font scheme values")
@@ -190,8 +190,8 @@ struct CustomizationTests {
         )
 
         // Then
-        #expect(rendered.contains("#1E293B")) // Modern primary color
-        #expect(rendered.contains("#475569")) // Modern secondary color
+        #expect(rendered.contains("#1e40af")) // Modern primary color
+        #expect(rendered.contains("#6b7280")) // Modern secondary color
     }
 
     @Test("Template applies font scheme")

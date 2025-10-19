@@ -19,9 +19,9 @@ public enum FontScheme: String, CaseIterable, Sendable {
             )
         case .modern:
             return (
-                heading: "ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, sans-serif",
-                body: "ui-sans-serif, 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif",
-                size: "10.5pt"
+                heading: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
+                body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
+                size: "10pt"
             )
         case .serif:
             return (

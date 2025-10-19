@@ -136,8 +136,8 @@ struct ModernTemplateTests {
         // Should use Creative palette colors
         #expect(rendered.contains("#6B46C1") || rendered.contains("#F97316"))  // Creative palette
 
-        // Should use Modern font scheme
-        #expect(rendered.contains("ui-rounded") || rendered.contains("ui-sans-serif"))
+        // Should use Modern font scheme (Inter font)
+        #expect(rendered.contains("Inter") || rendered.contains("10pt"))
     }
 
     @Test("Modern template has styled header section")
