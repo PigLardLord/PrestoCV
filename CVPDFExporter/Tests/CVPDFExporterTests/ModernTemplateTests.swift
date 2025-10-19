@@ -111,8 +111,8 @@ struct ModernTemplateTests {
         #expect(rendered.contains("Present"))
     }
 
-    @Test("Modern template uses its own design system")
-    func modernTemplateUsesOwnDesignSystem() async throws {
+    @Test("Modern template applies customization")
+    func modernTemplateAppliesCustomization() async throws {
         // Given
         let engine = MustacheTemplateEngine()
         let repository = BundledTemplateRepository()
@@ -133,11 +133,11 @@ struct ModernTemplateTests {
         let rendered = try await engine.render(template: template, data: document, customization: customization)
 
         // Then
-        // Modern template uses its own hardcoded color scheme (blue-based)
-        #expect(rendered.contains("#1e40af") || rendered.contains("#1f2937"))  // Modern template colors
+        // Should use Creative palette colors
+        #expect(rendered.contains("#6B46C1") || rendered.contains("#F97316"))  // Creative palette
 
-        // Modern template uses Inter font family
-        #expect(rendered.contains("Inter") || rendered.contains("-apple-system"))
+        // Should use Modern font scheme
+        #expect(rendered.contains("ui-rounded") || rendered.contains("ui-sans-serif"))
     }
 
     @Test("Modern template has styled header section")

@@ -29,10 +29,10 @@ struct ModernHTMLTemplate {
             }
 
             body {
-                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-                font-size: 10pt;
+                font-family: {{fontBody}};
+                font-size: {{fontSize}};
                 line-height: 1.3;
-                color: #1f2937;
+                color: {{colorText}};
                 background: white;
             }
 
@@ -63,7 +63,7 @@ struct ModernHTMLTemplate {
             .hero-name {
                 font-size: 24pt;
                 font-weight: 800;
-                color: #1e40af;
+                color: {{colorPrimary}};
                 margin-bottom: 3pt;
                 line-height: 1.0;
                 letter-spacing: -0.5pt;
@@ -72,7 +72,7 @@ struct ModernHTMLTemplate {
             .hero-title {
                 font-size: 12pt;
                 font-weight: 600;
-                color: #475569;
+                color: {{colorSecondary}};
                 margin-bottom: 8pt;
                 text-transform: uppercase;
                 letter-spacing: 0.5pt;
@@ -81,7 +81,7 @@ struct ModernHTMLTemplate {
             .hero-summary {
                 font-size: 9pt;
                 line-height: 1.3;
-                color: #374151;
+                color: {{colorText}};
             }
 
             .hero-sidebar {
@@ -100,7 +100,7 @@ struct ModernHTMLTemplate {
             .contact-item {
                 margin-bottom: 4pt;
                 font-size: 8pt;
-                color: #374151;
+                color: {{colorText}};
                 display: flex;
                 align-items: center;
                 gap: 4pt;
@@ -127,7 +127,7 @@ struct ModernHTMLTemplate {
                 text-align: center;
                 font-size: 10pt;
                 font-weight: 700;
-                color: #374151;
+                color: {{colorText}};
                 margin-bottom: 6pt;
                 text-transform: uppercase;
                 letter-spacing: 0.5pt;
@@ -151,14 +151,14 @@ struct ModernHTMLTemplate {
 
             .skill-name {
                 font-weight: 600;
-                color: #1f2937;
+                color: {{colorText}};
                 font-size: 8pt;
             }
 
             .skill-level {
                 font-family: monospace;
                 font-size: 8pt;
-                color: #1e40af;
+                color: {{colorPrimary}};
                 letter-spacing: 0.3pt;
             }
 
@@ -187,14 +187,14 @@ struct ModernHTMLTemplate {
             .title-accent {
                 width: 2pt;
                 height: 12pt;
-                background: #1e40af;
+                background: {{colorPrimary}};
                 border-radius: 1pt;
             }
 
             .section-title-text {
                 font-size: 9pt;
                 font-weight: 700;
-                color: #1f2937;
+                color: {{colorText}};
                 text-transform: uppercase;
                 letter-spacing: 0.25pt;
             }
@@ -213,32 +213,32 @@ struct ModernHTMLTemplate {
 
             .job-title {
                 font-weight: 700;
-                color: #1e40af;
+                color: {{colorPrimary}};
                 font-size: 9pt;
             }
 
             .job-company {
                 font-weight: 600;
-                color: #1f2937;
+                color: {{colorText}};
                 font-size: 9pt;
             }
 
             .job-period {
                 font-size: 8pt;
-                color: #6b7280;
+                color: {{colorSecondary}};
                 font-weight: 500;
                 margin-bottom: 4pt;
             }
 
             .job-location {
                 font-size: 8pt;
-                color: #6b7280;
+                color: {{colorSecondary}};
                 font-style: italic;
                 margin-bottom: 4pt;
             }
 
             .job-description {
-                color: #374151;
+                color: {{colorText}};
                 line-height: 1.3;
                 font-size: 8pt;
             }
@@ -255,25 +255,25 @@ struct ModernHTMLTemplate {
 
             .edu-degree {
                 font-weight: 700;
-                color: #1e40af;
+                color: {{colorPrimary}};
                 margin-bottom: 1pt;
                 font-size: 8pt;
             }
 
             .edu-school {
                 font-weight: 600;
-                color: #1f2937;
+                color: {{colorText}};
                 font-size: 8pt;
             }
 
             .edu-period {
-                color: #6b7280;
+                color: {{colorSecondary}};
                 font-size: 7pt;
                 margin-bottom: 3pt;
             }
 
             .edu-description {
-                color: #374151;
+                color: {{colorText}};
                 font-size: 7pt;
                 line-height: 1.2;
                 margin-top: 3pt;
@@ -291,17 +291,17 @@ struct ModernHTMLTemplate {
             }
 
             .cert-title {
-                color: #1e40af;
+                color: {{colorPrimary}};
                 font-weight: 700;
             }
 
             .cert-issuer {
-                color: #1f2937;
+                color: {{colorText}};
                 font-weight: 600;
             }
 
             .cert-date {
-                color: #6b7280;
+                color: {{colorSecondary}};
                 font-size: 7pt;
             }
 
@@ -309,7 +309,7 @@ struct ModernHTMLTemplate {
                 display: block;
                 margin-top: 1pt;
                 font-size: 7pt;
-                color: #4b5563;
+                color: {{colorText}};
                 line-height: 1.2;
             }
 
@@ -322,7 +322,7 @@ struct ModernHTMLTemplate {
                 padding: 3pt 0;
                 border-bottom: 0.5pt solid #f3f4f6;
                 font-size: 8pt;
-                color: #374151;
+                color: {{colorText}};
             }
 
             .languages-list li:last-child {
@@ -337,13 +337,13 @@ struct ModernHTMLTemplate {
             }
 
             .tag {
-                background: #e0e7ff;
-                color: #1e40af;
+                background: {{colorBackground}};
+                color: {{colorPrimary}};
                 padding: 2pt 3pt;
                 border-radius: 2pt;
                 font-size: 7pt;
                 font-weight: 500;
-                border: 0.5pt solid #c7d2fe;
+                border: 0.5pt solid {{colorSecondary}};
             }
 
             /* Page Break Control */
