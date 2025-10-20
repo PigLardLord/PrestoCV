@@ -104,9 +104,11 @@ private struct CVRowView: View {
             action: onTap
         )
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(role: .destructive, action: onDelete) {
+            Button(role: .none, action: onDelete) {
                 Label(String(localized: "common.delete"), systemImage: "trash")
             }
+            .tint(DesignTokens.Colors.error)
+
             Button(action: onExport) {
                 Label(String(localized: "export.swipe.action"), systemImage: "square.and.arrow.up")
             }
