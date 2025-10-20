@@ -89,11 +89,8 @@ struct TemplateSelectionView: View {
     
     private var createNewCard: some View {
         Button(action: {
-            Task {
-                if let emptyCV = await viewModel.getEmptyTemplate() {
-                    router.navigateToEditorWithTemplate(emptyCV)
-                }
-            }
+            // For empty CV, just pass an empty CVModel - no need to load from repository
+            router.navigateToEditorWithTemplate(CVModel())
         }) {
             CardView(padding: DesignTokens.Spacing.sm) {
                 VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
