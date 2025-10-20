@@ -15,7 +15,7 @@ final class CVExportSheetViewModel: ObservableObject {
     @Published var isPreviewLoading = false
     @Published private(set) var previewOptions: ExportOptions?
 
-    private let exportService: CVExportService
+    private let exportService: any CVExportServiceProtocol
 
     var aspectRatio: CGFloat {
         let options = previewOptions ?? currentExportOptions()
@@ -23,8 +23,8 @@ final class CVExportSheetViewModel: ObservableObject {
         return CGFloat(pageSize.width) / CGFloat(pageSize.height)
     }
 
-    init(exportService: CVExportService = CVExportService()) {
-        self.exportService = exportService
+    init(exportService: (any CVExportServiceProtocol)? = nil) {
+        self.exportService = exportService ?? CVExportService()
     }
 
     func loadTemplates() async {

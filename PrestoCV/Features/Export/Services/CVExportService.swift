@@ -2,8 +2,16 @@ import Foundation
 import PrestoCVCore
 import CVPDFExporter
 
+/// Protocol for PDF export operations
+protocol CVExportServiceProtocol: Actor {
+    func availableTemplates() async throws -> [Template]
+    func export(cv: CVModel, templateId: String, customization: CustomizationOptions) async throws -> URL
+    func cleanupTempFile(at url: URL) async
+    func generatePreviewHTML(cv: CVModel, templateId: String, options: ExportOptions) async throws -> String
+}
+
 /// Handles PDF export operations using CVPDFExporter while remaining SwiftUI-friendly.
-actor CVExportService {
+actor CVExportService: CVExportServiceProtocol {
     private let container: PDFExportDependencyContainer
     private let exportUseCase: PDFExportUseCase
     private let templateSelectionUseCase: TemplateSelectionUseCase
@@ -44,7 +52,7 @@ actor CVExportService {
         return outputURL
     }
 
-    func cleanupTempFile(at url: URL) {
+    func cleanupTempFile(at url: URL) async {
         try? FileManager.default.removeItem(at: url)
     }
 
