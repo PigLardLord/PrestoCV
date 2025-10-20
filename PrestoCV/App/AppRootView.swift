@@ -84,7 +84,7 @@ struct AppRootView: View {
             }
         case .cvEditor(let cvId):
             viewWithErrorHandling {
-                CVEditorView(viewModel: try viewModelFactory.makeCVEditorViewModel(cvId: cvId))
+                CVEditorView(viewModel: try viewModelFactory.makeCVEditorViewModel(cvId: cvId, initialCV: router.initialCVForEditor))
             }
         }
     }

@@ -115,14 +115,16 @@ final class CVEditorViewModel: ObservableObject {
     // MARK: - Initialization
     init(
         cvId: String?,
+        initialCV: CVModel? = nil,
         cvManagementUseCase: CVManagementUseCaseProtocol
     ) {
         self.cvId = cvId
         self.cvManagementUseCase = cvManagementUseCase
-        
-        // For new CVs, initialize with loaded state
+
+        // For new CVs, initialize with provided template or empty CV
         if cvId == nil {
-            viewState = .loaded(cv)
+            self.cv = initialCV ?? CVModel()
+            viewState = .loaded(self.cv)
         }
     }
     

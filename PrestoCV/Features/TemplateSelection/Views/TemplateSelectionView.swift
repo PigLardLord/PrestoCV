@@ -75,12 +75,7 @@ struct TemplateSelectionView: View {
                             TemplateCardView(
                                 template: template,
                                 onTap: {
-                                    Task {
-                                        let cvId = await viewModel.createCVFromTemplate(template)
-                                        if let cvId = cvId {
-                                            router.navigate(to: .cvEditor(cvId: cvId))
-                                        }
-                                    }
+                                    router.navigateToEditorWithTemplate(template)
                                 }
                             )
                         }
@@ -95,9 +90,8 @@ struct TemplateSelectionView: View {
     private var createNewCard: some View {
         Button(action: {
             Task {
-                let cvId = await viewModel.createNewEmptyCV()
-                if let cvId = cvId {
-                    router.navigate(to: .cvEditor(cvId: cvId))
+                if let emptyCV = await viewModel.getEmptyTemplate() {
+                    router.navigateToEditorWithTemplate(emptyCV)
                 }
             }
         }) {

@@ -26,9 +26,10 @@ final class ViewModelFactory {
     }
     
     @MainActor
-    func makeCVEditorViewModel(cvId: String?) throws -> CVEditorViewModel {
+    func makeCVEditorViewModel(cvId: String?, initialCV: CVModel?) throws -> CVEditorViewModel {
         return CVEditorViewModel(
             cvId: cvId,
+            initialCV: initialCV,
             cvManagementUseCase: try dependencyContainer.makeCVManagementUseCase()
         )
     }

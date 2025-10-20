@@ -47,28 +47,9 @@ final class TemplateSelectionViewModel: ObservableObject {
     }
     
     @MainActor
-    func createNewEmptyCV() async -> String? {
-        isCreatingCV = true
-        defer { isCreatingCV = false }
-        
+    func getEmptyTemplate() async -> CVModel? {
         do {
-            let emptyCV = try await sampleRepository.getDefaultSample()
-            let createdCV = try await cvManagementUseCase.createCV(from: emptyCV)
-            return createdCV.id.uuidString
-        } catch {
-            viewState = .error(error.localizedAppErrorDescription)
-            return nil
-        }
-    }
-    
-    @MainActor
-    func createCVFromTemplate(_ template: CVModel) async -> String? {
-        isCreatingCV = true
-        defer { isCreatingCV = false }
-        
-        do {
-            let createdCV = try await cvManagementUseCase.createCV(from: template)
-            return createdCV.id.uuidString
+            return try await sampleRepository.getDefaultSample()
         } catch {
             viewState = .error(error.localizedAppErrorDescription)
             return nil
