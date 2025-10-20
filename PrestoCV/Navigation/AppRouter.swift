@@ -27,7 +27,7 @@ final class AppRouter: ObservableObject {
     }
     
     func navigateToRoot() {
-        navigationPath.removeLast(navigationPath.count)
+        navigationPath = NavigationPath()
     }
     
     func replace(with route: Route) {

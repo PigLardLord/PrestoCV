@@ -104,7 +104,8 @@ struct CVEditorView: View {
     
     private func handleCancelTap() {
         if viewModel.handleCancelButtonTap() {
-            router.navigateBack()
+            // For new CVs, always go to root (CV List), not just back one level
+            router.navigateToRoot()
         }
     }
     
