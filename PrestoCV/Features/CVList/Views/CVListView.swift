@@ -70,10 +70,7 @@ struct CVListView: View {
     }
     
     private var cvListView: some View {
-        DeletableList(
-            items: viewModel.cvs,
-            onDelete: viewModel.performDeleteCVs
-        ) { cv in
+        DeletableList(items: viewModel.cvs) { cv in
             CVRowView(
                 cv: cv,
                 onTap: {
