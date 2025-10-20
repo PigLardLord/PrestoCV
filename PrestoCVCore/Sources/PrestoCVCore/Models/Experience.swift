@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Experience Model
 
-public struct Experience: Codable, Identifiable, Sendable {
+public struct Experience: Codable, Identifiable, Sendable, Equatable {
     public var id: UUID
     public var title: String
     public var company: String

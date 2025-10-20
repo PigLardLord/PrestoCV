@@ -62,7 +62,7 @@ public enum LanguageProficiencyLevel: String, CaseIterable, Codable, Sendable {
 
 // MARK: - Language Model
 
-public struct Language: Codable, Identifiable, Sendable {
+public struct Language: Codable, Identifiable, Sendable, Equatable {
     public var id: UUID
     public var name: String
     public var level: LanguageProficiencyLevel

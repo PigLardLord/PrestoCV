@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Skill Model
 
-public struct Skill: Codable, Identifiable, Sendable {
+public struct Skill: Codable, Identifiable, Sendable, Equatable {
     public var id: UUID
     public var name: String
     public var level: Int

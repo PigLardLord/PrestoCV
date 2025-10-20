@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - CV Model
 
-public struct CVModel: Codable, Identifiable, Sendable {
+public struct CVModel: Codable, Identifiable, Sendable, Equatable {
     public var id: UUID
     public var name: String           // Job-specific CV name (e.g., "iOS Developer - Apple")
     public var personalInfo: PersonalInfo

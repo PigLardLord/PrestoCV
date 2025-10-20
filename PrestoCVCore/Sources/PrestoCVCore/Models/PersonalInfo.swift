@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Personal Information Model
 
-public struct PersonalInfo: Codable, Sendable {
+public struct PersonalInfo: Codable, Sendable, Equatable {
     public var name: String      // User's full name
     public var title: String     // Professional title
     public var location: String

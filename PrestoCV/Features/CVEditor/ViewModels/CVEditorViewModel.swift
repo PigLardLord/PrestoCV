@@ -1,5 +1,6 @@
 import SwiftUI
 import PrestoCVCore
+import Combine
 
 final class CVEditorViewModel: ObservableObject {
     
@@ -13,6 +14,8 @@ final class CVEditorViewModel: ObservableObject {
     private let cvManagementUseCase: CVManagementUseCaseProtocol
     private let cvId: String?
     private var isNewCV: Bool { cvId == nil }
+    private var originalCV: CVModel = CVModel()
+    private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Computed Properties
     
@@ -87,16 +90,19 @@ final class CVEditorViewModel: ObservableObject {
         return Double(filledSections) / Double(totalSections)
     }
     
-    /// Indicates if there are unsaved changes (for future implementation)
+    /// Indicates if there are unsaved changes by comparing with original CV
     var hasUnsavedChanges: Bool {
-        // For now, assume there are always unsaved changes if meaningful content exists
-        // This could be enhanced with a proper dirty tracking system
-        hasMeaningfulContent
+        // For new CVs, check if meaningful content was added
+        if isNewCV {
+            return hasMeaningfulContent
+        }
+        // For existing CVs, compare with original
+        return cv != originalCV
     }
     
     /// Computed property for save button enabled state
     var isSaveButtonEnabled: Bool {
-        hasMeaningfulContent && !viewState.isLoading
+        hasMeaningfulContent && hasUnsavedChanges && !viewState.isLoading
     }
     
     /// Computed property for save button color
@@ -124,6 +130,7 @@ final class CVEditorViewModel: ObservableObject {
         // For new CVs, initialize with provided template or empty CV
         if cvId == nil {
             self.cv = initialCV ?? CVModel()
+            self.originalCV = CVModel() // New CVs start with empty original
             viewState = .loaded(self.cv)
         }
     }
@@ -157,8 +164,14 @@ final class CVEditorViewModel: ObservableObject {
         guard hasMeaningfulContent else {
             return false
         }
+
+        // Don't save if there are no changes
+        guard hasUnsavedChanges else {
+            return false
+        }
+
         viewState = .loading
-        
+
         do {
             let savedCV: CVModel
             if isNewCV {
@@ -170,6 +183,7 @@ final class CVEditorViewModel: ObservableObject {
             }
             // Update the local CV with the saved one (might have updated ID or timestamps)
             cv = savedCV
+            originalCV = savedCV // Update original after successful save
             viewState = .loaded(cv)
             return true
         } catch {
@@ -293,5 +307,6 @@ final class CVEditorViewModel: ObservableObject {
             throw AppError.notFound("CV with id \(uuid)")
         }
         cv = loadedCV
+        originalCV = loadedCV // Store original for change tracking
     }
 }

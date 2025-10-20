@@ -390,4 +390,182 @@ struct CVEditorViewModelTests {
         // Then
         #expect(viewModel.isSaveButtonEnabled == true)
     }
+
+    // MARK: - No Changes Save Behavior Tests
+
+    @Test("Existing CV without changes - save button is disabled")
+    func existingCVWithoutChanges_SaveButtonDisabled() async {
+        // Given
+        let mockUseCase = MockCVManagementUseCase()
+        let existingCV = CVModel(
+            id: UUID(),
+            name: "Existing CV",
+            personalInfo: PersonalInfo(name: "Jane Doe", email: "jane@example.com")
+        )
+        await mockUseCase.storeCV(existingCV)
+
+        let viewModel = CVEditorViewModel(
+            cvId: existingCV.id.uuidString,
+            cvManagementUseCase: mockUseCase
+        )
+
+        // When - Load existing CV without making changes
+        await viewModel.loadCV()
+
+        // Then - Save button should be disabled
+        #expect(viewModel.hasUnsavedChanges == false, "Should have no unsaved changes")
+        #expect(viewModel.hasMeaningfulContent == true, "Should have meaningful content")
+        #expect(viewModel.isSaveButtonEnabled == false, "Save button should be disabled without changes")
+    }
+
+    @Test("Existing CV without changes - saveCV returns false")
+    func existingCVWithoutChanges_SaveCVReturnsFalse() async {
+        // Given
+        let mockUseCase = MockCVManagementUseCase()
+        let existingCV = CVModel(
+            id: UUID(),
+            name: "Existing CV",
+            personalInfo: PersonalInfo(name: "Jane Doe", email: "jane@example.com")
+        )
+        await mockUseCase.storeCV(existingCV)
+
+        let viewModel = CVEditorViewModel(
+            cvId: existingCV.id.uuidString,
+            cvManagementUseCase: mockUseCase
+        )
+
+        // When - Load existing CV and try to save without changes
+        await viewModel.loadCV()
+        let saved = await viewModel.saveCV()
+
+        // Then - Save should return false
+        #expect(saved == false, "saveCV should return false when there are no changes")
+        #expect(await !mockUseCase.updateCVCalled, "updateCV should not be called when there are no changes")
+    }
+
+    @Test("Existing CV without changes - no save confirmation dialog")
+    func existingCVWithoutChanges_NoSaveConfirmation() async {
+        // Given
+        let mockUseCase = MockCVManagementUseCase()
+        let existingCV = CVModel(
+            id: UUID(),
+            name: "Existing CV",
+            personalInfo: PersonalInfo(name: "Jane Doe", email: "jane@example.com")
+        )
+        await mockUseCase.storeCV(existingCV)
+
+        let viewModel = CVEditorViewModel(
+            cvId: existingCV.id.uuidString,
+            cvManagementUseCase: mockUseCase
+        )
+
+        // When - Load existing CV and tap save without changes
+        await viewModel.loadCV()
+        await viewModel.handleSaveButtonTap(onNavigate: {})
+
+        // Then - Confirmation dialog should NOT be shown
+        #expect(viewModel.showingSaveConfirmation == false, "Save confirmation should not be shown without changes")
+    }
+
+    @Test("Existing CV with changes - save button is enabled")
+    func existingCVWithChanges_SaveButtonEnabled() async {
+        // Given
+        let mockUseCase = MockCVManagementUseCase()
+        let existingCV = CVModel(
+            id: UUID(),
+            name: "Existing CV",
+            personalInfo: PersonalInfo(name: "Jane Doe", email: "jane@example.com")
+        )
+        await mockUseCase.storeCV(existingCV)
+
+        let viewModel = CVEditorViewModel(
+            cvId: existingCV.id.uuidString,
+            cvManagementUseCase: mockUseCase
+        )
+
+        // When - Load existing CV and make changes
+        await viewModel.loadCV()
+        viewModel.cv.personalInfo.phone = "+1234567890"
+
+        // Then - Save button should be enabled
+        #expect(viewModel.hasUnsavedChanges == true, "Should have unsaved changes")
+        #expect(viewModel.isSaveButtonEnabled == true, "Save button should be enabled with changes")
+    }
+
+    @Test("Existing CV with changes - saveCV returns true and shows confirmation")
+    func existingCVWithChanges_SaveCVReturnsTrue() async {
+        // Given
+        let mockUseCase = MockCVManagementUseCase()
+        let existingCV = CVModel(
+            id: UUID(),
+            name: "Existing CV",
+            personalInfo: PersonalInfo(name: "Jane Doe", email: "jane@example.com")
+        )
+        await mockUseCase.storeCV(existingCV)
+
+        let viewModel = CVEditorViewModel(
+            cvId: existingCV.id.uuidString,
+            cvManagementUseCase: mockUseCase
+        )
+
+        // When - Load existing CV, make changes, and save
+        await viewModel.loadCV()
+        viewModel.cv.personalInfo.phone = "+1234567890"
+        let saved = await viewModel.saveCV()
+
+        // Then - Save should succeed
+        #expect(saved == true, "saveCV should return true when there are changes")
+        #expect(await mockUseCase.updateCVCalled, "updateCV should be called when there are changes")
+    }
+
+    @Test("Existing CV with changes - save confirmation dialog is shown")
+    func existingCVWithChanges_SaveConfirmationShown() async {
+        // Given
+        let mockUseCase = MockCVManagementUseCase()
+        let existingCV = CVModel(
+            id: UUID(),
+            name: "Existing CV",
+            personalInfo: PersonalInfo(name: "Jane Doe", email: "jane@example.com")
+        )
+        await mockUseCase.storeCV(existingCV)
+
+        let viewModel = CVEditorViewModel(
+            cvId: existingCV.id.uuidString,
+            cvManagementUseCase: mockUseCase
+        )
+
+        // When - Load existing CV, make changes, and tap save
+        await viewModel.loadCV()
+        viewModel.cv.personalInfo.phone = "+1234567890"
+        await viewModel.handleSaveButtonTap(onNavigate: {})
+
+        // Then - Confirmation dialog SHOULD be shown
+        #expect(viewModel.showingSaveConfirmation == true, "Save confirmation should be shown with changes")
+    }
+
+    @Test("After saving - no unsaved changes and save button disabled")
+    func afterSaving_NoUnsavedChanges() async {
+        // Given
+        let mockUseCase = MockCVManagementUseCase()
+        let existingCV = CVModel(
+            id: UUID(),
+            name: "Existing CV",
+            personalInfo: PersonalInfo(name: "Jane Doe", email: "jane@example.com")
+        )
+        await mockUseCase.storeCV(existingCV)
+
+        let viewModel = CVEditorViewModel(
+            cvId: existingCV.id.uuidString,
+            cvManagementUseCase: mockUseCase
+        )
+
+        // When - Load, modify, save, then check state
+        await viewModel.loadCV()
+        viewModel.cv.personalInfo.phone = "+1234567890"
+        _ = await viewModel.saveCV()
+
+        // Then - After save, no unsaved changes and save button disabled
+        #expect(viewModel.hasUnsavedChanges == false, "Should have no unsaved changes after save")
+        #expect(viewModel.isSaveButtonEnabled == false, "Save button should be disabled after save")
+    }
 }

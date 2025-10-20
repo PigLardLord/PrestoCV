@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Certification Model
 
-public struct Certification: Codable, Identifiable, Sendable {
+public struct Certification: Codable, Identifiable, Sendable, Equatable {
     public var id: UUID
     public var name: String
     public var issuer: String

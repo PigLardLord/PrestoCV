@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Social Model
 
-public struct Social: Codable, Identifiable, Sendable {
+public struct Social: Codable, Identifiable, Sendable, Equatable {
     public var id: UUID
     public var platform: String
     public var url: String

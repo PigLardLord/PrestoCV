@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Education Model
 
-public struct Education: Codable, Identifiable, Sendable {
+public struct Education: Codable, Identifiable, Sendable, Equatable {
     public var id: UUID
     public var degree: String
     public var school: String
