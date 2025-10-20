@@ -7,7 +7,7 @@ import CVPDFExporter
 struct CVExportSheetView: View {
     let cv: CVModel
     @StateObject private var viewModel: CVExportSheetViewModel
-    let previewCoordinator: HTMLPreviewCoordinator
+    @ObservedObject var previewCoordinator: HTMLPreviewCoordinator
 
     @Environment(\.dismiss) private var dismiss
     @State private var loadingTemplates = true
@@ -117,7 +117,7 @@ struct CVExportSheetView: View {
                     .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg))
                     .shadow(color: DesignTokens.Colors.shadow, radius: 12, x: 0, y: 8)
                     .overlay {
-                        if previewCoordinator.isLoading {
+                        if previewCoordinator.isLoading || viewModel.isPreviewLoading {
                             ProgressView()
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 .background(Color.black.opacity(0.08))

@@ -46,31 +46,25 @@ final class HTMLPreviewCoordinator: NSObject, ObservableObject {
         navigationContinuation = nil
 
         isLoading = true
+        defer { isLoading = false }
 
-        do {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                navigationContinuation = continuation
-                webView.loadHTMLString(html, baseURL: baseURL)
-            }
-
-            _ = try? await webView.callAsyncJavaScript(
-                PreviewReadinessScript.awaitReady,
-                arguments: [:],
-                in: nil,
-                contentWorld: .page
-            )
-
-            #if DEBUG
-            await dumpRenderedHTML()
-            #endif
-
-            _ = try? await webView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.applyScale();")
-
-            isLoading = false
-        } catch {
-            isLoading = false
-            throw error
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            navigationContinuation = continuation
+            webView.loadHTMLString(html, baseURL: baseURL)
         }
+
+        _ = try? await webView.callAsyncJavaScript(
+            PreviewReadinessScript.awaitReady,
+            arguments: [:],
+            in: nil,
+            contentWorld: .page
+        )
+
+        #if DEBUG
+        await dumpRenderedHTML()
+        #endif
+
+        _ = try? await webView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.applyScale();")
     }
 
     #if DEBUG
