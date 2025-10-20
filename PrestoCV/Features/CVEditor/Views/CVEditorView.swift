@@ -118,12 +118,12 @@ struct CVEditorView: View {
     
     private func handleDiscardChanges() {
         viewModel.confirmCancel()
-        router.navigateBack()
+        router.navigateToRoot()
     }
     
     private func handleSaveConfirmationDone() {
         viewModel.finishEditingAndNavigateBack()
-        router.navigateBack()
+        router.navigateToRoot()
     }
 }
 
