@@ -6,6 +6,7 @@ struct CVListView: View {
     @EnvironmentObject var router: AppRouter
     @State private var exportTarget: CVModel?
     @State private var deleteTarget: CVModel?
+    @State private var showDeleteConfirmation = false
     
     var body: some View {
         ViewStateContainer(
@@ -41,18 +42,17 @@ struct CVListView: View {
         }
         .confirmationDialog(
             String(localized: "cv.delete.confirmation.title"),
-            isPresented: Binding(
-                get: { deleteTarget != nil },
-                set: { if !$0 { deleteTarget = nil } }
-            ),
+            isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
             if let target = deleteTarget {
                 Button(String(localized: "common.delete"), role: .destructive) {
                     Task { await viewModel.deleteCV(withId: target.id) }
+                    showDeleteConfirmation = false
                     deleteTarget = nil
                 }
                 Button(String(localized: "common.cancel"), role: .cancel) {
+                    showDeleteConfirmation = false
                     deleteTarget = nil
                 }
             }
@@ -81,6 +81,7 @@ struct CVListView: View {
                 },
                 onDelete: {
                     deleteTarget = cv
+                    showDeleteConfirmation = true
                 }
             )
         }
