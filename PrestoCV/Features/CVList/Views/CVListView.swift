@@ -8,35 +8,33 @@ struct CVListView: View {
     @State private var deleteTarget: CVModel?
     
     var body: some View {
-        NavigationView {
-            ViewStateContainer(
-                viewState: viewModel.viewState,
-                loadingMessage: "common.loading_cvs".asLoclizedKey,
-                onRetry: viewModel.loadCVs
-            ) { cvs in
-                ConditionalContentView(
-                    isEmpty: cvs.isEmpty,
-                    content: { cvListView },
-                    emptyContent: { emptyStateView }
-                )
-            }
-            .navigationTitle("navigation.my_cvs".localized)
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        router.navigate(to: .templateSelection)
-                    }) {
-                        Image(systemName: "plus")
-                    }
+        ViewStateContainer(
+            viewState: viewModel.viewState,
+            loadingMessage: "common.loading_cvs".asLoclizedKey,
+            onRetry: viewModel.loadCVs
+        ) { cvs in
+            ConditionalContentView(
+                isEmpty: cvs.isEmpty,
+                content: { cvListView },
+                emptyContent: { emptyStateView }
+            )
+        }
+        .navigationTitle("navigation.my_cvs".localized)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    router.navigate(to: .templateSelection)
+                }) {
+                    Image(systemName: "plus")
                 }
             }
-            .task {
-                await viewModel.loadCVs()
-            }
-            .refreshable {
-                await viewModel.loadCVs()
-            }
+        }
+        .task {
+            await viewModel.loadCVs()
+        }
+        .refreshable {
+            await viewModel.loadCVs()
         }
         .sheet(item: $exportTarget) { cv in
             CVExportSheetView(cv: cv)
