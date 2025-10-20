@@ -45,8 +45,9 @@ struct CVListView: View {
                 get: { deleteTarget != nil },
                 set: { if !$0 { deleteTarget = nil } }
             ),
-            presenting: deleteTarget,
-            actions: { target in
+            titleVisibility: .visible
+        ) {
+            if let target = deleteTarget {
                 Button(String(localized: "common.delete"), role: .destructive) {
                     Task { await viewModel.deleteCV(withId: target.id) }
                     deleteTarget = nil
@@ -54,11 +55,10 @@ struct CVListView: View {
                 Button(String(localized: "common.cancel"), role: .cancel) {
                     deleteTarget = nil
                 }
-            },
-            message: { _ in
-                Text(String(localized: "cv.delete.confirmation.message"))
             }
-        )
+        } message: {
+            Text(String(localized: "cv.delete.confirmation.message"))
+        }
     }
     
     // MARK: - View Components
