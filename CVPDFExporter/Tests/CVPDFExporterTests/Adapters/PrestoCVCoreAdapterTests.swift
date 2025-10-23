@@ -132,6 +132,29 @@ struct PrestoCVCoreAdapterTests {
         #expect(certificationsSection?.items.first?.title == "AWS Certified")
     }
 
+    @Test("Maps social links section when present")
+    func test_convertToCV_mapsSocialLinksSection() {
+        // Given
+        let adapter = PrestoCVCoreAdapter()
+        let cvModel = createSampleCVModelWithSocial()
+
+        // When
+        let document = adapter.convertToCV(from: cvModel)
+
+        // Then
+        let socialSection = document.sections.first { $0.title == "Online Profiles" }
+        #expect(socialSection != nil, "Social section should exist")
+        #expect(socialSection?.items.count == 2, "Should have 2 social links")
+
+        let firstSocial = socialSection?.items.first
+        #expect(firstSocial?.title == "LinkedIn", "First social should be LinkedIn")
+        #expect(firstSocial?.url == "https://linkedin.com/in/janesmith", "LinkedIn URL should be correct")
+
+        let secondSocial = socialSection?.items[1]
+        #expect(secondSocial?.title == "GitHub", "Second social should be GitHub")
+        #expect(secondSocial?.url == "https://github.com/janesmith", "GitHub URL should be correct")
+    }
+
     // MARK: - Helper Methods
 
     private func createSampleCVModel() -> MockCVModel {
@@ -181,7 +204,8 @@ struct PrestoCVCoreAdapterTests {
                     issuer: "Amazon",
                     date: "2023"
                 )
-            ]
+            ],
+            social: []
         )
     }
 
@@ -195,7 +219,26 @@ struct PrestoCVCoreAdapterTests {
             education: [],
             skills: [],
             languages: [],
-            certifications: []
+            certifications: [],
+            social: []
+        )
+    }
+
+    private func createSampleCVModelWithSocial() -> MockCVModel {
+        MockCVModel(
+            personalInfo: MockPersonalInfo(
+                name: "Jane Smith",
+                email: "jane.smith@example.com"
+            ),
+            experiences: [],
+            education: [],
+            skills: [],
+            languages: [],
+            certifications: [],
+            social: [
+                MockSocial(platform: "LinkedIn", url: "https://linkedin.com/in/janesmith"),
+                MockSocial(platform: "GitHub", url: "https://github.com/janesmith")
+            ]
         )
     }
 }
@@ -209,6 +252,7 @@ private struct MockCVModel {
     let skills: [MockSkill]
     let languages: [MockLanguage]
     let certifications: [MockCertification]
+    let social: [MockSocial]
 }
 
 private struct MockPersonalInfo {
@@ -255,4 +299,9 @@ private struct MockCertification {
     let name: String
     let issuer: String
     let date: String
+}
+
+private struct MockSocial {
+    let platform: String
+    let url: String
 }

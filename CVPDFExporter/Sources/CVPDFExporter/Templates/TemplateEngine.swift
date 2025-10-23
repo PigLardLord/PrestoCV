@@ -93,37 +93,37 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
         // Skills
         let skillSections = document.sections.filter { $0.type == .skills }
         if !skillSections.isEmpty {
-            var skillGroups: [[String: Any]] = []
+            // Collect all skills from all skill sections into a single flat list
+            var allSkills: [[String: Any]] = []
             for section in skillSections {
                 for item in section.items {
-                    var skillGroup: [String: Any] = [
-                        "title": item.title,      // Changed from "category" to "title"
-                        "category": item.title,   // Keep both for compatibility
-                        "hasSkills": !item.tags.isEmpty  // Add flag for nested conditional
-                    ]
-                    if !item.tags.isEmpty {
-                        // Add tags directly as array of strings
-                        skillGroup["tags"] = item.tags
-                        // Also add as skillList for compatibility with different templates
-                        let skillTags = item.tags.map { tag -> [String: Any] in
-                            var skillDict: [String: Any] = ["name": tag]
-                            // Check if metadata contains skill level
-                            if let levelStr = item.metadata["level"], let level = Int(levelStr) {
-                                skillDict["level"] = level
-                                skillDict["hasLevel"] = true
-                                skillDict["levelDots"] = createLevelDots(level: level)
-                            } else {
-                                skillDict["hasLevel"] = false
-                            }
-                            return skillDict
-                        }
-                        skillGroup["skillList"] = skillTags
+                    // Each item represents a single skill
+                    var skillDict: [String: Any] = ["name": item.title]
+                    // Check if metadata contains skill level
+                    if let levelStr = item.metadata["level"], let level = Int(levelStr) {
+                        skillDict["level"] = level
+                        skillDict["hasLevel"] = true
+                        skillDict["levelDots"] = createLevelDots(level: level)
+                    } else {
+                        skillDict["hasLevel"] = false
                     }
-                    skillGroups.append(skillGroup)
+                    allSkills.append(skillDict)
                 }
             }
+
+            // Group skills for templates that expect grouped structure
+            var skillGroups: [[String: Any]] = []
+            if !allSkills.isEmpty {
+                skillGroups.append([
+                    "title": "Skills",
+                    "category": "Skills",
+                    "skillList": allSkills,
+                    "hasSkills": true
+                ])
+            }
+
             context["skills"] = skillGroups
-            context["hasSkills"] = !skillGroups.isEmpty
+            context["hasSkills"] = !allSkills.isEmpty
         } else {
             context["hasSkills"] = false
         }
@@ -179,6 +179,31 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
             context["hasInterests"] = !interestItems.isEmpty
         } else {
             context["hasInterests"] = false
+        }
+
+        // Social Links / Online Profiles
+        let socialSections = document.sections.filter { $0.title == "Online Profiles" || $0.type == .custom }
+        if !socialSections.isEmpty {
+            var socialItems: [[String: String]] = []
+            for section in socialSections {
+                // Only process if it's actually a social/online profiles section
+                if section.title == "Online Profiles" {
+                    for item in section.items {
+                        socialItems.append([
+                            "platform": item.title,
+                            "url": item.url ?? item.subtitle ?? ""
+                        ])
+                    }
+                }
+            }
+            if !socialItems.isEmpty {
+                context["socialLinks"] = socialItems
+                context["hasSocialLinks"] = true
+            } else {
+                context["hasSocialLinks"] = false
+            }
+        } else {
+            context["hasSocialLinks"] = false
         }
 
         // Add customization values

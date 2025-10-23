@@ -144,6 +144,33 @@ struct ProfessionalHTMLTemplate {
                 font-size: 9pt;
             }
 
+            .language-item, .cert-item, .social-item {
+                margin-bottom: 8pt;
+            }
+
+            .language-name, .cert-title, .social-platform {
+                font-weight: 600;
+                color: var(--color-primary);
+            }
+
+            .language-level, .cert-issuer, .social-url {
+                color: var(--color-secondary);
+                font-size: 9pt;
+            }
+
+            .interests-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8pt;
+            }
+
+            .interest-tag {
+                background-color: #ECF0F1;
+                padding: 3pt 8pt;
+                border-radius: 3pt;
+                font-size: 9pt;
+            }
+
             @media print {
                 body {
                     padding: 0;
@@ -235,6 +262,54 @@ struct ProfessionalHTMLTemplate {
             {{/skills}}
         </section>
         {{/hasSkills}}
+
+        {{#hasCertifications}}
+        <section class="section">
+            <h2>Certifications</h2>
+            {{#certifications}}
+            <div class="cert-item">
+                <div class="cert-title">{{title}}</div>
+                {{#issuer}}<div class="cert-issuer">{{issuer}}{{#date}} • {{date}}{{/date}}</div>{{/issuer}}
+                {{#description}}<div class="item-description">{{description}}</div>{{/description}}
+            </div>
+            {{/certifications}}
+        </section>
+        {{/hasCertifications}}
+
+        {{#hasLanguages}}
+        <section class="section">
+            <h2>Languages</h2>
+            {{#languages}}
+            <div class="language-item">
+                <span class="language-name">{{language}}</span>
+                <span class="language-level"> — {{level}}</span>
+            </div>
+            {{/languages}}
+        </section>
+        {{/hasLanguages}}
+
+        {{#hasSocialLinks}}
+        <section class="section">
+            <h2>Online Profiles</h2>
+            {{#socialLinks}}
+            <div class="social-item">
+                <div class="social-platform">{{platform}}</div>
+                <div class="social-url">{{url}}</div>
+            </div>
+            {{/socialLinks}}
+        </section>
+        {{/hasSocialLinks}}
+
+        {{#hasInterests}}
+        <section class="section">
+            <h2>Interests</h2>
+            <div class="interests-list">
+                {{#interests}}
+                <span class="interest-tag">{{.}}</span>
+                {{/interests}}
+            </div>
+        </section>
+        {{/hasInterests}}
     </body>
     </html>
     """

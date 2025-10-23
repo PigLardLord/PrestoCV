@@ -346,6 +346,32 @@ struct ModernHTMLTemplate {
                 border: 0.5pt solid {{colorSecondary}};
             }
 
+            /* Social Links */
+            .social-link {
+                background: #f8fafc;
+                border-radius: 2pt;
+                padding: 4pt 6pt;
+                margin-bottom: 3pt;
+                border-left: 2pt solid {{colorPrimary}};
+                page-break-inside: avoid;
+                font-size: 8pt;
+                display: flex;
+                flex-direction: column;
+                gap: 1pt;
+            }
+
+            .social-platform {
+                color: {{colorPrimary}};
+                font-weight: 700;
+                font-size: 8pt;
+            }
+
+            .social-url {
+                color: {{colorSecondary}};
+                font-size: 7pt;
+                word-break: break-all;
+            }
+
             /* Page Break Control */
             .hero-section {
                 page-break-after: avoid;
@@ -535,6 +561,21 @@ struct ModernHTMLTemplate {
                         </div>
                     </section>
                     {{/hasInterests}}
+
+                    {{#hasSocialLinks}}
+                    <section class="social-section">
+                        <h3 class="section-title">
+                            <span class="title-accent"></span>
+                            <span class="section-title-text">Online Profiles</span>
+                        </h3>
+                        {{#socialLinks}}
+                        <div class="social-link">
+                            <span class="social-platform">{{platform}}</span>
+                            <span class="social-url">{{url}}</span>
+                        </div>
+                        {{/socialLinks}}
+                    </section>
+                    {{/hasSocialLinks}}
                 </div>
             </main>
         </div>

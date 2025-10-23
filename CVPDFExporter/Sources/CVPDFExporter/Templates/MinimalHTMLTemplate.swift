@@ -164,6 +164,24 @@ struct MinimalHTMLTemplate {
                 content: "";
             }
 
+            /* Languages, Certifications, Social Links, Interests */
+            .simple-item {
+                margin-bottom: var(--spacing-xs);
+            }
+
+            .item-label {
+                font-weight: 600;
+                color: var(--color-primary);
+            }
+
+            .item-value {
+                color: var(--color-secondary);
+            }
+
+            .interests {
+                color: var(--color-secondary);
+            }
+
             /* Print styles */
             @media print {
                 body {
@@ -268,6 +286,49 @@ struct MinimalHTMLTemplate {
             {{/skills}}
         </section>
         {{/hasSkills}}
+
+        {{#hasCertifications}}
+        <section class="section">
+            <h2>Certifications</h2>
+            {{#certifications}}
+            <div class="simple-item">
+                <span class="item-label">{{title}}</span>{{#issuer}} — <span class="item-value">{{issuer}}</span>{{/issuer}}{{#date}} ({{date}}){{/date}}
+                {{#description}}<div class="item-description">{{description}}</div>{{/description}}
+            </div>
+            {{/certifications}}
+        </section>
+        {{/hasCertifications}}
+
+        {{#hasLanguages}}
+        <section class="section">
+            <h2>Languages</h2>
+            {{#languages}}
+            <div class="simple-item">
+                <span class="item-label">{{language}}</span> — <span class="item-value">{{level}}</span>
+            </div>
+            {{/languages}}
+        </section>
+        {{/hasLanguages}}
+
+        {{#hasSocialLinks}}
+        <section class="section">
+            <h2>Online Profiles</h2>
+            {{#socialLinks}}
+            <div class="simple-item">
+                <span class="item-label">{{platform}}:</span> <span class="item-value">{{url}}</span>
+            </div>
+            {{/socialLinks}}
+        </section>
+        {{/hasSocialLinks}}
+
+        {{#hasInterests}}
+        <section class="section">
+            <h2>Interests</h2>
+            <div class="interests">
+                {{#interests}}{{.}}{{^last}}, {{/last}}{{/interests}}
+            </div>
+        </section>
+        {{/hasInterests}}
     </body>
     </html>
     """
