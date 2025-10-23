@@ -326,4 +326,111 @@ struct TemplateValidatorTests {
         #expect(!result.description.isEmpty)
         #expect(result.description.contains("missing") || result.description.contains("Missing"))
     }
+
+    // MARK: - Package Validation
+
+    @Test("Validates template package with valid content")
+    func validatesValidTemplatePackage() throws {
+        // Given
+        let validator = TemplateValidator()
+        let manifest = TemplateManifest(
+            id: "test-template",
+            name: "Test Template",
+            description: "Test",
+            author: "Test Author",
+            version: "1.0.0",
+            previewImage: "preview.png",
+            price: 0.0
+        )
+
+        let validHTML = """
+        <html><body>
+        {{name}} {{email}}
+        {{#hasWorkExperience}}Work{{/hasWorkExperience}}
+        {{#hasEducation}}Edu{{/hasEducation}}
+        {{#hasSkills}}Skills{{/hasSkills}}
+        {{#hasLanguages}}Lang{{/hasLanguages}}
+        {{#hasCertifications}}Cert{{/hasCertifications}}
+        {{#hasSocialLinks}}Social{{/hasSocialLinks}}
+        {{#hasInterests}}Int{{/hasInterests}}
+        </body></html>
+        """
+
+        let package = TemplatePackage(
+            manifest: manifest,
+            cssContent: "body {}",
+            htmlContent: validHTML
+        )
+
+        // When
+        let result = try validator.validatePackage(package)
+
+        // Then
+        #expect(result.isValid)
+        #expect(result.missingFields.isEmpty)
+    }
+
+    @Test("Validates CSS-only package using base template")
+    func validatesCSSOnlyPackage() throws {
+        // Given
+        let validator = TemplateValidator()
+        let manifest = TemplateManifest(
+            id: "css-only",
+            name: "CSS Only Template",
+            description: "Test",
+            author: "Test Author",
+            version: "1.0.0",
+            previewImage: "preview.png",
+            price: 0.0
+        )
+
+        let package = TemplatePackage(
+            manifest: manifest,
+            cssContent: "body { color: blue; }",
+            htmlContent: nil // Uses base template
+        )
+
+        // When - Should use base template for validation
+        let result = try validator.validatePackage(package)
+
+        // Then - Base template has all required fields
+        #expect(result.isValid)
+        #expect(result.missingFields.isEmpty)
+    }
+
+    @Test("Detects missing fields in custom HTML package")
+    func detectsMissingFieldsInCustomHTMLPackage() throws {
+        // Given
+        let validator = TemplateValidator()
+        let manifest = TemplateManifest(
+            id: "incomplete",
+            name: "Incomplete Template",
+            description: "Test",
+            author: "Test Author",
+            version: "1.0.0",
+            previewImage: "preview.png",
+            price: 0.0
+        )
+
+        let incompleteHTML = """
+        <html><body>
+        {{name}} {{email}}
+        </body></html>
+        """
+
+        let package = TemplatePackage(
+            manifest: manifest,
+            cssContent: "body {}",
+            htmlContent: incompleteHTML
+        )
+
+        // When
+        let result = try validator.validatePackage(package)
+
+        // Then
+        #expect(!result.isValid)
+        #expect(result.missingFields.contains(.workExperience))
+        #expect(result.missingFields.contains(.education))
+        #expect(result.missingFields.contains(.skills))
+    }
 }

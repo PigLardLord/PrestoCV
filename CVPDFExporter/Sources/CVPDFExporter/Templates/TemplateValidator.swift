@@ -93,4 +93,19 @@ public struct TemplateValidator {
         let isValid = missing.isEmpty
         return ValidationResult(isValid: isValid, missingFields: missing)
     }
+
+    /// Validates a template package, checking the HTML content
+    /// For CSS-only packages (htmlContent == nil), assumes base template which includes all fields
+    /// - Parameter package: The template package to validate
+    /// - Returns: ValidationResult indicating validity
+    public func validatePackage(_ package: TemplatePackage) throws -> ValidationResult {
+        // If package has custom HTML, validate it
+        if let htmlContent = package.htmlContent {
+            return validate(template: htmlContent)
+        }
+
+        // CSS-only packages use base template which has all required fields
+        // Return valid result (base template is assumed to be complete)
+        return ValidationResult(isValid: true, missingFields: [])
+    }
 }
