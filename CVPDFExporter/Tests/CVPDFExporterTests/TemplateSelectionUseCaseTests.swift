@@ -211,11 +211,15 @@ final class TemplateSelectionUseCaseTests: XCTestCase {
 final class MockTemplateRepository: TemplateRepositoryProtocol, @unchecked Sendable {
     var templates: [Template] = []
 
-    func getAllTemplates() async throws -> [Template] {
+    func getTemplates() async throws -> [Template] {
         templates
     }
 
-    func getTemplate(byId id: String) async throws -> Template? {
+    func getTemplate(id: String) async throws -> Template? {
         templates.first { $0.id == id }
+    }
+
+    func installTemplate(_ package: TemplatePackage) async throws {
+        // Mock implementation - no-op for tests
     }
 }

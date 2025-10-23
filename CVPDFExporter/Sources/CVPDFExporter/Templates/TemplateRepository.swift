@@ -31,12 +31,17 @@ public final class BundledTemplateRepository: TemplateRepository, TemplateReposi
 
     // MARK: - TemplateRepositoryProtocol
 
-    public func getAllTemplates() async throws -> [Template] {
+    public func getTemplates() async throws -> [Template] {
         return templates
     }
 
-    public func getTemplate(byId id: String) async throws -> Template? {
+    public func getTemplate(id: String) async throws -> Template? {
         return templates.first { $0.id == id }
+    }
+
+    public func installTemplate(_ package: TemplatePackage) async throws {
+        // Bundled templates are read-only
+        throw TemplateRepositoryError.ioError("Cannot install templates into bundled repository")
     }
 
     // MARK: - Private Methods
