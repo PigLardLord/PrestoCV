@@ -1,7 +1,31 @@
 import Foundation
 
-/// Modern template HTML content
+/// Modern template - CSS-only variant using BaseHTMLTemplate
+///
+/// This template extends BaseHTMLTemplate with modern styling.
+/// All HTML structure comes from BaseHTMLTemplate, only CSS is customized here.
 struct ModernHTMLTemplate {
+
+    /// Custom CSS for the Modern template
+    /// Injected into BaseHTMLTemplate's {{customCSS}} placeholder
+    private static let customCSS = """
+    /* Modern Template - No additional CSS needed */
+    /* All styling is already in BaseHTMLTemplate */
+    """
+
+    /// Complete HTML with BaseHTMLTemplate + Modern CSS
+    static var html: String {
+        return BaseHTMLTemplate.html.replacingOccurrences(
+            of: "{{customCSS}}",
+            with: customCSS
+        )
+    }
+}
+
+/// Legacy Modern template HTML content (deprecated)
+/// This version contains the full HTML. Use the new CSS-only version instead.
+@available(*, deprecated, message: "Use BaseHTMLTemplate with TemplateLocalizer instead")
+struct ModernHTMLTemplateLegacy {
     static let html = """
     <!DOCTYPE html>
     <html lang="en">
