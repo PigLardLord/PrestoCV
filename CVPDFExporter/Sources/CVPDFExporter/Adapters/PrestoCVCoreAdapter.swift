@@ -387,6 +387,8 @@ public struct PrestoCVCoreAdapter: Sendable {
                 sections.append(mapLanguagesFromMock(child.value))
             case "certifications":
                 sections.append(mapCertificationsFromMock(child.value))
+            case "social":
+                sections.append(mapSocialLinksFromMock(child.value))
             default: break
             }
         }
@@ -602,6 +604,45 @@ public struct PrestoCVCoreAdapter: Sendable {
             title: "Certifications",
             items: items,
             order: 5
+        )
+    }
+
+    private func mapSocialLinksFromMock(_ value: Any) -> CVSection {
+        var items: [CVItem] = []
+
+        if let array = value as? [Any] {
+            for social in array {
+                let mirror = Mirror(reflecting: social)
+                var platform = ""
+                var url = ""
+
+                for prop in mirror.children {
+                    switch prop.label {
+                    case "platform": platform = prop.value as? String ?? ""
+                    case "url": url = prop.value as? String ?? ""
+                    default: break
+                    }
+                }
+
+                items.append(CVItem(
+                    title: platform,
+                    subtitle: nil,
+                    description: nil,
+                    startDate: nil,
+                    endDate: nil,
+                    location: nil,
+                    url: url,
+                    tags: []
+                ))
+            }
+        }
+
+        return CVSection(
+            id: "social",
+            type: .custom,
+            title: "Online Profiles",
+            items: items,
+            order: 6
         )
     }
 

@@ -93,12 +93,21 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
         // Skills
         let skillSections = document.sections.filter { $0.type == .skills }
         if !skillSections.isEmpty {
-            // Collect all skills from all skill sections into a single flat list
             var allSkills: [[String: Any]] = []
+
             for section in skillSections {
                 for item in section.items {
-                    // Each item represents a single skill
-                    var skillDict: [String: Any] = ["name": item.title]
+                    // Each item represents a single skill with both name and title for flexibility
+                    var skillDict: [String: Any] = [
+                        "name": item.title,    // For {{name}} in skill badges
+                        "title": item.title    // For {{title}} in nested structures
+                    ]
+
+                    // Add tags array for nested iteration ({{#tags}}{{.}}{{/tags}})
+                    if !item.tags.isEmpty {
+                        skillDict["tags"] = item.tags
+                    }
+
                     // Check if metadata contains skill level
                     if let levelStr = item.metadata["level"], let level = Int(levelStr) {
                         skillDict["level"] = level
@@ -111,18 +120,7 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                 }
             }
 
-            // Group skills for templates that expect grouped structure
-            var skillGroups: [[String: Any]] = []
-            if !allSkills.isEmpty {
-                skillGroups.append([
-                    "title": "Skills",
-                    "category": "Skills",
-                    "skillList": allSkills,
-                    "hasSkills": true
-                ])
-            }
-
-            context["skills"] = skillGroups
+            context["skills"] = allSkills
             context["hasSkills"] = !allSkills.isEmpty
         } else {
             context["hasSkills"] = false

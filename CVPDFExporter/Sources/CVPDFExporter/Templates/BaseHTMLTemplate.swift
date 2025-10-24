@@ -467,14 +467,12 @@ struct BaseHTMLTemplate {
                 <h3 class="spotlight-title">{{i18n_skills}}</h3>
                 <div class="skills-showcase">
                     {{#skills}}
-                    {{#skillList}}
                     <div class="skill-badge">
                         <span class="skill-name">{{name}}</span>
                         {{#hasLevel}}
                         <span class="skill-level">{{levelDots}}</span>
                         {{/hasLevel}}
                     </div>
-                    {{/skillList}}
                     {{/skills}}
                 </div>
             </section>
