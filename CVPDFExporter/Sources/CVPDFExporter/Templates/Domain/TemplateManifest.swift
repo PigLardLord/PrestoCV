@@ -21,6 +21,11 @@ public struct TemplateManifest: Codable, Equatable, Sendable {
     /// Filename of the preview image (PNG) in the package
     public let previewImage: String
 
+    /// Base64-encoded preview image (PNG) embedded in the package
+    /// If provided, this allows the preview to be self-contained within the .mcvt file
+    /// Optional for backward compatibility with templates that reference external preview files
+    public let previewImageBase64: String?
+
     /// Price in USD (0.0 for free templates)
     public let price: Double
 
@@ -31,6 +36,7 @@ public struct TemplateManifest: Codable, Equatable, Sendable {
         author: String,
         version: String,
         previewImage: String,
+        previewImageBase64: String? = nil,
         price: Double
     ) {
         self.id = id
@@ -39,6 +45,7 @@ public struct TemplateManifest: Codable, Equatable, Sendable {
         self.author = author
         self.version = version
         self.previewImage = previewImage
+        self.previewImageBase64 = previewImageBase64
         self.price = price
     }
 
