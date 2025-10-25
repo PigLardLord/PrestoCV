@@ -148,7 +148,7 @@ struct TemplateSelectionView: View {
                     // AI generation info
                     VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                         HStack(spacing: DesignTokens.Spacing.xs) {
-                            Text("AI CV Generation")
+                            Text("ai.card.title".localized)
                                 .typography(.headline)
                                 .foregroundColor(DesignTokens.Colors.primary)
 
@@ -157,7 +157,7 @@ struct TemplateSelectionView: View {
                                 .foregroundColor(DesignTokens.Colors.accent)
                         }
 
-                        Text("Describe your background and let AI create your CV")
+                        Text("ai.card.subtitle".localized)
                             .typography(.caption1)
                             .foregroundColor(DesignTokens.Colors.secondary)
                     }

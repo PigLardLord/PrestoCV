@@ -24,16 +24,16 @@ struct DocumentPreview: View {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 50))
                             .foregroundColor(.orange)
-                        
-                        Text("Unable to preview document")
+
+                        Text("export.preview_error".localized)
                             .font(.headline)
-                        
+
                         Text(error)
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
-                        
-                        Button("Try Again") {
+
+                        Button("common.retry".localized) {
                             loadError = nil
                             isLoading = true
                         }

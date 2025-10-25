@@ -231,7 +231,7 @@ struct MinimalHTMLTemplate {
 
         {{#hasWorkExperience}}
         <section class="section">
-            <h2>Experience</h2>
+            <h2>{{i18n_work_experience}}</h2>
             {{#workExperience}}
             <div class="item">
                 <div class="item-header">
@@ -251,7 +251,7 @@ struct MinimalHTMLTemplate {
 
         {{#hasEducation}}
         <section class="section">
-            <h2>Education</h2>
+            <h2>{{i18n_education}}</h2>
             {{#education}}
             <div class="item">
                 <div class="item-header">
@@ -271,7 +271,7 @@ struct MinimalHTMLTemplate {
 
         {{#hasSkills}}
         <section class="section">
-            <h2>Skills</h2>
+            <h2>{{i18n_skills}}</h2>
             {{#skills}}
             <div class="skills-group">
                 <span class="skills-category">{{category}}:</span>
@@ -289,7 +289,7 @@ struct MinimalHTMLTemplate {
 
         {{#hasCertifications}}
         <section class="section">
-            <h2>Certifications</h2>
+            <h2>{{i18n_certifications}}</h2>
             {{#certifications}}
             <div class="simple-item">
                 <span class="item-label">{{title}}</span>{{#issuer}} — <span class="item-value">{{issuer}}</span>{{/issuer}}{{#date}} ({{date}}){{/date}}
@@ -301,7 +301,7 @@ struct MinimalHTMLTemplate {
 
         {{#hasLanguages}}
         <section class="section">
-            <h2>Languages</h2>
+            <h2>{{i18n_languages}}</h2>
             {{#languages}}
             <div class="simple-item">
                 <span class="item-label">{{language}}</span> — <span class="item-value">{{level}}</span>
@@ -312,7 +312,7 @@ struct MinimalHTMLTemplate {
 
         {{#hasSocialLinks}}
         <section class="section">
-            <h2>Online Profiles</h2>
+            <h2>{{i18n_social_links}}</h2>
             {{#socialLinks}}
             <div class="simple-item">
                 <span class="item-label">{{platform}}:</span> <span class="item-value">{{url}}</span>
@@ -323,7 +323,7 @@ struct MinimalHTMLTemplate {
 
         {{#hasInterests}}
         <section class="section">
-            <h2>Interests</h2>
+            <h2>{{i18n_interests}}</h2>
             <div class="interests">
                 {{#interests}}{{.}}{{^last}}, {{/last}}{{/interests}}
             </div>

@@ -207,7 +207,7 @@ struct ProfessionalHTMLTemplate {
 
         {{#hasWorkExperience}}
         <section class="section">
-            <h2>Work Experience</h2>
+            <h2>{{i18n_work_experience}}</h2>
             {{#workExperience}}
             <div class="item">
                 <div class="item-header">
@@ -227,7 +227,7 @@ struct ProfessionalHTMLTemplate {
 
         {{#hasEducation}}
         <section class="section">
-            <h2>Education</h2>
+            <h2>{{i18n_education}}</h2>
             {{#education}}
             <div class="item">
                 <div class="item-header">
@@ -247,7 +247,7 @@ struct ProfessionalHTMLTemplate {
 
         {{#hasSkills}}
         <section class="section">
-            <h2>Skills</h2>
+            <h2>{{i18n_skills}}</h2>
             {{#skills}}
             <div class="skills-group">
                 <div class="skills-category">{{category}}</div>
@@ -265,7 +265,7 @@ struct ProfessionalHTMLTemplate {
 
         {{#hasCertifications}}
         <section class="section">
-            <h2>Certifications</h2>
+            <h2>{{i18n_certifications}}</h2>
             {{#certifications}}
             <div class="cert-item">
                 <div class="cert-title">{{title}}</div>
@@ -278,7 +278,7 @@ struct ProfessionalHTMLTemplate {
 
         {{#hasLanguages}}
         <section class="section">
-            <h2>Languages</h2>
+            <h2>{{i18n_languages}}</h2>
             {{#languages}}
             <div class="language-item">
                 <span class="language-name">{{language}}</span>
@@ -290,7 +290,7 @@ struct ProfessionalHTMLTemplate {
 
         {{#hasSocialLinks}}
         <section class="section">
-            <h2>Online Profiles</h2>
+            <h2>{{i18n_social_links}}</h2>
             {{#socialLinks}}
             <div class="social-item">
                 <div class="social-platform">{{platform}}</div>
@@ -302,7 +302,7 @@ struct ProfessionalHTMLTemplate {
 
         {{#hasInterests}}
         <section class="section">
-            <h2>Interests</h2>
+            <h2>{{i18n_interests}}</h2>
             <div class="interests-list">
                 {{#interests}}
                 <span class="interest-tag">{{.}}</span>

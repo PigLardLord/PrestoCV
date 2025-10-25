@@ -99,10 +99,10 @@ extension EmptyStateView {
     static func noCVs(onCreateCV: @escaping () -> Void) -> EmptyStateView {
         EmptyStateView(
             icon: "doc.text",
-            title: "No CVs Yet",
-            message: "Create your first CV to get started building your professional profile.",
+            title: "empty.no_cvs_title".localized,
+            message: "empty.no_cvs_message".localized,
             primaryAction: ActionButton(
-                title: "Create Your First CV",
+                title: "empty.no_cvs_button".localized,
                 icon: "plus.circle.fill",
                 action: onCreateCV
             )
@@ -111,13 +111,13 @@ extension EmptyStateView {
     
     /// Search results empty state
     static func noSearchResults(query: String = "") -> EmptyStateView {
-        let message = query.isEmpty 
-            ? "Try adjusting your search terms or filters."
+        let message = query.isEmpty
+            ? "empty.search_no_results_default".localized
             : "No results found for \"\(query)\". Try different keywords."
-        
+
         return EmptyStateView(
             icon: "magnifyingglass",
-            title: "No Results Found",
+            title: "empty.search_no_results_title".localized,
             message: message
         )
     }
@@ -126,20 +126,20 @@ extension EmptyStateView {
     static func networkError(onRetry: @escaping () -> Void) -> EmptyStateView {
         EmptyStateView(
             icon: "wifi.exclamationmark",
-            title: "Connection Error",
-            message: "Please check your internet connection and try again.",
+            title: "error.connection_error_title".localized,
+            message: "error.connection_error_message".localized,
             primaryAction: ActionButton(
-                title: "Try Again",
+                title: "common.retry".localized,
                 icon: "arrow.clockwise",
                 action: onRetry
             )
         )
     }
-    
+
     /// Generic error state
     static func error(
-        title: String = "Something Went Wrong",
-        message: String = "We encountered an unexpected error. Please try again.",
+        title: String = "error.generic_title".localized,
+        message: String = "error.generic_message".localized,
         onRetry: @escaping () -> Void
     ) -> EmptyStateView {
         EmptyStateView(
@@ -147,7 +147,7 @@ extension EmptyStateView {
             title: title,
             message: message,
             primaryAction: ActionButton(
-                title: "Try Again",
+                title: "common.retry".localized,
                 action: onRetry
             )
         )

@@ -7,6 +7,11 @@ import Foundation
 ///
 /// Usage:
 /// ```swift
+/// // With main app bundle:
+/// let localizer = TemplateLocalizer(bundle: .main, locale: Locale(identifier: "es"))
+/// let localizedHTML = localizer.localize(template: htmlTemplate)
+///
+/// // With fallback strings (for testing):
 /// let localizer = TemplateLocalizer(locale: Locale(identifier: "es"))
 /// let localizedHTML = localizer.localize(template: htmlTemplate)
 /// ```
@@ -15,9 +20,15 @@ public struct TemplateLocalizer: Sendable {
     /// The locale to use for localizations
     public let currentLocale: Locale
 
-    /// Initialize with a specific locale
-    /// - Parameter locale: The locale to use for localizations (defaults to current locale)
-    public init(locale: Locale = .current) {
+    /// The bundle to use for loading localized strings
+    public let bundle: Bundle?
+
+    /// Initialize with a specific locale and optional bundle
+    /// - Parameters:
+    ///   - bundle: The bundle containing Localizable.xcstrings (defaults to nil for fallback behavior)
+    ///   - locale: The locale to use for localizations (defaults to current locale)
+    public init(bundle: Bundle? = nil, locale: Locale = .current) {
+        self.bundle = bundle
         self.currentLocale = locale
     }
 
@@ -96,7 +107,24 @@ public struct TemplateLocalizer: Sendable {
 extension TemplateLocalizer {
     /// Gets the localized string for a given key, respecting the current locale
     private func localizedString(for key: String) -> String {
-        // Determine which localization dictionary to use
+        // Try to use Bundle localization if available
+        if let bundle = bundle {
+            let localizedValue = NSLocalizedString(
+                key,
+                tableName: "Localizable",
+                bundle: bundle,
+                value: "",
+                comment: ""
+            )
+
+            // If NSLocalizedString returns the key, it means the key wasn't found
+            // Fall back to hardcoded localizations
+            if localizedValue != key && !localizedValue.isEmpty {
+                return localizedValue
+            }
+        }
+
+        // Fall back to hardcoded localizations for testing or when bundle is unavailable
         let languageCode = currentLocale.language.languageCode?.identifier ?? "en"
 
         let localizations: [String: String]

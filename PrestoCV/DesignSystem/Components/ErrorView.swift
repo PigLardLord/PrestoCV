@@ -97,8 +97,8 @@ extension ErrorView {
     
     /// Generic network or general error state
     static func generic(
-        title: String = "Something Went Wrong",
-        message: String = "We encountered an unexpected error. Please try again.",
+        title: String = "error.generic_title".localized,
+        message: String = "error.generic_message".localized,
         onRetry: @escaping () -> Void
     ) -> ErrorView {
         ErrorView(
@@ -106,7 +106,7 @@ extension ErrorView {
             title: title,
             message: message,
             primaryAction: ActionButton(
-                title: "Try Again",
+                title: "common.retry".localized,
                 action: onRetry
             )
         )
@@ -114,15 +114,15 @@ extension ErrorView {
     
     /// Network connectivity error state
     static func network(
-        message: String = "Please check your internet connection and try again.",
+        message: String = "error.connection_error_message".localized,
         onRetry: @escaping () -> Void
     ) -> ErrorView {
         ErrorView(
             icon: "wifi.exclamationmark",
-            title: "Connection Error",
+            title: "error.connection_error_title".localized,
             message: message,
             primaryAction: ActionButton(
-                title: "Try Again",
+                title: "common.retry".localized,
                 icon: "arrow.clockwise",
                 action: onRetry
             )
@@ -131,8 +131,8 @@ extension ErrorView {
     
     /// Resource not found error state
     static func notFound(
-        title: String = "Not Found",
-        message: String = "The requested resource could not be found.",
+        title: String = "error.not_found_title".localized,
+        message: String = "error.not_found_message".localized,
         onRetry: @escaping () -> Void
     ) -> ErrorView {
         ErrorView(

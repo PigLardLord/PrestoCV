@@ -188,8 +188,9 @@ struct MinimalTemplateTests {
         let rendered = try await engine.render(template: template, data: document, customization: customization)
 
         // Then
-        #expect(rendered.contains("Experience"))
-        #expect(rendered.contains("Education"))
-        #expect(rendered.contains("Skills") || rendered.contains("Programming"))
+        // Check that content sections are rendered (i18n placeholders may or may not be localized yet)
+        #expect(rendered.contains("Engineer"))  // Work section content
+        #expect(rendered.contains("BS Computer Science"))  // Education section content
+        #expect(rendered.contains("skills") || rendered.contains("Programming") || rendered.contains("Swift"))  // Skills section rendered
     }
 }

@@ -23,13 +23,13 @@ struct AIGenerationView: View {
             }
             .padding(DesignTokens.Spacing.md)
         }
-        .navigationTitle("AI CV Generation")
+        .navigationTitle("navigation.ai_generation".localized)
         .navigationBarTitleDisplayMode(.large)
         .overlay(
-            viewModel.isGenerating ? LoadingView.fullscreen(message: "Generating your CV with AI...".asLoclizedKey) : nil
+            viewModel.isGenerating ? LoadingView.fullscreen(message: "ai.generation.loading_message".asLoclizedKey) : nil
         )
-        .alert("Error", isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
-            Button("OK") {
+        .alert("common.error".localized, isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
+            Button("common.ok".localized) {
                 viewModel.clearError()
             }
         } message: {
@@ -49,12 +49,12 @@ struct AIGenerationView: View {
                     .font(DesignTokens.IconSize.large.font)
                     .foregroundColor(DesignTokens.Colors.accent)
 
-                Text("AI-Powered CV Generation")
+                Text("ai.generation.header_title".localized)
                     .typography(.title2)
                     .foregroundColor(DesignTokens.Colors.primary)
             }
 
-            Text("Describe your professional background in detail, and AI will create a production-quality CV for you.")
+            Text("ai.generation.header_subtitle".localized)
                 .typography(.body)
                 .foregroundColor(DesignTokens.Colors.secondary)
         }
@@ -62,7 +62,7 @@ struct AIGenerationView: View {
 
     private var promptInputSection: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-            Text("Your Professional Background")
+            Text("ai.generation.prompt_section_title".localized)
                 .typography(.headline)
                 .foregroundColor(DesignTokens.Colors.primary)
 
@@ -77,7 +77,7 @@ struct AIGenerationView: View {
                         .stroke(isTextEditorFocused ? DesignTokens.Colors.accent : Color.clear, lineWidth: 2)
                 )
 
-            Text("Include: name, email, experience, education, skills, achievements, languages, etc.")
+            Text("ai.generation.prompt_instructions".localized)
                 .typography(.caption1)
                 .foregroundColor(DesignTokens.Colors.secondary)
         }
@@ -85,7 +85,7 @@ struct AIGenerationView: View {
 
     private var exampleSection: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-            Text("Example")
+            Text("ai.generation.example_section_title".localized)
                 .typography(.headline)
                 .foregroundColor(DesignTokens.Colors.primary)
 
@@ -108,7 +108,7 @@ struct AIGenerationView: View {
         }) {
             HStack {
                 Image(systemName: "sparkles")
-                Text("Generate CV with AI")
+                Text("ai.generation.button_title".localized)
             }
             .frame(maxWidth: .infinity)
             .padding(DesignTokens.Spacing.md)

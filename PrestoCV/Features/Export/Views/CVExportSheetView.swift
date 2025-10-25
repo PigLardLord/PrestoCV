@@ -205,11 +205,11 @@ struct CVExportSheetView: View {
                         action: { viewModel.selectedFontScheme = scheme }
                     ) {
                         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-                            Text("Aa")
+                            Text("export.font_preview_sample".localized)
                                 .font(scheme.previewHeadingFont)
                                 .foregroundColor(DesignTokens.Colors.primary)
 
-                            Text("Maya Chen")
+                            Text("export.font_preview_name".localized)
                                 .font(scheme.previewBodyFont)
                                 .foregroundColor(DesignTokens.Colors.secondary)
 
