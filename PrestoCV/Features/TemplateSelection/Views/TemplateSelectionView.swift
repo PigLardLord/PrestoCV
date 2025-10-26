@@ -61,7 +61,7 @@ struct TemplateSelectionView: View {
                 
                 // Sample Templates Section
                 if !viewModel.templates.isEmpty {
-                    Section(header: 
+                    Section(header:
                         SectionHeaderView(
                             title: "template.sample.title".localized,
                             subtitle: "template.sample.subtitle".localized,
@@ -72,7 +72,7 @@ struct TemplateSelectionView: View {
                         .padding(.bottom, DesignTokens.Spacing.sm)
                     ) {
                         ForEach(viewModel.templates) { template in
-                            TemplateCardView(
+                            OldTemplateCardView(
                                 template: template,
                                 onTap: {
                                     router.navigateToEditorWithTemplate(template)
@@ -169,12 +169,13 @@ struct TemplateSelectionView: View {
 
 }
 
-// MARK: - Template Card View
+// MARK: - Template Card Views
 
-private struct TemplateCardView: View {
+/// Old card view for CVModel (will be removed in Step 13)
+private struct OldTemplateCardView: View {
     let template: CVModel
     let onTap: () -> Void
-    
+
     var body: some View {
         Button(action: onTap) {
             CardView(padding: DesignTokens.Spacing.sm) {
@@ -188,13 +189,13 @@ private struct TemplateCardView: View {
                                 .font(DesignTokens.IconSize.hero.font)
                                 .foregroundColor(DesignTokens.Colors.secondary)
                         )
-                    
+
                     // Template info
                     VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                         Text(template.name.isEmpty ? "template.default.name".localized : template.name)
                             .typography(.headline)
                             .foregroundColor(DesignTokens.Colors.primary)
-                        
+
                         Text("template.tags".localized)
                             .typography(.caption1)
                             .foregroundColor(DesignTokens.Colors.secondary)
@@ -203,6 +204,77 @@ private struct TemplateCardView: View {
             }
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+/// New card view for TemplateDisplayModel with preview images
+private struct TemplateCardView: View {
+    let template: TemplateDisplayModel
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            CardView(padding: DesignTokens.Spacing.sm) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+                    // Template preview image
+                    if let previewURL = template.previewURL {
+                        AsyncImage(url: previewURL) { phase in
+                            switch phase {
+                            case .empty:
+                                // Loading placeholder
+                                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
+                                    .fill(DesignTokens.Colors.backgroundSecondary)
+                                    .aspectRatio(1.0, contentMode: .fit)
+                                    .overlay(
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle())
+                                    )
+                            case .success(let image):
+                                // Successfully loaded image
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(maxWidth: .infinity)
+                                    .aspectRatio(1.0, contentMode: .fit)
+                                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md))
+                            case .failure:
+                                // Failed to load - show fallback icon
+                                fallbackPreview
+                            @unknown default:
+                                fallbackPreview
+                            }
+                        }
+                    } else {
+                        // No preview URL - show fallback icon
+                        fallbackPreview
+                    }
+
+                    // Template info
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                        Text(template.name)
+                            .typography(.headline)
+                            .foregroundColor(DesignTokens.Colors.primary)
+
+                        Text(template.description)
+                            .typography(.caption1)
+                            .foregroundColor(DesignTokens.Colors.secondary)
+                            .lineLimit(2)
+                    }
+                }
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private var fallbackPreview: some View {
+        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
+            .fill(DesignTokens.Colors.backgroundSecondary)
+            .aspectRatio(1.0, contentMode: .fit)
+            .overlay(
+                Image(systemName: "doc.text")
+                    .font(DesignTokens.IconSize.hero.font)
+                    .foregroundColor(DesignTokens.Colors.secondary)
+            )
     }
 }
 
