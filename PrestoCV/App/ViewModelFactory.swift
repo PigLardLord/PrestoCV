@@ -1,6 +1,7 @@
 import Foundation
 import PrestoCVCore
 import CVGeneratorAI
+import CVPDFExporter
 
 final class ViewModelFactory {
     private let dependencyContainer: DependencyContainer
@@ -76,5 +77,18 @@ final class ViewModelFactory {
         #endif
 
         return nil
+    }
+
+    // MARK: - Template System Factories
+
+    /// Creates a GetAvailableTemplatesUseCase with BundledTemplateRepository
+    func makeGetAvailableTemplatesUseCase() -> GetAvailableTemplatesUseCase {
+        let repository = makeBundledTemplateRepository()
+        return GetAvailableTemplatesUseCase(repositories: [repository])
+    }
+
+    /// Creates a BundledTemplateRepository for built-in templates
+    private func makeBundledTemplateRepository() -> BundledTemplateRepository {
+        return BundledTemplateRepository()
     }
 }
