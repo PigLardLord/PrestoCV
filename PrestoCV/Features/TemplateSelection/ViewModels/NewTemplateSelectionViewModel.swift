@@ -61,7 +61,7 @@ final class NewTemplateSelectionViewModel: ObservableObject {
     }
 
     /// Clears any error state
-    func clearError() async {
+    func clearError() {
         viewState = viewState.clearingError()
     }
 }

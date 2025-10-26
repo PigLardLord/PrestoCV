@@ -3,10 +3,10 @@ import PrestoCVCore
 
 struct TemplateSelectionView: View {
     @EnvironmentObject var router: AppRouter
-    @StateObject private var viewModel: TemplateSelectionViewModel
+    @StateObject private var viewModel: NewTemplateSelectionViewModel
     let isAIGenerationAvailable: Bool
 
-    init(viewModel: TemplateSelectionViewModel, isAIGenerationAvailable: Bool = false) {
+    init(viewModel: NewTemplateSelectionViewModel, isAIGenerationAvailable: Bool = false) {
         self._viewModel = StateObject(wrappedValue: viewModel)
         self.isAIGenerationAvailable = isAIGenerationAvailable
     }
@@ -72,10 +72,11 @@ struct TemplateSelectionView: View {
                         .padding(.bottom, DesignTokens.Spacing.sm)
                     ) {
                         ForEach(viewModel.templates) { template in
-                            OldTemplateCardView(
+                            TemplateCardView(
                                 template: template,
                                 onTap: {
-                                    router.navigateToEditorWithTemplate(template)
+                                    let cvModel = viewModel.createCVFromTemplate(template)
+                                    router.navigateToEditorWithTemplate(cvModel)
                                 }
                             )
                         }
@@ -287,16 +288,12 @@ struct TemplateSelectionView_Previews: PreviewProvider {
         }
         .environmentObject(AppRouter())
     }
-    
-    private static func createMockViewModel() -> TemplateSelectionViewModel {
+
+    private static func createMockViewModel() -> NewTemplateSelectionViewModel {
         let container = DependencyContainer()
+        let factory = ViewModelFactory(dependencyContainer: container)
         do {
-            let sampleRepository = try container.makeSampleCVRepository()
-            let cvManagementUseCase = try container.makeCVManagementUseCase()
-            return TemplateSelectionViewModel(
-                sampleRepository: sampleRepository,
-                cvManagementUseCase: cvManagementUseCase
-            )
+            return try factory.makeTemplateSelectionViewModel()
         } catch {
             fatalError("Failed to create mock view model: \(error)")
         }
