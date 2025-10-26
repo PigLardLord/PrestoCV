@@ -69,9 +69,17 @@ func runDemo() async throws {
 @main
 struct DemoApp {
     static func main() async {
-        // Run the new CV rendering demo
-        await RenderCVDemo.main()
+        // Run the template preview generator
+        #if canImport(AppKit)
+        await GenerateTemplatePreviews.main()
+        #else
+        print("❌ Template preview generation requires macOS (AppKit)")
+        exit(1)
+        #endif
         return
+
+        // Other demos below (disabled)
+        // await RenderCVDemo.main()
 
         // Original demo below (disabled)
         do {

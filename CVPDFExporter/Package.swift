@@ -33,7 +33,7 @@ let package = Package(
             name: "CVPDFExporterDemo",
             dependencies: ["CVPDFExporter"],
             path: "Demo",
-            sources: ["main.swift", "RenderCVDemo.swift", "PlatformRenderer.swift"],
+            sources: ["main.swift", "RenderCVDemo.swift", "PlatformRenderer.swift", "GenerateTemplatePreviews.swift"],
             swiftSettings: [.unsafeFlags(["-parse-as-library"])]
         ),
         .executableTarget(
