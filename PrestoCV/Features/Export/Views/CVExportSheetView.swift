@@ -173,14 +173,38 @@ struct CVExportSheetView: View {
                             action: { viewModel.selectedTemplateId = template.id }
                         ) {
                             VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
-                                    .fill(DesignTokens.Colors.backgroundSecondary)
-                                    .aspectRatio(0.7, contentMode: .fit)
-                                    .overlay(
-                                        Image(systemName: "doc.text")
-                                            .font(DesignTokens.IconSize.large.font)
-                                            .foregroundColor(DesignTokens.Colors.secondary)
-                                    )
+                                // Template preview image
+                                if let thumbnailURL = template.thumbnailURL {
+                                    AsyncImage(url: thumbnailURL) { phase in
+                                        switch phase {
+                                        case .empty:
+                                            // Loading placeholder
+                                            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
+                                                .fill(DesignTokens.Colors.backgroundSecondary)
+                                                .aspectRatio(0.7, contentMode: .fit)
+                                                .overlay(
+                                                    ProgressView()
+                                                        .progressViewStyle(CircularProgressViewStyle())
+                                                )
+                                        case .success(let image):
+                                            // Successfully loaded image
+                                            image
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                                .frame(maxWidth: .infinity)
+                                                .aspectRatio(0.7, contentMode: .fit)
+                                                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md))
+                                        case .failure:
+                                            // Failed to load - show fallback icon
+                                            fallbackTemplatePreview
+                                        @unknown default:
+                                            fallbackTemplatePreview
+                                        }
+                                    }
+                                } else {
+                                    // No preview URL - show fallback icon
+                                    fallbackTemplatePreview
+                                }
 
                                 Text(template.name)
                                     .typography(.footnote)
@@ -292,6 +316,17 @@ struct CVExportSheetView: View {
         previewCoordinator.isLoading ||
         viewModel.isPreviewLoading ||
         viewModel.isExporting
+    }
+
+    private var fallbackTemplatePreview: some View {
+        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
+            .fill(DesignTokens.Colors.backgroundSecondary)
+            .aspectRatio(0.7, contentMode: .fit)
+            .overlay(
+                Image(systemName: "doc.text")
+                    .font(DesignTokens.IconSize.large.font)
+                    .foregroundColor(DesignTokens.Colors.secondary)
+            )
     }
 
     private struct OptionCarouselItem<Content: View>: View {
