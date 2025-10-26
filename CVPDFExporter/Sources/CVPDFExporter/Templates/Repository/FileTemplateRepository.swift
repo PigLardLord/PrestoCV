@@ -138,8 +138,8 @@ public final class FileTemplateRepository: TemplateRepositoryProtocol, @unchecke
             name: manifest.name,
             description: manifest.description,
             htmlContent: htmlContent,
-            isPremium: !manifest.isFree,
-            thumbnailURL: previewURL
+            thumbnailURL: previewURL,
+            isPremium: !manifest.isFree
         )
     }
 
