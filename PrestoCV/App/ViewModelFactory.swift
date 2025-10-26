@@ -19,9 +19,9 @@ final class ViewModelFactory {
     }
     
     @MainActor
-    func makeTemplateSelectionViewModel() throws -> TemplateSelectionViewModel {
-        return TemplateSelectionViewModel(
-            sampleRepository: try dependencyContainer.makeSampleCVRepository(),
+    func makeTemplateSelectionViewModel() throws -> NewTemplateSelectionViewModel {
+        return NewTemplateSelectionViewModel(
+            getTemplatesUseCase: makeGetAvailableTemplatesUseCase(),
             cvManagementUseCase: try dependencyContainer.makeCVManagementUseCase()
         )
     }
