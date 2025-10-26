@@ -172,43 +172,7 @@ struct TemplateSelectionView: View {
 
 // MARK: - Template Card Views
 
-/// Old card view for CVModel (will be removed in Step 13)
-private struct OldTemplateCardView: View {
-    let template: CVModel
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            CardView(padding: DesignTokens.Spacing.sm) {
-                VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-                    // Template preview image
-                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
-                        .fill(DesignTokens.Colors.backgroundSecondary)
-                        .aspectRatio(1.0, contentMode: .fit)
-                        .overlay(
-                            Image(systemName: "doc.text")
-                                .font(DesignTokens.IconSize.hero.font)
-                                .foregroundColor(DesignTokens.Colors.secondary)
-                        )
-
-                    // Template info
-                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                        Text(template.name.isEmpty ? "template.default.name".localized : template.name)
-                            .typography(.headline)
-                            .foregroundColor(DesignTokens.Colors.primary)
-
-                        Text("template.tags".localized)
-                            .typography(.caption1)
-                            .foregroundColor(DesignTokens.Colors.secondary)
-                    }
-                }
-            }
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-/// New card view for TemplateDisplayModel with preview images
+/// Card view for TemplateDisplayModel with preview images
 private struct TemplateCardView: View {
     let template: TemplateDisplayModel
     let onTap: () -> Void
