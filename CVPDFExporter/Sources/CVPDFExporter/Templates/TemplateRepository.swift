@@ -11,125 +11,112 @@ public protocol TemplateRepository: Sendable {
 // MARK: - Bundled Template Repository
 
 /// Repository for built-in templates
+/// Now delegates to FileTemplateRepository which loads from registry
+/// Maintains backward compatibility with TemplateRepository protocol
 public final class BundledTemplateRepository: TemplateRepository, TemplateRepositoryProtocol, @unchecked Sendable {
-    private let templates: [Template]
+    private let fileRepository: FileTemplateRepository
 
     public init() {
-        self.templates = Self.loadBundledTemplates()
+        // Initialize with default Application Support directory
+        let templatesDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first!
+            .appendingPathComponent("PrestoCV/Templates")
+
+        do {
+            self.fileRepository = try FileTemplateRepository(templatesDirectory: templatesDir)
+        } catch {
+            // Fatal error - registry initialization failed
+            fatalError("Failed to initialize BundledTemplateRepository: \(error)")
+        }
     }
 
+    /// Designated initializer with injected FileTemplateRepository
+    public init(fileRepository: FileTemplateRepository) {
+        self.fileRepository = fileRepository
+    }
+
+    // MARK: - TemplateRepository (Legacy Protocol)
+
     public func loadTemplate(id: String) throws -> Template {
-        guard let template = templates.first(where: { $0.id == id }) else {
-            throw TemplateError.templateNotFound(id)
+        // Synchronous wrapper for async method - for backward compatibility
+        // Use Task.detached to avoid Sendable warnings
+        let box = ResultBox<Template>()
+        let repo = fileRepository
+        let templateId = id
+
+        Task.detached {
+            do {
+                guard let template = try await repo.getTemplate(id: templateId) else {
+                    box.set(result: .failure(TemplateError.templateNotFound(templateId)))
+                    return
+                }
+                box.set(result: .success(template))
+            } catch {
+                box.set(result: .failure(error))
+            }
         }
-        return template
+
+        switch box.wait() {
+        case .success(let template):
+            return template
+        case .failure(let error):
+            throw error
+        }
     }
 
     public func availableTemplates() -> [Template] {
-        return templates
+        // Synchronous wrapper for async method - for backward compatibility
+        let box = ResultBox<[Template]>()
+        let repo = fileRepository
+
+        Task.detached {
+            do {
+                let templates = try await repo.getTemplates()
+                box.set(result: .success(templates))
+            } catch {
+                box.set(result: .success([]))
+            }
+        }
+
+        return (try? box.wait().get()) ?? []
     }
 
-    // MARK: - TemplateRepositoryProtocol
+    // MARK: - TemplateRepositoryProtocol (Modern Async Interface)
 
     public func getTemplates() async throws -> [Template] {
-        return templates
+        return try await fileRepository.getTemplates()
     }
 
     public func getTemplate(id: String) async throws -> Template? {
-        return templates.first { $0.id == id }
+        return try await fileRepository.getTemplate(id: id)
     }
 
     public func installTemplate(_ package: TemplatePackage) async throws {
-        // Bundled templates are read-only
+        // Bundled templates are read-only - don't allow installation
         throw TemplateRepositoryError.ioError("Cannot install templates into bundled repository")
     }
+}
 
-    // MARK: - Private Methods
+// MARK: - ResultBox Helper
 
-    private static func loadBundledTemplates() -> [Template] {
-        var templates: [Template] = []
+/// Thread-safe result box for bridging async/await to synchronous code
+/// Used by BundledTemplateRepository for backward compatibility
+private final class ResultBox<T>: @unchecked Sendable {
+    private var result: Result<T, Error>?
+    private let semaphore = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
 
-        // Professional Template
-        templates.append(Template(
-            id: "professional",
-            name: "Professional",
-            description: "Clean and professional template suitable for corporate positions",
-            htmlContent: loadProfessionalTemplate(),
-            supportedVariables: [
-                "name", "email", "phone", "location", "website", "summary",
-                "hasSummary", "hasPhone", "hasLocation", "hasWebsite",
-                "workExperience", "hasWorkExperience",
-                "education", "hasEducation",
-                "skills", "hasSkills",
-                "colorPrimary", "colorSecondary", "colorAccent", "colorBackground", "colorText",
-                "fontHeading", "fontBody", "fontSize"
-            ],
-            thumbnailURL: loadThumbnailURL(for: "professional")
-        ))
-
-        // Modern Template
-        templates.append(Template(
-            id: "modern",
-            name: "Modern",
-            description: "Contemporary design with clean lines and modern typography",
-            htmlContent: loadModernTemplate(),
-            supportedVariables: [
-                "name", "email", "phone", "location", "website", "summary",
-                "hasSummary", "hasPhone", "hasLocation", "hasWebsite",
-                "workExperience", "hasWorkExperience",
-                "education", "hasEducation",
-                "skills", "hasSkills",
-                "colorPrimary", "colorSecondary", "colorAccent", "colorBackground", "colorText",
-                "fontHeading", "fontBody", "fontSize"
-            ],
-            thumbnailURL: loadThumbnailURL(for: "modern")
-        ))
-
-        // Minimal Template
-        templates.append(Template(
-            id: "minimal",
-            name: "Minimal",
-            description: "Simple and clean design focusing on content",
-            htmlContent: loadMinimalTemplate(),
-            supportedVariables: [
-                "name", "email", "phone", "location", "summary",
-                "hasSummary", "hasPhone", "hasLocation",
-                "workExperience", "hasWorkExperience",
-                "education", "hasEducation",
-                "skills", "hasSkills"
-            ],
-            thumbnailURL: loadThumbnailURL(for: "minimal")
-        ))
-
-        return templates
+    func set(result: Result<T, Error>) {
+        lock.lock()
+        self.result = result
+        lock.unlock()
+        semaphore.signal()
     }
 
-    private static func loadProfessionalTemplate() -> String {
-        return ProfessionalHTMLTemplate.html
-    }
-
-    private static func loadModernTemplate() -> String {
-        return ModernHTMLTemplate.html
-    }
-
-    private static func loadMinimalTemplate() -> String {
-        return MinimalHTMLTemplate.html
-    }
-
-    /// Loads the thumbnail URL for a template from the bundle resources
-    /// - Parameter templateId: The ID of the template (e.g., "professional", "modern", "minimal")
-    /// - Returns: URL to the template's preview image, or nil if not found
-    private static func loadThumbnailURL(for templateId: String) -> URL? {
-        let filename = "\(templateId)_preview"
-
-        // Use .module bundle (correct way for Swift Package Manager resources)
-        // Try to find the preview PNG in Templates subdirectory
-        if let url = Bundle.module.url(forResource: filename, withExtension: "png", subdirectory: "Templates") {
-            return url
-        }
-
-        // Log warning if not found (visible during development)
-        print("⚠️ Warning: Thumbnail not found for template '\(templateId)' in module bundle (looking for 'Templates/\(filename).png')")
-        return nil
+    func wait() -> Result<T, Error> {
+        semaphore.wait()
+        lock.lock()
+        defer { lock.unlock() }
+        return result!
     }
 }
