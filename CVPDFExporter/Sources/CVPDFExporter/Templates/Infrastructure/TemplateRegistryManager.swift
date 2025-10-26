@@ -78,7 +78,7 @@ public actor TemplateRegistryManager: TemplateRegistryProtocol {
         // Check if registry file exists
         guard FileManager.default.fileExists(atPath: filePath.path) else {
             // Return empty registry on first launch
-            return TemplateRegistry()
+            return TemplateRegistry(entries: [])
         }
 
         do {
@@ -113,13 +113,12 @@ public actor TemplateRegistryManager: TemplateRegistryProtocol {
         var registry = try await loadRegistry()
 
         // Check for duplicates
-        if registry.templates.contains(where: { $0.id == entry.id }) {
+        if registry.entries.contains(where: { $0.id == entry.id }) {
             throw TemplateRegistryError.templateAlreadyExists(entry.id)
         }
 
-        // Add entry and update timestamp
-        registry.templates.append(entry)
-        registry.lastUpdate = Date()
+        // Add entry
+        registry.addEntry(entry)
 
         try await saveRegistry(registry)
     }
@@ -129,14 +128,10 @@ public actor TemplateRegistryManager: TemplateRegistryProtocol {
     public func removeTemplate(id: String) async throws {
         var registry = try await loadRegistry()
 
-        // Check if template exists
-        guard let index = registry.templates.firstIndex(where: { $0.id == id }) else {
+        // Check if template exists and remove
+        guard registry.removeEntry(id: id) else {
             throw TemplateRegistryError.templateNotFound(id)
         }
-
-        // Remove entry and update timestamp
-        registry.templates.remove(at: index)
-        registry.lastUpdate = Date()
 
         try await saveRegistry(registry)
     }
@@ -145,14 +140,14 @@ public actor TemplateRegistryManager: TemplateRegistryProtocol {
 
     public func getTemplate(id: String) async throws -> TemplateEntry? {
         let registry = try await loadRegistry()
-        return registry.templates.first(where: { $0.id == id })
+        return registry.findEntry(id: id)
     }
 
     // MARK: - Get All Templates
 
     public func getAllTemplates() async throws -> [TemplateEntry] {
         let registry = try await loadRegistry()
-        return registry.templates
+        return registry.entries
     }
 
     // MARK: - Refresh Registry

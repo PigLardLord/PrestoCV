@@ -2,13 +2,13 @@ import Foundation
 
 // MARK: - Template Source
 
-/// Indicates whether a template is bundled with the app or user-installed
-public enum TemplateSource: String, Codable, Sendable {
-    /// Template bundled with the application (read-only)
-    case bundled
-
-    /// Template installed by the user (via AirDrop, cloud, or sharing)
-    case user
+/// Represents the source from which a template was installed
+public enum TemplateSource: String, Codable, Sendable, CaseIterable {
+    case bundled    // Default templates shipped with the app
+    case airDrop    // Imported via AirDrop
+    case email      // Imported from email attachment
+    case chat       // Imported from messaging apps
+    case other      // Any other source
 }
 
 // MARK: - Template Entry
@@ -22,60 +22,92 @@ public struct TemplateEntry: Codable, Equatable, Sendable, Identifiable {
     /// Display name of the template
     public let name: String
 
-    /// Description of the template
-    public let description: String
-
-    /// Semantic version string
+    /// Semantic version string (e.g., "1.0.0")
     public let version: String
 
-    /// Source of the template (bundled or user-installed)
+    /// Source from which the template was installed
     public let source: TemplateSource
 
-    /// File system path to the .mcvt package file
-    public let packagePath: String
+    /// Installation timestamp
+    public let installedAt: Date
 
-    /// File system path to the cached preview image (PNG)
-    /// Nil if preview hasn't been extracted yet
-    public let previewPath: String?
-
-    /// Date when the template was last modified
-    public let lastModified: Date
+    /// Relative path to the preview image (e.g., "TemplateCache/professional_preview.png")
+    public let previewPath: String
 
     public init(
         id: String,
         name: String,
-        description: String,
         version: String,
         source: TemplateSource,
-        packagePath: String,
-        previewPath: String?,
-        lastModified: Date
+        installedAt: Date,
+        previewPath: String
     ) {
         self.id = id
         self.name = name
-        self.description = description
         self.version = version
         self.source = source
-        self.packagePath = packagePath
+        self.installedAt = installedAt
         self.previewPath = previewPath
-        self.lastModified = lastModified
     }
 }
 
 // MARK: - Template Registry
 
-/// Registry of all available templates (bundled + user-installed)
-/// Provides fast lookup without scanning directories or loading packages
-/// Cached in templates.json for performance
-public struct TemplateRegistry: Codable, Equatable, Sendable {
-    /// All registered templates
-    public var templates: [TemplateEntry]
+/// Registry of all installed templates
+public struct TemplateRegistry: Codable, Sendable {
+    /// Registry format version
+    public let version: String
 
-    /// Date when the registry was last updated
-    public var lastUpdate: Date
+    /// Last update timestamp
+    public let lastUpdated: Date
 
-    public init(templates: [TemplateEntry] = [], lastUpdate: Date = Date()) {
-        self.templates = templates
-        self.lastUpdate = lastUpdate
+    /// List of registered templates
+    public private(set) var entries: [TemplateEntry]
+
+    public init(entries: [TemplateEntry], version: String = "1.0", lastUpdated: Date = Date()) {
+        self.version = version
+        self.lastUpdated = lastUpdated
+        self.entries = entries
+    }
+
+    // MARK: - Query Methods
+
+    /// Find an entry by template ID
+    public func findEntry(id: String) -> TemplateEntry? {
+        return entries.first { $0.id == id }
+    }
+
+    /// Check if a template exists in the registry
+    public func hasTemplate(id: String) -> Bool {
+        return findEntry(id: id) != nil
+    }
+
+    // MARK: - Mutation Methods
+
+    /// Add a new entry to the registry
+    public mutating func addEntry(_ entry: TemplateEntry) {
+        entries.append(entry)
+    }
+
+    /// Update an existing entry
+    /// - Returns: true if the entry was found and updated, false otherwise
+    @discardableResult
+    public mutating func updateEntry(_ entry: TemplateEntry) -> Bool {
+        guard let index = entries.firstIndex(where: { $0.id == entry.id }) else {
+            return false
+        }
+        entries[index] = entry
+        return true
+    }
+
+    /// Remove an entry by ID
+    /// - Returns: true if the entry was found and removed, false otherwise
+    @discardableResult
+    public mutating func removeEntry(id: String) -> Bool {
+        guard let index = entries.firstIndex(where: { $0.id == id }) else {
+            return false
+        }
+        entries.remove(at: index)
+        return true
     }
 }
