@@ -14,6 +14,7 @@ final class NewTemplateSelectionViewModel: ObservableObject {
     // MARK: - Private Properties
     private let getTemplatesUseCase: GetAvailableTemplatesUseCase
     private let cvManagementUseCase: CVManagementUseCaseProtocol
+    private let templateConverter = TemplateToCVModelConverter()
 
     // MARK: - Computed Properties
     var templates: [TemplateDisplayModel] {
@@ -50,6 +51,13 @@ final class NewTemplateSelectionViewModel: ObservableObject {
         } catch {
             viewState = .error(error.localizedAppErrorDescription)
         }
+    }
+
+    /// Converts a template to a CVModel ready for editing
+    /// - Parameter templateDisplay: The template display model to convert
+    /// - Returns: A CVModel with the template's name and empty content
+    func createCVFromTemplate(_ templateDisplay: TemplateDisplayModel) -> CVModel {
+        return templateConverter.convert(template: templateDisplay.template)
     }
 
     /// Clears any error state

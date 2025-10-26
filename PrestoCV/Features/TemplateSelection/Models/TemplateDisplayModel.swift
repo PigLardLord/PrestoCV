@@ -10,6 +10,10 @@ struct TemplateDisplayModel: Identifiable, Equatable {
     let previewURL: URL?
     let isPremium: Bool
 
+    /// The underlying Template domain object
+    /// Stored to enable conversion to CVModel during navigation
+    let template: Template
+
     /// Initialize from a Template domain model
     init(from template: Template) {
         self.id = template.id
@@ -17,6 +21,7 @@ struct TemplateDisplayModel: Identifiable, Equatable {
         self.description = template.description
         self.previewURL = template.thumbnailURL
         self.isPremium = template.isPremium
+        self.template = template
     }
 
     /// Whether this template has a valid preview image URL
