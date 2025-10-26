@@ -122,32 +122,14 @@ public final class BundledTemplateRepository: TemplateRepository, TemplateReposi
     private static func loadThumbnailURL(for templateId: String) -> URL? {
         let filename = "\(templateId)_preview"
 
-        // Get the bundle for this class/module
-        let bundle = Bundle(for: BundledTemplateRepository.self)
-
-        // Try to find the preview PNG in the bundle - try Resources/Templates subdirectory first
-        if let url = bundle.url(forResource: filename, withExtension: "png", subdirectory: "Resources/Templates") {
+        // Use .module bundle (correct way for Swift Package Manager resources)
+        // Try to find the preview PNG in Templates subdirectory
+        if let url = Bundle.module.url(forResource: filename, withExtension: "png", subdirectory: "Templates") {
             return url
-        }
-
-        // Fallback: try just Templates subdirectory
-        if let url = bundle.url(forResource: filename, withExtension: "png", subdirectory: "Templates") {
-            return url
-        }
-
-        // Fallback: try without subdirectory
-        if let url = bundle.url(forResource: filename, withExtension: "png") {
-            return url
-        }
-
-        // Final fallback: construct absolute path directly
-        let resourcesPath = "/Users/dev/PrestoCV/CVPDFExporter/Resources/Templates/\(filename).png"
-        if FileManager.default.fileExists(atPath: resourcesPath) {
-            return URL(fileURLWithPath: resourcesPath)
         }
 
         // Log warning if not found (visible during development)
-        print("⚠️ Warning: Thumbnail not found for template '\(templateId)' (looking for '\(filename).png')")
+        print("⚠️ Warning: Thumbnail not found for template '\(templateId)' in module bundle (looking for 'Templates/\(filename).png')")
         return nil
     }
 }

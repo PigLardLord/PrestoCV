@@ -22,7 +22,10 @@ let package = Package(
             dependencies: [
                 .product(name: "PrestoCVCore", package: "PrestoCVCore")
             ],
-            path: "Sources/CVPDFExporter"
+            path: "Sources/CVPDFExporter",
+            resources: [
+                .copy("../../Resources/Templates")
+            ]
         ),
         .testTarget(
             name: "CVPDFExporterTests",
