@@ -1,5 +1,6 @@
 import SwiftUI
 import PrestoCVCore
+import CVPDFExporter
 
 struct AppRootView: View {
     @StateObject private var router = AppRouter()
@@ -60,6 +61,9 @@ struct AppRootView: View {
         }
         .environmentObject(router)
         .task {
+            // Bootstrap bundled templates on app launch
+            await bootstrapTemplates()
+            // Then check onboarding status
             await onboardingViewModel.checkOnboardingStatus()
         }
     }
@@ -102,6 +106,17 @@ struct AppRootView: View {
                     }
                 )
             }
+        }
+    }
+
+    private func bootstrapTemplates() async {
+        do {
+            // Create bootstrap service directly to avoid circular dependency
+            let bootstrapService = try TemplateBootstrapService()
+            try await bootstrapService.syncBundledTemplates()
+        } catch {
+            // Log error but don't block app launch
+            print("⚠️ Failed to bootstrap templates: \(error)")
         }
     }
 }
