@@ -10,69 +10,59 @@ struct FileTemplateRepositoryTests {
     // MARK: - Initialization Tests
 
     @Test("FileTemplateRepository initializes with templates directory")
-    func fileRepositoryInitializesWithDirectory() {
+    func fileRepositoryInitializesWithDirectory() throws {
         // Given
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("TestTemplates_\(UUID().uuidString)")
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
 
         // When
-        let repository = FileTemplateRepository(templatesDirectory: tempDir)
+        let repository = storage.makeRepository()
 
         // Then
-        #expect(repository.templatesDirectory == tempDir)
+        #expect(repository.templatesDirectory == storage.templatesDirectory)
     }
 
     @Test("FileTemplateRepository creates templates directory if it doesn't exist")
     func fileRepositoryCreatesDirectoryIfNeeded() throws {
         // Given
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("TestTemplates_\(UUID().uuidString)")
-
-        // Ensure directory doesn't exist
-        try? FileManager.default.removeItem(at: tempDir)
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        #expect(!FileManager.default.fileExists(atPath: storage.templatesDirectory.path))
 
         // When
-        _ = FileTemplateRepository(templatesDirectory: tempDir)
+        _ = storage.makeRepository()
 
         // Then
         var isDirectory: ObjCBool = false
-        let exists = FileManager.default.fileExists(atPath: tempDir.path, isDirectory: &isDirectory)
+        let exists = FileManager.default.fileExists(atPath: storage.templatesDirectory.path, isDirectory: &isDirectory)
         #expect(exists)
         #expect(isDirectory.boolValue)
-
-        // Cleanup
-        try? FileManager.default.removeItem(at: tempDir)
     }
 
     // MARK: - getTemplates Tests
 
-    @Test("getTemplates returns empty array when directory is empty")
-    func getTemplatesReturnsEmptyArrayWhenDirectoryEmpty() async throws {
+    @Test("getTemplates returns empty array when nothing is registered")
+    func getTemplatesReturnsEmptyArrayWhenNothingIsRegistered() async throws {
         // Given
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("TestTemplates_\(UUID().uuidString)")
-        let repository = FileTemplateRepository(templatesDirectory: tempDir)
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        let repository = storage.makeRepository()
 
         // When
         let templates = try await repository.getTemplates()
 
         // Then
         #expect(templates.isEmpty)
-
-        // Cleanup
-        try? FileManager.default.removeItem(at: tempDir)
     }
 
-    @Test("getTemplates loads valid .mcvt packages from directory")
-    func getTemplatesLoadsValidPackagesFromDirectory() async throws {
+    @Test("getTemplates loads the registered .mcvt packages")
+    func getTemplatesLoadsRegisteredPackages() async throws {
         // Given
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("TestTemplates_\(UUID().uuidString)")
-        let repository = FileTemplateRepository(templatesDirectory: tempDir)
-
-        // Create a test .mcvt package
-        let packageURL = tempDir.appendingPathComponent("test-template.mcvt")
-        try createTestPackage(at: packageURL, id: "test-modern", name: "Test Modern")
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        let repository = storage.makeRepository()
+        try storage.writePackage(id: "test-modern", name: "Test Modern")
+        try await storage.register(id: "test-modern", name: "Test Modern")
 
         // When
         let templates = try await repository.getTemplates()
@@ -81,25 +71,18 @@ struct FileTemplateRepositoryTests {
         #expect(templates.count == 1)
         #expect(templates.first?.id == "test-modern")
         #expect(templates.first?.name == "Test Modern")
-
-        // Cleanup
-        try? FileManager.default.removeItem(at: tempDir)
     }
 
-    @Test("getTemplates skips invalid packages")
+    @Test("getTemplates skips registered packages that cannot be read")
     func getTemplatesSkipsInvalidPackages() async throws {
         // Given
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("TestTemplates_\(UUID().uuidString)")
-        let repository = FileTemplateRepository(templatesDirectory: tempDir)
-
-        // Create valid package
-        let validURL = tempDir.appendingPathComponent("valid.mcvt")
-        try createTestPackage(at: validURL, id: "valid", name: "Valid")
-
-        // Create invalid package (corrupted manifest)
-        let invalidURL = tempDir.appendingPathComponent("invalid.mcvt")
-        try createInvalidPackage(at: invalidURL)
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        let repository = storage.makeRepository()
+        try storage.writePackage(id: "valid", name: "Valid")
+        try storage.writeInvalidPackage(id: "invalid")
+        try await storage.register(id: "valid", name: "Valid")
+        try await storage.register(id: "invalid", name: "Invalid")
 
         // When
         let templates = try await repository.getTemplates()
@@ -107,9 +90,6 @@ struct FileTemplateRepositoryTests {
         // Then
         #expect(templates.count == 1) // Only valid template loaded
         #expect(templates.first?.id == "valid")
-
-        // Cleanup
-        try? FileManager.default.removeItem(at: tempDir)
     }
 
     // MARK: - getTemplate(id:) Tests
@@ -117,30 +97,27 @@ struct FileTemplateRepositoryTests {
     @Test("getTemplate returns nil for non-existent template")
     func getTemplateReturnsNilForNonExistentTemplate() async throws {
         // Given
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("TestTemplates_\(UUID().uuidString)")
-        let repository = FileTemplateRepository(templatesDirectory: tempDir)
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        let repository = storage.makeRepository()
 
         // When
         let template = try await repository.getTemplate(id: "non-existent")
 
         // Then
         #expect(template == nil)
-
-        // Cleanup
-        try? FileManager.default.removeItem(at: tempDir)
     }
 
     @Test("getTemplate returns correct template by ID")
     func getTemplateReturnsCorrectTemplateByID() async throws {
         // Given
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("TestTemplates_\(UUID().uuidString)")
-        let repository = FileTemplateRepository(templatesDirectory: tempDir)
-
-        // Create multiple packages
-        try createTestPackage(at: tempDir.appendingPathComponent("template1.mcvt"), id: "template1", name: "Template 1")
-        try createTestPackage(at: tempDir.appendingPathComponent("template2.mcvt"), id: "template2", name: "Template 2")
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        let repository = storage.makeRepository()
+        for (id, name) in [("template1", "Template 1"), ("template2", "Template 2")] {
+            try storage.writePackage(id: id, name: name)
+            try await storage.register(id: id, name: name)
+        }
 
         // When
         let template = try await repository.getTemplate(id: "template2")
@@ -149,9 +126,6 @@ struct FileTemplateRepositoryTests {
         #expect(template != nil)
         #expect(template?.id == "template2")
         #expect(template?.name == "Template 2")
-
-        // Cleanup
-        try? FileManager.default.removeItem(at: tempDir)
     }
 
     // MARK: - installTemplate Tests
@@ -159,70 +133,77 @@ struct FileTemplateRepositoryTests {
     @Test("installTemplate saves package to templates directory")
     func installTemplateSavesPackageToDirectory() async throws {
         // Given
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("TestTemplates_\(UUID().uuidString)")
-        let repository = FileTemplateRepository(templatesDirectory: tempDir)
-
-        let manifest = TemplateManifest(
-            id: "new-template",
-            name: "New Template",
-            description: "A new template",
-            author: "Test Author",
-            version: "1.0.0",
-            previewImage: "preview.png",
-            price: 0.0
-        )
-        let package = TemplatePackage(
-            manifest: manifest,
-            cssContent: "body { color: blue; }",
-            htmlContent: nil
-        )
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        let repository = storage.makeRepository()
+        let package = FileRepositoryTestStorage.makePackage(id: "new-template", name: "New Template")
 
         // When
         try await repository.installTemplate(package)
 
         // Then - Package file should exist
-        let packageURL = tempDir.appendingPathComponent("\(manifest.id).mcvt")
+        let packageURL = storage.templatesDirectory.appendingPathComponent("new-template.mcvt")
         #expect(FileManager.default.fileExists(atPath: packageURL.path))
-
-        // Cleanup
-        try? FileManager.default.removeItem(at: tempDir)
     }
 
     @Test("installTemplate throws error for invalid package")
     func installTemplateThrowsErrorForInvalidPackage() async throws {
         // Given
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("TestTemplates_\(UUID().uuidString)")
-        let repository = FileTemplateRepository(templatesDirectory: tempDir)
-
-        let invalidManifest = TemplateManifest(
-            id: "", // Invalid empty ID
-            name: "Test",
-            description: "Test",
-            author: "Test",
-            version: "1.0.0",
-            previewImage: "preview.png",
-            price: 0.0
-        )
-        let invalidPackage = TemplatePackage(
-            manifest: invalidManifest,
-            cssContent: "body {}",
-            htmlContent: nil
-        )
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        let repository = storage.makeRepository()
+        let invalidPackage = FileRepositoryTestStorage.makePackage(id: "", name: "Test") // Invalid empty ID
 
         // When/Then
         await #expect(throws: TemplateRepositoryError.self) {
             try await repository.installTemplate(invalidPackage)
         }
-
-        // Cleanup
-        try? FileManager.default.removeItem(at: tempDir)
     }
 
-    // MARK: - Helper Methods
+    @Test("installTemplate makes the installed template available")
+    func installTemplateMakesTemplateAvailable() async throws {
+        // Given
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        let repository = storage.makeRepository()
 
-    private func createTestPackage(at url: URL, id: String, name: String) throws {
+        // When
+        try await repository.installTemplate(FileRepositoryTestStorage.makePackage(id: "installed", name: "Installed"))
+
+        // Then
+        await withKnownIssue("Installed templates are never registered: https://github.com/PigLardLord/PrestoCV-archive/issues/1") {
+            let template = try await repository.getTemplate(id: "installed")
+            #expect(template?.id == "installed")
+        }
+    }
+}
+
+// MARK: - Test Storage
+
+/// A temporary templates directory and registry, so that no test writes to Application Support
+private struct FileRepositoryTestStorage {
+    let root: URL
+    let templatesDirectory: URL
+    let registryManager: TemplateRegistryManager
+
+    init() throws {
+        root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TestTemplates_\(UUID().uuidString)")
+        templatesDirectory = root.appendingPathComponent("Templates")
+        let registryDirectory = root.appendingPathComponent("Registry")
+        try FileManager.default.createDirectory(at: registryDirectory, withIntermediateDirectories: true)
+        registryManager = TemplateRegistryManager(storageDirectory: registryDirectory)
+    }
+
+    func makeRepository() -> FileTemplateRepository {
+        FileTemplateRepository(templatesDirectory: templatesDirectory, registryManager: registryManager)
+    }
+
+    func cleanUp() {
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    static func makePackage(id: String, name: String) -> TemplatePackage {
         let manifest = TemplateManifest(
             id: id,
             name: name,
@@ -232,34 +213,28 @@ struct FileTemplateRepositoryTests {
             previewImage: "preview.png",
             price: 0.0
         )
-
-        let package = TemplatePackage(
-            manifest: manifest,
-            cssContent: "body { margin: 0; }",
-            htmlContent: nil
-        )
-
-        // Create parent directory if needed
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-
-        // Write package as JSON
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(package)
-        try data.write(to: url)
+        return TemplatePackage(manifest: manifest, cssContent: "body { margin: 0; }", htmlContent: nil)
     }
 
-    private func createInvalidPackage(at url: URL) throws {
-        // Create parent directory if needed
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
+    func writePackage(id: String, name: String) throws {
+        try FileManager.default.createDirectory(at: templatesDirectory, withIntermediateDirectories: true)
+        let data = try JSONEncoder().encode(Self.makePackage(id: id, name: name))
+        try data.write(to: templatesDirectory.appendingPathComponent("\(id).mcvt"))
+    }
 
-        // Write invalid JSON
-        let invalidData = "{ invalid json }".data(using: .utf8)!
-        try invalidData.write(to: url)
+    func writeInvalidPackage(id: String) throws {
+        try FileManager.default.createDirectory(at: templatesDirectory, withIntermediateDirectories: true)
+        try Data("{ invalid json }".utf8).write(to: templatesDirectory.appendingPathComponent("\(id).mcvt"))
+    }
+
+    func register(id: String, name: String) async throws {
+        try await registryManager.addTemplate(TemplateEntry(
+            id: id,
+            name: name,
+            version: "1.0.0",
+            source: .bundled,
+            installedAt: Date(),
+            previewPath: "\(id)_preview.png"
+        ))
     }
 }

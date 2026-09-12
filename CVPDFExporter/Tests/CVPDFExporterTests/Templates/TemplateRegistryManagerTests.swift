@@ -19,17 +19,15 @@ struct TemplateRegistryManagerTests {
         TemplateEntry(
             id: id,
             name: name,
-            description: "Test description",
             version: "1.0.0",
             source: source,
-            packagePath: "/path/to/\(id).mcvt",
-            previewPath: nil,
-            lastModified: testDate
+            installedAt: testDate,
+            previewPath: "\(id)_preview.png"
         )
     }
 
     static func createTestRegistry(entries: [TemplateEntry] = []) -> TemplateRegistry {
-        TemplateRegistry(templates: entries, lastUpdate: testDate)
+        TemplateRegistry(entries: entries, lastUpdated: testDate)
     }
 
     // MARK: - Load Registry Tests
@@ -47,7 +45,7 @@ struct TemplateRegistryManagerTests {
         let registry = try await manager.loadRegistry()
 
         // Then
-        #expect(registry.templates.isEmpty)
+        #expect(registry.entries.isEmpty)
     }
 
     @Test("Load registry from existing file returns saved registry")
@@ -67,8 +65,8 @@ struct TemplateRegistryManagerTests {
         let loadedRegistry = try await manager.loadRegistry()
 
         // Then
-        #expect(loadedRegistry.templates.count == 1)
-        #expect(loadedRegistry.templates[0].id == "test-template")
+        #expect(loadedRegistry.entries.count == 1)
+        #expect(loadedRegistry.entries[0].id == "test-template")
     }
 
     // MARK: - Save Registry Tests
@@ -101,7 +99,7 @@ struct TemplateRegistryManagerTests {
 
         let manager = TemplateRegistryManager(storageDirectory: tempDir)
         let entry1 = Self.createTestEntry(id: "modern", name: "Modern", source: .bundled)
-        let entry2 = Self.createTestEntry(id: "custom", name: "Custom", source: .user)
+        let entry2 = Self.createTestEntry(id: "custom", name: "Custom", source: .airDrop)
         let registry = Self.createTestRegistry(entries: [entry1, entry2])
 
         // When
@@ -109,11 +107,11 @@ struct TemplateRegistryManagerTests {
         let loaded = try await manager.loadRegistry()
 
         // Then
-        #expect(loaded.templates.count == 2)
-        #expect(loaded.templates[0].id == "modern")
-        #expect(loaded.templates[0].source == .bundled)
-        #expect(loaded.templates[1].id == "custom")
-        #expect(loaded.templates[1].source == .user)
+        #expect(loaded.entries.count == 2)
+        #expect(loaded.entries[0].id == "modern")
+        #expect(loaded.entries[0].source == .bundled)
+        #expect(loaded.entries[1].id == "custom")
+        #expect(loaded.entries[1].source == .airDrop)
     }
 
     // MARK: - Add Template Tests
@@ -133,8 +131,8 @@ struct TemplateRegistryManagerTests {
 
         // Then
         let registry = try await manager.loadRegistry()
-        #expect(registry.templates.count == 1)
-        #expect(registry.templates[0].id == "test-template")
+        #expect(registry.entries.count == 1)
+        #expect(registry.entries[0].id == "test-template")
     }
 
     @Test("Add template to existing registry")
@@ -155,7 +153,7 @@ struct TemplateRegistryManagerTests {
 
         // Then
         let registry = try await manager.loadRegistry()
-        #expect(registry.templates.count == 2)
+        #expect(registry.entries.count == 2)
     }
 
     @Test("Add duplicate template throws error")
@@ -193,7 +191,7 @@ struct TemplateRegistryManagerTests {
 
         // Then
         let registry = try await manager.loadRegistry()
-        #expect(registry.templates.isEmpty)
+        #expect(registry.entries.isEmpty)
     }
 
     @Test("Remove non-existent template throws error")
@@ -375,8 +373,8 @@ struct TemplateRegistryManagerTests {
         let refreshed = try await manager.refreshRegistry()
 
         // Then
-        #expect(refreshed.templates.count == 1)
-        #expect(refreshed.templates[0].id == "test-template")
+        #expect(refreshed.entries.count == 1)
+        #expect(refreshed.entries[0].id == "test-template")
     }
 
     // MARK: - Thread Safety Tests

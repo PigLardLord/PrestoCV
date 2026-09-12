@@ -235,12 +235,13 @@ struct ParallelProcessorTests {
 
     // MARK: - Template Creation Helpers
 
+    // Bundled templates are CSS over the shared base HTML, so the base HTML is what gets rendered
     private func createBasicTemplate() -> Template {
         Template(
             id: "basic",
             name: "Basic",
             description: "Basic template",
-            htmlContent: ProfessionalHTMLTemplate.html,
+            htmlContent: BaseHTMLTemplate.html,
             supportedVariables: []
         )
     }
@@ -250,7 +251,7 @@ struct ParallelProcessorTests {
             id: "modern",
             name: "Modern",
             description: "Modern template",
-            htmlContent: ModernHTMLTemplate.html,
+            htmlContent: BaseHTMLTemplate.html,
             supportedVariables: []
         )
     }
@@ -260,7 +261,7 @@ struct ParallelProcessorTests {
             id: "minimal",
             name: "Minimal",
             description: "Minimal template",
-            htmlContent: MinimalHTMLTemplate.html,
+            htmlContent: BaseHTMLTemplate.html,
             supportedVariables: []
         )
     }

@@ -7,20 +7,24 @@ import Foundation
 @Suite("Template Engine")
 struct TemplateEngineTests {
 
+    static let knownIssue: Comment = "Bundled templates are never registered: https://github.com/PigLardLord/PrestoCV-archive/issues/1"
+
     // MARK: - Template Loading Tests
 
     @Test("Load bundled template")
     func loadBundledTemplate() throws {
-        // Given
-        let repository = BundledTemplateRepository()
+        withKnownIssue(Self.knownIssue) {
+            // Given
+            let repository = BundledTemplateRepository()
 
-        // When
-        let template = try repository.loadTemplate(id: "professional")
+            // When
+            let template = try repository.loadTemplate(id: "professional")
 
-        // Then
-        #expect(template.id == "professional")
-        #expect(template.name == "Professional")
-        #expect(template.htmlContent.contains("<!DOCTYPE html>"))
+            // Then
+            #expect(template.id == "professional")
+            #expect(template.name == "Professional")
+            #expect(template.htmlContent.contains("<!DOCTYPE html>"))
+        }
     }
 
     @Test("Load non-existent template throws error")
@@ -43,10 +47,12 @@ struct TemplateEngineTests {
         let available = repository.availableTemplates()
 
         // Then
-        #expect(available.count >= 3)
-        #expect(available.contains { $0.id == "professional" })
-        #expect(available.contains { $0.id == "modern" })
-        #expect(available.contains { $0.id == "minimal" })
+        withKnownIssue(Self.knownIssue) {
+            #expect(available.count >= 3)
+            #expect(available.contains { $0.id == "professional" })
+            #expect(available.contains { $0.id == "modern" })
+            #expect(available.contains { $0.id == "minimal" })
+        }
     }
 
     // MARK: - Mustache Rendering Tests

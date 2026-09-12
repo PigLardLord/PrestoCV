@@ -308,4 +308,50 @@ struct TemplateRegistryTests {
 
         #expect(success == false)
     }
+
+    @Test("TemplateRegistry decodes the file the registry manager writes")
+    func templateRegistry_decodesManagerFile() throws {
+        let json = Data("""
+        {
+          "entries" : [
+            {
+              "id" : "modern",
+              "installedAt" : "2025-01-25T10:30:00Z",
+              "name" : "Modern",
+              "previewPath" : "modern_preview.png",
+              "source" : "bundled",
+              "version" : "1.0.0"
+            },
+            {
+              "id" : "custom",
+              "installedAt" : "2025-01-25T14:20:00Z",
+              "name" : "Custom",
+              "previewPath" : "custom_preview.png",
+              "source" : "airDrop",
+              "version" : "1.0.0"
+            }
+          ],
+          "lastUpdated" : "2025-01-25T14:20:00Z",
+          "version" : "1.0"
+        }
+        """.utf8)
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let registry = try decoder.decode(TemplateRegistry.self, from: json)
+
+        #expect(registry.entries.count == 2)
+        #expect(registry.entries[0].source == .bundled)
+        #expect(registry.entries[1].source == .airDrop)
+        #expect(registry.lastUpdated == ISO8601DateFormatter().date(from: "2025-01-25T14:20:00Z"))
+    }
+
+    @Test("TemplateRegistry keeps the last update date it is given")
+    func templateRegistry_keepsLastUpdated() {
+        let date = Date(timeIntervalSince1970: 1_737_814_800)
+
+        let registry = TemplateRegistry(entries: [], lastUpdated: date)
+
+        #expect(registry.lastUpdated == date)
+    }
 }

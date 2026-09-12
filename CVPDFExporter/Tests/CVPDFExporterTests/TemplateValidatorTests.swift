@@ -259,48 +259,32 @@ struct TemplateValidatorTests {
         #expect(result.missingFields.contains(.interests))
     }
 
-    // MARK: - Embedded Templates Validation
+    // MARK: - Bundled Templates Validation
 
-    @Test("Modern template contains all required fields")
-    func modernTemplateContainsAllFields() {
+    @Test("Bundled template contains all required fields", arguments: ["professional", "modern", "minimal"])
+    func bundledTemplateContainsAllFields(id: String) throws {
         // Given
         let validator = TemplateValidator()
-        let template = ModernHTMLTemplate.html
+        let package = try Self.loadBundledPackage(id: id)
+        let template = package.htmlContent ?? BaseHTMLTemplate.html
 
         // When
+        let packageResult = try validator.validatePackage(package)
         let result = validator.validate(template: template)
 
         // Then
-        #expect(result.isValid, "Modern template should contain all required fields. Missing: \(result.missingFields)")
+        #expect(packageResult.isValid, "Package '\(id)' should be valid. Missing: \(packageResult.missingFields)")
+        #expect(result.isValid, "Template '\(id)' should contain all required fields. Missing: \(result.missingFields)")
         #expect(result.missingFields.isEmpty, "Missing fields: \(result.missingFields.map { $0.rawValue }.joined(separator: ", "))")
     }
 
-    @Test("Professional template contains all required fields")
-    func professionalTemplateContainsAllFields() {
-        // Given
-        let validator = TemplateValidator()
-        let template = ProfessionalHTMLTemplate.html
-
-        // When
-        let result = validator.validate(template: template)
-
-        // Then
-        #expect(result.isValid, "Professional template should contain all required fields. Missing: \(result.missingFields)")
-        #expect(result.missingFields.isEmpty, "Missing fields: \(result.missingFields.map { $0.rawValue }.joined(separator: ", "))")
-    }
-
-    @Test("Minimal template contains all required fields")
-    func minimalTemplateContainsAllFields() {
-        // Given
-        let validator = TemplateValidator()
-        let template = MinimalHTMLTemplate.html
-
-        // When
-        let result = validator.validate(template: template)
-
-        // Then
-        #expect(result.isValid, "Minimal template should contain all required fields. Missing: \(result.missingFields)")
-        #expect(result.missingFields.isEmpty, "Missing fields: \(result.missingFields.map { $0.rawValue }.joined(separator: ", "))")
+    /// Bundled templates are .mcvt packages: CSS over the shared base HTML
+    private static func loadBundledPackage(id: String) throws -> TemplatePackage {
+        let url = try #require(
+            Bundle.module.url(forResource: id, withExtension: "mcvt", subdirectory: "Templates/Bundled"),
+            "Bundled template '\(id)' should be in the module bundle"
+        )
+        return try JSONDecoder().decode(TemplatePackage.self, from: Data(contentsOf: url))
     }
 
     // MARK: - Validation Result Details
