@@ -1,0 +1,117 @@
+# 0009. Persisted CVs use a versioned DTO, schema v1, strict decoding, revisions and a store lock
+
+- **Status:** Accepted
+- **Date:** 2026-09-28
+- **Related:** R6, R7, R12, [ADR 0010](0010-ui-free-presentation-package.md), issues #10, #11, #12, #30, #45, #56
+
+## Context
+
+Persistence today has these problems:
+- The domain types are the persisted types.
+- Every field is decoded with `decodeIfPresent ?? default`, so any JSON object becomes a CV, and a missing `id` becomes a new random UUID on each load.
+- Writes are not atomic and have no data protection.
+- A corrupt file disappears without an error, and a storage failure reads as "no CVs".
+- A legacy lookup makes some CVs impossible to delete, and saving one duplicates it.
+- There is no schema version, no revision and no timestamp. Two windows, or two processes, can silently overwrite each other.
+
+The app is not released, so no user data needs migrating.
+
+## Decision
+
+- **On-disk format: `CVFileV1`.** It is a DTO, separate from the domain `CV`. Fields: `schemaVersion: 1`, `id`, `revision`, `createdAt`, `updatedAt`, and the content, with structured periods and bounded levels.
+  - **The envelope is frozen:** `schemaVersion` is a top-level integer in every future version.
+- **Strict decoding.** Required fields are required.
+  - `revision` must lie in 1…2³¹−1, so incrementing it cannot overflow.
+  - Periods are built by the domain's single rule, `Period.make`; every contradictory or incomplete combination is rejected.
+  - Text is capped at 10 000 characters, and lists at 500 items.
+  - An email must already be in its normalised form.
+  - The embedded id must match the file name.
+- **Every read has its own outcome.** The repository never guesses:
+
+  | Outcome | What happens |
+  |---|---|
+  | Newer schema | Left untouched, reported as `upgradeRequired` |
+  | I/O failure, or a symbolic link | Left untouched, reported as `unreadable`, retried next time (for example, before first unlock) |
+  | Larger than the cap (5 MB) | Not read, reported as `tooLarge` |
+  | Decoding failure of a supported version | Moved to `Quarantine/` (a `N~` prefix avoids collisions), reported as `corrupt` with its reason |
+  | Quarantine not possible | Reported as `quarantineFailed`; the listing continues |
+
+  Only a store that does not exist yet is empty. A store that cannot be listed is `storeUnavailable`.
+- **Revisions, timestamps and the lock.**
+  - `create`, `update` and `delete` are conditional on the revision. `update` of a changed CV fails with `conflict(storedRevision:)`; update or delete of a missing CV fails with `notFound`. Nothing is overwritten and nothing is resurrected.
+  - Every mutation holds an exclusive `flock` on the store's lock file, so the check and the write are atomic across repository instances and processes. An actor alone only protects one instance.
+  - The repository assigns the revision and the timestamps: through the injected `TimeSource`, and via `package`-level API, so callers cannot forge them. The listing is ordered by last change.
+- **Maintenance port: `CVStoreMaintenance`.**
+  - `restore(quarantined:)`:
+    - accepts only names matching `^(\d+~)?<UUID>\.cv\.json\z` inside the quarantine folder, and refuses symbolic links;
+    - under the store lock, reads the candidate through the same checks as a listing: size cap, version and strict decoding;
+    - moves it back only if that read succeeds and no active CV has the same id. Otherwise it throws the read's outcome, and both folders stay unchanged (review round 3).
+  - `erase(_:)` deletes every copy of a CV, whatever its schema or state, including quarantined ones (GDPR erasure).
+  - `purgeQuarantine(olderThan:)` enforces retention (30 days).
+- **Nothing is written that could not be read back.** Before replacing a file, the repository encodes the CV and checks the size cap. It then decodes the bytes through the same strict path as a read, and requires the same CV back. Otherwise it throws `wouldNotReadBack`, which becomes `AuthoringError.tooLarge`, and the previous version stays. Without this, a save that exceeded a limit would be acknowledged, then quarantined or reported as `tooLarge` on the next listing (review round 2).
+- **Timestamps** are stored with whole-second precision. The repository truncates the clock's value before using it, so the read-back comparison holds for any clock.
+- **Writes** are one file per CV, atomic, with `complete` data protection on Apple platforms. The app never reads CVs in the background, and a locked file is reported as `unreadable` rather than quarantined. The location is given by the composition root.
+- **User experience.**
+  - A `conflict` offers "reload" (take the stored version) or "save as a copy".
+  - `notFound` on save (deleted in another window) offers "save as a copy" or "discard".
+  - Autosave (#30) will use the same serialised save path ([ADR 0010](0010-ui-free-presentation-package.md)), debounced.
+  - On macOS, the app sets `LSMultipleInstancesProhibited`. The lock still protects against other processes, such as extensions.
+- **Sample CVs** use the same v1 format and decoder.
+- **No compatibility with the current format.** Development data is reset when the new persistence lands.
+- **Migrations.** From the first release on, every schema change ships with a migration from every released version, and a test for each.
+
+## Consequences
+
+- Ghost CVs, unstable identities, duplicate-on-save, lost updates and resurrection disappear by construction. Each has a test.
+- Presentation has to handle `conflict` and `deletedElsewhere`.
+- Anyone running a development build loses their test CVs once.
+
+## Alternatives considered
+
+- **Lenient decoding for robustness.** Rejected: leniency is what turned bad data into invisible bugs.
+- **Quarantine every unreadable file.** Rejected after review: before first unlock on iOS it would quarantine every CV.
+- **An actor as the only serialisation.** Rejected after review: two instances on one store lost 200 of 200 races.
+- **SwiftData or Core Data.** Not needed for a handful of documents per user. It would tie persistence to Apple platforms and break the Linux build. It can be revisited together with iCloud sync (#56).
+
+## Validation
+
+The validation prototype, commit `90533fb` of its own repository (`PigLardLord/PrestoCV-adr-prototype`, #65), not yet in this repository. Swift 6.3.3, Linux. 27 Core tests pass.
+
+**Decoding**
+- Rejected: `{}`, a missing `id`, a missing, zero, negative or `Int.max` revision, an out-of-range level, month 13 with a valid start, an email with a trailing newline.
+- Every invalid period shape gives a typed `PeriodError`.
+- "May 2020 – 2020" is accepted.
+
+**Listing**
+- **Mixed directory:** a healthy file is listed; a corrupt file is quarantined with its reason; a newer-schema file stays byte-for-byte untouched.
+- **Unreadable file** (mode 000): reported and left in place, then listed again once readable.
+- **Oversized file:** reported without being read.
+- **A regular file where `Quarantine/` should be:** the healthy CV is still listed, and the failure is reported.
+- **Unreadable store:** an error, while a missing store is a first run.
+- **Id and file name disagree:** the file is corrupt.
+
+**Maintenance**
+- **Restore:** a repaired file comes back.
+  - A file that is still corrupt, or over the size cap, is refused and stays in quarantine.
+  - `../` names, `1~../../` names, a name with a trailing newline and a symbolic link are all refused.
+- **Erase:** removes the stored newer-schema file and both quarantined copies.
+- **Purge:** removes only old entries.
+
+**Writes**
+- A CV whose encoded file exceeds the cap is refused on create and on update:
+  - with 4-byte Unicode characters and a small cap;
+  - with a single field over the 10 000-character text limit, well under the byte cap.
+
+  Each time the previous version stays, the listing is unchanged, and `SaveCV` reports `tooLarge`.
+- A clock with fractional seconds still round-trips.
+
+**Contract and concurrency**
+- The contract suite passes on both repositories: round trip with timestamps, create twice, update bumps the revision and keeps `createdAt`, stale update and stale delete, update after delete, listing order.
+- **50 concurrent updates** from one revision on one instance: exactly one succeeds.
+- **Two instances, 40 concurrent updates:** exactly one succeeds. Before the lock, all of them did.
+
+**Found during validation**
+- Review round 2: the writer accepted data that its own reader rejected.
+- Fixing that exposed a latent defect: ISO 8601 drops fractional seconds, so with a real clock every write would have failed the read-back check.
+- The first quarantine used a `N-` prefix and stripped it with `^\d+-`, which also ate the leading digits of UUID names.
+- `completeFileProtection` compiles on Linux, where it has no effect, so no platform check is needed.
