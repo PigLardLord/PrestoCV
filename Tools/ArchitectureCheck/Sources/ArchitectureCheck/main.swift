@@ -86,6 +86,9 @@ for file in files.sorted() {
 // MARK: 2–4. Scan
 
 let adrDir = value(after: "--adr-dir")
+if let adrDir, ((try? FileManager.default.contentsOfDirectory(atPath: adrDir)) ?? []).isEmpty {
+    problems.append("cannot read the ADR directory \(adrDir)")
+}
 // Target names are identities (allow-lists, modules.md, manifest exemptions): they must be unique.
 for (name, entries) in Dictionary(grouping: config.targets, by: \.name) where entries.count > 1 {
     problems.append("target name \(name) appears \(entries.count) times in the rules")
@@ -177,7 +180,9 @@ for (file, target) in assignment where target.kind != "legacy" {
 let frameworks: Set<String> = ["Glibc", "Darwin", "Dispatch", "Foundation", "Observation", "WebKit", "UIKit", "AppKit", "FoundationModels", "Testing", "SwiftUI", "PDFKit", "QuickLook", "UniformTypeIdentifiers", "Synchronization"]
 if let modulesPath = value(after: "--modules") {
     var documented: [String: Set<String>?] = [:]
-    for line in ((try? String(contentsOfFile: modulesPath, encoding: .utf8)) ?? "").components(separatedBy: "\n") where line.hasPrefix("| `") {
+    let modulesText = (try? String(contentsOfFile: modulesPath, encoding: .utf8)) ?? ""
+    if modulesText.isEmpty { problems.append("cannot read \(modulesPath): the modules check has nothing to compare") }
+    for line in modulesText.components(separatedBy: "\n") where line.hasPrefix("| `") {
         let cells = line.split(separator: "|", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
         guard cells.count >= 4, let name = cells[1].split(separator: "`").first.map(String.init) else { continue }
         let allowCell = cells[cells.count - 2]

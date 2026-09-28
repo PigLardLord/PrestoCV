@@ -17,6 +17,16 @@ swift build -c release --package-path Tools/ArchitectureCheck && Tools/Architect
 
 The first build takes a few minutes, because it compiles SwiftSyntax.
 
+## Pre-commit hook
+
+`pre-commit.sh` checks a checkout of the index, which is what is being committed, so a violation that is only in the working tree does not block the commit. It runs only when the commit touches Swift files, manifests, the checker or `docs/architecture/`. A rename counts as a deletion plus an addition. The staged checker is the one that runs, and its build shares `Tools/ArchitectureCheck/.build`, so SwiftSyntax is not rebuilt. A path given to `--modules` or `--adr-dir` that cannot be read is an error, never a silent pass. To install it as a drop-in of the repository's git hooks:
+
+```bash
+mkdir -p .githooks/pre-commit.d
+printf '#!/usr/bin/env bash\nexec "$(git rev-parse --show-toplevel)/Tools/ArchitectureCheck/pre-commit.sh"\n' > .githooks/pre-commit.d/architecture-check
+chmod +x .githooks/pre-commit.d/architecture-check
+```
+
 ## Changing the rules
 
 - **A new target:** add it to `rules.json` and to `docs/architecture/modules.md` in the same pull request, and remove it from `notYetImplemented`.

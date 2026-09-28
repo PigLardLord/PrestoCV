@@ -5,10 +5,12 @@
 set -euo pipefail
 ROOT="${ARCHITECTURE_CHECK_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 TOOL="$(cd "$(dirname "$0")" && pwd)"
-swift build -c release --package-path "$TOOL" >&2
-# The rules and the baseline come from the tree being checked, so a hook that checks an index checkout
-# judges the staged rules. The binary is built from this script's own copy, which keeps the build cache.
-"$TOOL/.build/release/ArchitectureCheck" "$ROOT" \
+# The build directory can be shared (ARCHITECTURE_CHECK_SCRATCH), so a checker built from another copy of the
+# sources, such as the pre-commit hook's index checkout, reuses the compiled SwiftSyntax.
+SCRATCH="${ARCHITECTURE_CHECK_SCRATCH:-$TOOL/.build}"
+swift build -c release --package-path "$TOOL" --scratch-path "$SCRATCH" >&2
+# The rules and the baseline come from the tree being checked, so an index checkout judges the staged rules.
+"$SCRATCH/release/ArchitectureCheck" "$ROOT" \
   --rules "$ROOT/Tools/ArchitectureCheck/rules.json" --baseline "$ROOT/Tools/ArchitectureCheck/baseline.json" \
   --modules "$ROOT/docs/architecture/modules.md" --adr-dir "$ROOT/docs/architecture/adr" \
   --packages PrestoCVCore,CVPDFExporter,CVGeneratorAI,Tools/ArchitectureCheck "$@"

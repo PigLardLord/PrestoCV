@@ -107,6 +107,9 @@ import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"][0]["requiredI
 PY
   src "$form"; expect "R5: '$form' is accepted" 0 ""
 done
+# --- inputs that cannot be read are problems, never a silent pass (#67)
+setup; src 'let x = 1'; expect "a missing modules file fails" 1 "cannot read" --modules "$ROOT/missing.md"
+setup; src 'let x = 1'; rm -rf "$ROOT/adr"; expect "a missing ADR directory fails" 1 "cannot read the ADR directory"
 # --- manifests
 setup; src 'let x = 1'; printf '%s\n' '// swift-tools-version: 6.0' 'import PackageDescription' \
   'let package = Package(name: "F", targets: [.target(name: "Pure", swiftSettings: [.swiftLanguageMode(.v5)]), .target(name: "Other")])' > "$ROOT/Package.swift"
