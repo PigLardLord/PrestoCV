@@ -57,7 +57,7 @@ Today:
 
 **Scope.** Linux only, with a fake renderer. Nothing here validates a real PDF. The native iOS and macOS runs of the contract suite are pending, and they are required before any PDF defect is declared fixed. `CVRenderingWebKitSupport` has not been compiled: there is no Apple toolchain on this machine. Its block rules were exercised on WebKitGTK 2.52.6 by the security review: rule compilation, a blocked image load, and the main document still loading. That engine shares WebKit's content-extension compiler, but its PDF path differs from Apple's.
 
-Prototype: the validation prototype of the target structure (packages `Core`, `Exporter`, `Drafting`, `App`, plus the checker), commit `90533fb` of its own repository (`PigLardLord/PrestoCV-adr-prototype`, #65), Swift 6.3.3 on Linux (x86_64), 2026-09-27, after an adversarial review and three internal reviews (Swift code, security, documentation). It stays outside this repository until it passes review, then it is committed under `Prototypes/ADRValidation/` and mapped as `excluded` in the checker's rules, so these results can be reproduced.
+Prototype: the validation prototype of the target structure (packages `Core`, `Exporter`, `Drafting`, `App`, plus the checker), in `Prototypes/ADRValidation/`, Swift 6.3.3 on Linux (x86_64), 2026-09-27, after an adversarial review and three internal reviews (Swift code, security, documentation). It is mapped as `excluded` in the checker's rules, and its README says how to reproduce these results.
 
 **Passed**
 - The contract reads the PDF through `PDFInspecting`. The fake renderer writes real, uncompressed PDFs and passes.

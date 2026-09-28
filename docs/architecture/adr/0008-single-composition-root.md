@@ -43,7 +43,7 @@ The consequences:
 
 ## Validation
 
-The validation prototype, commit `90533fb` of its own repository (`PigLardLord/PrestoCV-adr-prototype`, #65) (Swift 6.3.3, Linux), not yet in this repository; it is committed under `Prototypes/ADRValidation/` once it passes review.
+The validation prototype in `Prototypes/ADRValidation/` (Swift 6.3.3, Linux).
 
 **Passed**
 - A single `AppComposition` builds the file repository and the platform renderer, which it selects through conditional target dependencies. The package builds on Linux, where the composition is compiled out.

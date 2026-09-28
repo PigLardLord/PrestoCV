@@ -48,7 +48,7 @@ The three bundled designs are CSS-only (`htmlContent: null`). R8 already rejects
 
 **Scope.** HTML and CSS level. PDF-level evidence needs the native renderers ([ADR 0003](0003-one-pdf-renderer-per-platform.md)), and the geometric completeness check is still pending.
 
-The validation prototype, commit `90533fb` of its own repository (`PigLardLord/PrestoCV-adr-prototype`, #65) (Swift 6.3.3, Linux), not yet in this repository; it is committed under `Prototypes/ADRValidation/` once it passes review. 42 Exporter tests pass, many with dozens of parameterised cases.
+The validation prototype in `Prototypes/ADRValidation/` (Swift 6.3.3, Linux). 42 Exporter tests pass, many with dozens of parameterised cases.
 
 **Passed**
 - **Every field in its own section.** There is no parent-context leak (#2), and an unrated skill has no bare number (#21).

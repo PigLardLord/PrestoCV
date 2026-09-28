@@ -39,7 +39,7 @@ A kernel would end up shared by one package only.
 
 ## Validation
 
-The validation prototype, commit `90533fb` of its own repository (`PigLardLord/PrestoCV-adr-prototype`, #65) (Swift 6.3.3, Linux), not yet in this repository; it is committed under `Prototypes/ADRValidation/` once it passes review.
+The validation prototype in `Prototypes/ADRValidation/` (Swift 6.3.3, Linux).
 
 **Passed**
 - **`CV → CVDocument` keeps every field**, with typed dates. An unknown end becomes `unspecified`, never "present" (review finding H1).

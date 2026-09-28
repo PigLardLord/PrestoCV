@@ -44,7 +44,7 @@ Headings are translated through package resources, in the document's language.
 
 ## Validation
 
-The validation prototype, commit `90533fb` of its own repository (`PigLardLord/PrestoCV-adr-prototype`, #65) (Swift 6.3.3, Linux), not yet in this repository; it is committed under `Prototypes/ADRValidation/` once it passes review.
+The validation prototype in `Prototypes/ADRValidation/` (Swift 6.3.3, Linux).
 
 **Scope.** Linux only. This validates the package's core; nothing here validates a PDF produced by WebKit.
 

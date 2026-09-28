@@ -1,0 +1,510 @@
+{
+ "rules": {
+  "R1": [
+   "exportedImport"
+  ],
+  "R2": [
+   "wallClock",
+   "randomIdentity",
+   "ambientEnvironment",
+   "localization",
+   "printing"
+  ],
+  "R4": [
+   "singleton",
+   "infrastructureConstruction"
+  ],
+  "R7": [
+   "swallowedError"
+  ],
+  "R9": [
+   "escapeHatch"
+  ],
+  "R11": [
+   "platformCondition"
+  ],
+  "R13": [
+   "localization"
+  ],
+  "R14": [
+   "printing",
+   "testDouble"
+  ],
+  "R9m": [
+   "swift5Mode",
+   "unsafeFlags"
+  ]
+ },
+ "infrastructureTypes": [
+  "FileCVRepository",
+  "FileDesignStore",
+  "BundleDesignSource",
+  "IOSPDFRenderer",
+  "MacPDFRenderer",
+  "FoundationModelsDrafter"
+ ],
+ "exceptions": [],
+ "notYetImplemented": [
+  "CVDesignCatalogFileStore",
+  "CVRenderingPDFKitInspector",
+  "App/",
+  "Features/",
+  "DesignSystem/",
+  "Platform/",
+  "Resources/"
+ ],
+ "targets": [
+  {
+   "name": "PrestoCVDomain",
+   "path": "Core/Sources/PrestoCVDomain",
+   "allowedImports": [
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "PrestoCVApplication",
+   "path": "Core/Sources/PrestoCVApplication",
+   "allowedImports": [
+    "PrestoCVDomain",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "PrestoCVPersistence",
+   "path": "Core/Sources/PrestoCVPersistence",
+   "allowedImports": [
+    "PrestoCVApplication",
+    "PrestoCVDomain",
+    "Foundation",
+    "Glibc",
+    "Darwin"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "PrestoCVCoreTestSupport",
+   "path": "Core/Sources/PrestoCVCoreTestSupport",
+   "allowedImports": [
+    "PrestoCVApplication",
+    "PrestoCVDomain",
+    "Foundation",
+    "Synchronization"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
+   "name": "CoreTests",
+   "path": "Core/Tests/CoreTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "Glibc",
+    "Darwin",
+    "PrestoCVDomain",
+    "PrestoCVApplication",
+    "PrestoCVPersistence",
+    "PrestoCVCoreTestSupport"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
+   "name": "CVDocumentModel",
+   "path": "Exporter/Sources/CVDocumentModel",
+   "allowedImports": [
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "CVDesignCatalog",
+   "path": "Exporter/Sources/CVDesignCatalog",
+   "allowedImports": [
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "CVBundledDesigns",
+   "path": "Exporter/Sources/CVBundledDesigns",
+   "allowedImports": [
+    "CVDesignCatalog",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "CVRendering",
+   "path": "Exporter/Sources/CVRendering",
+   "allowedImports": [
+    "CVDocumentModel",
+    "CVDesignCatalog",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "CVRenderingWebKitSupport",
+   "path": "Exporter/Sources/CVRenderingWebKitSupport",
+   "allowedImports": [
+    "CVRendering",
+    "WebKit",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "CVRenderingIOS",
+   "path": "Exporter/Sources/CVRenderingIOS",
+   "allowedImports": [
+    "CVRenderingWebKitSupport",
+    "CVRendering",
+    "WebKit",
+    "UIKit",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "CVRenderingMacOS",
+   "path": "Exporter/Sources/CVRenderingMacOS",
+   "allowedImports": [
+    "CVRenderingWebKitSupport",
+    "CVRendering",
+    "WebKit",
+    "AppKit",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "CVRenderingTestSupport",
+   "path": "Exporter/Sources/CVRenderingTestSupport",
+   "allowedImports": [
+    "CVRendering",
+    "CVDocumentModel",
+    "CVDesignCatalog",
+    "Foundation"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
+   "name": "CVRenderingTests",
+   "path": "Exporter/Tests/CVRenderingTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "CVDocumentModel",
+    "CVDesignCatalog",
+    "CVRendering",
+    "CVRenderingTestSupport",
+    "CVBundledDesigns"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
+   "name": "CVDesignCatalogTests",
+   "path": "Exporter/Tests/CVDesignCatalogTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "CVDesignCatalog",
+    "CVBundledDesigns"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
+   "name": "CVDrafting",
+   "path": "Drafting/Sources/CVDrafting",
+   "allowedImports": [
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "CVDraftingFoundationModels",
+   "path": "Drafting/Sources/CVDraftingFoundationModels",
+   "allowedImports": [
+    "CVDrafting",
+    "FoundationModels",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "PrestoCVWorkflowPorts",
+   "path": "App/Sources/PrestoCVWorkflowPorts",
+   "allowedImports": [
+    "PrestoCVDomain",
+    "PrestoCVApplication",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "PrestoCVIntegration",
+   "path": "App/Sources/PrestoCVIntegration",
+   "allowedImports": [
+    "PrestoCVWorkflowPorts",
+    "PrestoCVApplication",
+    "PrestoCVDomain",
+    "CVDocumentModel",
+    "CVDesignCatalog",
+    "CVRendering",
+    "CVDrafting",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "PrestoCVPresentation",
+   "path": "App/Sources/PrestoCVPresentation",
+   "allowedImports": [
+    "PrestoCVWorkflowPorts",
+    "PrestoCVApplication",
+    "PrestoCVDomain",
+    "Observation",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14"
+   ],
+   "requiredImportAccess": {
+    "PrestoCVDomain": "internal",
+    "PrestoCVApplication": "internal"
+   }
+  },
+  {
+   "name": "PrestoCVComposition",
+   "path": "App/Sources/PrestoCVComposition",
+   "allowedImports": [
+    "PrestoCVIntegration",
+    "PrestoCVPresentation",
+    "PrestoCVWorkflowPorts",
+    "PrestoCVPersistence",
+    "PrestoCVApplication",
+    "CVRendering",
+    "CVRenderingIOS",
+    "CVRenderingMacOS",
+    "CVDraftingFoundationModels",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14"
+   ]
+  },
+  {
+   "name": "AppTests",
+   "path": "App/Tests/AppTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "Synchronization",
+    "PrestoCVDomain",
+    "PrestoCVApplication",
+    "PrestoCVWorkflowPorts",
+    "PrestoCVIntegration",
+    "PrestoCVPresentation",
+    "PrestoCVCoreTestSupport",
+    "CVDocumentModel",
+    "CVDesignCatalog",
+    "CVRendering",
+    "CVRenderingTestSupport",
+    "CVDrafting"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
+   "name": "ArchitectureCheck",
+   "path": "checker/Sources/ArchitectureCheck",
+   "allowedImports": [
+    "Foundation",
+    "SwiftSyntax",
+    "SwiftParser"
+   ],
+   "rules": [],
+   "kind": "tool"
+  },
+  {
+   "name": "CoreManifest",
+   "path": "Core/Package.swift",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m"
+   ],
+   "kind": "manifest"
+  },
+  {
+   "name": "ExporterManifest",
+   "path": "Exporter/Package.swift",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m"
+   ],
+   "kind": "manifest"
+  },
+  {
+   "name": "DraftingManifest",
+   "path": "Drafting/Package.swift",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m"
+   ],
+   "kind": "manifest"
+  },
+  {
+   "name": "AppManifest",
+   "path": "App/Package.swift",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m"
+   ],
+   "kind": "manifest"
+  },
+  {
+   "name": "checkerManifest",
+   "path": "checker/Package.swift",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m"
+   ],
+   "kind": "manifest"
+  }
+ ]
+}

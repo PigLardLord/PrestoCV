@@ -36,7 +36,7 @@ Because nothing is released, compatibility with the current code, persisted file
 
 This is a process decision, so there is nothing to compile. The prototype checked the premise: the structure fixes defects by construction, not one patch at a time.
 
-The validation prototype, commit `90533fb` of its own repository (`PigLardLord/PrestoCV-adr-prototype`, #65) (Swift 6.3.3, Linux), not yet in this repository; it is committed under `Prototypes/ADRValidation/` once it passes review.
+The validation prototype in `Prototypes/ADRValidation/` (Swift 6.3.3, Linux).
 
 It went through two adversarial reviews and three internal reviews (Swift code, security, documentation). About 80 findings were fixed, each with a test.
 

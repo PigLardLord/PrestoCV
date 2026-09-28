@@ -75,7 +75,7 @@ The app is not released, so no user data needs migrating.
 
 ## Validation
 
-The validation prototype, commit `90533fb` of its own repository (`PigLardLord/PrestoCV-adr-prototype`, #65), not yet in this repository. Swift 6.3.3, Linux. 27 Core tests pass.
+The validation prototype in `Prototypes/ADRValidation/`. Swift 6.3.3, Linux. 27 Core tests pass.
 
 **Decoding**
 - Rejected: `{}`, a missing `id`, a missing, zero, negative or `Int.max` revision, an out-of-range level, month 13 with a valid start, an email with a trailing newline.

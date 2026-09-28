@@ -41,7 +41,7 @@ On 2026-09-27 it was verified that the `Observation` module and `@Observable @Ma
 
 ## Validation
 
-The validation prototype, commit `90533fb` of its own repository (`PigLardLord/PrestoCV-adr-prototype`, #65) (Swift 6.3.3, Linux), not yet in this repository; it is committed under `Prototypes/ADRValidation/` once it passes review. 15 App tests pass.
+The validation prototype in `Prototypes/ADRValidation/` (Swift 6.3.3, Linux). 15 App tests pass.
 
 **Passed**
 - **Presentation builds on Linux.** It imports only `Observation`, Foundation, `PrestoCVWorkflowPorts`, and the domain and application through `internal import`.

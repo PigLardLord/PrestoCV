@@ -75,7 +75,7 @@ The git guards read their policy from `.agents/harness/guards.json`, which count
 
 ## Validation
 
-The validation prototype, commit `90533fb` of its own repository (`PigLardLord/PrestoCV-adr-prototype`, #65), not yet in this repository.
+The validation prototype in `Prototypes/ADRValidation/`.
 
 **Self-test: 95 cases, all passing.** The groups:
 - **Import forms** — 10 cases:

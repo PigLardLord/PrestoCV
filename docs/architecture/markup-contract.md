@@ -7,7 +7,7 @@ This document defines two things, both normative ([ADR 0011](adr/0011-typed-html
 
 A design declares the contract version it targets in its manifest (`markupContract`), and the validator rejects any other version.
 
-The source of truth is code in `CVDesignCatalog`: `MarkupContract` for the structure, `allowedProperties` for the properties. This page must match that code exactly. Once the code is in the repository, a test will compare the two as part of the Rendering migration step. Until then, the pinned reference is `CSS.swift` and `MarkupContract.swift` in the validation prototype, commit `90533fb` of `PigLardLord/PrestoCV-adr-prototype` (#65), together with its attack fixtures.
+The source of truth is code in `CVDesignCatalog`: `MarkupContract` for the structure, `allowedProperties` for the properties. This page must match that code exactly. Once the code is in the repository, a test will compare the two as part of the Rendering migration step. Until then, the reference is `CSS.swift` and `MarkupContract.swift` in `Prototypes/ADRValidation/Exporter/Sources/CVDesignCatalog/`, together with its attack fixtures.
 
 ## Version 1
 
