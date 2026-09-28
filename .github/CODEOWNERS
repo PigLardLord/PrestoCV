@@ -1,0 +1,3 @@
+# The architecture rules and their checker are binding (ADR 0006): changes need the owner's review.
+/docs/architecture/ @PigLardLord
+/Tools/ArchitectureCheck/ @PigLardLord
