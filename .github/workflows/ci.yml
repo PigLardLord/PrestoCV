@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux · architecture check
+    runs-on: ubuntu-latest
+    container: swift:6.3
+    steps:
+      - name: Install the self-test's dependencies
+        run: apt-get update -qq && apt-get install -y -qq git python3 > /dev/null
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Cache the checker build
+        uses: actions/cache@v4
+        with:
+          path: Tools/ArchitectureCheck/.build
+          key: checker-linux-${{ hashFiles('Tools/ArchitectureCheck/Package.resolved', 'Tools/ArchitectureCheck/Sources/**') }}
+          restore-keys: checker-linux-
+      - name: Architecture check
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if [ -n "$BASE_REF" ]; then
+            # The baseline may only shrink: compare it with the base branch's (ADR 0006).
+            git show "origin/$BASE_REF:Tools/ArchitectureCheck/baseline.json" > "$RUNNER_TEMP/base-baseline.json" 2>/dev/null \
+              || echo "[]" > "$RUNNER_TEMP/base-baseline.json"
+            Tools/ArchitectureCheck/check.sh --against "$RUNNER_TEMP/base-baseline.json"
+          else
+            Tools/ArchitectureCheck/check.sh
+          fi
+      - name: Checker self-test
+        run: Tools/ArchitectureCheck/selftest.sh

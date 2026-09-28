@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Architecture check on the staged changes (Tools/ArchitectureCheck/README.md). Branches older than the checker skip it;
+# a check script that exists but cannot run fails, because a check that cannot run must not pass in silence.
+HOOK="$(git rev-parse --show-toplevel)/Tools/ArchitectureCheck/pre-commit.sh"
+if [ ! -e "$HOOK" ]; then echo "architecture check: not on this branch yet, skipped" >&2; exit 0; fi
+if [ ! -x "$HOOK" ]; then echo "architecture check: $HOOK is not executable, so it did NOT run. chmod +x it." >&2; exit 1; fi
+exec "$HOOK"

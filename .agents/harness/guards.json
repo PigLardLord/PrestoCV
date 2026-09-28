@@ -1,0 +1,15 @@
+{
+  "_comment": "Branch policy for this project's git hooks: protected branches, and the paths that are not code. Versioned because it is project policy; the hook scripts are installed on each machine.",
+  "protected": [
+    "^main$",
+    "^release/.+$"
+  ],
+  "noncode": [
+    "^AGENTS\\.md$",
+    "(^|/)\\.gitignore$",
+    "^\\.agents/harness/stacks/",
+    "^docs/[^/]+$",
+    "^README\\.md$"
+  ],
+  "_code_note": "docs/architecture/ holds binding rules (ADR 0006, issue #69): it is code, reviewed through branches. Only top-level files in docs/ are non-code."
+}
