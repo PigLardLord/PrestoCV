@@ -1,0 +1,244 @@
+{
+ "_comment": "Architecture rules of the repository (ADR 0006). Every Swift file belongs to exactly one target. Legacy targets are exempt until deleted (ADR 0012); targets listed in modules.md but not built yet are in notYetImplemented.",
+ "rules": {
+  "R1": [
+   "exportedImport"
+  ],
+  "R2": [
+   "wallClock",
+   "randomIdentity",
+   "ambientEnvironment",
+   "localization",
+   "printing"
+  ],
+  "R4": [
+   "singleton",
+   "infrastructureConstruction"
+  ],
+  "R7": [
+   "swallowedError"
+  ],
+  "R9": [
+   "escapeHatch"
+  ],
+  "R11": [
+   "platformCondition"
+  ],
+  "R13": [
+   "localization"
+  ],
+  "R14": [
+   "printing",
+   "testDouble"
+  ],
+  "R9m": [
+   "swift5Mode",
+   "unsafeFlags"
+  ]
+ },
+ "infrastructureTypes": [
+  "FileCVRepository",
+  "FileDesignStore",
+  "BundleDesignSource",
+  "IOSPDFRenderer",
+  "MacPDFRenderer",
+  "FoundationModelsDrafter"
+ ],
+ "exceptions": [],
+ "notYetImplemented": [
+  "PrestoCVDomain",
+  "PrestoCVApplication",
+  "PrestoCVPersistence",
+  "CVDocumentModel",
+  "CVDesignCatalog",
+  "CVDesignCatalogFileStore",
+  "CVBundledDesigns",
+  "CVRendering",
+  "CVRenderingWebKitSupport",
+  "CVRenderingIOS",
+  "CVRenderingMacOS",
+  "CVRenderingPDFKitInspector",
+  "CVDrafting",
+  "CVDraftingFoundationModels",
+  "PrestoCVWorkflowPorts",
+  "PrestoCVIntegration",
+  "PrestoCVPresentation",
+  "PrestoCVComposition",
+  "App/",
+  "Features/",
+  "DesignSystem/",
+  "Platform/",
+  "Resources/"
+ ],
+ "targets": [
+  {
+   "name": "PrestoCVCore",
+   "path": "PrestoCVCore/Sources/PrestoCVCore",
+   "kind": "legacy",
+   "allowedImports": [],
+   "rules": []
+  },
+  {
+   "name": "PrestoCVCoreTests",
+   "path": "PrestoCVCore/Tests/PrestoCVCoreTests",
+   "kind": "legacy",
+   "allowedImports": [
+    "PrestoCVCore"
+   ],
+   "rules": []
+  },
+  {
+   "name": "CVPDFExporter",
+   "path": "CVPDFExporter/Sources/CVPDFExporter",
+   "kind": "legacy",
+   "allowedImports": [
+    "PrestoCVCore"
+   ],
+   "rules": []
+  },
+  {
+   "name": "CVPDFExporterTests",
+   "path": "CVPDFExporter/Tests/CVPDFExporterTests",
+   "kind": "legacy",
+   "allowedImports": [
+    "CVPDFExporter"
+   ],
+   "rules": []
+  },
+  {
+   "name": "CVPDFExporterDemo",
+   "path": "CVPDFExporter/Demo",
+   "kind": "legacy",
+   "allowedImports": [
+    "CVPDFExporter"
+   ],
+   "rules": []
+  },
+  {
+   "name": "TestExport",
+   "path": "CVPDFExporter/Demo/TestExport.swift",
+   "kind": "legacy",
+   "allowedImports": [
+    "CVPDFExporter"
+   ],
+   "rules": []
+  },
+  {
+   "name": "CVExportDemoApp",
+   "path": "CVPDFExporter/Example",
+   "kind": "legacy",
+   "allowedImports": [
+    "CVPDFExporter"
+   ],
+   "rules": []
+  },
+  {
+   "name": "TemplateViewer",
+   "path": "CVPDFExporter/TemplateViewer",
+   "kind": "legacy",
+   "allowedImports": [
+    "CVPDFExporter"
+   ],
+   "rules": []
+  },
+  {
+   "name": "CVGeneratorAI",
+   "path": "CVGeneratorAI/Sources/CVGeneratorAI",
+   "kind": "legacy",
+   "allowedImports": [],
+   "rules": []
+  },
+  {
+   "name": "CVGeneratorAITests",
+   "path": "CVGeneratorAI/Tests/CVGeneratorAITests",
+   "kind": "legacy",
+   "allowedImports": [
+    "CVGeneratorAI"
+   ],
+   "rules": []
+  },
+  {
+   "name": "PrestoCV",
+   "path": "PrestoCV",
+   "kind": "legacy",
+   "allowedImports": [],
+   "rules": []
+  },
+  {
+   "name": "PrestoCVTests",
+   "path": "PrestoCVTests",
+   "kind": "legacy",
+   "allowedImports": [],
+   "rules": []
+  },
+  {
+   "name": "PrestoCVUITests",
+   "path": "PrestoCVUITests",
+   "kind": "legacy",
+   "allowedImports": [],
+   "rules": []
+  },
+  {
+   "name": "ArchitectureCheck",
+   "path": "Tools/ArchitectureCheck/Sources/ArchitectureCheck",
+   "kind": "tool",
+   "allowedImports": [
+    "Foundation",
+    "SwiftSyntax",
+    "SwiftParser"
+   ],
+   "rules": []
+  },
+  {
+   "name": "PrestoCVCoreManifest",
+   "path": "PrestoCVCore/Package.swift",
+   "kind": "manifest",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m"
+   ]
+  },
+  {
+   "name": "CVPDFExporterManifest",
+   "path": "CVPDFExporter/Package.swift",
+   "kind": "manifest",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m"
+   ]
+  },
+  {
+   "name": "CVGeneratorAIManifest",
+   "path": "CVGeneratorAI/Package.swift",
+   "kind": "manifest",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m"
+   ]
+  },
+  {
+   "name": "ArchitectureCheckManifest",
+   "path": "Tools/ArchitectureCheck/Package.swift",
+   "kind": "manifest",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m"
+   ]
+  },
+  {
+   "name": "ADRValidationPrototype",
+   "path": "Prototypes/ADRValidation",
+   "kind": "excluded",
+   "allowedImports": [],
+   "rules": []
+  }
+ ]
+}

@@ -148,7 +148,7 @@ Production code does not use:
 
 Continuations resume exactly once, time out where they wait on the outside world, and support cancellation (review).
 
-**Enforced by:** compiler, checker (detectors `escapeHatch` in sources; `swift5Mode` and `unsafeFlags` in manifests, where only the declaration of a legacy target is exempt) and review for continuations.
+**Enforced by:** compiler, checker (detectors `escapeHatch` in sources; `swift5Mode` and `unsafeFlags` in manifests, where only the declaration of a legacy target is exempt; with `--packages`, the effective language mode of every target that is not legacy must be Swift 6) and review for continuations. Module-qualified names (`Swift.fatalError`, `Foundation.Date()`) are checked like bare ones.
 
 ## R10. Tests are fast, hermetic and at the right level
 
