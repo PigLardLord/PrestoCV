@@ -7,6 +7,9 @@ public struct DesignManifest: Codable, Sendable, Equatable {
     public init(id: String, name: String, version: String, description: String, markupContract: Int = MarkupContract.version) {
         self.id = id; self.name = name; self.version = version; self.description = description; self.markupContract = markupContract
     }
+    /// The one rule for design identifiers: lowercase ASCII letters, digits and hyphens, 1–64 characters. Stores use it
+    /// before touching storage, so an identifier can never name a path.
+    public static func isValidID(_ id: String) -> Bool { id.fullyMatches(#"[a-z0-9-]{1,64}"#) }
 }
 
 public enum DesignPackageViolation: Equatable, Sendable, CustomStringConvertible {
@@ -58,7 +61,7 @@ public struct DesignPackageValidator: Sendable {
         do { manifest = try JSONDecoder().decode(DesignManifest.self, from: JSONSerialization.data(withJSONObject: manifestObject)) }
         catch { throw DesignPackageRejected(violations: violations + [.malformed("manifest")]) }
         guard let css = object["cssContent"] as? String else { throw DesignPackageRejected(violations: violations + [.malformed("cssContent")]) }
-        if !manifest.id.fullyMatches(#"[a-z0-9-]{1,64}"#) { violations.append(.invalidID(manifest.id)) }
+        if !DesignManifest.isValidID(manifest.id) { violations.append(.invalidID(manifest.id)) }
         if manifest.markupContract != MarkupContract.version { violations.append(.unsupportedContract(manifest.markupContract)) }
         var stylesheet: ValidatedStylesheet?
         do throws(CSSRejection) { stylesheet = ValidatedStylesheet(css: try CSSPolicy.canonical(css)) } catch { violations.append(.css(error.reason)) }
@@ -73,10 +76,14 @@ public struct DesignPackageValidator: Sendable {
     }
 }
 
-/// Stores validated designs. Owned by the catalog (R3); adapters live in CVDesignCatalogFileStore and test support.
+/// Stores validated designs. Owned by the catalog (R3); adapters live in CVDesignCatalogFileStore and test support,
+/// and pass `DesignStoreContract`. Saving an identifier again replaces its design.
 public protocol DesignStore: Sendable {
     func save(_ design: ValidatedDesign) async throws
+    /// nil only when no design has this identifier; a stored design that cannot be read is an error (R7).
     func design(id: String) async throws -> ValidatedDesign?
+    /// The stored designs' manifests, ordered by identifier.
+    func installedDesigns() async throws -> [DesignManifest]
 }
 
 /// Proves that a design renders a fixture document without losing content (ADR 0011). Owned by the

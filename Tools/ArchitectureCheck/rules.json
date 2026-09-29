@@ -287,6 +287,21 @@
    "kind": "test"
   },
   {
+   "name": "CVDesignCatalogFileStoreTests",
+   "path": "CVPDFExporter/Tests/CVDesignCatalogFileStoreTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "CVDesignCatalog",
+    "CVDesignCatalogFileStore",
+    "CVRenderingTestSupport",
+    "Glibc",
+    "Darwin"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
    "name": "CVDesignCatalogTests",
    "path": "CVPDFExporter/Tests/CVDesignCatalogTests",
    "allowedImports": [

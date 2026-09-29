@@ -105,11 +105,3 @@ public enum PDFRenderingContract {
         guard cancelled else { throw PDFRenderingContractFailure.cancellationIgnored }
     }
 }
-
-/// In-memory `DesignStore` for tests.
-public actor InMemoryDesignStore: DesignStore {
-    var designs: [String: ValidatedDesign] = [:]
-    public init() {}
-    public func save(_ design: ValidatedDesign) async throws { designs[design.manifest.id] = design }
-    public func design(id: String) async throws -> ValidatedDesign? { designs[id] }
-}
