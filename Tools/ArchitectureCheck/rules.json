@@ -260,6 +260,45 @@
    ]
   },
   {
+   "name": "CVRenderingTestSupport",
+   "path": "CVPDFExporter/Sources/CVRenderingTestSupport",
+   "allowedImports": [
+    "CVRendering",
+    "CVDocumentModel",
+    "CVDesignCatalog",
+    "Foundation"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
+   "name": "CVRenderingTests",
+   "path": "CVPDFExporter/Tests/CVRenderingTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "CVDocumentModel",
+    "CVDesignCatalog",
+    "CVRendering",
+    "CVRenderingTestSupport",
+    "CVBundledDesigns"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
+   "name": "CVDesignCatalogTests",
+   "path": "CVPDFExporter/Tests/CVDesignCatalogTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "CVDesignCatalog",
+    "CVBundledDesigns"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
    "name": "CVDrafting",
    "path": "CVGeneratorAI/Sources/CVDrafting",
    "allowedImports": [

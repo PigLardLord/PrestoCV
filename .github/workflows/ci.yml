@@ -41,12 +41,13 @@ jobs:
           fi
       - name: Checker self-test
         run: Tools/ArchitectureCheck/selftest.sh
-      - name: Build the new targets
+      - name: Build and test the new targets
         # On Linux only the new targets exist; the legacy ones are declared for Apple hosts only (ADR 0012).
         run: |
-          for package in PrestoCVCore CVPDFExporter CVGeneratorAI PrestoCVApp; do
+          for package in PrestoCVCore CVGeneratorAI PrestoCVApp; do
             swift build --package-path "$package"
           done
+          swift test --package-path CVPDFExporter
 
   macos:
     name: macOS · checks, packages and app

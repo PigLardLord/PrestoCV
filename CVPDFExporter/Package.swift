@@ -9,6 +9,7 @@ var products: [Product] = [
     .library(name: "CVDesignCatalogFileStore", targets: ["CVDesignCatalogFileStore"]),
     .library(name: "CVBundledDesigns", targets: ["CVBundledDesigns"]),
     .library(name: "CVRendering", targets: ["CVRendering"]),
+    .library(name: "CVRenderingTestSupport", targets: ["CVRenderingTestSupport"]),
 ]
 var dependencies: [Package.Dependency] = []
 var targets: [Target] = [
@@ -16,7 +17,14 @@ var targets: [Target] = [
     .target(name: "CVDesignCatalog"),
     .target(name: "CVDesignCatalogFileStore", dependencies: ["CVDesignCatalog"]),
     .target(name: "CVBundledDesigns", dependencies: ["CVDesignCatalog"], resources: [.copy("Designs")]),
-    .target(name: "CVRendering", dependencies: ["CVDocumentModel", "CVDesignCatalog"]),
+    .target(name: "CVRendering", dependencies: ["CVDocumentModel", "CVDesignCatalog"], resources: [.copy("Resources")]),
+    .target(name: "CVRenderingTestSupport", dependencies: ["CVRendering", "CVDocumentModel", "CVDesignCatalog"]),
+    .testTarget(name: "CVDesignCatalogTests", dependencies: ["CVDesignCatalog", "CVBundledDesigns"]),
+    .testTarget(
+        name: "CVRenderingTests",
+        dependencies: ["CVRendering", "CVRenderingTestSupport", "CVDocumentModel", "CVBundledDesigns", "CVDesignCatalog"],
+        resources: [.copy("Golden")]
+    ),
 ]
 
 // Apple-only adapters (the platform column of docs/architecture/modules.md): not part of a Linux build.

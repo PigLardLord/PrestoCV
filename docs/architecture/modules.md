@@ -91,7 +91,10 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - typed sections: summary, experience, education, skills, languages, certifications (name, issuer, year, URL, description), profiles, interests;
   - dates as `DocumentDate` and `DocumentPeriod` with `PeriodEnd` `present`, `date` or `unspecified`, never display strings.
 - **Explicit JSON.** Sections are `{"kind": …}` objects and periods carry an `end` discriminator.
-- **`CVDocumentValidator`** is the anti-corruption layer for documents from outside. It checks the name, text sizes, counts, dates and ratings.
+- **`CVDocumentValidator`** is the anti-corruption layer for documents from outside:
+  - it checks the name, counts, dates and ratings;
+  - it bounds text in UTF-8 bytes, per field and for the whole document, and refuses control characters and bidirectional overrides;
+  - JSON arrives through `decode(json:)`, which checks the size before decoding.
 - Pending: a committed JSON Schema.
 
 **`CVDesignCatalog`**
@@ -118,7 +121,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - **`PDFRendering`**, the outbound port: `render(html:page:) async throws -> RenderedPDF`, with `data`, `pageCount` and `requiredPages`. `truncated` is derived from those.
 - **`PDFInspecting`**, the outbound port that reads the page count and text of a PDF.
 - **`RenderedDocument`:** the builder's output, meaning the HTML plus the exact text nodes it contains.
-- **`DocumentCompleteness`:** every text node must occur in the PDF at least as often as in the document, ignoring case and spacing.
+- **`DocumentCompleteness`:** every text node needs its own span of the PDF text, which no other node uses, ignoring case and spacing.
 - **`FixtureRenderingGate`:** implements the catalog's `DesignRenderingGate`. It renders a fixture that uses every section with the candidate design, and requires a complete, untruncated PDF.
 - **Policy:** the required fields and page limit, shared by preview and export.
 

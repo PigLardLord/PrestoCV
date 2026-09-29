@@ -7,7 +7,7 @@ This document defines two things, both normative ([ADR 0011](adr/0011-typed-html
 
 A design declares the contract version it targets in its manifest (`markupContract`), and the validator rejects any other version.
 
-The source of truth is code in `CVDesignCatalog`: `MarkupContract` for the structure, `allowedProperties` for the properties. This page must match that code exactly. Once the code is in the repository, a test will compare the two as part of the Rendering migration step. Until then, the reference is `CSS.swift` and `MarkupContract.swift` in `Prototypes/ADRValidation/Exporter/Sources/CVDesignCatalog/`, together with its attack fixtures.
+The source of truth is code in `CVDesignCatalog`: `MarkupContract` for the structure, `allowedProperties` for the properties. This page must match that code exactly. That code is `CSS.swift` and `MarkupContract.swift` in `CVPDFExporter/Sources/CVDesignCatalog/`, with the attack fixtures in `CVPDFExporter/Tests/`. A test comparing this page with the code is planned (#83).
 
 ## Version 1
 
@@ -31,6 +31,7 @@ html[lang]
                 certifications:          article.cv-entry
                                          ├── h3.cv-entry-title        role / degree / certification name
                                          ├── p.cv-entry-subtitle      company / school / issuer
+                                         ├── p.cv-entry-location      (experience: if present)
                                          ├── p.cv-entry-period        (if present; certifications: the year)
                                          ├── p.cv-entry-description   (if present)
                                          └── a.cv-entry-link[href]    (certifications: if present and valid; its text is the href)
@@ -58,7 +59,7 @@ html[lang]
 | Kind | Values |
 |---|---|
 | Elements | `main`, `header`, `section`, `article`, `h1`, `h2`, `h3`, `p`, `span`, `a` |
-| Classes | `cv`, `cv-header`, `cv-name`, `cv-title`, `cv-contact`, `cv-phone`, `cv-location`, `cv-website`, `cv-section`, `cv-section-title`, `cv-summary`, `cv-entry`, `cv-entry-title`, `cv-entry-subtitle`, `cv-entry-period`, `cv-entry-description`, `cv-entry-link`, `cv-skill`, `cv-language`, `cv-language-level`, `cv-profile`, `cv-profile-platform`, `cv-profile-url`, `cv-interest` |
+| Classes | `cv`, `cv-header`, `cv-name`, `cv-title`, `cv-contact`, `cv-phone`, `cv-location`, `cv-website`, `cv-section`, `cv-section-title`, `cv-summary`, `cv-entry`, `cv-entry-title`, `cv-entry-subtitle`, `cv-entry-location`, `cv-entry-period`, `cv-entry-description`, `cv-entry-link`, `cv-skill`, `cv-language`, `cv-language-level`, `cv-profile`, `cv-profile-platform`, `cv-profile-url`, `cv-interest` |
 | `[data-section=…]` | `summary`, `experience`, `education`, `skills`, `languages`, `certifications`, `profiles`, `interests` |
 | `[data-rating=…]` | `1` … `5` |
 | Pseudo-classes | `:first-child`, `:last-child`, `:only-child` |
@@ -78,7 +79,7 @@ Comments are dropped. Strings may appear only as `[data-section="…"]` values. 
 **Structure.** A stylesheet is a sequence of rules `selector-list { declarations }` and of `@media print|screen|all { rules }`. Rules cannot be nested. No other at-rule is allowed.
 
 **Rejected outright:**
-- ids, attribute selectors other than the two above, pseudo-elements, functional pseudo-classes (`:has()`, `:not()`, `:nth-*()`), and any element or class outside the contract;
+- ids, the universal selector `*` (it also reaches the document root), attribute selectors other than the two above, pseudo-elements, functional pseudo-classes (`:has()`, `:not()`, `:nth-*()`), and any element or class outside the contract;
 - custom property declarations (`--x: …`), `!important`, and every function except `var()` on the variables above.
 
 **Declarations.** Only these properties exist. Any other property, or a value outside the bounds, rejects the whole stylesheet.
@@ -93,7 +94,7 @@ Units and bounds:
 | `color`, `border-color` | `var(--color-text)` or `var(--color-primary)` |
 | `background-color` | `var(--color-background)` or `transparent` |
 | `font-family` | `var(--font-body)` or `var(--font-heading)` |
-| `font-size` | 7–48 pt; 0.6–4 em/rem; 60–400 % |
+| `font-size` | 7–48 pt (px converted). Relative units are refused: `em` and `%` compound through nesting, and `rem` follows the root's size, so only an absolute size keeps the floor. |
 | `font-weight` | a number 100–900, `normal`, `bold` |
 | `font-style` | `normal`, `italic` |
 | `line-height` | a number 1–3, `normal` |
@@ -125,6 +126,6 @@ Anything that could load a resource, or hide, move, reorder or inject content, i
 
 | Version | Change | Compatible with |
 |---|---|---|
-| 1 | Initial contract (2026-09-28): structure, contact fields, certifications, links that print their destination, spaces between inline entries, CSS grammar. | — |
+| 1 | Initial contract (2026-09-28): structure, contact fields, certifications, links that print their destination, spaces between inline entries, an experience's location, CSS grammar with absolute font sizes and no universal selector. | — |
 
 A change that could break an existing design bumps the version, for example removing a class, changing the nesting, or tightening a bound. Adding a class, a property or a wider bound does not.
