@@ -119,6 +119,22 @@
    "rules": []
   },
   {
+   "name": "PrestoCVPersistenceTests",
+   "path": "PrestoCVCore/Tests/PrestoCVPersistenceTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "Glibc",
+    "Darwin",
+    "PrestoCVDomain",
+    "PrestoCVApplication",
+    "PrestoCVPersistence",
+    "PrestoCVCoreTestSupport"
+   ],
+   "rules": []
+  },
+  {
    "name": "PrestoCVAuthoringTests",
    "path": "PrestoCVCore/Tests/PrestoCVAuthoringTests",
    "kind": "test",

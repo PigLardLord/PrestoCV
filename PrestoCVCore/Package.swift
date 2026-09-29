@@ -14,6 +14,7 @@ var targets: [Target] = [
     .target(name: "PrestoCVPersistence", dependencies: ["PrestoCVApplication", "PrestoCVDomain"]),
     .target(name: "PrestoCVCoreTestSupport", dependencies: ["PrestoCVApplication", "PrestoCVDomain"]),
     .testTarget(name: "PrestoCVAuthoringTests", dependencies: ["PrestoCVDomain", "PrestoCVApplication", "PrestoCVCoreTestSupport"]),
+    .testTarget(name: "PrestoCVPersistenceTests", dependencies: ["PrestoCVPersistence", "PrestoCVDomain", "PrestoCVApplication", "PrestoCVCoreTestSupport"]),
 ]
 
 // Legacy targets: declared only on Apple hosts, and deleted when their replacement is wired in (ADR 0012).
