@@ -7,7 +7,7 @@ This document defines two things, both normative ([ADR 0011](adr/0011-typed-html
 
 A design declares the contract version it targets in its manifest (`markupContract`), and the validator rejects any other version.
 
-The source of truth is code in `CVDesignCatalog`: `MarkupContract` for the structure, `allowedProperties` for the properties. This page must match that code exactly. That code is `CSS.swift` and `MarkupContract.swift` in `CVPDFExporter/Sources/CVDesignCatalog/`, with the attack fixtures in `CVPDFExporter/Tests/`. A test comparing this page with the code is planned (#83).
+The source of truth is code in `CVDesignCatalog`: `MarkupContract` for the structure, `allowedProperties` for the properties. This page must match that code exactly. That code is `CSS.swift` and `MarkupContract.swift` in `CVPDFExporter/Sources/CVDesignCatalog/`, with the attack fixtures in `CVPDFExporter/Tests/`. `MarkupContractPageTests`, in `CVPDFExporter/Tests/CVDesignCatalogTests/`, reads this page and fails when it and the code disagree: the sets must be equal, and every documented value and bound is probed at its edges.
 
 ## Version 1
 
