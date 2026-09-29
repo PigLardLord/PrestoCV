@@ -2,7 +2,8 @@
 # Self-test of the architecture checker: one case per known evasion, false positive or policy rule.
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
-CHECK="$HERE/.build/release/ArchitectureCheck"
+# The same build directory check.sh uses (ARCHITECTURE_CHECK_SCRATCH), so CI can keep it outside the checkout.
+CHECK="${ARCHITECTURE_CHECK_SCRATCH:-$HERE/.build}/release/ArchitectureCheck"
 pass=0; fail=0; ROOTS=()
 trap 'rm -rf "${ROOTS[@]}"' EXIT
 
