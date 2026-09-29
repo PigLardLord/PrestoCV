@@ -22,7 +22,7 @@ The current app and packages are the legacy code the migration replaces, one con
 
 ## Building and testing
 
-You need Xcode 26 and the iOS 26.5 simulator.
+You need Xcode 27, which reads the project in its JSON format (`PrestoCV.xcodeproj/project.xcproj`), and the iOS 26.5 simulator.
 
 ```bash
 xcodebuild -project PrestoCV.xcodeproj -scheme PrestoCV -configuration Debug build
