@@ -31,7 +31,7 @@ swift test --package-path PrestoCVCore
 Tools/ArchitectureCheck/check.sh
 ```
 
-Today only the architecture checker and the prototype build and test on Linux. The new targets will too, as the migration creates them. The legacy targets stay Apple-only (ADR 0012).
+On Linux, the packages contain only the new targets. They build today and stay empty until the migration fills them; the architecture checker and the prototype also build and test there. The legacy targets are declared only on Apple hosts (ADR 0012).
 
 ## Contributing
 

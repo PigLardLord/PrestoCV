@@ -41,6 +41,12 @@ jobs:
           fi
       - name: Checker self-test
         run: Tools/ArchitectureCheck/selftest.sh
+      - name: Build the new targets
+        # On Linux only the new targets exist; the legacy ones are declared for Apple hosts only (ADR 0012).
+        run: |
+          for package in PrestoCVCore CVPDFExporter CVGeneratorAI PrestoCVApp; do
+            swift build --package-path "$package"
+          done
 
   macos:
     name: macOS · checks, packages and app
@@ -76,6 +82,9 @@ jobs:
           for package in PrestoCVCore CVPDFExporter CVGeneratorAI; do
             swift test --package-path "$package"
           done
+      - name: Build the app package
+        # PrestoCVApp has no tests until step 5 (#88); building it checks its targets and cross-package dependencies.
+        run: swift build --package-path PrestoCVApp
       - name: App tests on the iOS simulator
         run: |
           DEVICE="$(Tools/CI/test-simulator.sh)"
