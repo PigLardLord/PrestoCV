@@ -6,11 +6,14 @@ var products: [Product] = [
     .library(name: "PrestoCVDomain", targets: ["PrestoCVDomain"]),
     .library(name: "PrestoCVApplication", targets: ["PrestoCVApplication"]),
     .library(name: "PrestoCVPersistence", targets: ["PrestoCVPersistence"]),
+    .library(name: "PrestoCVCoreTestSupport", targets: ["PrestoCVCoreTestSupport"]),
 ]
 var targets: [Target] = [
     .target(name: "PrestoCVDomain"),
     .target(name: "PrestoCVApplication", dependencies: ["PrestoCVDomain"]),
     .target(name: "PrestoCVPersistence", dependencies: ["PrestoCVApplication", "PrestoCVDomain"]),
+    .target(name: "PrestoCVCoreTestSupport", dependencies: ["PrestoCVApplication", "PrestoCVDomain"]),
+    .testTarget(name: "PrestoCVAuthoringTests", dependencies: ["PrestoCVDomain", "PrestoCVApplication", "PrestoCVCoreTestSupport"]),
 ]
 
 // Legacy targets: declared only on Apple hosts, and deleted when their replacement is wired in (ADR 0012).

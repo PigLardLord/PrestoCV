@@ -107,6 +107,31 @@
    ]
   },
   {
+   "name": "PrestoCVCoreTestSupport",
+   "path": "PrestoCVCore/Sources/PrestoCVCoreTestSupport",
+   "kind": "test",
+   "allowedImports": [
+    "PrestoCVApplication",
+    "PrestoCVDomain",
+    "Foundation",
+    "Synchronization"
+   ],
+   "rules": []
+  },
+  {
+   "name": "PrestoCVAuthoringTests",
+   "path": "PrestoCVCore/Tests/PrestoCVAuthoringTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "PrestoCVDomain",
+    "PrestoCVApplication",
+    "PrestoCVCoreTestSupport"
+   ],
+   "rules": []
+  },
+  {
    "name": "CVDocumentModel",
    "path": "CVPDFExporter/Sources/CVDocumentModel",
    "allowedImports": [
