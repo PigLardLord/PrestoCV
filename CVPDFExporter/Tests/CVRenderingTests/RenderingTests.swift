@@ -108,7 +108,7 @@ struct BuilderTests {
         #expect(!html.contains("2015 – Oggi"))
     }
 
-    @Test("unsupported languages are an error, never English; matching uses the whole primary subtag", arguments: ["de", "fil", "fi", "e", "en_GB", "en-\n"])
+    @Test("unsupported languages are an error, never English; matching uses the whole primary subtag", arguments: ["ja", "fil", "fi", "e", "en_GB", "en-\n"])
     func unsupportedLanguage(tag: String) {
         #expect(throws: HeadingsCatalog.Failure.self) { _ = try HeadingsCatalog.headings(for: tag) }
     }
@@ -116,8 +116,31 @@ struct BuilderTests {
     @Test("every supported language has a complete heading table")
     func headingTablesComplete() throws {
         let languages = try HeadingsCatalog.supportedLanguages()
-        #expect(languages == ["en", "it"])
-        for tag in languages { _ = try HeadingsCatalog.headings(for: tag) }
+        #expect(languages == ["en", "it", "de", "es", "fr", "pt"])
+        for tag in languages {
+            _ = try HeadingsCatalog.headings(for: tag)
+            let table = try #require(try HeadingsCatalog.table(tag))
+            #expect(Set(table.keys) == Set(HeadingsCatalog.keys), "\(tag) has unknown or missing keys")
+        }
+    }
+
+    @Test("a regional tag uses its language's table (#81)",
+          arguments: [("de-CH", "Berufserfahrung"), ("es-419", "Experiencia laboral"), ("fr-CA", "Expérience professionnelle"),
+                      ("pt-BR", "Experiência profissional"), ("pt-PT", "Experiência profissional")])
+    func regionalTags(tag: String, experience: String) throws {
+        #expect(try HeadingsCatalog.headings(for: tag).experience == experience)
+    }
+
+    @Test("a document in each new language prints its own headings, period end and native level (#81)",
+          arguments: [("de", "Berufserfahrung", "Heute", "Muttersprache"), ("es", "Experiencia laboral", "Actualidad", "Lengua materna"),
+                      ("fr", "Expérience professionnelle", "Aujourd’hui", "Langue maternelle"), ("pt", "Experiência profissional", "Presente", "Língua materna")])
+    func newLanguages(tag: String, experience: String, present: String, native: String) throws {
+        let doc = CVDocument(language: tag, person: fixture.person, sections: fixture.sections)
+        let html = DocumentHTMLBuilder().build(doc, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: tag))
+        #expect(html.contains(#"<html lang="\#(tag)">"#))
+        #expect(html.contains(#"<h2 class="cv-section-title">\#(experience)</h2>"#))
+        #expect(html.contains("03/2019 – \(present)"))
+        #expect(html.contains(#"<span class="cv-language-level">\#(native)</span>"#))
     }
 
     /// Golden test (R10): the committed file is the reviewed output. To change it on purpose, set
