@@ -112,7 +112,7 @@ swift test  # Must stay green!
 swift test
 
 # Test with demo app (uses real renderer)
-swift run CVPDFExporterDemo
+swift run --package-path ../CVPDFExporterExamples CVPDFExporterDemo
 
 # Run on different platforms to verify
 swift test --enable-test-discovery  # Linux
@@ -282,7 +282,7 @@ swift test --show-code-coverage
 docker run --rm -v "$PWD":/app -w /app swift:latest swift test
 
 # Run demo app
-swift run CVPDFExporterDemo
+swift run --package-path ../CVPDFExporterExamples CVPDFExporterDemo
 
 # Build for all platforms
 swift build

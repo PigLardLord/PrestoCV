@@ -105,5 +105,5 @@ To continue development:
 ## Commands:
 - Build: `swift build`
 - Test: `swift test`
-- Run demo: `swift run CVPDFExporterDemo`
+- Run demo: `swift run --package-path ../CVPDFExporterExamples CVPDFExporterDemo`
 - Generate PDF: Run WorkingPDFExport.swift on macOS

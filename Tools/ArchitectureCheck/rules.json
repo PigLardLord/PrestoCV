@@ -506,7 +506,7 @@
   },
   {
    "name": "CVPDFExporterDemo",
-   "path": "CVPDFExporter/Demo",
+   "path": "CVPDFExporterExamples/Demo",
    "kind": "legacy",
    "allowedImports": [
     "CVPDFExporter"
@@ -515,7 +515,7 @@
   },
   {
    "name": "TestExport",
-   "path": "CVPDFExporter/Demo/TestExport.swift",
+   "path": "CVPDFExporterExamples/Demo/TestExport.swift",
    "kind": "legacy",
    "allowedImports": [
     "CVPDFExporter"
@@ -524,7 +524,7 @@
   },
   {
    "name": "CVExportDemoApp",
-   "path": "CVPDFExporter/Example",
+   "path": "CVPDFExporterExamples/Example",
    "kind": "legacy",
    "allowedImports": [
     "CVPDFExporter"
@@ -533,7 +533,7 @@
   },
   {
    "name": "TemplateViewer",
-   "path": "CVPDFExporter/TemplateViewer",
+   "path": "CVPDFExporterExamples/TemplateViewer",
    "kind": "legacy",
    "allowedImports": [
     "CVPDFExporter"
@@ -609,6 +609,17 @@
   {
    "name": "CVPDFExporterManifest",
    "path": "CVPDFExporter/Package.swift",
+   "kind": "manifest",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m"
+   ]
+  },
+  {
+   "name": "CVPDFExporterExamplesManifest",
+   "path": "CVPDFExporterExamples/Package.swift",
    "kind": "manifest",
    "allowedImports": [
     "PackageDescription"
