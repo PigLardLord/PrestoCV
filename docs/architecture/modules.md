@@ -200,6 +200,8 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - `BrowseDesigns`;
   - `DraftCVWithAI`: availability, then draft, then an unsaved CV plus its gaps.
 - **Mappers:** `CV → CVDocument` and `CVDraft → CV`. They are exhaustive and deterministic, with typed dates. The draft mapper uses `Period.make` and reports every gap.
+  - The document mapper writes the sections in a fixed order (summary, experience, education, skills, languages, certifications, profiles, interests), each only when it has content. An optional text that holds only white space becomes nil; any other text is passed as it is.
+  - Not printed, so never mapped: identity, revision, dates of storage, title, design, and the CV's own language (the export chooses the document's). A certification keeps its year only: `CVDocument` version 1 has no month for it.
 
 **`PrestoCVPresentation`**
 - `@Observable @MainActor` view models whose public API holds presentation types only: status enums, and no domain types.
@@ -218,7 +220,9 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - the `ScreenFactory`.
 - **UI tests and previews** use the production `FileCVRepository` on a temporary directory seeded from fixture JSON. A launch argument selects it. No production target depends on a test-support target.
 
-**Test support.** `PrestoCVAppTestSupport` holds fakes for the workflow ports.
+**Test support and tests.**
+- `PrestoCVAppTestSupport` holds fakes for the workflow ports.
+- `PrestoCVIntegrationTests` run the workflows and the mappers against the core's in-memory adapters, including the Mirror-based completeness test (R10).
 
 ---
 
