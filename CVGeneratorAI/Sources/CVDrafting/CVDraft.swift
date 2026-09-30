@@ -26,6 +26,8 @@ extension CVDraft {
         public var fullName: String?, professionalTitle: String?, email: String?, phone: String?
         public var location: String?, website: String?, summary: String?
 
+        var texts: [String?] { [fullName, professionalTitle, email, phone, location, website, summary] }
+
         public init(fullName: String? = nil, professionalTitle: String? = nil, email: String? = nil, phone: String? = nil,
                     location: String? = nil, website: String? = nil, summary: String? = nil) {
             self.fullName = fullName; self.professionalTitle = professionalTitle; self.email = email; self.phone = phone
@@ -34,7 +36,7 @@ extension CVDraft {
     }
 
     /// A year, and the month when the user said it. Its range is checked when the draft becomes a CV.
-    public struct YearMonth: Hashable, Sendable {
+    public struct PartialDate: Hashable, Sendable {
         public var year: Int, month: Int?
         public init(year: Int, month: Int? = nil) { self.year = year; self.month = month }
     }
@@ -42,10 +44,12 @@ extension CVDraft {
     /// A job. Dates the model could not find stay nil.
     public struct Job: Hashable, Sendable {
         public var role: String?, company: String?, location: String?, description: String?
-        public var start: YearMonth?, end: YearMonth?, isCurrent: Bool
+        public var start: PartialDate?, end: PartialDate?, isCurrent: Bool
+
+        var texts: [String?] { [role, company, location, description] }
 
         public init(role: String? = nil, company: String? = nil, location: String? = nil, description: String? = nil,
-                    start: YearMonth? = nil, end: YearMonth? = nil, isCurrent: Bool = false) {
+                    start: PartialDate? = nil, end: PartialDate? = nil, isCurrent: Bool = false) {
             self.role = role; self.company = company; self.location = location; self.description = description
             self.start = start; self.end = end; self.isCurrent = isCurrent
         }
@@ -54,30 +58,44 @@ extension CVDraft {
     /// A course of study. Dates the model could not find stay nil.
     public struct Study: Hashable, Sendable {
         public var degree: String?, school: String?, description: String?
-        public var start: YearMonth?, end: YearMonth?, isCurrent: Bool
+        public var start: PartialDate?, end: PartialDate?, isCurrent: Bool
+
+        var texts: [String?] { [degree, school, description] }
 
         public init(degree: String? = nil, school: String? = nil, description: String? = nil,
-                    start: YearMonth? = nil, end: YearMonth? = nil, isCurrent: Bool = false) {
+                    start: PartialDate? = nil, end: PartialDate? = nil, isCurrent: Bool = false) {
             self.degree = degree; self.school = school; self.description = description
             self.start = start; self.end = end; self.isCurrent = isCurrent
         }
     }
 
+    /// A skill, and how well the user said they know it.
     public struct Skill: Hashable, Sendable {
         public enum Proficiency: Hashable, Sendable, CaseIterable { case beginner, intermediate, advanced, expert }
         public var name: String, proficiency: Proficiency?
+
+        var texts: [String?] { [name] }
+
         public init(name: String, proficiency: Proficiency? = nil) { self.name = name; self.proficiency = proficiency }
     }
 
+    /// A language the user speaks, and their level in it.
     public struct Language: Hashable, Sendable {
         /// The CEFR levels, plus native.
         public enum Level: Hashable, Sendable, CaseIterable { case a1, a2, b1, b2, c1, c2, native }
         public var name: String, level: Level?
+
+        var texts: [String?] { [name] }
+
         public init(name: String, level: Level? = nil) { self.name = name; self.level = level }
     }
 
+    /// A certification, who issued it and the year the user said.
     public struct Certification: Hashable, Sendable {
         public var name: String, issuer: String?, year: Int?
+
+        var texts: [String?] { [name, issuer] }
+
         public init(name: String, issuer: String? = nil, year: Int? = nil) { self.name = name; self.issuer = issuer; self.year = year }
     }
 }
@@ -88,14 +106,13 @@ extension CVDraft {
     /// Every text the draft holds. A field added to the draft is added here, or the limits miss it: the tests hold an
     /// oversize case for every field, and the case of a field missing here fails.
     var texts: [String?] {
-        var all: [String?] = [person.fullName, person.professionalTitle, person.email, person.phone,
-                              person.location, person.website, person.summary]
-        for job in jobs { all += [job.role, job.company, job.location, job.description] }
-        for study in education { all += [study.degree, study.school, study.description] }
-        for skill in skills { all.append(skill.name) }
-        for language in languages { all.append(language.name) }
-        for certification in certifications { all += [certification.name, certification.issuer] }
-        for interest in interests { all.append(interest) }
+        var all = person.texts
+        all += jobs.flatMap(\.texts)
+        all += education.flatMap(\.texts)
+        all += skills.flatMap(\.texts)
+        all += languages.flatMap(\.texts)
+        all += certifications.flatMap(\.texts)
+        all += interests
         return all
     }
 

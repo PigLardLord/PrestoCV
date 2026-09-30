@@ -5,7 +5,7 @@ import CVDrafting
 /// and records every request.
 public actor FakeDraftGenerator: DraftGenerating {
     public enum Answer: Sendable {
-        case draft(CVDraft), failure(DraftingError), otherFailure, snapshots([CVDraft])
+        case draft(CVDraft), failure(DraftingError), unrecognisedError, snapshots([CVDraft])
         /// Waits until the task is cancelled, then throws `CancellationError`.
         case waitForCancellation
         /// Waits until the task is cancelled, then throws the given error, as a model may on its way out.
@@ -17,16 +17,16 @@ public actor FakeDraftGenerator: DraftGenerating {
         public init(description: String, language: String) { self.description = description; self.language = language }
     }
 
-    private let state: DraftAvailability
+    private let scriptedAvailability: DraftAvailability
     private let answer: Answer
     public private(set) var requests: [Request] = []
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
     public init(availability: DraftAvailability = .available, answer: Answer) {
-        self.state = availability; self.answer = answer
+        self.scriptedAvailability = availability; self.answer = answer
     }
 
-    public func availability() async -> DraftAvailability { state }
+    public func availability() async -> DraftAvailability { scriptedAvailability }
 
     /// Returns once the generator has been asked at least once.
     public func firstRequest() async {
@@ -39,7 +39,7 @@ public actor FakeDraftGenerator: DraftGenerating {
         switch answer {
         case .draft(let draft): return draft
         case .failure(let error): throw error
-        case .otherFailure: throw CocoaError(.featureUnsupported)
+        case .unrecognisedError: throw CocoaError(.featureUnsupported)
         case .snapshots(let snapshots):
             guard let last = snapshots.last else { throw DraftingError.emptyDraft }
             return last
@@ -64,7 +64,7 @@ public actor FakeDraftGenerator: DraftGenerating {
                     continuation.yield(draft)
                     continuation.finish()
                 case .failure(let error): continuation.finish(throwing: error)
-                case .otherFailure: continuation.finish(throwing: CocoaError(.featureUnsupported))
+                case .unrecognisedError: continuation.finish(throwing: CocoaError(.featureUnsupported))
                 case .waitForCancellation:
                     do { try await Task.sleep(for: .seconds(60)) } catch { continuation.finish(throwing: error); return }
                     continuation.finish()

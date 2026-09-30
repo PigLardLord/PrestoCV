@@ -1,55 +1,15 @@
 import Foundation
 
-// MARK: - Ports
-
-/// Whether a model can draft now, and if not, why: the app says so instead of offering the feature.
-public enum DraftAvailability: Hashable, Sendable {
-    public enum Reason: Hashable, Sendable, CaseIterable { case appleIntelligenceDisabled, deviceNotEligible, modelNotReady }
-    case available
-    case unavailable(Reason)
-}
-
-/// A model that drafts a CV from a description. Implementations throw what the model throws: the use case maps it.
-/// Cancelling the calling task, or ending the stream, stops the model.
-public protocol DraftGenerating: Sendable {
-    func availability() async -> DraftAvailability
-    func draft(from description: String, language: String) async throws -> CVDraft
-    /// Snapshots of the draft as it grows; the last one is the result.
-    func stream(from description: String, language: String) -> AsyncThrowingStream<CVDraft, any Error>
-}
-
-// MARK: - Errors
-
-/// Why no draft came back. Cancellation is not one of them: it ends in `CancellationError`.
-public enum DraftingError: Error, Hashable, Sendable {
-    // The request
-    case descriptionTooShort, descriptionTooLong
-    /// The language is not a BCP 47 tag, or the model does not support it.
-    case unsupportedLanguage
-    case unavailable(DraftAvailability.Reason)
-
-    // The model, one case per failure it reports
-    case contextWindowExceeded, assetsUnavailable, guardrailViolation, refusal, decodingFailure, rateLimited, concurrentRequests
-    /// Any other failure of the model or of its adapter.
-    case generationFailed
-
-    // The draft
-    /// The draft holds no text: it is never handed on as a CV.
-    case emptyDraft
-    /// A text or a list in the draft is over its limit.
-    case oversizedDraft
-}
-
 // MARK: - Use case
 
 /// Drafts a CV from the user's description: checks the request and the model's availability before asking the model,
 /// then checks what comes back. Streaming follows the same path, snapshot by snapshot (ADR 0007).
 public struct DraftCV: Sendable {
-    /// Limits on the description, in characters after trimming; the upper one counts Unicode scalars, so combining
-    /// marks cannot stretch it.
-    public static let minDescriptionCharacters = 10, maxDescriptionCharacters = 4000
-    /// Limits on the draft: each text, in Unicode scalars, and each list.
-    public static let maxTextCharacters = 2000, maxItems = 50
+    /// Limits on the description, after trimming: at least `minDescriptionCharacters` characters and at most
+    /// `maxDescriptionScalars` Unicode scalars, so combining marks cannot stretch the upper one.
+    public static let minDescriptionCharacters = 10, maxDescriptionScalars = 4000
+    /// Limits on the draft: each text holds at most `maxTextScalars` Unicode scalars, each list at most `maxItems` items.
+    public static let maxTextScalars = 2000, maxItems = 50
 
     private let generator: any DraftGenerating
 
@@ -99,7 +59,7 @@ public struct DraftCV: Sendable {
     /// The trimmed description and the canonical language tag, once the model is known to be available.
     private func prepare(_ description: String, _ language: String) async throws -> (description: String, language: String) {
         let text = description.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard text.unicodeScalars.count <= Self.maxDescriptionCharacters else { throw DraftingError.descriptionTooLong }
+        guard text.unicodeScalars.count <= Self.maxDescriptionScalars else { throw DraftingError.descriptionTooLong }
         guard text.count >= Self.minDescriptionCharacters else { throw DraftingError.descriptionTooShort }
         guard let tag = Self.languageTag(language) else { throw DraftingError.unsupportedLanguage }
         if case .unavailable(let reason) = await generator.availability() { throw DraftingError.unavailable(reason) }
@@ -109,7 +69,7 @@ public struct DraftCV: Sendable {
 
     private static func checkLimits(_ draft: CVDraft) throws {
         guard draft.listLengths.allSatisfy({ $0 <= maxItems }),
-              draft.texts.allSatisfy({ ($0 ?? "").unicodeScalars.count <= maxTextCharacters })
+              draft.texts.allSatisfy({ ($0 ?? "").unicodeScalars.count <= maxTextScalars })
         else { throw DraftingError.oversizedDraft }
     }
 

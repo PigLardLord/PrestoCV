@@ -433,7 +433,6 @@
    "kind": "test",
    "allowedImports": [
     "Testing",
-    "Foundation",
     "CVDrafting",
     "CVDraftingTestSupport"
    ],
