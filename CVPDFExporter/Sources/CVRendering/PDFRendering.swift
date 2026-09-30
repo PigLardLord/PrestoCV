@@ -1,11 +1,14 @@
 import Foundation
 import CVDocumentModel
 
+/// The page the renderers print on. Every page keeps `verticalMarginPoints` free at its top and bottom, which a design's
+/// padding cannot do past the first page; the left and right margins are the design's (markup-contract.md, "Pages").
 public struct PageSetup: Sendable, Equatable {
-    public var widthPoints: Double, heightPoints: Double, maxPages: Int
+    public var widthPoints: Double, heightPoints: Double, maxPages: Int, verticalMarginPoints: Double
     public static let a4 = PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 4)
-    public init(widthPoints: Double, heightPoints: Double, maxPages: Int) {
+    public init(widthPoints: Double, heightPoints: Double, maxPages: Int, verticalMarginPoints: Double = 36) {
         self.widthPoints = widthPoints; self.heightPoints = heightPoints; self.maxPages = maxPages
+        self.verticalMarginPoints = verticalMarginPoints
     }
 }
 

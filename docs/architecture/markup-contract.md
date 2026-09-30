@@ -54,6 +54,10 @@ html[lang]
 - Where a platform keeps the annotations, the native renderer tests also check that they match the `href`s.
 - The builder's own base style sets `a { overflow-wrap: anywhere }`, so a long destination wraps instead of running off the page. Designs cannot set `overflow-wrap`.
 
+### Pages
+
+The renderers print on the page size, A4 unless the caller says otherwise. Every page keeps 36pt free at its top and at its bottom, the pages after the first too; a design's padding only applies where the document starts and ends. The left and right margins are the design's: its padding on `.cv`. A design keeps a heading with what follows it with `break-after: avoid`, and an entry together with `break-inside: avoid`.
+
 ### Selectable by a design
 
 | Kind | Values |
