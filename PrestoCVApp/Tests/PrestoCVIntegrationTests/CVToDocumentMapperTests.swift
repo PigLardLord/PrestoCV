@@ -6,10 +6,6 @@ import CVDocumentModel
 
 // MARK: - Builders
 
-func partialDate(_ year: Int, _ month: Int? = nil) throws -> PartialDate { try #require(PartialDate(year: year, month: month)) }
-func webLink(_ raw: String) throws -> WebLink { try #require(WebLink(raw)) }
-func documentLanguage(_ raw: String) throws -> DocumentLanguage { try #require(DocumentLanguage(raw)) }
-
 /// A CV that holds only what a test sets: a name, and optionally details and sections.
 private func cv(_ details: PersonalDetails = PersonalDetails(fullName: "Ada"), sections: CVSections = CVSections()) -> CV {
     CV(id: SequentialIDGenerator().next(), personal: details, sections: sections)
@@ -154,7 +150,8 @@ struct CVToDocumentMapperTests {
 
     @Test("an empty section is left out and the others keep their order")
     func emptySectionsLeftOut() throws {
-        let sparse = cv(sections: CVSections(skills: [Skill(name: "Swift")], profiles: [ProfileLink(platform: "GitHub", link: try webLink("https://github.com/ada"))],
+        let link = try webLink("https://github.com/ada")
+        let sparse = cv(sections: CVSections(skills: [Skill(name: "Swift")], profiles: [ProfileLink(platform: "GitHub", link: link)],
                                              interests: ["Chess"]))
 
         #expect(mapper.map(sparse, language: italian).kinds == ["skills", "profiles", "interests"])
@@ -326,7 +323,8 @@ struct CVToDocumentMapperTests {
 
     @Test("a certification keeps the year it was issued, not the month")
     func certificationYear() throws {
-        let issued = cv(sections: CVSections(certifications: [Certification(name: "Swift Certified", issuer: "Apple", issued: try partialDate(2021, 6))]))
+        let certification = Certification(name: "Swift Certified", issuer: "Apple", issued: try partialDate(2021, 6))
+        let issued = cv(sections: CVSections(certifications: [certification]))
 
         #expect(mapper.map(issued, language: italian).certifications?.first?.year == 2021)
     }

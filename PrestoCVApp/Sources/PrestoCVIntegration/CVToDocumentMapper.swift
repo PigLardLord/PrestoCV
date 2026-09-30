@@ -22,8 +22,8 @@ public struct CVToDocumentMapper: Sendable {
     // MARK: Person
 
     private func person(_ details: PersonalDetails) -> Person {
-        Person(name: details.fullName, professionalTitle: optionalText(details.professionalTitle), email: details.email?.value,
-               phone: details.phone?.value, location: optionalText(details.location), website: details.website?.value)
+        Person(name: details.fullName, professionalTitle: nilIfBlank(details.professionalTitle), email: details.email?.value,
+               phone: details.phone?.value, location: nilIfBlank(details.location), website: details.website?.value)
     }
 
     // MARK: Sections
@@ -31,7 +31,7 @@ public struct CVToDocumentMapper: Sendable {
     private func sections(of cv: CV) -> [Section] {
         let entries = cv.sections
         var result: [Section] = []
-        if let summary = optionalText(cv.personal.summary) { result.append(.summary(summary)) }
+        if let summary = nilIfBlank(cv.personal.summary) { result.append(.summary(summary)) }
         if !entries.experiences.isEmpty { result.append(.experience(entries.experiences.map(experience))) }
         if !entries.education.isEmpty { result.append(.education(entries.education.map(education))) }
         if !entries.skills.isEmpty { result.append(.skills(entries.skills.map(skill))) }
@@ -43,13 +43,13 @@ public struct CVToDocumentMapper: Sendable {
     }
 
     private func experience(_ entry: Experience) -> ExperienceItem {
-        ExperienceItem(role: entry.role, company: entry.company, location: optionalText(entry.location),
-                       period: entry.period.map(period), description: optionalText(entry.description))
+        ExperienceItem(role: entry.role, company: entry.company, location: nilIfBlank(entry.location),
+                       period: entry.period.map(period), description: nilIfBlank(entry.description))
     }
 
     private func education(_ entry: Education) -> EducationItem {
         EducationItem(degree: entry.degree, school: entry.school, period: entry.period.map(period),
-                      description: optionalText(entry.description))
+                      description: nilIfBlank(entry.description))
     }
 
     private func skill(_ entry: Skill) -> SkillItem {
@@ -62,7 +62,7 @@ public struct CVToDocumentMapper: Sendable {
 
     private func certification(_ entry: Certification) -> CertificationItem {
         CertificationItem(name: entry.name, issuer: entry.issuer, year: entry.issued?.year, url: entry.link?.value,
-                          description: optionalText(entry.description))
+                          description: nilIfBlank(entry.description))
     }
 
     private func profile(_ entry: PrestoCVDomain.ProfileLink) -> CVDocumentModel.ProfileLink {
@@ -101,7 +101,7 @@ public struct CVToDocumentMapper: Sendable {
 
     // MARK: Text
 
-    private func optionalText(_ text: String) -> String? {
+    private func nilIfBlank(_ text: String) -> String? {
         text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
     }
 }
