@@ -60,24 +60,49 @@ struct DraftStreamTests {
         }
     }
 
-    @Test("cancelling the consumer stops the model and ends the stream")
-    func cancelled() async throws {
-        let generator = FakeDraftGenerator(answer: .waitForCancellation)
+    @Test("cancelling the consumer stops the model")
+    func cancelled() async {
+        let generator = FakeDraftGenerator(answer: .waitForCancellation())
         let stream = DraftCV(generator: generator).stream(validDescription, language: "en")
         let task = Task {
             var count = 0
             for try await _ in stream { count += 1 }
             return count
         }
-        await generator.firstRequest()
+        #expect(await generator.happened(.asked))
         task.cancel()
-        let ended = try await withThrowingTaskGroup(of: Bool.self) { group in
-            group.addTask { _ = await task.result; return true }
-            group.addTask { try await Task.sleep(for: .seconds(5)); return false }
-            let first = try await group.next() ?? false
-            group.cancelAll()
-            return first
+        _ = await task.result
+        #expect(await generator.happened(.stopped))
+    }
+
+    @Test("dropping the stream without reading it stops the model")
+    func dropped() async {
+        let generator = FakeDraftGenerator(answer: .waitForCancellation())
+        do {
+            let stream = DraftCV(generator: generator).stream(validDescription, language: "en")
+            #expect(await generator.happened(.asked))
+            withExtendedLifetime(stream) {}
         }
-        #expect(ended, "the stream should end soon after its consumer is cancelled")
+        #expect(await generator.happened(.stopped))
+    }
+
+    @Test("leaving the loop early stops the model")
+    func leftEarly() async throws {
+        let generator = FakeDraftGenerator(answer: .waitForCancellation(after: [DraftFixtures.full]))
+        do {
+            let stream = DraftCV(generator: generator).stream(validDescription, language: "en")
+            for try await _ in stream { break }
+        }
+        #expect(await generator.happened(.stopped))
+    }
+
+    @Test("an oversized snapshot stops the model")
+    func oversizedStops() async {
+        var oversized = DraftFixtures.full
+        oversized.person.summary = String(repeating: "x", count: DraftCV.maxTextScalars + 1)
+        let generator = FakeDraftGenerator(answer: .waitForCancellation(after: [oversized]))
+        let stream = DraftCV(generator: generator).stream(validDescription, language: "en")
+        await #expect(throws: DraftingError.oversizedDraft) { for try await _ in stream {} }
+        #expect(await generator.happened(.stopped))
     }
 }

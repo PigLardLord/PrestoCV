@@ -83,13 +83,13 @@ struct DraftCVTests {
     }
 
     @Test("a cancelled draft ends in a cancellation, not a draft or a model failure", arguments: [
-        FakeDraftGenerator.Answer.waitForCancellation, .failWhenCancelled(.generationFailed), .failWhenCancelled(.refusal),
+        FakeDraftGenerator.Answer.waitForCancellation(), .failWhenCancelled(.generationFailed), .failWhenCancelled(.refusal),
     ])
     func cancelled(answer: FakeDraftGenerator.Answer) async throws {
         let generator = FakeDraftGenerator(answer: answer)
         let use = DraftCV(generator: generator)
         let task = Task { try await use(validDescription, language: "en") }
-        await generator.firstRequest()
+        #expect(await generator.happened(.asked))
         task.cancel()
         await #expect(throws: CancellationError.self) { _ = try await task.value }
     }
