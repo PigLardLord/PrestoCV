@@ -121,8 +121,20 @@ extension CVDraft {
         [jobs.count, education.count, skills.count, languages.count, certifications.count, interests.count]
     }
 
-    /// True when no text in the draft has anything but white space: there is nothing to show or to map.
+    /// True when no text in the draft has a visible character: there is nothing to show or to map.
     var isBlank: Bool {
-        texts.allSatisfy { ($0 ?? "").allSatisfy(\.isWhitespace) }
+        texts.allSatisfy { !($0 ?? "").unicodeScalars.contains(where: \.isVisible) }
+    }
+}
+
+private extension Unicode.Scalar {
+    /// False for white space, for the characters a renderer leaves out (default ignorable code points) and for control,
+    /// format, unassigned and surrogate characters.
+    var isVisible: Bool {
+        if properties.isWhitespace || properties.isDefaultIgnorableCodePoint { return false }
+        switch properties.generalCategory {
+        case .control, .format, .unassigned, .surrogate: return false
+        default: return true
+        }
     }
 }

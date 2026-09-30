@@ -51,6 +51,14 @@ struct DraftCVTests {
         await #expect(throws: DraftingError.emptyDraft) { _ = try await DraftCV(generator: generator)(validDescription, language: "en") }
     }
 
+    @Test("a text with a visible character is a draft, whatever surrounds it", arguments: [
+        "\u{200B}Ada", "e\u{301}", "\u{1F469}\u{200D}\u{1F4BB}", "\u{645}\u{6CC}\u{200C}\u{62E}\u{648}\u{627}\u{647}\u{645}",
+    ])
+    func visible(name: String) async throws {
+        let draft = CVDraft(person: .init(fullName: name))
+        #expect(try await DraftCV(generator: FakeDraftGenerator(answer: .draft(draft)))(validDescription, language: "en") == draft)
+    }
+
     @Test("a draft with a single text is a draft: the gaps are the app's to report")
     func sparse() async throws {
         let draft = CVDraft(jobs: [.init(role: "Engineer")])
@@ -160,5 +168,9 @@ let blankDrafts: [CVDraft] = {
     var drafts: [CVDraft] = [CVDraft()]
     drafts.append(CVDraft(person: .init(fullName: "   ", summary: "\n\t")))
     drafts.append(CVDraft(jobs: [.init(role: " ", start: .init(year: 2019), isCurrent: true)], skills: [.init(name: "")], interests: [" "]))
+    // Characters that show nothing: control, zero-width, joiners, the byte order mark, a filler, a soft hyphen, a direction override.
+    for invisible in ["\u{0}", "\u{200B}", "\u{2060}", "\u{FEFF}", "\u{3164}", "\u{AD}", "\u{202E}", " \u{200B}\n\u{FEFF}"] {
+        drafts.append(CVDraft(person: .init(fullName: invisible)))
+    }
     return drafts
 }()
