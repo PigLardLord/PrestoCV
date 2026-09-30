@@ -7,6 +7,11 @@ import CVRenderingWebKitSupport
 /// The iOS PDF renderer (ADR 0003). The HTML is loaded into a secure web view (R8) and paginated by the print system
 /// at the page size, so the design's page-break rules apply. The page count is the print system's; a document longer
 /// than the page limit keeps its first pages and reports how many it needed.
+///
+/// The web view is not in a window: iOS lays it out and prints it offscreen, as the contract tests show on the
+/// simulator, and a window would need a scene that an extension or a background export may not have. UIKit paginates
+/// on the main actor in one synchronous step, which nothing can interrupt; the document's size is bounded
+/// (`CVDocumentValidator`), and drawing stops between pages when the task is cancelled.
 public struct IOSPDFRenderer: PDFRendering {
     public enum Failure: Error, Equatable, Sendable { case invalidPageSetup, nothingToPrint }
 
@@ -18,7 +23,8 @@ public struct IOSPDFRenderer: PDFRendering {
         engine = IOSPrintEngine(rules: rules, loadTimeout: loadTimeout, readinessTimeout: readinessTimeout)
     }
 
-    /// Cancellation, before or during the work, ends in `CancellationError`.
+    /// Cancellation before the work, during the load or the readiness wait, or between pages ends in
+    /// `CancellationError`.
     public func render(html: String, page: PageSetup) async throws -> RenderedPDF {
         try Task.checkCancellation()
         return try await engine.render(html, page)
@@ -53,13 +59,17 @@ final class IOSPrintEngine {
         let required = printer.numberOfPages
         guard required > 0 else { throw IOSPDFRenderer.Failure.nothingToPrint }
         let kept = min(required, page.maxPages)
+        try Task.checkCancellation()
         printer.prepare(forDrawingPages: NSRange(location: 0, length: kept))
+        var cancelled = false
         let data = UIGraphicsPDFRenderer(bounds: paper).pdfData { context in
             for index in 0..<kept {
+                if Task.isCancelled { cancelled = true; return }
                 context.beginPage()
                 printer.drawPage(at: index, in: context.pdfContextBounds)
             }
         }
+        if cancelled { throw CancellationError() }
         return RenderedPDF(data: data, pageCount: kept, requiredPages: required)
     }
 }
