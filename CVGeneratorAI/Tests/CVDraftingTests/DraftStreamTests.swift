@@ -4,7 +4,7 @@ import CVDraftingTestSupport
 
 @Suite("DraftCV streaming (#93)")
 struct DraftStreamTests {
-    func collect(_ stream: AsyncThrowingStream<CVDraft, any Error>) async throws -> [CVDraft] {
+    func collect(_ stream: DraftCV.Snapshots) async throws -> [CVDraft] {
         var drafts: [CVDraft] = []
         for try await draft in stream { drafts.append(draft) }
         return drafts
@@ -27,15 +27,45 @@ struct DraftStreamTests {
         }
     }
 
-    @Test("snapshots supersede each other: the consumer ends on the newest and never receives a blank one")
+    @Test("snapshots arrive as the model produces them; blank ones are skipped")
     func snapshots() async throws {
         let partial = CVDraft(person: .init(fullName: "Ada Lovelace"))
         let generator = FakeDraftGenerator(answer: .snapshots([CVDraft(), partial, DraftFixtures.full]))
-        let received = try await collect(DraftCV(generator: generator).stream(validDescription, language: "pt-br"))
-        #expect(!received.isEmpty)
-        #expect(received.last == DraftFixtures.full)
-        #expect(received.allSatisfy { [partial, DraftFixtures.full].contains($0) })
+        #expect(try await collect(DraftCV(generator: generator).stream(validDescription, language: "pt-br")) == [partial, DraftFixtures.full])
         #expect(await generator.requests == [.init(description: validDescription, language: "pt-BR")])
+    }
+
+    @Test("each reading of the stream is a new request")
+    func eachReadingIsARequest() async throws {
+        let generator = FakeDraftGenerator(answer: .snapshots([DraftFixtures.full]))
+        let stream = DraftCV(generator: generator).stream(validDescription, language: "en")
+        #expect(try await collect(stream) == [DraftFixtures.full])
+        #expect(try await collect(stream) == [DraftFixtures.full])
+        #expect(await generator.requests.count == 2)
+    }
+
+    @Test("a stream nobody reads does not ask the model")
+    func unread() async {
+        let generator = FakeDraftGenerator(answer: .snapshots([DraftFixtures.full]))
+        do { _ = DraftCV(generator: generator).stream(validDescription, language: "en") }
+        #expect(await generator.requests.isEmpty)
+        #expect(await generator.happened(.asked, within: .milliseconds(100)) == false)
+    }
+
+    @Test("reading again after the end or an error returns nothing, and the model is not asked again")
+    func readingAgain() async throws {
+        let ending = FakeDraftGenerator(answer: .snapshots([DraftFixtures.full]))
+        var atTheEnd = DraftCV(generator: ending).stream(validDescription, language: "en").makeAsyncIterator()
+        #expect(try await atTheEnd.next() == DraftFixtures.full)
+        #expect(try await atTheEnd.next() == nil)
+        #expect(try await atTheEnd.next() == nil)
+        #expect(await ending.requests.count == 1)
+
+        let failing = FakeDraftGenerator(answer: .failure(.refusal))
+        var afterError = DraftCV(generator: failing).stream(validDescription, language: "en").makeAsyncIterator()
+        await #expect(throws: DraftingError.refusal) { _ = try await afterError.next() }
+        #expect(try await afterError.next() == nil)
+        #expect(await failing.requests.count == 1)
     }
 
     @Test("streaming refuses the same inputs, before the model is asked", arguments: invalidInputs)
@@ -108,66 +138,87 @@ struct DraftStreamTests {
     func cancelled() async {
         let generator = FakeDraftGenerator(answer: .waitForCancellation())
         let stream = DraftCV(generator: generator).stream(validDescription, language: "en")
-        let task = Task {
-            var count = 0
-            for try await _ in stream { count += 1 }
-            return count
-        }
+        let reader = Task { try await collect(stream) }
         #expect(await generator.happened(.asked))
-        task.cancel()
-        _ = await task.result
+        reader.cancel()
+        await #expect(throws: CancellationError.self) { _ = try await reader.value }
         #expect(await generator.happened(.stopped))
     }
 
-    @Test("a cancelled consumer sees the stream end without an error")
-    func cancelledConsumerSeesTheEnd() async throws {
+    @Test("a cancelled reader ends in a cancellation after the snapshots it had")
+    func cancelledAfterSnapshots() async {
         let generator = FakeDraftGenerator(answer: .waitForCancellation(after: [DraftFixtures.full]))
         let stream = DraftCV(generator: generator).stream(validDescription, language: "en")
         let firstSnapshot = AsyncStream<Void>.makeStream()
-        let consumer = Task {
-            var snapshots: [CVDraft] = []
-            for try await snapshot in stream {
-                snapshots.append(snapshot)
-                firstSnapshot.continuation.yield()
-            }
-            return (snapshots, Task.isCancelled)
-        }
-        #expect(await generator.happened(.asked))
+        let reader = Task { await readToTheEnd(stream) { _ in firstSnapshot.continuation.yield() } }
         #expect(await arrives(firstSnapshot.stream))
-        consumer.cancel()
-        let (snapshots, cancelled) = try await consumer.value
-        #expect(snapshots == [DraftFixtures.full])
-        #expect(cancelled)
-    }
-
-    @Test("dropping the stream without reading it stops the model")
-    func dropped() async {
-        let generator = FakeDraftGenerator(answer: .waitForCancellation())
-        do {
-            let stream = DraftCV(generator: generator).stream(validDescription, language: "en")
-            #expect(await generator.happened(.asked))
-            withExtendedLifetime(stream) {}
-        }
+        reader.cancel()
+        let reading = await reader.value
+        #expect(reading.received == [DraftFixtures.full])
+        #expect(reading.error is CancellationError)
         #expect(await generator.happened(.stopped))
     }
 
-    @Test("leaving the loop early stops the model")
-    func leftEarly() async throws {
+    @Test("leaving the loop stops the model, even while the stream is kept")
+    func leftEarlyWhileKept() async throws {
         let generator = FakeDraftGenerator(answer: .waitForCancellation(after: [DraftFixtures.full]))
-        do {
-            let stream = DraftCV(generator: generator).stream(validDescription, language: "en")
-            for try await _ in stream { break }
-        }
+        let stream = DraftCV(generator: generator).stream(validDescription, language: "en")
+        for try await _ in stream { break }
         #expect(await generator.happened(.stopped))
+        withExtendedLifetime(stream) {}
     }
 
-    @Test("an oversized snapshot stops the model")
+    @Test("a reader cancelled between two snapshots ends in a cancellation, not in the next draft or the model's failure")
+    func cancelledBetweenSnapshots() async {
+        var second = DraftFixtures.full
+        second.person.fullName = "Grace Hopper"
+        let generator = FakeDraftGenerator(answer: .snapshotsThenFailure([DraftFixtures.full, second], .rateLimited))
+        let stream = DraftCV(generator: generator).stream(validDescription, language: "en")
+        let gotFirst = AsyncStream<Void>.makeStream()
+        let goAhead = AsyncStream<Void>.makeStream()
+        let reader = Task {
+            await readToTheEnd(stream) { count in
+                guard count == 1 else { return }
+                gotFirst.continuation.yield()
+                for await _ in goAhead.stream { break }
+            }
+        }
+        #expect(await arrives(gotFirst.stream))
+        reader.cancel()
+        goAhead.continuation.yield()
+        let reading = await reader.value
+        #expect(reading.received == [DraftFixtures.full])
+        #expect(reading.error is CancellationError)
+    }
+
+    @Test("an oversized snapshot stops the model, even while the reader is kept")
     func oversizedStops() async {
         var oversized = DraftFixtures.full
         oversized.person.summary = String(repeating: "x", count: DraftCV.maxTextScalars + 1)
         let generator = FakeDraftGenerator(answer: .waitForCancellation(after: [oversized]))
-        let stream = DraftCV(generator: generator).stream(validDescription, language: "en")
-        await #expect(throws: DraftingError.oversizedDraft) { for try await _ in stream {} }
+        var reader = DraftCV(generator: generator).stream(validDescription, language: "en").makeAsyncIterator()
+        await #expect(throws: DraftingError.oversizedDraft) { _ = try await reader.next() }
         #expect(await generator.happened(.stopped))
+        withExtendedLifetime(reader) {}
     }
+}
+
+/// What a reader got: the snapshots it received, and the error it ended with, if any.
+struct Reading: Sendable {
+    var received: [CVDraft] = []
+    var error: (any Error)?
+}
+
+/// Reads a stream to its end, calling `afterEach` with the number of snapshots received so far.
+func readToTheEnd(_ stream: DraftCV.Snapshots, afterEach: @Sendable (Int) async -> Void) async -> Reading {
+    var reading = Reading()
+    do {
+        for try await snapshot in stream {
+            reading.received.append(snapshot)
+            await afterEach(reading.received.count)
+        }
+    } catch {
+        reading.error = error
+    }
+    return reading
 }

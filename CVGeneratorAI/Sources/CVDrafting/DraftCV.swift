@@ -27,30 +27,75 @@ public struct DraftCV: Sendable {
     }
 
     /// Snapshots within the limits, as the model produces them; blank ones are skipped.
-    /// - The model is asked as soon as the stream is created, not when it is first read.
-    /// - Snapshots supersede each other: a consumer that falls behind receives the newest one only.
+    /// - The model is asked when the stream is first read, in the reader's task, and each reading is a new request.
+    /// - The model is stopped when the reader stops reading, is cancelled, or a snapshot is refused.
     /// - The stream ends with an error when a snapshot is over the limits, or when the last one is blank.
-    /// - A cancelled consumer sees the stream end without an error, so it checks for cancellation after its loop.
-    public func stream(_ description: String, language: String) -> AsyncThrowingStream<CVDraft, any Error> {
-        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
-            let task = Task {
+    /// - A cancelled reader gets `CancellationError`, as it does from `callAsFunction`.
+    public func stream(_ description: String, language: String) -> Snapshots {
+        Snapshots(useCase: self, description: description, language: language)
+    }
+
+    /// The snapshots of one request, read in the reader's task: the iterator asks the model on its first `next()` and
+    /// holds the model's stream until it ends, fails or is dropped, and dropping it stops the model.
+    public struct Snapshots: AsyncSequence, Sendable {
+        public typealias Element = CVDraft
+
+        fileprivate let useCase: DraftCV
+        fileprivate let description: String, language: String
+
+        public func makeAsyncIterator() -> Iterator {
+            Iterator(useCase: useCase, description: description, language: language)
+        }
+
+        public struct Iterator: AsyncIteratorProtocol {
+            private enum State {
+                case notAsked
+                case asked(AsyncThrowingStream<CVDraft, any Error>.Iterator, last: CVDraft?)
+                case ended
+            }
+
+            private let useCase: DraftCV
+            private let description: String, language: String
+            private var state = State.notAsked
+
+            fileprivate init(useCase: DraftCV, description: String, language: String) {
+                self.useCase = useCase; self.description = description; self.language = language
+            }
+
+            public mutating func next() async throws -> CVDraft? {
                 do {
-                    let request = try await prepare(description, language)
-                    var last: CVDraft?
-                    do {
-                        for try await snapshot in generator.stream(from: request.description, language: request.language) {
-                            try Self.checkLimits(snapshot)
-                            last = snapshot
-                            if !snapshot.isBlank { continuation.yield(snapshot) }
-                        }
-                    } catch { throw Self.mapped(error) }
-                    guard let last, !last.isBlank else { throw DraftingError.emptyDraft }
-                    continuation.finish()
+                    return try await read()
                 } catch {
-                    continuation.finish(throwing: error)
+                    state = .ended
+                    throw error
                 }
             }
-            continuation.onTermination = { _ in task.cancel() }
+
+            private mutating func read() async throws -> CVDraft? {
+                if case .notAsked = state {
+                    let request = try await useCase.prepare(description, language)
+                    let models = useCase.generator.stream(from: request.description, language: request.language)
+                    state = .asked(models.makeAsyncIterator(), last: nil)
+                }
+                guard case .asked(var models, var last) = state else { return nil }
+                while true {
+                    try Task.checkCancellation()
+                    let next: CVDraft?
+                    do { next = try await models.next() } catch { throw DraftCV.mapped(error) }
+                    try Task.checkCancellation()
+                    guard let snapshot = next else {
+                        guard let last, !last.isBlank else { throw DraftingError.emptyDraft }
+                        state = .ended
+                        return nil
+                    }
+                    try DraftCV.checkLimits(snapshot)
+                    last = snapshot
+                    if !snapshot.isBlank {
+                        state = .asked(models, last: last)
+                        return snapshot
+                    }
+                }
+            }
         }
     }
 

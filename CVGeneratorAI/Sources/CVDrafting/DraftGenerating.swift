@@ -13,7 +13,7 @@ public enum DraftAvailability: Hashable, Sendable {
 /// - stops the model when the calling task is cancelled or the stream ends;
 /// - gives the same answer to the same request in `draft` and in the last snapshot of `stream`;
 /// - bounds what the model generates, because the use case can only bound what it hands on;
-/// - asks the model when `stream` is called, not when the stream is first read.
+/// - treats snapshots as superseding each other, so an implementation that buffers keeps the newest one only.
 public protocol DraftGenerating: Sendable {
     func availability() async -> DraftAvailability
     func draft(from description: String, language: String) async throws -> CVDraft
