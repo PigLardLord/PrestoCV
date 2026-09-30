@@ -517,6 +517,21 @@
    ]
   },
   {
+   "name": "PrestoCVIntegrationTests",
+   "path": "PrestoCVApp/Tests/PrestoCVIntegrationTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "PrestoCVIntegration",
+    "PrestoCVWorkflowPorts",
+    "PrestoCVDomain",
+    "PrestoCVApplication",
+    "PrestoCVCoreTestSupport",
+    "CVDocumentModel"
+   ],
+   "rules": []
+  },
+  {
    "name": "PrestoCVCore",
    "path": "PrestoCVCore/Sources/PrestoCVCore",
    "kind": "legacy",

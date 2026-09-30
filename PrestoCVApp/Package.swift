@@ -1,8 +1,9 @@
 // swift-tools-version: 6.1
 import PackageDescription
 
-// App integration and presentation (docs/architecture/modules.md). The targets are empty until step 5 fills them;
-// the Xcode app starts depending on this package then (#88, #89).
+// App integration and presentation (docs/architecture/modules.md). The editing port, its workflow and the
+// CV -> CVDocument mapper are in place; the other workflows, presentation and the composition root are empty
+// until #88 fills them. The Xcode app starts depending on this package then (#88, #89).
 var products: [Product] = [
     .library(name: "PrestoCVWorkflowPorts", targets: ["PrestoCVWorkflowPorts"]),
     .library(name: "PrestoCVIntegration", targets: ["PrestoCVIntegration"]),
@@ -26,6 +27,13 @@ var targets: [Target] = [
         "PrestoCVWorkflowPorts",
         .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
         .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
+    ]),
+    .testTarget(name: "PrestoCVIntegrationTests", dependencies: [
+        "PrestoCVIntegration", "PrestoCVWorkflowPorts",
+        .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
+        .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
+        .product(name: "PrestoCVCoreTestSupport", package: "PrestoCVCore"),
+        .product(name: "CVDocumentModel", package: "CVPDFExporter"),
     ]),
 ]
 
