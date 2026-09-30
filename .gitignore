@@ -45,6 +45,15 @@ playground.xcworkspace
 # Xcode automatically generates this directory with a .xcworkspacedata file and xcuserdata
 # hence it is not needed unless you have added a package configuration file to your project
 .swiftpm
+# The exporter's shared test scheme is versioned: the package scheme also builds the legacy targets, which do not
+# build for iOS (ADR 0012).
+!/CVPDFExporter/.swiftpm/
+/CVPDFExporter/.swiftpm/*
+!/CVPDFExporter/.swiftpm/xcode/
+/CVPDFExporter/.swiftpm/xcode/*
+!/CVPDFExporter/.swiftpm/xcode/xcshareddata/
+/CVPDFExporter/.swiftpm/xcode/xcshareddata/*
+!/CVPDFExporter/.swiftpm/xcode/xcshareddata/xcschemes/
 .build/
 
 # Credentials

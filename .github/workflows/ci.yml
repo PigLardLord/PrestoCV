@@ -94,3 +94,10 @@ jobs:
         run: |
           DEVICE="$(Tools/CI/test-simulator.sh)"
           xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -derivedDataPath "$DERIVED_DATA" -destination "id=$DEVICE"
+      - name: Exporter tests on the iOS simulator
+        # The package scheme also builds the legacy targets, which do not build for iOS (ADR 0012); the shared
+        # ExporterTests scheme holds the new test targets only. Simulator builds need no signing.
+        working-directory: CVPDFExporter
+        run: |
+          DEVICE="$(../Tools/CI/test-simulator.sh)"
+          xcodebuild test -scheme ExporterTests -derivedDataPath "$DERIVED_DATA-exporter" -destination "id=$DEVICE" CODE_SIGNING_ALLOWED=NO

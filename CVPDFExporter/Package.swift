@@ -41,6 +41,7 @@ targets += [
     .target(name: "CVRenderingIOS", dependencies: ["CVRenderingWebKitSupport", "CVRendering"]),
     .target(name: "CVRenderingMacOS", dependencies: ["CVRenderingWebKitSupport", "CVRendering"]),
     .target(name: "CVRenderingPDFKitInspector", dependencies: ["CVRendering"]),
+    .testTarget(name: "CVRenderingWebKitSupportTests", dependencies: ["CVRenderingWebKitSupport"]),
 ]
 #endif
 

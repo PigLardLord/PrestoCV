@@ -328,6 +328,20 @@
    "kind": "test"
   },
   {
+   "name": "CVRenderingWebKitSupportTests",
+   "path": "CVPDFExporter/Tests/CVRenderingWebKitSupportTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "Network",
+    "Synchronization",
+    "WebKit",
+    "CVRenderingWebKitSupport"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
    "name": "CVDesignCatalogFileStoreTests",
    "path": "CVPDFExporter/Tests/CVDesignCatalogFileStoreTests",
    "allowedImports": [
