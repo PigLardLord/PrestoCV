@@ -166,15 +166,24 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 **`CVDrafting`**
 - **`CVDraft`:** plain `Sendable` structs; optional wherever the user may not have said it. A job and a course of study each have an optional start and an optional end, each a year with an optional month, and say whether they are current.
-- **Use case:** `DraftCV` validates the input, generates, then validates the output. Streaming follows the same path.
-- **Ports:** `DraftGenerating` (untyped `throws`, cancellable) and `DraftAvailability`.
-- **`DraftingError`:** one case per model failure.
+- **Use case:** `DraftCV` validates the input, reads the model's availability, generates, then validates the output. Streaming follows the same path. The rules:
+  - the description is trimmed and holds at least 10 characters and at most 4000 Unicode scalars;
+  - the language is a BCP 47 tag (language, optional script, optional region), sent on in canonical case;
+  - an unavailable model is not asked;
+  - each text holds at most 2000 Unicode scalars and each list at most 50 items;
+  - a draft with no visible text is refused;
+  - the stream keeps only the newest snapshot;
+  - a cancellation ends in `CancellationError`, and a cancelled stream consumer sees the stream end.
+- **Port:** `DraftGenerating` (untyped `throws`, cancellable). It answers the availability as a `DraftAvailability`.
+- **`DraftingError`:** one case per refused request, per model failure and per refused draft.
 
 **`CVDraftingFoundationModels`**
 - Internal `@Generable` schema, a session with instructions, availability from `SystemLanguageModel`.
 - Until it is implemented it throws a typed "unavailable" error; it never returns an empty draft.
 
-**Test support.** `CVDraftingTestSupport` holds a fake generator and fixtures.
+**Test support and tests.**
+- `CVDraftingTestSupport` may import `CVDrafting`, Foundation. It holds `FakeDraftGenerator`, a scripted generator that tells when it was asked and when it was stopped, and a full fixture.
+- **`CVDraftingTests`** run the use case against the fake: every rule above, a cancelled, dropped or abandoned stream stopping the model, and an oversize case for every text and every list of a draft, so a field left out of the limits fails a test.
 
 ---
 
