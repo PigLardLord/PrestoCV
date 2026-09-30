@@ -79,7 +79,6 @@ public struct DraftCV: Sendable {
                 }
                 guard case .asked(var models, var last) = state else { return nil }
                 while true {
-                    try Task.checkCancellation()
                     let next: CVDraft?
                     do { next = try await models.next() } catch { throw DraftCV.mapped(error) }
                     try Task.checkCancellation()
