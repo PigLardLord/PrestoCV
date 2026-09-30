@@ -7,8 +7,13 @@ public enum DraftAvailability: Hashable, Sendable {
     case unavailable(Reason)
 }
 
-/// A model that drafts a CV from a description. Implementations throw what the model throws: the use case maps it.
-/// Cancelling the calling task, or ending the stream, stops the model.
+/// A model that drafts a CV from a description. An implementation:
+/// - translates the failures it recognises into `DraftingError`; the use case reports any other error as `.generationFailed`;
+/// - throws `CancellationError` only when the calling task is cancelled;
+/// - stops the model when the calling task is cancelled or the stream ends;
+/// - gives the same answer to the same request in `draft` and in the last snapshot of `stream`;
+/// - bounds what the model generates, because the use case can only bound what it hands on;
+/// - asks the model when `stream` is called, not when the stream is first read.
 public protocol DraftGenerating: Sendable {
     func availability() async -> DraftAvailability
     func draft(from description: String, language: String) async throws -> CVDraft

@@ -26,23 +26,24 @@ public struct DraftCV: Sendable {
         return draft
     }
 
-    /// Snapshots within the limits, as the model produces them; blank ones are skipped. The stream ends with an error
-    /// when a snapshot is over the limits, or when the last one is blank.
+    /// Snapshots within the limits, as the model produces them; blank ones are skipped.
+    /// - The model is asked as soon as the stream is created, not when it is first read.
+    /// - Snapshots supersede each other: a consumer that falls behind receives the newest one only.
+    /// - The stream ends with an error when a snapshot is over the limits, or when the last one is blank.
+    /// - A cancelled consumer sees the stream end without an error, so it checks for cancellation after its loop.
     public func stream(_ description: String, language: String) -> AsyncThrowingStream<CVDraft, any Error> {
-        AsyncThrowingStream { continuation in
+        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
             let task = Task {
                 do {
                     let request = try await prepare(description, language)
-                    var snapshots = generator.stream(from: request.description, language: request.language).makeAsyncIterator()
                     var last: CVDraft?
-                    while true {
-                        let next: CVDraft?
-                        do { next = try await snapshots.next() } catch { throw Self.mapped(error) }
-                        guard let snapshot = next else { break }
-                        try Self.checkLimits(snapshot)
-                        last = snapshot
-                        if !snapshot.isBlank { continuation.yield(snapshot) }
-                    }
+                    do {
+                        for try await snapshot in generator.stream(from: request.description, language: request.language) {
+                            try Self.checkLimits(snapshot)
+                            last = snapshot
+                            if !snapshot.isBlank { continuation.yield(snapshot) }
+                        }
+                    } catch { throw Self.mapped(error) }
                     guard let last, !last.isBlank else { throw DraftingError.emptyDraft }
                     continuation.finish()
                 } catch {
