@@ -62,7 +62,7 @@ public struct DraftCV: Sendable {
         let text = description.trimmingCharacters(in: .whitespacesAndNewlines)
         guard text.unicodeScalars.count <= Self.maxDescriptionScalars else { throw DraftingError.descriptionTooLong }
         guard text.count >= Self.minDescriptionCharacters else { throw DraftingError.descriptionTooShort }
-        guard let tag = Self.languageTag(language) else { throw DraftingError.unsupportedLanguage }
+        guard let tag = Self.languageTag(language) else { throw DraftingError.invalidLanguage }
         let availability = await generator.availability()
         try Task.checkCancellation()
         if case .unavailable(let reason) = availability { throw DraftingError.unavailable(reason) }

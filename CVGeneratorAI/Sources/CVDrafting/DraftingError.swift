@@ -4,12 +4,14 @@
 public enum DraftingError: Error, Hashable, Sendable {
     // The request
     case descriptionTooShort, descriptionTooLong
-    /// The language is not a BCP 47 tag, or the model does not support it.
-    case unsupportedLanguage
+    /// The language is not a BCP 47 tag of a language, an optional script and an optional region.
+    case invalidLanguage
     case unavailable(DraftAvailability.Reason)
 
     // The model, one case per failure it reports
     case contextWindowExceeded, assetsUnavailable, guardrailViolation, refusal, decodingFailure, rateLimited, concurrentRequests
+    /// The model does not draft in this language.
+    case unsupportedLanguage
     /// Any other failure of the model or of its adapter.
     case generationFailed
 

@@ -85,6 +85,9 @@ struct DraftCVTests {
         await #expect(throws: DraftingError.guardrailViolation) {
             _ = try await DraftCV(generator: FakeDraftGenerator(answer: .failure(.guardrailViolation)))(validDescription, language: "en")
         }
+        await #expect(throws: DraftingError.unsupportedLanguage) {
+            _ = try await DraftCV(generator: FakeDraftGenerator(answer: .failure(.unsupportedLanguage)))(validDescription, language: "en")
+        }
         await #expect(throws: DraftingError.generationFailed) {
             _ = try await DraftCV(generator: FakeDraftGenerator(answer: .unrecognisedError))(validDescription, language: "en")
         }
@@ -159,7 +162,7 @@ let invalidInputs: [InvalidInput] = {
     // Few characters, many scalars: combining marks cannot stretch the limit.
     inputs.append(InvalidInput(text: "e" + String(repeating: "\u{301}", count: DraftCV.maxDescriptionScalars), language: "en", error: .descriptionTooLong))
     for language in ["", "e", "english", "en_GB", "en-", "-en", "en-GB-x", "en-Latn-GB-1996", "en-12", "ен", "e1"] {
-        inputs.append(InvalidInput(text: validDescription, language: language, error: .unsupportedLanguage))
+        inputs.append(InvalidInput(text: validDescription, language: language, error: .invalidLanguage))
     }
     return inputs
 }()
