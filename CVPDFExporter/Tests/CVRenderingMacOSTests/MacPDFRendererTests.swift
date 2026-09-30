@@ -20,6 +20,8 @@ let invalidPageSetups: [PageSetup] = {
     setups.append(PageSetup(widthPoints: .infinity, heightPoints: 842, maxPages: 1))
     setups.append(PageSetup(widthPoints: 595, heightPoints: .nan, maxPages: 1))
     setups.append(PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 1, verticalMarginPoints: .infinity))
+    setups.append(PageSetup(widthPoints: 100, heightPoints: 842, maxPages: 1))                              // too narrow
+    setups.append(PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 1, verticalMarginPoints: 360))   // printable height 122
     return setups
 }()
 

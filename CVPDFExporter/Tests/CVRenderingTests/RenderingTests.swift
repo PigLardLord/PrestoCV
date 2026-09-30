@@ -312,6 +312,8 @@ struct PageSetupTests {
         #expect(!PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 1, verticalMarginPoints: -1).isPrintable)
         #expect(!PageSetup(widthPoints: .nan, heightPoints: 842, maxPages: 1).isPrintable)
         #expect(!PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 0).isPrintable)
+        #expect(!PageSetup(widthPoints: 143, heightPoints: 842, maxPages: 1).isPrintable)
+        #expect(PageSetup(widthPoints: 144, heightPoints: 216, maxPages: 1).isPrintable)   // 144pt printable, the minimum
     }
 }
 

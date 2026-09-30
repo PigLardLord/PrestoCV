@@ -20,6 +20,8 @@ let invalidPageSetups: [PageSetup] = {
     setups.append(PageSetup(widthPoints: .infinity, heightPoints: 842, maxPages: 1))
     setups.append(PageSetup(widthPoints: 595, heightPoints: .nan, maxPages: 1))
     setups.append(PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 1, verticalMarginPoints: .infinity))
+    setups.append(PageSetup(widthPoints: 100, heightPoints: 842, maxPages: 1))                              // too narrow
+    setups.append(PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 1, verticalMarginPoints: 360))   // printable height 122
     return setups
 }()
 
@@ -88,6 +90,12 @@ struct IOSPDFRendererTests {
         }
         guard case .documentTooLong(let pages)? = error else { Issue.record("\(String(describing: error))"); return }
         #expect(pages > IOSPDFRenderer.maxPaginatedPages)
+    }
+
+    @Test("HTML larger than the renderer paginates is refused before pagination")
+    func tooLarge() async throws {
+        let html = "<p>" + String(repeating: "x", count: IOSPDFRenderer.maxHTMLBytes) + "</p>"
+        await #expect(throws: IOSPDFRenderer.Failure.documentTooLarge) { _ = try await renderer().render(html: html, page: .a4) }
     }
 }
 #endif

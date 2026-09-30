@@ -13,11 +13,17 @@ public struct PageSetup: Sendable, Equatable {
 }
 
 extension PageSetup {
-    /// Whether a renderer can print on it: finite, positive page dimensions, a finite margin that is not negative and
-    /// leaves a printable height, and at least one page. Renderers refuse anything else before it reaches the platform.
+    /// The smallest page side, and printable height, a renderer accepts: two inches. A smaller page would paginate a
+    /// document into so many pages that the work could not be bounded.
+    public static let minimumPrintablePoints: Double = 144
+
+    /// Whether a renderer can print on it: finite page dimensions of at least `minimumPrintablePoints`, a finite margin
+    /// that is not negative and leaves at least that printable height, and at least one page. Renderers refuse anything
+    /// else before it reaches the platform.
     public var isPrintable: Bool {
         widthPoints.isFinite && heightPoints.isFinite && verticalMarginPoints.isFinite
-            && widthPoints > 0 && verticalMarginPoints >= 0 && heightPoints - 2 * verticalMarginPoints > 0 && maxPages >= 1
+            && widthPoints >= Self.minimumPrintablePoints && verticalMarginPoints >= 0
+            && heightPoints - 2 * verticalMarginPoints >= Self.minimumPrintablePoints && maxPages >= 1
     }
 }
 

@@ -11,10 +11,15 @@ import CVRenderingWebKitSupport
 /// The web view is not in a window: iOS lays it out and prints it offscreen, as the contract tests show on the
 /// simulator, and a window would need a scene that an extension or a background export may not have. UIKit paginates,
 /// and WebKit renders the whole document on the first page drawn, on the main actor in synchronous steps that nothing
-/// can interrupt. The work is bounded by refusing documents longer than `maxPaginatedPages`; a web content process
-/// that never answers would still hold the main actor (#120). Drawing stops between pages when the task is cancelled.
+/// can interrupt. The work is bounded before it starts, by the HTML's size and the page geometry, and before drawing,
+/// by refusing documents longer than `maxPaginatedPages`; a web content process that never answers would still hold
+/// the main actor (#120). Drawing stops between pages when the task is cancelled.
 public struct IOSPDFRenderer: PDFRendering {
-    public enum Failure: Error, Equatable, Sendable { case invalidPageSetup, nothingToPrint, documentTooLong(pages: Int) }
+    public enum Failure: Error, Equatable, Sendable { case invalidPageSetup, documentTooLarge, nothingToPrint, documentTooLong(pages: Int) }
+
+    /// The largest HTML the renderer paginates. The builder's output for a validated CV stays well below it; together
+    /// with the page geometry (`PageSetup.isPrintable`) it bounds the synchronous pagination step.
+    public static let maxHTMLBytes = 1024 * 1024
 
     /// WebKit renders every page of the document the first time a page is drawn, in one synchronous step on the main
     /// actor, whatever the page limit. A document longer than this is refused before drawing; no CV comes near it.
@@ -48,6 +53,7 @@ final class IOSPrintEngine {
 
     func render(_ html: String, _ page: PageSetup) async throws -> RenderedPDF {
         guard page.isPrintable else { throw IOSPDFRenderer.Failure.invalidPageSetup }
+        guard html.utf8.count <= IOSPDFRenderer.maxHTMLBytes else { throw IOSPDFRenderer.Failure.documentTooLarge }
         let paper = CGRect(x: 0, y: 0, width: page.widthPoints, height: page.heightPoints)
         let view = WKWebView(frame: paper, configuration: SecureWebViewConfiguration.make(rules: rules))
         let delegate = SingleLoadNavigationDelegate()
