@@ -214,6 +214,60 @@ struct CVToDocumentMapperTests {
         #expect(mapper.map(padded, language: italian).certifications?.first?.description == " Concurrency ")
     }
 
+    // MARK: Mandatory text and order
+
+    @Test("mandatory texts are passed as they are, spaces included")
+    func paddedMandatoryText() throws {
+        // Interests are trimmed by the domain when they are set, so they are not part of this test.
+        var sections = CVSections()
+        sections.experiences = [Experience(role: " Engineer ", company: " Analytical ")]
+        sections.education = [Education(degree: " Mathematics ", school: " Home ")]
+        sections.skills = [Skill(name: " Swift ")]
+        sections.languages = [LanguageSkill(language: " Italian ", proficiency: .native)]
+        sections.certifications = [Certification(name: " Swift Certified ", issuer: " Apple ")]
+        sections.profiles = [ProfileLink(platform: " GitHub ", link: try webLink("https://github.com/ada"))]
+        let padded = cv(PersonalDetails(fullName: "  Ada Lovelace "), sections: sections)
+
+        let document = mapper.map(padded, language: italian)
+
+        #expect(document.person.name == "  Ada Lovelace ")
+        #expect(document.experience == [ExperienceItem(role: " Engineer ", company: " Analytical ")])
+        #expect(document.education == [EducationItem(degree: " Mathematics ", school: " Home ")])
+        #expect(document.skills == [SkillItem(name: " Swift ")])
+        #expect(document.languages == [LanguageItem(language: " Italian ", level: .native)])
+        #expect(document.certifications == [CertificationItem(name: " Swift Certified ", issuer: " Apple ")])
+        #expect(document.profiles == [CVDocumentModel.ProfileLink(platform: " GitHub ", url: "https://github.com/ada")])
+    }
+
+    @Test("entries keep the CV's order, which is not chronological")
+    func entryOrder() throws {
+        var sections = CVSections()
+        sections.experiences = [
+            Experience(role: "Lead", company: "Mid Co", period: Period(start: try partialDate(2015), end: .date(try partialDate(2018)))),
+            Experience(role: "Director", company: "New Co", period: Period(start: try partialDate(2020), end: .current)),
+            Experience(role: "Intern", company: "Old Co", period: Period(start: try partialDate(2005), end: .date(try partialDate(2006)))),
+        ]
+        sections.education = [
+            Education(degree: "Master", school: "Newer U", period: Period(start: try partialDate(2016), end: .date(try partialDate(2018)))),
+            Education(degree: "Bachelor", school: "Older U", period: Period(start: try partialDate(2012), end: .date(try partialDate(2016)))),
+        ]
+        sections.certifications = [
+            Certification(name: "Expert", issuer: "Apple", issued: try partialDate(2022)),
+            Certification(name: "Associate", issuer: "Apple", issued: try partialDate(2018)),
+        ]
+        sections.profiles = [
+            ProfileLink(platform: "LinkedIn", link: try webLink("https://linkedin.com/in/ada")),
+            ProfileLink(platform: "GitHub", link: try webLink("https://github.com/ada")),
+        ]
+
+        let document = mapper.map(cv(sections: sections), language: italian)
+
+        #expect(document.experience?.map(\.role) == ["Lead", "Director", "Intern"])
+        #expect(document.education?.map(\.degree) == ["Master", "Bachelor"])
+        #expect(document.certifications?.map(\.name) == ["Expert", "Associate"])
+        #expect(document.profiles?.map(\.platform) == ["LinkedIn", "GitHub"])
+    }
+
     // MARK: Periods
 
     @Test("a current period has no end date and ends at the present")

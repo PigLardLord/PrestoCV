@@ -44,6 +44,8 @@ struct MapperCompletenessTests {
     @Test("every printed leaf reaches the document as many times as it occurs in the CV", arguments: Subject.allCases)
     func everyLeafReachesTheDocument(subject: Subject) throws {
         let cv = try subject.cv()
+        #expect(CVDocument.currentSchemaVersion == 1,
+                "CVDocument has a new version: check whether it holds a certification's month, and drop the exception")
         var expected = Self.printedLeaves(of: cv).map { Self.translations[$0] ?? $0 }
         // CVDocument version 1 holds only the year of a certification, so the months of `issued` are the one thing that
         // cannot arrive. They are computed from the CV, and removed from the expectation one occurrence each.
