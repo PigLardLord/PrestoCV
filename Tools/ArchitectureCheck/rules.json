@@ -328,6 +328,22 @@
    "kind": "test"
   },
   {
+   "name": "CVRenderingIOSTests",
+   "path": "CVPDFExporter/Tests/CVRenderingIOSTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "PDFKit",
+    "CVRendering",
+    "CVRenderingIOS",
+    "CVRenderingWebKitSupport",
+    "CVRenderingPDFKitInspector",
+    "CVRenderingTestSupport"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
    "name": "CVRenderingMacOSTests",
    "path": "CVPDFExporter/Tests/CVRenderingMacOSTests",
    "allowedImports": [
