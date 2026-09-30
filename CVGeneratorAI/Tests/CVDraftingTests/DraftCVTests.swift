@@ -158,6 +158,7 @@ let invalidInputs: [InvalidInput] = {
     var inputs: [InvalidInput] = []
     inputs.append(InvalidInput(text: "", language: "en", error: .descriptionTooShort))
     inputs.append(InvalidInput(text: "   short   \n", language: "en", error: .descriptionTooShort))
+    inputs.append(InvalidInput(text: String(repeating: "x", count: DraftCV.minDescriptionCharacters - 1), language: "en", error: .descriptionTooShort))
     inputs.append(InvalidInput(text: String(repeating: "x", count: DraftCV.maxDescriptionScalars + 1), language: "en", error: .descriptionTooLong))
     // Few characters, many scalars: combining marks cannot stretch the limit.
     inputs.append(InvalidInput(text: "e" + String(repeating: "\u{301}", count: DraftCV.maxDescriptionScalars), language: "en", error: .descriptionTooLong))
