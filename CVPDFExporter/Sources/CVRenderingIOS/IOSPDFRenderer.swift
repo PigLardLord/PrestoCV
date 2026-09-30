@@ -9,11 +9,16 @@ import CVRenderingWebKitSupport
 /// than the page limit keeps its first pages and reports how many it needed.
 ///
 /// The web view is not in a window: iOS lays it out and prints it offscreen, as the contract tests show on the
-/// simulator, and a window would need a scene that an extension or a background export may not have. UIKit paginates
-/// on the main actor in one synchronous step, which nothing can interrupt; the document's size is bounded
-/// (`CVDocumentValidator`), and drawing stops between pages when the task is cancelled.
+/// simulator, and a window would need a scene that an extension or a background export may not have. UIKit paginates,
+/// and WebKit renders the whole document on the first page drawn, on the main actor in synchronous steps that nothing
+/// can interrupt. The work is bounded by refusing documents longer than `maxPaginatedPages`; a web content process
+/// that never answers would still hold the main actor (#120). Drawing stops between pages when the task is cancelled.
 public struct IOSPDFRenderer: PDFRendering {
-    public enum Failure: Error, Equatable, Sendable { case invalidPageSetup, nothingToPrint }
+    public enum Failure: Error, Equatable, Sendable { case invalidPageSetup, nothingToPrint, documentTooLong(pages: Int) }
+
+    /// WebKit renders every page of the document the first time a page is drawn, in one synchronous step on the main
+    /// actor, whatever the page limit. A document longer than this is refused before drawing; no CV comes near it.
+    public static let maxPaginatedPages = 100
 
     private let engine: IOSPrintEngine
 
@@ -42,9 +47,7 @@ final class IOSPrintEngine {
     }
 
     func render(_ html: String, _ page: PageSetup) async throws -> RenderedPDF {
-        guard page.maxPages >= 1, page.widthPoints > 0, page.heightPoints > 2 * page.verticalMarginPoints else {
-            throw IOSPDFRenderer.Failure.invalidPageSetup
-        }
+        guard page.isPrintable else { throw IOSPDFRenderer.Failure.invalidPageSetup }
         let paper = CGRect(x: 0, y: 0, width: page.widthPoints, height: page.heightPoints)
         let view = WKWebView(frame: paper, configuration: SecureWebViewConfiguration.make(rules: rules))
         let delegate = SingleLoadNavigationDelegate()
@@ -58,6 +61,7 @@ final class IOSPrintEngine {
         printer.addPrintFormatter(view.viewPrintFormatter(), startingAtPageAt: 0)
         let required = printer.numberOfPages
         guard required > 0 else { throw IOSPDFRenderer.Failure.nothingToPrint }
+        guard required <= IOSPDFRenderer.maxPaginatedPages else { throw IOSPDFRenderer.Failure.documentTooLong(pages: required) }
         let kept = min(required, page.maxPages)
         try Task.checkCancellation()
         printer.prepare(forDrawingPages: NSRange(location: 0, length: kept))
@@ -70,6 +74,7 @@ final class IOSPrintEngine {
             }
         }
         if cancelled { throw CancellationError() }
+        try Task.checkCancellation()   // cancelled while the last page was drawn
         return RenderedPDF(data: data, pageCount: kept, requiredPages: required)
     }
 }

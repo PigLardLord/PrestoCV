@@ -303,6 +303,18 @@ struct DocumentContractTests {
     }
 }
 
+@Suite("PageSetup")
+struct PageSetupTests {
+    @Test("only finite, positive pages with a printable height and at least one page can be printed on")
+    func printable() {
+        #expect(PageSetup.a4.isPrintable)
+        #expect(!PageSetup(widthPoints: 595, heightPoints: 72, maxPages: 1).isPrintable)
+        #expect(!PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 1, verticalMarginPoints: -1).isPrintable)
+        #expect(!PageSetup(widthPoints: .nan, heightPoints: 842, maxPages: 1).isPrintable)
+        #expect(!PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 0).isPrintable)
+    }
+}
+
 @Suite("ADR 0003 · PDFRendering contract")
 struct ContractTests {
     func fixtureHTML() throws -> String {

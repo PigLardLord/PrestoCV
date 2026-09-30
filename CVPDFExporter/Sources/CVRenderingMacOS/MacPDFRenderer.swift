@@ -37,9 +37,7 @@ final class MacPrintEngine {
     }
 
     func render(_ html: String, _ page: PageSetup) async throws -> RenderedPDF {
-        guard page.maxPages >= 1, page.widthPoints > 0, page.heightPoints > 2 * page.verticalMarginPoints else {
-            throw MacPDFRenderer.Failure.invalidPageSetup
-        }
+        guard page.isPrintable else { throw MacPDFRenderer.Failure.invalidPageSetup }
         // A print AppKit never finishes keeps its window and web view; bounding the prints still running bounds that.
         // This early check saves a load; the print job enforces the limit where it starts a print.
         guard PrintJob.runningCount < PrintJob.maxRunning else { throw MacPDFRenderer.Failure.tooManyPrints }

@@ -12,6 +12,15 @@ public struct PageSetup: Sendable, Equatable {
     }
 }
 
+extension PageSetup {
+    /// Whether a renderer can print on it: finite, positive page dimensions, a finite margin that is not negative and
+    /// leaves a printable height, and at least one page. Renderers refuse anything else before it reaches the platform.
+    public var isPrintable: Bool {
+        widthPoints.isFinite && heightPoints.isFinite && verticalMarginPoints.isFinite
+            && widthPoints > 0 && verticalMarginPoints >= 0 && heightPoints - 2 * verticalMarginPoints > 0 && maxPages >= 1
+    }
+}
+
 /// `pageCount` is the number of pages in `data`; `requiredPages` is how many the content needed.
 /// Truncation is derived, never self-declared.
 public struct RenderedPDF: Sendable, Equatable {

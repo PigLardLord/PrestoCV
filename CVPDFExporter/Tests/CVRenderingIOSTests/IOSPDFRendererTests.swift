@@ -8,6 +8,21 @@ import CVRenderingWebKitSupport
 import CVRenderingPDFKitInspector
 import CVRenderingTestSupport
 
+/// Page setups no renderer can print on: no page, no printable height, a negative margin or dimension, or a value that
+/// is not finite.
+let invalidPageSetups: [PageSetup] = {
+    var setups: [PageSetup] = []
+    setups.append(PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 0))
+    setups.append(PageSetup(widthPoints: 595, heightPoints: 60, maxPages: 1))
+    setups.append(PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 1, verticalMarginPoints: -36))
+    setups.append(PageSetup(widthPoints: 595, heightPoints: -1, maxPages: 1, verticalMarginPoints: -36))
+    setups.append(PageSetup(widthPoints: -595, heightPoints: 842, maxPages: 1))
+    setups.append(PageSetup(widthPoints: .infinity, heightPoints: 842, maxPages: 1))
+    setups.append(PageSetup(widthPoints: 595, heightPoints: .nan, maxPages: 1))
+    setups.append(PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 1, verticalMarginPoints: .infinity))
+    return setups
+}()
+
 @MainActor
 @Suite("#76 · the iOS renderer, checked with PDFKit", .serialized, .timeLimit(.minutes(3)))
 struct IOSPDFRendererTests {
@@ -59,11 +74,20 @@ struct IOSPDFRendererTests {
         #expect(ContinuousClock.now - start < .seconds(10))
     }
 
-    @Test("a page setup with no page or no printable height is refused", arguments: [
-        PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 0), PageSetup(widthPoints: 595, heightPoints: 60, maxPages: 1),
-    ])
+    @Test("a page setup that cannot be printed on is refused before it reaches the platform", arguments: invalidPageSetups)
     func invalidPageSetup(page: PageSetup) async throws {
         await #expect(throws: IOSPDFRenderer.Failure.invalidPageSetup) { _ = try await renderer().render(html: "<p>x</p>", page: page) }
+    }
+
+    @Test("a document longer than the paginated-page limit is refused before any page is drawn")
+    func tooLong() async throws {
+        let document = try ContractFixture.rendered()
+        let long = document.html.replacingOccurrences(of: "</main>", with: String(repeating: "<p>Line of a long document.</p>", count: 8_000) + "</main>")
+        let error = await #expect(throws: IOSPDFRenderer.Failure.self) {
+            _ = try await renderer().render(html: long, page: PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 1))
+        }
+        guard case .documentTooLong(let pages)? = error else { Issue.record("\(String(describing: error))"); return }
+        #expect(pages > IOSPDFRenderer.maxPaginatedPages)
     }
 }
 #endif
