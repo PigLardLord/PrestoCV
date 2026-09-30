@@ -43,7 +43,6 @@ public struct DraftCV: Sendable {
                         last = snapshot
                         if !snapshot.isBlank { continuation.yield(snapshot) }
                     }
-                    try Task.checkCancellation()
                     guard let last, !last.isBlank else { throw DraftingError.emptyDraft }
                     continuation.finish()
                 } catch {
@@ -58,12 +57,14 @@ public struct DraftCV: Sendable {
 
     /// The trimmed description and the canonical language tag, once the model is known to be available.
     private func prepare(_ description: String, _ language: String) async throws -> (description: String, language: String) {
+        try Task.checkCancellation()
         let text = description.trimmingCharacters(in: .whitespacesAndNewlines)
         guard text.unicodeScalars.count <= Self.maxDescriptionScalars else { throw DraftingError.descriptionTooLong }
         guard text.count >= Self.minDescriptionCharacters else { throw DraftingError.descriptionTooShort }
         guard let tag = Self.languageTag(language) else { throw DraftingError.unsupportedLanguage }
-        if case .unavailable(let reason) = await generator.availability() { throw DraftingError.unavailable(reason) }
+        let availability = await generator.availability()
         try Task.checkCancellation()
+        if case .unavailable(let reason) = availability { throw DraftingError.unavailable(reason) }
         return (text, tag)
     }
 
@@ -74,9 +75,10 @@ public struct DraftCV: Sendable {
     }
 
     /// What the model threw, as the use case reports it: a cancelled task ends in a cancellation, whatever the model
-    /// threw on the way out; a drafting error keeps its case; anything else is a generation failure.
+    /// threw on the way out; a drafting error keeps its case; anything else is a generation failure, a
+    /// `CancellationError` from a model nobody cancelled included.
     private static func mapped(_ error: any Error) -> any Error {
-        if Task.isCancelled || error is CancellationError { return CancellationError() }
+        if Task.isCancelled { return CancellationError() }
         if let drafting = error as? DraftingError { return drafting }
         return DraftingError.generationFailed
     }

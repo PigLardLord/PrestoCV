@@ -93,6 +93,47 @@ struct DraftCVTests {
         task.cancel()
         await #expect(throws: CancellationError.self) { _ = try await task.value }
     }
+
+    @Test("a request cancelled before it starts ends in a cancellation, whatever is wrong with it")
+    func cancelledBeforeStart() async {
+        let generator = FakeDraftGenerator(answer: .draft(DraftFixtures.full))
+        let use = DraftCV(generator: generator)
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await use("", language: "en")
+        }
+        await #expect(throws: CancellationError.self) { _ = try await task.value }
+        #expect(await generator.requests.isEmpty)
+    }
+
+    @Test("a request cancelled while the model's availability is read ends in a cancellation, and the model is not asked",
+          arguments: [DraftAvailability.available, .unavailable(.modelNotReady)])
+    func cancelledWhileAvailabilityIsRead(availability: DraftAvailability) async {
+        let generator = FakeDraftGenerator(availability: availability, availabilityWaitsForCancellation: true,
+                                           answer: .draft(DraftFixtures.full))
+        let use = DraftCV(generator: generator)
+        let task = Task { try await use(validDescription, language: "en") }
+        #expect(await generator.happened(.availabilityAsked))
+        task.cancel()
+        await #expect(throws: CancellationError.self) { _ = try await task.value }
+        #expect(await generator.requests.isEmpty)
+    }
+
+    @Test("a draft that arrives after the cancellation is dropped")
+    func draftAfterCancellation() async {
+        let generator = FakeDraftGenerator(answer: .draftWhenCancelled(DraftFixtures.full))
+        let use = DraftCV(generator: generator)
+        let task = Task { try await use(validDescription, language: "en") }
+        #expect(await generator.happened(.asked))
+        task.cancel()
+        await #expect(throws: CancellationError.self) { _ = try await task.value }
+    }
+
+    @Test("a cancellation the model reports on its own is a generation failure")
+    func strayCancellation() async {
+        let generator = FakeDraftGenerator(answer: .strayCancellation)
+        await #expect(throws: DraftingError.generationFailed) { _ = try await DraftCV(generator: generator)(validDescription, language: "en") }
+    }
 }
 
 // MARK: - Inputs and drafts

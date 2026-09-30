@@ -60,6 +60,14 @@ struct DraftStreamTests {
         }
     }
 
+    @Test("a cancellation the model reports on its own is a generation failure in a stream too")
+    func strayCancellation() async {
+        let generator = FakeDraftGenerator(answer: .strayCancellation)
+        await #expect(throws: DraftingError.generationFailed) {
+            _ = try await collect(DraftCV(generator: generator).stream(validDescription, language: "en"))
+        }
+    }
+
     @Test("cancelling the consumer stops the model")
     func cancelled() async {
         let generator = FakeDraftGenerator(answer: .waitForCancellation())
