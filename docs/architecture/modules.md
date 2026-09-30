@@ -165,7 +165,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 | `CVDraftingFoundationModels` | outbound adapter | iOS 26, macOS 26 | `CVDrafting`, FoundationModels, Foundation |
 
 **`CVDrafting`**
-- **`CVDraft`:** plain `Sendable` structs; optional wherever the user may not have said it. A job has an optional start year, an optional end year and whether it is current.
+- **`CVDraft`:** plain `Sendable` structs; optional wherever the user may not have said it. A job and a course of study each have an optional start and an optional end, each a year with an optional month, and say whether they are current.
 - **Use case:** `DraftCV` validates the input, generates, then validates the output. Streaming follows the same path.
 - **Ports:** `DraftGenerating` (untyped `throws`, cancellable) and `DraftAvailability`.
 - **`DraftingError`:** one case per model failure.
