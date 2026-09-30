@@ -57,7 +57,7 @@ Test targets and test-support targets are described below each package. The chec
   - every mutation under an exclusive `flock` on the store;
   - reads classified as described in R12;
   - `Quarantine/` with validated restore, erase and purge.
-- `DirectorySampleCVSource`: sample CVs from an injected directory, in the same v1 format.
+- `DirectorySampleCVSource`: sample CVs from an injected directory, in the same v1 format and through the store's own reader. The app ships them in `PrestoCV/Resources/Samples/`.
 
 **Test support and tests.**
 - `PrestoCVCoreTestSupport` may import `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Synchronization. It holds:

@@ -33,6 +33,11 @@ Tools/ArchitectureCheck/check.sh
 
 On Linux, the packages contain only the new targets. They build today and stay empty until the migration fills them; the architecture checker and the prototype also build and test there. The legacy targets are declared only on Apple hosts (ADR 0012).
 
+## Development data
+
+- **Saved CVs.** The CVs a development build saves today are stored by the legacy code. When the app switches to the new persistence (schema 1, ADR 0009), they are not migrated, so a development build loses them once. There are no users yet, so no migration ships (R12).
+- **Samples.** The sample CVs offered on first run are in `PrestoCV/Resources/Samples/`, in schema 1, read by `DirectorySampleCVSource` through the store's own reader. The legacy app still reads the old samples, `PrestoCV/Resources/*_cv.json`, until the switch; they go with the legacy code (#47).
+
 ## Contributing
 
 - **Conventions, reviews, commits and pull requests:** `AGENTS.md`.

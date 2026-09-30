@@ -96,33 +96,12 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
 
     // MARK: Reading one file
 
-    private enum Read { case cv(CV), absent, newer(Int), corrupt(String), unreadable, tooLarge(Int) }
-
-    /// Distinguishes what must not be touched (I/O failure, a link or any file that is not a regular file, too large,
-    /// newer schema) from what is genuinely corrupt. Only the latter is ever quarantined. The file is opened once,
-    /// without following a link or blocking, and checked and read through that descriptor.
-    private func read(_ u: URL, asName name: String? = nil) -> Read {
-        let fd = open(u.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
-        guard fd >= 0 else { return errno == ENOENT ? .absent : .unreadable }
-        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
-        var status = stat()
-        guard fstat(fd, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { return .unreadable }
-        guard Int(status.st_size) <= maxFileBytes else { return .tooLarge(Int(status.st_size)) }
-        let data: Data
-        do { data = try handle.read(upToCount: maxFileBytes + 1) ?? Data() } catch { return .unreadable }
-        guard data.count <= maxFileBytes else { return .tooLarge(data.count) }
-        // The frozen envelope: a newer integer schemaVersion is valid data from a newer build.
-        struct Peek: Decodable { let schemaVersion: Int }
-        do {
-            let peek = try JSONDecoder().decode(Peek.self, from: data)
-            if peek.schemaVersion > CVFileV1.version { return .newer(peek.schemaVersion) }
-        } catch { return .corrupt("no schemaVersion envelope") }
-        do {
-            let cv = try CVFileV1.decode(data).toDomain()
-            guard (name ?? u.lastPathComponent) == cv.id.raw.uuidString + Self.suffix else { return .corrupt("id does not match file name") }
-            return .cv(cv)
-        } catch let invalid as CVFileV1.Invalid { return .corrupt(invalid.reason) }
-        catch { return .corrupt("not a CV file") }
+    /// A stored CV, which must also carry the identifier its file is named after.
+    private func read(_ u: URL, asName name: String? = nil) -> StoredCVFile {
+        let file = StoredCVFile.read(u, maxBytes: maxFileBytes)
+        guard case .cv(let cv) = file else { return file }
+        guard (name ?? u.lastPathComponent) == cv.id.raw.uuidString + Self.suffix else { return .corrupt("id does not match file name") }
+        return file
     }
 
     private func current(_ id: CVID) throws(RepositoryError) -> CV? {

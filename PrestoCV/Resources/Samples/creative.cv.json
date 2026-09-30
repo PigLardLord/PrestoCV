@@ -1,0 +1,182 @@
+{
+  "certifications": [
+    {
+      "description": "Advanced certification in usability and user experience principles.",
+      "issued": {
+        "year": 2022
+      },
+      "issuer": "NN/g",
+      "link": "https://www.nngroup.com/training/",
+      "name": "Nielsen Norman Group UX Certification"
+    },
+    {
+      "description": "Comprehensive training in UX design process and methodologies.",
+      "issued": {
+        "year": 2019
+      },
+      "issuer": "Google",
+      "link": "https://grow.google/certificates/ux-design/",
+      "name": "Google UX Design Certificate"
+    }
+  ],
+  "createdAt": "2026-09-29T00:00:00Z",
+  "education": [
+    {
+      "current": false,
+      "degree": "M.F.A. in Graphic Design",
+      "description": "Focus on digital interaction design and motion graphics. Thesis project on inclusive design for accessibility.",
+      "school": "Rhode Island School of Design",
+      "start": {
+        "year": 2016
+      }
+    },
+    {
+      "current": false,
+      "degree": "B.F.A. in Visual Communication",
+      "description": "Emphasis on typography and user experience design. Graduated with distinction. Led design team for senior capstone project.",
+      "school": "School of the Art Institute of Chicago",
+      "start": {
+        "year": 2014
+      }
+    }
+  ],
+  "experiences": [
+    {
+      "company": "DesignForward Agency",
+      "current": true,
+      "description": "Lead design for fintech platform used by 2M+ customers. • Created comprehensive design system adopted by 15+ product teams • Increased user engagement by 35% through UX optimization and A/B testing • Managed team of 4 designers and established design review process",
+      "location": "New York, NY",
+      "role": "Senior UX/UI Designer",
+      "start": {
+        "month": 4,
+        "year": 2021
+      }
+    },
+    {
+      "company": "EcoTech Solutions",
+      "current": false,
+      "description": "Designed sustainable technology platform for environmental monitoring. • Led end-to-end design process from user research to final implementation • Created interactive prototypes that improved stakeholder alignment by 50% • Collaborated with engineering team to ensure design feasibility and quality",
+      "end": {
+        "month": 3,
+        "year": 2021
+      },
+      "location": "Brooklyn, NY",
+      "role": "Product Designer",
+      "start": {
+        "month": 8,
+        "year": 2018
+      }
+    },
+    {
+      "company": "PixelPerfect Studio",
+      "current": false,
+      "description": "Created visual assets and layouts for marketing campaigns. • Designed brand identities for 20+ clients across various industries • Developed wireframes and prototypes for mobile and web applications • Participated in user testing sessions and incorporated feedback into designs",
+      "end": {
+        "month": 7,
+        "year": 2018
+      },
+      "location": "Chicago, IL",
+      "role": "Junior Designer",
+      "start": {
+        "month": 6,
+        "year": 2016
+      }
+    }
+  ],
+  "id": "89F5FDD0-C310-52C6-A4ED-8C6B1932AE70",
+  "interests": [
+    "Typography",
+    "Digital Art",
+    "Photography",
+    "Travel",
+    "Sustainable Design"
+  ],
+  "language": "en",
+  "languages": [
+    {
+      "language": "English",
+      "proficiency": "native"
+    },
+    {
+      "language": "Mandarin",
+      "proficiency": "c1"
+    },
+    {
+      "language": "French",
+      "proficiency": "a2"
+    }
+  ],
+  "personal": {
+    "email": "maya.chen@example.com",
+    "fullName": "Maya Chen",
+    "location": "Brooklyn, NY",
+    "phone": "+1 (555) 987-6543",
+    "professionalTitle": "Senior UX/UI Designer",
+    "summary": "Creative designer with 7+ years of experience crafting intuitive digital experiences for startups and Fortune 500 companies. Specialized in user-centered design, design systems, and cross-platform experiences. Passionate about accessibility and creating beautiful, functional interfaces that solve real user problems.",
+    "website": "https://mayachen.design"
+  },
+  "profiles": [
+    {
+      "link": "https://mayachen.design",
+      "platform": "Portfolio"
+    },
+    {
+      "link": "https://dribbble.com/mayachen",
+      "platform": "Dribbble"
+    },
+    {
+      "link": "https://linkedin.com/in/mayachen",
+      "platform": "LinkedIn"
+    },
+    {
+      "link": "https://behance.net/mayachen",
+      "platform": "Behance"
+    }
+  ],
+  "revision": 1,
+  "schemaVersion": 1,
+  "skills": [
+    {
+      "level": 5,
+      "name": "Figma"
+    },
+    {
+      "level": 5,
+      "name": "Adobe Creative Suite"
+    },
+    {
+      "level": 4,
+      "name": "Sketch"
+    },
+    {
+      "level": 5,
+      "name": "Prototyping"
+    },
+    {
+      "level": 4,
+      "name": "User Research"
+    },
+    {
+      "level": 5,
+      "name": "Design Systems"
+    },
+    {
+      "level": 4,
+      "name": "Accessibility"
+    },
+    {
+      "level": 3,
+      "name": "Illustration"
+    },
+    {
+      "level": 3,
+      "name": "Motion Design"
+    },
+    {
+      "level": 5,
+      "name": "Brand Identity"
+    }
+  ],
+  "title": "Senior UX/UI Designer Application - DesignForward Agency",
+  "updatedAt": "2026-09-29T00:00:00Z"
+}

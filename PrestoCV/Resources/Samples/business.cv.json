@@ -1,0 +1,165 @@
+{
+  "certifications": [
+    {
+      "description": "Advanced certification in process improvement methodologies and statistical analysis.",
+      "issued": {
+        "year": 2018
+      },
+      "issuer": "American Society for Quality",
+      "link": "https://asq.org/",
+      "name": "Six Sigma Black Belt"
+    },
+    {
+      "description": "Certification validating project management knowledge and experience.",
+      "issued": {
+        "year": 2015
+      },
+      "issuer": "Project Management Institute",
+      "link": "https://www.pmi.org/",
+      "name": "Project Management Professional (PMP)"
+    }
+  ],
+  "createdAt": "2026-09-29T00:00:00Z",
+  "education": [
+    {
+      "current": false,
+      "degree": "MBA",
+      "description": "Specialization in Operations Management and Strategy. Dean's List. Led consulting project for Fortune 500 client.",
+      "school": "Northwestern University - Kellogg School of Management",
+      "start": {
+        "year": 2012
+      }
+    },
+    {
+      "current": false,
+      "degree": "B.S. in Industrial Engineering",
+      "description": "Focus on systems optimization and quality management. Graduated with honors. President of Industrial Engineering Student Association.",
+      "school": "Georgia Institute of Technology",
+      "start": {
+        "year": 2009
+      }
+    }
+  ],
+  "experiences": [
+    {
+      "company": "Global Manufacturing Corp",
+      "current": true,
+      "description": "Oversee operations across 5 facilities with $2B annual revenue. • Implemented lean manufacturing principles, reducing costs by 18% • Led digital transformation initiative improving supply chain efficiency by 30% • Managed P&L for operations division and consistently exceeded KPIs",
+      "location": "Chicago, IL",
+      "role": "Director of Operations",
+      "start": {
+        "month": 1,
+        "year": 2020
+      }
+    },
+    {
+      "company": "SupplyChain Solutions Inc",
+      "current": false,
+      "description": "Managed logistics network serving 500+ clients nationwide. • Expanded operations into 3 new markets, increasing revenue by 45% • Developed key performance metrics dashboard improving decision-making speed by 40% • Negotiated vendor contracts saving $2.5M annually",
+      "end": {
+        "month": 12,
+        "year": 2019
+      },
+      "location": "Dallas, TX",
+      "role": "Operations Manager",
+      "start": {
+        "month": 3,
+        "year": 2016
+      }
+    },
+    {
+      "company": "Consulting Partners LLC",
+      "current": false,
+      "description": "Provided operational consulting services to mid-market clients. • Conducted process mapping and efficiency analysis for 25+ clients • Developed ROI models for operational improvement initiatives • Facilitated executive workshops on change management and strategy",
+      "end": {
+        "month": 2,
+        "year": 2016
+      },
+      "location": "Boston, MA",
+      "role": "Business Analyst",
+      "start": {
+        "month": 6,
+        "year": 2013
+      }
+    }
+  ],
+  "id": "D06017F5-2391-5205-B6D7-2B75FC9E9702",
+  "interests": [
+    "Leadership Development",
+    "Mentoring",
+    "Golf",
+    "Reading (Business & History)",
+    "Volunteer Work"
+  ],
+  "language": "en",
+  "languages": [
+    {
+      "language": "English",
+      "proficiency": "native"
+    },
+    {
+      "language": "Spanish",
+      "proficiency": "c1"
+    }
+  ],
+  "personal": {
+    "email": "james.rodriguez@example.com",
+    "fullName": "James Rodriguez",
+    "location": "Chicago, IL",
+    "phone": "+1 (555) 456-7890",
+    "professionalTitle": "Director of Operations",
+    "summary": "Results-driven operations executive with 12+ years of experience driving organizational efficiency and growth in Fortune 500 companies. Expert in process optimization, strategic planning, and cross-functional leadership. Proven track record of delivering double-digit improvements in operational metrics and leading teams of 100+ employees."
+  },
+  "profiles": [
+    {
+      "link": "https://linkedin.com/in/jamesrodriguez",
+      "platform": "LinkedIn"
+    }
+  ],
+  "revision": 1,
+  "schemaVersion": 1,
+  "skills": [
+    {
+      "level": 5,
+      "name": "Strategic Planning"
+    },
+    {
+      "level": 5,
+      "name": "Process Optimization"
+    },
+    {
+      "level": 5,
+      "name": "Project Management"
+    },
+    {
+      "level": 5,
+      "name": "Budget Management"
+    },
+    {
+      "level": 5,
+      "name": "Team Leadership"
+    },
+    {
+      "level": 4,
+      "name": "Supply Chain"
+    },
+    {
+      "level": 4,
+      "name": "Data Analysis"
+    },
+    {
+      "level": 4,
+      "name": "Change Management"
+    },
+    {
+      "level": 4,
+      "name": "Lean Six Sigma"
+    },
+    {
+      "level": 3,
+      "name": "Financial Modeling"
+    }
+  ],
+  "title": "Director of Operations Application - Global Manufacturing Corp",
+  "updatedAt": "2026-09-29T00:00:00Z"
+}

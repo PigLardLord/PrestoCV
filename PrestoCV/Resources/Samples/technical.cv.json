@@ -1,0 +1,173 @@
+{
+  "certifications": [
+    {
+      "description": "Validates ability to design and deploy scalable, highly available, and fault-tolerant systems on AWS.",
+      "issued": {
+        "year": 2021
+      },
+      "issuer": "Amazon Web Services",
+      "link": "https://aws.amazon.com/certification/",
+      "name": "AWS Certified Solutions Architect"
+    },
+    {
+      "description": "Demonstrates skills in configuring, deploying, and managing Kubernetes clusters.",
+      "issued": {
+        "year": 2020
+      },
+      "issuer": "Cloud Native Computing Foundation",
+      "link": "https://www.cncf.io/certification/cka/",
+      "name": "Certified Kubernetes Administrator"
+    }
+  ],
+  "createdAt": "2026-09-29T00:00:00Z",
+  "education": [
+    {
+      "current": false,
+      "degree": "M.S. in Computer Science",
+      "description": "Specialized in Distributed Systems and Machine Learning. Capstone project on optimizing container orchestration in cloud environments.",
+      "school": "Stanford University",
+      "start": {
+        "year": 2015
+      }
+    },
+    {
+      "current": false,
+      "degree": "B.S. in Software Engineering",
+      "description": "Focus on software architecture and design patterns. Graduated with honors. Lead developer for senior project - campus notification system.",
+      "school": "University of Texas at Austin",
+      "start": {
+        "year": 2013
+      }
+    }
+  ],
+  "experiences": [
+    {
+      "company": "TechFlow Inc.",
+      "current": true,
+      "description": "Led development of microservices platform serving 10M+ users. • Architected and implemented event-driven system processing 100K+ events/second • Reduced system latency by 40% through caching strategies and database optimization • Mentored 5 junior engineers and established coding standards across teams",
+      "location": "San Francisco, CA",
+      "role": "Senior Software Engineer",
+      "start": {
+        "month": 3,
+        "year": 2020
+      }
+    },
+    {
+      "company": "DataSphere Solutions",
+      "current": false,
+      "description": "Developed data processing pipelines for financial analytics platform. • Built real-time data streaming solution using Apache Kafka and Spark • Improved data accuracy by 99.9% through validation frameworks • Collaborated with product team to deliver features 30% faster using Agile methodologies",
+      "end": {
+        "month": 2,
+        "year": 2020
+      },
+      "location": "Seattle, WA",
+      "role": "Software Engineer",
+      "start": {
+        "month": 6,
+        "year": 2017
+      }
+    },
+    {
+      "company": "StartUp Ventures",
+      "current": false,
+      "description": "Full-stack development for MVP of SaaS product. • Implemented RESTful APIs using Node.js and Express • Developed responsive UI with React and Redux • Participated in code reviews and contributed to technical documentation",
+      "end": {
+        "month": 5,
+        "year": 2017
+      },
+      "location": "Austin, TX",
+      "role": "Junior Developer",
+      "start": {
+        "month": 1,
+        "year": 2016
+      }
+    }
+  ],
+  "id": "B2F802C9-BFE8-5717-AE8A-31EEBF92779D",
+  "interests": [
+    "Open Source Contributions",
+    "Tech Blogging",
+    "Mountain Biking",
+    "Photography"
+  ],
+  "language": "en",
+  "languages": [
+    {
+      "language": "English",
+      "proficiency": "native"
+    },
+    {
+      "language": "Spanish",
+      "proficiency": "b1"
+    }
+  ],
+  "personal": {
+    "email": "alex.morgan@example.com",
+    "fullName": "Alex Morgan",
+    "location": "San Francisco, CA",
+    "phone": "+1 (555) 123-4567",
+    "professionalTitle": "Senior Software Engineer",
+    "summary": "Senior Software Engineer with 8+ years of experience in building scalable distributed systems and cloud-native applications. Expertise in microservices architecture, DevOps practices, and leading engineering teams. Passionate about clean code, system design, and mentoring junior developers.",
+    "website": "https://alex-morgan.dev"
+  },
+  "profiles": [
+    {
+      "link": "https://github.com/alexmorgan",
+      "platform": "GitHub"
+    },
+    {
+      "link": "https://linkedin.com/in/alexmorgan",
+      "platform": "LinkedIn"
+    },
+    {
+      "link": "https://alex-morgan.dev",
+      "platform": "Portfolio"
+    }
+  ],
+  "revision": 1,
+  "schemaVersion": 1,
+  "skills": [
+    {
+      "level": 5,
+      "name": "JavaScript"
+    },
+    {
+      "level": 5,
+      "name": "Python"
+    },
+    {
+      "level": 4,
+      "name": "React"
+    },
+    {
+      "level": 5,
+      "name": "Node.js"
+    },
+    {
+      "level": 4,
+      "name": "AWS"
+    },
+    {
+      "level": 4,
+      "name": "Docker"
+    },
+    {
+      "level": 3,
+      "name": "Kubernetes"
+    },
+    {
+      "level": 5,
+      "name": "SQL"
+    },
+    {
+      "level": 4,
+      "name": "MongoDB"
+    },
+    {
+      "level": 5,
+      "name": "System Design"
+    }
+  ],
+  "title": "Senior Software Engineer - TechFlow Inc. Application",
+  "updatedAt": "2026-09-29T00:00:00Z"
+}

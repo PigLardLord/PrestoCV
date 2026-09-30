@@ -1,0 +1,178 @@
+{
+  "certifications": [
+    {
+      "description": "Board certification in Emergency Medicine demonstrating expertise and commitment to continuing education.",
+      "issued": {
+        "year": 2018
+      },
+      "issuer": "American Board of Emergency Medicine",
+      "link": "https://www.abem.org/",
+      "name": "American Board of Emergency Medicine - Certification"
+    },
+    {
+      "description": "Advanced certification in trauma care and emergency treatment protocols.",
+      "issued": {
+        "year": 2017
+      },
+      "issuer": "American College of Surgeons",
+      "link": "https://www.amtrauma.org/",
+      "name": "Advanced Trauma Life Support (ATLS)"
+    },
+    {
+      "description": "Certified instructor for Basic Life Support courses for healthcare professionals.",
+      "issued": {
+        "year": 2019
+      },
+      "issuer": "American Heart Association",
+      "link": "https://www.heart.org/",
+      "name": "Basic Life Support (BLS) Instructor"
+    }
+  ],
+  "createdAt": "2026-09-29T00:00:00Z",
+  "education": [
+    {
+      "current": false,
+      "degree": "M.D.",
+      "description": "Graduated magna cum laude. Alpha Omega Alpha Honor Society. Research thesis on emergency cardiac care protocols.",
+      "school": "Harvard Medical School",
+      "start": {
+        "year": 2015
+      }
+    },
+    {
+      "current": false,
+      "degree": "B.S. in Biology",
+      "description": "Focus on molecular biology and pre-medical studies. Graduated with distinction. NCAA Division I swim team captain.",
+      "school": "Stanford University",
+      "start": {
+        "year": 2011
+      }
+    }
+  ],
+  "experiences": [
+    {
+      "company": "Boston Medical Center",
+      "current": true,
+      "description": "Provide leadership in Level 1 trauma center serving 90K+ patients annually. • Serve as residency program director mentoring 20+ residents yearly • Implemented sepsis protocol reducing mortality by 25% • Lead quality improvement initiatives and hospital safety committees",
+      "location": "Boston, MA",
+      "role": "Attending Physician",
+      "start": {
+        "month": 7,
+        "year": 2018
+      }
+    },
+    {
+      "company": "Johns Hopkins Hospital",
+      "current": false,
+      "description": "Completed comprehensive training in emergency medicine and critical care. • Rotated through cardiology, trauma, pediatrics, and toxicology • First responder for mass casualty incidents and disaster drills • Published research on emergency department efficiency metrics",
+      "end": {
+        "month": 6,
+        "year": 2018
+      },
+      "location": "Baltimore, MD",
+      "role": "Emergency Medicine Resident",
+      "start": {
+        "month": 7,
+        "year": 2015
+      }
+    },
+    {
+      "company": "Harvard Medical School",
+      "current": false,
+      "description": "Graduated with honors and Alpha Omega Alpha recognition. • Completed clinical rotations in surgery, internal medicine, and psychiatry • Research assistant in emergency medicine department • Volunteer at community health centers serving underserved populations",
+      "end": {
+        "month": 5,
+        "year": 2015
+      },
+      "location": "Boston, MA",
+      "role": "Medical Student",
+      "start": {
+        "month": 8,
+        "year": 2011
+      }
+    }
+  ],
+  "id": "153D748B-8EEA-5E6A-A1CC-5BC1859DFE2C",
+  "interests": [
+    "Medical Education",
+    "Global Health",
+    "Marathon Running",
+    "Cooking",
+    "Volunteer Medical Missions"
+  ],
+  "language": "en",
+  "languages": [
+    {
+      "language": "English",
+      "proficiency": "native"
+    },
+    {
+      "language": "Spanish",
+      "proficiency": "c1"
+    }
+  ],
+  "personal": {
+    "email": "m.thompson@hospital.edu",
+    "fullName": "Dr. Michael Thompson",
+    "location": "Boston, MA",
+    "phone": "+1 (555) 357-9123",
+    "professionalTitle": "Senior Emergency Medicine Physician",
+    "summary": "Board-certified emergency medicine physician with 10+ years of experience providing critical care in high-volume trauma centers. Expert in emergency procedures, crisis management, and medical education. Committed to patient safety, quality improvement, and training the next generation of emergency physicians."
+  },
+  "profiles": [
+    {
+      "link": "https://linkedin.com/in/dr-michael-thompson",
+      "platform": "LinkedIn"
+    },
+    {
+      "link": "https://www.acep.org/michael-thompson",
+      "platform": "Professional Society"
+    }
+  ],
+  "revision": 1,
+  "schemaVersion": 1,
+  "skills": [
+    {
+      "level": 5,
+      "name": "Emergency Medicine"
+    },
+    {
+      "level": 5,
+      "name": "Trauma Care"
+    },
+    {
+      "level": 5,
+      "name": "Advanced Cardiac Life Support"
+    },
+    {
+      "level": 5,
+      "name": "Pediatric Advanced Life Support"
+    },
+    {
+      "level": 4,
+      "name": "Medical Education"
+    },
+    {
+      "level": 5,
+      "name": "Crisis Management"
+    },
+    {
+      "level": 4,
+      "name": "Electronic Health Records"
+    },
+    {
+      "level": 4,
+      "name": "Quality Improvement"
+    },
+    {
+      "level": 4,
+      "name": "Research"
+    },
+    {
+      "level": 4,
+      "name": "Leadership"
+    }
+  ],
+  "title": "Senior Emergency Medicine Physician Application - Boston Medical Center",
+  "updatedAt": "2026-09-29T00:00:00Z"
+}

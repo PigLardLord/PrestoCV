@@ -1,0 +1,182 @@
+{
+  "certifications": [
+    {
+      "description": "Certification validating expertise in designing, building, and productionizing ML models.",
+      "issued": {
+        "year": 2021
+      },
+      "issuer": "Google Cloud",
+      "link": "https://cloud.google.com/certification/machine-learning-engineer",
+      "name": "Google Professional Machine Learning Engineer"
+    }
+  ],
+  "createdAt": "2026-09-29T00:00:00Z",
+  "education": [
+    {
+      "current": false,
+      "degree": "Ph.D. in Computer Science",
+      "description": "Dissertation: 'Scalable Algorithms for Multi-modal Machine Learning'. Advisor: Dr. Andrew Moore. Outstanding Dissertation Award.",
+      "school": "Carnegie Mellon University",
+      "start": {
+        "year": 2013
+      }
+    },
+    {
+      "current": false,
+      "degree": "M.S. in Artificial Intelligence",
+      "description": "Specialized in machine learning and neural networks. Thesis on deep reinforcement learning applications.",
+      "school": "University of Edinburgh",
+      "start": {
+        "year": 2009
+      }
+    },
+    {
+      "current": false,
+      "degree": "B.S. in Computer Science",
+      "description": "Graduated summa cum laude. Minor in Mathematics. Senior thesis on computational complexity theory.",
+      "school": "University of California, Berkeley",
+      "start": {
+        "year": 2007
+      }
+    }
+  ],
+  "experiences": [
+    {
+      "company": "MIT Computer Science Department",
+      "current": true,
+      "description": "Lead research group in machine learning applications for healthcare. • Secured $1.8M in federal funding from NSF and NIH • Supervised 8 PhD students and 15 MS students to graduation • Published 25+ papers in top AI conferences (NeurIPS, ICML, AAAI)",
+      "location": "Cambridge, MA",
+      "role": "Associate Professor",
+      "start": {
+        "month": 8,
+        "year": 2019
+      }
+    },
+    {
+      "company": "Stanford University",
+      "current": false,
+      "description": "Established research program in deep learning and computer vision. • Received NSF CAREER Award ($500K) for innovative research • Taught graduate and undergraduate courses in AI and machine learning • Built interdisciplinary collaborations with medical school and engineering departments",
+      "end": {
+        "month": 7,
+        "year": 2019
+      },
+      "location": "Stanford, CA",
+      "role": "Assistant Professor",
+      "start": {
+        "month": 9,
+        "year": 2015
+      }
+    },
+    {
+      "company": "Google Research",
+      "current": false,
+      "description": "Advanced research in natural language processing and large language models. • Co-authored 12 papers during postdoc tenure • Developed novel algorithms for text summarization deployed in Google products • Collaborated with industry researchers on practical AI applications",
+      "end": {
+        "month": 8,
+        "year": 2015
+      },
+      "location": "Mountain View, CA",
+      "role": "Postdoctoral Researcher",
+      "start": {
+        "month": 6,
+        "year": 2013
+      }
+    }
+  ],
+  "id": "8E430C19-32AD-570A-9D96-91E2826D4BA3",
+  "interests": [
+    "AI Ethics",
+    "Open Science",
+    "Science Communication",
+    "Classical Music",
+    "Hiking"
+  ],
+  "language": "en",
+  "languages": [
+    {
+      "language": "English",
+      "proficiency": "native"
+    },
+    {
+      "language": "German",
+      "proficiency": "b2"
+    },
+    {
+      "language": "Mandarin",
+      "proficiency": "a2"
+    }
+  ],
+  "personal": {
+    "email": "s.johnson@university.edu",
+    "fullName": "Dr. Sarah Johnson",
+    "location": "Cambridge, MA",
+    "phone": "+1 (555) 246-8101",
+    "professionalTitle": "Associate Professor of Computer Science",
+    "summary": "Tenured associate professor with 10+ years of experience in artificial intelligence research and education. Published extensively in top-tier conferences and journals with over 50 peer-reviewed publications. Principal investigator on $3M in research grants. Dedicated to mentoring graduate students and advancing the field through innovative research.",
+    "website": "https://sarahjohnson.academic.edu"
+  },
+  "profiles": [
+    {
+      "link": "https://scholar.google.com/citations?user=sarahjohnson",
+      "platform": "Google Scholar"
+    },
+    {
+      "link": "https://sarahjohnson.academic.edu",
+      "platform": "Academic Website"
+    },
+    {
+      "link": "https://linkedin.com/in/sarahjohnsonacademic",
+      "platform": "LinkedIn"
+    },
+    {
+      "link": "https://orcid.org/0000-0000-0000-0000",
+      "platform": "ORCID"
+    }
+  ],
+  "revision": 1,
+  "schemaVersion": 1,
+  "skills": [
+    {
+      "level": 5,
+      "name": "Machine Learning"
+    },
+    {
+      "level": 5,
+      "name": "Python"
+    },
+    {
+      "level": 5,
+      "name": "Research Methodology"
+    },
+    {
+      "level": 5,
+      "name": "Statistical Analysis"
+    },
+    {
+      "level": 5,
+      "name": "Academic Writing"
+    },
+    {
+      "level": 4,
+      "name": "Grant Writing"
+    },
+    {
+      "level": 5,
+      "name": "TensorFlow/PyTorch"
+    },
+    {
+      "level": 4,
+      "name": "Data Science"
+    },
+    {
+      "level": 4,
+      "name": "Public Speaking"
+    },
+    {
+      "level": 5,
+      "name": "Teaching"
+    }
+  ],
+  "title": "Associate Professor Application - MIT CS Department",
+  "updatedAt": "2026-09-29T00:00:00Z"
+}
