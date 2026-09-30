@@ -172,8 +172,8 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - an unavailable model is not asked;
   - each text holds at most 2000 Unicode scalars and each list at most 50 items;
   - a draft with no visible text is refused;
-  - the stream keeps only the newest snapshot;
-  - a cancellation ends in `CancellationError`, and a cancelled stream consumer sees the stream end.
+  - the stream is read in the reader's task: the model is asked when it is first read, and stopped when the reader stops, is cancelled, or a snapshot is refused;
+  - a cancellation ends in `CancellationError` on both paths, before any other failure.
 - **Port:** `DraftGenerating` (untyped `throws`, cancellable). It answers the availability as a `DraftAvailability`.
 - **`DraftingError`:** one case per refused request, per model failure and per refused draft.
 
@@ -183,7 +183,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 **Test support and tests.**
 - `CVDraftingTestSupport` may import `CVDrafting`, Foundation. It holds `FakeDraftGenerator`, a scripted generator that tells when it was asked and when it was stopped, and a full fixture.
-- **`CVDraftingTests`** run the use case against the fake: every rule above, a cancelled, dropped or abandoned stream stopping the model, and an oversize case for every text and every list of a draft, so a field left out of the limits fails a test.
+- **`CVDraftingTests`** run the use case against the fake: every rule above, the model stopping when a reader leaves the stream, is cancelled, or reads a snapshot that is refused, and an oversize case for every text and every list of a draft, so a field left out of the limits fails a test.
 
 ---
 
