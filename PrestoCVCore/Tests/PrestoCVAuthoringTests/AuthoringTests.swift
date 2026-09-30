@@ -120,6 +120,16 @@ struct DomainTests {
         #expect(FieldLeaves.of(CV(id: id1)).contains(FieldLeaves.missing))   // the walk does see an unset field
     }
 
+    @Test("a leaf of a type the walk cannot compare is reported, not dropped; dates and identifiers yield nothing")
+    func unsupportedLeaves() {
+        struct Measured { var years: Double?, code: UInt8, initial: Character }
+
+        #expect(FieldLeaves.of(Measured(years: 1.5, code: 3, initial: "A")) == ["<unsupported Double>", "<unsupported UInt8>", "<unsupported Character>"])
+        #expect(FieldLeaves.of(Measured(years: nil, code: 3, initial: "A")).first == FieldLeaves.missing)
+        #expect(FieldLeaves.of(Measured(years: 1.5, code: 3, initial: "A")).allSatisfy { $0.hasPrefix(FieldLeaves.unsupportedPrefix) })
+        #expect(FieldLeaves.of(Date(timeIntervalSince1970: 0)).isEmpty && FieldLeaves.of(id1.raw).isEmpty)
+    }
+
     @Test("entries keep the order the editor sets; duplication keeps content and design, not identity or history")
     func orderAndDuplication() {
         var cv = FixtureCV.full()

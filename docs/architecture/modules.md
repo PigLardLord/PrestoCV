@@ -62,6 +62,7 @@ Test targets and test-support targets are described below each package. The chec
 **Test support and tests.**
 - `PrestoCVCoreTestSupport` may import `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Synchronization. It holds:
   - `InMemoryCVRepository`, `SteppingClock`, `SequentialIDGenerator`;
+  - `FixtureCV`, a CV with every field populated, and `FieldLeaves`, the Mirror walk over the leaves of a value that completeness tests use;
   - the **`CVRepository` contract suite**: round trip with timestamps, create twice, update bumps the revision, stale update and stale delete, 50 concurrent updates from one revision leave exactly one success, update after delete, listing order.
 - File-store behaviour that an in-memory store cannot have is tested in the Core tests, not in the contract: mixed directory, unreadable, oversized and hostile files, restore, erase, purge, and two instances racing.
 

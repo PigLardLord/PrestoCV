@@ -36,6 +36,9 @@ struct MapperCompletenessTests {
         #expect(!leaves.isEmpty)
         #expect(!leaves.contains(FieldLeaves.missing), "a printed field of the fixture is nil")
         #expect(!leaves.contains(FieldLeaves.empty), "a printed collection of the fixture is empty")
+        #expect(!leaves.contains(""), "a printed text of the fixture is empty")
+        #expect(!leaves.contains { $0.hasPrefix(FieldLeaves.unsupportedPrefix) },
+                "a printed field of the fixture has a type the walk cannot compare")
     }
 
     @Test("every printed leaf reaches the document as many times as it occurs in the CV", arguments: Subject.allCases)

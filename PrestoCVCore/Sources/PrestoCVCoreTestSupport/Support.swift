@@ -136,8 +136,13 @@ public enum FixtureCV {
 /// The leaves of a value, walked with Mirror: strings, integers, booleans and enum cases without a payload. A nil is
 /// `missing` and an empty collection is `empty`, so a completeness test can require a fixture to populate every field,
 /// and the mapper test (R10) can check that each leaf reaches the document.
+///
+/// A value without children of any other type (a `Double`, a `Character`, an `Int64`) cannot be compared, so it is one
+/// leaf that starts with `unsupportedPrefix`: a field of such a type makes a completeness test fail instead of
+/// vanishing from the walk. A `Date` and a `UUID` yield nothing, on purpose: they are the identity and the dates of
+/// storage, which a repository owns and no mapper carries.
 public enum FieldLeaves {
-    public static let missing = "<nil>", empty = "<empty>"
+    public static let missing = "<nil>", empty = "<empty>", unsupportedPrefix = "<unsupported "
 
     public static func of(_ value: Any, skipping: Set<String> = []) -> [String] {
         let mirror = Mirror(reflecting: value)
@@ -152,7 +157,9 @@ public enum FieldLeaves {
         case let number as Int: return [String(number)]
         case let flag as Bool: return [String(flag)]
         case is Date, is UUID: return []
-        default: return mirror.children.filter { !skipping.contains($0.label ?? "") }.flatMap { of($0.value, skipping: skipping) }
+        default:
+            if mirror.children.isEmpty { return ["\(unsupportedPrefix)\(type(of: value))>"] }
+            return mirror.children.filter { !skipping.contains($0.label ?? "") }.flatMap { of($0.value, skipping: skipping) }
         }
     }
 }
