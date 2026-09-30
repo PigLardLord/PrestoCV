@@ -418,6 +418,28 @@
    ]
   },
   {
+   "name": "CVDraftingTestSupport",
+   "path": "CVGeneratorAI/Sources/CVDraftingTestSupport",
+   "kind": "test",
+   "allowedImports": [
+    "CVDrafting",
+    "Foundation"
+   ],
+   "rules": []
+  },
+  {
+   "name": "CVDraftingTests",
+   "path": "CVGeneratorAI/Tests/CVDraftingTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "CVDrafting",
+    "CVDraftingTestSupport"
+   ],
+   "rules": []
+  },
+  {
    "name": "PrestoCVWorkflowPorts",
    "path": "PrestoCVApp/Sources/PrestoCVWorkflowPorts",
    "allowedImports": [

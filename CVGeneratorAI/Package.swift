@@ -1,12 +1,15 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// AI Drafting (docs/architecture/modules.md). The targets are empty until the migration fills them.
+// AI Drafting (docs/architecture/modules.md).
 var products: [Product] = [
     .library(name: "CVDrafting", targets: ["CVDrafting"]),
+    .library(name: "CVDraftingTestSupport", targets: ["CVDraftingTestSupport"]),
 ]
 var targets: [Target] = [
     .target(name: "CVDrafting"),
+    .target(name: "CVDraftingTestSupport", dependencies: ["CVDrafting"]),
+    .testTarget(name: "CVDraftingTests", dependencies: ["CVDrafting", "CVDraftingTestSupport"]),
 ]
 
 // Apple-only adapter (the platform column of docs/architecture/modules.md): not part of a Linux build.
