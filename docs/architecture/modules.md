@@ -100,10 +100,18 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 **`CVDesignCatalog`**
 - **`MarkupContract`**, version 1: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](markup-contract.md).
 - **The CSS policy:** a tokenizer, an allow-list of properties and values, and canonical re-serialisation into `ValidatedStylesheet`, whose initialiser is internal.
-- **`DesignPackageValidator`** takes raw bytes and returns a `ValidatedDesign`: manifest, stylesheet and PNG preview.
-- **Customisation values:** `HexColor`, `Palette` (exists only with readable contrast) and `FontScheme` (a closed set).
-- **Use cases:**
-  - list, get, sync bundled designs (upgrade when newer);
+- **`DesignPackageValidator`** takes raw bytes and returns a `ValidatedDesign`: manifest, parsed version, stylesheet and PNG preview.
+  - The manifest names the design's default palette and default font scheme by identifier. A missing one is a malformed manifest; an identifier the catalog does not know is reported by name (`unknownPalette`, `unknownFontScheme`).
+  - The version is `MAJOR.MINOR.PATCH`: each part is `0` or one to nine ASCII digits without a leading zero, so a version has one spelling. `DesignVersion` orders versions by number (`1.0.10` is later than `1.0.9`); anything else is `invalidVersion`.
+- **Customisation values:**
+  - `HexColor`, and `Palette`, which exists only with readable contrast;
+  - `NamedPalette`: a closed set named after colours, never after a design (`ink`, `slate`, `ocean`, `plum`). Each passes the `Palette` contrast rule, which a test proves through the public initialisers. Its raw value is the identifier a design choice stores;
+  - `FontScheme`: a closed set of system families (`system`, `serif`, `rounded`), also stored by its raw value.
+- **Use cases** report `DesignCatalogError` (`unknownDesign`, `storeUnavailable`, `bundledDesignsUnavailable`). They are typed and not cancellable (R3), and a failure of the store or the source is translated, never passed through:
+  - **`ListDesigns`**: the installed designs' manifests, ordered by identifier;
+  - **`GetDesign`**: one installed design, or `unknownDesign`;
+  - **`SyncBundledDesigns`**: validates each bundled package. A package whose identifier no design has is installed, and one newer than the installed design replaces it (upgraded). One of the same or an older version is left alone, so a bundled design never downgrades a design installed by other means. A package the validator rejects is reported with its name and violations, and the others still sync. The `SyncReport` lists the installed, upgraded and unchanged identifiers and the rejected packages. No rendering gate runs here: bundled designs are proved by the rendering tests, and the sync runs at every launch;
+  - **`ResolveDesign`**: turns a design identifier and optional palette and font scheme identifiers into a `ResolvedDesign` (stylesheet, palette, font scheme). A palette or font scheme that is missing or unknown falls back to the design's default; an unknown design is `unknownDesign`. It takes raw identifiers because the catalog does not import the domain (R1), so the app maps its `DesignChoice` to them;
   - **`InstallDesign`**: validate the raw bytes, then `DesignRenderingGate.verify`, then `DesignStore.save`. Nothing is stored unless both checks pass.
 - **Ports:** `DesignStore`, `BundledDesignSource` (raw bytes), and **`DesignRenderingGate`**. The catalog owns the gate; `CVRendering` implements it, along the allowed Rendering → Catalog edge.
 
