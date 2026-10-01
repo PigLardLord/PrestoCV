@@ -95,7 +95,10 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - it checks the name, counts, dates and ratings;
   - it bounds text in UTF-8 bytes, per field and for the whole document, and refuses control characters and bidirectional overrides;
   - JSON arrives through `decode(json:)`, which checks the size before decoding.
-- Pending: a committed JSON Schema.
+- **The JSON Schema** of version 1 is `CVPDFExporter/Schema/cvdocument.v1.schema.json` (draft 2020-12), a published file outside every target:
+  - it permits unknown properties and `null` for optional fields, as the decoder does;
+  - it does not express the byte limits, the character rules or the order of a period's dates, so `CVDocumentValidator` is authoritative;
+  - `CVDocumentModelTests` hold it and the model to each other.
 
 **`CVDesignCatalog`**
 - **`MarkupContract`**, version 1: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](markup-contract.md).
@@ -151,6 +154,10 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
     - deterministic pre-start cancellation;
   - `FakePDFRenderer`, which writes real uncompressed PDFs;
   - `MinimalPDFInspector`.
+- **`CVDocumentModelTests`** may import `CVDocumentModel`, `CVRenderingTestSupport`, Foundation, Testing. They read the committed schema from the source tree and check it with a minimal validator of their own, which refuses any keyword it does not support:
+  - the documents the encoder writes, `ContractFixture.document` among them, validate against the schema;
+  - on a table of valid and invalid documents, the schema and `CVDocumentValidator.decode(json:)` give the same verdict, except for the rules the schema cannot express, which the table lists;
+  - the section kinds, period ends and language levels of the schema are the ones the model writes, and the schema declares exactly the properties the model writes.
 - **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test, in-flight cancellation and the content-completeness test for every bundled design.
 
 **Separate package `CVPDFExporterExamples`** holds the demos and the template viewer. The library package contains no executables (R14).
