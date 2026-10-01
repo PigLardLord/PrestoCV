@@ -103,6 +103,9 @@ public struct DesignPackageValidator: Sendable {
         let unknown = Set(object.keys).subtracting(Self.packageKeys).subtracting(["htmlContent"])
             .union(Set(manifestObject.keys).subtracting(Self.manifestKeys).map { "manifest." + $0 })
         if !unknown.isEmpty { violations.append(.unknownKeys(unknown.sorted())) }
+        guard JSONSerialization.isValidJSONObject(manifestObject) else {   // on Darwin, an invalid object raises an exception no `catch` sees
+            throw DesignPackageRejected(violations: violations + [.malformed("manifest")])
+        }
         let raw: RawManifest
         do { raw = try JSONDecoder().decode(RawManifest.self, from: JSONSerialization.data(withJSONObject: manifestObject)) }
         catch { throw DesignPackageRejected(violations: violations + [.malformed("manifest")]) }
@@ -146,21 +149,6 @@ public protocol DesignStore: Sendable {
 /// catalog, implemented downstream by CVRendering (the allowed Rendering → Catalog edge).
 public protocol DesignRenderingGate: Sendable {
     func verify(_ design: ValidatedDesign) async throws
-}
-
-/// Installing a design from untrusted bytes: validate, then prove it renders completely, then store.
-/// Nothing is stored unless both checks pass.
-public struct InstallDesign: Sendable {
-    let validator: DesignPackageValidator, gate: any DesignRenderingGate, store: any DesignStore
-    public init(validator: DesignPackageValidator = DesignPackageValidator(), gate: any DesignRenderingGate, store: any DesignStore) {
-        self.validator = validator; self.gate = gate; self.store = store
-    }
-    public func callAsFunction(_ data: Data) async throws -> ValidatedDesign {
-        let design = try validator.validate(data)
-        try await gate.verify(design)
-        try await store.save(design)
-        return design
-    }
 }
 
 /// Outbound port, owned by the catalog (R3). Raw bytes: validation happens in the catalog, not the source.

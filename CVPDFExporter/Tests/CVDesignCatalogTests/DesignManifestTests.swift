@@ -151,6 +151,12 @@ struct DesignManifestTests {
         #expect(DesignVersion(text) == nil)
     }
 
+    @Test("a number JSON cannot hold is refused, never a crash")
+    func overflowingNumber() {
+        let json = #"{"manifest":{"id":"ok","name":"x","version":"1.0.0","description":"","defaultPalette":"ink","defaultFonts":"system","markupContract":1e999},"cssContent":".cv{}"}"#
+        guard case .malformed? = violations(of: Data(json.utf8))?.first else { Issue.record("not refused as malformed"); return }
+    }
+
     @Test("a version that is not a string is a malformed manifest", arguments: ["1", "1.5", "null", #"["1.0.0"]"#])
     func versionNotAString(json: String) throws {
         #expect(violations(of: designData(".cv{}", manifestExtra: ["version": try fragment(json)])) == [.malformed("manifest")])

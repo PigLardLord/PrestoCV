@@ -10,6 +10,21 @@ public enum DesignCatalogError: Error, Equatable, Sendable {
     case bundledDesignsUnavailable
 }
 
+/// Installing a design from untrusted bytes: validate, then prove it renders completely, then store.
+/// Nothing is stored unless both checks pass.
+public struct InstallDesign: Sendable {
+    let validator: DesignPackageValidator, gate: any DesignRenderingGate, store: any DesignStore
+    public init(validator: DesignPackageValidator = DesignPackageValidator(), gate: any DesignRenderingGate, store: any DesignStore) {
+        self.validator = validator; self.gate = gate; self.store = store
+    }
+    public func callAsFunction(_ data: Data) async throws -> ValidatedDesign {
+        let design = try validator.validate(data)
+        try await gate.verify(design)
+        try await store.save(design)
+        return design
+    }
+}
+
 /// The installed designs, in the store's order (by identifier).
 public struct ListDesigns: Sendable {
     let store: any DesignStore
@@ -98,11 +113,11 @@ public struct ResolvedDesign: Equatable, Sendable {
 /// the catalog does not know the domain that stores it. A palette or font identifier that is missing or unknown falls
 /// back to the design's default; a design identifier that is unknown is an error.
 public struct ResolveDesign: Sendable {
-    let store: any DesignStore
-    public init(store: any DesignStore) { self.store = store }
+    let getDesign: GetDesign
+    public init(store: any DesignStore) { getDesign = GetDesign(store: store) }
 
     public func callAsFunction(design: String, palette: String?, fonts: String?) async throws(DesignCatalogError) -> ResolvedDesign {
-        let found = try await GetDesign(store: store)(id: design)
+        let found = try await getDesign(id: design)
         let chosenPalette = palette.flatMap(NamedPalette.init(rawValue:)) ?? found.manifest.defaultPalette
         let chosenFonts = fonts.flatMap(FontScheme.init(rawValue:)) ?? found.manifest.defaultFonts
         return ResolvedDesign(id: found.manifest.id, stylesheet: found.stylesheet, palette: chosenPalette.palette, fonts: chosenFonts)
