@@ -6,7 +6,7 @@ import Glibc
 import Darwin
 #endif
 import CVDesignCatalog
-import CVDesignCatalogFileStore
+@testable import CVDesignCatalogFileStore
 import CVRenderingTestSupport
 
 /// Runs `body` with a store directory of its own, removed afterwards (R10: hermetic). The directory is not created.
@@ -21,6 +21,43 @@ extension URL {
     func file(_ id: String, generation: Int = 1) -> URL { appendingPathComponent("Designs/\(id).\(generation).mcvt") }
     var designFiles: Set<String> { Set((try? FileManager.default.contentsOfDirectory(atPath: appendingPathComponent("Designs").path)) ?? []) }
 }
+
+/// An index listing one design `x`, whose manifest has the given JSON fields replaced. Schema 2 unless told otherwise.
+private func index(_ fields: [String: String] = [:], generation: Int = 1, schemaVersion: Int = 2) -> String {
+    var manifest = ["id": "\"x\"", "name": "\"X\"", "version": "\"1.0.0\"", "description": "\"\"", "defaultPalette": "\"ink\"",
+                    "defaultFonts": "\"system\"", "markupContract": "1"]
+    manifest.merge(fields) { $1 }
+    let body = manifest.sorted { $0.key < $1.key }.map { "\"\($0.key)\":\($0.value)" }.joined(separator: ",")
+    return #"{"schemaVersion":\#(schemaVersion),"designs":[{"generation":\#(generation),"manifest":{\#(body)}}]}"#
+}
+
+private func quoted(_ text: String) -> String { "\"" + text + "\"" }
+
+/// Index files the store refuses, with the error it reports. Built step by step: a long literal array is slow to type-check.
+private let badIndexes: [(String, FileDesignStoreError)] = {
+    var cases: [(String, FileDesignStoreError)] = []
+    cases.append((#"{"schemaVersion":3,"designs":[],"themes":[]}"#, .indexFromNewerVersion(3)))
+    cases.append(("not JSON", .indexCorrupt("no schema version")))
+    cases.append((index(schemaVersion: 1), .indexCorrupt("schema version 1")))
+    cases.append((index(schemaVersion: 0), .indexCorrupt("schema version 0")))
+    cases.append((#"{"schemaVersion":2}"#, .indexCorrupt("not an index")))
+    cases.append((index(["id": quoted("../x")]), .indexCorrupt("entries")))
+    cases.append((index(generation: 0), .indexCorrupt("entries")))
+    // An entry the validator would refuse is corrupt: the fields an index holds are checked as a package's are.
+    cases.append((index(["name": quoted("")]), .indexCorrupt("entries")))
+    cases.append((index(["name": quoted(String(repeating: "n", count: 81))]), .indexCorrupt("entries")))
+    cases.append((index(["name": quoted("two\\nlines")]), .indexCorrupt("entries")))
+    cases.append((index(["name": quoted("a\\u202eb")]), .indexCorrupt("entries")))
+    cases.append((index(["description": quoted(String(repeating: "d", count: 501))]), .indexCorrupt("entries")))
+    cases.append((index(["description": quoted("a\\u0000b")]), .indexCorrupt("entries")))
+    cases.append((index(["markupContract": "2"]), .indexCorrupt("entries")))
+    // Typed fields fail to decode, like any other malformed entry.
+    cases.append((index(["version": quoted("1.0")]), .indexCorrupt("not an index")))
+    cases.append((index(["version": "1"]), .indexCorrupt("not an index")))
+    cases.append((index(["defaultPalette": quoted("pale")]), .indexCorrupt("not an index")))
+    cases.append((index(["defaultFonts": quoted("comic")]), .indexCorrupt("not an index")))
+    return cases
+}()
 
 @Suite("R10 · design store contract")
 struct DesignStoreContractTests {
@@ -112,14 +149,7 @@ struct FileDesignStoreTests {
         }
     }
 
-    @Test("an index from a newer version or a corrupt one is reported and left untouched, even by a save",
-          arguments: [(#"{"schemaVersion":2,"designs":[],"themes":[]}"#, FileDesignStoreError.indexFromNewerVersion(2)),
-                      ("not JSON", .indexCorrupt("no schema version")),
-                      (#"{"schemaVersion":1,"designs":[{"generation":1,"manifest":{"id":"../x","name":"","version":"1.0.0","description":"","defaultPalette":"ink","defaultFonts":"system","markupContract":1}}]}"#,
-                       .indexCorrupt("entries")),
-                      (#"{"schemaVersion":1,"designs":[{"generation":0,"manifest":{"id":"x","name":"","version":"1.0.0","description":"","defaultPalette":"ink","defaultFonts":"system","markupContract":1}}]}"#,
-                       .indexCorrupt("entries")),
-                      (#"{"schemaVersion":1}"#, .indexCorrupt("not an index"))] as [(String, FileDesignStoreError)])
+    @Test("an index from a newer version or a corrupt one is reported and left untouched, even by a save", arguments: badIndexes)
     func badIndex(contents: String, error: FileDesignStoreError) async throws {
         try await inTemporaryStore { dir in
             let store = FileDesignStore(directory: dir)
@@ -131,6 +161,26 @@ struct FileDesignStoreTests {
             #expect(try Data(contentsOf: dir.index) == Data(contents.utf8))
             #expect(!FileManager.default.fileExists(atPath: dir.file("bold").path))
         }
+    }
+
+    @Test("an index of schema 2 whose fields are within bounds is read")
+    func goodIndex() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            try await store.save(DesignStoreContract.design(id: "clean"))
+            let description = String(repeating: "d", count: 500), name = String(repeating: "n", count: 80)
+            try Data(index(["name": quoted(name), "description": quoted(description), "version": quoted("12.0.3")]).utf8).write(to: dir.index)
+            let manifests = try await store.installedDesigns()
+            #expect(manifests.map(\.id) == ["x"] && manifests.map(\.name) == [name] && manifests.map(\.version.text) == ["12.0.3"])
+        }
+    }
+
+    @Test("the index version follows the identifiers the index holds: bump it when a palette or font scheme is added")
+    func indexVersionFollowsIdentifiers() {
+        let message: Comment = "an index written with a new palette or font scheme cannot be read by an older app: bump the index version when these change"
+        #expect(FileDesignStore.indexVersion == 2, message)
+        #expect(NamedPalette.allCases.map(\.rawValue) == ["ink", "slate", "ocean", "plum"], message)
+        #expect(FontScheme.allCases.map(\.rawValue) == ["system", "serif", "rounded"], message)
     }
 
     @Test("an index that is a symbolic link is not followed")

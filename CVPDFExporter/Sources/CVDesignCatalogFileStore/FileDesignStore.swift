@@ -39,7 +39,10 @@ public actor FileDesignStore: DesignStore {
         self.directory = directory; self.validator = validator
     }
 
-    static let indexVersion = 1, maxIndexBytes = 1024 * 1024, maxGeneration = Int(Int32.max)
+    /// The index's schema version. An index written with a new palette or font scheme cannot be read by an older app:
+    /// bump the index version when these change.
+    static let indexVersion = 2
+    static let maxIndexBytes = 1024 * 1024, maxGeneration = Int(Int32.max)
     private var designsDirectory: URL { directory.appendingPathComponent("Designs", isDirectory: true) }
     private var indexFile: URL { directory.appendingPathComponent("index.json") }
     private static func fileName(_ id: String, _ generation: Int) -> String { "\(id).\(generation).mcvt" }
@@ -47,8 +50,8 @@ public actor FileDesignStore: DesignStore {
 
     /// A design file is a design package, in the format the validator reads.
     private struct PackageFile: Codable { let manifest: DesignManifest; let cssContent: String; let previewImageBase64: String? }
-    /// Index schema 1: each stored design's manifest and the generation of its file.
-    private struct IndexV1: Codable { let schemaVersion: Int; let designs: [Entry] }
+    /// Index schema 2: each stored design's manifest and the generation of its file.
+    private struct IndexV2: Codable { let schemaVersion: Int; let designs: [Entry] }
     private struct Entry: Codable { let manifest: DesignManifest; let generation: Int }
 
     // MARK: DesignStore
@@ -63,7 +66,7 @@ public actor FileDesignStore: DesignStore {
             guard generation <= Self.maxGeneration else { throw .wouldNotReadBack(id: id) }
             let entry = Entry(manifest: design.manifest, generation: generation)
             let listed = (entries.filter { $0.manifest.id != id } + [entry]).sorted { $0.manifest.id < $1.manifest.id }
-            let index = try encode(IndexV1(schemaVersion: Self.indexVersion, designs: listed), for: id)
+            let index = try encode(IndexV2(schemaVersion: Self.indexVersion, designs: listed), for: id)
             guard index.count <= Self.maxIndexBytes else { throw .wouldNotReadBack(id: id) }
             try write(package, to: file(entry), for: id)
             try write(index, to: indexFile, for: id)
@@ -177,14 +180,22 @@ public actor FileDesignStore: DesignStore {
         do { version = try JSONDecoder().decode(Envelope.self, from: data).schemaVersion } catch { throw .indexCorrupt("no schema version") }
         guard version <= Self.indexVersion else { throw .indexFromNewerVersion(version) }
         guard version == Self.indexVersion else { throw .indexCorrupt("schema version \(version)") }
-        let index: IndexV1
-        do { index = try JSONDecoder().decode(IndexV1.self, from: data) } catch { throw .indexCorrupt("not an index") }
+        let index: IndexV2
+        do { index = try JSONDecoder().decode(IndexV2.self, from: data) } catch { throw .indexCorrupt("not an index") }
         let ids = index.designs.map(\.manifest.id)
         guard ids.allSatisfy(DesignManifest.isValidID), ids == ids.sorted(), Set(ids).count == ids.count,
-              index.designs.allSatisfy({ (1...Self.maxGeneration).contains($0.generation) }) else {
+              index.designs.allSatisfy({ (1...Self.maxGeneration).contains($0.generation) && Self.isValid($0.manifest) }) else {
             throw .indexCorrupt("entries")
         }
         return index.designs
+    }
+
+    /// The fields an index holds are checked as the validator checks them in a package (the identifier is checked
+    /// with the list, and the version, palette and font scheme are typed, so they are checked by decoding): an entry the
+    /// validator would refuse is corrupt.
+    private static func isValid(_ manifest: DesignManifest) -> Bool {
+        DesignManifest.isValidName(manifest.name) && DesignManifest.isValidDescription(manifest.description)
+            && manifest.markupContract == MarkupContract.version
     }
 
     // MARK: Writing
