@@ -100,22 +100,28 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 **`CVDesignCatalog`**
 - **`MarkupContract`**, version 1: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](markup-contract.md).
 - **The CSS policy:** a tokenizer, an allow-list of properties and values, and canonical re-serialisation into `ValidatedStylesheet`, whose initialiser is internal.
-- **`DesignPackageValidator`** takes raw bytes and returns a `ValidatedDesign`: manifest, parsed version, stylesheet and PNG preview.
-  - The manifest names the design's default palette and default font scheme by identifier. A missing one is a malformed manifest; an identifier the catalog does not know is reported by name (`unknownPalette`, `unknownFontScheme`).
-  - The version is `MAJOR.MINOR.PATCH`: each part is `0` or one to nine ASCII digits without a leading zero, so a version has one spelling. `DesignVersion` orders versions by number (`1.0.10` is later than `1.0.9`); anything else is `invalidVersion`.
+- **`DesignPackageValidator`** takes raw bytes and returns a `ValidatedDesign`: manifest, stylesheet and PNG preview.
+  - The manifest's `name` is one line of 1–80 Unicode scalars that is not only white space, and its `description` has up to 500 scalars and may span lines. Neither holds a control character (the description's new line aside) or an explicit bidirectional embedding, override or isolate: `invalidName`, `invalidDescription`. `FileDesignStore` applies the same predicates to the entries of its index.
+  - The manifest names the design's default palette and default font scheme by identifier. A missing key, or a value that is not a string, is a malformed manifest; an identifier the catalog does not know is reported (`unknownPalette`, `unknownFontScheme`).
+  - The version is `MAJOR.MINOR.PATCH`: each part is `0` or one to nine ASCII digits without a leading zero, so a version has one spelling. `DesignManifest.version` is a `DesignVersion`, stored and decoded as that text and ordered by number (`1.0.10` is later than `1.0.9`). A missing or non-string version is a malformed manifest; a string that is not a version is `invalidVersion`.
+  - A violation's description prints at most 64 scalars of the text it names, escaped to ASCII and marked when cut. The violation itself keeps the full text.
 - **Customisation values:**
   - `HexColor`, and `Palette`, which exists only with readable contrast;
-  - `NamedPalette`: a closed set named after colours, never after a design (`ink`, `slate`, `ocean`, `plum`). Each passes the `Palette` contrast rule, which a test proves through the public initialisers. Its raw value is the identifier a design choice stores;
+  - `NamedPalette`: a closed set named after colours, never after a design (`ink`, `slate`, `ocean`, `plum`). Each passes the `Palette` contrast rule, and a test rebuilds every case through the public initialisers. Its raw value is the identifier a design choice stores;
   - `FontScheme`: a closed set of system families (`system`, `serif`, `rounded`), also stored by its raw value.
-- **Use cases** report `DesignCatalogError` (`unknownDesign`, `storeUnavailable`, `bundledDesignsUnavailable`). They are typed and not cancellable (R3), and a failure of the store or the source is translated, never passed through:
+- **Use cases:**
+  - **`ListDesigns`**, **`GetDesign`** and **`ResolveDesign`** use typed `throws(DesignCatalogError)`: store operations are short I/O and not cancellable (R3), and a failure of the store is translated to `storeUnavailable`, never passed through;
   - **`ListDesigns`**: the installed designs' manifests, ordered by identifier;
   - **`GetDesign`**: one installed design, or `unknownDesign`;
-  - **`SyncBundledDesigns`**: validates each bundled package. A package whose identifier no design has is installed, and one newer than the installed design replaces it (upgraded). One of the same or an older version is left alone, so a bundled design never downgrades a design installed by other means. A package the validator rejects is reported with its name and violations, and the others still sync. The `SyncReport` lists the installed, upgraded and unchanged identifiers and the rejected packages. No rendering gate runs here: bundled designs are proved by the rendering tests, and the sync runs at every launch;
-  - **`ResolveDesign`**: turns a design identifier and optional palette and font scheme identifiers into a `ResolvedDesign` (stylesheet, palette, font scheme). A palette or font scheme that is missing or unknown falls back to the design's default; an unknown design is `unknownDesign`. It takes raw identifiers because the catalog does not import the domain (R1), so the app maps its `DesignChoice` to them;
-  - **`InstallDesign`**: validate the raw bytes, then `DesignRenderingGate.verify`, then `DesignStore.save`. Nothing is stored unless both checks pass.
+  - **`ResolveDesign`**: turns a design identifier and optional palette and font scheme identifiers into a `ResolvedDesign` (stylesheet, palette, font scheme). A palette or font scheme that is missing or unknown falls back to the design's default; an unknown design is `unknownDesign`. It takes raw identifiers because the catalog does not import the domain (R1), so `PrestoCVIntegration` maps a CV's `DesignChoice` to them;
+  - **`InstallDesign`**: validate the raw bytes, then `DesignRenderingGate.verify`, then `DesignStore.save`. Nothing is stored unless both checks pass. It uses untyped `throws` and passes its errors through, so a cancelled render ends in a `CancellationError`;
+  - **`SyncBundledDesigns`**: validates each bundled package, then renders it through the same gate, then saves it (R8). It uses untyped `throws`: a `DesignCatalogError` or the gate's `CancellationError`, unchanged.
+    - The installed designs are listed once and compared by manifest version. A package whose identifier no design has is installed, and one newer than the installed design replaces it (upgraded). One of the same or an older version is left alone, neither rendered nor written, so a bundled design never downgrades a design installed by other means and an installed design is never read.
+    - A package fails on its own, and the others still sync: the validator rejects it (`rejected`, with its name and violations), the gate refuses it or fails (`notRendered`), or the store fails to save it (`failed`).
+    - What stops the sync: a store that cannot list its designs (`storeUnavailable`), a source that cannot be read (`bundledDesignsUnavailable`), and cancellation. The `SyncReport` lists `installed`, `upgraded`, `unchanged`, `rejected`, `notRendered` and `failed`.
 - **Ports:** `DesignStore`, `BundledDesignSource` (raw bytes), and **`DesignRenderingGate`**. The catalog owns the gate; `CVRendering` implements it, along the allowed Rendering → Catalog edge.
 
-**`CVDesignCatalogFileStore`** holds `FileDesignStore`: the directory is injected, the index is written atomically under a lock (`flock`), and one instance serves the process. Every read validates the file again, so only validated designs leave the store.
+**`CVDesignCatalogFileStore`** holds `FileDesignStore`: the directory is injected, the index is written atomically under a lock (`flock`), and one instance serves the process. Every read validates the file again, so only validated designs leave the store. The index is schema version 2, and each entry's manifest is validated when the index is read; an index of another schema, or with an entry the validator would refuse, is reported and left untouched.
 
 **`CVBundledDesigns`** holds the bundled `.mcvt` files as resources, served as raw bytes through `Bundle.module`.
 
@@ -150,7 +156,8 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - `PDFInspecting` on PDFKit, used by the export workflow and by the native contract tests. Every file is wrapped in `#if canImport(PDFKit)`.
 
 **Test support and tests.**
-- **`CVRenderingTestSupport`** may import `CVRendering`, `CVDocumentModel`, `CVDesignCatalog`, Foundation. It holds `InMemoryDesignStore`, the **`DesignStore` contract suite** that it and `FileDesignStore` pass, and:
+- **`CVRenderingTestSupport`** may import `CVRendering`, `CVDocumentModel`, `CVDesignCatalog`, Foundation. It holds `InMemoryDesignStore`, the **`DesignStore` contract suite** that it and `FileDesignStore` pass, the design package builders, and:
+  - the catalog doubles: `UnavailableStore` (every call fails), `SpyDesignStore` (records its saves; listing, reading and saving can be made to fail), `FixedBundledSource` (a fixed list of packages, or none readable) and `FakeRenderingGate` (refuses or cancels on chosen identifiers, and records what it verified);
   - the **`PDFRendering` contract suite**:
     - the fixture must fit and contain every field;
     - page count per the inspector;
@@ -159,7 +166,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
     - deterministic pre-start cancellation;
   - `FakePDFRenderer`, which writes real uncompressed PDFs;
   - `MinimalPDFInspector`.
-- **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test, in-flight cancellation and the content-completeness test for every bundled design.
+- **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test and in-flight cancellation.
 
 **Separate package `CVPDFExporterExamples`** holds the demos and the template viewer. The library package contains no executables (R14).
 
