@@ -100,7 +100,9 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - it judges a parsed JSON value, so the exporter stays the authority for what parsing does:
     - with duplicate keys, Swift's decoder keeps the first value and most others the last;
     - a trailing comma and a leading byte order mark are accepted;
-    - nesting deeper than 512 levels and lone surrogate escapes are refused;
+    - UTF-16 and UTF-32 input are accepted too (a UTF-32 little-endian byte order mark is refused on Linux), and the 1 MiB limit then counts bytes in that encoding;
+    - nesting deeper than 512 levels is refused;
+    - a lone surrogate escape and a number out of range, such as `1e400`, are refused in the fields the exporter reads and accepted in the value of an unknown property (a lone surrogate in a property name is refused too);
     - numbers with more than 15 significant digits round as a double does;
   - it does not express the byte limits, the character rules, a blank name or the order of a period's dates, so `CVDocumentValidator` is authoritative;
   - `CVDocumentModelTests` hold it and the model to each other.
@@ -159,7 +161,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
     - deterministic pre-start cancellation;
   - `FakePDFRenderer`, which writes real uncompressed PDFs;
   - `MinimalPDFInspector`.
-- **`CVDocumentModelTests`** may import `CVDocumentModel`, `CVRenderingTestSupport`, Foundation, Testing. They read the committed schema from the source tree and check it with a minimal validator of their own, which refuses any keyword it does not support, and any supported keyword whose value has the wrong shape:
+- **`CVDocumentModelTests`** may import `CVDocumentModel`, `CVRenderingTestSupport`, Foundation, Testing. They read the committed schema from the source tree as strict JSON (no byte order mark, no trailing comma, no repeated key) and check it with a minimal validator of their own, which refuses any keyword it does not support, and any supported keyword whose value has the wrong shape:
   - the documents the encoder writes, `ContractFixture.document` among them, validate against the schema;
   - the schema and `CVDocumentValidator.decode(json:)` give the same verdict on a generated matrix and on a short table of semantic cases:
     - the matrix changes every node of a document that has all its optional fields: null, empty, the text limit in characters and in bytes, the bounds of each integer, a number written with a decimal point, a removed key, an unknown property, 200 and 201 elements, a value of the wrong type;
