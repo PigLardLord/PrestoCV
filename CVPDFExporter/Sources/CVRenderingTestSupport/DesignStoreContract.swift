@@ -39,16 +39,17 @@ public enum DesignStoreContract {
 
     /// A design as the validator accepts it; `preview` adds a PNG preview, which is stored too.
     public static func design(id: String, version: String = "1.0.0", css: String = ".cv-name{color:var(--color-primary)}",
-                              preview: Bool = false) throws -> ValidatedDesign {
-        try DesignPackageValidator().validate(package(id: id, version: version, css: css, preview: preview))
+                              preview: Bool = false, defaultPalette: NamedPalette = .ink, defaultFonts: FontScheme = .system) throws -> ValidatedDesign {
+        try DesignPackageValidator().validate(package(id: id, version: version, css: css, preview: preview,
+                                                      defaultPalette: defaultPalette, defaultFonts: defaultFonts))
     }
 
     /// The raw bytes of a design package, valid unless the arguments make it invalid.
     public static func package(id: String, version: String = "1.0.0", css: String = ".cv-name{color:var(--color-primary)}",
-                               preview: Bool = false) throws -> Data {
+                               preview: Bool = false, defaultPalette: NamedPalette = .ink, defaultFonts: FontScheme = .system) throws -> Data {
         var object: [String: Any] = [
-            "manifest": ["id": id, "name": id, "version": version, "description": "", "defaultPalette": NamedPalette.ink.rawValue,
-                         "defaultFonts": FontScheme.system.rawValue, "markupContract": MarkupContract.version],
+            "manifest": ["id": id, "name": id, "version": version, "description": "", "defaultPalette": defaultPalette.rawValue,
+                         "defaultFonts": defaultFonts.rawValue, "markupContract": MarkupContract.version],
             "cssContent": css,
         ]
         if preview { object["previewImageBase64"] = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x2A]).base64EncodedString() }

@@ -8,10 +8,8 @@ struct ResolveDesignTests {
     /// A store with `clean` (defaults slate and serif) and `bold` (defaults plum and rounded).
     private func store() async throws -> InMemoryDesignStore {
         let store = InMemoryDesignStore()
-        let clean = designData(".cv-name{color:var(--color-primary)}", id: "clean", manifestExtra: ["defaultPalette": "slate", "defaultFonts": "serif"])
-        let bold = designData(".cv-entry-title{font-weight:700}", id: "bold", manifestExtra: ["defaultPalette": "plum", "defaultFonts": "rounded"])
-        try await store.save(DesignPackageValidator().validate(clean))
-        try await store.save(DesignPackageValidator().validate(bold))
+        try await store.save(DesignStoreContract.design(id: "clean", css: ".cv-name{color:var(--color-primary)}", defaultPalette: .slate, defaultFonts: .serif))
+        try await store.save(DesignStoreContract.design(id: "bold", css: ".cv-entry-title{font-weight:700}", defaultPalette: .plum, defaultFonts: .rounded))
         return store
     }
 

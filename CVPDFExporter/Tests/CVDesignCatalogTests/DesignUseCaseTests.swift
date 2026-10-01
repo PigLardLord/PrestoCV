@@ -4,14 +4,6 @@ import CVDesignCatalog
 import CVBundledDesigns
 import CVRenderingTestSupport
 
-/// A store that cannot be reached: every operation fails, so the tests can see how the use cases report it (R7).
-struct UnavailableStore: DesignStore {
-    struct Failure: Error {}
-    func save(_ design: ValidatedDesign) async throws { throw Failure() }
-    func design(id: String) async throws -> ValidatedDesign? { throw Failure() }
-    func installedDesigns() async throws -> [DesignManifest] { throw Failure() }
-}
-
 @Suite("listing and getting designs (#125)")
 struct ListAndGetDesignTests {
     @Test("an empty store lists no designs")
@@ -61,16 +53,6 @@ struct ReadOnlyStore: DesignStore {
     func save(_ design: ValidatedDesign) async throws { throw Failure() }
     func design(id: String) async throws -> ValidatedDesign? { nil }
     func installedDesigns() async throws -> [DesignManifest] { [] }
-}
-
-/// A bundled source with a fixed list of packages; `nil` is a source that cannot be read.
-struct FixedBundledSource: BundledDesignSource {
-    struct Unreachable: Error {}
-    let packages: [(name: String, data: Data)]?
-    func bundledPackages() async throws -> [(name: String, data: Data)] {
-        guard let packages else { throw Unreachable() }
-        return packages
-    }
 }
 
 private func bundled(_ id: String, version: String = "1.0.0", css: String = ".cv-name{color:var(--color-primary)}") throws -> (name: String, data: Data) {
