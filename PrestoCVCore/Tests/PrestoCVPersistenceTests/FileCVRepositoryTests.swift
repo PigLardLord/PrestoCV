@@ -438,3 +438,33 @@ struct StoredTextTests {
         #expect(listing.cvs == [loaded] && listing.issues.isEmpty)
     }
 }
+
+@Suite("R6 · saveable implies storable")
+struct StorableLimitsTests {
+    @Test("the domain's text and entry limits sit within the store's caps, which count characters and not bytes")
+    func limitsWithinStoreCaps() {
+        #expect(CVLimits.maxTextBytes <= CVFileV1.maxText && CVLimits.maxEntriesPerSection <= CVFileV1.maxItems)
+    }
+
+    @Test("a CV at every limit is saved by the file store and loads back equal")
+    func extremeCV() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let summary = String(repeating: "x", count: CVLimits.maxTextBytes)                // ASCII: as many characters as bytes
+        var budget = CVLimits.maxTotalTextBytes - "Ada".utf8.count - summary.utf8.count - CVLimits.maxEntriesPerSection
+        var skills: [Skill] = []
+        for _ in 0..<CVLimits.maxEntriesPerSection {                                       // one byte each, and the rest in the first skills
+            let extra = min(budget, CVLimits.maxTextBytes - 1)
+            budget -= extra
+            skills.append(Skill(name: String(repeating: "s", count: 1 + extra), level: SkillLevel(3)))
+        }
+        let cv = CV(id: id1, personal: PersonalDetails(fullName: "Ada", summary: summary), sections: CVSections(skills: skills))
+        #expect(budget == 0 && cv.sections.skills.count == CVLimits.maxEntriesPerSection)
+        #expect("Ada".utf8.count + summary.utf8.count + skills.reduce(0) { $0 + $1.name.utf8.count } == CVLimits.maxTotalTextBytes)
+        #expect(skills.map(\.name.utf8.count).max() == CVLimits.maxTextBytes)
+        #expect(cv.limitViolation == nil)
+
+        let saved = try await SaveCV(repository: repo(dir))(cv)
+        let loaded = try await repo(dir).load(id1)
+        #expect(loaded == saved && loaded.personal == cv.personal && loaded.sections == cv.sections)
+    }
+}

@@ -1,11 +1,15 @@
-/// The size bounds of a CV, in UTF-8 bytes and in entries (R6). A CV within them maps to a document the exporter accepts,
-/// so a CV that can be saved can be rendered. They sit at or below the document validator's bounds (16,384 bytes in a
-/// text, 262,144 in the whole document, 200 entries in a section), never above: the document adds its language tag, and
-/// the domain counts every text a CV holds, the title included, so it is never looser than the validator.
+/// The size bounds of a CV, in UTF-8 bytes and in entries (R6). They sit at or below the bounds of both places a CV
+/// goes:
+/// - **The document validator** of the exporter (16,384 bytes in a text, 262,144 in the whole document, 200 entries in a
+///   section), so a CV within them maps to a document the validator accepts. The domain is never looser: the document
+///   adds its language tag, and the domain counts every text a CV holds, the title included.
+/// - **The stored file** (schema 1), which caps a text at 10,000 characters, a list at 500 items and a file at 5 MiB.
+///   10,000 bytes are never more than 10,000 characters, 200 entries are under 500, and 250,000 bytes of text are far
+///   under the file cap, so a CV that can be saved can be stored.
 ///
 /// A CV over a bound is refused at save with the reason (`CV.limitViolation`). No text is ever cut.
 public enum CVLimits {
-    public static let maxTextBytes = 16_000
+    public static let maxTextBytes = 10_000
     public static let maxTotalTextBytes = 250_000
     public static let maxEntriesPerSection = 200
 }

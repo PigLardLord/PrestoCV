@@ -89,7 +89,7 @@ struct CVLimitsTests {
     }
 
     @Test("a text is measured in UTF-8 bytes, not characters",
-          arguments: [("\u{00E9}", 8_000, true), ("\u{00E9}", 8_001, false), ("e\u{0301}", 5_333, true), ("e\u{0301}", 5_334, false), ("🙂", 4_000, true), ("🙂", 4_001, false)])
+          arguments: [("\u{00E9}", 5_000, true), ("\u{00E9}", 5_001, false), ("e\u{0301}", 3_333, true), ("e\u{0301}", 3_334, false), ("🙂", 2_500, true), ("🙂", 2_501, false)])
     func bytesNotCharacters(unit: String, repeats: Int, fits: Bool) {
         let summary = limitCV(PersonalDetails(fullName: "Ada", summary: String(repeating: unit, count: repeats)))
         #expect((summary.limitViolation == nil) == fits)

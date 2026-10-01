@@ -37,8 +37,10 @@ Test targets and test-support targets are described below each package. The chec
   - **multi line**: the summary and the descriptions of an experience, an education entry and a certification. A line break becomes `\n`, and a tab becomes one space.
   - **Both kinds** remove, without an error, the C0 controls, DEL, the C1 controls other than NEL, bidirectional embeddings, overrides and isolates (U+202A–U+202E, U+2066–U+2069), and tag characters (U+E0000–U+E007F). They keep ZWJ and ZWNJ, and they neither trim nor collapse spaces. Applying the rule twice gives the same text.
   - Interests are normalised before they are trimmed and de-duplicated, so `a<tab>b` and `a b` are one interest.
-- **Size limits**, `CVLimits`, counted in UTF-8 bytes: 16,000 bytes in a text, 250,000 in all the text of a CV, and 200 entries in a section.
-  - They are at or below the bounds of the document validator in `CVPDFExporter` (16,384, 262,144 and 200), so a CV within them maps to a document the validator accepts (R6). They sit below the validator's because the document adds its language tag, and because the domain counts every text a CV holds, the title, the contact details and the links included, so it is never looser.
+- **Size limits**, `CVLimits`, counted in UTF-8 bytes: 10,000 bytes in a text, 250,000 in all the text of a CV, and 200 entries in a section.
+  - They are at or below the bounds of both places a CV goes, so a CV that can be saved can be rendered and can be stored (R6, R12):
+    - the document validator in `CVPDFExporter` (16,384 bytes in a text, 262,144 in all, 200 entries). They sit below it because the document adds its language tag, and because the domain counts every text a CV holds, the title, the contact details and the links included, so it is never looser;
+    - the stored file ([ADR 0009](adr/0009-persisted-schema-v1.md)): a text of at most 10,000 characters, a list of at most 500 items and a file of at most 5 MiB. A text of 10,000 bytes is never more than 10,000 characters, 200 entries are under 500, and 250,000 bytes of text are far under the file cap.
   - `limitViolation` reports the first bound in a fixed order: a text that is too long (`textTooLong`, which names the field and, for an entry, its index in the section), then a section with too many entries (`tooManyEntries`), then the total (`tooMuchText`). The values name fields and sections; presentation writes the words (R13).
   - A text is never cut. A CV over a bound is refused at save.
 - **Value objects:**
