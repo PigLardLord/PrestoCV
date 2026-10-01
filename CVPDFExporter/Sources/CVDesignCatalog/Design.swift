@@ -156,7 +156,7 @@ public struct HexColor: Sendable, Equatable {
     }
     /// A colour written in the source, known to be `#RRGGBB`. Only `NamedPalette` uses it; everything else goes
     /// through the checked initialiser.
-    init(known value: String) { self.value = value }
+    fileprivate init(known value: String) { self.value = value }
     /// WCAG relative luminance.
     var luminance: Double {
         let hex = Array(value.dropFirst())
@@ -182,7 +182,7 @@ public struct Palette: Sendable, Equatable {
     }
     /// A palette written in the source, known to pass the contrast rule. Only `NamedPalette` uses it, and its tests
     /// build every case again through the checked initialiser.
-    init(known primary: HexColor, text: HexColor, background: HexColor) {
+    fileprivate init(known primary: HexColor, text: HexColor, background: HexColor) {
         self.primary = primary; self.text = text; self.background = background
     }
     public var customProperties: String {

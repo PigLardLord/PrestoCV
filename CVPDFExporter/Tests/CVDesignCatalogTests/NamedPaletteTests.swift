@@ -22,6 +22,15 @@ struct NamedPaletteTests {
         #expect(named.palette == built)
     }
 
+    @Test("every named palette, whatever the table above lists, rebuilds through the public checked initialisers", arguments: NamedPalette.allCases)
+    func rebuilt(named: NamedPalette) throws {
+        let palette = named.palette
+        let primary = try #require(HexColor(palette.primary.value)), text = try #require(HexColor(palette.text.value))
+        let background = try #require(HexColor(palette.background.value))
+        let checked = try #require(Palette(primary: primary, text: text, background: background), "\(named.rawValue) is not readable")
+        #expect(checked == palette)
+    }
+
     @Test("the identifiers of palettes and font schemes are their raw values, and round-trip through JSON")
     func identifiers() throws {
         struct Choice: Codable, Equatable { var palette: NamedPalette, fonts: FontScheme }
