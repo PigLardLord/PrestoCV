@@ -75,7 +75,7 @@ public struct SyncBundledDesigns: Sendable {
             let id = design.manifest.id
             let installed: ValidatedDesign?
             do { installed = try await store.design(id: id) } catch { throw .storeUnavailable }
-            if let installed, design.version <= installed.version {
+            if let installed, design.manifest.version <= installed.manifest.version {
                 report.unchanged.append(id)
                 continue
             }

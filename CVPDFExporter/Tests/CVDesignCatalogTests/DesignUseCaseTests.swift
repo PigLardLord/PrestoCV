@@ -98,7 +98,7 @@ struct SyncBundledDesignsTests {
         #expect(report.upgraded == ["clean"])
         #expect(report.installed.isEmpty && report.unchanged.isEmpty && report.rejected.isEmpty)
         let stored = try await GetDesign(store: store)(id: "clean")
-        #expect(stored.manifest.version == bundledVersion && stored.stylesheet.css == ".cv-entry-title{font-weight:600}")
+        #expect(stored.manifest.version.text == bundledVersion && stored.stylesheet.css == ".cv-entry-title{font-weight:600}")
     }
 
     @Test("a bundled design of the same version leaves the installed one alone")
@@ -132,7 +132,7 @@ struct SyncBundledDesignsTests {
         let source = FixedBundledSource(packages: [try bundled("a"), try bundled("b", version: "1.1.0"), try bundled("c"), try bundled("d")])
         let report = try await SyncBundledDesigns(source: source, store: store)()
         #expect(report.installed == ["a"] && report.upgraded == ["b"] && report.unchanged == ["c", "d"] && report.rejected.isEmpty)
-        #expect(try await store.installedDesigns().map(\.version) == ["1.0.0", "1.1.0", "1.0.0", "2.0.0"])
+        #expect(try await store.installedDesigns().map(\.version.text) == ["1.0.0", "1.1.0", "1.0.0", "2.0.0"])
     }
 
     @Test("a rejected package is reported with its name and violations, and the others still sync")

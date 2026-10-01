@@ -1,13 +1,13 @@
 import Foundation
 
 public struct DesignManifest: Codable, Sendable, Equatable {
-    public var id: String, name: String, version: String, description: String
+    public var id: String, name: String, version: DesignVersion, description: String
     /// The palette and the font scheme the design uses when a design choice names none, or names one the catalog does
     /// not know.
     public var defaultPalette: NamedPalette, defaultFonts: FontScheme
     /// Version of the markup contract the design's CSS was written for (ADR 0011).
     public var markupContract: Int
-    public init(id: String, name: String, version: String, description: String, defaultPalette: NamedPalette, defaultFonts: FontScheme,
+    public init(id: String, name: String, version: DesignVersion, description: String, defaultPalette: NamedPalette, defaultFonts: FontScheme,
                 markupContract: Int = MarkupContract.version) {
         self.id = id; self.name = name; self.version = version; self.description = description
         self.defaultPalette = defaultPalette; self.defaultFonts = defaultFonts; self.markupContract = markupContract
@@ -40,8 +40,6 @@ public enum DesignPackageViolation: Equatable, Sendable, CustomStringConvertible
 /// A design that passed every check. Only the validator creates one.
 public struct ValidatedDesign: Sendable, Equatable {
     public let manifest: DesignManifest
-    /// The manifest's `version`, parsed: the only ordered form of it.
-    public let version: DesignVersion
     public let stylesheet: ValidatedStylesheet
     public let previewPNG: Data?
 }
@@ -57,8 +55,8 @@ public struct DesignPackageValidator: Sendable {
     static let manifestKeys: Set<String> = ["id", "name", "version", "description", "defaultPalette", "defaultFonts", "markupContract",
                                             "author", "price"]
 
-    /// The manifest as the package writes it. The identifiers of the defaults stay strings until the catalog has checked
-    /// that it knows them, so a violation can name the identifier.
+    /// The manifest as the package writes it. The version and the identifiers of the defaults stay strings until the
+    /// catalog has checked them, so a violation can name the text.
     private struct RawManifest: Decodable {
         let id: String, name: String, version: String, description: String
         let defaultPalette: String, defaultFonts: String
@@ -98,9 +96,9 @@ public struct DesignPackageValidator: Sendable {
             else { violations.append(.invalidPreview("not a PNG within \(maxPreviewBytes) bytes")) }
         }
         guard violations.isEmpty, let version, let palette, let fonts, let stylesheet else { throw DesignPackageRejected(violations: violations) }
-        let manifest = DesignManifest(id: raw.id, name: raw.name, version: raw.version, description: raw.description,
+        let manifest = DesignManifest(id: raw.id, name: raw.name, version: version, description: raw.description,
                                       defaultPalette: palette, defaultFonts: fonts, markupContract: raw.markupContract)
-        return ValidatedDesign(manifest: manifest, version: version, stylesheet: stylesheet, previewPNG: preview)
+        return ValidatedDesign(manifest: manifest, stylesheet: stylesheet, previewPNG: preview)
     }
 }
 

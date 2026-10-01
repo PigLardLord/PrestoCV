@@ -11,8 +11,31 @@ private func fragment(_ json: String) throws -> Any {
 }
 
 private func version(_ text: String) throws -> DesignVersion {
-    try DesignPackageValidator().validate(designData(".cv{}", manifestExtra: ["version": text])).version
+    try #require(DesignVersion(text), "\(text) should be a version")
 }
+
+/// Texts that are not versions, built step by step: a long literal array is slow to type-check.
+private let invalidVersions: [String] = {
+    var texts: [String] = []
+    texts.append(contentsOf: ["", "1", "1.0", "1.0.0.0", "1..0", "1.0.", ".1.0"])
+    texts.append(contentsOf: ["01.0.0", "1.00.0", "1.0.00", "+1.0.0", "-1.0.0", "1.-1.0"])
+    texts.append(contentsOf: ["1.0.0-beta", "1.0.0+build", "v1.0.0", "1.0.x", "1,0,0"])
+    texts.append(contentsOf: [" 1.0.0", "1.0.0 ", "1. 0.0", "1.0.0\n", "1.0.0\u{2028}"])
+    texts.append(contentsOf: ["9999999999.0.0", "1.9999999999.0", "1.0.9999999999", "\u{0661}.0.0"])
+    return texts
+}()
+
+private let orderedPairs: [(greater: String, lesser: String)] = {
+    var pairs: [(greater: String, lesser: String)] = []
+    pairs.append(("1.0.10", "1.0.9"))
+    pairs.append(("1.10.0", "1.9.9"))
+    pairs.append(("2.0.0", "1.99.99"))
+    pairs.append(("10.0.0", "9.0.0"))
+    pairs.append(("1.0.1", "1.0.0"))
+    pairs.append(("1.1.0", "1.0.99"))
+    pairs.append(("0.0.1", "0.0.0"))
+    return pairs
+}()
 
 @Suite("the manifest names a design's defaults and an ordered version (#125)")
 struct DesignManifestTests {
@@ -67,16 +90,13 @@ struct DesignManifestTests {
     ])
     func validVersion(text: String) throws {
         let design = try DesignPackageValidator().validate(designData(".cv{}", manifestExtra: ["version": text]))
-        #expect(design.manifest.version == text)
+        #expect(design.manifest.version == DesignVersion(text) && design.manifest.version.text == text)
     }
 
-    @Test("anything else is an invalid version", arguments: [
-        "", "1", "1.0", "1.0.0.0", "1..0", "1.0.", ".1.0", "01.0.0", "1.00.0", "1.0.00", "+1.0.0", "-1.0.0", "1.-1.0", "1.0.0-beta",
-        "1.0.0+build", "v1.0.0", "1.0.x", " 1.0.0", "1.0.0 ", "1. 0.0", "1.0.0\n", "1.0.0\u{2028}", "9999999999.0.0", "1.9999999999.0",
-        "1.0.9999999999", "\u{0661}.0.0", "1,0,0",
-    ])
+    @Test("anything else is an invalid version", arguments: invalidVersions)
     func invalidVersion(text: String) {
         #expect(violations(of: designData(".cv{}", manifestExtra: ["version": text])) == [.invalidVersion(text)])
+        #expect(DesignVersion(text) == nil)
     }
 
     @Test("a version that is not a string is a malformed manifest", arguments: ["1", "1.5", "null", #"["1.0.0"]"#])
@@ -84,10 +104,7 @@ struct DesignManifestTests {
         #expect(violations(of: designData(".cv{}", manifestExtra: ["version": try fragment(json)])) == [.malformed("manifest")])
     }
 
-    @Test("versions are compared by number, part by part", arguments: [
-        ("1.0.10", "1.0.9"), ("1.10.0", "1.9.9"), ("2.0.0", "1.99.99"), ("10.0.0", "9.0.0"), ("1.0.1", "1.0.0"), ("1.1.0", "1.0.99"),
-        ("0.0.1", "0.0.0"),
-    ])
+    @Test("versions are compared by number, part by part", arguments: orderedPairs)
     func ordering(greater: String, lesser: String) throws {
         let (high, low) = (try version(greater), try version(lesser))
         #expect(high > low)
@@ -103,11 +120,29 @@ struct DesignManifestTests {
         #expect(!(first < second) && !(first > second))
     }
 
-    @Test("a validated design carries the parsed version of its manifest")
-    func validatedDesignVersion() throws {
-        let design = try DesignPackageValidator().validate(designData(".cv{}", manifestExtra: ["version": "3.4.5"]))
-        let (before, same, after) = (try version("3.4.4"), try version("3.4.5"), try version("3.4.6"))
-        #expect(design.version == same)
-        #expect(design.version > before && design.version < after)
+    @Test("a version has one spelling, and is hashable")
+    func text() throws {
+        for text in ["0.0.0", "1.2.3", "10.20.30", "999999999.999999999.999999999"] { #expect(try version(text).text == text) }
+        #expect(Set([try version("1.2.3"), try version("1.2.3"), try version("1.2.4")]).count == 2)
+    }
+
+    @Test("a version is stored as its text, and a text that is not a version does not decode")
+    func codable() throws {
+        struct Holder: Codable, Equatable { var version: DesignVersion }
+        let holder = Holder(version: try version("3.4.5"))
+        let json = try JSONEncoder().encode(holder)
+        #expect(try JSONDecoder().decode([String: String].self, from: json) == ["version": "3.4.5"])
+        #expect(try JSONDecoder().decode(Holder.self, from: json) == holder)
+        for bad in [#"{"version":"1.0"}"#, #"{"version":"01.0.0"}"#, #"{"version":1}"#, #"{"version":null}"#, "{}"] {
+            #expect(throws: DecodingError.self) { _ = try JSONDecoder().decode(Holder.self, from: Data(bad.utf8)) }
+        }
+    }
+
+    @Test("a manifest keeps its version typed, and stores it as text")
+    func manifestVersion() throws {
+        let manifest = DesignManifest(id: "clean", name: "Clean", version: try version("2.0.1"), description: "", defaultPalette: .ink, defaultFonts: .system)
+        let object = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(manifest)) as? [String: Any])
+        #expect(object["version"] as? String == "2.0.1")
+        #expect(try JSONDecoder().decode(DesignManifest.self, from: JSONEncoder().encode(manifest)) == manifest)
     }
 }
