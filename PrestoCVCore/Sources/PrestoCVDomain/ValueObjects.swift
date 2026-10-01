@@ -78,7 +78,9 @@ public enum LanguageProficiency: String, CaseIterable, Hashable, Sendable {
 /// digits, inner hyphens, 1–63 characters each) ending in an alphabetic top-level label. Internationalised letters
 /// are allowed, with the combining marks that follow them (Indic vowel signs, decomposed accents); control, format
 /// and separator characters (NUL, zero-width space, bidirectional overrides) are not, since they can hide or disguise
-/// what is printed. No atom or label starts with a mark.
+/// what is printed. No atom or label starts with a mark. The address is at most 254 bytes and its local part 64. Each
+/// domain label is at most 63 bytes once encoded for IDNA (Punycode, RFC 5891) and the encoded domain at most 253 bytes
+/// (RFC 5890); a label is measured lowercased and in NFC, while the stored value stays as it was written.
 public struct EmailAddress: Hashable, Sendable {
     public let value: String
     static let atom = #"[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-][\p{L}\p{M}\p{N}!#$%&'*+/=?^_`{|}~-]*"#
@@ -92,11 +94,21 @@ public struct EmailAddress: Hashable, Sendable {
         guard v.utf8.count <= 254, !v.unicodeScalars.contains(where: { hidden.contains($0.properties.generalCategory) }),
               v.range(of: Self.pattern, options: .regularExpression) != nil else { return nil }
         // Length limits the pattern cannot express once marks are allowed: a local part of at most 64 bytes, and
-        // domain labels of at most 63 characters, marks included. The exact IDNA length is not checked.
+        // domain lengths. The 254-byte bound above comes first, so the encoder never sees more than that.
         let parts = v.split(separator: "@", omittingEmptySubsequences: false)
-        guard parts.count == 2, parts[0].utf8.count <= 64,
-              parts[1].split(separator: ".").allSatisfy({ $0.unicodeScalars.count <= 63 }) else { return nil }
+        guard parts.count == 2, parts[0].utf8.count <= 64, Self.domainFits(parts[1]) else { return nil }
         value = v
+    }
+
+    /// Each label at most 63 characters, marks included, and 63 bytes as an A-label; all the A-labels, joined by
+    /// dots, at most 253 bytes.
+    private static func domainFits(_ domain: Substring) -> Bool {
+        var aLabels: [String] = []
+        for label in domain.split(separator: ".") {
+            guard label.unicodeScalars.count <= 63, let aLabel = IDNA.aLabel(String(label)), aLabel.utf8.count <= 63 else { return false }
+            aLabels.append(aLabel)
+        }
+        return aLabels.joined(separator: ".").utf8.count <= 253
     }
 }
 

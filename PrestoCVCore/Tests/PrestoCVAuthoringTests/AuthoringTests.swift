@@ -7,14 +7,16 @@ import PrestoCVCoreTestSupport
 let id1 = CVID(UUID(uuidString: "11111111-1111-1111-1111-111111111111")!)
 func named(_ name: String, id: CVID = id1) -> CV { CV(id: id, personal: PersonalDetails(fullName: name)) }
 
-/// Addresses at and just past each length limit: the local part in bytes ("é" is two), a label in characters.
+/// Addresses at and just past each length limit: the local part in bytes ("é" is two), a label in characters and, once
+/// encoded for IDNA, in bytes (EmailDomainLengthTests holds the boundaries of the encoded length).
 let emailLengthCases: [(String, Bool)] = {
     let domain = "@example.com"
     let local64 = String(repeating: "a", count: 64), local65 = String(repeating: "a", count: 65)
     let accented32 = String(repeating: "é", count: 32), accented33 = String(repeating: "é", count: 33)
     let label63 = "a" + String(repeating: "\u{0301}", count: 61) + "b", label64 = "a" + String(repeating: "\u{0301}", count: 62) + "b"
     return [(local64 + domain, true), (local65 + domain, false), (accented32 + domain, true), (accented33 + domain, false),
-            ("ada@example." + label63, true), ("ada@example." + label64, false)]
+            ("ada@example." + String(repeating: "a", count: 63), true), ("ada@example." + String(repeating: "a", count: 64), false),
+            ("ada@example." + label63, false), ("ada@example." + label64, false)]   // 63 characters, but 71 bytes once encoded
 }()
 
 @Suite("R6 · rich domain")
@@ -56,7 +58,7 @@ struct DomainTests {
                       "ada@-example.com", "ada@example-.com", "ada@example.c", "ada@example.123", "ada@@example.com", "@example.com"])
     func malformedEmail(raw: String) { #expect(EmailAddress(raw) == nil) }
 
-    @Test("a local part is at most 64 bytes and a domain label at most 63 characters, marks included", arguments: emailLengthCases)
+    @Test("a local part is at most 64 bytes and a domain label at most 63 characters, marks included, and 63 bytes once encoded", arguments: emailLengthCases)
     func emailLengths(raw: String, accepted: Bool) { #expect((EmailAddress(raw) != nil) == accepted) }
 
     @Test("every accepted link rebuilds itself from its value and stays within the limit (final gate)",
