@@ -27,7 +27,8 @@ public enum ContractFixture {
 
     /// A plain design that passes the CSS policy.
     public static func stylesheet(_ css: String = ".cv-name{color:var(--color-primary)}.cv-entry-title{font-weight:600}") throws -> ValidatedStylesheet {
-        let package: [String: Any] = ["manifest": ["id": "contract", "name": "Contract", "version": "1", "description": "",
+        let package: [String: Any] = ["manifest": ["id": "contract", "name": "Contract", "version": "1.0.0", "description": "",
+                                                    "defaultPalette": NamedPalette.ink.rawValue, "defaultFonts": FontScheme.system.rawValue,
                                                     "markupContract": MarkupContract.version], "cssContent": css]
         return try DesignPackageValidator().validate(JSONSerialization.data(withJSONObject: package)).stylesheet
     }

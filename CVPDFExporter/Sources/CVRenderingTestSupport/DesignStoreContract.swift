@@ -47,7 +47,8 @@ public enum DesignStoreContract {
     public static func package(id: String, version: String = "1.0.0", css: String = ".cv-name{color:var(--color-primary)}",
                                preview: Bool = false) throws -> Data {
         var object: [String: Any] = [
-            "manifest": ["id": id, "name": id, "version": version, "description": "", "markupContract": MarkupContract.version],
+            "manifest": ["id": id, "name": id, "version": version, "description": "", "defaultPalette": NamedPalette.ink.rawValue,
+                         "defaultFonts": FontScheme.system.rawValue, "markupContract": MarkupContract.version],
             "cssContent": css,
         ]
         if preview { object["previewImageBase64"] = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x2A]).base64EncodedString() }

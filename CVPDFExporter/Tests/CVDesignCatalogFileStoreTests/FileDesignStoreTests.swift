@@ -115,9 +115,9 @@ struct FileDesignStoreTests {
     @Test("an index from a newer version or a corrupt one is reported and left untouched, even by a save",
           arguments: [(#"{"schemaVersion":2,"designs":[],"themes":[]}"#, FileDesignStoreError.indexFromNewerVersion(2)),
                       ("not JSON", .indexCorrupt("no schema version")),
-                      (#"{"schemaVersion":1,"designs":[{"generation":1,"manifest":{"id":"../x","name":"","version":"1","description":"","markupContract":1}}]}"#,
+                      (#"{"schemaVersion":1,"designs":[{"generation":1,"manifest":{"id":"../x","name":"","version":"1.0.0","description":"","defaultPalette":"ink","defaultFonts":"system","markupContract":1}}]}"#,
                        .indexCorrupt("entries")),
-                      (#"{"schemaVersion":1,"designs":[{"generation":0,"manifest":{"id":"x","name":"","version":"1","description":"","markupContract":1}}]}"#,
+                      (#"{"schemaVersion":1,"designs":[{"generation":0,"manifest":{"id":"x","name":"","version":"1.0.0","description":"","defaultPalette":"ink","defaultFonts":"system","markupContract":1}}]}"#,
                        .indexCorrupt("entries")),
                       (#"{"schemaVersion":1}"#, .indexCorrupt("not an index"))] as [(String, FileDesignStoreError)])
     func badIndex(contents: String, error: FileDesignStoreError) async throws {

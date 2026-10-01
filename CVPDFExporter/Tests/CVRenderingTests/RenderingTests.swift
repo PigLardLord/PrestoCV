@@ -8,7 +8,8 @@ import CVRenderingTestSupport
 let cleanCSS = ".cv-name{color:var(--color-primary)}.cv-entry-title{font-weight:600}.cv-section-title{text-transform:uppercase}"
 
 func designData(_ css: String, id: String = "clean") -> Data {
-    let object: [String: Any] = ["manifest": ["id": id, "name": "Clean", "version": "1.0.0", "description": "", "markupContract": 1], "cssContent": css]
+    let object: [String: Any] = ["manifest": ["id": id, "name": "Clean", "version": "1.0.0", "description": "", "defaultPalette": "ink",
+                                              "defaultFonts": "system", "markupContract": 1], "cssContent": css]
     return try! JSONSerialization.data(withJSONObject: object)   // test fixture only
 }
 

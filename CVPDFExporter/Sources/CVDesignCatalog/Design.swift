@@ -2,10 +2,15 @@ import Foundation
 
 public struct DesignManifest: Codable, Sendable, Equatable {
     public var id: String, name: String, version: String, description: String
+    /// The palette and the font scheme the design uses when a design choice names none, or names one the catalog does
+    /// not know.
+    public var defaultPalette: NamedPalette, defaultFonts: FontScheme
     /// Version of the markup contract the design's CSS was written for (ADR 0011).
     public var markupContract: Int
-    public init(id: String, name: String, version: String, description: String, markupContract: Int = MarkupContract.version) {
-        self.id = id; self.name = name; self.version = version; self.description = description; self.markupContract = markupContract
+    public init(id: String, name: String, version: String, description: String, defaultPalette: NamedPalette, defaultFonts: FontScheme,
+                markupContract: Int = MarkupContract.version) {
+        self.id = id; self.name = name; self.version = version; self.description = description
+        self.defaultPalette = defaultPalette; self.defaultFonts = defaultFonts; self.markupContract = markupContract
     }
     /// The one rule for design identifiers: lowercase ASCII letters, digits and hyphens, 1–64 characters. Stores use it
     /// before touching storage, so an identifier can never name a path.
@@ -13,8 +18,8 @@ public struct DesignManifest: Codable, Sendable, Equatable {
 }
 
 public enum DesignPackageViolation: Equatable, Sendable, CustomStringConvertible {
-    case tooLarge(Int), malformed(String), unknownKeys([String]), containsHTML, invalidID(String),
-         unsupportedContract(Int), css(String), invalidPreview(String)
+    case tooLarge(Int), malformed(String), unknownKeys([String]), containsHTML, invalidID(String), invalidVersion(String),
+         unknownPalette(String), unknownFontScheme(String), unsupportedContract(Int), css(String), invalidPreview(String)
     public var description: String {
         switch self {
         case .tooLarge(let n): "package too large: \(n) bytes"
@@ -22,6 +27,9 @@ public enum DesignPackageViolation: Equatable, Sendable, CustomStringConvertible
         case .unknownKeys(let k): "unknown keys: \(k)"
         case .containsHTML: "package ships HTML"
         case .invalidID(let id): "invalid id \(id)"
+        case .invalidVersion(let v): "invalid version \(v)"
+        case .unknownPalette(let id): "unknown palette \(id)"
+        case .unknownFontScheme(let id): "unknown font scheme \(id)"
         case .unsupportedContract(let v): "unsupported markup contract \(v)"
         case .css(let reason): "stylesheet rejected: \(reason)"
         case .invalidPreview(let r): "invalid preview: \(r)"
@@ -32,18 +40,30 @@ public enum DesignPackageViolation: Equatable, Sendable, CustomStringConvertible
 /// A design that passed every check. Only the validator creates one.
 public struct ValidatedDesign: Sendable, Equatable {
     public let manifest: DesignManifest
+    /// The manifest's `version`, parsed: the only ordered form of it.
+    public let version: DesignVersion
     public let stylesheet: ValidatedStylesheet
     public let previewPNG: Data?
 }
 
 /// Anti-corruption layer for design packages (R8). Works on the raw bytes: size first, then a strict
-/// decode (unknown keys and any `htmlContent` key are rejected), then id, contract, CSS and preview.
+/// decode (unknown keys and any `htmlContent` key are rejected), then id, version, default palette and font scheme,
+/// contract, CSS and preview.
 public struct DesignPackageValidator: Sendable {
     public var maxBytes: Int, maxPreviewBytes: Int
     public init(maxBytes: Int = 512 * 1024, maxPreviewBytes: Int = 256 * 1024) { self.maxBytes = maxBytes; self.maxPreviewBytes = maxPreviewBytes }
 
     static let packageKeys: Set<String> = ["manifest", "cssContent", "previewImageBase64"]
-    static let manifestKeys: Set<String> = ["id", "name", "version", "description", "markupContract", "author", "price"]
+    static let manifestKeys: Set<String> = ["id", "name", "version", "description", "defaultPalette", "defaultFonts", "markupContract",
+                                            "author", "price"]
+
+    /// The manifest as the package writes it. The identifiers of the defaults stay strings until the catalog has checked
+    /// that it knows them, so a violation can name the identifier.
+    private struct RawManifest: Decodable {
+        let id: String, name: String, version: String, description: String
+        let defaultPalette: String, defaultFonts: String
+        let markupContract: Int
+    }
 
     public func validate(_ data: Data) throws(DesignPackageRejected) -> ValidatedDesign {
         guard data.count <= maxBytes else { throw DesignPackageRejected(violations: [.tooLarge(data.count)]) }
@@ -57,12 +77,18 @@ public struct DesignPackageValidator: Sendable {
         let unknown = Set(object.keys).subtracting(Self.packageKeys).subtracting(["htmlContent"])
             .union(Set(manifestObject.keys).subtracting(Self.manifestKeys).map { "manifest." + $0 })
         if !unknown.isEmpty { violations.append(.unknownKeys(unknown.sorted())) }
-        let manifest: DesignManifest
-        do { manifest = try JSONDecoder().decode(DesignManifest.self, from: JSONSerialization.data(withJSONObject: manifestObject)) }
+        let raw: RawManifest
+        do { raw = try JSONDecoder().decode(RawManifest.self, from: JSONSerialization.data(withJSONObject: manifestObject)) }
         catch { throw DesignPackageRejected(violations: violations + [.malformed("manifest")]) }
         guard let css = object["cssContent"] as? String else { throw DesignPackageRejected(violations: violations + [.malformed("cssContent")]) }
-        if !DesignManifest.isValidID(manifest.id) { violations.append(.invalidID(manifest.id)) }
-        if manifest.markupContract != MarkupContract.version { violations.append(.unsupportedContract(manifest.markupContract)) }
+        if !DesignManifest.isValidID(raw.id) { violations.append(.invalidID(raw.id)) }
+        let version = DesignVersion(raw.version)
+        if version == nil { violations.append(.invalidVersion(raw.version)) }
+        let palette = NamedPalette(rawValue: raw.defaultPalette)
+        if palette == nil { violations.append(.unknownPalette(raw.defaultPalette)) }
+        let fonts = FontScheme(rawValue: raw.defaultFonts)
+        if fonts == nil { violations.append(.unknownFontScheme(raw.defaultFonts)) }
+        if raw.markupContract != MarkupContract.version { violations.append(.unsupportedContract(raw.markupContract)) }
         var stylesheet: ValidatedStylesheet?
         do throws(CSSRejection) { stylesheet = ValidatedStylesheet(css: try CSSPolicy.canonical(css)) } catch { violations.append(.css(error.reason)) }
         var preview: Data?
@@ -71,8 +97,10 @@ public struct DesignPackageValidator: Sendable {
                png.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) { preview = png }
             else { violations.append(.invalidPreview("not a PNG within \(maxPreviewBytes) bytes")) }
         }
-        guard violations.isEmpty, let stylesheet else { throw DesignPackageRejected(violations: violations) }
-        return ValidatedDesign(manifest: manifest, stylesheet: stylesheet, previewPNG: preview)
+        guard violations.isEmpty, let version, let palette, let fonts, let stylesheet else { throw DesignPackageRejected(violations: violations) }
+        let manifest = DesignManifest(id: raw.id, name: raw.name, version: raw.version, description: raw.description,
+                                      defaultPalette: palette, defaultFonts: fonts, markupContract: raw.markupContract)
+        return ValidatedDesign(manifest: manifest, version: version, stylesheet: stylesheet, previewPNG: preview)
     }
 }
 
