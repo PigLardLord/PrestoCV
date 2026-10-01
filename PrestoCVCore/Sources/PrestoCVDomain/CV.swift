@@ -1,5 +1,8 @@
 import Foundation
 
+/// Why a CV cannot be saved: it has no visible name, or it is over a size bound.
+public enum SaveBlocker: Hashable, Sendable { case missingName, limit(CVLimitViolation) }
+
 /// Aggregate root: state changes go through methods (R6). Revision and timestamps belong to the
 /// repository: they can only be set from inside the package (`package` access).
 ///
@@ -36,8 +39,16 @@ public struct CV: Hashable, Sendable {
            sections: sections, design: design, language: language)
     }
 
-    /// The one definition of "has enough content to be saved": a full name with at least one visible character.
-    public var canBeSaved: Bool { personal.fullName.unicodeScalars.contains(where: \.isVisible) }
+    /// The one answer to "can this CV be saved, and why not" (R6): nil when it can. A CV needs a full name with at least
+    /// one visible character, and it must be within the size bounds. The name is checked first, then `limitViolation`,
+    /// which walks the whole CV.
+    public var saveBlocker: SaveBlocker? {
+        guard personal.fullName.unicodeScalars.contains(where: \.isVisible) else { return .missingName }
+        return limitViolation.map(SaveBlocker.limit)
+    }
+
+    /// Whether the CV can be saved: it has no `saveBlocker`, that is, a visible name and no size bound exceeded.
+    public var canBeSaved: Bool { saveBlocker == nil }
 
     public mutating func rename(_ newTitle: String) { title = TextRule.singleLine(newTitle) }
     public mutating func setPersonalDetails(_ details: PersonalDetails) { personal = details.normalised() }

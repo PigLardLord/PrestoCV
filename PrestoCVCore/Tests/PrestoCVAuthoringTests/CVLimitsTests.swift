@@ -153,15 +153,39 @@ struct CVLimitsTests {
         #expect(manyAndLarge.limitViolation == .tooManyEntries(.skills))
     }
 
-    @Test("canBeSaved is about the name only, and a limit is reported beside it")
-    func canBeSavedIsAboutTheName() {
+    @Test("a CV over a limit cannot be saved, the blocker says which, and a missing name comes first")
+    func saveBlockerIsTheWholeRule() {
         let long = text(bytes: CVLimits.maxTextBytes + 1)
-        let named = limitCV(PersonalDetails(fullName: "Ada", summary: long))
-        #expect(named.canBeSaved && named.limitViolation == .textTooLong(.summary))
-        let anonymous = limitCV(PersonalDetails(summary: long))
-        #expect(!anonymous.canBeSaved && anonymous.limitViolation == .textTooLong(.summary))
+        let withName = limitCV(PersonalDetails(fullName: "Ada", summary: long))
+        #expect(!withName.canBeSaved && withName.saveBlocker == .limit(.textTooLong(.summary)))
+        let anonymous = limitCV(PersonalDetails(summary: long), sections: entries(in: [.skills], count: 201))
+        #expect(!anonymous.canBeSaved && anonymous.saveBlocker == .missingName)
+        #expect(FixtureCV.full().canBeSaved && FixtureCV.full().saveBlocker == nil)
+    }
+
+    @Test("every text, section and total violation blocks the save with that violation", arguments: blockedCVs)
+    func blockerCarriesTheViolation(_ test: BlockedCV) {
+        #expect(test.cv.limitViolation == test.violation)
+        #expect(test.cv.saveBlocker == .limit(test.violation) && !test.cv.canBeSaved)
     }
 }
+
+struct BlockedCV: CustomTestStringConvertible, Sendable {
+    let name: String, cv: CV, violation: CVLimitViolation
+    var testDescription: String { name }
+}
+
+/// One CV per kind of violation: a text too long, a section with too many entries, and too much text in all.
+let blockedCVs: [BlockedCV] = {
+    var blocked: [BlockedCV] = []
+    var draft = TextDraft(FixtureCV.full())
+    draft.personal.summary = text(bytes: CVLimits.maxTextBytes + 1)
+    blocked.append(BlockedCV(name: "a text", cv: TextEntry.initialiser.cv(from: draft), violation: .textTooLong(.summary)))
+    blocked.append(BlockedCV(name: "a section", cv: limitCV(sections: entries(in: [.profiles], count: CVLimits.maxEntriesPerSection + 1)),
+                             violation: .tooManyEntries(.profiles)))
+    blocked.append(BlockedCV(name: "the total", cv: limitCV(totalling: CVLimits.maxTotalTextBytes + 1), violation: .tooMuchText))
+    return blocked
+}()
 
 struct OrderedPair: CustomTestStringConvertible, Sendable {
     let first: TextFieldSpec, second: TextFieldSpec

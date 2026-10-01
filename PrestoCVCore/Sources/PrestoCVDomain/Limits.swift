@@ -15,16 +15,16 @@ public enum CVLimits {
 }
 
 /// A section that holds a list of entries.
-public enum CVSection: Equatable, Sendable { case experiences, education, skills, languages, certifications, profiles, interests }
+public enum CVSection: Hashable, Sendable { case experiences, education, skills, languages, certifications, profiles, interests }
 
-public enum ExperienceField: Equatable, Sendable { case role, company, location, description }
-public enum EducationField: Equatable, Sendable { case degree, school, description }
-public enum CertificationField: Equatable, Sendable { case name, issuer, description }
+public enum ExperienceField: Hashable, Sendable { case role, company, location, description }
+public enum EducationField: Hashable, Sendable { case degree, school, description }
+public enum CertificationField: Hashable, Sendable { case name, issuer, description }
 
 /// A text of a CV that can be too long, named so that presentation can point at it (R13: no display strings here). The
 /// text of an entry carries the entry's index in its section. A skill, a language, a profile and an interest have one
 /// text each. Contact details are not listed: a value object is bounded when it is made.
-public enum CVTextField: Equatable, Sendable {
+public enum CVTextField: Hashable, Sendable {
     case title
     case fullName, professionalTitle, location, summary
     case experience(index: Int, ExperienceField)
@@ -37,7 +37,7 @@ public enum CVTextField: Equatable, Sendable {
 }
 
 /// Why a CV is over a bound of `CVLimits`.
-public enum CVLimitViolation: Equatable, Sendable {
+public enum CVLimitViolation: Hashable, Sendable {
     case textTooLong(CVTextField)
     case tooManyEntries(CVSection)
     case tooMuchText

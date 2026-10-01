@@ -15,14 +15,17 @@ public struct NewCV: Sendable {
     public func callAsFunction() -> CV { CV(id: ids.next()) }
 }
 
-/// Saves a CV: create when never saved, conditional update otherwise. Returns the stored CV. A CV without a name is
-/// refused first, then a CV over a size limit, with the reason; nothing is stored and no text is cut.
+/// Saves a CV: create when never saved, conditional update otherwise. Returns the stored CV. A CV that has a
+/// `saveBlocker` is refused with the reason before the store is touched: nothing is stored and no text is cut.
 public struct SaveCV: Sendable {
     let repository: any CVRepository
     public init(repository: any CVRepository) { self.repository = repository }
     public func callAsFunction(_ cv: CV) async throws(AuthoringError) -> CV {
-        guard cv.canBeSaved else { throw .notEnoughContent }
-        if let violation = cv.limitViolation { throw .exceedsLimits(violation) }
+        switch cv.saveBlocker {
+        case .missingName?: throw .notEnoughContent
+        case .limit(let violation)?: throw .exceedsLimits(violation)
+        case nil: break
+        }
         do { return cv.revision == 0 ? try await repository.create(cv) : try await repository.update(cv) }
         catch .conflict(_, let stored) { throw .conflict(storedRevision: stored) }
         catch .notFound { throw .deletedElsewhere }

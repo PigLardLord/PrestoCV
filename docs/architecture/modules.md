@@ -29,8 +29,8 @@ Test targets and test-support targets are described below each package. The chec
   - a typed identity (`CVID`);
   - `revision`, `createdAt` and `updatedAt`, settable only inside the package;
   - a private title, `PersonalDetails`, and ordered sections of entries;
-  - the "has enough content to be saved" rule (`canBeSaved`): a full name with at least one visible character, that is, one that is not white space, not a default-ignorable code point (a joiner, a direction mark) and not a control, format, unassigned or surrogate character. It does not include the size bounds;
-  - the size bounds: `limitViolation` reports the first bound the CV is over, or nil;
+  - the one answer to "can it be saved, and why not": `saveBlocker` is nil when the CV can be saved, `missingName` when the full name has no visible character, or `limit(violation)` when a size bound is exceeded; the name is checked first. A visible character is one that is not white space, not a default-ignorable code point (a joiner, a direction mark) and not a control, format, unassigned or surrogate character. `canBeSaved` is `saveBlocker == nil`;
+  - the size bounds: `limitViolation` walks the whole CV and reports the first bound it is over, or nil;
   - duplication with a title composed by the caller.
 - **The text rule** is internal to the domain, in one file. `CV` applies it wherever text enters: both initialisers, so a stored file too, and `rename`, `setPersonalDetails` and `setSections`. Value objects are validated when they are made, and the rule does not touch them. It has two kinds:
   - **single line**: the title, the name, the professional title, the location, an entry's role, company, location, degree and school, a skill, a language, a certification's name and issuer, a profile's platform, and each interest. A line break (`\r\n`, `\r`, `\n`, NEL, U+2028, U+2029) or a tab becomes one space.
@@ -59,7 +59,7 @@ Test targets and test-support targets are described below each package. The chec
   - `SampleCVSource`, `IDGenerator`, `TimeSource`. `TimeSource` is so named to avoid shadowing `Swift.Clock`.
 - **Use cases:**
   - `NewCV`, `SaveCV` (create or conditional update, errors translated to `AuthoringError`, including `tooLarge`), `LoadCV`;
-  - `SaveCV` refuses a CV without a name (`notEnoughContent`) first, then a CV over a size limit (`exceedsLimits`, which carries the CV's `limitViolation`), before it touches the store; rename and duplicate save through it and refuse the same way;
+  - `SaveCV` refuses a CV that has a `saveBlocker` before it touches the store: `notEnoughContent` for a missing name, `exceedsLimits` (which carries the CV's `limitViolation`) for a size bound. It does not order the checks itself. Rename and duplicate save through it and refuse the same way;
   - list (by last change), rename, duplicate, delete, start from a sample, determine onboarding.
 - **Listing** returns the healthy CVs plus `StoreIssue`s: `corrupt`, `upgradeRequired`, `unreadable`, `tooLarge`, `quarantineFailed`.
 
