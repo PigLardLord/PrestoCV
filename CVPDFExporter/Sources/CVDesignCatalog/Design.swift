@@ -128,6 +128,9 @@ public struct HexColor: Sendable, Equatable {
         guard value.fullyMatches(#"#[0-9A-Fa-f]{6}"#) else { return nil }
         self.value = value
     }
+    /// A colour written in the source, known to be `#RRGGBB`. Only `NamedPalette` uses it; everything else goes
+    /// through the checked initialiser.
+    init(known value: String) { self.value = value }
     /// WCAG relative luminance.
     var luminance: Double {
         let hex = Array(value.dropFirst())
@@ -151,13 +154,36 @@ public struct Palette: Sendable, Equatable {
         guard text.contrast(with: background) >= 4.5, primary.contrast(with: background) >= 3 else { return nil }
         self.primary = primary; self.text = text; self.background = background
     }
+    /// A palette written in the source, known to pass the contrast rule. Only `NamedPalette` uses it, and its tests
+    /// build every case again through the checked initialiser.
+    init(known primary: HexColor, text: HexColor, background: HexColor) {
+        self.primary = primary; self.text = text; self.background = background
+    }
     public var customProperties: String {
         ":root{--color-primary:\(primary.value);--color-text:\(text.value);--color-background:\(background.value)}"
     }
 }
 
-/// Font stacks are a closed set of system families; designs refer to them only through variables.
-public enum FontScheme: String, Sendable, CaseIterable {
+/// The palettes a design choice can name: a closed set, named after colours and never after a design. The raw value is
+/// the identifier a `DesignChoice` stores. Each one passes the `Palette` contrast rule.
+public enum NamedPalette: String, Sendable, CaseIterable, Codable {
+    case ink, slate, ocean, plum
+    public var palette: Palette {
+        switch self {
+        case .ink: Self.palette("#000000", text: "#000000", background: "#FFFFFF")
+        case .slate: Self.palette("#2C3E50", text: "#2C3E50", background: "#FFFFFF")
+        case .ocean: Self.palette("#1E40AF", text: "#1F2937", background: "#E0E7FF")
+        case .plum: Self.palette("#6B46C1", text: "#1F2937", background: "#FEF3C7")
+        }
+    }
+    private static func palette(_ primary: String, text: String, background: String) -> Palette {
+        Palette(known: HexColor(known: primary), text: HexColor(known: text), background: HexColor(known: background))
+    }
+}
+
+/// Font stacks are a closed set of system families; designs refer to them only through variables. The raw value is
+/// the identifier a `DesignChoice` stores.
+public enum FontScheme: String, Sendable, CaseIterable, Codable {
     case system, serif, rounded
     public var customProperties: String {
         let stack = switch self {
