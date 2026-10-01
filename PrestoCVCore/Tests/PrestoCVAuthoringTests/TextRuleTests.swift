@@ -13,20 +13,26 @@ private func code(_ scalar: Unicode.Scalar) -> String {
 }
 
 /// The classes both kinds remove, with scalars at and near the edges of each.
-private let removedClasses: [(name: String, scalars: [Unicode.Scalar])] = [
-    ("C0 control", ["\u{0000}", "\u{0001}", "\u{0008}", "\u{000E}", "\u{001B}", "\u{001C}", "\u{001F}"]),
-    ("DEL", ["\u{007F}"]),
-    ("C1 control", ["\u{0080}", "\u{0084}", "\u{0086}", "\u{008D}", "\u{009F}"]),
-    ("bidirectional embedding or override", ["\u{202A}", "\u{202B}", "\u{202C}", "\u{202D}", "\u{202E}"]),
-    ("bidirectional isolate", ["\u{2066}", "\u{2067}", "\u{2068}", "\u{2069}"]),
-    ("tag character", ["\u{E0000}", "\u{E0001}", "\u{E0020}", "\u{E0041}", "\u{E007F}"]),
-]
+private let removedClasses: [(name: String, scalars: [Unicode.Scalar])] = {
+    var classes: [(name: String, scalars: [Unicode.Scalar])] = []
+    func add(_ name: String, _ scalars: [Unicode.Scalar]) { classes.append((name, scalars)) }
+    add("C0 control", ["\u{0000}", "\u{0001}", "\u{0008}", "\u{000E}", "\u{001B}", "\u{001C}", "\u{001F}"])
+    add("DEL", ["\u{007F}"])
+    add("C1 control", ["\u{0080}", "\u{0084}", "\u{0086}", "\u{008D}", "\u{009F}"])
+    add("bidirectional embedding or override", ["\u{202A}", "\u{202B}", "\u{202C}", "\u{202D}", "\u{202E}"])
+    add("bidirectional isolate", ["\u{2066}", "\u{2067}", "\u{2068}", "\u{2069}"])
+    add("tag character", ["\u{E0000}", "\u{E0001}", "\u{E0020}", "\u{E0041}", "\u{E007F}"])
+    return classes
+}()
 
-/// Characters that end a line, and the tab, written as they arrive.
-private let lineBreaks: [(name: String, text: String)] = [
-    ("CR LF", "\r\n"), ("CR", "\r"), ("LF", "\n"), ("VERTICAL TAB", "\u{000B}"), ("FORM FEED", "\u{000C}"), ("NEL", "\u{0085}"),
-    ("LINE SEPARATOR", "\u{2028}"), ("PARAGRAPH SEPARATOR", "\u{2029}"),
-]
+/// Characters that end a line, written as they arrive.
+private let lineBreaks: [(name: String, text: String)] = {
+    var breaks: [(name: String, text: String)] = []
+    func add(_ name: String, _ text: String) { breaks.append((name, text)) }
+    add("CR LF", "\r\n"); add("CR", "\r"); add("LF", "\n"); add("VERTICAL TAB", "\u{000B}"); add("FORM FEED", "\u{000C}")
+    add("NEL", "\u{0085}"); add("LINE SEPARATOR", "\u{2028}"); add("PARAGRAPH SEPARATOR", "\u{2029}")
+    return breaks
+}()
 
 private func removalCases() -> [TextCase] {
     var cases = removedClasses.flatMap { kind in
@@ -86,10 +92,17 @@ private let keptTexts: [TextCase] = {
     add("no-break space", "a\u{00A0}b")
     add("CJK and accented letters", "日本語 Zoë Łukasz")
     add("empty text", "")
-    for neighbour in ["\u{0020}", "\u{00A0}", "\u{2027}", "\u{202F}", "\u{2065}", "\u{206A}", "\u{E0080}", "\u{DFFFF}"] as [Unicode.Scalar] {
-        add("\(code(neighbour)) next to a removed range", "a\(neighbour)b")
-    }
+    var neighbours: [Unicode.Scalar] = []
+    neighbours.append("\u{0020}"); neighbours.append("\u{00A0}"); neighbours.append("\u{2027}"); neighbours.append("\u{202F}")
+    neighbours.append("\u{2065}"); neighbours.append("\u{206A}"); neighbours.append("\u{E0080}"); neighbours.append("\u{DFFFF}")
+    for neighbour in neighbours { add("\(code(neighbour)) next to a removed range", "a\(neighbour)b") }
     return kept
+}()
+
+private let everyTextCase: [TextCase] = {
+    var cases: [TextCase] = []
+    cases.append(contentsOf: singleLineCases); cases.append(contentsOf: multiLineCases); cases.append(contentsOf: keptTexts)
+    return cases
 }()
 
 private func isChanged(_ scalar: Unicode.Scalar) -> Bool {
@@ -114,7 +127,7 @@ struct TextRuleTests {
         #expect(TextRule.multiLine(test.input) == test.expected)
     }
 
-    @Test("normalising twice gives the same text, in both kinds", arguments: singleLineCases + multiLineCases + keptTexts)
+    @Test("normalising twice gives the same text, in both kinds", arguments: everyTextCase)
     func idempotent(_ test: TextCase) {
         let single = TextRule.singleLine(test.input), multi = TextRule.multiLine(test.input)
         #expect(TextRule.singleLine(single) == single)

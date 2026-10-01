@@ -406,17 +406,17 @@ struct StoredTextTests {
     func loadsNormalised() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let person = #"{"fullName":\#(quoted("name")),"professionalTitle":\#(quoted("headline")),"email":"ada@example.com","phone":"+39 06 1234567","#
-            + #""location":\#(quoted("city")),"website":"https://ada.example","summary":\#(quoted("summary"))}"#
-        let sections: [String: String] = [
-            "experiences": #"[{"role":\#(quoted("role")),"company":\#(quoted("company")),"location":\#(quoted("place")),"description":\#(quoted("work")),"current":false}]"#,
-            "education": #"[{"degree":\#(quoted("degree")),"school":\#(quoted("school")),"description":\#(quoted("study")),"current":false}]"#,
-            "skills": #"[{"name":\#(quoted("skill")),"level":4}]"#,
-            "languages": #"[{"language":\#(quoted("tongue")),"proficiency":"native"}]"#,
-            "certifications": #"[{"name":\#(quoted("certificate")),"issuer":\#(quoted("issuer")),"description":\#(quoted("exam")),"link":"https://cert.example/1"}]"#,
-            "profiles": #"[{"platform":\#(quoted("network")),"link":"https://github.com/ada"}]"#,
-            "interests": #"["a\tb","a b",\#(quoted("chess")),"\u0001"]"#,
-        ]
+        let personStart = #"{"fullName":\#(quoted("name")),"professionalTitle":\#(quoted("headline")),"email":"ada@example.com","phone":"+39 06 1234567","#
+        let personEnd = #""location":\#(quoted("city")),"website":"https://ada.example","summary":\#(quoted("summary"))}"#
+        let person = personStart + personEnd
+        var sections: [String: String] = [:]
+        sections["experiences"] = #"[{"role":\#(quoted("role")),"company":\#(quoted("company")),"location":\#(quoted("place")),"description":\#(quoted("work")),"current":false}]"#
+        sections["education"] = #"[{"degree":\#(quoted("degree")),"school":\#(quoted("school")),"description":\#(quoted("study")),"current":false}]"#
+        sections["skills"] = #"[{"name":\#(quoted("skill")),"level":4}]"#
+        sections["languages"] = #"[{"language":\#(quoted("tongue")),"proficiency":"native"}]"#
+        sections["certifications"] = #"[{"name":\#(quoted("certificate")),"issuer":\#(quoted("issuer")),"description":\#(quoted("exam")),"link":"https://cert.example/1"}]"#
+        sections["profiles"] = #"[{"platform":\#(quoted("network")),"link":"https://github.com/ada"}]"#
+        sections["interests"] = #"["a\tb","a b",\#(quoted("chess")),"\u0001"]"#
         let json = fileJSON(personal: person, sections: sections).replacingOccurrences(of: #""title":"""#, with: #""title":\#(quoted("title"))"#)
         try Data(json.utf8).write(to: dir.appendingPathComponent(fileName(id1)))
 

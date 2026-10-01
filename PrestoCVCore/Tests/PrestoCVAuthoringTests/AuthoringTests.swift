@@ -17,6 +17,25 @@ let emailLengthCases: [(String, Bool)] = {
             ("ada@example." + label63, true), ("ada@example." + label64, false)]
 }()
 
+/// Names made only of characters that print nothing: white space, zero-width and joining characters, direction marks,
+/// a soft hyphen, a variation selector, an unassigned scalar.
+let invisibleNames: [String] = {
+    var names: [String] = []
+    names.append(""); names.append("   "); names.append("\u{3000}"); names.append("\u{200B}"); names.append("\u{200D}")
+    names.append("\u{200C}"); names.append("\u{200E}"); names.append("\u{200F}"); names.append("\u{2060}"); names.append("\u{FEFF}")
+    names.append("\u{00AD}"); names.append("\u{FE0F}"); names.append("\u{0378}"); names.append("\u{200B} \u{200D}\u{200E} ")
+    return names
+}()
+
+/// Names with at least one visible character, some of them with invisible ones around it.
+let visibleNames: [String] = {
+    var names: [String] = []
+    names.append("\u{200B}Ada"); names.append("Ada\u{200D}"); names.append("\u{200E}Ada"); names.append(" Ada "); names.append("e\u{0301}")
+    names.append("A"); names.append("\u{1F600}"); names.append("\u{1F469}\u{200D}\u{1F469}\u{200D}\u{1F467}")
+    names.append("\u{0639}\u{0644}\u{064A}"); names.append("\u{5C71}\u{7530} \u{592A}\u{90CE}"); names.append("\u{0645}\u{06CC}\u{200C}\u{062E}\u{0648}\u{0627}\u{0647}\u{0645}")
+    return names
+}()
+
 @Suite("R6 · rich domain")
 struct DomainTests {
     @Test("invalid values cannot exist; validators reject trailing newlines")
@@ -28,12 +47,11 @@ struct DomainTests {
     }
 
     @Test("a name that prints nothing is no name: white space, joiners, marks and other invisible characters do not count",
-          arguments: ["", "   ", "\u{3000}", "\u{200B}", "\u{200D}", "\u{200C}", "\u{200E}", "\u{200F}", "\u{2060}", "\u{FEFF}", "\u{00AD}",
-                      "\u{FE0F}", "\u{0378}", "\u{200B} \u{200D}\u{200E} "])
+          arguments: invisibleNames)
     func invisibleNameCannotBeSaved(name: String) { #expect(!named(name).canBeSaved) }
 
     @Test("a name with one visible character can be saved, whatever invisible characters surround it",
-          arguments: ["\u{200B}Ada", "Ada\u{200D}", "\u{200E}Ada", " Ada ", "e\u{0301}", "A", "😀", "👩\u{200D}👩\u{200D}👧", "علي", "山田 太郎", "می\u{200C}خواهم"])
+          arguments: visibleNames)
     func visibleNameCanBeSaved(name: String) { #expect(named(name).canBeSaved) }
 
     @Test("mixed precision is ordered by year when months are unknown")

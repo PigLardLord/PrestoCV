@@ -6,7 +6,12 @@ import PrestoCVCoreTestSupport
 func text(bytes: Int) -> String { String(repeating: "x", count: bytes) }
 
 /// Every section, in the order the CV reports them.
-let allSections: [CVSectionKind] = [.experiences, .education, .skills, .languages, .certifications, .profiles, .interests]
+let allSections: [CVSectionKind] = {
+    var kinds: [CVSectionKind] = []
+    kinds.append(.experiences); kinds.append(.education); kinds.append(.skills); kinds.append(.languages)
+    kinds.append(.certifications); kinds.append(.profiles); kinds.append(.interests)
+    return kinds
+}()
 
 /// Sections of `count` entries each for the listed sections, and none for the others.
 func entries(in listed: [CVSectionKind], count: Int) -> CVSections {
@@ -63,8 +68,10 @@ struct CVLimitsTests {
     @Test("the names of the fields, sections and blockers can be collected: they are hashable, and an entry's field is nested in the text field")
     func namesAreHashable() {
         let description: CVTextField.ExperienceText = .description
-        let blockers: Set<SaveBlocker> = [.missingName, .limit(.tooMuchText), .limit(.tooManyEntries(.skills)),
-                                          .limit(.textTooLong(.experience(index: 1, description))), .limit(.textTooLong(.experience(index: 1, .description)))]
+        var blockers: Set<SaveBlocker> = []
+        blockers.insert(.missingName); blockers.insert(.limit(.tooMuchText)); blockers.insert(.limit(.tooManyEntries(.skills)))
+        blockers.insert(.limit(.textTooLong(.experience(index: 1, description))))
+        blockers.insert(.limit(.textTooLong(.experience(index: 1, .description))))      // the same blocker again
         #expect(blockers.count == 4)
         #expect(Set<CVSectionKind>(allSections).count == allSections.count)
         #expect(Set(textFields.map(\.reported)).count == textFields.count)
@@ -98,12 +105,11 @@ struct CVLimitsTests {
         #expect(renamed.limitViolation == .textTooLong(.title))
     }
 
-    @Test("a text is measured in UTF-8 bytes, not characters",
-          arguments: [("\u{00E9}", 5_000, true), ("\u{00E9}", 5_001, false), ("e\u{0301}", 3_333, true), ("e\u{0301}", 3_334, false), ("🙂", 2_500, true), ("🙂", 2_501, false)])
-    func bytesNotCharacters(unit: String, repeats: Int, fits: Bool) {
-        let summary = limitCV(PersonalDetails(fullName: "Ada", summary: String(repeating: unit, count: repeats)))
-        #expect((summary.limitViolation == nil) == fits)
-        #expect(fits || summary.limitViolation == .textTooLong(.summary))
+    @Test("a text is measured in UTF-8 bytes, not characters", arguments: byteCases)
+    func bytesNotCharacters(_ test: ByteCase) {
+        let summary = limitCV(PersonalDetails(fullName: "Ada", summary: String(repeating: test.unit, count: test.repeats)))
+        #expect((summary.limitViolation == nil) == test.fits)
+        #expect(test.fits || summary.limitViolation == .textTooLong(.summary))
     }
 
     @Test("a text is measured as it is held, after normalisation")
@@ -137,7 +143,7 @@ struct CVLimitsTests {
     }
 
     @Test("with two texts too long, the first in the CV's order is reported",
-          arguments: zip(textFields, textFields.dropFirst()).map { OrderedPair(first: $0, second: $1) })
+          arguments: textFieldPairs)
     func firstTextTooLong(_ pair: OrderedPair) {
         var draft = TextDraft(FixtureCV.full())
         draft[keyPath: pair.second.key] = "y" + text(bytes: CVLimits.maxTextBytes)
@@ -146,7 +152,7 @@ struct CVLimitsTests {
     }
 
     @Test("with two sections too long, the first in the CV's order is reported",
-          arguments: zip(allSections, allSections.dropFirst()).map { SectionPair(first: $0, second: $1) })
+          arguments: sectionPairs)
     func firstSectionTooLong(_ pair: SectionPair) {
         let both = limitCV(sections: entries(in: [pair.second, pair.first], count: CVLimits.maxEntriesPerSection + 1))
         #expect(both.limitViolation == .tooManyEntries(pair.first))
@@ -195,6 +201,36 @@ let blockedCVs: [BlockedCV] = {
                              violation: .tooManyEntries(.profiles)))
     blocked.append(BlockedCV(name: "the total", cv: limitCV(totalling: CVLimits.maxTotalTextBytes + 1), violation: .tooMuchText))
     return blocked
+}()
+
+/// A repeated unit of text and whether the text fits the limit. Each unit is more than one byte: a letter with an accent,
+/// a letter with a combining mark, an emoji.
+struct ByteCase: CustomTestStringConvertible, Sendable {
+    let unit: String, repeats: Int, fits: Bool
+    var testDescription: String { "\(repeats) x \(unit.utf8.count) bytes, \(fits ? "fits" : "is too long")" }
+}
+
+let byteCases: [ByteCase] = {
+    var cases: [ByteCase] = []
+    cases.append(ByteCase(unit: "\u{00E9}", repeats: 5_000, fits: true))        // 2 bytes each
+    cases.append(ByteCase(unit: "\u{00E9}", repeats: 5_001, fits: false))
+    cases.append(ByteCase(unit: "e\u{0301}", repeats: 3_333, fits: true))       // 3 bytes each, one character
+    cases.append(ByteCase(unit: "e\u{0301}", repeats: 3_334, fits: false))
+    cases.append(ByteCase(unit: "\u{1F642}", repeats: 2_500, fits: true))       // 4 bytes each
+    cases.append(ByteCase(unit: "\u{1F642}", repeats: 2_501, fits: false))
+    return cases
+}()
+
+let textFieldPairs: [OrderedPair] = {
+    var pairs: [OrderedPair] = []
+    for (first, second) in zip(textFields, textFields.dropFirst()) { pairs.append(OrderedPair(first: first, second: second)) }
+    return pairs
+}()
+
+let sectionPairs: [SectionPair] = {
+    var pairs: [SectionPair] = []
+    for (first, second) in zip(allSections, allSections.dropFirst()) { pairs.append(SectionPair(first: first, second: second)) }
+    return pairs
 }()
 
 struct OrderedPair: CustomTestStringConvertible, Sendable {
