@@ -15,11 +15,29 @@ public struct DesignManifest: Codable, Sendable, Equatable {
     /// The one rule for design identifiers: lowercase ASCII letters, digits and hyphens, 1–64 characters. Stores use it
     /// before touching storage, so an identifier can never name a path.
     public static func isValidID(_ id: String) -> Bool { id.fullyMatches(#"[a-z0-9-]{1,64}"#) }
+    /// A name is one line of 1–80 Unicode scalars that is not only white space.
+    public static func isValidName(_ name: String) -> Bool {
+        isClean(name, maxScalars: 80, allowingNewlines: false) && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    /// A description is 0–500 Unicode scalars, and may span lines.
+    public static func isValidDescription(_ description: String) -> Bool { isClean(description, maxScalars: 500, allowingNewlines: true) }
+    /// Within the bound, with no control character (a newline only where allowed) and no explicit bidirectional
+    /// embedding, override or isolate (U+202A–U+202E, U+2066–U+2069): none can reorder the text around it.
+    private static func isClean(_ text: String, maxScalars: Int, allowingNewlines: Bool) -> Bool {
+        var count = 0
+        for scalar in text.unicodeScalars {
+            count += 1
+            if count > maxScalars { return false }
+            if scalar.properties.generalCategory == .control && !(allowingNewlines && scalar == "\n") { return false }
+            if (0x202A...0x202E).contains(scalar.value) || (0x2066...0x2069).contains(scalar.value) { return false }
+        }
+        return true
+    }
 }
 
 public enum DesignPackageViolation: Equatable, Sendable, CustomStringConvertible {
-    case tooLarge(Int), malformed(String), unknownKeys([String]), containsHTML, invalidID(String), invalidVersion(String),
-         unknownPalette(String), unknownFontScheme(String), unsupportedContract(Int), css(String), invalidPreview(String)
+    case tooLarge(Int), malformed(String), unknownKeys([String]), containsHTML, invalidID(String), invalidName, invalidVersion(String),
+         invalidDescription, unknownPalette(String), unknownFontScheme(String), unsupportedContract(Int), css(String), invalidPreview(String)
     public var description: String {
         switch self {
         case .tooLarge(let n): "package too large: \(n) bytes"
@@ -27,7 +45,9 @@ public enum DesignPackageViolation: Equatable, Sendable, CustomStringConvertible
         case .unknownKeys(let k): "unknown keys: \(k)"
         case .containsHTML: "package ships HTML"
         case .invalidID(let id): "invalid id \(id)"
+        case .invalidName: "invalid name"
         case .invalidVersion(let v): "invalid version \(v)"
+        case .invalidDescription: "invalid description"
         case .unknownPalette(let id): "unknown palette \(id)"
         case .unknownFontScheme(let id): "unknown font scheme \(id)"
         case .unsupportedContract(let v): "unsupported markup contract \(v)"
@@ -45,8 +65,8 @@ public struct ValidatedDesign: Sendable, Equatable {
 }
 
 /// Anti-corruption layer for design packages (R8). Works on the raw bytes: size first, then a strict
-/// decode (unknown keys and any `htmlContent` key are rejected), then id, version, default palette and font scheme,
-/// contract, CSS and preview.
+/// decode (unknown keys and any `htmlContent` key are rejected), then id, name, version, description, default palette
+/// and font scheme, contract, CSS and preview.
 public struct DesignPackageValidator: Sendable {
     public var maxBytes: Int, maxPreviewBytes: Int
     public init(maxBytes: Int = 512 * 1024, maxPreviewBytes: Int = 256 * 1024) { self.maxBytes = maxBytes; self.maxPreviewBytes = maxPreviewBytes }
@@ -80,8 +100,10 @@ public struct DesignPackageValidator: Sendable {
         catch { throw DesignPackageRejected(violations: violations + [.malformed("manifest")]) }
         guard let css = object["cssContent"] as? String else { throw DesignPackageRejected(violations: violations + [.malformed("cssContent")]) }
         if !DesignManifest.isValidID(raw.id) { violations.append(.invalidID(raw.id)) }
+        if !DesignManifest.isValidName(raw.name) { violations.append(.invalidName) }
         let version = DesignVersion(raw.version)
         if version == nil { violations.append(.invalidVersion(raw.version)) }
+        if !DesignManifest.isValidDescription(raw.description) { violations.append(.invalidDescription) }
         let palette = NamedPalette(rawValue: raw.defaultPalette)
         if palette == nil { violations.append(.unknownPalette(raw.defaultPalette)) }
         let fonts = FontScheme(rawValue: raw.defaultFonts)
