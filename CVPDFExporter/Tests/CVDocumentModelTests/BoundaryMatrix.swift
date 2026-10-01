@@ -125,7 +125,8 @@ enum BoundaryMatrix {
             for (name, _) in members.inKeyOrder { add("\(name) removed", .remove, .exporterDecides, at: node.path + [.key(name)]) }
             add("an unknown property", .addUnknownProperty, .exporterAccepts)
         case .array(let elements):
-            add("its first element instead of the array", .replace(elements.first.map(plain) ?? "{}"), .exporterRefuses)
+            if let first = elements.first { add("its first element instead of the array", .replace(plain(first)), .exporterRefuses) }
+            add("an object instead of an array", .replace("{}"), .exporterRefuses)
             add("200 elements", .resize(200), .exporterAccepts)
             add("201 elements", .resize(201), .exporterRefuses)
         case .bool, .null:

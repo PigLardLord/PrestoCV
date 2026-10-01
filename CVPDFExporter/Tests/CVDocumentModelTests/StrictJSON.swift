@@ -1,8 +1,12 @@
 import Foundation
 
-/// A check that bytes are JSON as RFC 8259 defines it and that no object repeats a key. `JSONDecoder` keeps the first of
-/// two equal keys and accepts a trailing comma and a byte order mark, which other readers do not, so the committed schema
-/// is held to this stricter reading before it is parsed.
+/// A check that bytes are JSON as RFC 8259 defines it, plus the rules of I-JSON (RFC 7493) that it applies: no object
+/// repeats a key, no string holds a lone surrogate, and the bytes are valid UTF-8. Two keys repeat when their unescaped
+/// bytes are equal or when Swift takes them for the same text (canonical equivalence), and nesting stops at 512 levels, as
+/// it does for the decoder.
+///
+/// `JSONDecoder` keeps the first of two equal keys and accepts a trailing comma and a byte order mark, which other readers
+/// do not, so the committed schema is held to this stricter reading before it is parsed.
 enum StrictJSON {
     struct Problem: Error, CustomStringConvertible {
         let description: String
@@ -16,8 +20,12 @@ enum StrictJSON {
 }
 
 private struct TokenScanner {
+    /// The deepest nesting of objects and arrays the scanner reads, which is the decoder's limit.
+    private static let maxDepth = 512
+
     let bytes: [UInt8]
     var position = 0
+    var depth = 0
 
     init(bytes: [UInt8]) { self.bytes = bytes }
 
@@ -47,16 +55,20 @@ private struct TokenScanner {
     }
 
     private mutating func scanObject() throws {
+        try enterContainer()
+        defer { depth -= 1 }
         position += 1
         skipWhitespace()
         if peek() == UInt8(ascii: "}") { position += 1; return }
-        var keys: Set<[UInt8]> = []
+        var keys: Set<[UInt8]> = [], texts: Set<String> = []
         while true {
             skipWhitespace()
             guard peek() == UInt8(ascii: "\"") else { throw problem("an object member must start with a key") }
             let keyStart = position
             let key = try scanString()
-            guard keys.insert(key).inserted else { throw problem("duplicate key \"\(String(decoding: key, as: UTF8.self))\"", at: keyStart) }
+            let text = String(decoding: key, as: UTF8.self)
+            guard keys.insert(key).inserted else { throw problem("duplicate key \"\(text)\"", at: keyStart) }
+            guard texts.insert(text).inserted else { throw problem("duplicate key \"\(text)\" under canonical equivalence", at: keyStart) }
             skipWhitespace()
             try expect(UInt8(ascii: ":"), "a colon after the key")
             skipWhitespace()
@@ -67,6 +79,8 @@ private struct TokenScanner {
     }
 
     private mutating func scanArray() throws {
+        try enterContainer()
+        defer { depth -= 1 }
         position += 1
         skipWhitespace()
         if peek() == UInt8(ascii: "]") { position += 1; return }
@@ -76,6 +90,12 @@ private struct TokenScanner {
             skipWhitespace()
             if try endOfList(closing: UInt8(ascii: "]")) { return }
         }
+    }
+
+    /// Counts one more level of nesting, which the caller leaves with `defer`.
+    private mutating func enterContainer() throws {
+        depth += 1
+        guard depth <= Self.maxDepth else { throw problem("nesting deeper than \(Self.maxDepth) levels") }
     }
 
     /// After a member or an element: true at the closing byte, false after a comma that is followed by another entry.
