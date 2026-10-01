@@ -190,3 +190,8 @@ struct SchemaValidator {
         (resolve(schema).map(itemSchemas) ?? []) + (schema["items"].map { [$0] } ?? [])
     }
 }
+
+extension Dictionary where Key == String {
+    /// The members in the order of their keys, so that messages and generated documents do not change between runs.
+    var inKeyOrder: [(key: String, value: Value)] { sorted { $0.key < $1.key } }
+}
