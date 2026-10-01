@@ -29,9 +29,12 @@ private let lineBreaks: [(name: String, text: String)] = [
 ]
 
 private func removalCases() -> [TextCase] {
-    removedClasses.flatMap { kind in
+    var cases = removedClasses.flatMap { kind in
         kind.scalars.map { TextCase(name: "\(kind.name) \(code($0))", input: "a\($0)b", expected: "ab") }
     }
+    let england = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}"
+    cases.append(TextCase(name: "a subdivision flag loses its tag characters and stays a black flag", input: england, expected: "\u{1F3F4}"))
+    return cases
 }
 
 /// Single line: every line break and the tab become one space each.

@@ -7,8 +7,9 @@ public enum SaveBlocker: Hashable, Sendable { case missingName, limit(CVLimitVio
 /// repository: they can only be set from inside the package (`package` access).
 ///
 /// Its text is normalised where it enters, by the rule in `TextRule`: the initialisers (so a stored file too), `rename`,
-/// `setPersonalDetails` and `setSections`. A CV never holds a control, bidirectional or tag character, and never a line
-/// break in a one-line field. What a CV returns is the normalised text, not necessarily what was handed over.
+/// `setPersonalDetails` and `setSections`. A CV holds no control character other than the line feed, which a summary or
+/// a description keeps, no bidirectional or tag character, and no line break in a one-line field. What a CV returns is
+/// the normalised text, not necessarily what was handed over.
 public struct CV: Hashable, Sendable {
     public let id: CVID
     public let revision: Int                 // 0 = never saved

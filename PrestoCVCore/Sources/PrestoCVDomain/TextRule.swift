@@ -1,18 +1,26 @@
-/// The one rule for the text of a CV: which characters it keeps (R6). `CV` applies it wherever text enters, so a text it
-/// holds never carries a character that can hide, reorder or break what is printed, whether it was typed, drafted or
-/// stored. There are two kinds, by the field the text belongs to:
-/// - **single line**: a name, a title, a company, a skill, an interest. A line break or a tab becomes a space.
-/// - **multi line**: a summary or a description. A line break becomes `\n`, and a tab becomes a space.
+/// The one rule for the text of a CV (R6): which characters it removes, which it turns into a space or a line feed, and
+/// which it keeps. `CV` applies it wherever text enters, whether the text was typed, drafted or stored. There are two
+/// kinds, by the field the text belongs to:
+/// - **single line**: a name, a title, a company, a skill, an interest. A line break becomes a space.
+/// - **multi line**: a summary or a description. A line break becomes `\n`.
 ///
-/// Both kinds remove, without an error, because the user cannot see these characters:
+/// Both kinds **remove**, without an error, because the user cannot see these characters:
 /// - the C0 controls other than the tab and the line breaks, DEL, and the C1 controls other than NEL;
-/// - bidirectional embeddings, overrides and isolates (U+202A–U+202E, U+2066–U+2069);
+/// - bidirectional embeddings, overrides and isolates (U+202A–U+202E, U+2066–U+2069), which reorder what is printed;
 /// - tag characters (U+E0000–U+E007F), which hide ASCII text.
 ///
-/// Line breaks are `\r\n` (one break), `\r`, `\n`, the vertical tab (U+000B), the form feed (U+000C), NEL (U+0085), U+2028
-/// and U+2029: each is a hard break, and removing one would glue the words around it. Everything else is kept, the joiners
-/// ZWJ (U+200D) and ZWNJ (U+200C) included, since emoji sequences and Persian or Indic text need them. Spaces are
-/// neither trimmed nor collapsed. The rule works on Unicode scalars, and applying it twice gives the same text.
+/// Both kinds **convert**:
+/// - a line break: `\r\n` (one break), `\r`, `\n`, the vertical tab (U+000B), the form feed (U+000C), NEL (U+0085), U+2028
+///   and U+2029. Each is a hard break, and removing one would glue the words around it;
+/// - a tab: one space.
+///
+/// Everything else is **kept**, on purpose: the zero-width and joining characters (U+200B, ZWJ U+200D, ZWNJ U+200C,
+/// U+2060, U+FEFF), the direction marks (U+200E, U+200F) and the variation selectors, because emoji sequences, Persian
+/// and Indic text and mixed-direction text need them. Spaces are neither trimmed nor collapsed. One consequence: a
+/// subdivision flag (England, Scotland, Wales) is a black flag followed by tag characters, so it loses them and prints as
+/// a plain black flag.
+///
+/// The rule works on Unicode scalars, and applying it twice gives the same text.
 enum TextRule {
     static func singleLine(_ text: String) -> String { normalised(text, lineBreak: " ") }
     static func multiLine(_ text: String) -> String { normalised(text, lineBreak: "\n") }
