@@ -21,14 +21,17 @@ public struct DesignManifest: Codable, Sendable, Equatable {
     }
     /// A description is 0–500 Unicode scalars, and may span lines.
     public static func isValidDescription(_ description: String) -> Bool { isClean(description, maxScalars: 500, allowingNewlines: true) }
-    /// Within the bound, with no control character (a newline only where allowed) and no explicit bidirectional
-    /// embedding, override or isolate (U+202A–U+202E, U+2066–U+2069): none can reorder the text around it.
+    /// Within the bound, with no control character (a newline only where allowed), no line or paragraph separator
+    /// (U+2028, U+2029: a renderer breaks the line there, and a description's only break is `\n`) and no explicit
+    /// bidirectional embedding, override or isolate (U+202A–U+202E, U+2066–U+2069): none can reorder the text around it.
+    /// The directional marks U+200E, U+200F and U+061C stay: a right-to-left name may need them.
     private static func isClean(_ text: String, maxScalars: Int, allowingNewlines: Bool) -> Bool {
         var count = 0
         for scalar in text.unicodeScalars {
             count += 1
             if count > maxScalars { return false }
             if scalar.properties.generalCategory == .control && !(allowingNewlines && scalar == "\n") { return false }
+            if scalar == "\u{2028}" || scalar == "\u{2029}" { return false }
             if (0x202A...0x202E).contains(scalar.value) || (0x2066...0x2069).contains(scalar.value) { return false }
         }
         return true

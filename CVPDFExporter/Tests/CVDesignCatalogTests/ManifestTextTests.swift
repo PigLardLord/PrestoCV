@@ -50,10 +50,18 @@ struct ManifestTextTests {
         #expect(name("A" + control + "B") == [.invalidName])
     }
 
-    @Test("a name may hold the characters next to the refused ranges", arguments: ["\u{2029}", "\u{202F}", "\u{2065}", "\u{206A}", "\u{200E}"])
+    @Test("a name and a description may hold the characters next to the refused ones, and the marks a right-to-left name needs",
+          arguments: ["\u{202F}", "\u{2065}", "\u{206A}", "\u{200E}", "\u{200F}", "\u{061C}"])
     func neighbours(text: String) {
         #expect(name("A" + text + "B") == nil)
         #expect(description("A" + text + "B") == nil)
+    }
+
+    @Test("the line and paragraph separators are line breaks to a renderer: refused in a name and in a description", arguments: ["\u{2028}", "\u{2029}"])
+    func separators(text: String) {
+        #expect(name("A" + text + "B") == [.invalidName])
+        #expect(description("A" + text + "B") == [.invalidDescription])
+        #expect(!DesignManifest.isValidName("A" + text + "B") && !DesignManifest.isValidDescription("A" + text + "B"))
     }
 
     @Test("a description of up to 500 scalars is accepted, empty or with new lines", arguments: [
