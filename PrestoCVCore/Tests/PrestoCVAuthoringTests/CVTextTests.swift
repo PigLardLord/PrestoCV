@@ -20,9 +20,11 @@ struct TextDraft {
     }
 }
 
-/// A text of a CV: where Mirror finds it, its kind, and how to put a text into a draft.
+/// A text of a CV: where Mirror finds it, its kind, how a limit reports it, and how to put a text into a draft.
 struct TextFieldSpec: CustomTestStringConvertible, Sendable {
     let path: String, multiLine: Bool
+    /// How the CV reports this field when its text is too long.
+    let reported: CVTextField
     let key: WritableKeyPath<TextDraft, String> & Sendable
     var testDescription: String { path }
     /// Carries a bidirectional override, a NUL, a CR LF, a tab and a tag character, and the path, so no two fields hold the same text.
@@ -31,43 +33,47 @@ struct TextFieldSpec: CustomTestStringConvertible, Sendable {
     var expected: String { multiLine ? "\(path)\ny z" : "\(path) y z" }
 }
 
-private let textFields: [TextFieldSpec] = {
+let textFields: [TextFieldSpec] = {
     var fields: [TextFieldSpec] = []
-    func single(_ path: String, _ key: WritableKeyPath<TextDraft, String> & Sendable) { fields.append(TextFieldSpec(path: path, multiLine: false, key: key)) }
-    func multi(_ path: String, _ key: WritableKeyPath<TextDraft, String> & Sendable) { fields.append(TextFieldSpec(path: path, multiLine: true, key: key)) }
-    single("title", \.title)
-    single("personal.fullName", \.personal.fullName)
-    single("personal.professionalTitle", \.personal.professionalTitle)
-    single("personal.location", \.personal.location)
-    multi("personal.summary", \.personal.summary)
-    single("sections.experiences[0].role", \.sections.experiences[0].role)
-    single("sections.experiences[0].company", \.sections.experiences[0].company)
-    single("sections.experiences[0].location", \.sections.experiences[0].location)
-    multi("sections.experiences[0].description", \.sections.experiences[0].description)
-    single("sections.education[0].degree", \.sections.education[0].degree)
-    single("sections.education[0].school", \.sections.education[0].school)
-    multi("sections.education[0].description", \.sections.education[0].description)
-    single("sections.skills[0].name", \.sections.skills[0].name)
-    single("sections.skills[1].name", \.sections.skills[1].name)
-    single("sections.languages[0].language", \.sections.languages[0].language)
-    single("sections.languages[1].language", \.sections.languages[1].language)
-    single("sections.certifications[0].name", \.sections.certifications[0].name)
-    single("sections.certifications[0].issuer", \.sections.certifications[0].issuer)
-    multi("sections.certifications[0].description", \.sections.certifications[0].description)
-    single("sections.profiles[0].platform", \.sections.profiles[0].platform)
-    single("sections.interests[0]", \.firstInterest)
-    single("sections.interests[1]", \.secondInterest)
+    func single(_ path: String, _ reported: CVTextField, _ key: WritableKeyPath<TextDraft, String> & Sendable) {
+        fields.append(TextFieldSpec(path: path, multiLine: false, reported: reported, key: key))
+    }
+    func multi(_ path: String, _ reported: CVTextField, _ key: WritableKeyPath<TextDraft, String> & Sendable) {
+        fields.append(TextFieldSpec(path: path, multiLine: true, reported: reported, key: key))
+    }
+    single("title", .title, \.title)
+    single("personal.fullName", .fullName, \.personal.fullName)
+    single("personal.professionalTitle", .professionalTitle, \.personal.professionalTitle)
+    single("personal.location", .location, \.personal.location)
+    multi("personal.summary", .summary, \.personal.summary)
+    single("sections.experiences[0].role", .experience(index: 0, .role), \.sections.experiences[0].role)
+    single("sections.experiences[0].company", .experience(index: 0, .company), \.sections.experiences[0].company)
+    single("sections.experiences[0].location", .experience(index: 0, .location), \.sections.experiences[0].location)
+    multi("sections.experiences[0].description", .experience(index: 0, .description), \.sections.experiences[0].description)
+    single("sections.education[0].degree", .education(index: 0, .degree), \.sections.education[0].degree)
+    single("sections.education[0].school", .education(index: 0, .school), \.sections.education[0].school)
+    multi("sections.education[0].description", .education(index: 0, .description), \.sections.education[0].description)
+    single("sections.skills[0].name", .skill(index: 0), \.sections.skills[0].name)
+    single("sections.skills[1].name", .skill(index: 1), \.sections.skills[1].name)
+    single("sections.languages[0].language", .language(index: 0), \.sections.languages[0].language)
+    single("sections.languages[1].language", .language(index: 1), \.sections.languages[1].language)
+    single("sections.certifications[0].name", .certification(index: 0, .name), \.sections.certifications[0].name)
+    single("sections.certifications[0].issuer", .certification(index: 0, .issuer), \.sections.certifications[0].issuer)
+    multi("sections.certifications[0].description", .certification(index: 0, .description), \.sections.certifications[0].description)
+    single("sections.profiles[0].platform", .profile(index: 0), \.sections.profiles[0].platform)
+    single("sections.interests[0]", .interest(index: 0), \.firstInterest)
+    single("sections.interests[1]", .interest(index: 1), \.secondInterest)
     return fields
 }()
 
 /// Texts that are validated value objects, or identifiers: the rule does not touch them.
-private let validatedTexts: Set<String> = [
+let validatedTexts: Set<String> = [
     "personal.email.value", "personal.phone.value", "personal.website.value", "sections.certifications[0].link.value",
     "sections.profiles[0].link.value", "design.design", "design.palette", "design.fonts", "language.tag",
 ]
 
 /// Every string a value holds, by the path Mirror finds it at: `sections.experiences[0].role`.
-private func texts(of value: Any, path: String = "") -> [String: String] {
+func texts(of value: Any, path: String = "") -> [String: String] {
     if let text = value as? String { return [path: text] }
     let mirror = Mirror(reflecting: value)
     if mirror.displayStyle == .optional { return mirror.children.first.map { texts(of: $0.value, path: path) } ?? [:] }
