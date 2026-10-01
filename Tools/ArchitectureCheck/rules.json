@@ -373,6 +373,16 @@
    "kind": "test"
   },
   {
+   "name": "CVDocumentModelTests",
+   "path": "CVPDFExporter/Tests/CVDocumentModelTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
    "name": "CVDesignCatalogTests",
    "path": "CVPDFExporter/Tests/CVDesignCatalogTests",
    "allowedImports": [
