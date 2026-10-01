@@ -64,16 +64,3 @@ public struct CV: Hashable, Sendable {
         CV(id: newID, title: title, personal: personal, sections: sections, design: design, language: language)
     }
 }
-
-private extension Unicode.Scalar {
-    /// False for white space, for the characters a renderer leaves out (default ignorable code points, such as the joiners
-    /// and the direction marks) and for control, format, unassigned and surrogate characters: a name made only of these
-    /// prints nothing.
-    var isVisible: Bool {
-        if properties.isWhitespace || properties.isDefaultIgnorableCodePoint { return false }
-        switch properties.generalCategory {
-        case .control, .format, .unassigned, .surrogate: return false
-        default: return true
-        }
-    }
-}

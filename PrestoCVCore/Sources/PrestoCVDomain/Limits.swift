@@ -14,37 +14,39 @@ public enum CVLimits {
     public static let maxEntriesPerSection = 200
 }
 
-/// A section that holds a list of entries.
-public enum CVSection: Hashable, Sendable { case experiences, education, skills, languages, certifications, profiles, interests }
-
-public enum ExperienceField: Hashable, Sendable { case role, company, location, description }
-public enum EducationField: Hashable, Sendable { case degree, school, description }
-public enum CertificationField: Hashable, Sendable { case name, issuer, description }
+/// The kind of a section that holds a list of entries.
+public enum CVSectionKind: Hashable, Sendable { case experiences, education, skills, languages, certifications, profiles, interests }
 
 /// A text of a CV that can be too long, named so that presentation can point at it (R13: no display strings here). The
-/// text of an entry carries the entry's index in its section. A skill, a language, a profile and an interest have one
-/// text each. Contact details are not listed: a value object is bounded when it is made.
+/// text of an entry carries the entry's index in its section, and which of the entry's texts it is. A skill, a language,
+/// a profile and an interest have one text each. Contact details are not listed: a value object is bounded when it is
+/// made. The nested enums are named for the text of an entry, so they do not shadow the entry types.
 public enum CVTextField: Hashable, Sendable {
     case title
     case fullName, professionalTitle, location, summary
-    case experience(index: Int, ExperienceField)
-    case education(index: Int, EducationField)
+    case experience(index: Int, ExperienceText)
+    case education(index: Int, EducationText)
     case skill(index: Int)
     case language(index: Int)
-    case certification(index: Int, CertificationField)
+    case certification(index: Int, CertificationText)
     case profile(index: Int)
     case interest(index: Int)
+
+    public enum ExperienceText: Hashable, Sendable { case role, company, location, description }
+    public enum EducationText: Hashable, Sendable { case degree, school, description }
+    public enum CertificationText: Hashable, Sendable { case name, issuer, description }
 }
 
 /// Why a CV is over a bound of `CVLimits`.
 public enum CVLimitViolation: Hashable, Sendable {
     case textTooLong(CVTextField)
-    case tooManyEntries(CVSection)
+    case tooManyEntries(CVSectionKind)
     case tooMuchText
 }
 
 extension CV {
-    /// The first bound this CV is over, or nil. The order is fixed: a text that is too long (the title, the personal
+    /// The first bound this CV is over, or nil. It walks the whole CV on every read, so read it once and keep the result.
+    /// The order is fixed: a text that is too long (the title, the personal
     /// details, then the entries of each section in order), then a section with too many entries, then the total text.
     /// Sizes are those of the text as the CV holds it, after normalisation. The total counts every text, the title and
     /// the contact details and links included.
@@ -89,8 +91,8 @@ extension CV {
         return texts
     }
 
-    private var entryCounts: [(section: CVSection, count: Int)] {
-        var counts: [(section: CVSection, count: Int)] = []
+    private var entryCounts: [(section: CVSectionKind, count: Int)] {
+        var counts: [(section: CVSectionKind, count: Int)] = []
         counts.append((.experiences, sections.experiences.count)); counts.append((.education, sections.education.count))
         counts.append((.skills, sections.skills.count)); counts.append((.languages, sections.languages.count))
         counts.append((.certifications, sections.certifications.count)); counts.append((.profiles, sections.profiles.count))

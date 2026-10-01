@@ -6,10 +6,10 @@ import PrestoCVCoreTestSupport
 func text(bytes: Int) -> String { String(repeating: "x", count: bytes) }
 
 /// Every section, in the order the CV reports them.
-let allSections: [CVSection] = [.experiences, .education, .skills, .languages, .certifications, .profiles, .interests]
+let allSections: [CVSectionKind] = [.experiences, .education, .skills, .languages, .certifications, .profiles, .interests]
 
 /// Sections of `count` entries each for the listed sections, and none for the others.
-func entries(in listed: [CVSection], count: Int) -> CVSections {
+func entries(in listed: [CVSectionKind], count: Int) -> CVSections {
     let link = FixtureCV.full().sections.profiles[0].link
     var result = CVSections()
     for section in listed {
@@ -58,6 +58,16 @@ struct CVLimitsTests {
     func limitsAreWithinTheDocumentBounds() {
         #expect(CVLimits.maxTextBytes <= 16_384 && CVLimits.maxTotalTextBytes <= 262_144 && CVLimits.maxEntriesPerSection <= 200)
         #expect(CVLimits.maxTextBytes > 0 && CVLimits.maxTotalTextBytes >= CVLimits.maxTextBytes)
+    }
+
+    @Test("the names of the fields, sections and blockers can be collected: they are hashable, and an entry's field is nested in the text field")
+    func namesAreHashable() {
+        let description: CVTextField.ExperienceText = .description
+        let blockers: Set<SaveBlocker> = [.missingName, .limit(.tooMuchText), .limit(.tooManyEntries(.skills)),
+                                          .limit(.textTooLong(.experience(index: 1, description))), .limit(.textTooLong(.experience(index: 1, .description)))]
+        #expect(blockers.count == 4)
+        #expect(Set<CVSectionKind>(allSections).count == allSections.count)
+        #expect(Set(textFields.map(\.reported)).count == textFields.count)
     }
 
     @Test("a CV within the limits has no violation, and neither has an empty one")
@@ -111,7 +121,7 @@ struct CVLimitsTests {
     }
 
     @Test("a section of 200 entries is accepted and one more is reported with its section", arguments: allSections)
-    func entryBoundary(_ section: CVSection) {
+    func entryBoundary(_ section: CVSectionKind) {
         #expect(limitCV(sections: entries(in: [section], count: CVLimits.maxEntriesPerSection)).limitViolation == nil)
         #expect(limitCV(sections: entries(in: [section], count: CVLimits.maxEntriesPerSection + 1)).limitViolation == .tooManyEntries(section))
     }
@@ -193,6 +203,6 @@ struct OrderedPair: CustomTestStringConvertible, Sendable {
 }
 
 struct SectionPair: CustomTestStringConvertible, Sendable {
-    let first: CVSection, second: CVSection
+    let first: CVSectionKind, second: CVSectionKind
     var testDescription: String { "\(first) before \(second)" }
 }

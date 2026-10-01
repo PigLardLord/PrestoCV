@@ -23,7 +23,7 @@ struct SaveLimitsTests {
     }
 
     @Test("a section of 200 entries is saved; one more is refused with its section and nothing is stored", arguments: allSections)
-    func entryLimit(_ section: CVSection) async throws {
+    func entryLimit(_ section: CVSectionKind) async throws {
         _ = try await SaveCV(repository: InMemoryCVRepository())(limitCV(sections: entries(in: [section], count: CVLimits.maxEntriesPerSection)))
         let over = InMemoryCVRepository()
         await #expect(throws: AuthoringError.exceedsLimits(.tooManyEntries(section))) {
