@@ -432,7 +432,7 @@ func startTags(in html: String) -> [(name: String, attributes: [String: String])
 struct InstallTests {
     func gate(_ renderer: any PDFRendering) throws -> FixtureRenderingGate {
         FixtureRenderingGate(renderer: renderer, inspector: MinimalPDFInspector(), fixture: fixture,
-                             headings: try HeadingsCatalog.headings(for: "it"), palette: palette)
+                             headings: try HeadingsCatalog.headings(for: "it"))
     }
     @Test("a valid design that renders completely is stored")
     func installs() async throws {

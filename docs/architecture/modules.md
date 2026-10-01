@@ -139,7 +139,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - **`PDFInspecting`**, the outbound port that reads the page count and text of a PDF.
 - **`RenderedDocument`:** the builder's output, meaning the HTML plus the exact text nodes it contains.
 - **`DocumentCompleteness`:** every text node needs its own span of the PDF text, which no other node uses, ignoring case and spacing.
-- **`FixtureRenderingGate`:** implements the catalog's `DesignRenderingGate`. It renders a fixture that uses every section with the candidate design, and requires a complete, untruncated PDF.
+- **`FixtureRenderingGate`:** implements the catalog's `DesignRenderingGate`. It renders a fixture that uses every section with the candidate design, in the design's own default palette (palettes change colours only), once under every `FontScheme`, the design's default first, because a user can choose any font scheme and fonts change pagination. Each PDF must be complete and untruncated, and the first that is not fails the design.
 - **Policy:** the required fields and page limit, shared by preview and export.
 
 **`CVRenderingWebKitSupport`**
