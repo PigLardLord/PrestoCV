@@ -379,7 +379,8 @@
     "Testing",
     "Foundation",
     "CVDesignCatalog",
-    "CVBundledDesigns"
+    "CVBundledDesigns",
+    "CVRenderingTestSupport"
    ],
    "rules": [],
    "kind": "test"
