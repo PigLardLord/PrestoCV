@@ -1,26 +1,5 @@
 import Foundation
 
-/// A JSON value decoded from text, so that booleans, numbers and `null` stay what the text says on every platform.
-enum JSON: Equatable, Decodable {
-    case null, bool(Bool), number(Double), string(String), array([JSON]), object([String: JSON])
-
-    init(from decoder: any Decoder) throws {
-        let c = try decoder.singleValueContainer()
-        if c.decodeNil() { self = .null }
-        else if let value = try? c.decode(Bool.self) { self = .bool(value) }
-        else if let value = try? c.decode(Double.self) { self = .number(value) }
-        else if let value = try? c.decode(String.self) { self = .string(value) }
-        else if let value = try? c.decode([JSON].self) { self = .array(value) }
-        else { self = .object(try c.decode([String: JSON].self)) }
-    }
-
-    init(parsing data: Data) throws { self = try JSONDecoder().decode(JSON.self, from: data) }
-
-    init(parsing text: String) throws { try self.init(parsing: Data(text.utf8)) }
-
-    subscript(key: String) -> JSON? { if case .object(let members) = self { members[key] } else { nil } }
-}
-
 /// The part of JSON Schema (draft 2020-12) that `cvdocument.v1.schema.json` uses, and nothing more. A keyword it does not
 /// know makes `init` throw, so the schema cannot rely on a check this validator does not perform.
 struct SchemaValidator {
@@ -64,7 +43,7 @@ struct SchemaValidator {
     /// Throws unless every keyword is one the checker applies, with a value of the shape JSON Schema requires.
     private static func audit(_ schema: JSON, at path: String, root: JSON) throws {
         guard case .object(let keywords) = schema else { throw Unsupported(description: "\(path): a schema must be an object") }
-        for (keyword, value) in keywords.sorted(by: { $0.key < $1.key }) {
+        for (keyword, value) in keywords.inKeyOrder {
             let here = "\(path)/\(keyword)"
             func malformed(_ expected: String) -> Unsupported { Unsupported(description: "\(here): \(expected)") }
             switch keyword {
@@ -76,7 +55,7 @@ struct SchemaValidator {
                 guard case .string = value else { throw malformed("must be text") }
             case "$defs", "properties":
                 guard case .object(let schemas) = value else { throw malformed("must be an object whose values are schemas") }
-                for (name, subschema) in schemas.sorted(by: { $0.key < $1.key }) { try audit(subschema, at: "\(here)/\(name)", root: root) }
+                for (name, subschema) in schemas.inKeyOrder { try audit(subschema, at: "\(here)/\(name)", root: root) }
             case "items":
                 try audit(value, at: here, root: root)
             case "oneOf":
@@ -128,7 +107,7 @@ struct SchemaValidator {
     private func check(_ instance: JSON, against schema: JSON, at path: String) -> [String] {
         guard case .object(let keywords) = schema else { return [] }
         var found: [String] = []
-        for (keyword, value) in keywords.sorted(by: { $0.key < $1.key }) {
+        for (keyword, value) in keywords.inKeyOrder {
             switch (keyword, value) {
             case ("$ref", .string(let reference)):
                 if let target = Self.target(of: reference, in: root) { found += check(instance, against: target, at: path) }
@@ -140,7 +119,7 @@ struct SchemaValidator {
                     for case .string(let name) in names where members[name] == nil { found.append("\(path): \(name) is required") }
                 }
             case ("properties", .object(let schemas)):
-                for (name, subschema) in schemas.sorted(by: { $0.key < $1.key }) {
+                for (name, subschema) in schemas.inKeyOrder {
                     if let member = instance[name] { found += check(member, against: subschema, at: "\(path).\(name)") }
                 }
             case ("items", _):
@@ -188,7 +167,7 @@ struct SchemaValidator {
             let declared = declaredProperties(in: schema, for: instance)
             for name in members.keys.sorted() where declared[name] == nil { found.append("\(path).\(name) is written but not declared") }
             for name in declared.keys.sorted() where members[name] == nil { found.append("\(path).\(name) is declared but not written") }
-            for (name, member) in members.sorted(by: { $0.key < $1.key }) {
+            for (name, member) in members.inKeyOrder {
                 for subschema in declared[name] ?? [] { found += differences(of: member, against: subschema, at: "\(path).\(name)") }
             }
         case .array(let elements):
@@ -216,9 +195,4 @@ struct SchemaValidator {
     private func itemSchemas(in schema: JSON) -> [JSON] {
         (resolve(schema).map(itemSchemas) ?? []) + (schema["items"].map { [$0] } ?? [])
     }
-}
-
-extension Dictionary where Key == String {
-    /// The members in the order of their keys, so that messages and generated documents do not change between runs.
-    var inKeyOrder: [(key: String, value: Value)] { sorted { $0.key < $1.key } }
 }

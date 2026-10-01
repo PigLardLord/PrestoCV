@@ -2,7 +2,7 @@ import Testing
 import Foundation
 
 @Suite("ADR 0002 · the schema validator checks what it supports and refuses the rest")
-struct JSONSchemaValidatorTests {
+struct SchemaValidatorTests {
     struct Case: Sendable, CustomTestStringConvertible {
         let name: String, schema: String, instance: String, valid: Bool
         var testDescription: String { name }

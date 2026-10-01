@@ -97,7 +97,12 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - JSON arrives through `decode(json:)`, which checks the size before decoding.
 - **The JSON Schema** of version 1 is `CVPDFExporter/Schema/cvdocument.v1.schema.json` (draft 2020-12), a published file outside every target:
   - it permits unknown properties and `null` for optional fields, as the decoder does;
-  - it does not express the byte limits, the character rules or the order of a period's dates, so `CVDocumentValidator` is authoritative;
+  - it judges a parsed JSON value, so the exporter stays the authority for what parsing does:
+    - with duplicate keys, Swift's decoder keeps the first value and most others the last;
+    - a trailing comma and a leading byte order mark are accepted;
+    - nesting deeper than 512 levels and lone surrogate escapes are refused;
+    - numbers with more than 15 significant digits round as a double does;
+  - it does not express the byte limits, the character rules, a blank name or the order of a period's dates, so `CVDocumentValidator` is authoritative;
   - `CVDocumentModelTests` hold it and the model to each other.
 
 **`CVDesignCatalog`**
@@ -136,7 +141,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - A clicked link, which only happens in the preview, may open a connection to its host before the navigation is cancelled (a WebKit preconnect). Nothing is sent over it. A document's links and a refresh make no connection at all; tests record both.
 - Every file is wrapped in `#if canImport(WebKit)`.
 - **`CVRenderingWebKitSupportTests`** check each of these on iOS and macOS. Each network test has a control without the rules, which shows that the test can see a request.
-- On iOS the exporter's tests run through the shared `ExporterTests` scheme, which holds the new test targets only: the package scheme also builds the legacy targets, which do not build for iOS.
+- On iOS the exporter's tests run through the shared `ExporterTests` scheme, which holds the new test targets that run on the simulator: the package scheme also builds the legacy targets, which do not build for iOS. `CVDocumentModelTests` is not in it: it reads the schema from the source tree and has nothing platform-specific, so it runs under `swift test` on Linux and macOS.
 
 **`CVRenderingIOS`, `CVRenderingMacOS`**
 - One `PDFRendering` implementation per platform ([ADR 0003](adr/0003-one-pdf-renderer-per-platform.md)). Every file is wrapped in its platform condition.
@@ -154,9 +159,11 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
     - deterministic pre-start cancellation;
   - `FakePDFRenderer`, which writes real uncompressed PDFs;
   - `MinimalPDFInspector`.
-- **`CVDocumentModelTests`** may import `CVDocumentModel`, `CVRenderingTestSupport`, Foundation, Testing. They read the committed schema from the source tree and check it with a minimal validator of their own, which refuses any keyword it does not support:
+- **`CVDocumentModelTests`** may import `CVDocumentModel`, `CVRenderingTestSupport`, Foundation, Testing. They read the committed schema from the source tree and check it with a minimal validator of their own, which refuses any keyword it does not support, and any supported keyword whose value has the wrong shape:
   - the documents the encoder writes, `ContractFixture.document` among them, validate against the schema;
-  - on a table of valid and invalid documents, the schema and `CVDocumentValidator.decode(json:)` give the same verdict, except for the rules the schema cannot express, which the table lists;
+  - the schema and `CVDocumentValidator.decode(json:)` give the same verdict on a generated matrix and on a short table of semantic cases:
+    - the matrix changes every node of a document that has all its optional fields: null, empty, the text limit in characters and in bytes, the bounds of each integer, a number written with a decimal point, a removed key, an unknown property, 200 and 201 elements, a value of the wrong type;
+    - the schema never refuses what the exporter accepts, and accepts what the exporter refuses only on a rule it cannot express, which the table of semantic cases lists;
   - the section kinds, period ends and language levels of the schema are the ones the model writes, and the schema declares exactly the properties the model writes.
 - **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test, in-flight cancellation and the content-completeness test for every bundled design.
 
