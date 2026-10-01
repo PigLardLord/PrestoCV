@@ -82,7 +82,9 @@ public enum LanguageProficiency: String, CaseIterable, Hashable, Sendable {
 /// at most 64 bytes (RFC 5321 §4.5.3.1.1), and each domain label is at most 63 characters as written and 63 bytes once
 /// encoded for IDNA (Punycode, RFC 5891; RFC 1035 §3.1). The local part, the at sign and the encoded domain together
 /// are at most 254 bytes, a mail path of 256 octets less its angle brackets (RFC 5321 §4.5.3.1.3). A label is measured
-/// lowercased and in NFC, while the stored value stays as it was written.
+/// as IDNA maps it (compatibility normalisation, lowercasing, NFC), so fullwidth letters and ligatures count as the
+/// letters they stand for, and a label that is not a label once mapped is refused. The stored value stays as it was
+/// written.
 public struct EmailAddress: Hashable, Sendable {
     public let value: String
     static let atom = #"[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-][\p{L}\p{M}\p{N}!#$%&'*+/=?^_`{|}~-]*"#
@@ -96,9 +98,9 @@ public struct EmailAddress: Hashable, Sendable {
         guard v.utf8.count <= 254, !v.unicodeScalars.contains(where: { hidden.contains($0.properties.generalCategory) }),
               v.range(of: Self.pattern, options: .regularExpression) != nil else { return nil }
         // Length limits the pattern cannot express once marks are allowed: the local part, and the domain once encoded.
-        // Each label is checked to be at most 63 characters as written before it is encoded, so the encoder only sees
-        // short labels. The path bound is tighter than a domain name's own (255 octets on the wire, 253 as dotted text,
-        // RFC 1035 §3.1), so it is the only bound on the whole domain.
+        // Each label is checked to be at most 63 characters as written before it is mapped and encoded, which bounds
+        // the work per label. The path bound is tighter than a domain name's own (255 octets on the wire, 253 as
+        // dotted text, RFC 1035 §3.1), so it is the only bound on the whole domain.
         let parts = Self.pieces(of: v, separatedBy: "@", keepingEmpty: true)
         guard parts.count == 2, parts[0].utf8.count <= 64, let domain = Self.encodedDomain(parts[1]),
               parts[0].utf8.count + 1 + domain.utf8.count <= 254 else { return nil }
@@ -106,7 +108,7 @@ public struct EmailAddress: Hashable, Sendable {
     }
 
     /// The A-labels of the domain joined by dots, or nil when a label is longer than 63 characters as written or than 63
-    /// bytes once encoded.
+    /// bytes once encoded, or is not a label once mapped.
     private static func encodedDomain(_ domain: String) -> String? {
         var aLabels: [String] = []
         for label in pieces(of: domain, separatedBy: ".", keepingEmpty: false) {

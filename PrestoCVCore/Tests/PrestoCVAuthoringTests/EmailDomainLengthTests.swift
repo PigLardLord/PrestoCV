@@ -39,7 +39,53 @@ let encodedLabels: [(String, String)] = {
     cases.append(("\u{212A}elvin", "kelvin"))
     cases.append(("xn--bcher-kva", "xn--bcher-kva"))
     cases.append(("a" + prependLetter, "xn--a-mmf"))
+    cases.append(("a-b", "a-b"))
+    cases.append(("straße", "xn--strae-oqa"))                       // non-transitional: the sharp s stays
+    cases.append(("οδυσσεύς", "xn--pxac2aodam1e"))                  // and so does the final sigma
+    cases.append(("\u{FF21}\u{FF22}", "ab"))                        // fullwidth capitals map to ASCII letters
+    cases.append(("\u{FB03}", "ffi"))
+    cases.append(("\u{FB03}b\u{FF21}", "ffiba"))
+    cases.append(("\u{03AA}\u{0300}", "xn--dtg"))                    // lowercasing decomposes it, and NFC puts it back together
     return cases
+}()
+
+/// Labels that IDNA maps to other letters before it encodes them: the label, its A-label and whether an address holding
+/// the label is accepted.
+let mappedLabelCases: [(String, String, Bool)] = {
+    func repeated(_ text: String, _ count: Int) -> String { String(repeating: text, count: count) }
+    let fullwidthA = "\u{FF41}", ligature = "\u{FB03}", longS = "\u{017F}"
+    var cases: [(String, String, Bool)] = []
+    cases.append((repeated(fullwidthA, 58), repeated("a", 58), true))
+    cases.append((repeated(fullwidthA, 63), repeated("a", 63), true))
+    cases.append((repeated(fullwidthA, 64), repeated("a", 64), false))
+    cases.append((repeated(ligature, 21), repeated("ffi", 21), true))
+    cases.append((repeated(ligature, 22), repeated("ffi", 22), false))
+    cases.append((repeated(longS, 63), repeated("s", 63), true))
+    return cases
+}()
+
+/// Labels whose mapping is not a label: it holds a dot, it starts or ends with a hyphen, it starts with a mark or it is empty.
+let notLabels: [String] = {
+    var labels: [String] = []
+    labels.append("")
+    labels.append("-abc")
+    labels.append("abc-")
+    labels.append("a.b")
+    labels.append("\u{2488}")           // DIGIT ONE FULL STOP maps to "1."
+    labels.append("a\u{2488}b")
+    labels.append("\u{FF9E}a")          // HALFWIDTH KATAKANA VOICED SOUND MARK maps to a combining mark
+    labels.append("a\u{2474}")          // PARENTHESIZED DIGIT ONE maps to "(1)"
+    return labels
+}()
+
+/// Addresses whose domain holds a label that is valid as written and not once mapped.
+let unmappableAddresses: [String] = {
+    var addresses: [String] = []
+    addresses.append("ada@\u{2488}.example.com")
+    addresses.append("ada@a\u{2488}b.example.com")
+    addresses.append("ada@\u{FF9E}a.example.com")
+    addresses.append("ada@a\u{2474}.example.com")
+    return addresses
 }()
 
 /// Labels of at most 63 characters, with the length of their A-label and whether an address holding them is accepted.
@@ -105,11 +151,19 @@ let typedAddresses: [String] = {
 
 @Suite("IDNA A-labels")
 struct IDNALabelTests {
-    @Test("a label is lowercased and put in NFC, then written in ASCII only if it needs it", arguments: encodedLabels)
+    @Test("a label is mapped as IDNA maps it, then written in ASCII only if it needs it", arguments: encodedLabels)
     func encoded(label: String, aLabel: String) { #expect(IDNA.aLabel(label) == aLabel) }
 
+    @Test("a label whose mapping is not a label has no A-label", arguments: notLabels)
+    func notALabel(label: String) { #expect(IDNA.aLabel(label) == nil) }
+
     @Test("a label that overflows the encoder has no A-label")
-    func overflow() { #expect(IDNA.aLabel(String(repeating: "a", count: 3_855) + "\u{10FFFF}") == nil) }
+    func overflow() {
+        // The last CJK ideograph of Unicode 15 costs (U+323AF - 128) * (basic scalars + 1) in the encoder.
+        let ideograph = "\u{323AF}"
+        #expect(IDNA.aLabel(String(repeating: "a", count: 20_000) + ideograph) != nil)
+        #expect(IDNA.aLabel(String(repeating: "a", count: 25_000) + ideograph) == nil)
+    }
 }
 
 @Suite("R6 · email domain length once encoded")
@@ -142,6 +196,16 @@ struct EmailDomainLengthTests {
         #expect(label.unicodeScalars.count == (accepted ? 63 : 64) && (aLabelLength(label) ?? .max) <= 63)
         for raw in addresses(with: label) { #expect((EmailAddress(raw) != nil) == accepted) }
     }
+
+    @Test("a label is measured as IDNA maps it: fullwidth letters and ligatures count as the letters they stand for",
+          arguments: mappedLabelCases)
+    func mappedLabelBytes(label: String, aLabel: String, accepted: Bool) {
+        #expect(IDNA.aLabel(label) == aLabel && (aLabel.utf8.count <= 63) == accepted)   // the premise
+        for raw in addresses(with: label) { #expect((EmailAddress(raw) != nil) == accepted) }
+    }
+
+    @Test("an address whose label is not a label once mapped is refused", arguments: unmappableAddresses)
+    func unmappableLabel(raw: String) { #expect(EmailAddress(raw) == nil) }
 
     @Test("a label ending in a letter that grapheme clusters join to the next dot is measured on its own",
           arguments: prependLabelCases)

@@ -103,6 +103,15 @@ struct FileRepositoryTests {
         #expect(loaded.design == FixtureCV.full().design && loaded.language == FixtureCV.full().language && loaded.title == FixtureCV.full().title)
     }
 
+    @Test("a stored CV whose email domain is a fullwidth label that IDNA maps to 58 ASCII letters loads as written")
+    func fullwidthEmailLoads() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let email = "ada@" + String(repeating: "\u{FF41}", count: 58) + ".com"
+        try Data(fileJSON(personal: personal("email", "\"" + email + "\"")).utf8).write(to: dir.appendingPathComponent(fileName(id1)))
+        #expect(try await repo(dir).load(id1).personal.email?.value == email)
+    }
+
     @Test("mixed directory: healthy listed, corrupt quarantined with a reason, newer schema untouched")
     func mixedDirectory() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
