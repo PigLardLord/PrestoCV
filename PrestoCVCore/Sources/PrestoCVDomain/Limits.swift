@@ -1,8 +1,9 @@
 /// The size bounds of a CV, in UTF-8 bytes and in entries (R6). They sit at or below the bounds of both places a CV
 /// goes:
 /// - **The document validator** of the exporter (16,384 bytes in a text, 262,144 in the whole document, 200 entries in a
-///   section), so a CV within them maps to a document the validator accepts. The domain is never looser: the document
-///   adds its language tag, and the domain counts every text a CV holds, the title included.
+///   section), so a CV within them maps to a document the validator accepts. The domain is never looser: it counts
+///   every text a CV prints and its title, which the document does not carry. It does not count the design identifiers
+///   or the language tag, which the margin below the validator's total covers.
 /// - **The stored file** (schema 1), which caps a text at 10,000 characters, a list at 500 items and a file at 5 MiB.
 ///   10,000 bytes are never more than 10,000 characters, 200 entries are under 500, and 250,000 bytes of text are far
 ///   under the file cap, so a CV that can be saved can be stored.

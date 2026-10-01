@@ -85,7 +85,8 @@ func texts(of value: Any, path: String = "") -> [String: String] {
     return found
 }
 
-/// The ways text enters a CV, and the fields each one governs.
+/// The ways text enters a CV, and the fields each one governs. A new method on `CV` that sets text must go through
+/// `TextRule` and be added here, or the coverage test cannot see it.
 enum TextEntry: String, CaseIterable, Sendable, CustomTestStringConvertible {
     case initialiser, storedInitialiser, rename, setPersonalDetails, setSections
     var testDescription: String { rawValue }

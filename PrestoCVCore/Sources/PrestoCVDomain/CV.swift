@@ -8,8 +8,9 @@ public enum SaveBlocker: Hashable, Sendable { case missingName, limit(CVLimitVio
 ///
 /// Its text is normalised where it enters, by the rule in `TextRule`: the initialisers (so a stored file too), `rename`,
 /// `setPersonalDetails` and `setSections`. A CV holds no control character other than the line feed, which a summary or
-/// a description keeps, no bidirectional or tag character, and no line break in a one-line field. What a CV returns is
-/// the normalised text, not necessarily what was handed over.
+/// a description keeps, no bidirectional embedding, override or isolate (the direction marks LRM, RLM and ALM are kept),
+/// no tag character, and no line break in a one-line field. What a CV returns is the normalised text, not necessarily
+/// what was handed over.
 public struct CV: Hashable, Sendable {
     public let id: CVID
     public let revision: Int                 // 0 = never saved
@@ -48,9 +49,12 @@ public struct CV: Hashable, Sendable {
         return limitViolation.map(SaveBlocker.limit)
     }
 
-    /// Whether the CV can be saved: it has no `saveBlocker`, that is, a visible name and no size bound exceeded.
+    /// Whether the CV can be saved: it has no `saveBlocker`, that is, a visible name and no size bound exceeded. Like
+    /// `limitViolation`, it walks the whole CV on every read.
     public var canBeSaved: Bool { saveBlocker == nil }
 
+    // Text enters a CV only through the initialisers and the three methods below, each through `TextRule`. A new method
+    // that sets text must do the same, and be added to `TextEntry` in the tests, or the coverage test cannot see it.
     public mutating func rename(_ newTitle: String) { title = TextRule.singleLine(newTitle) }
     public mutating func setPersonalDetails(_ details: PersonalDetails) { personal = details.normalised() }
     /// Every edit of the entries goes through here; the order is the one the user chose.

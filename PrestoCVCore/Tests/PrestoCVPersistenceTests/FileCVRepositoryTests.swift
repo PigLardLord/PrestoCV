@@ -87,7 +87,7 @@ struct StrictDecodingTests {
         #expect(try decode(fileJSON(sections: ["experiences": experience])).sections.experiences.first?.period?.end == .unknown)
     }
 
-    @Test("every value that is not in its canonical, valid form is corrupt, never normalised or defaulted", arguments: corruptFiles)
+    @Test("every value that is not in its canonical, valid form is corrupt: the decoder repairs and defaults nothing, and text is left to the domain", arguments: corruptFiles)
     func corrupt(json: String) { #expect(throws: CVFileV1.Invalid.self) { try decode(json) } }
 }
 

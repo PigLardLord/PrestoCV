@@ -78,7 +78,7 @@ private let keptTexts: [TextCase] = {
     var kept: [TextCase] = []
     func add(_ name: String, _ text: String) { kept.append(TextCase(name: name, input: text, expected: text)) }
     add("zero width joiner in an emoji sequence", "👩\u{200D}👩\u{200D}👧")
-    add("zero width joiner in a rainbow flag", "🏳️\u{200D}🌈")
+    add("zero width joiner in a rainbow flag", "\u{1F3F3}\u{FE0F}\u{200D}\u{1F308}")
     add("zero width non-joiner in Persian", "می\u{200C}خواهم")
     add("zero width non-joiner after a virama", "ക\u{0D4D}\u{200C}ക")
     add("emoji with a skin tone and a variation selector", "👍🏽 ❤\u{FE0F}")

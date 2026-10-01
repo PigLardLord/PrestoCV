@@ -44,11 +44,13 @@ enum TextRule {
 }
 
 extension Unicode.Scalar {
-    /// False for white space, for the characters a renderer leaves out (default ignorable code points, such as the joiners
-    /// and the direction marks) and for control, format, unassigned and surrogate characters: a name made only of these
-    /// prints nothing.
+    /// A heuristic for "prints something", used to tell a name from a blank. False for white space, for the characters a
+    /// renderer leaves out (default ignorable code points, such as the joiners and the direction marks), for control,
+    /// format, unassigned and surrogate characters, and for the blank braille pattern (U+2800), which prints an empty
+    /// cell. Private-use characters count as visible on purpose: a font can draw them (U+F8FF prints on Apple platforms).
+    /// A name made only of invisible characters is no name.
     var isVisible: Bool {
-        if properties.isWhitespace || properties.isDefaultIgnorableCodePoint { return false }
+        if properties.isWhitespace || properties.isDefaultIgnorableCodePoint || self == "\u{2800}" { return false }
         switch properties.generalCategory {
         case .control, .format, .unassigned, .surrogate: return false
         default: return true

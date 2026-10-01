@@ -18,19 +18,20 @@ let emailLengthCases: [(String, Bool)] = {
 }()
 
 /// Names made only of characters that print nothing: white space, zero-width and joining characters, direction marks,
-/// a soft hyphen, a variation selector, an unassigned scalar.
+/// a soft hyphen, a variation selector, an unassigned scalar, the blank braille pattern.
 let invisibleNames: [String] = {
     var names: [String] = []
     names.append(""); names.append("   "); names.append("\u{3000}"); names.append("\u{200B}"); names.append("\u{200D}")
     names.append("\u{200C}"); names.append("\u{200E}"); names.append("\u{200F}"); names.append("\u{2060}"); names.append("\u{FEFF}")
     names.append("\u{00AD}"); names.append("\u{FE0F}"); names.append("\u{0378}"); names.append("\u{200B} \u{200D}\u{200E} ")
+    names.append("\u{2800}"); names.append("\u{2800} \u{2800}")
     return names
 }()
 
 /// Names with at least one visible character, some of them with invisible ones around it.
 let visibleNames: [String] = {
     var names: [String] = []
-    names.append("\u{200B}Ada"); names.append("Ada\u{200D}"); names.append("\u{200E}Ada"); names.append(" Ada "); names.append("e\u{0301}")
+    names.append("\u{2800}Ada"); names.append("\u{200B}Ada"); names.append("Ada\u{200D}"); names.append("\u{200E}Ada"); names.append(" Ada "); names.append("e\u{0301}")
     names.append("A"); names.append("\u{1F600}"); names.append("\u{1F469}\u{200D}\u{1F469}\u{200D}\u{1F467}")
     names.append("\u{0639}\u{0644}\u{064A}"); names.append("\u{5C71}\u{7530} \u{592A}\u{90CE}"); names.append("\u{0645}\u{06CC}\u{200C}\u{062E}\u{0648}\u{0627}\u{0647}\u{0645}")
     return names
