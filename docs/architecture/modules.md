@@ -29,8 +29,18 @@ Test targets and test-support targets are described below each package. The chec
   - a typed identity (`CVID`);
   - `revision`, `createdAt` and `updatedAt`, settable only inside the package;
   - a private title, `PersonalDetails`, and ordered sections of entries;
-  - the "has enough content to be saved" rule;
+  - the "has enough content to be saved" rule, which is about the name only;
+  - the size bounds: `limitViolation` reports the first bound the CV is over, or nil;
   - duplication with a title composed by the caller.
+- **The text rule** is internal to the domain, in one file. `CV` applies it wherever text enters: both initialisers, so a stored file too, and `rename`, `setPersonalDetails` and `setSections`. Value objects are validated when they are made, and the rule does not touch them. It has two kinds:
+  - **single line**: the title, the name, the professional title, the location, an entry's role, company, location, degree and school, a skill, a language, a certification's name and issuer, a profile's platform, and each interest. A line break (`\r\n`, `\r`, `\n`, NEL, U+2028, U+2029) or a tab becomes one space.
+  - **multi line**: the summary and the descriptions of an experience, an education entry and a certification. A line break becomes `\n`, and a tab becomes one space.
+  - **Both kinds** remove, without an error, the C0 controls, DEL, the C1 controls other than NEL, bidirectional embeddings, overrides and isolates (U+202A–U+202E, U+2066–U+2069), and tag characters (U+E0000–U+E007F). They keep ZWJ and ZWNJ, and they neither trim nor collapse spaces. Applying the rule twice gives the same text.
+  - Interests are normalised before they are trimmed and de-duplicated, so `a<tab>b` and `a b` are one interest.
+- **Size limits**, `CVLimits`, counted in UTF-8 bytes: 16,000 bytes in a text, 250,000 in all the text of a CV, and 200 entries in a section.
+  - They are at or below the bounds of the document validator in `CVPDFExporter` (16,384, 262,144 and 200), so a CV within them maps to a document the validator accepts (R6). They sit below the validator's because the document adds its language tag, and because the domain counts every text a CV holds, the title, the contact details and the links included, so it is never looser.
+  - `limitViolation` reports the first bound in a fixed order: a text that is too long (`textTooLong`, which names the field and, for an entry, its index in the section), then a section with too many entries (`tooManyEntries`), then the total (`tooMuchText`). The values name fields and sections; presentation writes the words (R13).
+  - A text is never cut. A CV over a bound is refused at save.
 - **Value objects:**
   - `PartialDate` (year or month precision, partial order);
   - `Period`, whose end is a date, "current" or "ended, date unknown" (`PeriodEnd.unknown`);
@@ -47,6 +57,7 @@ Test targets and test-support targets are described below each package. The chec
   - `SampleCVSource`, `IDGenerator`, `TimeSource`. `TimeSource` is so named to avoid shadowing `Swift.Clock`.
 - **Use cases:**
   - `NewCV`, `SaveCV` (create or conditional update, errors translated to `AuthoringError`, including `tooLarge`), `LoadCV`;
+  - `SaveCV` refuses a CV without a name (`notEnoughContent`) first, then a CV over a size limit (`exceedsLimits`, which carries the CV's `limitViolation`), before it touches the store; rename and duplicate save through it and refuse the same way;
   - list (by last change), rename, duplicate, delete, start from a sample, determine onboarding.
 - **Listing** returns the healthy CVs plus `StoreIssue`s: `corrupt`, `upgradeRequired`, `unreadable`, `tooLarge`, `quarantineFailed`.
 
@@ -55,7 +66,7 @@ Test targets and test-support targets are described below each package. The chec
   - one `CVFileV1` file per CV, named from its id;
   - atomic writes with `complete` protection, and a read-back check before every write;
   - every mutation under an exclusive `flock` on the store;
-  - reads classified as described in R12;
+  - reads classified as described in R12, and text normalised by the domain when the CV is built, so a stored file cannot bring back what the text rule removes;
   - `Quarantine/` with validated restore, erase and purge.
 - `DirectorySampleCVSource`: sample CVs from an injected directory, in the same v1 format and through the store's own reader. The app ships them in `PrestoCV/Resources/Samples/`.
 

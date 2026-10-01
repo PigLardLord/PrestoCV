@@ -3,8 +3,9 @@ import PrestoCVDomain
 
 /// The stored form of a CV, schema 1: a DTO separate from the domain (ADR 0009, R12). Decoding is strict: required
 /// fields are required, sizes are capped, and every value must be in the canonical, valid form its value object
-/// produces. A file is never normalised or defaulted on read. The envelope is frozen: `schemaVersion` is a top-level
-/// integer in every future version.
+/// produces. A file is never defaulted on read, and no value is repaired here; the text of a CV is normalised by the
+/// domain when the CV is built (`CV`). The envelope is frozen: `schemaVersion` is a top-level integer in every future
+/// version.
 struct CVFileV1: Codable, Equatable {
     static let version = 1
     static let maxText = 10_000, maxItems = 500
