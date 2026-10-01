@@ -14,8 +14,8 @@ enum Punycode {
 
         var handled = basicCount, n = initialN, delta: UInt32 = 0, bias = initialBias
         while handled < input.count {
-            guard let next = input.filter({ $0 >= n }).min(), let points = UInt32(exactly: handled + 1) else { return nil }
-            let (step, stepOverflow) = (next - n).multipliedReportingOverflow(by: points)
+            guard let next = input.filter({ $0 >= n }).min(), let passPoints = UInt32(exactly: handled + 1) else { return nil }
+            let (step, stepOverflow) = (next - n).multipliedReportingOverflow(by: passPoints)
             let (jumped, jumpOverflow) = delta.addingReportingOverflow(step)
             guard !stepOverflow, !jumpOverflow else { return nil }
             n = next; delta = jumped
@@ -25,6 +25,7 @@ enum Punycode {
                     guard !overflow else { return nil }
                     delta = passed
                 } else if scalar == n {
+                    guard let points = UInt32(exactly: handled + 1) else { return nil }
                     appendInteger(delta, bias: bias, to: &output)
                     bias = adapt(delta, points: points, firstTime: handled == basicCount)
                     delta = 0
