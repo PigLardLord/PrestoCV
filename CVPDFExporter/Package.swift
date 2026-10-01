@@ -20,7 +20,7 @@ var targets: [Target] = [
     .target(name: "CVRendering", dependencies: ["CVDocumentModel", "CVDesignCatalog"], resources: [.copy("Resources")]),
     .target(name: "CVRenderingTestSupport", dependencies: ["CVRendering", "CVDocumentModel", "CVDesignCatalog"]),
     .testTarget(name: "CVDesignCatalogTests", dependencies: ["CVDesignCatalog", "CVBundledDesigns"]),
-    .testTarget(name: "CVDocumentModelTests"),
+    .testTarget(name: "CVDocumentModelTests", dependencies: ["CVDocumentModel", "CVRenderingTestSupport"]),
     .testTarget(name: "CVDesignCatalogFileStoreTests", dependencies: ["CVDesignCatalogFileStore", "CVDesignCatalog", "CVRenderingTestSupport"]),
     .testTarget(
         name: "CVRenderingTests",

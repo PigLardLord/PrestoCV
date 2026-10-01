@@ -377,7 +377,9 @@
    "path": "CVPDFExporter/Tests/CVDocumentModelTests",
    "allowedImports": [
     "Testing",
-    "Foundation"
+    "Foundation",
+    "CVDocumentModel",
+    "CVRenderingTestSupport"
    ],
    "rules": [],
    "kind": "test"

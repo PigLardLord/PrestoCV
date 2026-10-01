@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:prestocv:cvpdfexporter:cvdocument:1",
+  "title": "CVDocument, schema version 1",
+  "description": "The JSON that the CVPDFExporter package reads and that a backend accepts: version 1 of CVDocument, the package's published language (ADR 0002). CVDocumentValidator, in the CVDocumentModel target, is authoritative; a test holds this schema and the Swift model to each other. Properties that are not listed are ignored by the exporter, so this schema permits them. The validator enforces rules that this schema does not. Its limits are in UTF-8 bytes (16,384 per text, 262,144 for all the text of a document, 1,048,576 for the JSON itself), which JSON Schema cannot express exactly: maxLength here counts characters, which are never more than UTF-8 bytes. It refuses control characters other than the line feed, and bidirectional embeddings, overrides and isolates (U+202A to U+202E and U+2066 to U+2069). It refuses a name that is blank once whitespace is trimmed, and a period that ends before it starts. So this schema never refuses a document the validator accepts, and may accept one the validator refuses.",
+  "type": "object",
+  "required": ["schemaVersion", "language", "person", "sections"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "The version of this schema. Any other version is rejected."
+    },
+    "language": {
+      "$ref": "#/$defs/text",
+      "description": "The language of the document as a BCP 47 tag, for example it or en-GB."
+    },
+    "person": { "$ref": "#/$defs/person" },
+    "sections": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/section" },
+      "description": "The sections in print order. At most 200."
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "maxLength": 16384
+    },
+    "optionalText": {
+      "type": ["string", "null"],
+      "maxLength": 16384,
+      "description": "Absent or null when there is no value."
+    },
+    "date": {
+      "type": "object",
+      "required": ["year"],
+      "properties": {
+        "year": { "type": "integer", "minimum": 1900, "maximum": 2200 },
+        "month": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 12,
+          "description": "Absent or null for a date with year precision."
+        }
+      },
+      "description": "A date with year or month precision. The renderer formats it in the language of the document."
+    },
+    "period": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "$ref": "#/$defs/date" },
+        "end": {
+          "enum": ["present", "unspecified", "date"],
+          "description": "present: it goes on. unspecified: it ended on an unknown date. date: it ended on endDate."
+        }
+      },
+      "oneOf": [
+        { "properties": { "end": { "const": "present" } } },
+        { "properties": { "end": { "const": "unspecified" } } },
+        {
+          "required": ["endDate"],
+          "properties": {
+            "end": { "const": "date" },
+            "endDate": { "$ref": "#/$defs/date" }
+          },
+          "description": "endDate is read only when end is date, and must not be before start."
+        }
+      ]
+    },
+    "optionalPeriod": {
+      "oneOf": [
+        { "$ref": "#/$defs/period" },
+        { "type": "null" }
+      ],
+      "description": "Absent or null when there is no period."
+    },
+    "person": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384,
+          "description": "Required and not blank: the validator refuses a name that is empty once whitespace and newlines are trimmed. minLength expresses the empty case only."
+        },
+        "professionalTitle": { "$ref": "#/$defs/optionalText" },
+        "email": { "$ref": "#/$defs/optionalText" },
+        "phone": { "$ref": "#/$defs/optionalText" },
+        "location": { "$ref": "#/$defs/optionalText" },
+        "website": { "$ref": "#/$defs/optionalText" }
+      }
+    },
+    "section": {
+      "oneOf": [
+        { "$ref": "#/$defs/summarySection" },
+        { "$ref": "#/$defs/experienceSection" },
+        { "$ref": "#/$defs/educationSection" },
+        { "$ref": "#/$defs/skillsSection" },
+        { "$ref": "#/$defs/languagesSection" },
+        { "$ref": "#/$defs/certificationsSection" },
+        { "$ref": "#/$defs/profilesSection" },
+        { "$ref": "#/$defs/interestsSection" }
+      ],
+      "description": "A section is identified by its kind, never by a title. A summary carries text; every other kind carries at most 200 items."
+    },
+    "summarySection": {
+      "type": "object",
+      "required": ["kind", "text"],
+      "properties": {
+        "kind": { "const": "summary" },
+        "text": { "$ref": "#/$defs/text" }
+      }
+    },
+    "experienceSection": {
+      "type": "object",
+      "required": ["kind", "items"],
+      "properties": {
+        "kind": { "const": "experience" },
+        "items": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/experienceItem" } }
+      }
+    },
+    "educationSection": {
+      "type": "object",
+      "required": ["kind", "items"],
+      "properties": {
+        "kind": { "const": "education" },
+        "items": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/educationItem" } }
+      }
+    },
+    "skillsSection": {
+      "type": "object",
+      "required": ["kind", "items"],
+      "properties": {
+        "kind": { "const": "skills" },
+        "items": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/skillItem" } }
+      }
+    },
+    "languagesSection": {
+      "type": "object",
+      "required": ["kind", "items"],
+      "properties": {
+        "kind": { "const": "languages" },
+        "items": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/languageItem" } }
+      }
+    },
+    "certificationsSection": {
+      "type": "object",
+      "required": ["kind", "items"],
+      "properties": {
+        "kind": { "const": "certifications" },
+        "items": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/certificationItem" } }
+      }
+    },
+    "profilesSection": {
+      "type": "object",
+      "required": ["kind", "items"],
+      "properties": {
+        "kind": { "const": "profiles" },
+        "items": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/profileLink" } }
+      }
+    },
+    "interestsSection": {
+      "type": "object",
+      "required": ["kind", "items"],
+      "properties": {
+        "kind": { "const": "interests" },
+        "items": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/text" } }
+      }
+    },
+    "experienceItem": {
+      "type": "object",
+      "required": ["role", "company"],
+      "properties": {
+        "role": { "$ref": "#/$defs/text" },
+        "company": { "$ref": "#/$defs/text" },
+        "location": { "$ref": "#/$defs/optionalText" },
+        "period": { "$ref": "#/$defs/optionalPeriod" },
+        "description": { "$ref": "#/$defs/optionalText" }
+      }
+    },
+    "educationItem": {
+      "type": "object",
+      "required": ["degree", "school"],
+      "properties": {
+        "degree": { "$ref": "#/$defs/text" },
+        "school": { "$ref": "#/$defs/text" },
+        "period": { "$ref": "#/$defs/optionalPeriod" },
+        "description": { "$ref": "#/$defs/optionalText" }
+      }
+    },
+    "skillItem": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "$ref": "#/$defs/text" },
+        "rating": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Absent or null when the skill is not rated."
+        }
+      }
+    },
+    "languageItem": {
+      "type": "object",
+      "required": ["language", "level"],
+      "properties": {
+        "language": { "$ref": "#/$defs/text" },
+        "level": {
+          "enum": ["a1", "a2", "b1", "b2", "c1", "c2", "native"],
+          "description": "A CEFR level, or native."
+        }
+      }
+    },
+    "certificationItem": {
+      "type": "object",
+      "required": ["name", "issuer"],
+      "properties": {
+        "name": { "$ref": "#/$defs/text" },
+        "issuer": { "$ref": "#/$defs/text" },
+        "year": {
+          "type": ["integer", "null"],
+          "minimum": 1900,
+          "maximum": 2200
+        },
+        "url": { "$ref": "#/$defs/optionalText" },
+        "description": { "$ref": "#/$defs/optionalText" }
+      }
+    },
+    "profileLink": {
+      "type": "object",
+      "required": ["platform", "url"],
+      "properties": {
+        "platform": { "$ref": "#/$defs/text" },
+        "url": { "$ref": "#/$defs/text" }
+      }
+    }
+  }
+}

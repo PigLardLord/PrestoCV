@@ -14,7 +14,9 @@ enum JSON: Equatable, Decodable {
         else { self = .object(try c.decode([String: JSON].self)) }
     }
 
-    init(parsing text: String) throws { self = try JSONDecoder().decode(JSON.self, from: Data(text.utf8)) }
+    init(parsing data: Data) throws { self = try JSONDecoder().decode(JSON.self, from: data) }
+
+    init(parsing text: String) throws { try self.init(parsing: Data(text.utf8)) }
 
     subscript(key: String) -> JSON? { if case .object(let members) = self { members[key] } else { nil } }
 }
@@ -40,6 +42,20 @@ struct SchemaValidator {
     func violations(of instance: JSON) -> [String] { check(instance, against: root, at: "$") }
 
     func accepts(_ instance: JSON) -> Bool { violations(of: instance).isEmpty }
+
+    /// The schema called `name` in `$defs`.
+    func definition(_ name: String) -> JSON? { root["$defs"]?[name] }
+
+    /// The schema a `{"$ref": …}` schema points to.
+    func resolve(_ schema: JSON) -> JSON? {
+        guard case .string(let reference)? = schema["$ref"] else { return nil }
+        return Self.target(of: reference, in: root)
+    }
+
+    /// Where `instance` and the schema disagree about which properties exist: those the instance has and no schema declares
+    /// (what `unevaluatedProperties: false` would refuse), and those a schema declares that the instance lacks. Run on a
+    /// document with every optional field present, it shows that the schema describes exactly what the model writes.
+    func propertyDifferences(of instance: JSON) -> [String] { differences(of: instance, against: root, at: "$") }
 
     // MARK: Auditing the schema
 
@@ -134,5 +150,43 @@ struct SchemaValidator {
         case ("integer", .number(let number)): number.isFinite && number == number.rounded()
         default: false
         }
+    }
+
+    // MARK: Comparing the properties
+
+    private func differences(of instance: JSON, against schema: JSON, at path: String) -> [String] {
+        var found: [String] = []
+        switch instance {
+        case .object(let members):
+            let declared = declaredProperties(in: schema, for: instance)
+            for name in members.keys.sorted() where declared[name] == nil { found.append("\(path).\(name) is written but not declared") }
+            for name in declared.keys.sorted() where members[name] == nil { found.append("\(path).\(name) is declared but not written") }
+            for (name, member) in members.sorted(by: { $0.key < $1.key }) {
+                for subschema in declared[name] ?? [] { found += differences(of: member, against: subschema, at: "\(path).\(name)") }
+            }
+        case .array(let elements):
+            for items in itemSchemas(in: schema) {
+                for (index, element) in elements.enumerated() { found += differences(of: element, against: items, at: "\(path)[\(index)]") }
+            }
+        default:
+            break
+        }
+        return found
+    }
+
+    /// The subschemas of each property that `schema`, its reference and the alternatives that accept `instance` declare.
+    private func declaredProperties(in schema: JSON, for instance: JSON) -> [String: [JSON]] {
+        var declared: [String: [JSON]] = [:]
+        func merge(_ more: [String: [JSON]]) { declared.merge(more) { $0 + $1 } }
+        if let target = resolve(schema) { merge(declaredProperties(in: target, for: instance)) }
+        if case .object(let properties)? = schema["properties"] { merge(properties.mapValues { [$0] }) }
+        if case .array(let branches)? = schema["oneOf"] {
+            for branch in branches where check(instance, against: branch, at: "$").isEmpty { merge(declaredProperties(in: branch, for: instance)) }
+        }
+        return declared
+    }
+
+    private func itemSchemas(in schema: JSON) -> [JSON] {
+        (resolve(schema).map(itemSchemas) ?? []) + (schema["items"].map { [$0] } ?? [])
     }
 }

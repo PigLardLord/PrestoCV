@@ -112,4 +112,33 @@ struct JSONSchemaValidatorTests {
     func malformedSchema(schema: String) {
         #expect(throws: SchemaValidator.Unsupported.self) { _ = try SchemaValidator(schema: JSON(parsing: schema)) }
     }
+
+    struct DifferenceCase: Sendable, CustomTestStringConvertible {
+        let name: String, schema: String, instance: String, expected: [String]
+        var testDescription: String { name }
+    }
+
+    static let differenceCases: [DifferenceCase] = {
+        var all: [DifferenceCase] = []
+        func add(_ name: String, _ schema: String, _ instance: String, expected: [String]) {
+            all.append(DifferenceCase(name: name, schema: schema, instance: instance, expected: expected))
+        }
+        let oneOf = #"{"oneOf":[{"properties":{"k":{"const":1},"a":{}}},{"properties":{"k":{"const":2},"b":{}}}]}"#
+        add("a property nobody declares", #"{"properties":{"a":{}}}"#, #"{"a":1,"b":2}"#, expected: ["$.b is written but not declared"])
+        add("a declared property the instance lacks", #"{"properties":{"a":{},"b":{}}}"#, #"{"a":1}"#, expected: ["$.b is declared but not written"])
+        add("the same properties", #"{"properties":{"a":{}}}"#, #"{"a":1}"#, expected: [])
+        add("a reference at the root", ##"{"$defs":{"d":{"properties":{"a":{}}}},"$ref":"#/$defs/d"}"##, #"{"a":1,"b":2}"#, expected: ["$.b is written but not declared"])
+        add("the items of an array", #"{"properties":{"l":{"items":{"properties":{"a":{}}}}}}"#, #"{"l":[{"a":1},{"a":1,"b":2}]}"#, expected: ["$.l[1].b is written but not declared"])
+        add("the items of an array, by reference", ##"{"$defs":{"e":{"properties":{"a":{}}}},"properties":{"l":{"items":{"$ref":"#/$defs/e"}}}}"##, #"{"l":[{"b":2}]}"#,
+            expected: ["$.l[0].b is written but not declared", "$.l[0].a is declared but not written"])
+        add("the alternative that accepts the instance", oneOf, #"{"k":2,"b":0}"#, expected: [])
+        add("the properties of another alternative", oneOf, #"{"k":2,"a":0}"#, expected: ["$.a is written but not declared", "$.b is declared but not written"])
+        return all
+    }()
+
+    @Test("a property the schema does not declare, or declares and the instance lacks, is reported", arguments: differenceCases)
+    func propertyDifferences(testCase: DifferenceCase) throws {
+        let validator = try SchemaValidator(schema: JSON(parsing: testCase.schema))
+        #expect(validator.propertyDifferences(of: try JSON(parsing: testCase.instance)) == testCase.expected)
+    }
 }
