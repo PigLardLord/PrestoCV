@@ -23,7 +23,7 @@ The pipeline has two stages:
 1. **Document + design → HTML** is pure Swift and identical everywhere.
 2. **HTML → PDF** is a port with one adapter per platform ([ADR 0003](0003-one-pdf-renderer-per-platform.md)).
 
-The published contract is explicit JSON: sections carry a `kind`, periods an `end` discriminator. Other schema versions are rejected, and `CVDocumentValidator` validates every document that arrives from outside. A committed JSON Schema is pending.
+The published contract is explicit JSON: sections carry a `kind`, periods an `end` discriminator. Other schema versions are rejected, and `CVDocumentValidator` validates every document that arrives from outside. The JSON Schema is committed at `CVPDFExporter/Schema/cvdocument.v1.schema.json`, `CVDocumentModelTests` holds it to the model, and the validator stays authoritative for the rules the schema cannot express.
 
 On a backend, rendering runs in a sandboxed process with no network egress, and with time, page and memory limits. A design that escapes the rules must not be able to reach internal services.
 
