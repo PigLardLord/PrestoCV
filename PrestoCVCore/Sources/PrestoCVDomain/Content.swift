@@ -83,3 +83,66 @@ public struct CVSections: Hashable, Sendable {
             .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
     }
 }
+
+// MARK: - Text rule
+
+// Each type applies `TextRule` to its own text; `CV` calls these wherever text enters. A copy keeps every other field.
+extension PersonalDetails {
+    func normalised() -> PersonalDetails {
+        var copy = self
+        copy.fullName = TextRule.singleLine(fullName); copy.professionalTitle = TextRule.singleLine(professionalTitle)
+        copy.location = TextRule.singleLine(location); copy.summary = TextRule.multiLine(summary)
+        return copy
+    }
+}
+
+extension Experience {
+    func normalised() -> Experience {
+        var copy = self
+        copy.role = TextRule.singleLine(role); copy.company = TextRule.singleLine(company)
+        copy.location = TextRule.singleLine(location); copy.description = TextRule.multiLine(description)
+        return copy
+    }
+}
+
+extension Education {
+    func normalised() -> Education {
+        var copy = self
+        copy.degree = TextRule.singleLine(degree); copy.school = TextRule.singleLine(school); copy.description = TextRule.multiLine(description)
+        return copy
+    }
+}
+
+extension Skill {
+    func normalised() -> Skill { var copy = self; copy.name = TextRule.singleLine(name); return copy }
+}
+
+extension LanguageSkill {
+    func normalised() -> LanguageSkill { var copy = self; copy.language = TextRule.singleLine(language); return copy }
+}
+
+extension Certification {
+    func normalised() -> Certification {
+        var copy = self
+        copy.name = TextRule.singleLine(name); copy.issuer = TextRule.singleLine(issuer); copy.description = TextRule.multiLine(description)
+        return copy
+    }
+}
+
+extension ProfileLink {
+    func normalised() -> ProfileLink { var copy = self; copy.platform = TextRule.singleLine(platform); return copy }
+}
+
+extension CVSections {
+    func normalised() -> CVSections {
+        var copy = self
+        copy.experiences = experiences.map { $0.normalised() }
+        copy.education = education.map { $0.normalised() }
+        copy.skills = skills.map { $0.normalised() }
+        copy.languages = languages.map { $0.normalised() }
+        copy.certifications = certifications.map { $0.normalised() }
+        copy.profiles = profiles.map { $0.normalised() }
+        copy.setInterests(interests.map(TextRule.singleLine))   // before the trim and the de-duplication, so "a\tb" and "a b" are one
+        return copy
+    }
+}
