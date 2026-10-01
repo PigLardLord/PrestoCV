@@ -1,6 +1,7 @@
 import Foundation
 
-/// Why a catalog use case failed (R7). A failure of the store is reported as such, never passed through raw.
+/// Why `ListDesigns`, `GetDesign`, `SyncBundledDesigns` and `ResolveDesign` fail (R7): a failure of the store or of the
+/// bundled source is reported as such, never passed through raw.
 public enum DesignCatalogError: Error, Equatable, Sendable {
     /// No installed design has this identifier.
     case unknownDesign(String)
@@ -52,34 +53,46 @@ public struct RejectedBundledDesign: Equatable, Sendable {
     public let violations: [DesignPackageViolation]
 }
 
-/// What a sync did, as design identifiers in the order the source listed the packages.
+/// What a sync did, as design identifiers in the order the source listed the packages. A package appears in one list
+/// only; the same identifier listed twice by the source appears once for each package.
 public struct SyncReport: Equatable, Sendable {
-    /// Saved because no design had the identifier.
+    /// Rendered and saved because no design had the identifier.
     public internal(set) var installed: [String] = []
-    /// Saved because the installed design was older.
+    /// Rendered and saved because the installed design was older.
     public internal(set) var upgraded: [String] = []
-    /// Left alone because the installed design has the same or a newer version.
+    /// Left alone, and not rendered: the installed design has the same or a newer version.
     public internal(set) var unchanged: [String] = []
-    /// Not saved: the validator refused the package.
+    /// Not saved: the validator refused the package. These are named as the source names them.
     public internal(set) var rejected: [RejectedBundledDesign] = []
+    /// Not saved: the design is valid, but the rendering gate refused it or failed.
+    public internal(set) var notRendered: [String] = []
+    /// Not saved: the design is valid and rendered, but the store failed to save it.
+    public internal(set) var failed: [String] = []
 }
 
-/// Brings the designs that ship with the app into the store, at every launch. A bundled design is installed when no
-/// design has its identifier and replaces an older installed one; it never replaces one of the same or a newer version,
-/// so a design installed by other means is not downgraded. A package the validator rejects is reported and the others
-/// still sync.
-///
-/// No rendering gate runs here, unlike `InstallDesign`: a bundled design is proved by the rendering tests when the app
-/// is built, and this runs at every launch.
+/// Brings the designs that ship with the app into the store, at every launch. Each bundled package is validated, then
+/// rendered through the gate, then saved, as `InstallDesign` does (R8).
+/// - A package whose identifier no installed design has is installed. One newer than the installed design replaces it
+///   (upgraded). One of the same or an older version is left alone and not rendered, so a design installed by other
+///   means is never downgraded and the steady state does no rendering and no writing.
+/// - The installed designs are listed once, and only their manifests are compared. An installed design is never read, so
+///   one whose file is damaged does not stop the sync while the bundled design is unchanged.
+/// - A package fails on its own: the validator refuses it (`rejected`), the gate refuses it or fails (`notRendered`), or
+///   the store fails to save it (`failed`). The other packages still sync.
+/// - What stops the sync: a store that cannot list its designs (`DesignCatalogError.storeUnavailable`), a source that
+///   cannot be read (`DesignCatalogError.bundledDesignsUnavailable`), and cancellation. The gate can be cancelled
+///   (ADR 0003), so this throws untyped: a `DesignCatalogError`, or a `CancellationError` passed through unchanged.
 public struct SyncBundledDesigns: Sendable {
-    let source: any BundledDesignSource, validator: DesignPackageValidator, store: any DesignStore
-    public init(source: any BundledDesignSource, validator: DesignPackageValidator = DesignPackageValidator(), store: any DesignStore) {
-        self.source = source; self.validator = validator; self.store = store
+    let source: any BundledDesignSource, validator: DesignPackageValidator, gate: any DesignRenderingGate, store: any DesignStore
+    public init(source: any BundledDesignSource, validator: DesignPackageValidator = DesignPackageValidator(),
+                gate: any DesignRenderingGate, store: any DesignStore) {
+        self.source = source; self.validator = validator; self.gate = gate; self.store = store
     }
 
-    public func callAsFunction() async throws(DesignCatalogError) -> SyncReport {
+    public func callAsFunction() async throws -> SyncReport {
         let packages: [(name: String, data: Data)]
-        do { packages = try await source.bundledPackages() } catch { throw .bundledDesignsUnavailable }
+        do { packages = try await source.bundledPackages() } catch { throw DesignCatalogError.bundledDesignsUnavailable }
+        var versions = try await installedVersions()
         var report = SyncReport()
         for (name, data) in packages {
             let design: ValidatedDesign
@@ -87,17 +100,29 @@ public struct SyncBundledDesigns: Sendable {
                 report.rejected.append(RejectedBundledDesign(name: name, violations: error.violations))
                 continue
             }
-            let id = design.manifest.id
-            let installed: ValidatedDesign?
-            do { installed = try await store.design(id: id) } catch { throw .storeUnavailable }
-            if let installed, design.manifest.version <= installed.manifest.version {
+            let id = design.manifest.id, version = design.manifest.version
+            if let installed = versions[id], version <= installed {
                 report.unchanged.append(id)
                 continue
             }
-            do { try await store.save(design) } catch { throw .storeUnavailable }
-            if installed == nil { report.installed.append(id) } else { report.upgraded.append(id) }
+            do { try await gate.verify(design) } catch let cancellation as CancellationError { throw cancellation } catch {
+                report.notRendered.append(id)
+                continue
+            }
+            do { try await store.save(design) } catch {
+                report.failed.append(id)
+                continue
+            }
+            if versions[id] == nil { report.installed.append(id) } else { report.upgraded.append(id) }
+            versions[id] = version
         }
         return report
+    }
+
+    private func installedVersions() async throws(DesignCatalogError) -> [String: DesignVersion] {
+        let manifests: [DesignManifest]
+        do { manifests = try await store.installedDesigns() } catch { throw .storeUnavailable }
+        return Dictionary(manifests.map { ($0.id, $0.version) }, uniquingKeysWith: max)
     }
 }
 
