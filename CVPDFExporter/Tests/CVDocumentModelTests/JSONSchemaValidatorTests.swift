@@ -50,15 +50,16 @@ struct JSONSchemaValidatorTests {
         add("minLength accepts one character", #"{"minLength":1}"#, #""a""#, valid: true)
         add("maxLength is inclusive", #"{"maxLength":2}"#, #""ab""#, valid: true)
         add("more than maxLength is refused", #"{"maxLength":2}"#, #""abc""#, valid: false)
-        add("a character outside the BMP counts once", #"{"maxLength":1}"#, #""😀""#, valid: true)
-        add("a letter and a combining mark count twice", #"{"maxLength":1}"#, #""é""#, valid: false)
+        add("a character outside the BMP counts once", #"{"maxLength":1}"#, #""\ud83d\ude00""#, valid: true)
+        add("a letter and a combining mark count twice", #"{"maxLength":1}"#, #""e\u0301""#, valid: false)
         add("oneOf accepts exactly one match", #"{"oneOf":[{"type":"string"},{"type":"integer"}]}"#, "1", valid: true)
         add("oneOf refuses no match", #"{"oneOf":[{"type":"string"},{"type":"integer"}]}"#, "null", valid: false)
         add("oneOf refuses two matches", #"{"oneOf":[{"type":"integer"},{"type":"number"}]}"#, "1", valid: false)
         add("a reference applies the definition", ##"{"$defs":{"n":{"type":"integer"}},"properties":{"a":{"$ref":"#/$defs/n"}}}"##, #"{"a":"x"}"#, valid: false)
         add("a reference accepts what the definition accepts", ##"{"$defs":{"n":{"type":"integer"}},"properties":{"a":{"$ref":"#/$defs/n"}}}"##, #"{"a":7}"#, valid: true)
         add("a reference keeps its sibling keywords", ##"{"$defs":{"n":{"type":"integer"}},"$ref":"#/$defs/n","maximum":3}"##, "4", valid: false)
-        add("annotations change nothing", #"{"$schema":"x","$id":"y","title":"t","description":"d","type":"string"}"#, #""x""#, valid: true)
+        add("annotations change nothing", ##"{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"urn:y","title":"t","description":"d","$comment":"c","type":"string"}"##, #""x""#, valid: true)
+        add("annotations apply nowhere but where they are", #"{"properties":{"a":{"title":"t","description":"d","$comment":"c","type":"string"}}}"#, #"{"a":1}"#, valid: false)
         return all
     }()
 
@@ -108,8 +109,52 @@ struct JSONSchemaValidatorTests {
         #expect(throws: SchemaValidator.Unsupported.self) { _ = try SchemaValidator(schema: JSON(parsing: schema)) }
     }
 
-    @Test("an unknown type name and a schema that is not an object are refused", arguments: [#"{"type":"float"}"#, #"{"properties":{"a":true}}"#])
-    func malformedSchema(schema: String) {
+    @Test("a keyword whose value has the wrong shape is refused", arguments: [
+        #"{"type":"float"}"#,
+        #"{"type":5}"#,
+        #"{"type":[]}"#,
+        #"{"type":["string","string"]}"#,
+        #"{"type":["string",5]}"#,
+        #"{"required":"a"}"#,
+        #"{"required":[1]}"#,
+        #"{"enum":"a"}"#,
+        #"{"minimum":"1"}"#,
+        #"{"maximum":null}"#,
+        #"{"maxItems":"1"}"#,
+        #"{"maxItems":-1}"#,
+        #"{"maxItems":1.5}"#,
+        #"{"minLength":"1"}"#,
+        #"{"minLength":-1}"#,
+        #"{"maxLength":2.5}"#,
+        #"{"maxLength":[]}"#,
+        #"{"oneOf":[]}"#,
+        #"{"oneOf":{}}"#,
+        #"{"oneOf":[true]}"#,
+        #"{"properties":[]}"#,
+        #"{"properties":{"a":true}}"#,
+        #"{"properties":{"a":{"maxItems":"1"}}}"#,
+        #"{"items":[{}]}"#,
+        #"{"items":true}"#,
+        #"{"$defs":[]}"#,
+        #"{"$defs":{"a":5}}"#,
+        #"{"$ref":5}"#,
+        #"{"title":5}"#,
+        #"{"description":[]}"#,
+        #"{"$comment":1}"#,
+        #"{"$id":5}"#,
+        #"{"$schema":"http://json-schema.org/draft-07/schema#"}"#,
+        #"{"$schema":5}"#,
+    ])
+    func malformedKeyword(schema: String) {
+        #expect(throws: SchemaValidator.Unsupported.self) { _ = try SchemaValidator(schema: JSON(parsing: schema)) }
+    }
+
+    @Test("only the root may declare $schema or an $id", arguments: [
+        ##"{"properties":{"a":{"$id":"urn:a"}}}"##,
+        ##"{"$defs":{"a":{"$schema":"https://json-schema.org/draft/2020-12/schema"}}}"##,
+        ##"{"items":{"$id":"urn:a"}}"##,
+    ])
+    func rootOnlyKeywords(schema: String) {
         #expect(throws: SchemaValidator.Unsupported.self) { _ = try SchemaValidator(schema: JSON(parsing: schema)) }
     }
 

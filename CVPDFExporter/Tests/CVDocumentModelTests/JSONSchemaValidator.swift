@@ -28,8 +28,7 @@ struct SchemaValidator {
         let description: String
     }
 
-    private static let annotations: Set<String> = ["$schema", "$id", "title", "description"]
-    private static let types: Set<String> = ["null", "boolean", "object", "array", "number", "integer", "string"]
+        private static let types: Set<String> = ["null", "boolean", "object", "array", "number", "integer", "string"]
 
     private let root: JSON
 
@@ -46,7 +45,7 @@ struct SchemaValidator {
     /// The schema called `name` in `$defs`.
     func definition(_ name: String) -> JSON? { root["$defs"]?[name] }
 
-    /// The schema a `{"$ref": …}` schema points to.
+    /// The schema a `{"$ref": "..."}` schema points to.
     func resolve(_ schema: JSON) -> JSON? {
         guard case .string(let reference)? = schema["$ref"] else { return nil }
         return Self.target(of: reference, in: root)
@@ -59,23 +58,46 @@ struct SchemaValidator {
 
     // MARK: Auditing the schema
 
+    /// The dialect the schema declares.
+    private static let dialect = "https://json-schema.org/draft/2020-12/schema"
+
+    /// Throws unless every keyword is one the checker applies, with a value of the shape JSON Schema requires.
     private static func audit(_ schema: JSON, at path: String, root: JSON) throws {
         guard case .object(let keywords) = schema else { throw Unsupported(description: "\(path): a schema must be an object") }
-        for (keyword, value) in keywords.sorted(by: { $0.key < $1.key }) where !annotations.contains(keyword) {
+        for (keyword, value) in keywords.sorted(by: { $0.key < $1.key }) {
             let here = "\(path)/\(keyword)"
-            switch (keyword, value) {
-            case ("$defs", .object(let schemas)), ("properties", .object(let schemas)):
+            func malformed(_ expected: String) -> Unsupported { Unsupported(description: "\(here): \(expected)") }
+            switch keyword {
+            case "$schema":
+                guard path == "#", value == .string(dialect) else { throw malformed("only the root declares $schema, and it is \(dialect)") }
+            case "$id":
+                guard path == "#", case .string = value else { throw malformed("only the root has an $id, and it is text") }
+            case "title", "description", "$comment":
+                guard case .string = value else { throw malformed("must be text") }
+            case "$defs", "properties":
+                guard case .object(let schemas) = value else { throw malformed("must be an object whose values are schemas") }
                 for (name, subschema) in schemas.sorted(by: { $0.key < $1.key }) { try audit(subschema, at: "\(here)/\(name)", root: root) }
-            case ("items", _):
+            case "items":
                 try audit(value, at: here, root: root)
-            case ("oneOf", .array(let branches)):
+            case "oneOf":
+                guard case .array(let branches) = value, !branches.isEmpty else { throw malformed("must be a non-empty array of schemas") }
                 for (index, branch) in branches.enumerated() { try audit(branch, at: "\(here)/\(index)", root: root) }
-            case ("$ref", .string(let reference)):
-                guard target(of: reference, in: root) != nil else { throw Unsupported(description: "\(here): \(reference) does not name a schema in #/$defs") }
-            case ("type", _):
-                if let unknown = typeNames(value).first(where: { !types.contains($0) }) { throw Unsupported(description: "\(here): unknown type \(unknown)") }
-            case ("required", _), ("enum", _), ("const", _), ("minimum", _), ("maximum", _), ("maxItems", _), ("minLength", _), ("maxLength", _):
+            case "$ref":
+                guard case .string(let reference) = value, target(of: reference, in: root) != nil else { throw malformed("must name a schema in #/$defs") }
+            case "type":
+                guard let names = typeNames(value), !names.isEmpty, Set(names).count == names.count, names.allSatisfy(types.contains) else {
+                    throw malformed("must be a type name, or a non-empty array of different type names")
+                }
+            case "required":
+                guard case .array(let names) = value, names.allSatisfy({ if case .string = $0 { true } else { false } }) else { throw malformed("must be an array of text") }
+            case "enum":
+                guard case .array = value else { throw malformed("must be an array") }
+            case "const":
                 continue
+            case "minimum", "maximum":
+                guard case .number = value else { throw malformed("must be a number") }
+            case "minLength", "maxLength", "maxItems":
+                guard case .number(let limit) = value, limit >= 0, limit == limit.rounded() else { throw malformed("must be a non-negative integer") }
             default:
                 throw Unsupported(description: "\(here): the keyword \(keyword) is not supported")
             }
@@ -88,11 +110,16 @@ struct SchemaValidator {
         return root["$defs"]?[String(reference.dropFirst(prefix.count))]
     }
 
-    private static func typeNames(_ value: JSON) -> [String] {
+    /// The type names a `type` keyword lists; nil when its value is neither a name nor an array of names.
+    private static func typeNames(_ value: JSON) -> [String]? {
         switch value {
-        case .string(let name): [name]
-        case .array(let names): names.compactMap { if case .string(let name) = $0 { name } else { nil } }
-        default: []
+        case .string(let name):
+            return [name]
+        case .array(let names):
+            let texts = names.compactMap { if case .string(let name) = $0 { name } else { nil } }
+            return texts.count == names.count ? texts : nil
+        default:
+            return nil
         }
     }
 
@@ -106,7 +133,7 @@ struct SchemaValidator {
             case ("$ref", .string(let reference)):
                 if let target = Self.target(of: reference, in: root) { found += check(instance, against: target, at: path) }
             case ("type", _):
-                let names = Self.typeNames(value)
+                let names = Self.typeNames(value) ?? []
                 if !names.contains(where: { Self.matches(instance, type: $0) }) { found.append("\(path): expected \(names.joined(separator: " or "))") }
             case ("required", .array(let names)):
                 if case .object(let members) = instance {
