@@ -52,6 +52,9 @@ struct CVDocumentSchemaTests {
         }
         #expect(violations.isEmpty == schemaShouldAccept, "the schema should \(schemaShouldAccept ? "accept" : "refuse") it: \(violations)")
         #expect((exporter == .accepted) == exporterShouldAccept, "the exporter should \(exporterShouldAccept ? "accept" : "refuse") it: \(exporter)")
+        if case .beyondSchema(let rule) = documentCase.agreement, case .refused(let reason) = exporter {
+            #expect(Exporter.rule(of: reason) == rule, "the exporter refuses it for \"\(reason)\", and not on the rule \(rule)")
+        }
     }
 
     @Test("the samples hold one value of every case, each of the case it is named after")
@@ -71,12 +74,19 @@ struct CVDocumentSchemaTests {
         #expect(try CommittedSchema.validator().propertyDifferences(of: written) == [])
     }
 
-    @Test("the section kinds of the schema are the ones the encoder writes")
+    @Test("every alternative of a section is one of the kinds the encoder writes")
     func sectionKinds() throws {
         let schema = try CommittedSchema.validator()
         guard case .array(let alternatives)? = schema.definition("section")?["oneOf"] else { throw SchemaShapeError(what: "section is not a oneOf") }
-        let declared = strings(alternatives.map { schema.resolve($0)?["properties"]?["kind"]?["const"] })
+        let targets = alternatives.compactMap { schema.resolve($0) }
+        #expect(targets.count == alternatives.count, "every alternative of section is a $ref")
+        for target in targets {
+            #expect(target["type"] == .string("object"), "\(target)")
+            if case .array(let required)? = target["required"] { #expect(required.contains(.string("kind")), "\(target)") } else { Issue.record("no required list: \(target)") }
+        }
+        let declared = strings(targets.map { $0["properties"]?["kind"]?["const"] })
         let written = try strings(ModelSamples.sections.map { try JSON(parsing: JSONEncoder().encode($0))["kind"] })
+        #expect(declared.count == alternatives.count, "every alternative declares the const of its kind")
         #expect(declared.sorted() == written.sorted())
         #expect(Set(written).count == ModelSamples.sections.count)
     }

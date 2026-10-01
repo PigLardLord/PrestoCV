@@ -111,7 +111,7 @@ enum BoundaryMatrix {
             add("16,384 bytes in two-byte characters", .replace(quote(twoByte)), isWord ? .exporterRefuses : .exporterAccepts)
             add("16,386 bytes in two-byte characters", .replace(quote(twoByte + "\u{00E9}")), isWord ? .exporterRefuses : .exceedsSchema)
         case .number(let current):
-            add("text instead of a number", .replace(quote("7")), .exporterRefuses)
+            add("\(Int(current)) as text", .replace(quote("\(Int(current))")), .exporterRefuses)
             if case .key(let name)? = node.path.last, let range = bounds[name] {
                 add("\(range.lowerBound - 1)", .replace("\(range.lowerBound - 1)"), .exporterRefuses)
                 add("\(range.lowerBound)", .replace("\(range.lowerBound)"), .exporterAccepts)
@@ -124,8 +124,8 @@ enum BoundaryMatrix {
             add("text instead of an object", .replace(quote("x")), .exporterRefuses)
             for (name, _) in members.inKeyOrder { add("\(name) removed", .remove, .exporterDecides, at: node.path + [.key(name)]) }
             add("an unknown property", .addUnknownProperty, .exporterAccepts)
-        case .array:
-            add("an object instead of an array", .replace("{}"), .exporterRefuses)
+        case .array(let elements):
+            add("its first element instead of the array", .replace(elements.first.map(plain) ?? "{}"), .exporterRefuses)
             add("200 elements", .resize(200), .exporterAccepts)
             add("201 elements", .resize(201), .exporterRefuses)
         case .bool, .null:

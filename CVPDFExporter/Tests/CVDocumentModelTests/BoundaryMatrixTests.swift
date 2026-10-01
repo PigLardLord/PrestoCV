@@ -16,20 +16,20 @@ struct BoundaryMatrixTests {
         case (false, .accepted):
             Issue.record("the schema refuses what the exporter accepts: \(violations)")
         case (true, .refused(let reason)):
-            let isPeriodOrder = reason == Exporter.periodOrder
-            let isByteLimit = testCase.premise == .exceedsSchema && Exporter.isTextRule(reason)
-            #expect(isPeriodOrder || isByteLimit, "the schema accepts what the exporter refuses: \(reason)")
+            let rule = Exporter.rule(of: reason)
+            let isKnownGap = rule == .periodOrder || (rule == .textRules && testCase.premise == .exceedsSchema)
+            #expect(isKnownGap, "the schema accepts what the exporter refuses: \(reason)")
         default:
             break
         }
 
         switch (testCase.premise, verdict) {
         case (.exporterAccepts, .refused(let reason)):
-            #expect(reason == Exporter.periodOrder, "the exporter refuses a change taken to be valid: \(reason)")
+            #expect(Exporter.rule(of: reason) == .periodOrder, "the exporter refuses a change taken to be valid: \(reason)")
         case (.exporterRefuses, .accepted), (.exceedsSchema, .accepted):
             Issue.record("the exporter accepts a change taken to be invalid")
         case (.exceedsSchema, .refused(let reason)):
-            #expect(Exporter.isTextRule(reason), "the exporter refuses on a rule other than the byte limit: \(reason)")
+            #expect(Exporter.rule(of: reason) == .textRules, "the exporter refuses on a rule other than the byte limit: \(reason)")
         default:
             break
         }

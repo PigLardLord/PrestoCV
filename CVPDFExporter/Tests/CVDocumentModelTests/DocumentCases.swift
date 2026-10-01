@@ -7,9 +7,9 @@ struct DocumentCase: Sendable, CustomTestStringConvertible {
         case valid
         /// Both refuse it.
         case invalid
-        /// The schema accepts it and the exporter refuses it: a rule JSON Schema cannot express exactly, which the
-        /// validator alone enforces.
-        case beyondSchema
+        /// The schema accepts it and the exporter refuses it on this rule, which JSON Schema cannot express exactly and
+        /// the validator alone enforces.
+        case beyondSchema(Exporter.Rule)
     }
 
     let name: String, json: String, agreement: Agreement
@@ -58,6 +58,9 @@ enum DocumentCases {
         add("a line feed in a text", summary(#"a\nb"#))
         add("a link of any scheme: the renderer decides which links to keep", section("profiles", #"{"platform":"Evil","url":"javascript:alert(1)"}"#))
         add("items on a summary, which reads text only", document(sections: #"[{"kind":"summary","text":"t","items":7}]"#))
+        for kind in ["experience", "education", "skills", "languages", "certifications", "profiles", "interests"] {
+            add("text on a \(kind) section, which reads items only", document(sections: #"[{"kind":"\#(kind)","items":[],"text":"ignored"}]"#))
+        }
         add("an endDate that is ignored when the period is not over", education(period: #"{"start":{"year":2000},"end":"present","endDate":"never read"}"#))
         for end in ["present", "unspecified"] {
             add("a valid endDate that is ignored when the period ends as \(end)", education(period: #"{"start":{"year":2000},"end":"\#(end)","endDate":{"year":2001}}"#))
@@ -67,7 +70,9 @@ enum DocumentCases {
 
     private static func invalid(_ all: inout [DocumentCase]) {
         func add(_ name: String, _ json: String) { all.append(DocumentCase(name: name, json: json, agreement: .invalid)) }
-        add("an unknown section kind", document(sections: #"[{"kind":"hobbies","items":[]}]"#))
+        for kind in ["hobbies", "projects", ""] {
+            add("an unknown section kind: \(kind.isEmpty ? "the empty text" : kind)", document(sections: #"[{"kind":"\#(kind)","items":[]}]"#))
+        }
         add("a section kind in capitals", document(sections: #"[{"kind":"Summary","text":"t"}]"#))
         add("a summary that carries items instead of text", document(sections: #"[{"kind":"summary","items":[]}]"#))
         add("a section of items that carries text instead of items", document(sections: #"[{"kind":"skills","text":"t"}]"#))
@@ -79,22 +84,22 @@ enum DocumentCases {
     }
 
     private static func beyondSchema(_ all: inout [DocumentCase]) {
-        func add(_ name: String, _ json: String) { all.append(DocumentCase(name: name, json: json, agreement: .beyondSchema)) }
-        add("a name of one space", named(quoted(" ")))
-        add("a name of one line feed", named(quoted(#"\n"#)))
-        add("a bell character in a text", summary(#"a\u0007b"#))
-        add("a tab in a text", summary(#"a\tb"#))
-        add("a delete character in a text", summary(#"a\u007Fb"#))
-        add("a next-line control in a text", summary(#"a\u0085b"#))
-        add("a right-to-left override in a text", summary(#"\u202Eevil"#))
-        add("a left-to-right embedding in a text", summary(#"x\u202Ay"#))
-        add("a left-to-right isolate in a text", summary(#"a\u2066b"#))
-        add("a period that ends in an earlier year", education(period: #"{"start":{"year":2020},"end":"date","endDate":{"year":2019}}"#))
-        add("a period that ends in an earlier month", education(period: #"{"start":{"year":2020,"month":6},"end":"date","endDate":{"year":2020,"month":5}}"#))
-        add("a text of 16,386 bytes in two-byte characters", summary(String(repeating: "\u{00E9}", count: 8_193)))
-        add("a letter with 10,000 combining marks", summary("a" + String(repeating: "\u{0301}", count: 10_000)))
-        add("30 texts of 10,000 characters, above the budget of the whole document",
+        func add(_ name: String, _ rule: Exporter.Rule, _ json: String) { all.append(DocumentCase(name: name, json: json, agreement: .beyondSchema(rule))) }
+        add("a name of one space", .blankName, named(quoted(" ")))
+        add("a name of one line feed", .blankName, named(quoted(#"\n"#)))
+        add("a bell character in a text", .textRules, summary(#"a\u0007b"#))
+        add("a tab in a text", .textRules, summary(#"a\tb"#))
+        add("a delete character in a text", .textRules, summary(#"a\u007Fb"#))
+        add("a next-line control in a text", .textRules, summary(#"a\u0085b"#))
+        add("a right-to-left override in a text", .textRules, summary(#"\u202Eevil"#))
+        add("a left-to-right embedding in a text", .textRules, summary(#"x\u202Ay"#))
+        add("a left-to-right isolate in a text", .textRules, summary(#"a\u2066b"#))
+        add("a period that ends in an earlier year", .periodOrder, education(period: #"{"start":{"year":2020},"end":"date","endDate":{"year":2019}}"#))
+        add("a period that ends in an earlier month", .periodOrder, education(period: #"{"start":{"year":2020,"month":6},"end":"date","endDate":{"year":2020,"month":5}}"#))
+        add("a text of 16,386 bytes in two-byte characters", .textRules, summary(String(repeating: "\u{00E9}", count: 8_193)))
+        add("a letter with 10,000 combining marks", .textRules, summary("a" + String(repeating: "\u{0301}", count: 10_000)))
+        add("30 texts of 10,000 characters, above the budget of the whole document", .textRules,
             section("interests", items: Array(repeating: quoted(String(repeating: "x", count: 10_000)), count: 30)))
-        add("a document of more than 1 MiB", document() + String(repeating: " ", count: 1_048_577))
+        add("a document of more than 1 MiB", .documentSize, document() + String(repeating: " ", count: 1_048_577))
     }
 }

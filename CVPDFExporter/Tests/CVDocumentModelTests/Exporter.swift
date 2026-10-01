@@ -8,8 +8,20 @@ enum Exporter {
         case refused(reason: String)
     }
 
-    /// The reason the validator gives when a period ends before it starts.
-    static let periodOrder = "end before start"
+    /// The rules of the validator that JSON Schema cannot express, as its reasons name them. A reason that names none of
+    /// them is a refusal by the decoder or by a rule the schema does express.
+    enum Rule: Equatable, Sendable {
+        case blankName, periodOrder, textRules, documentSize
+    }
+
+    static func rule(of reason: String) -> Rule? {
+        switch reason {
+        case "name is required": .blankName
+        case "end before start": .periodOrder
+        case "document is too large": .documentSize
+        default: reason.contains("too long") ? .textRules : nil
+        }
+    }
 
     static func verdict(for json: String) -> Verdict {
         do {
@@ -19,8 +31,4 @@ enum Exporter {
             return .refused(reason: error.reason)
         }
     }
-
-    /// The reason the validator gives when a text is too long in bytes, the document's text is too large, or a text has
-    /// control characters.
-    static func isTextRule(_ reason: String) -> Bool { reason.contains("too long") }
 }
