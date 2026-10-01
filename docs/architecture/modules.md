@@ -117,11 +117,14 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - **`InstallDesign`**: validate the raw bytes, then `DesignRenderingGate.verify`, then `DesignStore.save`. Nothing is stored unless both checks pass. It uses untyped `throws` and passes its errors through, so a cancelled render ends in a `CancellationError`;
   - **`SyncBundledDesigns`**: validates each bundled package, then renders it through the same gate, then saves it (R8). It uses untyped `throws`: a `DesignCatalogError` or the gate's `CancellationError`, unchanged.
     - The installed designs are listed once and compared by manifest version. A package whose identifier no design has is installed, and one newer than the installed design replaces it (upgraded). One of the same or an older version is left alone, neither rendered nor written, so a bundled design never downgrades a design installed by other means and an installed design is never read.
+    - The save after the render is `DesignStore.saveIfNewer`, which compares again and writes under the store's lock. A design saved by someone else while this one rendered is never overwritten by the older bundled design: the store keeps it and the report lists the identifier as `unchanged`.
     - A package fails on its own, and the others still sync: the validator rejects it (`rejected`, with its name and violations), the gate refuses it or fails (`notRendered`), or the store fails to save it (`failed`).
     - What stops the sync: a store that cannot list its designs (`storeUnavailable`), a source that cannot be read (`bundledDesignsUnavailable`), and cancellation. The `SyncReport` lists `installed`, `upgraded`, `unchanged`, `rejected`, `notRendered` and `failed`.
-- **Ports:** `DesignStore`, `BundledDesignSource` (raw bytes), and **`DesignRenderingGate`**. The catalog owns the gate; `CVRendering` implements it, along the allowed Rendering → Catalog edge.
+- **Ports:** `DesignStore`, `BundledDesignSource` (raw bytes), and **`DesignRenderingGate`**.
+  - `DesignStore` saves, reads one design and lists the manifests. `saveIfNewer` saves only when no design has the identifier (`installed`) or the installed one is older (`upgraded`), and otherwise writes nothing (`keptInstalled`). The comparison and the write are one step under the store's lock.
+  - The catalog owns the gate; `CVRendering` implements it, along the allowed Rendering → Catalog edge.
 
-**`CVDesignCatalogFileStore`** holds `FileDesignStore`: the directory is injected, the index is written atomically under a lock (`flock`), and one instance serves the process. Every read validates the file again, so only validated designs leave the store. The index is schema version 2, and each entry's manifest is validated when the index is read; an index of another schema, or with an entry the validator would refuse, is reported and left untouched.
+**`CVDesignCatalogFileStore`** holds `FileDesignStore`: the directory is injected, the index is written atomically under a lock (`flock`), and one instance serves the process. A conditional save compares versions inside the same exclusive lock as the write. Every read validates the file again, so only validated designs leave the store. The index is schema version 2, and each entry's manifest is validated when the index is read; an index of another schema, or with an entry the validator would refuse, is reported and left untouched.
 
 **`CVBundledDesigns`** holds the bundled `.mcvt` files as resources, served as raw bytes through `Bundle.module`.
 
@@ -157,7 +160,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 **Test support and tests.**
 - **`CVRenderingTestSupport`** may import `CVRendering`, `CVDocumentModel`, `CVDesignCatalog`, Foundation. It holds `InMemoryDesignStore`, the **`DesignStore` contract suite** that it and `FileDesignStore` pass, the design package builders, and:
-  - the catalog doubles: `UnavailableStore` (every call fails), `SpyDesignStore` (records its saves; listing, reading and saving can be made to fail), `FixedBundledSource` (a fixed list of packages, or none readable) and `FakeRenderingGate` (refuses or cancels on chosen identifiers, and records what it verified);
+  - the catalog doubles: `UnavailableStore` (every call fails), `SpyDesignStore` (records its saves; listing, reading and saving can be made to fail), `FixedBundledSource` (a fixed list of packages, or none readable) and `FakeRenderingGate` (refuses or cancels on chosen identifiers, and records what it verified) and `SuspendingRenderingGate` (holds one design's render until the test releases it);
   - the **`PDFRendering` contract suite**:
     - the fixture must fit and contain every field;
     - page count per the inspector;

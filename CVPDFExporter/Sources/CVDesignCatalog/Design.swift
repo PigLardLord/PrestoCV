@@ -138,10 +138,24 @@ public struct DesignPackageValidator: Sendable {
     }
 }
 
+/// What `DesignStore.saveIfNewer` did.
+public enum ConditionalSave: Equatable, Sendable {
+    /// No design had the identifier: the design was saved.
+    case installed
+    /// The installed design had an older version: the design replaced it.
+    case upgraded
+    /// The installed design has the same or a newer version: nothing was written.
+    case keptInstalled
+}
+
 /// Stores validated designs. Owned by the catalog (R3); adapters live in CVDesignCatalogFileStore and test support,
 /// and pass `DesignStoreContract`. Saving an identifier again replaces its design.
 public protocol DesignStore: Sendable {
     func save(_ design: ValidatedDesign) async throws
+    /// Saves the design only if no design has its identifier or the installed one has an older version, and says which.
+    /// The comparison and the write are one step under the store's lock, so a design saved meanwhile by another caller
+    /// is never replaced by an older one. When the installed design is kept, nothing is written.
+    func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave
     /// nil only when no design has this identifier; a stored design that cannot be read is an error (R7).
     func design(id: String) async throws -> ValidatedDesign?
     /// The stored designs' manifests, ordered by identifier.

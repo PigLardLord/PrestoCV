@@ -6,6 +6,7 @@ public struct UnavailableStore: DesignStore {
     public struct Failure: Error {}
     public init() {}
     public func save(_ design: ValidatedDesign) async throws { throw Failure() }
+    public func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave { throw Failure() }
     public func design(id: String) async throws -> ValidatedDesign? { throw Failure() }
     public func installedDesigns() async throws -> [DesignManifest] { throw Failure() }
 }
@@ -40,6 +41,17 @@ public actor SpyDesignStore: DesignStore {
         designs[id] = design
         savedIDs.append(id)
     }
+    public func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave {
+        let id = design.manifest.id
+        if savesFailFor.contains(id) { throw Failure() }
+        let outcome: ConditionalSave
+        if let installed = designs[id] { outcome = design.manifest.version > installed.manifest.version ? .upgraded : .keptInstalled } else { outcome = .installed }
+        if outcome != .keptInstalled {
+            designs[id] = design
+            savedIDs.append(id)
+        }
+        return outcome
+    }
     public func design(id: String) async throws -> ValidatedDesign? {
         if unreadable.contains(id) { throw Failure() }
         return designs[id]
@@ -65,4 +77,43 @@ public actor FakeRenderingGate: DesignRenderingGate {
         if cancellingOn.contains(id) { throw CancellationError() }
         if refusing.contains(id) { throw Refusal() }
     }
+}
+
+/// A rendering gate that holds `verify` for one design until the test calls `release()`, so a test can act while a
+/// render is in flight. Other designs pass at once.
+public actor SuspendingRenderingGate: DesignRenderingGate {
+    private let holding: String
+    private let entered: AsyncStream<Void>, enteredSignal: AsyncStream<Void>.Continuation
+    private let released: AsyncStream<Void>, releaseSignal: AsyncStream<Void>.Continuation
+
+    public init(holding id: String) {
+        holding = id
+        (entered, enteredSignal) = AsyncStream.makeStream(of: Void.self)
+        (released, releaseSignal) = AsyncStream.makeStream(of: Void.self)
+    }
+
+    public func verify(_ design: ValidatedDesign) async throws {
+        guard design.manifest.id == holding else { return }
+        enteredSignal.yield()
+        for await _ in released { return }
+        try Task.checkCancellation()
+    }
+
+    /// Waits until `verify` holds the design: true, or false after `timeout`, when the caller records the issue.
+    public func waitUntilEntered(timeout: Duration = .seconds(10)) async -> Bool {
+        let stream = entered
+        return await withTaskGroup(of: Bool.self) { group in
+            group.addTask { for await _ in stream { return true }; return false }
+            group.addTask {
+                do { try await Task.sleep(for: timeout) } catch { return false }
+                return false
+            }
+            let first = await group.next() ?? false
+            group.cancelAll()
+            return first
+        }
+    }
+
+    /// Lets the held `verify` return.
+    public func release() { releaseSignal.yield() }
 }

@@ -60,7 +60,8 @@ public struct SyncReport: Equatable, Sendable {
     public internal(set) var installed: [String] = []
     /// Rendered and saved because the installed design was older.
     public internal(set) var upgraded: [String] = []
-    /// Left alone, and not rendered: the installed design has the same or a newer version.
+    /// Left alone: the installed design has the same or a newer version. It is not rendered, unless it became the same or
+    /// newer while this design rendered: then the store kept it (`ConditionalSave.keptInstalled`).
     public internal(set) var unchanged: [String] = []
     /// Not saved: the validator refused the package. These are named as the source names them.
     public internal(set) var rejected: [RejectedBundledDesign] = []
@@ -75,6 +76,9 @@ public struct SyncReport: Equatable, Sendable {
 /// - A package whose identifier no installed design has is installed. One newer than the installed design replaces it
 ///   (upgraded). One of the same or an older version is left alone and not rendered, so a design installed by other
 ///   means is never downgraded and the steady state does no rendering and no writing.
+/// - Rendering takes long, and another caller may save the design meanwhile. So the save is `DesignStore.saveIfNewer`,
+///   which compares again under the store's lock, and the report states what the store did: a design the store kept
+///   because it became the same or a newer version is `unchanged`, and is never overwritten by the older one.
 /// - The installed designs are listed once, and only their manifests are compared. An installed design is never read, so
 ///   one whose file is damaged does not stop the sync while the bundled design is unchanged.
 /// - A package fails on its own: the validator refuses it (`rejected`), the gate refuses it or fails (`notRendered`), or
@@ -109,12 +113,17 @@ public struct SyncBundledDesigns: Sendable {
                 report.notRendered.append(id)
                 continue
             }
-            do { try await store.save(design) } catch {
+            let outcome: ConditionalSave
+            do { outcome = try await store.saveIfNewer(design) } catch {
                 report.failed.append(id)
                 continue
             }
-            if versions[id] == nil { report.installed.append(id) } else { report.upgraded.append(id) }
-            versions[id] = version
+            switch outcome {
+            case .installed: report.installed.append(id)
+            case .upgraded: report.upgraded.append(id)
+            case .keptInstalled: report.unchanged.append(id)
+            }
+            versions[id] = max(version, versions[id] ?? version)
         }
         return report
     }

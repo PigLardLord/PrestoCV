@@ -158,6 +158,7 @@ struct FileDesignStoreTests {
             await #expect(throws: error) { _ = try await store.installedDesigns() }
             await #expect(throws: error) { _ = try await store.design(id: "clean") }
             await #expect(throws: error) { try await store.save(DesignStoreContract.design(id: "bold")) }
+            await #expect(throws: error) { _ = try await store.saveIfNewer(DesignStoreContract.design(id: "bold")) }
             #expect(try Data(contentsOf: dir.index) == Data(contents.utf8))
             #expect(!FileManager.default.fileExists(atPath: dir.file("bold").path))
         }
@@ -218,6 +219,36 @@ struct FileDesignStoreTests {
             try await store.save(DesignStoreContract.design(id: "bold"))
             #expect(dir.designFiles == ["bold.1.mcvt", "clean.2.mcvt", "notes.txt"])
             #expect(try await store.design(id: "clean") == cleanV2)
+        }
+    }
+
+    @Test("a conditional save that keeps the installed design writes nothing")
+    func keptWritesNothing() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            try await store.save(DesignStoreContract.design(id: "clean", version: "2.0.0"))
+            let index = try Data(contentsOf: dir.index), files = dir.designFiles
+            for version in ["2.0.0", "1.9.9", "1.0.0"] {
+                let outcome = try await store.saveIfNewer(DesignStoreContract.design(id: "clean", version: version, css: ".cv-skill{font-weight:700}"))
+                #expect(outcome == .keptInstalled)
+            }
+            #expect(try Data(contentsOf: dir.index) == index)
+            #expect(dir.designFiles == files)
+        }
+    }
+
+    @Test("conditional saves from two instances, newest first, leave the newest version")
+    func racingConditionalSaves() async throws {
+        try await inTemporaryStore { dir in
+            let stores = [FileDesignStore(directory: dir), FileDesignStore(directory: dir)]
+            let designs = try (0..<40).map { try DesignStoreContract.design(id: "clean", version: "1.0.\($0)") }
+            let outcomes = try await withThrowingTaskGroup(of: ConditionalSave.self) { group in
+                for (n, design) in designs.reversed().enumerated() { group.addTask { try await stores[n % 2].saveIfNewer(design) } }
+                return try await group.reduce(into: []) { $0.append($1) }
+            }
+            #expect(try await FileDesignStore(directory: dir).design(id: "clean") == designs[39])
+            #expect(outcomes.filter { $0 == .installed }.count == 1)
+            #expect(outcomes.filter { $0 == .upgraded }.count + outcomes.filter { $0 == .keptInstalled }.count == 39)
         }
     }
 

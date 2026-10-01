@@ -154,6 +154,26 @@ struct SyncBundledDesignsTests {
         #expect(await gate.verified == ["clean", "bold"])
     }
 
+    @Test("a newer design saved while the sync renders is not overwritten by the older bundled design", .timeLimit(.minutes(1)))
+    func savedWhileRendering() async throws {
+        let store = InMemoryDesignStore(), gate = SuspendingRenderingGate(holding: "clean")
+        try await store.save(DesignStoreContract.design(id: "clean", version: "1.0.0"))
+        let sync = SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean", version: "2.0.0", css: otherCSS)]), gate: gate, store: store)
+        let running = Task { try await sync() }
+        guard await gate.waitUntilEntered() else {
+            Issue.record("the sync did not reach the rendering gate in time")
+            running.cancel()
+            return
+        }
+        let newest = try DesignStoreContract.design(id: "clean", version: "3.0.0", css: ".cv-skill{font-weight:700}")
+        try await store.save(newest)
+        await gate.release()
+        let report = try await running.value
+        #expect(report.unchanged == ["clean"])
+        #expect(report.upgraded.isEmpty && report.installed.isEmpty && report.failed.isEmpty && report.notRendered.isEmpty)
+        #expect(try await GetDesign(store: store)(id: "clean") == newest)
+    }
+
     @Test("an installed design is listed, never read: one that cannot be read does not stop the sync")
     func unreadableInstalledDesign() async throws {
         let store = SpyDesignStore(installed: [try DesignStoreContract.design(id: "clean")], unreadable: ["clean"])

@@ -57,12 +57,24 @@ public actor FileDesignStore: DesignStore {
     // MARK: DesignStore
 
     public func save(_ design: ValidatedDesign) async throws(FileDesignStoreError) {
+        _ = try saveEntry(design, onlyIfNewer: false)
+    }
+
+    public func saveIfNewer(_ design: ValidatedDesign) async throws(FileDesignStoreError) -> ConditionalSave {
+        try saveEntry(design, onlyIfNewer: true)
+    }
+
+    /// The one write path. With `onlyIfNewer`, the installed version is compared inside the exclusive lock that the
+    /// write holds, and an installed design of the same or a newer version leaves the store untouched.
+    private func saveEntry(_ design: ValidatedDesign, onlyIfNewer: Bool) throws(FileDesignStoreError) -> ConditionalSave {
         let id = design.manifest.id
         let package = try encodeReadingBack(design)
-        _ = try withLock(exclusive: true) { () throws(FileDesignStoreError) in
+        let outcome = try withLock(exclusive: true) { () throws(FileDesignStoreError) -> ConditionalSave in
             let entries = try readIndex()
+            let installed = entries.first { $0.manifest.id == id }
+            if onlyIfNewer, let installed, design.manifest.version <= installed.manifest.version { return .keptInstalled }
             try removeUnlistedFiles(keeping: entries, for: id)
-            let generation = (entries.first { $0.manifest.id == id }?.generation ?? 0) + 1
+            let generation = (installed?.generation ?? 0) + 1
             guard generation <= Self.maxGeneration else { throw .wouldNotReadBack(id: id) }
             let entry = Entry(manifest: design.manifest, generation: generation)
             let listed = (entries.filter { $0.manifest.id != id } + [entry]).sorted { $0.manifest.id < $1.manifest.id }
@@ -70,7 +82,10 @@ public actor FileDesignStore: DesignStore {
             guard index.count <= Self.maxIndexBytes else { throw .wouldNotReadBack(id: id) }
             try write(package, to: file(entry), for: id)
             try write(index, to: indexFile, for: id)
+            return installed == nil ? .installed : .upgraded
         }
+        guard let outcome else { throw .storeUnavailable }   // an exclusive lock creates the store, so it is never absent
+        return outcome
     }
 
     public func design(id: String) async throws(FileDesignStoreError) -> ValidatedDesign? {
