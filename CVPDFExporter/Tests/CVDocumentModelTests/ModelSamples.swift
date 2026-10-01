@@ -1,12 +1,46 @@
 import CVDocumentModel
 
-/// Values of the model for the schema tests. The enumerations hold one value of every case of `Section`, `PeriodEnd` and
-/// `LanguageItem.Level`, written by a `next` function whose switch has no default: a case added to the model does not
-/// compile until it has a sample here, so the schema tests cannot silently leave it out.
+/// The cases of `Section`, named. `init(of:)` switches over `Section` without a default, so a case added to the model does
+/// not compile until it is named here; `allCases` then makes `ModelSamples` write a sample for it.
+enum SectionKind: CaseIterable {
+    case summary, experience, education, skills, languages, certifications, profiles, interests
+
+    init(of section: Section) {
+        switch section {
+        case .summary: self = .summary
+        case .experience: self = .experience
+        case .education: self = .education
+        case .skills: self = .skills
+        case .languages: self = .languages
+        case .certifications: self = .certifications
+        case .profiles: self = .profiles
+        case .interests: self = .interests
+        }
+    }
+}
+
+/// The cases of `PeriodEnd`, named, on the same terms as `SectionKind`.
+enum PeriodEndKind: CaseIterable {
+    case present, unspecified, date
+
+    init(of end: PeriodEnd) {
+        switch end {
+        case .present: self = .present
+        case .unspecified: self = .unspecified
+        case .date: self = .date
+        }
+    }
+}
+
+/// Values of the model for the schema tests.
+///
+/// There is one sample for every case of `Section` and of `PeriodEnd`: the kinds list the cases and the `sample` functions
+/// switch over them without a default, so a case added to the model has to be named and then given a sample before the
+/// tests compile. `LanguageItem.Level` is `CaseIterable` itself. That each sample is of the case it is named after is
+/// checked by a test.
 enum ModelSamples {
-    static let ends: [PeriodEnd] = chain(from: .present, next: next(after:))
-    static let levels: [LanguageItem.Level] = chain(from: .a1, next: next(after:))
-    static let sections: [Section] = chain(from: .summary("Writes programs."), next: next(after:))
+    static let ends: [PeriodEnd] = PeriodEndKind.allCases.map { sample(of: $0) }
+    static let sections: [Section] = SectionKind.allCases.map { sample(of: $0) }
 
     /// Every kind of section, every period end and every level, with every optional field present.
     static let populated = CVDocument(
@@ -42,44 +76,26 @@ enum ModelSamples {
         return CVDocument(language: "en", person: Person(name: "A"), sections: sections)
     }()
 
-    // MARK: Walking the cases of an enumeration
+    // MARK: One sample for every case
 
-    private static func chain<T>(from first: T, next: (T) -> T?) -> [T] {
-        var all = [first]
-        while let following = next(all[all.count - 1]) { all.append(following) }
-        return all
-    }
-
-    private static func next(after end: PeriodEnd) -> PeriodEnd? {
-        switch end {
-        case .present: .unspecified
-        case .unspecified: .date(DocumentDate(year: 2020, month: 6))
-        case .date: nil
+    private static func sample(of kind: PeriodEndKind) -> PeriodEnd {
+        switch kind {
+        case .present: .present
+        case .unspecified: .unspecified
+        case .date: .date(DocumentDate(year: 2020, month: 6))
         }
     }
 
-    private static func next(after level: LanguageItem.Level) -> LanguageItem.Level? {
-        switch level {
-        case .a1: .a2
-        case .a2: .b1
-        case .b1: .b2
-        case .b2: .c1
-        case .c1: .c2
-        case .c2: .native
-        case .native: nil
-        }
-    }
-
-    private static func next(after section: Section) -> Section? {
-        switch section {
-        case .summary: .experience(ends.map { experience(ending: $0) })
-        case .experience: .education([education])
-        case .education: .skills([SkillItem(name: "Swift", rating: 4)])
-        case .skills: .languages(levels.map { LanguageItem(language: "Language \($0.rawValue)", level: $0) })
-        case .languages: .certifications([CertificationItem(name: "Diploma", issuer: "Society", year: 2021, url: "https://society.example", description: "Awarded")])
-        case .certifications: .profiles([ProfileLink(platform: "Web", url: "https://ada.example")])
-        case .profiles: .interests(["Chess", "Poetry"])
-        case .interests: nil
+    private static func sample(of kind: SectionKind) -> Section {
+        switch kind {
+        case .summary: .summary("Writes programs.")
+        case .experience: .experience(ends.map { experience(ending: $0) })
+        case .education: .education([education])
+        case .skills: .skills([SkillItem(name: "Swift", rating: 4)])
+        case .languages: .languages(LanguageItem.Level.allCases.map { LanguageItem(language: "Language \($0.rawValue)", level: $0) })
+        case .certifications: .certifications([CertificationItem(name: "Diploma", issuer: "Society", year: 2021, url: "https://society.example", description: "Awarded")])
+        case .profiles: .profiles([ProfileLink(platform: "Web", url: "https://ada.example")])
+        case .interests: .interests(["Chess", "Poetry"])
         }
     }
 

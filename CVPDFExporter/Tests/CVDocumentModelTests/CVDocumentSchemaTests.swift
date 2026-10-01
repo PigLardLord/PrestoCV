@@ -54,6 +54,12 @@ struct CVDocumentSchemaTests {
         #expect((exporter == .accepted) == exporterShouldAccept, "the exporter should \(exporterShouldAccept ? "accept" : "refuse") it: \(exporter)")
     }
 
+    @Test("the samples hold one value of every case, each of the case it is named after")
+    func samplesCoverEveryCase() {
+        #expect(ModelSamples.sections.map(SectionKind.init(of:)) == SectionKind.allCases)
+        #expect(ModelSamples.ends.map(PeriodEndKind.init(of:)) == PeriodEndKind.allCases)
+    }
+
     @Test("the populated sample sets every optional field of the model")
     func populatedSample() {
         #expect(unsetOptionals(in: ModelSamples.populated) == [])
@@ -87,7 +93,7 @@ struct CVDocumentSchemaTests {
     @Test("the language levels of the schema are the raw values of LanguageItem.Level")
     func levels() throws {
         guard case .array(let declared)? = try CommittedSchema.validator().definition("languageItem")?["properties"]?["level"]?["enum"] else { throw SchemaShapeError(what: "level has no enum") }
-        #expect(strings(declared).sorted() == ModelSamples.levels.map(\.rawValue).sorted())
+        #expect(strings(declared).sorted() == LanguageItem.Level.allCases.map(\.rawValue).sorted())
     }
 
     struct SchemaShapeError: Error { let what: String }
