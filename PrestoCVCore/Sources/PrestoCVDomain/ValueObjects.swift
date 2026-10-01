@@ -78,9 +78,11 @@ public enum LanguageProficiency: String, CaseIterable, Hashable, Sendable {
 /// digits, inner hyphens, 1–63 characters each) ending in an alphabetic top-level label. Internationalised letters
 /// are allowed, with the combining marks that follow them (Indic vowel signs, decomposed accents); control, format
 /// and separator characters (NUL, zero-width space, bidirectional overrides) are not, since they can hide or disguise
-/// what is printed. No atom or label starts with a mark. The address is at most 254 bytes and its local part 64. Each
-/// domain label is at most 63 bytes once encoded for IDNA (Punycode, RFC 5891) and the encoded domain at most 253 bytes
-/// (RFC 5890); a label is measured lowercased and in NFC, while the stored value stays as it was written.
+/// what is printed. No atom or label starts with a mark. The address is at most 254 bytes as typed. Its local part is
+/// at most 64 bytes (RFC 5321 §4.5.3.1.1), and each domain label is at most 63 characters as written and 63 bytes once
+/// encoded for IDNA (Punycode, RFC 5891; RFC 1035 §3.1). The local part, the at sign and the encoded domain together
+/// are at most 254 bytes, a mail path of 256 octets less its angle brackets (RFC 5321 §4.5.3.1.3). A label is measured
+/// lowercased and in NFC, while the stored value stays as it was written.
 public struct EmailAddress: Hashable, Sendable {
     public let value: String
     static let atom = #"[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-][\p{L}\p{M}\p{N}!#$%&'*+/=?^_`{|}~-]*"#
@@ -93,22 +95,32 @@ public struct EmailAddress: Hashable, Sendable {
                                                     .privateUse, .surrogate, .unassigned]
         guard v.utf8.count <= 254, !v.unicodeScalars.contains(where: { hidden.contains($0.properties.generalCategory) }),
               v.range(of: Self.pattern, options: .regularExpression) != nil else { return nil }
-        // Length limits the pattern cannot express once marks are allowed: a local part of at most 64 bytes, and
-        // domain lengths. The 254-byte bound above comes first, so the encoder never sees more than that.
-        let parts = v.split(separator: "@", omittingEmptySubsequences: false)
-        guard parts.count == 2, parts[0].utf8.count <= 64, Self.domainFits(parts[1]) else { return nil }
+        // Length limits the pattern cannot express once marks are allowed: the local part, and the domain once encoded.
+        // Each label is checked to be at most 63 characters as written before it is encoded, so the encoder only sees
+        // short labels. The path bound is tighter than a domain name's own (255 octets on the wire, 253 as dotted text,
+        // RFC 1035 §3.1), so it is the only bound on the whole domain.
+        let parts = Self.pieces(of: v, separatedBy: "@", keepingEmpty: true)
+        guard parts.count == 2, parts[0].utf8.count <= 64, let domain = Self.encodedDomain(parts[1]),
+              parts[0].utf8.count + 1 + domain.utf8.count <= 254 else { return nil }
         value = v
     }
 
-    /// Each label at most 63 characters, marks included, and 63 bytes as an A-label; all the A-labels, joined by
-    /// dots, at most 253 bytes.
-    private static func domainFits(_ domain: Substring) -> Bool {
+    /// The A-labels of the domain joined by dots, or nil when a label is longer than 63 characters as written or than 63
+    /// bytes once encoded.
+    private static func encodedDomain(_ domain: String) -> String? {
         var aLabels: [String] = []
-        for label in domain.split(separator: ".") {
-            guard label.unicodeScalars.count <= 63, let aLabel = IDNA.aLabel(String(label)), aLabel.utf8.count <= 63 else { return false }
+        for label in pieces(of: domain, separatedBy: ".", keepingEmpty: false) {
+            guard label.unicodeScalars.count <= 63, let aLabel = IDNA.aLabel(label), aLabel.utf8.count <= 63 else { return nil }
             aLabels.append(aLabel)
         }
-        return aLabels.joined(separator: ".").utf8.count <= 253
+        return aLabels.joined(separator: ".")
+    }
+
+    /// Splits on scalars, not characters: grapheme rules join a letter such as U+0D4E to the scalar after it, which
+    /// would hide a separator.
+    private static func pieces(of text: String, separatedBy separator: Unicode.Scalar, keepingEmpty: Bool) -> [String] {
+        text.unicodeScalars.split(separator: separator, omittingEmptySubsequences: !keepingEmpty)
+            .map { String(String.UnicodeScalarView($0)) }
     }
 }
 

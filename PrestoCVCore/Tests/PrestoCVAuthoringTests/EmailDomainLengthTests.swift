@@ -11,16 +11,97 @@ func spacedLabel(letters: Int, ascii: Int = 0) -> String {
 }
 
 /// The label as the last label of a domain and as an inner one.
-func addresses(with label: String) -> [String] { ["ada@example.\(label)", "ada@\(label).example.com"] }
+func addresses(with label: String) -> [String] {
+    var addresses: [String] = []
+    addresses.append("ada@example." + label)
+    addresses.append("ada@" + label + ".example.com")
+    return addresses
+}
 
 func aLabelLength(_ label: String) -> Int? { IDNA.aLabel(label)?.utf8.count }
 
-let encodedLabels: [(String, String)] = [
-    ("bücher", "xn--bcher-kva"), ("BÜCHER", "xn--bcher-kva"), ("bu\u{0308}cher", "xn--bcher-kva"),
-    ("例え", "xn--r8jz45g"), ("テスト", "xn--zckzah"), ("مثال", "xn--mgbh0fb"), ("إختبار", "xn--kgbechtv"),
-    ("हिन्दी", "xn--j2bd4cyah0f"), ("भारत", "xn--h2brj9c"), ("İstanbul", "xn--istanbul-o0e"),
-    ("Example", "example"), ("\u{212A}elvin", "kelvin"), ("xn--bcher-kva", "xn--bcher-kva"),
-]
+/// MALAYALAM LETTER DOT REPH, a letter that grapheme clusters join to the scalar after it.
+let prependLetter = "\u{0D4E}"
+
+let encodedLabels: [(String, String)] = {
+    var cases: [(String, String)] = []
+    cases.append(("bücher", "xn--bcher-kva"))
+    cases.append(("BÜCHER", "xn--bcher-kva"))
+    cases.append(("bu\u{0308}cher", "xn--bcher-kva"))
+    cases.append(("例え", "xn--r8jz45g"))
+    cases.append(("テスト", "xn--zckzah"))
+    cases.append(("مثال", "xn--mgbh0fb"))
+    cases.append(("إختبار", "xn--kgbechtv"))
+    cases.append(("हिन्दी", "xn--j2bd4cyah0f"))
+    cases.append(("भारत", "xn--h2brj9c"))
+    cases.append(("İstanbul", "xn--istanbul-o0e"))
+    cases.append(("Example", "example"))
+    cases.append(("\u{212A}elvin", "kelvin"))
+    cases.append(("xn--bcher-kva", "xn--bcher-kva"))
+    cases.append(("a" + prependLetter, "xn--a-mmf"))
+    return cases
+}()
+
+/// Labels of at most 63 characters, with the length of their A-label and whether an address holding them is accepted.
+let labelByteCases: [(String, Int, Bool)] = {
+    let dense57 = String(repeating: "\u{00E9}", count: 57), dense58 = String(repeating: "\u{00E9}", count: 58)
+    var cases: [(String, Int, Bool)] = []
+    cases.append((spacedLabel(letters: 27, ascii: 1), 62, true))
+    cases.append((spacedLabel(letters: 30), 63, true))
+    cases.append((spacedLabel(letters: 28, ascii: 1), 64, false))
+    cases.append((spacedLabel(letters: 31), 65, false))
+    cases.append((spacedLabel(letters: 40), 83, false))
+    cases.append((dense57, 63, true))     // the densest label: one byte per character after the first
+    cases.append((dense58, 64, false))
+    return cases
+}()
+
+/// Addresses with 28 one-letter international labels and `padding` letters in the next one: padding, bytes on the wire
+/// (local part, "@" and the A-labels joined by dots) and whether the address is accepted.
+let wireCases: [(Int, Int, Bool)] = {
+    var cases: [(Int, Int, Bool)] = []
+    cases.append((22, 254, true))
+    cases.append((23, 255, false))
+    cases.append((25, 257, false))
+    return cases
+}()
+
+/// Labels of pairs "e" and a combining accent, then "a" when accepted: 63 and 64 scalars, both with a short A-label.
+let labelCharacterCases: [(Int, Bool)] = {
+    var cases: [(Int, Bool)] = []
+    cases.append((31, true))
+    cases.append((32, false))
+    return cases
+}()
+
+/// Labels that end in a letter which grapheme clusters join to the dot after it: letters before it, A-label length, accepted.
+let prependLabelCases: [(Int, Int, Bool)] = {
+    var cases: [(Int, Int, Bool)] = []
+    cases.append((54, 63, true))
+    cases.append((55, 64, false))
+    return cases
+}()
+
+let internationalAddresses: [String] = {
+    var addresses: [String] = []
+    addresses.append("ada@bücher.example")
+    addresses.append("ada@例え.テスト")
+    addresses.append("ada@مثال.إختبار")
+    addresses.append("ada@हिन्दी.भारत")
+    addresses.append("josé@BÜCHER.example")
+    addresses.append("ada@" + spacedLabel(letters: 10) + ".example")
+    addresses.append("ada@\u{20000}\u{20001}.example")
+    return addresses
+}()
+
+let typedAddresses: [String] = {
+    var addresses: [String] = []
+    addresses.append("Ada@Bücher.Example")
+    addresses.append("ada@bu\u{0308}cher.example")
+    addresses.append("ADA@例え.テスト")
+    addresses.append("ada@\u{212A}elvin.example")
+    return addresses
+}()
 
 @Suite("IDNA A-labels")
 struct IDNALabelTests {
@@ -34,39 +115,64 @@ struct IDNALabelTests {
 @Suite("R6 · email domain length once encoded")
 struct EmailDomainLengthTests {
     @Test("a label within 63 characters is refused when its A-label passes 63 bytes, at 63 bytes exactly it is accepted",
-          arguments: [(spacedLabel(letters: 27, ascii: 1), 62, true), (spacedLabel(letters: 30), 63, true),
-                      (spacedLabel(letters: 28, ascii: 1), 64, false), (spacedLabel(letters: 31), 65, false),
-                      (spacedLabel(letters: 40), 83, false)])
+          arguments: labelByteCases)
     func labelBytes(label: String, bytes: Int, accepted: Bool) {
         #expect(label.unicodeScalars.count <= 63 && aLabelLength(label) == bytes)   // the premise: it fits in characters, not always in bytes
         for raw in addresses(with: label) { #expect((EmailAddress(raw) != nil) == accepted) }
     }
 
-    @Test("a domain is refused when its A-labels joined by dots pass 253 bytes, although every label fits",
-          arguments: [(25, 253, true), (26, 254, false)])
-    func domainBytes(padding: Int, bytes: Int, accepted: Bool) {
-        let labels = Array(repeating: "ü", count: 28) + [String(repeating: "a", count: padding), "com"]
-        let raw = "ada@" + labels.joined(separator: ".")
+    @Test("an address is accepted only when its local part, the at sign and the A-labels of its domain fit in 254 bytes",
+          arguments: wireCases)
+    func wireBytes(padding: Int, bytes: Int, accepted: Bool) {
+        var labels = [String](repeating: "\u{00FC}", count: 28)
+        labels.append(String(repeating: "a", count: padding))
+        labels.append("com")
+        let local = "ada", raw = local + "@" + labels.joined(separator: ".")
         let aLabels = labels.compactMap(IDNA.aLabel)
-        #expect(aLabels.count == labels.count && aLabels.allSatisfy { $0.utf8.count <= 63 })
-        #expect(aLabels.joined(separator: ".").utf8.count == bytes && raw.utf8.count <= 254)
+        #expect(aLabels.count == labels.count && aLabels.allSatisfy { $0.utf8.count <= 63 })   // every label fits
+        #expect(local.utf8.count + 1 + aLabels.joined(separator: ".").utf8.count == bytes)
+        #expect(raw.utf8.count <= 254)   // as typed it fits
         #expect((EmailAddress(raw) != nil) == accepted)
     }
 
     @Test("a label is also refused past 63 characters as written, although its A-label fits",
-          arguments: [(31, true), (32, false)])
+          arguments: labelCharacterCases)
     func labelCharacters(pairs: Int, accepted: Bool) {
         let label = String(repeating: "e\u{0301}", count: pairs) + (accepted ? "a" : "")   // 63 and 64 scalars
         #expect(label.unicodeScalars.count == (accepted ? 63 : 64) && (aLabelLength(label) ?? .max) <= 63)
         for raw in addresses(with: label) { #expect((EmailAddress(raw) != nil) == accepted) }
     }
 
-    @Test("international domains that fit are accepted",
-          arguments: ["ada@bücher.example", "ada@例え.テスト", "ada@مثال.إختبار", "ada@हिन्दी.भारत", "josé@BÜCHER.example",
-                      "ada@" + spacedLabel(letters: 10) + ".example", "ada@\u{20000}\u{20001}.example"])
+    @Test("a label ending in a letter that grapheme clusters join to the next dot is measured on its own",
+          arguments: prependLabelCases)
+    func labelBeforeDot(letters: Int, bytes: Int, accepted: Bool) {
+        let label = String(repeating: "b", count: letters) + prependLetter
+        #expect(aLabelLength(label) == bytes)
+        #expect((EmailAddress("ada@" + label + ".example.com") != nil) == accepted)
+    }
+
+    @Test("two labels that fit are not measured as one because the first ends in a letter joined to the dot")
+    func neighbouringLabels() {
+        let first = String(repeating: "b", count: 30) + prependLetter, second = String(repeating: "c", count: 40)
+        #expect(aLabelLength(first) == 39 && aLabelLength(second) == 40)
+        #expect(EmailAddress("ada@" + first + "." + second + ".example.com") != nil)
+    }
+
+    @Test("a short label ending in a letter joined to the dot is accepted, measured alone")
+    func shortLabelBeforeDot() {
+        #expect(aLabelLength("a" + prependLetter) == 9)
+        #expect(EmailAddress("ada@a" + prependLetter + ".example.com") != nil)
+    }
+
+    @Test("a local part ending in a letter joined to the at sign is accepted, and kept as written")
+    func localPartBeforeAt() {
+        let raw = "x" + prependLetter + "@example.com"
+        #expect(EmailAddress(raw)?.value == raw)
+    }
+
+    @Test("international domains that fit are accepted", arguments: internationalAddresses)
     func accepted(raw: String) { #expect(EmailAddress(raw) != nil) }
 
-    @Test("the stored value is what was typed: not lowercased, normalised or encoded",
-          arguments: ["Ada@Bücher.Example", "ada@bu\u{0308}cher.example", "ADA@例え.テスト", "ada@\u{212A}elvin.example"])
+    @Test("the stored value is what was typed: not lowercased, normalised or encoded", arguments: typedAddresses)
     func storedValue(raw: String) { #expect(EmailAddress(raw)?.value == raw) }
 }

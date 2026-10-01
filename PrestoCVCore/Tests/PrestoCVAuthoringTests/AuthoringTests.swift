@@ -1,22 +1,32 @@
 import Testing
 import Foundation
-import PrestoCVDomain
+@testable import PrestoCVDomain
 import PrestoCVApplication
 import PrestoCVCoreTestSupport
 
 let id1 = CVID(UUID(uuidString: "11111111-1111-1111-1111-111111111111")!)
 func named(_ name: String, id: CVID = id1) -> CV { CV(id: id, personal: PersonalDetails(fullName: name)) }
 
+/// A label of 63 and one of 64 characters with combining marks: the first is 71 bytes once encoded for IDNA.
+let markedLabel63: String = "a" + String(repeating: "\u{0301}", count: 61) + "b"
+let markedLabel64: String = "a" + String(repeating: "\u{0301}", count: 62) + "b"
+
 /// Addresses at and just past each length limit: the local part in bytes ("é" is two), a label in characters and, once
 /// encoded for IDNA, in bytes (EmailDomainLengthTests holds the boundaries of the encoded length).
 let emailLengthCases: [(String, Bool)] = {
-    let domain = "@example.com"
+    let domain = "@example.com", tld = "ada@example."
     let local64 = String(repeating: "a", count: 64), local65 = String(repeating: "a", count: 65)
     let accented32 = String(repeating: "é", count: 32), accented33 = String(repeating: "é", count: 33)
-    let label63 = "a" + String(repeating: "\u{0301}", count: 61) + "b", label64 = "a" + String(repeating: "\u{0301}", count: 62) + "b"
-    return [(local64 + domain, true), (local65 + domain, false), (accented32 + domain, true), (accented33 + domain, false),
-            ("ada@example." + String(repeating: "a", count: 63), true), ("ada@example." + String(repeating: "a", count: 64), false),
-            ("ada@example." + label63, false), ("ada@example." + label64, false)]   // 63 characters, but 71 bytes once encoded
+    var cases: [(String, Bool)] = []
+    cases.append((local64 + domain, true))
+    cases.append((local65 + domain, false))
+    cases.append((accented32 + domain, true))
+    cases.append((accented33 + domain, false))
+    cases.append((tld + String(repeating: "a", count: 63), true))
+    cases.append((tld + String(repeating: "a", count: 64), false))
+    cases.append((tld + markedLabel63, false))
+    cases.append((tld + markedLabel64, false))
+    return cases
 }()
 
 @Suite("R6 · rich domain")
@@ -60,6 +70,12 @@ struct DomainTests {
 
     @Test("a local part is at most 64 bytes and a domain label at most 63 characters, marks included, and 63 bytes once encoded", arguments: emailLengthCases)
     func emailLengths(raw: String, accepted: Bool) { #expect((EmailAddress(raw) != nil) == accepted) }
+
+    @Test("the label of 63 characters in the length cases is 71 bytes once encoded, the next one 64 characters")
+    func markedLabelLengths() {
+        #expect(markedLabel63.unicodeScalars.count == 63 && IDNA.aLabel(markedLabel63)?.utf8.count == 71)
+        #expect(markedLabel64.unicodeScalars.count == 64)
+    }
 
     @Test("every accepted link rebuilds itself from its value and stays within the limit (final gate)",
           arguments: ["https://ada.example", "http://example.org/path?q=1", "https://example.com/a b",
