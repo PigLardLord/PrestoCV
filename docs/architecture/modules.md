@@ -29,7 +29,7 @@ Test targets and test-support targets are described below each package. The chec
   - a typed identity (`CVID`);
   - `revision`, `createdAt` and `updatedAt`, settable only inside the package;
   - a private title, `PersonalDetails`, and ordered sections of entries;
-  - the "has enough content to be saved" rule, which is about the name only;
+  - the "has enough content to be saved" rule (`canBeSaved`): a full name with at least one visible character, that is, one that is not white space, not a default-ignorable code point (a joiner, a direction mark) and not a control, format, unassigned or surrogate character. It does not include the size bounds;
   - the size bounds: `limitViolation` reports the first bound the CV is over, or nil;
   - duplication with a title composed by the caller.
 - **The text rule** is internal to the domain, in one file. `CV` applies it wherever text enters: both initialisers, so a stored file too, and `rename`, `setPersonalDetails` and `setSections`. Value objects are validated when they are made, and the rule does not touch them. It has two kinds:

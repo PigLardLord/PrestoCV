@@ -27,6 +27,15 @@ struct DomainTests {
         #expect(!named("\n").canBeSaved && named("Ada").canBeSaved)
     }
 
+    @Test("a name that prints nothing is no name: white space, joiners, marks and other invisible characters do not count",
+          arguments: ["", "   ", "\u{3000}", "\u{200B}", "\u{200D}", "\u{200C}", "\u{200E}", "\u{200F}", "\u{2060}", "\u{FEFF}", "\u{00AD}",
+                      "\u{FE0F}", "\u{0378}", "\u{200B} \u{200D}\u{200E} "])
+    func invisibleNameCannotBeSaved(name: String) { #expect(!named(name).canBeSaved) }
+
+    @Test("a name with one visible character can be saved, whatever invisible characters surround it",
+          arguments: ["\u{200B}Ada", "Ada\u{200D}", "\u{200E}Ada", " Ada ", "e\u{0301}", "A", "😀", "👩\u{200D}👩\u{200D}👧", "علي", "山田 太郎", "می\u{200C}خواهم"])
+    func visibleNameCanBeSaved(name: String) { #expect(named(name).canBeSaved) }
+
     @Test("mixed precision is ordered by year when months are unknown")
     func mixedPrecision() throws {
         #expect(try Period.make(start: (2020, 5), end: (2020, nil), current: false) != nil)

@@ -36,8 +36,8 @@ public struct CV: Hashable, Sendable {
            sections: sections, design: design, language: language)
     }
 
-    /// The one definition of "has enough content to be saved".
-    public var canBeSaved: Bool { !personal.fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    /// The one definition of "has enough content to be saved": a full name with at least one visible character.
+    public var canBeSaved: Bool { personal.fullName.unicodeScalars.contains(where: \.isVisible) }
 
     public mutating func rename(_ newTitle: String) { title = TextRule.singleLine(newTitle) }
     public mutating func setPersonalDetails(_ details: PersonalDetails) { personal = details.normalised() }
@@ -50,5 +50,18 @@ public struct CV: Hashable, Sendable {
     /// The new title is composed by presentation, which knows the language (R13).
     public func duplicated(as newID: CVID, title: String) -> CV {
         CV(id: newID, title: title, personal: personal, sections: sections, design: design, language: language)
+    }
+}
+
+private extension Unicode.Scalar {
+    /// False for white space, for the characters a renderer leaves out (default ignorable code points, such as the joiners
+    /// and the direction marks) and for control, format, unassigned and surrogate characters: a name made only of these
+    /// prints nothing.
+    var isVisible: Bool {
+        if properties.isWhitespace || properties.isDefaultIgnorableCodePoint { return false }
+        switch properties.generalCategory {
+        case .control, .format, .unassigned, .surrogate: return false
+        default: return true
+        }
     }
 }
