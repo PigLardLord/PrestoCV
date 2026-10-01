@@ -397,7 +397,7 @@ struct FileContractTests {
 @Suite("R6 · text of a stored CV")
 struct StoredTextTests {
     /// A JSON string value carrying a bidirectional override, a NUL, a CR LF, a tab and a tag character, written as escapes.
-    func hostile(_ label: String) -> String { #"‮"# + label + #"\u0000\r\nx\ty󠁁"# }
+    func hostile(_ label: String) -> String { #"\u202E"# + label + #"\u0000\r\nx\ty\uDB40\uDC41"# }
     func quoted(_ label: String) -> String { "\"" + hostile(label) + "\"" }
     func oneLine(_ label: String) -> String { "\(label) x y" }
     func lines(_ label: String) -> String { "\(label)\nx y" }
