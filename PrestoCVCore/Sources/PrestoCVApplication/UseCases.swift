@@ -1,9 +1,11 @@
 import Foundation
 import PrestoCVDomain
 
-/// What presentation needs to know, without the port's error shape (R7).
+/// What presentation needs to know, without the port's error shape (R7). `exceedsLimits` says which size limit a CV is
+/// over (`CV.limitViolation`).
 public enum AuthoringError: Error, Equatable, Sendable {
     case notEnoughContent, conflict(storedRevision: Int), deletedElsewhere, tooLarge, unavailable
+    case exceedsLimits(CVLimitViolation)
 }
 
 /// A new, unsaved CV with a fresh identity.
@@ -13,12 +15,14 @@ public struct NewCV: Sendable {
     public func callAsFunction() -> CV { CV(id: ids.next()) }
 }
 
-/// Saves a CV: create when never saved, conditional update otherwise. Returns the stored CV.
+/// Saves a CV: create when never saved, conditional update otherwise. Returns the stored CV. A CV without a name is
+/// refused first, then a CV over a size limit, with the reason; nothing is stored and no text is cut.
 public struct SaveCV: Sendable {
     let repository: any CVRepository
     public init(repository: any CVRepository) { self.repository = repository }
     public func callAsFunction(_ cv: CV) async throws(AuthoringError) -> CV {
         guard cv.canBeSaved else { throw .notEnoughContent }
+        if let violation = cv.limitViolation { throw .exceedsLimits(violation) }
         do { return cv.revision == 0 ? try await repository.create(cv) : try await repository.update(cv) }
         catch .conflict(_, let stored) { throw .conflict(storedRevision: stored) }
         catch .notFound { throw .deletedElsewhere }

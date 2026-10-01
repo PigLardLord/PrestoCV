@@ -6,7 +6,7 @@ import PrestoCVCoreTestSupport
 func text(bytes: Int) -> String { String(repeating: "x", count: bytes) }
 
 /// Every section, in the order the CV reports them.
-private let allSections: [CVSection] = [.experiences, .education, .skills, .languages, .certifications, .profiles, .interests]
+let allSections: [CVSection] = [.experiences, .education, .skills, .languages, .certifications, .profiles, .interests]
 
 /// Sections of `count` entries each for the listed sections, and none for the others.
 func entries(in listed: [CVSection], count: Int) -> CVSections {
@@ -34,12 +34,12 @@ func limitCV(_ details: PersonalDetails = PersonalDetails(fullName: "Ada"), titl
 private let uncountedTexts: Set<String> = ["design.design", "design.palette", "design.fonts", "language.tag"]
 
 /// The UTF-8 bytes of every text a CV holds, found by Mirror: the title and the value objects' text included.
-private func countedBytes(_ cv: CV) -> Int {
+func countedBytes(_ cv: CV) -> Int {
     texts(of: cv).filter { !uncountedTexts.contains($0.key) }.values.reduce(0) { $0 + $1.utf8.count }
 }
 
 /// The fixture, with skills added until its texts total `target` bytes, each skill within the limit for one text.
-private func limitCV(totalling target: Int) -> CV {
+func limitCV(totalling target: Int) -> CV {
     var result = FixtureCV.full()
     var padded = result.sections
     var remaining = target - countedBytes(result)
