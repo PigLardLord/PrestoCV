@@ -67,6 +67,13 @@ let encodedLabels: [(String, String)] = {
     cases.append(("\u{1C88}", "xn--xw8a"))
     cases.append(("a\u{3164}b", "ab"))                               // default-ignorable code points are dropped
     cases.append(("\u{845B}\u{E0100}", "xn--pt1a"))
+    cases.append(("\u{1F80}\u{0300}", "xn--dng2q"))                // each scalar is mapped alone, then the label is put in NFC once
+    cases.append(("\u{03F2}", "xn--4xa"))                            // UTS 46 maps the lunate sigma and the mathematical final sigmas to sigma
+    cases.append(("\u{1D6D3}", "xn--4xa"))
+    cases.append(("\u{1D70D}", "xn--4xa"))
+    cases.append(("\u{1D747}", "xn--4xa"))
+    cases.append(("\u{1D781}", "xn--4xa"))
+    cases.append(("\u{1D7BB}", "xn--4xa"))
     return cases
 }()
 
@@ -89,6 +96,8 @@ let mappedLabelCases: [(String, String, Bool)] = {
     cases.append((scalars(from: 0x13A0, count: 41), wire(scalars(from: 0x13A0, count: 41)), true))   // 63 bytes
     cases.append((scalars(from: 0xAB70, count: 41), wire(scalars(from: 0x13A0, count: 41)), true))   // small letters fold to them
     cases.append((scalars(from: 0x13A0, count: 42), wire(scalars(from: 0x13A0, count: 42)), false))
+    let accents = repeated("\u{1F80}\u{0300}\u{1FB3}", 12)   // 36 characters; 64 bytes, not 60, when mapped scalar by scalar
+    cases.append((accents, "xn--mxaaaaaaaaaaaa7gbbbbbbbbbbb5665ocacccccccccc744bdadddddddddd", false))
     return cases
 }()
 
@@ -111,6 +120,8 @@ let notLabels: [String] = {
     labels.append("\u{3164}")           // default-ignorable code points are dropped, which leaves nothing
     labels.append("\u{FFA0}")
     labels.append("\u{FE0F}")
+    labels.append("a\u{200D}b")         // joiners are not ignored: they are refused
+    labels.append("a\u{200C}b")
     return labels
 }()
 
@@ -203,10 +214,137 @@ let hiddenAddresses: [String] = {
     return addresses
 }()
 
+/// Every scalar that case folding changes after lowercasing and that UTS 46 folds, with its folding (CaseFolding.txt,
+/// Unicode 16, status C): the combining iota subscript, the small Cherokee letters, and the small Cyrillic variants.
+let caseFoldingEntries: [(UInt32, UInt32)] = {
+    var cases: [(UInt32, UInt32)] = []
+    cases.append((0x0345, 0x03B9))
+    cases.append((0xAB70, 0x13A0))
+    cases.append((0xAB71, 0x13A1))
+    cases.append((0xAB72, 0x13A2))
+    cases.append((0xAB73, 0x13A3))
+    cases.append((0xAB74, 0x13A4))
+    cases.append((0xAB75, 0x13A5))
+    cases.append((0xAB76, 0x13A6))
+    cases.append((0xAB77, 0x13A7))
+    cases.append((0xAB78, 0x13A8))
+    cases.append((0xAB79, 0x13A9))
+    cases.append((0xAB7A, 0x13AA))
+    cases.append((0xAB7B, 0x13AB))
+    cases.append((0xAB7C, 0x13AC))
+    cases.append((0xAB7D, 0x13AD))
+    cases.append((0xAB7E, 0x13AE))
+    cases.append((0xAB7F, 0x13AF))
+    cases.append((0xAB80, 0x13B0))
+    cases.append((0xAB81, 0x13B1))
+    cases.append((0xAB82, 0x13B2))
+    cases.append((0xAB83, 0x13B3))
+    cases.append((0xAB84, 0x13B4))
+    cases.append((0xAB85, 0x13B5))
+    cases.append((0xAB86, 0x13B6))
+    cases.append((0xAB87, 0x13B7))
+    cases.append((0xAB88, 0x13B8))
+    cases.append((0xAB89, 0x13B9))
+    cases.append((0xAB8A, 0x13BA))
+    cases.append((0xAB8B, 0x13BB))
+    cases.append((0xAB8C, 0x13BC))
+    cases.append((0xAB8D, 0x13BD))
+    cases.append((0xAB8E, 0x13BE))
+    cases.append((0xAB8F, 0x13BF))
+    cases.append((0xAB90, 0x13C0))
+    cases.append((0xAB91, 0x13C1))
+    cases.append((0xAB92, 0x13C2))
+    cases.append((0xAB93, 0x13C3))
+    cases.append((0xAB94, 0x13C4))
+    cases.append((0xAB95, 0x13C5))
+    cases.append((0xAB96, 0x13C6))
+    cases.append((0xAB97, 0x13C7))
+    cases.append((0xAB98, 0x13C8))
+    cases.append((0xAB99, 0x13C9))
+    cases.append((0xAB9A, 0x13CA))
+    cases.append((0xAB9B, 0x13CB))
+    cases.append((0xAB9C, 0x13CC))
+    cases.append((0xAB9D, 0x13CD))
+    cases.append((0xAB9E, 0x13CE))
+    cases.append((0xAB9F, 0x13CF))
+    cases.append((0xABA0, 0x13D0))
+    cases.append((0xABA1, 0x13D1))
+    cases.append((0xABA2, 0x13D2))
+    cases.append((0xABA3, 0x13D3))
+    cases.append((0xABA4, 0x13D4))
+    cases.append((0xABA5, 0x13D5))
+    cases.append((0xABA6, 0x13D6))
+    cases.append((0xABA7, 0x13D7))
+    cases.append((0xABA8, 0x13D8))
+    cases.append((0xABA9, 0x13D9))
+    cases.append((0xABAA, 0x13DA))
+    cases.append((0xABAB, 0x13DB))
+    cases.append((0xABAC, 0x13DC))
+    cases.append((0xABAD, 0x13DD))
+    cases.append((0xABAE, 0x13DE))
+    cases.append((0xABAF, 0x13DF))
+    cases.append((0xABB0, 0x13E0))
+    cases.append((0xABB1, 0x13E1))
+    cases.append((0xABB2, 0x13E2))
+    cases.append((0xABB3, 0x13E3))
+    cases.append((0xABB4, 0x13E4))
+    cases.append((0xABB5, 0x13E5))
+    cases.append((0xABB6, 0x13E6))
+    cases.append((0xABB7, 0x13E7))
+    cases.append((0xABB8, 0x13E8))
+    cases.append((0xABB9, 0x13E9))
+    cases.append((0xABBA, 0x13EA))
+    cases.append((0xABBB, 0x13EB))
+    cases.append((0xABBC, 0x13EC))
+    cases.append((0xABBD, 0x13ED))
+    cases.append((0xABBE, 0x13EE))
+    cases.append((0xABBF, 0x13EF))
+    cases.append((0x13F8, 0x13F0))
+    cases.append((0x13F9, 0x13F1))
+    cases.append((0x13FA, 0x13F2))
+    cases.append((0x13FB, 0x13F3))
+    cases.append((0x13FC, 0x13F4))
+    cases.append((0x13FD, 0x13F5))
+    cases.append((0x1C80, 0x0432))
+    cases.append((0x1C81, 0x0434))
+    cases.append((0x1C82, 0x043E))
+    cases.append((0x1C83, 0x0441))
+    cases.append((0x1C84, 0x0442))
+    cases.append((0x1C85, 0x0442))
+    cases.append((0x1C86, 0x044A))
+    cases.append((0x1C87, 0x0463))
+    cases.append((0x1C88, 0xA64B))
+    return cases
+}()
+
+/// Scalars next to the folded ranges, which stay as they are, and the two that non-transitional processing keeps.
+let unfoldedScalars: [UInt32] = {
+    var scalars: [UInt32] = []
+    scalars.append(0x0344)
+    scalars.append(0x0346)
+    scalars.append(0xAB6F)
+    scalars.append(0xABC0)
+    scalars.append(0x13F7)
+    scalars.append(0x13FE)
+    scalars.append(0x1C7F)
+    scalars.append(0x1C89)
+    scalars.append(0x00DF)   // the sharp s
+    scalars.append(0x03C2)   // the final sigma
+    return scalars
+}()
+
 @Suite("IDNA A-labels")
 struct IDNALabelTests {
     @Test("a label is mapped as IDNA maps it, then written in ASCII only if it needs it", arguments: encodedLabels)
     func encoded(label: String, aLabel: String) { #expect(IDNA.aLabel(label) == aLabel) }
+
+    @Test("every scalar that case folding changes after lowercasing is folded as CaseFolding.txt says", arguments: caseFoldingEntries)
+    func caseFolding(scalar: UInt32, folded: UInt32) {
+        #expect(Unicode.Scalar(scalar).map(IDNA.caseFolded)?.value == folded)
+    }
+
+    @Test("the scalars next to the folded ranges, the sharp s and the final sigma are left as they are", arguments: unfoldedScalars)
+    func notFolded(scalar: UInt32) { #expect(Unicode.Scalar(scalar).map(IDNA.caseFolded)?.value == scalar) }
 
     @Test("a label whose mapping is not a label has no A-label", arguments: notLabels)
     func notALabel(label: String) { #expect(IDNA.aLabel(label) == nil) }
@@ -256,13 +394,6 @@ struct EmailDomainLengthTests {
     func mappedLabelBytes(label: String, aLabel: String, accepted: Bool) {
         #expect(IDNA.aLabel(label) == aLabel && (aLabel.utf8.count <= 63) == accepted)   // the premise
         for raw in addresses(with: label) { #expect((EmailAddress(raw) != nil) == accepted) }
-    }
-
-    @Test("a label that fits 63 characters as written is refused when its mapping passes 63 bytes")
-    func mappedBytesBeyondCharacters() {
-        let label = String(repeating: "\u{FB03}", count: 21) + "\u{FF41}"
-        #expect(label.unicodeScalars.count == 22 && aLabelLength(label) == 64)
-        for raw in addresses(with: label) { #expect(EmailAddress(raw) == nil) }
     }
 
     @Test("an invisible filler is refused anywhere in an address; variation selectors are not fillers", arguments: hiddenAddresses)

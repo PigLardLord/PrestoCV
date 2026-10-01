@@ -77,16 +77,17 @@ public enum LanguageProficiency: String, CaseIterable, Hashable, Sendable {
 /// A local part of dot-separated atoms (no leading, trailing or doubled dot) and a domain of labels (letters or
 /// digits, inner hyphens, 1–63 characters each) ending in an alphabetic top-level label. Internationalised letters
 /// are allowed, with the combining marks that follow them (Indic vowel signs, decomposed accents); control, format
-/// and separator characters (NUL, zero-width space, bidirectional overrides) are not, nor are the invisible fillers
-/// (default-ignorable code points other than variation selectors), since they can hide or disguise what is printed.
-/// No atom or label starts with a mark. The address is at most 254 bytes as typed. Its local part is at most 64 bytes
-/// (RFC 5321 §4.5.3.1.1), and each domain label is at most 63 characters as written and 63 bytes once encoded for
-/// IDNA (Punycode, RFC 5891; RFC 1035 §3.1). The local part, the at sign and the encoded domain together are at most
-/// 254 bytes, a mail path of 256 octets less its angle brackets (RFC 5321 §4.5.3.1.3). A label is measured as IDNA
-/// maps it (variation selectors ignored, compatibility normalisation, case folding, NFC), so fullwidth letters and
-/// ligatures count as the letters they stand for, and a label that is not a label once mapped is refused (the Catalan
-/// middle dot is allowed between two "l"). The disallowed characters, bidirectional and contextual rules of IDNA are
-/// not applied. The stored value stays as it was written.
+/// and separator characters (NUL, zero-width space, bidirectional overrides) are not, since they can hide or disguise
+/// what is printed, and neither are the invisible fillers (default-ignorable code points other than variation
+/// selectors). Variation selectors are kept, because ideographic and Mongolian text need them, although they can make
+/// two addresses print alike. No atom or label starts with a mark. The address is at most 254 bytes as typed. Its local
+/// part is at most 64 bytes (RFC 5321 §4.5.3.1.1), and each domain label is at most 63 characters as written and 63
+/// bytes once encoded for IDNA (Punycode, RFC 5891; RFC 1035 §3.1). The local part, the at sign and the encoded domain
+/// together are at most 254 bytes, a mail path of 256 octets less its angle brackets (RFC 5321 §4.5.3.1.3). A label is
+/// measured as IDNA maps it (variation selectors ignored, compatibility normalisation, case folding, NFC), so fullwidth
+/// letters and ligatures count as the letters they stand for, and a label that is not a label once mapped is refused
+/// (the Catalan middle dot is allowed between two "l"). The disallowed characters of IDNA, its bidirectional rule and
+/// its other contextual rules are not applied. The stored value stays as it was written.
 public struct EmailAddress: Hashable, Sendable {
     public let value: String
     static let atom = #"[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-][\p{L}\p{M}\p{N}!#$%&'*+/=?^_`{|}~-]*"#
