@@ -393,3 +393,48 @@ struct FileContractTests {
         try await CVRepositoryContract.verify(repo(dir))
     }
 }
+
+@Suite("R6 · text of a stored CV")
+struct StoredTextTests {
+    /// A JSON string value carrying a bidirectional override, a NUL, a CR LF, a tab and a tag character, written as escapes.
+    func hostile(_ label: String) -> String { #"‮"# + label + #"\u0000\r\nx\ty󠁁"# }
+    func quoted(_ label: String) -> String { "\"" + hostile(label) + "\"" }
+    func oneLine(_ label: String) -> String { "\(label) x y" }
+    func lines(_ label: String) -> String { "\(label)\nx y" }
+
+    @Test("a stored file whose texts hold control, bidirectional and tag characters loads normalised, so they cannot come back")
+    func loadsNormalised() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let person = #"{"fullName":\#(quoted("name")),"professionalTitle":\#(quoted("headline")),"email":"ada@example.com","phone":"+39 06 1234567","#
+            + #""location":\#(quoted("city")),"website":"https://ada.example","summary":\#(quoted("summary"))}"#
+        let sections: [String: String] = [
+            "experiences": #"[{"role":\#(quoted("role")),"company":\#(quoted("company")),"location":\#(quoted("place")),"description":\#(quoted("work")),"current":false}]"#,
+            "education": #"[{"degree":\#(quoted("degree")),"school":\#(quoted("school")),"description":\#(quoted("study")),"current":false}]"#,
+            "skills": #"[{"name":\#(quoted("skill")),"level":4}]"#,
+            "languages": #"[{"language":\#(quoted("tongue")),"proficiency":"native"}]"#,
+            "certifications": #"[{"name":\#(quoted("certificate")),"issuer":\#(quoted("issuer")),"description":\#(quoted("exam")),"link":"https://cert.example/1"}]"#,
+            "profiles": #"[{"platform":\#(quoted("network")),"link":"https://github.com/ada"}]"#,
+            "interests": #"["a\tb","a b",\#(quoted("chess")),"\u0001"]"#,
+        ]
+        let json = fileJSON(personal: person, sections: sections).replacingOccurrences(of: #""title":"""#, with: #""title":\#(quoted("title"))"#)
+        try Data(json.utf8).write(to: dir.appendingPathComponent(fileName(id1)))
+
+        let loaded = try await repo(dir).load(id1)
+        #expect(loaded.title == oneLine("title"))
+        #expect(loaded.personal == PersonalDetails(
+            fullName: oneLine("name"), professionalTitle: oneLine("headline"), email: EmailAddress("ada@example.com"), phone: PhoneNumber("+39 06 1234567"),
+            location: oneLine("city"), website: WebLink("https://ada.example"), summary: lines("summary")))
+        #expect(loaded.sections.experiences == [Experience(role: oneLine("role"), company: oneLine("company"), location: oneLine("place"), description: lines("work"))])
+        #expect(loaded.sections.education == [Education(degree: oneLine("degree"), school: oneLine("school"), description: lines("study"))])
+        #expect(loaded.sections.skills == [Skill(name: oneLine("skill"), level: SkillLevel(4))])
+        #expect(loaded.sections.languages == [LanguageSkill(language: oneLine("tongue"), proficiency: .native)])
+        #expect(loaded.sections.certifications == [Certification(name: oneLine("certificate"), issuer: oneLine("issuer"), link: WebLink("https://cert.example/1"),
+                                                                  description: lines("exam"))])
+        #expect(loaded.sections.profiles == [ProfileLink(platform: oneLine("network"), link: try #require(WebLink("https://github.com/ada")))])
+        #expect(loaded.sections.interests == ["a b", "chess x y"])
+
+        let listing = try await repo(dir).list()
+        #expect(listing.cvs == [loaded] && listing.issues.isEmpty)
+    }
+}
