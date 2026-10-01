@@ -14,7 +14,7 @@ private func code(_ scalar: Unicode.Scalar) -> String {
 
 /// The classes both kinds remove, with scalars at and near the edges of each.
 private let removedClasses: [(name: String, scalars: [Unicode.Scalar])] = [
-    ("C0 control", ["\u{0000}", "\u{0001}", "\u{0008}", "\u{000B}", "\u{000C}", "\u{000E}", "\u{001B}", "\u{001C}", "\u{001F}"]),
+    ("C0 control", ["\u{0000}", "\u{0001}", "\u{0008}", "\u{000E}", "\u{001B}", "\u{001C}", "\u{001F}"]),
     ("DEL", ["\u{007F}"]),
     ("C1 control", ["\u{0080}", "\u{0084}", "\u{0086}", "\u{008D}", "\u{009F}"]),
     ("bidirectional embedding or override", ["\u{202A}", "\u{202B}", "\u{202C}", "\u{202D}", "\u{202E}"]),
@@ -24,7 +24,8 @@ private let removedClasses: [(name: String, scalars: [Unicode.Scalar])] = [
 
 /// Characters that end a line, and the tab, written as they arrive.
 private let lineBreaks: [(name: String, text: String)] = [
-    ("CR LF", "\r\n"), ("CR", "\r"), ("LF", "\n"), ("NEL", "\u{0085}"), ("LINE SEPARATOR", "\u{2028}"), ("PARAGRAPH SEPARATOR", "\u{2029}"),
+    ("CR LF", "\r\n"), ("CR", "\r"), ("LF", "\n"), ("VERTICAL TAB", "\u{000B}"), ("FORM FEED", "\u{000C}"), ("NEL", "\u{0085}"),
+    ("LINE SEPARATOR", "\u{2028}"), ("PARAGRAPH SEPARATOR", "\u{2029}"),
 ]
 
 private func removalCases() -> [TextCase] {
@@ -38,6 +39,8 @@ private let singleLineCases: [TextCase] = {
     var cases = removalCases()
     for lineBreak in lineBreaks { cases.append(TextCase(name: "\(lineBreak.name) is a space", input: "a\(lineBreak.text)b", expected: "a b")) }
     cases.append(TextCase(name: "tab is a space", input: "a\tb", expected: "a b"))
+    cases.append(TextCase(name: "a vertical tab does not glue words", input: "foo\u{0B}bar", expected: "foo bar"))
+    cases.append(TextCase(name: "a form feed does not glue words", input: "foo\u{0C}bar", expected: "foo bar"))
     cases.append(TextCase(name: "two breaks are two spaces", input: "a\r\n\r\nb", expected: "a  b"))
     cases.append(TextCase(name: "LF CR is two breaks", input: "a\n\rb", expected: "a  b"))
     cases.append(TextCase(name: "CR CR LF is two breaks", input: "a\r\r\nb", expected: "a  b"))
@@ -51,6 +54,8 @@ private let multiLineCases: [TextCase] = {
     var cases = removalCases()
     for lineBreak in lineBreaks { cases.append(TextCase(name: "\(lineBreak.name) is a line feed", input: "a\(lineBreak.text)b", expected: "a\nb")) }
     cases.append(TextCase(name: "tab is a space", input: "a\tb", expected: "a b"))
+    cases.append(TextCase(name: "a vertical tab is a line feed", input: "foo\u{0B}bar", expected: "foo\nbar"))
+    cases.append(TextCase(name: "a form feed is a line feed", input: "foo\u{0C}bar", expected: "foo\nbar"))
     cases.append(TextCase(name: "two breaks are two line feeds", input: "a\r\n\r\nb", expected: "a\n\nb"))
     cases.append(TextCase(name: "LF CR is two breaks", input: "a\n\rb", expected: "a\n\nb"))
     cases.append(TextCase(name: "CR CR LF is two breaks", input: "a\r\r\nb", expected: "a\n\nb"))
