@@ -23,6 +23,16 @@ func aLabelLength(_ label: String) -> Int? { IDNA.aLabel(label)?.utf8.count }
 /// MALAYALAM LETTER DOT REPH, a letter that grapheme clusters join to the scalar after it.
 let prependLetter = "\u{0D4E}"
 
+/// `xn--` and the Punycode of an already mapped label.
+func wire(_ mapped: String) -> String { "xn--" + (Punycode.encode(mapped) ?? "") }
+
+/// `count` consecutive scalars from `first`.
+func scalars(from first: UInt32, count: Int) -> String {
+    var text = ""
+    for offset in 0..<count { if let scalar = Unicode.Scalar(first + UInt32(offset)) { text.unicodeScalars.append(scalar) } }
+    return text
+}
+
 let encodedLabels: [(String, String)] = {
     var cases: [(String, String)] = []
     cases.append(("bücher", "xn--bcher-kva"))
@@ -46,6 +56,17 @@ let encodedLabels: [(String, String)] = {
     cases.append(("\u{FB03}", "ffi"))
     cases.append(("\u{FB03}b\u{FF21}", "ffiba"))
     cases.append(("\u{03AA}\u{0300}", "xn--dtg"))                    // lowercasing decomposes it, and NFC puts it back together
+    cases.append(("co\u{0140}legi", "xn--collegi-xma"))              // the Catalan middle dot between two l
+    cases.append(("CO\u{013F}LEGI", "xn--collegi-xma"))
+    cases.append(("l\u{00B7}l", "xn--ll-0ea"))
+    cases.append(("\u{1FB3}", "xn--mxaq"))                           // alpha with iota subscript is alpha, iota
+    cases.append(("\u{03B1}\u{0345}", "xn--mxaq"))
+    cases.append(("\u{AB70}", "xn--58d"))                            // the small Cherokee letters fold to the capitals
+    cases.append(("\u{13F8}", "xn--gce"))
+    cases.append(("\u{1C80}", "xn--b1a"))                            // and so do the small Cyrillic variants
+    cases.append(("\u{1C88}", "xn--xw8a"))
+    cases.append(("a\u{3164}b", "ab"))                               // default-ignorable code points are dropped
+    cases.append(("\u{845B}\u{E0100}", "xn--pt1a"))
     return cases
 }()
 
@@ -61,6 +82,13 @@ let mappedLabelCases: [(String, String, Bool)] = {
     cases.append((repeated(ligature, 21), repeated("ffi", 21), true))
     cases.append((repeated(ligature, 22), repeated("ffi", 22), false))
     cases.append((repeated(longS, 63), repeated("s", 63), true))
+    cases.append((repeated(ligature, 21) + fullwidthA, repeated("ffi", 21) + "a", false))   // 22 characters, 64 bytes mapped
+    cases.append((repeated("\u{845B}\u{E0100}", 25), wire(repeated("\u{845B}", 25)), true))   // ideographic variation selectors are ignored
+    cases.append((repeated("\u{1FB3}", 57), wire(repeated("\u{03B1}\u{03B9}", 57)), false))   // each maps to two letters
+    cases.append((repeated("\u{03B1}\u{0345}", 31) + "\u{03B1}", wire(repeated("\u{03B1}\u{03B9}", 31) + "\u{03B1}"), false))
+    cases.append((scalars(from: 0x13A0, count: 41), wire(scalars(from: 0x13A0, count: 41)), true))   // 63 bytes
+    cases.append((scalars(from: 0xAB70, count: 41), wire(scalars(from: 0x13A0, count: 41)), true))   // small letters fold to them
+    cases.append((scalars(from: 0x13A0, count: 42), wire(scalars(from: 0x13A0, count: 42)), false))
     return cases
 }()
 
@@ -75,6 +103,14 @@ let notLabels: [String] = {
     labels.append("a\u{2488}b")
     labels.append("\u{FF9E}a")          // HALFWIDTH KATAKANA VOICED SOUND MARK maps to a combining mark
     labels.append("a\u{2474}")          // PARENTHESIZED DIGIT ONE maps to "(1)"
+    labels.append("a\u{0140}b")         // LATIN SMALL LETTER L WITH MIDDLE DOT maps to "l" and a middle dot: not between two l
+    labels.append("\u{0140}")
+    labels.append("l\u{00B7}")
+    labels.append("\u{00B7}l")
+    labels.append("a\u{00B7}l")
+    labels.append("\u{3164}")           // default-ignorable code points are dropped, which leaves nothing
+    labels.append("\u{FFA0}")
+    labels.append("\u{FE0F}")
     return labels
 }()
 
@@ -85,6 +121,7 @@ let unmappableAddresses: [String] = {
     addresses.append("ada@a\u{2488}b.example.com")
     addresses.append("ada@\u{FF9E}a.example.com")
     addresses.append("ada@a\u{2474}.example.com")
+    addresses.append("ada@a\u{0140}b.example.com")
     return addresses
 }()
 
@@ -137,6 +174,9 @@ let internationalAddresses: [String] = {
     addresses.append("josé@BÜCHER.example")
     addresses.append("ada@" + spacedLabel(letters: 10) + ".example")
     addresses.append("ada@\u{20000}\u{20001}.example")
+    addresses.append("ada@co\u{0140}legi.cat")
+    addresses.append("ada@CO\u{013F}LEGI.cat")
+    addresses.append("ada@" + String(repeating: "\u{845B}\u{E0100}", count: 25) + ".jp")
     return addresses
 }()
 
@@ -146,6 +186,20 @@ let typedAddresses: [String] = {
     addresses.append("ada@bu\u{0308}cher.example")
     addresses.append("ADA@例え.テスト")
     addresses.append("ada@\u{212A}elvin.example")
+    addresses.append("ada@co\u{0140}legi.cat")
+    addresses.append("x\u{FE0F}@example.com")
+    return addresses
+}()
+
+/// Addresses with an invisible filler or another default-ignorable code point that is not a variation selector.
+let hiddenAddresses: [String] = {
+    var addresses: [String] = []
+    addresses.append("\u{3164}ada@example.com")
+    addresses.append("ada\u{FFA0}@example.com")
+    addresses.append("a\u{034F}da@example.com")
+    addresses.append("ada@exa\u{3164}mple.com")
+    addresses.append("ada@\u{3164}.example.com")
+    addresses.append("ada@a\u{FFA0}.example.com")
     return addresses
 }()
 
@@ -203,6 +257,16 @@ struct EmailDomainLengthTests {
         #expect(IDNA.aLabel(label) == aLabel && (aLabel.utf8.count <= 63) == accepted)   // the premise
         for raw in addresses(with: label) { #expect((EmailAddress(raw) != nil) == accepted) }
     }
+
+    @Test("a label that fits 63 characters as written is refused when its mapping passes 63 bytes")
+    func mappedBytesBeyondCharacters() {
+        let label = String(repeating: "\u{FB03}", count: 21) + "\u{FF41}"
+        #expect(label.unicodeScalars.count == 22 && aLabelLength(label) == 64)
+        for raw in addresses(with: label) { #expect(EmailAddress(raw) == nil) }
+    }
+
+    @Test("an invisible filler is refused anywhere in an address; variation selectors are not fillers", arguments: hiddenAddresses)
+    func hidden(raw: String) { #expect(EmailAddress(raw) == nil) }
 
     @Test("an address whose label is not a label once mapped is refused", arguments: unmappableAddresses)
     func unmappableLabel(raw: String) { #expect(EmailAddress(raw) == nil) }
