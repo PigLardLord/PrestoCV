@@ -42,18 +42,26 @@ public enum DesignPackageViolation: Equatable, Sendable, CustomStringConvertible
         switch self {
         case .tooLarge(let n): "package too large: \(n) bytes"
         case .malformed(let r): "malformed package: \(r)"
-        case .unknownKeys(let k): "unknown keys: \(k)"
+        case .unknownKeys(let keys): "unknown keys (\(keys.count)): " + keys.prefix(16).map(Self.excerpt).joined(separator: ", ") + (keys.count > 16 ? ", …" : "")
         case .containsHTML: "package ships HTML"
-        case .invalidID(let id): "invalid id \(id)"
+        case .invalidID(let id): "invalid id \(Self.excerpt(id))"
         case .invalidName: "invalid name"
-        case .invalidVersion(let v): "invalid version \(v)"
+        case .invalidVersion(let v): "invalid version \(Self.excerpt(v))"
         case .invalidDescription: "invalid description"
-        case .unknownPalette(let id): "unknown palette \(id)"
-        case .unknownFontScheme(let id): "unknown font scheme \(id)"
+        case .unknownPalette(let id): "unknown palette \(Self.excerpt(id))"
+        case .unknownFontScheme(let id): "unknown font scheme \(Self.excerpt(id))"
         case .unsupportedContract(let v): "unsupported markup contract \(v)"
         case .css(let reason): "stylesheet rejected: \(reason)"
         case .invalidPreview(let r): "invalid preview: \(r)"
         }
+    }
+
+    /// At most 64 Unicode scalars of the text a package supplied, quoted and escaped to ASCII (`\n`, `\u{202E}`), and `…`
+    /// when cut: a description must not carry a whole package, or raw control and bidirectional characters, into a log
+    /// or a screen. The associated values keep the full text.
+    private static func excerpt(_ text: String) -> String {
+        let quoted = "\"" + text.unicodeScalars.prefix(64).map { $0.escaped(asASCII: true) }.joined() + "\""
+        return text.unicodeScalars.dropFirst(64).isEmpty ? quoted : quoted + "…"
     }
 }
 

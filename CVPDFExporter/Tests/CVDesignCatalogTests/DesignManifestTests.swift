@@ -76,11 +76,63 @@ struct DesignManifestTests {
         #expect(violations(of: data) == [.invalidID("Bad"), .invalidVersion("1"), .unknownPalette("x"), .unknownFontScheme("y")])
     }
 
-    @Test("the violations name what was wrong")
+    @Test("the violations name what was wrong, quoted")
     func descriptions() {
-        #expect(DesignPackageViolation.unknownPalette("minimal").description == "unknown palette minimal")
-        #expect(DesignPackageViolation.unknownFontScheme("comic").description == "unknown font scheme comic")
-        #expect(DesignPackageViolation.invalidVersion("1.0").description == "invalid version 1.0")
+        #expect(DesignPackageViolation.unknownPalette("minimal").description == #"unknown palette "minimal""#)
+        #expect(DesignPackageViolation.unknownFontScheme("comic").description == #"unknown font scheme "comic""#)
+        #expect(DesignPackageViolation.invalidVersion("1.0").description == #"invalid version "1.0""#)
+        #expect(DesignPackageViolation.invalidID("Bad").description == #"invalid id "Bad""#)
+        #expect(DesignPackageViolation.unknownKeys(["scripts"]).description == #"unknown keys (1): "scripts""#)
+    }
+
+    // MARK: Violations do not echo a package at length
+
+    private static func hostile(_ violation: (String) -> DesignPackageViolation) -> [String] {
+        let long = String(repeating: "a", count: 100_000)
+        let escapes = "a\nb\u{1B}[31mc\u{202E}d\r\u{0}e" + String(repeating: "x", count: 100_000)
+        let marks = "e" + String(repeating: "\u{301}", count: 100_000)
+        return [long, escapes, marks].map { violation($0).description }
+    }
+
+    @Test("a violation prints an excerpt of the text it names: short, escaped, and marked when cut")
+    func excerpts() {
+        let violations: [(String) -> DesignPackageViolation] = [
+            { .invalidID($0) }, { .invalidVersion($0) }, { .unknownPalette($0) }, { .unknownFontScheme($0) }, { .unknownKeys([$0]) },
+        ]
+        for violation in violations {
+            for text in Self.hostile(violation) {
+                #expect(text.count < 800)
+                #expect(text.contains("…"))
+                #expect(!text.contains("\n") && !text.contains("\r"))
+                #expect(text.unicodeScalars.allSatisfy { $0.properties.generalCategory != .control && $0 != "\u{202E}" })
+            }
+        }
+    }
+
+    @Test("an excerpt keeps the first 64 scalars, escaped, and is not marked when nothing was cut")
+    func excerptShape() {
+        let exact = String(repeating: "a", count: 64)
+        #expect(DesignPackageViolation.invalidID(exact).description == "invalid id \"\(exact)\"")
+        #expect(DesignPackageViolation.invalidID(exact + "b").description == "invalid id \"\(exact)\"…")
+        #expect(DesignPackageViolation.invalidID("a\nb\u{1B}c\u{202E}d").description == #"invalid id "a\nb\u{1B}c\u{202E}d""#)
+    }
+
+    @Test("a long list of unknown keys shows the first 16 and the count")
+    func unknownKeys() {
+        let keys = (1...20).map { "key\($0)" }
+        let text = DesignPackageViolation.unknownKeys(keys).description
+        #expect(text.hasPrefix("unknown keys (20): "))
+        #expect(text.contains("\"key16\"") && !text.contains("\"key17\""))
+        #expect(text.hasSuffix("…"))
+        let few = DesignPackageViolation.unknownKeys(["a", "b"]).description
+        #expect(few == #"unknown keys (2): "a", "b""#)
+    }
+
+    @Test("the violations keep the full text, so that tests and callers can compare it")
+    func fullText() {
+        let long = String(repeating: "a", count: 1_000)
+        #expect(violations(of: designData(".cv{}", manifestExtra: ["defaultPalette": long])) == [.unknownPalette(long)])
+        #expect(DesignPackageViolation.unknownPalette(long) != .unknownPalette(long + "b"))
     }
 
     // MARK: Version
