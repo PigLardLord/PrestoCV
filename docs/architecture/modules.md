@@ -202,6 +202,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
     - each line is trimmed;
     - one leading bullet (`•`, `◦`, `▪`, `‣`, `·`, `-`, `*`, `–`, `—`, `●`, `○`, `■`, `➢`, `➤`, `✓` and U+F0B7) is removed when a space follows it or it ends the line, so `-5% churn` keeps its sign and `1.` is not a bullet;
     - a line empty after that is dropped, so a description of one paragraph is one statement.
+  - A snapshot travels as its statements and is never split again: references are indices, and the split is not idempotent (`- - x` gives `- x`, which gives `x`). `SourceExperience` takes statements, kept as they are, or a description, which it splits once.
   - A `Statement` is always one line. One built from text (a line a model wrote) is trimmed and bounded, and refused when it is empty or holds a line break.
 - **Typed references.** `ExperienceRef` and `StatementRef` read "experience n, line m", counted from 0.
   - Only a `SourceCV` makes them, through `experienceRef(at:)` and `statementRef(experience:line:)`. A position the snapshot does not have is `referenceOutOfRange`.

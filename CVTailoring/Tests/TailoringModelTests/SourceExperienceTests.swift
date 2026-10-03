@@ -71,4 +71,56 @@ struct SourceExperienceTests {
         let description = lines(200).replacingOccurrences(of: "\n", with: "\n\n- \n")
         #expect(try SourceExperience(role: "r", company: "c", description: description).statements.count == 200)
     }
+
+    // MARK: Built from statements
+
+    @Test("an experience built from statements keeps them as they are")
+    func fromStatements() throws {
+        let statements = Statement.split("- Built the API\n- Cut costs")
+        let experience = try SourceExperience(role: "Engineer", company: "Acme", location: "Turin", statements: statements)
+        #expect(experience.statements == statements)
+        #expect(experience.role == "Engineer" && experience.company == "Acme" && experience.location == "Turin")
+        #expect(experience.period == nil)
+    }
+
+    @Test("an experience built from a description is the one built from the statements of its split")
+    func descriptionIsItsSplit() throws {
+        let description = "\u{2022} Built the API\n\n- Cut costs by 30%\nTrained two juniors"
+        #expect(try SourceExperience(role: "r", company: "c", description: description)
+                == SourceExperience(role: "r", company: "c", statements: Statement.split(description)))
+    }
+
+    @Test("statements are never split again, because a reference is an index and the split is not idempotent")
+    func neverSplitAgain() throws {
+        #expect(Statement.split("- - x").map(\.text) == ["- x"])
+        #expect(Statement.split("- x").map(\.text) == ["x"])
+        let once = try Statement(text: "- x")
+        let experience = try SourceExperience(role: "r", company: "c", statements: [once, once])
+        #expect(experience.statements.map(\.text) == ["- x", "- x"])
+    }
+
+    static let statementFields: [TextFieldCase] = {
+        var cases: [TextFieldCase] = []
+        cases.append(TextFieldCase(.role) { _ = try SourceExperience(role: $0, company: "x", statements: []) })
+        cases.append(TextFieldCase(.company) { _ = try SourceExperience(role: "x", company: $0, statements: []) })
+        cases.append(TextFieldCase(.location) { _ = try SourceExperience(role: "x", company: "x", location: $0, statements: []) })
+        cases.append(TextFieldCase(.statement) { _ = try SourceExperience(role: "x", company: "x", statements: Statement.split($0)) })
+        cases.append(TextFieldCase(.statement) { _ = try SourceExperience(role: "x", company: "x", statements: Statement.split("first\n" + $0)) })
+        return cases
+    }()
+
+    @Test("each field, and each statement, of an experience built from statements accepts 10,000 bytes and refuses one more", arguments: statementFields)
+    func statementBounds(field: TextFieldCase) throws {
+        try field.build(ascii(10_000))
+        #expect(throws: TailoringModelError.tooLarge(field.field)) { try field.build(ascii(10_001)) }
+    }
+
+    @Test("an experience built from statements holds at most 200")
+    func statementsCount() throws {
+        let one = try Statement(text: "line")
+        _ = try SourceExperience(role: "r", company: "c", statements: Array(repeating: one, count: 200))
+        #expect(throws: TailoringModelError.tooMany(.statements)) {
+            try SourceExperience(role: "r", company: "c", statements: Array(repeating: one, count: 201))
+        }
+    }
 }
