@@ -67,12 +67,12 @@ enum Bounds {
 }
 
 extension TailoringModelError.Field {
-    /// Whether a text of this field may hold line breaks and tabs (`TextRules`): a description, the summary and the
-    /// advert. A statement is a line of a description: a tab is allowed in it, and its breaks are refused by
-    /// `Statement` itself as `notOneLine`.
+    /// Whether a text of this field may hold line breaks and tabs (`TextRules`): a description, the summary, the advert
+    /// and the letter note. A statement is a line of a description: a tab is allowed in it, and its breaks are refused
+    /// by `Statement` itself as `notOneLine`.
     var isMultiLine: Bool {
         switch self {
-        case .description, .summary, .advert, .statement: true
+        case .description, .summary, .advert, .note, .statement: true
         default: false
         }
     }

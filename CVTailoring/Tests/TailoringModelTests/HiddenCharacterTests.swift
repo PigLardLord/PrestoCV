@@ -38,9 +38,9 @@ enum HiddenSamples {
         return values
     }()
 
-    /// The fields whose text may hold line breaks and tabs. A statement is a line of a multi-line text: its line
-    /// breaks are refused by `notOneLine`, and a tab is allowed.
-    static let multiLine: Set<TailoringModelError.Field> = [.description, .summary, .advert, .statement]
+    /// The fields whose text may hold line breaks and tabs: a description, the summary, the advert and the letter note.
+    /// A statement is a line of a multi-line text: its line breaks are refused by `notOneLine`, and a tab is allowed.
+    static let multiLine: Set<TailoringModelError.Field> = [.description, .summary, .advert, .statement, .note]
 
     /// Every field, with the way to build the value that holds it, but for the statements of an experience.
     static let fields: [TextFieldCase] = {

@@ -15,7 +15,7 @@
 /// and emoji need them.
 ///
 /// Whether a field is multi-line is the model's to say: an experience's description, the descriptions of education and
-/// certifications, the summary and the advert are; every other text is one line. A statement is a line of a
+/// certifications, the summary, the advert and the letter note are; every other text is one line. A statement is a line of a
 /// description, so a tab is allowed in it, and its line breaks are refused as `notOneLine`.
 public enum TextRules {
     /// Whether `text` holds a hidden character. A multi-line text may hold `\n`, `\r` and tab; a single-line one none.

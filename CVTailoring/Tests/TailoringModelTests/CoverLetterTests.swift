@@ -121,6 +121,18 @@ struct CoverLetterTests {
         #expect(none.salaryExpectation == nil && none.startDate == nil && none.note == nil)
     }
 
+    @Test("the note may run over several lines and hold a tab, as the user wrote it")
+    func noteIsMultiLine() throws {
+        let note = "Open to relocation.\n\tAvailable from March.\r\nThank you."
+        #expect(try LetterDefaults(note: note).note == note)
+    }
+
+    @Test("the salary expectation and the start date are one line each")
+    func otherDefaultsAreOneLine() {
+        #expect(throws: TailoringModelError.hiddenCharacter(.salaryExpectation)) { try LetterDefaults(salaryExpectation: "55k\n60k") }
+        #expect(throws: TailoringModelError.hiddenCharacter(.startDate)) { try LetterDefaults(startDate: "1 March\n1 April") }
+    }
+
     // MARK: Advert
 
     @Test("an advert is its text and its language, kept as written")
