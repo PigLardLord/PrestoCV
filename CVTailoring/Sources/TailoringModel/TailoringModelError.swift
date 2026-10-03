@@ -7,6 +7,8 @@ public enum TailoringModelError: Error, Hashable, Sendable {
     case emptyField(Field)
     /// A field longer than `TailoringLimits.maxTextBytes`, or an advert longer than `TailoringLimits.maxAdvertBytes` (R8).
     case tooLarge(Field)
+    /// A skill level outside 1 to 5.
+    case invalidSkillLevel
     /// A year outside 1900 to 2200, or a month outside 1 to 12.
     case invalidDate
     /// A period that ends before it starts.
@@ -14,6 +16,9 @@ public enum TailoringModelError: Error, Hashable, Sendable {
 
     /// The text fields of the model, by what they hold, not by which type holds them.
     public enum Field: Hashable, Sendable {
+        case fullName, professionalTitle, email, phone, location, website
+        case skillName, languageName, platform, link
+        case degree, school, certificationName, issuer, description
         case statement
     }
 }
