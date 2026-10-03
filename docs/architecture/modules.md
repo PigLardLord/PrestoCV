@@ -216,7 +216,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
   - `TailoringLanguage`: English, German, Spanish, French, Italian, Portuguese, read from a BCP 47 tag by its primary language subtag. Any other tag is `unsupportedLanguage`, never English.
   - `TailoringDate` (year 1900–2200, month 1–12 or none) and `TailoringPeriod`, whose end is a date, "current" or unknown and is never before its start; months are compared only when both are known.
   - `LanguageLevel` (CEFR + native), and a skill level from 1 to 5.
-  - The e-mail address, the phone number and the links are plain strings that the app's mapper has already validated; this model only bounds them.
+  - The e-mail address, the phone number and the links are plain strings that the app's mapper has already validated; this model only bounds them. An optional text (these, a certification's link, the letter defaults) is nil when it is absent, so a present one that is blank is `emptyField`.
 - **Bounds (R8)**, in `TailoringLimits`, checked by every initialiser that builds a snapshot value and measured in UTF-8 bytes. An input that is split or parsed, a description or a language tag, is bounded first, before the work begins:
 
 | Limit | Value |

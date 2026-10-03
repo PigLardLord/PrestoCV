@@ -5,8 +5,9 @@ enum Bounds {
         guard value.utf8.count <= maxBytes else { throw .tooLarge(field) }
     }
 
+    /// An optional text is nil when it is absent, so a present one must say something.
     static func optionalText(_ value: String?, _ field: TailoringModelError.Field) throws(TailoringModelError) {
-        if let value { try text(value, field) }
+        if let value { try requiredText(value, field) }
     }
 
     /// Text that must say something: its size is checked first, and then that it holds a character that shows. The
