@@ -46,7 +46,8 @@ The server is an integration and composition package beside the app, in two role
 
 - The four domain packages **never import each other**. Each publishes its own model: `CV` in Authoring, `CVDocument` in Rendering, `CVDraft` in Drafting, `SourceCV` and `TailoredCV` in Tailoring.
 - Inside `CVPDFExporter`, Document Rendering is downstream of Design Catalog: it consumes validated stylesheets and palettes. That is the only edge between contexts inside a package, and it goes one way ([R1](rules.md#r1-packages-are-isolated-contexts-depend-only-along-documented-edges)).
-- All translation between contexts happens in one place per executable: `PrestoCVIntegration` in the app, and `ServerHTTP` in the server. Each mapper is exhaustive and tested ([ADR 0007](adr/0007-each-package-owns-its-model.md), [ADR 0014](adr/0014-server-modular-monolith.md)).
+- All translation between contexts happens in one place: the app's integration layer (`PrestoCVIntegration`). Each mapper is exhaustive and tested ([ADR 0007](adr/0007-each-package-owns-its-model.md)).
+- On the server, `ServerHTTP` maps the API's generated types to the tailoring model and back. That is not a translation between contexts, and the generated types never leave it ([ADR 0014](adr/0014-server-modular-monolith.md)).
 - The server sits beside the app. It conforms to CV Tailoring's published model and to no other context's.
 - `CVPDFExporter` is reusable outside the app, including on a Linux backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)).
 

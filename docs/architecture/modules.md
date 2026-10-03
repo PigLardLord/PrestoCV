@@ -329,13 +329,13 @@ The targets are created by #158 part 2 and the tickets named below. Until then t
 
 **Environments.** `local` uses the local profile. `staging` and `production` use the hosted profile, each with its own configuration, database and queue. Staging accepts App Attest's development environment and production only the production one. How a change reaches each belongs to the infrastructure layer of #133.
 
-**Translation.** On the server, only `ServerHTTP` translates between the API's types and the tailoring model, as only `PrestoCVIntegration` does in the app ([ADR 0007](adr/0007-each-package-owns-its-model.md)).
+**Translation.** On the server, the API's generated types are translated to and from the tailoring model only in `ServerHTTP`, and never leave it. A translation between two context packages on the server lives in a server target that this file names, or needs an ADR (R1).
 
 **Dependencies.**
 - External packages are imported only by adapters and by the executable, never by `ServerApplication`. Each is pinned in the committed `Package.resolved`. A new one changes this file in the same pull request, and the checker's `--packages` rule holds it.
 - The tickets that add logging and metrics (#167, #178) extend the adapters' allow-lists with `Logging` and `Metrics` in this file.
-- The package depends on `CVTailoring`, and on `PrestoCVAPI` once #177 exists. It never depends on `PrestoCVApp`, `PrestoCVCore` or `CVGeneratorAI`.
-- It may depend on `CVPDFExporter`, which is reusable on a backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)). The ticket that needs that edge adds it to this file, for example #94.
+- The package depends on `CVTailoring`, and on `PrestoCVAPI` once #177 exists. It never depends on `PrestoCVApp` or `PrestoCVCore`.
+- It may depend on the Linux targets of `CVPDFExporter` and of `CVGeneratorAI` (`CVDrafting`), which are reusable on a backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)). The ticket that needs such an edge adds it to this file, for example #94 or #196.
 - The targets for authentication, logs and notifications are set by their tickets' decisions (#167, #168, #180) and added to this file then.
 
 **Test support.** None yet. The contract suites of the ports (#157) live in a test-support target that #157 adds to this file.
@@ -378,5 +378,5 @@ Forbidden: any edge between PrestoCVCore, CVPDFExporter, CVGeneratorAI and CVTai
 Forbidden: any edge from a domain, application or port target to an adapter target.
 Forbidden: PrestoCVPresentation → PrestoCVIntegration.
 Forbidden: any edge from ServerApplication to an external package.
-Forbidden: any edge from the server's package to PrestoCVApp, PrestoCVCore or CVGeneratorAI.
+Forbidden: any edge from the server's package to PrestoCVApp or PrestoCVCore.
 ```
