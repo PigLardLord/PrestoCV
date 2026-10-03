@@ -20,6 +20,7 @@ The files are resources of the `TailoringModel` target, read through `Bundle.mod
 - A file names its own language in `language`. The decoder refuses a file whose language is not the one the index lists it for.
 - Every file is JSON and at most 1,048,576 bytes (1 MiB). The size is checked before the bytes are decoded.
 - The format is closed. A key that is not in the tables below is refused wherever it is: at the top of a file, in a group, in a list and in an entry.
+- The decoder is the JSON decoder of Foundation, so a key that appears twice in one object is read as its last value, and the format does not detect it. This is a known limit.
 
 ### Languages
 
@@ -51,7 +52,7 @@ The supported languages are the ones the index names, each with its file. An ind
 - The forms of address: `ms`, `mr`. The neutral form has no word of its own.
 - `spans.tiedCounts` holds templates: literal words around `{count}` and `{employer}`, each exactly once, no other brace, and a word between them. A language puts the count before or after the employer as it writes it.
 - A source, a licence and every entry is one line of text that shows something. It holds no hidden character: the model's `TextRules` refuse control characters, bidirectional marks, embeddings and overrides, and tag characters. It has no blank at either end by the model's one rule of trimming. And it is not empty once folded: an entry that folds to nothing, such as a lone combining mark, is corrupt.
-- Entries are kept as written. A match folds both sides with `TextFold.fold`, the one normalisation in `TailoringModel`: case, accents and ligatures are dropped, `ß` is `ss`, and runs of white space are one space.
+- Entries are kept as written, and how a match reads them is the check's. cv-giovanni folds both sides with `TextFold.fold`, the one normalisation in `TailoringModel` (case, accents and ligatures are dropped, `ß` is `ss`, and runs of white space are one space), for the stopwords, the plain words, the dimensions, the boilerplate, the headings, the names, the synonyms and the months. It lower-cases the gender markers and does not fold them, since folding strips the "ä" of "männlich" that a line still carries. It reads the instructions, the legal forms and the number words case-insensitively as written, and it capitalises each street word before it matches it. The Swift matching of each list is for the check that reads it to decide (#138 for the advert lists), and this page does not fix it.
 
 ### Ranks
 
@@ -60,6 +61,8 @@ A word of a title claims the ranks it may mean, and a tailored title may claim n
 ### Keys
 
 Every file holds every key below. A file that lacks one is refused as incomplete, with the key named.
+
+cv-giovanni has three kinds of headings, which it calls required, offer and neutral, and this format calls `requirementHeadings`, `offerHeadings` and `structuralHeadings`: not the four kinds (requirements, nice to have, company, benefits) that the issue of #136 names. The format follows the source.
 
 | Key | Holds | Used by |
 |---|---|---|
