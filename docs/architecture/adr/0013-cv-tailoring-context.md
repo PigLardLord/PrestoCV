@@ -25,7 +25,7 @@
   - A failure goes back to the model at most twice. After that the tailoring fails, with every failure listed.
   - Whatever the advert asks for that the CV does not evidence becomes a question for the user, never a line of the CV.
   - The gate's failures are values with codes. The app words them for the user (R13); the prompt in `Tailoring` words them for the model, from the same codes.
-- **The unit of provenance is a line of an experience's description,** called a statement. Each rewritten line names the lines of the same experience it comes from. PrestoCV's CV model does not change.
+- **The unit of provenance is a line of an experience's description,** called a statement. Each rewritten line names the lines of the same experience it comes from; the user's answers in scope are sources too (#153). PrestoCV's CV model does not change.
 - **Any profession.** The checks stay general. Word lists that know a field's names, starting with technologies, are a floor that grows. The check never depends on them.
 - **Six languages in the first version:** English, German, Spanish, French, Italian and Portuguese, each one as data, one file per language. The supported languages are exactly the ones that have a file, so adding a language adds a file. Any other language is a typed error, never a weaker check that reads as a pass. The files are resources of `TailoringModel`, one JSON file per language plus an index, read through `Bundle.module` as the rendering's heading tables are (R2, R13). A server image ships the package's resource bundle beside its binary, as it already must for those headings (#136, #162).
 - **No translation in the first version.** A CV is tailored in its own language (#147).
