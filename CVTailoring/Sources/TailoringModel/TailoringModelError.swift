@@ -27,6 +27,7 @@ public enum TailoringModelError: Error, Hashable, Sendable {
         case summary, interest
         case contactName, title, surname, addressLine, reference, position, subject, opening, paragraph, closing, attachment
         case salaryExpectation, startDate, note, advert
+        case argument, reportItem, term, request
     }
 
     /// The lists of the model, by what they hold, not by which type holds them.
@@ -34,5 +35,6 @@ public enum TailoringModelError: Error, Hashable, Sendable {
         case experiences, education, skills, languages, certifications, profiles, interests
         case statements, lines, sources
         case addressLines, paragraphs, attachments
+        case cut, moved, reworded
     }
 }
