@@ -19,6 +19,8 @@ struct LanguageWordListsTests {
         #expect(lists.advert.streets.list.entries == ["alpha", "beta"])
         #expect(lists.dates.months.entries.count == 12)
         #expect(lists.dates.months.entries.first == MonthName(name: "month1", month: 1))
+        #expect(lists.dates.presentWords.entries == ["alpha", "beta"] && lists.dates.durationUnitWords.entries == ["alpha", "beta"])
+        #expect(lists.dates.sinceWords.entries == ["alpha", "beta"] && lists.dates.rangeSeparatorWords.entries == ["alpha", "beta"])
         #expect(lists.numbers.words.entries == [NumberWord(word: "two", value: 2), NumberWord(word: "three", value: 3)])
         #expect(lists.spans.countWords.entries == [NumberWord(word: "two", value: 2), NumberWord(word: "three", value: 3)])
         #expect(lists.spans.tiedCounts.entries == ["{count} of them at {employer}"])

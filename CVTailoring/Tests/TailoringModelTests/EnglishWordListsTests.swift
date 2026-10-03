@@ -64,6 +64,10 @@ struct EnglishWordListsTests {
         rows[.advertOfferHeadings] = row(lists.advert.offerHeadings)
         rows[.advertStructuralHeadings] = row(lists.advert.structuralHeadings)
         rows[.datesMonths] = row(lists.dates.months)
+        rows[.datesPresentWords] = row(lists.dates.presentWords)
+        rows[.datesSinceWords] = row(lists.dates.sinceWords)
+        rows[.datesRangeSeparatorWords] = row(lists.dates.rangeSeparatorWords)
+        rows[.datesDurationUnitWords] = row(lists.dates.durationUnitWords)
         rows[.numbersWords] = row(lists.numbers.words)
         rows[.spansFloorLeadIns] = row(lists.spans.floorLeadIns)
         rows[.spansYearWords] = row(lists.spans.yearWords)
@@ -118,6 +122,10 @@ struct EnglishWordListsTests {
         counts[.advertOfferHeadings] = 8  // ADVERT.offerHeadings.en
         counts[.advertStructuralHeadings] = 12  // ADVERT.structuralHeadings.en
         counts[.datesMonths] = 24  // domain/DateRange.js MONTHS.en: 12 names and 12 abbreviations
+        counts[.datesPresentWords] = 4  // PRESENT: present, now, current, ongoing; the other seven words are German and Italian
+        counts[.datesSinceWords] = 1  // SINCE: since; seit, dal and da are German and Italian
+        counts[.datesRangeSeparatorWords] = 1  // SEPARATOR: to; bis and al are German and Italian
+        counts[.datesDurationUnitWords] = 8  // DateRange.parse, the unit after a length: years?, yrs?, months?, mos?, expanded
         counts[.numbersWords] = 30  // core/ProvenanceCheck.js NUMBERS: two to nine, ten to nineteen, the tens, dozen, hundred, thousand, million
         counts[.spansFloorLeadIns] = 3  // domain/StatedSpans.js FLOOR: over, more than, at least
         counts[.spansYearWords] = 2  // UNIT: year, years
@@ -179,6 +187,15 @@ struct EnglishWordListsTests {
         #expect(month("january") == 1 && month("jan") == 1 && month("may") == 5 && month("sept") == 9 && month("sep") == 9)
         #expect(month("december") == 12 && month("dec") == 12 && month("mai") == nil && month("marz") == nil)
         #expect(Set(months.map(\.month)) == Set(1...12))
+    }
+
+    @Test("the words of a period written in text are cv-giovanni's")
+    func periodWords() throws {
+        let dates = try english().dates
+        #expect(dates.presentWords.entries == ["present", "now", "current", "ongoing"])
+        #expect(dates.sinceWords.entries == ["since"])
+        #expect(dates.rangeSeparatorWords.entries == ["to"])
+        #expect(dates.durationUnitWords.entries == ["year", "years", "yr", "yrs", "month", "months", "mo", "mos"])
     }
 
     @Test("the number words carry their values, and one is not among them")

@@ -65,6 +65,10 @@ Every file holds every key below. A file that lacks one is refused as incomplete
 | `advert.offerHeadings` | Headings under which an advert talks about itself: what it offers and who it is ("we offer", "about us") | `AdvertAnalysis` ranks the terms below one lower |
 | `advert.structuralHeadings` | Headings that organise an advert without demanding or offering anything ("tech stack", "location") | `AdvertAnalysis` reads their own words as structure, so "tech stack" is no technology |
 | `dates.months` | The names and abbreviations of the twelve months, each with its month; every month has a name at least | `ContentChecks` and `Provenance` read a date written with a month's name as the date of the numbers |
+| `dates.presentWords` | How a period says it has not ended ("present", "ongoing") | `ContentChecks` reads a period written in text: a role still running cannot bear a count tied to it, since the calendar overtakes it |
+| `dates.sinceWords` | What a period says before its start when it began and has not ended ("since") | `ContentChecks` reads it as a period that runs to the present |
+| `dates.rangeSeparatorWords` | The words between the two dates of a period ("to"); the dashes and the tilde are a shape | `ContentChecks` splits a period into its two dates |
+| `dates.durationUnitWords` | The units of the length a period carries after its dates ("3 years", "8 mos"), every form written out | `ContentChecks` takes the length off a period, since what a reader compares is the dates |
 | `numbers.words` | Numbers written in words, with their value: "two" to "nineteen", the tens, "dozen", "hundred", "thousand", "million". "One" is left out: it is a pronoun as often as a number | `Provenance` reads a figure in words as a figure and holds it to the source; a tens word, a hyphen and a word of 2 to 9 are one figure |
 | `spans.floorLeadIns` | What opens a floor before its count ("over", "more than"); "11+ years" is a shape and needs no entry | `ContentChecks` lets a floor pass, since it only grows truer |
 | `spans.yearWords` | The words for a year, singular and plural | `ContentChecks` reads the unit of a count of time |
@@ -83,7 +87,7 @@ Every file holds every key below. A file that lacks one is refused as incomplete
 
 ### What stays in code
 
-A shape is the same in every language, so it is not a list: the letters of a gender marker joined by slashes ("m/w/d"), a house number, a postcode, an American state and its ZIP code, the floor written "11+ years", a figure in numerals, and a tens word joined to a unit by a hyphen. The checks that read them are in the targets that use them.
+A shape is the same in every language, so it is not a list: the letters of a gender marker joined by slashes ("m/w/d"), a house number, a postcode, an American state and its ZIP code, the dashes and the tilde between two dates, the floor written "11+ years", a figure in numerals, and a tens word joined to a unit by a hyphen. The checks that read them are in the targets that use them.
 
 ### Source and licence
 

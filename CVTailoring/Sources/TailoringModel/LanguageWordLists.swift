@@ -67,9 +67,17 @@ public struct AdvertWords: Hashable, Sendable {
     public let structuralHeadings: WordList<String>
 }
 
-/// The month names of a language.
+/// The month names of a language, and the words of a period written in text.
 public struct DateWords: Hashable, Sendable {
     public let months: WordList<MonthName>
+    /// How a period says it has not ended: "present", "ongoing".
+    public let presentWords: WordList<String>
+    /// How a period says it began and has not ended, before its start: "since".
+    public let sinceWords: WordList<String>
+    /// The words that stand between the two dates of a period: "to".
+    public let rangeSeparatorWords: WordList<String>
+    /// The units of the length a period may carry after its dates: "years", "mos".
+    public let durationUnitWords: WordList<String>
 }
 
 /// The numbers a language writes in words.

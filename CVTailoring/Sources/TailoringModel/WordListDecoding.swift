@@ -16,7 +16,7 @@ extension LanguageWordLists {
         self.init(
             language: language,
             advert: try reading.advert(file.advert),
-            dates: DateWords(months: try reading.months(file.dates.months, .datesMonths)),
+            dates: try reading.dates(file.dates),
             numbers: NumberWords(words: try reading.numbers(file.numbers.words, .numbersWords)),
             spans: try reading.spans(file.spans),
             letter: try reading.letter(file.letter),
@@ -164,6 +164,19 @@ private struct RawAdvert {
     }
 }
 
+private struct RawDates {
+    let months: RawList<RawMonth>
+    let presentWords, sinceWords, rangeSeparatorWords, durationUnitWords: RawList<String>
+
+    init(_ group: RawGroup) throws {
+        months = try group.list(.datesMonths)
+        presentWords = try group.list(.datesPresentWords)
+        sinceWords = try group.list(.datesSinceWords)
+        rangeSeparatorWords = try group.list(.datesRangeSeparatorWords)
+        durationUnitWords = try group.list(.datesDurationUnitWords)
+    }
+}
+
 private struct RawSpans {
     let floorLeadIns, yearWords, monthWords, tiedCounts: RawList<String>
     let countWords: RawList<RawNumber>
@@ -195,12 +208,11 @@ private struct RawLetter {
 
 /// The whole file as written.
 private struct WordListDocument: Decodable {
-    struct Dates { let months: RawList<RawMonth> }
     struct Numbers { let words: RawList<RawNumber> }
     struct Fields { let technologies: RawList<String> }
 
     let advert: RawAdvert
-    let dates: Dates
+    let dates: RawDates
     let numbers: Numbers
     let spans: RawSpans
     let letter: RawLetter
@@ -213,7 +225,7 @@ private struct WordListDocument: Decodable {
         }
         try root.allowOnly(WordListFormat.rootKeys)
         advert = try RawAdvert(RawGroup(root, startingWith: .advertStopwords))
-        dates = Dates(months: try RawGroup(root, startingWith: .datesMonths).list(.datesMonths))
+        dates = try RawDates(RawGroup(root, startingWith: .datesMonths))
         numbers = Numbers(words: try RawGroup(root, startingWith: .numbersWords).list(.numbersWords))
         spans = try RawSpans(RawGroup(root, startingWith: .spansFloorLeadIns))
         letter = try RawLetter(RawGroup(root, startingWith: .letterGreetings))
@@ -241,6 +253,16 @@ private struct WordListReading {
             requirementHeadings: try texts(raw.requirementHeadings, .advertRequirementHeadings),
             offerHeadings: try texts(raw.offerHeadings, .advertOfferHeadings),
             structuralHeadings: try texts(raw.structuralHeadings, .advertStructuralHeadings)
+        )
+    }
+
+    func dates(_ raw: RawDates) throws(TailoringModelError) -> DateWords {
+        DateWords(
+            months: try months(raw.months, .datesMonths),
+            presentWords: try texts(raw.presentWords, .datesPresentWords),
+            sinceWords: try texts(raw.sinceWords, .datesSinceWords),
+            rangeSeparatorWords: try texts(raw.rangeSeparatorWords, .datesRangeSeparatorWords),
+            durationUnitWords: try texts(raw.durationUnitWords, .datesDurationUnitWords)
         )
     }
 
