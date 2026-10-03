@@ -1,5 +1,6 @@
-/// Who the CV is about. The e-mail address, the phone number and the website are plain strings: the app's mapper hands
-/// over values its own domain has already validated, and this model only bounds them.
+/// Who the CV is about. The e-mail address, the phone number and the website are plain strings: each mapper hands over
+/// values its own side has already validated, and this model only bounds them. The app's mapper (`PrestoCVIntegration`)
+/// reads them from its domain types, and the server's reads them from its API types. An absent one is nil.
 public struct SourcePersonalDetails: Hashable, Sendable {
     public let fullName: String
     public let professionalTitle: String
