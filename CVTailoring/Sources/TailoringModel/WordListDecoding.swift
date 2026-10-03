@@ -252,7 +252,7 @@ private struct WordListReading {
             yearWords: try texts(raw.yearWords, .spansYearWords),
             monthWords: try texts(raw.monthWords, .spansMonthWords),
             countWords: try numbers(raw.countWords, .spansCountWords),
-            tiedCounts: try texts(raw.tiedCounts, .spansTiedCounts)
+            tiedCounts: try tiedCounts(raw.tiedCounts)
         )
     }
 
@@ -276,17 +276,34 @@ private struct WordListReading {
 
     func months(_ raw: RawList<RawMonth>, _ key: WordListKey) throws(TailoringModelError) -> WordList<MonthName> {
         try check(raw, key, words: raw.entries.map(\.name))
+        guard raw.entries.allSatisfy({ (1...12).contains($0.month) }) else { throw corrupt }
+        guard Set(raw.entries.map(\.month)).count == 12 else { throw .incompleteWordList(language, key) }
         return WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { MonthName(name: $0.name, month: $0.month) })
     }
 
     func numbers(_ raw: RawList<RawNumber>, _ key: WordListKey) throws(TailoringModelError) -> WordList<NumberWord> {
         try check(raw, key, words: raw.entries.map(\.word))
+        guard raw.entries.allSatisfy({ $0.value >= 0 }) else { throw corrupt }
         return WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { NumberWord(word: $0.word, value: $0.value) })
     }
 
     func synonyms(_ raw: RawList<RawSynonym>, _ key: WordListKey) throws(TailoringModelError) -> WordList<SynonymGroup> {
         try check(raw, key, words: raw.entries.flatMap(\.forms))
+        guard raw.entries.allSatisfy({ $0.forms.count >= 2 }) else { throw corrupt }
         return WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { SynonymGroup(forms: $0.forms) })
+    }
+
+    /// Each template holds `{count}` and `{employer}` once and no other brace, so a consumer can split it into its words.
+    func tiedCounts(_ raw: RawList<String>) throws(TailoringModelError) -> WordList<String> {
+        let list = try texts(raw, .spansTiedCounts)
+        for template in raw.entries {
+            func occurrences(of placeholder: String) -> Int { template.components(separatedBy: placeholder).count - 1 }
+            let literal = template.replacingOccurrences(of: "{count}", with: "").replacingOccurrences(of: "{employer}", with: "")
+            guard occurrences(of: "{count}") == 1, occurrences(of: "{employer}") == 1, !literal.contains("{"), !literal.contains("}") else {
+                throw corrupt
+            }
+        }
+        return list
     }
 
     func streets(_ raw: RawStreets) throws(TailoringModelError) -> StreetWords {

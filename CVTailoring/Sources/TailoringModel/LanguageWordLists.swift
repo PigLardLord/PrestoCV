@@ -26,7 +26,7 @@ public struct SynonymGroup: Hashable, Sendable {
 }
 
 /// Where a language writes the word of a street in an address.
-public enum StreetOrder: String, Hashable, Sendable {
+public enum StreetOrder: String, CaseIterable, Hashable, Sendable {
     /// Joined to the name, or after an adjective of the town: "Hauptstraße 1", "Frankfurter Str. 5".
     case joined
     /// After the name, with the number first: "221B Baker Street".

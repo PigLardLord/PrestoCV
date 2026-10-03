@@ -251,4 +251,111 @@ struct LanguageWordListsTests {
         let stopwords = try #require(try decode(WordListFixture.data()).advert.stopwords.entries.first)
         #expect(try decode(WordListFixture.data()).advert.plainWords.entries.contains(stopwords))
     }
+
+    // MARK: - Rules of one kind of list
+
+    private func months(_ edit: @escaping ([WordListFixture.Object]) -> [WordListFixture.Object]) throws -> Data {
+        try WordListFixture.data(editing: .datesMonths) { list in
+            list["entries"] = edit(list["entries"] as? [WordListFixture.Object] ?? [])
+        }
+    }
+
+    @Test("a month outside 1 to 12 is corrupt", arguments: [0, 13, -1, 100])
+    func monthOutOfRange(month: Int) throws {
+        let data = try months { entries in
+            var entries = entries
+            entries[0]["month"] = month
+            return entries
+        }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    @Test("a month that is not a whole number is corrupt")
+    func monthNotANumber() throws {
+        var values: [Any] = ["1"]
+        values.append(1.5)
+        values.append(NSNull())
+        for value in values {
+            let data = try months { entries in
+                var entries = entries
+                entries[0]["month"] = value
+                return entries
+            }
+            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        }
+    }
+
+    @Test("a language that names no month for each of the twelve is incomplete", arguments: Array(1...12))
+    func monthMissing(month: Int) throws {
+        let data = try months { $0.filter { ($0["month"] as? Int) != month } }
+        #expect(throws: TailoringModelError.incompleteWordList(.english, .datesMonths)) { try decode(data) }
+    }
+
+    @Test("a month may be named several times, by its name and by its abbreviation")
+    func monthNamedTwice() throws {
+        let data = try months { entries in
+            var entries = entries
+            entries.append(["name": "m1", "month": 1])
+            return entries
+        }
+        let lists = try decode(data)
+        #expect(lists.dates.months.entries.filter { $0.month == 1 }.map(\.name) == ["month1", "m1"])
+    }
+
+    @Test("a number word with a value below 0, or that is not a whole number, is corrupt", arguments: [WordListKey.numbersWords, .spansCountWords])
+    func numberValue(key: WordListKey) throws {
+        var values: [Any] = [-1]
+        values.append("2")
+        values.append(2.5)
+        values.append(NSNull())
+        for value in values {
+            let data = try WordListFixture.data(editing: key) { list in
+                var entries = list["entries"] as? [WordListFixture.Object] ?? []
+                entries[0]["value"] = value
+                list["entries"] = entries
+            }
+            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        }
+    }
+
+    @Test("a group of synonyms with fewer than two forms is corrupt", arguments: [[String](), ["ui"]])
+    func shortSynonymGroup(forms: [String]) throws {
+        let data = try WordListFixture.data(editing: .advertSynonyms) { $0["entries"] = [["forms": ["a", "b"]], ["forms": forms]] }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    @Test("a tied count holds {count} and {employer} once each, and no other braces", arguments: [
+        "of them at", "{count} of them at", "of them at {employer}", "{count} {count} at {employer}", "{count} at {employer} {employer}",
+        "{count} at {employer} {unit}", "{count at {employer}", "{count} at {employer}}", "{employer} of {count}{",
+    ])
+    func tiedCountPlaceholders(template: String) throws {
+        let data = try WordListFixture.data(editing: .spansTiedCounts) { $0["entries"] = [template] }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    @Test("a tied count may put the count before or after the employer, and say more", arguments: [
+        "{count} of them at {employer}", "davon {count} bei {employer}", "{employer}: {count}", "{count}{employer}",
+    ])
+    func tiedCountShapes(template: String) throws {
+        let data = try WordListFixture.data(editing: .spansTiedCounts) { $0["entries"] = [template] }
+        #expect(try decode(data).spans.tiedCounts.entries == [template])
+    }
+
+    @Test("the street order is joined, after or before, and a list of streets must say it", arguments: StreetOrder.allCases)
+    func streetOrder(order: StreetOrder) throws {
+        let data = try WordListFixture.data(editing: .advertStreets) { $0["order"] = order.rawValue }
+        #expect(try decode(data).advert.streets.order == order)
+    }
+
+    @Test("a street order that is unknown, empty or missing is corrupt", arguments: ["middle", "", "After", "joined "])
+    func streetOrderUnknown(order: String) throws {
+        let data = try WordListFixture.data(editing: .advertStreets) { $0["order"] = order }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    @Test("a list of streets without an order is corrupt")
+    func streetOrderMissing() throws {
+        let data = try WordListFixture.data(editing: .advertStreets) { $0["order"] = nil }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
 }
