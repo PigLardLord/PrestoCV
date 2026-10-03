@@ -39,15 +39,31 @@ Test targets and test-support targets are described below each package. The chec
   - `EmailAddress`, `PhoneNumber`, `WebLink`, `DocumentLanguage`, `DesignChoice`.
 - **`Period.make(start:end:current:)`** is the single rule that turns loose data into a period, or into a typed `PeriodError`.
 - Planned: projects (#54), photo (#53).
+- **Applications** (planned, #185, [ADR 0019](adr/0019-applications.md)): what a tailoring produces and the user keeps.
+  - **`Application`**, the aggregate:
+    - a typed identity (`ApplicationID`);
+    - `revision`, `createdAt` and `updatedAt`, settable only inside the package;
+    - its tailored `CV` as a value, which keeps its own `CVID` and is never listed among the user's CVs;
+    - its `CoverLetter`;
+    - the advert's company, role and text;
+    - its override of the letter defaults, when the user sets one;
+    - its provenance, as plain values that Authoring stores and does not interpret: the source CV as the snapshot the tailoring used, the report, the questions and their answers, the prompt version, the provider alias and the statement references. Never Tailoring's types (R1).
+  - **`CoverLetter`**: the letter the user keeps and edits, as value types that validate on creation. It stores no salutation and no valediction: the page writes them (#187).
+  - **`LetterDefaults`**: the person's salary expectation, start date and note. They belong to the person, not to a CV. One rule combines them with an application's override.
 
 **`PrestoCVApplication`**
 - **Ports:**
   - `CVRepository`: create, conditional update, load, list, conditional delete. Typed `RepositoryError`, not cancellable.
   - `CVStoreMaintenance`: restore from quarantine, erase every copy, purge quarantine.
   - `SampleCVSource`, `IDGenerator`, `TimeSource`. `TimeSource` is so named to avoid shadowing `Swift.Clock`.
+  - Planned (#185, [ADR 0019](adr/0019-applications.md)):
+    - `ApplicationRepository`: create, conditional update, load, list, conditional delete. Typed errors, not cancellable, like `CVRepository`. Listing returns the healthy applications, ordered by last change, plus the store's issues;
+    - `ApplicationStoreMaintenance`: restore from quarantine, erase every copy, purge quarantine;
+    - `LetterDefaultsStore`: load, save and erase the person's defaults. `PrestoCVIntegration` reads it and hands the defaults to the question builder (#153, #186).
 - **Use cases:**
   - `NewCV`, `SaveCV` (create or conditional update, errors translated to `AuthoringError`, including `tooLarge`), `LoadCV`;
   - list (by last change), rename, duplicate, delete, start from a sample, determine onboarding.
+  - Planned, for applications (#185): create from a tailoring result, list by last change, load, update its CV, update its letter, set or clear its override, delete; and load and save the letter defaults. Create takes values, never Tailoring's types, and assigns the application's identity and its CV's through `IDGenerator`.
 - **Listing** returns the healthy CVs plus `StoreIssue`s: `corrupt`, `upgradeRequired`, `unreadable`, `tooLarge`, `quarantineFailed`.
 
 **`PrestoCVPersistence`**
@@ -58,12 +74,17 @@ Test targets and test-support targets are described below each package. The chec
   - reads classified as described in R12;
   - `Quarantine/` with validated restore, erase and purge.
 - `DirectorySampleCVSource`: sample CVs from an injected directory, in the same v1 format and through the store's own reader. The app ships them in `PrestoCV/Resources/Samples/`.
+- Planned (#185, [ADR 0019](adr/0019-applications.md)):
+  - `FileApplicationRepository`: one `ApplicationFileV1` file per application, named from its id, in a directory of its own with its own lock and `Quarantine/`. It gives the file every guarantee that `FileCVRepository` gives a CV: R12's every outcome, atomic writes, the read-back check, mutations under `flock`, and validated restore, erase and purge. The tailored CV inside goes through the same content DTO as `CVFileV1`.
+  - `FileLetterDefaultsStore`: the person's defaults in one `LetterDefaultsFileV1` file, with the same envelope and outcomes. A missing file is empty defaults. Any other failure is an error, never an empty store.
+  - Erasing everything erases the applications, with every copy, and the letter defaults.
 
 **Test support and tests.**
 - `PrestoCVCoreTestSupport` may import `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Synchronization. It holds:
   - `InMemoryCVRepository`, `SteppingClock`, `SequentialIDGenerator`;
   - the **`CVRepository` contract suite**: round trip with timestamps, create twice, update bumps the revision, stale update and stale delete, 50 concurrent updates from one revision leave exactly one success, update after delete, listing order.
 - File-store behaviour that an in-memory store cannot have is tested in the Core tests, not in the contract: mixed directory, unreadable, oversized and hostile files, restore, erase, purge, and two instances racing.
+- Planned (#185): the same target holds `InMemoryApplicationRepository`, an in-memory `LetterDefaultsStore`, and the **`ApplicationRepository` contract suite**, modelled on the `CVRepository` one. The in-memory adapter and the file adapter both pass it. The file store's own cases for applications and for the letter defaults are tested in the Core tests.
 
 ---
 
@@ -96,6 +117,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - it bounds text in UTF-8 bytes, per field and for the whole document, and refuses control characters and bidirectional overrides;
   - JSON arrives through `decode(json:)`, which checks the size before decoding.
 - Pending: a committed JSON Schema.
+- **`LetterDocument`** (planned, #187, [ADR 0019](adr/0019-applications.md)), a second published document type, beside `CVDocument`: the sender, the recipient, the place and date, the reference and subject, the body, the closing, the name and the attachments. The salutation and the valediction are the page's, not the document's (below). Plain values, no PrestoCV type. It carries a `schemaVersion`, and a letter that arrives as JSON passes a validator of its own (R8).
 
 **`CVDesignCatalog`**
 - **`MarkupContract`**, version 1: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](markup-contract.md).
@@ -124,6 +146,10 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - **`DocumentCompleteness`:** every text node needs its own span of the PDF text, which no other node uses, ignoring case and spacing.
 - **`FixtureRenderingGate`:** implements the catalog's `DesignRenderingGate`. It renders a fixture that uses every section with the candidate design, and requires a complete, untruncated PDF.
 - **Policy:** the required fields and page limit, shared by preview and export.
+- **The cover letter** (planned, #187, [ADR 0019](adr/0019-applications.md)):
+  - one built-in stylesheet renders a `LetterDocument`, with the typed builder, for every design. It is not a design: it is not in the catalog, so no design choice can select it. It passes the same CSS policy as a design's;
+  - the page writes the salutation and the valediction. The language conventions, the date format, the salutations and the valedictions, are data for the six languages: one JSON file per language and an index, with a completeness test (R13);
+  - the letter is one A4 page, and one that does not fit is an error, never a truncated page. The PDF is checked against the builder's text nodes, as for a CV.
 
 **`CVRenderingWebKitSupport`**
 - `SecureWebViewConfiguration.compileRules()` is called once by the composition root: a block rule per network scheme, plus a block on every subresource type. `make(rules:)` then builds each configuration: JavaScript off for content, non-persistent store, media only on user action.
@@ -241,7 +267,12 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - `BrowseDesigns`;
   - `DraftCVWithAI`: availability, then draft, then an unsaved CV plus its gaps.
 - **Mappers:** `CV → CVDocument` and `CVDraft → CV`. They are exhaustive and deterministic, with typed dates. The draft mapper uses `Period.make` and reports every gap.
-  - `CV → SourceCV`, and the tailoring result into the app's own types (planned, #184, #188).
+  - `CV → SourceCV` (planned, #179).
+  - The person's `LetterDefaults`, with an application's override applied → the snapshot's letter defaults (planned, #153, #179).
+  - The tailoring result → `Application`: the tailored `CV`, the `CoverLetter` and the provenance values (planned, #188, [ADR 0019](adr/0019-applications.md)).
+  - `CoverLetter` plus the person's details, which are those of the application's own CV → `LetterDocument` (planned, #187).
+  - Two modules each export a `CoverLetter` and a `LetterDefaults`, Tailoring's and Authoring's. The mappers name the module. Nothing maps an `Application` back into Tailoring's types.
+- **The tailoring workflow and the application screens** (planned, #188, #191): the tailoring workflow saves the result as an application, and only then confirms to the server. The application workflows open its CV in the same editor and its letter in an editor of its own, and export both PDFs.
 - **Outbound ports that reach the server,** owned here (R3): the tailoring workflow's (start, read, cancel and confirm), the policy's (#190) and the push token's (#181). They speak the tailoring model and the workflow's typed errors, never a generated type. `PrestoCVAPIAdapter` implements them (planned, #179, #188).
 - **The attestation port,** owned here (R3), not by `PrestoCVAPIAdapter` that calls it, so that no edge joins two adapters: it signs the encoded body of a start and proves the installation (#174). `PrestoCVAPIAdapter` calls it. The App Attest adapter of #174, a target that the ADR of #168 adds to this file, implements it and never calls the API.
 
@@ -263,7 +294,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 **`PrestoCVComposition`**
 - The app's composition root, and the only place in the app that creates infrastructure (R4). The `@main` App type holds it in a `static let`. It owns:
   - file locations under Application Support;
-  - one `FileCVRepository` and one `FileDesignStore`;
+  - one `FileCVRepository` and one `FileDesignStore`, and, once #185 lands, one `FileApplicationRepository` and one `FileLetterDefaultsStore`;
   - the web-view rule list, compiled once;
   - the platform renderer and the PDFKit inspector;
   - the AI adapter, `TimeSource`, `IDGenerator` and logger;

@@ -18,7 +18,7 @@ One word, one meaning, in code, UI copy, tickets and translations. Today "templa
 | **Installed design** | A design package in the design store, bundled or imported. | — | Design Catalog |
 | **Palette** / **Font scheme** | Customisations of a design. They get their own names in the UI (colour names, typeface names), never a design's name. | Design | Design Catalog |
 | **Design choice** | The design, palette and font a CV uses, stored on the CV. | — | Authoring (as opaque identifiers) |
-| **Document** | `CVDocument`: the input of rendering, the published language of `CVPDFExporter`. | CV | Rendering |
+| **Document** | `CVDocument`: the input of rendering a CV, the published language of `CVPDFExporter`. A cover letter has its own, `LetterDocument`. | CV | Rendering |
 | **Document language** | The language a CV is written and printed in. It can differ from the app language. | App language | Authoring, Rendering, Drafting |
 | **Preview** | HTML rendered on screen from the same pipeline and policy as the PDF. | — | Rendering |
 | **Render policy** | Required fields and page limits, the same for preview and export. | — | Rendering |
@@ -26,14 +26,16 @@ One word, one meaning, in code, UI copy, tickets and translations. Today "templa
 | **Tailoring** | Rewriting one CV and writing a cover letter for one advert, then holding both to the source. | Translation: a CV is tailored in its own language | Tailoring |
 | **Advert** | The job advert a tailoring is for: its text and what it asks for. | — | Tailoring |
 | **Source CV** | The snapshot of the CV a tailoring starts from. | The stored CV, which can change meanwhile | Tailoring |
-| **Tailored CV** | The CV a tailoring produces: the source CV rewritten for one advert, each rewritten line naming its sources. | Draft, source CV | Tailoring |
+| **Tailored CV** | The CV a tailoring produces: the source CV rewritten for one advert, each rewritten line naming its sources. Once the user keeps it, it is a `CV` inside its application, edited with the same editor and not listed among the user's CVs. | Draft, source CV | Tailoring, then Authoring |
 | **Statement** | One line of an experience's description, as written, without its leading bullet. The unit of provenance. | An entry, or a whole description | Tailoring |
 | **Evidence** | Where the source CV states a term the advert asks for: in prose, only listed, or absent. Only prose counts as evidence. | A skills list, which names a term without showing it | Tailoring |
 | **Provenance** | The sources a tailored line names: statements of the same experience, and answers in scope. | — | Tailoring |
 | **Provenance check** | The gate that refuses a tailored CV or letter that states anything its sources do not. | An audit that only warns | Tailoring |
 | **Question** | What the user is asked. Before a tailoring: what the advert asks for that the source CV does not evidence, and the letter fields the advert asks for that the defaults do not give. After it: what the model says it would have needed. Never written into the CV. | — | Tailoring |
 | **Answer** | What the user replies to a question. It is a source for that tailoring only, and only in its question's scope. | An edit of the CV (an answer never changes it); the model's reply | Tailoring |
-| **Cover letter** | The letter a tailoring writes for one advert. It is held to the source CV, the advert and the letter defaults: whom it addresses comes from the advert, what it argues from the source. | — | Tailoring |
+| **Cover letter** | The letter a tailoring writes for one advert, and the one the user keeps with its application. The word means the same letter in both contexts, and each context holds it as its own type. Tailoring's is held to the source CV, the advert and the letter defaults: whom it addresses comes from the advert, what it argues from the source. Authoring's is what the user keeps and edits. Neither holds a salutation or a valediction: the page writes them, in one fixed layout for every design. In Rendering it is a `LetterDocument`. | — | Tailoring, Authoring |
+| **Application** | What a tailoring produces and the user keeps: the advert (company, role and text), the tailored CV and its cover letter, when it was made, and where it came from (the source CV, the report, the questions and their answers, the prompt version and the provider alias), which Authoring stores and does not interpret. It lives in CV Authoring, and its CV is not listed among the user's CVs. Its status comes later. | The application layer (use cases and ports), the `PrestoCVApplication` target, the app itself, and the *job*, which is the server's record of a tailoring | Authoring |
+| **Letter defaults** | What a person wants every letter to say unless an application says otherwise: the salary expectation, the start date and a note. They belong to the person, not to a CV. The user edits them in Settings, and an application can override them for itself. | An answer, which counts for one tailoring only | Authoring |
 | **Role** | What one run of the server binary does: `serve` answers the API, `work` runs tailorings. The local profile runs both in one process. | An experience's role, or the professional title | Server |
 | **Profile** | `hosted` or `local`: the set of adapters a composition root picks from configuration. | Environment | Server |
 | **Environment** | Where the server runs: `local`, `staging` or `production`. `local` uses the local profile, the other two the hosted one. | Profile | Server |

@@ -187,6 +187,7 @@ A platform-only target wraps **every file** entirely in its platform condition. 
 
 ([ADR 0009](adr/0009-persisted-schema-v1.md))
 
+- **Which files.** CV Authoring persists three file types: `CVFileV1`, `ApplicationFileV1` and `LetterDefaultsFileV1` ([ADR 0019](adr/0019-applications.md)). Each follows everything below.
 - **DTO, not the domain.** What is written to disk is a DTO, separate from the domain type. Its envelope is frozen: `schemaVersion` is a top-level integer in every future version.
 - **Strict decoding.** Required fields are required. The revision is bounded. Periods pass `Period.make`. Text and list sizes are capped.
 - **Every failure has its own outcome:**
@@ -201,10 +202,10 @@ A platform-only target wraps **every file** entirely in its platform condition. 
   - Timestamps are stored with whole-second precision.
   - Create, update and delete are conditional on the revision, under an exclusive lock on the store (`flock`), so no update is lost across repository instances or processes.
   - Timestamps are assigned by the repository through the injected `TimeSource`. Listing is ordered by last change.
-- **Erasure.** Erasing a CV removes every copy: the stored file whatever its schema, and the quarantined copies. Quarantine is purged after a retention period.
+- **Erasure.** Erasing a CV removes every copy: the stored file whatever its schema, and the quarantined copies. Erasing an application does the same, with the CV inside it. Erasing everything removes the applications and the letter defaults too. Quarantine is purged after a retention period.
 - **Migrations.** Schema changes after release ship with a migration and a test for it. Before the first release there is no legacy format to support.
 
-**Enforced by:** test (the repository contract suite, and the file-store tests for every outcome above) and review.
+**Enforced by:** test (the repository contract suite, and the file-store tests for every outcome above, for each file type) and review.
 
 ## R13. Localisation happens at the edges
 

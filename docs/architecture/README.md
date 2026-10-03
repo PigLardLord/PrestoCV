@@ -16,15 +16,17 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 
 | Context | Kind | Owns | Package |
 |---|---|---|---|
-| **CV Authoring** | core domain | The CV aggregate and its entries, their invariants and lifecycle; sample CVs; the reference to the chosen design | `PrestoCVCore` |
+| **CV Authoring** | core domain | The CV aggregate and its entries, their invariants and lifecycle; sample CVs; the reference to the chosen design; the applications a user keeps, each with its tailored CV and cover letter, and the person's letter defaults | `PrestoCVCore` |
 | **Design Catalog** | supporting | Design packages (`.mcvt`), their validation, installation, versions and listing | `CVPDFExporter` |
-| **Document Rendering** | generic | Turning a document plus a design into HTML, and HTML into PDF, per platform | `CVPDFExporter` |
+| **Document Rendering** | generic | Turning a document plus a design into HTML, and HTML into PDF, per platform; a cover letter, in one fixed layout, with no design | `CVPDFExporter` |
 | **AI Drafting** | supporting | Producing a CV draft from a free-text description with the on-device model | `CVGeneratorAI` |
 | **CV Tailoring** | core domain | Tailoring one CV to a job advert and writing its cover letter, and holding both to their sources: advert analysis, content checks, the provenance gate, the tailoring loop | `CVTailoring` |
 | **App** | integration and presentation | Cross-context workflows, the mappers between contexts, view models, views, the composition root | `PrestoCVApp` package + Xcode app target |
 | **Server** | integration and composition | The HTTP API, the jobs, and the adapters that run tailorings with a model | `PrestoCVServer` package |
 
 CV Tailoring is the context [ADR 0005](adr/0005-remove-ai-tailoring-and-json-resume.md) reserved ([ADR 0013](adr/0013-cv-tailoring-context.md)). It runs in the app and on the server; the tailoring loop runs only on the server. JSON Resume is not supported (ADR 0005).
+
+What a tailoring leaves the user with is an application, and it lives in CV Authoring, not in Tailoring: the tailored CV is a `CV` that belongs to it, the cover letter is an authoring type, and the letter defaults belong to the person ([ADR 0019](adr/0019-applications.md)).
 
 The server is an integration and composition package beside the app, in two roles, `serve` and `work` ([ADR 0014](adr/0014-server-modular-monolith.md)). Like the app, it has a composition root of its own ([R4](rules.md#r4-one-composition-root-per-executable)). It reaches models through the providers its deployment configures, each held to the deployment's data policy ([ADR 0015](adr/0015-inference-providers-and-data-policy.md)). Hosted, it runs on Cloud Run in the EU, erases a job once the app has its result (24 hours after it ends at the latest), and limits what it spends ([ADR 0017](adr/0017-hosting-storage-and-cost.md)).
 
@@ -44,7 +46,7 @@ The server is an integration and composition package beside the app, in two role
                               no arrows between the four packages
 ```
 
-- The four domain packages **never import each other**. Each publishes its own model: `CV` in Authoring, `CVDocument` in Rendering, `CVDraft` in Drafting, `SourceCV` and `TailoredCV` in Tailoring.
+- The four domain packages **never import each other**. Each publishes its own model: `CV` and `Application` in Authoring, `CVDocument` and `LetterDocument` in Rendering, `CVDraft` in Drafting, `SourceCV` and `TailoredCV` in Tailoring.
 - Inside `CVPDFExporter`, Document Rendering is downstream of Design Catalog: it consumes validated stylesheets and palettes. That is the only edge between contexts inside a package, and it goes one way ([R1](rules.md#r1-packages-are-isolated-contexts-depend-only-along-documented-edges)).
 - All translation between contexts happens today in one place: the app's integration layer (`PrestoCVIntegration`). Each mapper is exhaustive and tested ([ADR 0007](adr/0007-each-package-owns-its-model.md)).
 - On the server, `ServerHTTP` maps the API's generated types to the tailoring model and back. That is not a translation between contexts, and the generated types never leave it ([ADR 0014](adr/0014-server-modular-monolith.md)).
