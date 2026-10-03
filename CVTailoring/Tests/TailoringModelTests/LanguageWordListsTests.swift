@@ -4,6 +4,11 @@ import Foundation
 
 @Suite("ADR 0013 / R8 · one language's word-list file is decoded into typed groups (#136)")
 struct LanguageWordListsTests {
+    /// The refusal of a file read for `language`, in the list `key` when the fault is in one, and nil for a fault of the file.
+    private func corrupt(_ key: WordListKey? = nil, language: TailoringLanguage = .english) -> TailoringModelError {
+        .corruptWordList(.language(language), key)
+    }
+
     private func decode(_ data: Data, as language: TailoringLanguage = .english) throws(TailoringModelError) -> LanguageWordLists {
         try LanguageWordLists(decoding: data, language: language)
     }
@@ -43,7 +48,7 @@ struct LanguageWordListsTests {
 
     @Test("a file that is not a JSON object is corrupt", arguments: notAnObjectCases)
     func notAnObject(text: String) {
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(Data(text.utf8)) }
+        #expect(throws: corrupt()) { try decode(Data(text.utf8)) }
     }
 
     @Test("a missing list is incomplete, and the key names it", arguments: WordListKey.allCases)
@@ -71,7 +76,7 @@ struct LanguageWordListsTests {
 
     @Test("the error names the language the file was read for")
     func errorNamesTheLanguage() {
-        #expect(throws: TailoringModelError.corruptWordList(.language(.french))) { try decode(Data("nope".utf8), as: .french) }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.french), nil)) { try decode(Data("nope".utf8), as: .french) }
     }
 
     // MARK: - Keys the format does not know
@@ -79,7 +84,7 @@ struct LanguageWordListsTests {
     @Test("a key the format does not know at the top of the file is corrupt")
     func unknownRootKey() throws {
         let data = try WordListFixture.data { $0["extra"] = 1 }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt()) { try decode(data) }
     }
 
     static let unknownGroupKeyCases: [String] = {
@@ -96,13 +101,13 @@ struct LanguageWordListsTests {
             members["extra"] = WordListFixture.list(for: .advertStopwords)
             object[group] = members
         }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt()) { try decode(data) }
     }
 
     @Test("a key the format does not know in a list is corrupt", arguments: WordListKey.allCases)
     func unknownListKey(key: WordListKey) throws {
         let data = try WordListFixture.data(editing: key) { $0["extra"] = 1 }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt(key)) { try decode(data) }
     }
 
     static let unknownEntryKeyCases: [WordListKey] = {
@@ -119,13 +124,13 @@ struct LanguageWordListsTests {
             entries[0]["extra"] = 1
             list["entries"] = entries
         }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt(key)) { try decode(data) }
     }
 
     @Test("an entry of a list of words that is an object is corrupt")
     func objectInAListOfWords() throws {
         let data = try WordListFixture.data(editing: .advertStopwords) { $0["entries"] = [["word": "the"]] }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt(.advertStopwords)) { try decode(data) }
     }
 
     // MARK: - Version and size
@@ -145,7 +150,7 @@ struct LanguageWordListsTests {
     @Test("a version other than 1 is corrupt", arguments: otherVersionCases)
     func otherVersion(version: Int) throws {
         let data = try WordListFixture.data { $0["version"] = version }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt()) { try decode(data) }
     }
 
     @Test("a version that is not a whole number is corrupt")
@@ -158,14 +163,14 @@ struct LanguageWordListsTests {
         versions.append("")
         for version in versions {
             let data = try WordListFixture.data { $0["version"] = version }
-            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+            #expect(throws: corrupt()) { try decode(data) }
         }
     }
 
     @Test("a file without a version is corrupt")
     func noVersion() throws {
         let data = try WordListFixture.data { $0["version"] = nil }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt()) { try decode(data) }
     }
 
     @Test("a file of the largest size is read, and one byte more is corrupt")
@@ -175,7 +180,7 @@ struct LanguageWordListsTests {
         let atTheCap = complete + Data(repeating: UInt8(ascii: " "), count: padding)
         #expect(atTheCap.count == WordListFormat.maxFileBytes)
         _ = try decode(atTheCap)
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(atTheCap + Data(" ".utf8)) }
+        #expect(throws: corrupt()) { try decode(atTheCap + Data(" ".utf8)) }
     }
 
     @Test("the largest size is 1 MiB")
@@ -189,7 +194,7 @@ struct LanguageWordListsTests {
     func noSourceOrLicence(key: WordListKey) throws {
         for field in ["source", "licence"] {
             let data = try WordListFixture.data(editing: key) { $0[field] = nil }
-            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+            #expect(throws: corrupt(key)) { try decode(data) }
         }
     }
 
@@ -206,7 +211,7 @@ struct LanguageWordListsTests {
         for key in WordListKey.allCases {
             for field in ["source", "licence"] {
                 let data = try WordListFixture.data(editing: key) { $0[field] = text }
-                #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+                #expect(throws: corrupt(key)) { try decode(data) }
             }
         }
     }
@@ -234,7 +239,7 @@ struct LanguageWordListsTests {
     func badText(key: WordListKey) throws {
         for entry in Self.badEntries {
             let data = try WordListFixture.data(editing: key) { $0["entries"] = ["alpha", entry] }
-            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+            #expect(throws: corrupt(key)) { try decode(data) }
         }
     }
 
@@ -258,9 +263,11 @@ struct LanguageWordListsTests {
             }
             let synonym = try WordListFixture.data(editing: .advertSynonyms) { $0["entries"] = [["forms": ["ui", entry]]] }
             let tied = try WordListFixture.data(editing: .spansTiedCounts) { $0["entries"] = [entry] }
-            for data in [month, number, count, synonym, tied] {
-                #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
-            }
+            #expect(throws: corrupt(.datesMonths)) { try decode(month) }
+            #expect(throws: corrupt(.numbersWords)) { try decode(number) }
+            #expect(throws: corrupt(.spansCountWords)) { try decode(count) }
+            #expect(throws: corrupt(.advertSynonyms)) { try decode(synonym) }
+            #expect(throws: corrupt(.spansTiedCounts)) { try decode(tied) }
         }
     }
 
@@ -278,7 +285,7 @@ struct LanguageWordListsTests {
     func repeatedText(entries: [String]) throws {
         for key in WordListFixture.textKeys {
             let data = try WordListFixture.data(editing: key) { $0["entries"] = ["alpha"] + entries }
-            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+            #expect(throws: corrupt(key)) { try decode(data) }
         }
     }
 
@@ -306,9 +313,12 @@ struct LanguageWordListsTests {
         let tied = try WordListFixture.data(editing: .spansTiedCounts) {
             $0["entries"] = ["{count} of them at {employer}", "{COUNT} OF THEM AT {employer}"]
         }
-        for data in [month, number, count, withinAGroup, acrossGroups, tied] {
-            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
-        }
+        #expect(throws: corrupt(.datesMonths)) { try decode(month) }
+        #expect(throws: corrupt(.numbersWords)) { try decode(number) }
+        #expect(throws: corrupt(.spansCountWords)) { try decode(count) }
+        #expect(throws: corrupt(.advertSynonyms)) { try decode(withinAGroup) }
+        #expect(throws: corrupt(.advertSynonyms)) { try decode(acrossGroups) }
+        #expect(throws: corrupt(.spansTiedCounts)) { try decode(tied) }
     }
 
     @Test("the same entry in two different lists is fine")
@@ -339,7 +349,7 @@ struct LanguageWordListsTests {
             entries[0]["month"] = month
             return entries
         }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt(.datesMonths)) { try decode(data) }
     }
 
     @Test("a month that is not a whole number is corrupt")
@@ -353,7 +363,7 @@ struct LanguageWordListsTests {
                 entries[0]["month"] = value
                 return entries
             }
-            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+            #expect(throws: corrupt(.datesMonths)) { try decode(data) }
         }
     }
 
@@ -392,7 +402,7 @@ struct LanguageWordListsTests {
                 entries[0]["value"] = value
                 list["entries"] = entries
             }
-            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+            #expect(throws: corrupt(key)) { try decode(data) }
         }
     }
 
@@ -406,7 +416,7 @@ struct LanguageWordListsTests {
     @Test("a group of synonyms with fewer than two forms is corrupt", arguments: shortSynonymGroupCases)
     func shortSynonymGroup(forms: [String]) throws {
         let data = try WordListFixture.data(editing: .advertSynonyms) { $0["entries"] = [["forms": ["a", "b"]], ["forms": forms]] }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt(.advertSynonyms)) { try decode(data) }
     }
 
     static let tiedCountPlaceholdersCases: [String] = {
@@ -420,7 +430,7 @@ struct LanguageWordListsTests {
     @Test("a tied count holds {count} and {employer} once each, and no other braces", arguments: tiedCountPlaceholdersCases)
     func tiedCountPlaceholders(template: String) throws {
         let data = try WordListFixture.data(editing: .spansTiedCounts) { $0["entries"] = [template] }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt(.spansTiedCounts)) { try decode(data) }
     }
 
     static let tiedCountShapesCases: [String] = {
@@ -450,13 +460,13 @@ struct LanguageWordListsTests {
     @Test("a street order that is unknown or empty is corrupt", arguments: streetOrderUnknownCases)
     func streetOrderUnknown(order: String) throws {
         let data = try WordListFixture.data(editing: .advertStreets) { $0["order"] = order }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt(.advertStreets)) { try decode(data) }
     }
 
     @Test("a list of streets without an order is corrupt")
     func streetOrderMissing() throws {
         let data = try WordListFixture.data(editing: .advertStreets) { $0["order"] = nil }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt(.advertStreets)) { try decode(data) }
     }
 
     // MARK: - Forms of address
@@ -470,7 +480,7 @@ struct LanguageWordListsTests {
     @Test("a form of address that is not ms or mr is corrupt", arguments: unknownFormCases)
     func unknownForm(form: String) throws {
         let data = try WordListFixture.data(editing: .letterFormsOfAddress) { $0["entries"] = [["form": form, "word": "alpha"]] }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt(.letterFormsOfAddress)) { try decode(data) }
     }
 
     @Test("a form of address that is not a string, or has no word, is corrupt")
@@ -480,17 +490,17 @@ struct LanguageWordListsTests {
         forms.append(["ms"])
         for form in forms {
             let data = try WordListFixture.data(editing: .letterFormsOfAddress) { $0["entries"] = [["form": form, "word": "alpha"]] }
-            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+            #expect(throws: corrupt(.letterFormsOfAddress)) { try decode(data) }
         }
         let noWord = try WordListFixture.data(editing: .letterFormsOfAddress) { $0["entries"] = [["form": "ms"]] }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(noWord) }
+        #expect(throws: corrupt(.letterFormsOfAddress)) { try decode(noWord) }
     }
 
     @Test("a word of a form of address that is empty, hidden or not trimmed is corrupt")
     func badFormWord() throws {
         for word in Self.badEntries {
             let data = try WordListFixture.data(editing: .letterFormsOfAddress) { $0["entries"] = [["form": "ms", "word": word]] }
-            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+            #expect(throws: corrupt(.letterFormsOfAddress)) { try decode(data) }
         }
     }
 
@@ -499,7 +509,7 @@ struct LanguageWordListsTests {
         let data = try WordListFixture.data(editing: .letterFormsOfAddress) {
             $0["entries"] = [["form": "ms", "word": "alpha"], ["form": "mr", "word": "ALPHA"]]
         }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt(.letterFormsOfAddress)) { try decode(data) }
     }
 
     @Test("one form of address may have several words")
@@ -526,7 +536,7 @@ struct LanguageWordListsTests {
     @Test("a rank the format does not know is corrupt", arguments: unknownRankCases)
     func unknownRank(rank: String) throws {
         let data = try WordListFixture.data(editing: .provenanceRanks) { $0["entries"] = [["word": "alpha", "ranks": ["senior", rank]]] }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt(.provenanceRanks)) { try decode(data) }
     }
 
     @Test("a word that claims no rank, or one rank twice, is corrupt")
@@ -535,7 +545,7 @@ struct LanguageWordListsTests {
         lists.append(["lead", "lead"])
         for ranks in lists {
             let data = try WordListFixture.data(editing: .provenanceRanks) { $0["entries"] = [["word": "alpha", "ranks": ranks]] }
-            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+            #expect(throws: corrupt(.provenanceRanks)) { try decode(data) }
         }
     }
 
@@ -547,17 +557,17 @@ struct LanguageWordListsTests {
         values.append([1])
         for ranks in values {
             let data = try WordListFixture.data(editing: .provenanceRanks) { $0["entries"] = [["word": "alpha", "ranks": ranks]] }
-            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+            #expect(throws: corrupt(.provenanceRanks)) { try decode(data) }
         }
         let missing = try WordListFixture.data(editing: .provenanceRanks) { $0["entries"] = [["word": "alpha"]] }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(missing) }
+        #expect(throws: corrupt(.provenanceRanks)) { try decode(missing) }
     }
 
     @Test("a word of a rank that is empty, hidden or not trimmed is corrupt")
     func badRankWord() throws {
         for word in Self.badEntries {
             let data = try WordListFixture.data(editing: .provenanceRanks) { $0["entries"] = [["word": word, "ranks": ["lead"]]] }
-            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+            #expect(throws: corrupt(.provenanceRanks)) { try decode(data) }
         }
     }
 
@@ -566,7 +576,7 @@ struct LanguageWordListsTests {
         let data = try WordListFixture.data(editing: .provenanceRanks) {
             $0["entries"] = [["word": "lead", "ranks": ["lead"]], ["word": "LEAD", "ranks": ["head"]]]
         }
-        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        #expect(throws: corrupt(.provenanceRanks)) { try decode(data) }
     }
 
     @Test("a word may claim several ranks, in the order the file writes them")
@@ -595,7 +605,7 @@ struct LanguageWordListsTests {
     func licenceNotAllowed(licence: String) throws {
         for key in WordListKey.allCases {
             let data = try WordListFixture.data(editing: key) { $0["licence"] = licence }
-            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+            #expect(throws: corrupt(key)) { try decode(data) }
         }
     }
 }

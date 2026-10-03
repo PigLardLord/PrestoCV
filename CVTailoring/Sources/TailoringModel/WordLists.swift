@@ -15,7 +15,7 @@ public struct WordLists: Hashable, Sendable {
         let languages = try Self.languages(in: index)
         var lists: [TailoringLanguage: LanguageWordLists] = [:]
         for language in languages {
-            guard let data = try files(language) else { throw .corruptWordList(.language(language)) }
+            guard let data = try files(language) else { throw .corruptWordList(.language(language), nil) }
             lists[language] = try LanguageWordLists(decoding: data, language: language)
         }
         self.languages = languages
@@ -24,7 +24,7 @@ public struct WordLists: Hashable, Sendable {
 
     /// Reads the index and the files of this package's resources. The caller loads once and injects the value (R4).
     public static func load() throws(TailoringModelError) -> WordLists {
-        guard let index = try WordListResources.data(named: "index", as: .index) else { throw .corruptWordList(.index) }
+        guard let index = try WordListResources.data(named: "index", as: .index) else { throw .corruptWordList(.index, nil) }
         return try WordLists(index: index) { language throws(TailoringModelError) in
             try WordListResources.data(named: language.code, as: .language(language))
         }
@@ -38,11 +38,11 @@ public struct WordLists: Hashable, Sendable {
 
     /// The codes of the index, each one of the six and none twice.
     private static func languages(in index: Data) throws(TailoringModelError) -> [TailoringLanguage] {
-        guard index.count <= WordListFormat.maxFileBytes else { throw .corruptWordList(.index) }
+        guard index.count <= WordListFormat.maxFileBytes else { throw .corruptWordList(.index, nil) }
         let codes: [String]
-        do { codes = try JSONDecoder().decode([String].self, from: index) } catch { throw .corruptWordList(.index) }
+        do { codes = try JSONDecoder().decode([String].self, from: index) } catch { throw .corruptWordList(.index, nil) }
         let languages = codes.compactMap(TailoringLanguage.init(rawValue:))
-        guard !codes.isEmpty, languages.count == codes.count, Set(languages).count == languages.count else { throw .corruptWordList(.index) }
+        guard !codes.isEmpty, languages.count == codes.count, Set(languages).count == languages.count else { throw .corruptWordList(.index, nil) }
         return languages
     }
 }

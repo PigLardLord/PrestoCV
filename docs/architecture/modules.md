@@ -252,7 +252,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
   - A statement is a line of a description: it allows a tab, and refuses its line breaks as `notOneLine`.
   - The size is checked first, and a blank required text is `emptyField` whatever its controls.
 
-- **`TailoringModelError`**: `unsupportedLanguage`, `emptyField`, `notOneLine`, `hiddenCharacter`, `mismatchedScope`, `tooLarge`, `tooMany`, `invalidDate`, `invalidPeriod`, `invalidSkillLevel`, `referenceOutOfRange`, `corruptWordList`, `incompleteWordList`. The field, the list and the word-list file are codes (R7, R13).
+- **`TailoringModelError`**: `unsupportedLanguage`, `emptyField`, `notOneLine`, `hiddenCharacter`, `mismatchedScope`, `tooLarge`, `tooMany`, `invalidDate`, `invalidPeriod`, `invalidSkillLevel`, `referenceOutOfRange`, `corruptWordList(file, list?)`, `incompleteWordList(language, list)`. The field, the list and the word-list file are codes (R7, R13).
 - The model has no `Codable`: JSON crosses through DTOs in the targets that need it (#152).
 - **Word lists** (#136), one JSON file per language and an index, as resources of the target.
   - `WordLists.load()` reads them through `Bundle.module` (R2), validates them (R8), and holds them. A composition root loads them once and injects the value (R4); nothing caches them.

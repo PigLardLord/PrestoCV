@@ -26,9 +26,11 @@ public enum TailoringModelError: Error, Hashable, Sendable {
     /// A period that ends before it starts.
     case invalidPeriod
     /// A word-list file the format cannot read (`docs/architecture/word-lists.md`): not JSON, an unsupported version, a
-    /// key the format does not know, a list without its source or licence, an entry that is empty, not trimmed or
-    /// repeated, a file that is too large, or an index that names a language with no file.
-    case corruptWordList(WordListFile)
+    /// key the format does not know, a list without its source or licence, an entry that is empty, hides a character,
+    /// is not trimmed or repeated, a file that is too large, or an index that names a language with no file. The list is
+    /// named when the fault is in one, and nil for a fault of the file: its version, its size, its JSON, a key at the top
+    /// or in a group.
+    case corruptWordList(WordListFile, WordListKey?)
     /// A word-list file that lacks a list the format requires, or holds a list with no entry, or no name for a month.
     case incompleteWordList(TailoringLanguage, WordListKey)
 

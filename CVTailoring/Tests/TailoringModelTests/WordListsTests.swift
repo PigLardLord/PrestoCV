@@ -8,7 +8,7 @@ struct WordListsTests {
 
     /// A complete file. Building it cannot fail; the error only keeps the closures below typed.
     private static func complete(_ edit: ((inout WordListFixture.Object) -> Void)? = nil) throws(TailoringModelError) -> Data {
-        do { return try WordListFixture.data { edit?(&$0) } } catch { throw .corruptWordList(.index) }
+        do { return try WordListFixture.data { edit?(&$0) } } catch { throw .corruptWordList(.index, nil) }
     }
 
     /// Files for the languages named, each a complete file; any other language has none.
@@ -18,7 +18,7 @@ struct WordListsTests {
 
     private func lists(_ codes: [String], available: [TailoringLanguage]) throws(TailoringModelError) -> WordLists {
         let data: Data
-        do { data = try index(codes) } catch { throw .corruptWordList(.index) }
+        do { data = try index(codes) } catch { throw .corruptWordList(.index, nil) }
         return try WordLists(index: data, files: files(for: available))
     }
 
@@ -38,13 +38,13 @@ struct WordListsTests {
 
     @Test("a language in the index without a file is corrupt, and names the language")
     func listedWithoutAFile() {
-        #expect(throws: TailoringModelError.corruptWordList(.language(.german))) { try lists(["en", "de"], available: [.english]) }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.german), nil)) { try lists(["en", "de"], available: [.english]) }
     }
 
     @Test("a file that cannot be read is corrupt, and names its language")
     func corruptFile() throws {
         let data = try index(["en", "it"])
-        #expect(throws: TailoringModelError.corruptWordList(.language(.italian))) {
+        #expect(throws: TailoringModelError.corruptWordList(.language(.italian), nil)) {
             try WordLists(index: data) { language throws(TailoringModelError) in language == .english ? try Self.complete() : Data("nope".utf8) }
         }
     }
@@ -67,14 +67,14 @@ struct WordListsTests {
 
     @Test("an index that is not an array of language codes is corrupt", arguments: notAnIndexCases)
     func notAnIndex(text: String) {
-        #expect(throws: TailoringModelError.corruptWordList(.index)) {
+        #expect(throws: TailoringModelError.corruptWordList(.index, nil)) {
             try WordLists(index: Data(text.utf8), files: files(for: TailoringLanguage.allCases))
         }
     }
 
     @Test("an index with no language is corrupt: nothing could be tailored")
     func emptyIndex() {
-        #expect(throws: TailoringModelError.corruptWordList(.index)) { try lists([], available: TailoringLanguage.allCases) }
+        #expect(throws: TailoringModelError.corruptWordList(.index, nil)) { try lists([], available: TailoringLanguage.allCases) }
     }
 
     static let unknownCodeCases: [[String]] = {
@@ -92,18 +92,18 @@ struct WordListsTests {
 
     @Test("an index code that is not one of the six, or not written as one, is corrupt", arguments: unknownCodeCases)
     func unknownCode(codes: [String]) {
-        #expect(throws: TailoringModelError.corruptWordList(.index)) { try lists(codes, available: TailoringLanguage.allCases) }
+        #expect(throws: TailoringModelError.corruptWordList(.index, nil)) { try lists(codes, available: TailoringLanguage.allCases) }
     }
 
     @Test("a language listed twice is corrupt")
     func listedTwice() {
-        #expect(throws: TailoringModelError.corruptWordList(.index)) { try lists(["en", "de", "en"], available: TailoringLanguage.allCases) }
+        #expect(throws: TailoringModelError.corruptWordList(.index, nil)) { try lists(["en", "de", "en"], available: TailoringLanguage.allCases) }
     }
 
     @Test("an index over 1 MiB is corrupt")
     func largeIndex() {
         let padded = Data("[\"en\"]".utf8) + Data(repeating: UInt8(ascii: " "), count: WordListFormat.maxFileBytes)
-        #expect(throws: TailoringModelError.corruptWordList(.index)) { try WordLists(index: padded, files: files(for: [.english])) }
+        #expect(throws: TailoringModelError.corruptWordList(.index, nil)) { try WordLists(index: padded, files: files(for: [.english])) }
     }
 
     @Test("every one of the six can be listed")

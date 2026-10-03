@@ -134,8 +134,17 @@ Every refusal is a typed error that carries codes and no text ([R7](rules.md#r7-
 
 | Error | When |
 |---|---|
-| `corruptWordList(.index)` | The index is not a JSON array of language codes, is empty, names a code that is none of the six, lists a language twice, or is too large |
-| `corruptWordList(.language(l))` | The file of `l` is missing though the index lists it; or is not JSON, is too large, has a version other than 1, has a key the format does not know, or lacks a `source`, a `licence` or `entries` of a list; or a `source`, a `licence` or an entry is empty, not trimmed, hides a character, or folds to nothing; or two entries of a list are the same once folded; or a month is out of range, a value is negative, a group of synonyms has fewer than two forms, a template is malformed, or `order` is none of the three |
+| `corruptWordList(.index, nil)` | The index is not a JSON array of language codes, is empty, names a code that is none of the six, lists a language twice, or is too large |
+| `corruptWordList(.language(l), nil)` | A fault of the file of `l` and not of a list: it is missing though the index lists it, is not JSON, is too large, has a version other than 1, or has a key the format does not know at the top or in a group |
+| `corruptWordList(.language(l), key)` | The list `key` has a key the format does not know, lacks its `source`, `licence` or `entries`, or holds a value of the wrong type |
+| `corruptWordList(.language(l), key)` | The `licence` of the list is not one of the allowed set |
+| `corruptWordList(.language(l), key)` | A `source`, a `licence` or an entry is empty, is not trimmed, hides a character, or folds to nothing |
+| `corruptWordList(.language(l), key)` | Two entries of the list are the same once folded, so a word two forms of address or two ranks share counts too |
+| `corruptWordList(.language(l), key)` | A month is outside 1 to 12, a value is negative, or a group of synonyms has fewer than 2 forms |
+| `corruptWordList(.language(l), key)` | A tied count does not hold `{count}` and `{employer}` once each, or holds another brace |
+| `corruptWordList(.language(l), key)` | The `order` of the streets is missing or is none of the three |
+| `corruptWordList(.language(l), key)` | The form of a form of address is not `ms` or `mr` |
+| `corruptWordList(.language(l), key)` | A rank is none of the eight, or a word claims no rank, or claims one twice |
 | `incompleteWordList(l, key)` | The file of `l` has no group or no list for `key` (a missing group is reported as its first list), a list has no entry, or no month is named for one of the twelve |
 | `unsupportedLanguage` | `forLanguage(_:)` is asked for a language that has no file |
 

@@ -3,14 +3,14 @@ import Foundation
 extension LanguageWordLists {
     /// Reads the file of one language (`docs/architecture/word-lists.md`) into its typed lists, or refuses it (R8).
     init(decoding data: Data, language: TailoringLanguage) throws(TailoringModelError) {
-        guard data.count <= WordListFormat.maxFileBytes else { throw .corruptWordList(.language(language)) }
+        guard data.count <= WordListFormat.maxFileBytes else { throw .corruptWordList(.language(language), nil) }
         let file: WordListDocument
         do {
             file = try JSONDecoder().decode(WordListDocument.self, from: data)
         } catch let failure as WordListFailure {
             throw failure.error(in: language)
         } catch {
-            throw .corruptWordList(.language(language))
+            throw .corruptWordList(.language(language), nil)
         }
         let reading = WordListReading(language: language)
         self.init(
@@ -31,10 +31,12 @@ extension LanguageWordLists {
 /// Why the decoder stopped, as a code. Anything else it throws is a file that cannot be read.
 private enum WordListFailure: Error {
     case missing(WordListKey)
+    case corrupt(WordListKey)
 
     func error(in language: TailoringLanguage) -> TailoringModelError {
         switch self {
         case .missing(let key): .incompleteWordList(language, key)
+        case .corrupt(let key): .corruptWordList(.language(language), key)
         }
     }
 }
@@ -163,7 +165,11 @@ private struct RawGroup {
 
     func list<Value: Decodable>(_ key: WordListKey, as type: Value.Type = Value.self) throws -> Value {
         guard container.contains(DynamicKey(key.name)) else { throw WordListFailure.missing(key) }
-        return try container.decode(Value.self, forKey: DynamicKey(key.name))
+        do {
+            return try container.decode(Value.self, forKey: DynamicKey(key.name))
+        } catch {
+            throw WordListFailure.corrupt(key)
+        }
     }
 }
 
@@ -353,14 +359,14 @@ private struct WordListReading {
 
     func months(_ raw: RawList<RawMonth>, _ key: WordListKey) throws(TailoringModelError) -> WordList<MonthName> {
         try check(raw, key, words: raw.entries.map(\.name))
-        guard raw.entries.allSatisfy({ (1...12).contains($0.month) }) else { throw corrupt }
+        guard raw.entries.allSatisfy({ (1...12).contains($0.month) }) else { throw corrupt(key) }
         guard Set(raw.entries.map(\.month)).count == 12 else { throw .incompleteWordList(language, key) }
         return WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { MonthName(name: $0.name, month: $0.month) })
     }
 
     func numbers(_ raw: RawList<RawNumber>, _ key: WordListKey) throws(TailoringModelError) -> WordList<NumberWord> {
         try check(raw, key, words: raw.entries.map(\.word))
-        guard raw.entries.allSatisfy({ $0.value >= 0 }) else { throw corrupt }
+        guard raw.entries.allSatisfy({ $0.value >= 0 }) else { throw corrupt(key) }
         return WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { NumberWord(word: $0.word, value: $0.value) })
     }
 
@@ -370,7 +376,7 @@ private struct WordListReading {
         var entries: [RankWord] = []
         for entry in raw.entries {
             let ranks = entry.ranks.compactMap(Rank.init(rawValue:))
-            guard !ranks.isEmpty, ranks.count == entry.ranks.count, Set(ranks).count == ranks.count else { throw corrupt }
+            guard !ranks.isEmpty, ranks.count == entry.ranks.count, Set(ranks).count == ranks.count else { throw corrupt(key) }
             entries.append(RankWord(word: entry.word, ranks: ranks))
         }
         return WordList(source: raw.source, licence: raw.licence, entries: entries)
@@ -384,7 +390,7 @@ private struct WordListReading {
             switch entry.form {
             case "ms": entries.append(FormOfAddressWord(form: .ms, word: entry.word))
             case "mr": entries.append(FormOfAddressWord(form: .mr, word: entry.word))
-            default: throw corrupt
+            default: throw corrupt(key)
             }
         }
         return WordList(source: raw.source, licence: raw.licence, entries: entries)
@@ -392,7 +398,7 @@ private struct WordListReading {
 
     func synonyms(_ raw: RawList<RawSynonym>, _ key: WordListKey) throws(TailoringModelError) -> WordList<SynonymGroup> {
         try check(raw, key, words: raw.entries.flatMap(\.forms))
-        guard raw.entries.allSatisfy({ $0.forms.count >= 2 }) else { throw corrupt }
+        guard raw.entries.allSatisfy({ $0.forms.count >= 2 }) else { throw corrupt(key) }
         return WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { SynonymGroup(forms: $0.forms) })
     }
 
@@ -403,29 +409,29 @@ private struct WordListReading {
             func occurrences(of placeholder: String) -> Int { template.components(separatedBy: placeholder).count - 1 }
             let literal = template.replacingOccurrences(of: "{count}", with: "").replacingOccurrences(of: "{employer}", with: "")
             guard occurrences(of: "{count}") == 1, occurrences(of: "{employer}") == 1, !literal.contains("{"), !literal.contains("}") else {
-                throw corrupt
+                throw corrupt(.spansTiedCounts)
             }
         }
         return list
     }
 
     func streets(_ raw: RawStreets) throws(TailoringModelError) -> StreetWords {
-        guard let order = StreetOrder(rawValue: raw.order) else { throw corrupt }
+        guard let order = StreetOrder(rawValue: raw.order) else { throw corrupt(.advertStreets) }
         return StreetWords(list: try texts(raw.list, .advertStreets), order: order)
     }
 
     // MARK: The rules every list shares
 
-    private var corrupt: TailoringModelError { .corruptWordList(.language(language)) }
+    private func corrupt(_ key: WordListKey) -> TailoringModelError { .corruptWordList(.language(language), key) }
 
     /// A list states its source and a licence of the allowed set, holds an entry, and each word of it is one line of text that shows
     /// something (`isStated`) and is not another word of the list once folded: a repeat would count a word twice.
     private func check<Entry>(_ raw: RawList<Entry>, _ key: WordListKey, words: [String]) throws(TailoringModelError) {
-        guard isStated(raw.source), WordListFormat.allowedLicences.contains(raw.licence) else { throw corrupt }
+        guard isStated(raw.source), WordListFormat.allowedLicences.contains(raw.licence) else { throw corrupt(key) }
         guard !raw.entries.isEmpty else { throw .incompleteWordList(language, key) }
         var folded = Set<String>()
         for word in words {
-            guard isStated(word), folded.insert(TextFold.fold(word)).inserted else { throw corrupt }
+            guard isStated(word), folded.insert(TextFold.fold(word)).inserted else { throw corrupt(key) }
         }
     }
 
