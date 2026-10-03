@@ -29,9 +29,11 @@ One word, one meaning, in code, UI copy, tickets and translations. Today "templa
 | **Tailored CV** | The CV a tailoring produces: the source CV rewritten for one advert, each rewritten line naming its source statements. | Draft, source CV | Tailoring |
 | **Statement** | One line of an experience's description, as written, without its leading bullet. The unit of provenance. | An entry, or a whole description | Tailoring |
 | **Evidence** | Where the source CV states a term the advert asks for: in prose, only listed, or absent. Only prose counts as evidence. | A skills list, which names a term without showing it | Tailoring |
-| **Provenance** | The source statements a tailored line names, and the gate that refuses anything they do not state. | — | Tailoring |
-| **Question** | What the advert asks for that the source CV does not evidence, asked to the user. Never written into the CV. | — | Tailoring |
-| **Cover letter** | The letter a tailoring writes for one advert. It is held to the source CV like the tailored CV. | — | Tailoring |
+| **Provenance** | The source statements a tailored line names. | — | Tailoring |
+| **Provenance check** | The gate that refuses a tailored CV or letter that states anything its sources do not. | An audit that only warns | Tailoring |
+| **Question** | What the user is asked. Before a tailoring: what the advert asks for that the source CV does not evidence, and the letter fields the advert asks for that the defaults do not give. After it: what the model says it would have needed. Never written into the CV. | — | Tailoring |
+| **Answer** | What the user replies to a question. It is a source for that tailoring only, and only in its question's scope. | An edit of the CV: an answer never changes it | Tailoring |
+| **Cover letter** | The letter a tailoring writes for one advert. It is held to the source CV, the advert and the letter defaults: whom it addresses comes from the advert, what it argues from the source. | — | Tailoring |
 
 ## UI copy in other languages
 
