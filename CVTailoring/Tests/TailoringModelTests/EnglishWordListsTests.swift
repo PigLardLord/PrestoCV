@@ -275,6 +275,15 @@ struct EnglishWordListsTests {
         #expect(fnv1a64(stopwords.joined(separator: "\n")) == 0x9ebb_4a5a_802e_5cf6)
     }
 
+    @Test("the legal forms are the same in every file, since a legal form belongs to a jurisdiction and not to a language")
+    func legalFormsAreTheSameEverywhere() throws {
+        let lists = try WordLists.load()
+        let reference = try english().provenance.legalForms
+        for language in lists.languages {
+            #expect(try lists.forLanguage(language).provenance.legalForms.entries == reference.entries, "\(language)")
+        }
+    }
+
     @Test("the months, with and without an abbreviation, carry their numbers")
     func months() throws {
         let months = try english().dates.months.entries
