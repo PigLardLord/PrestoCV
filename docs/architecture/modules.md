@@ -327,7 +327,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - The executable and the server's composition root (R4). It reads the command line with ArgumentParser and the configuration, picks the profile's adapters, wires them behind the ports of `ServerApplication` and of `Tailoring`, and creates the infrastructure: the database pool, the queue client, the inference providers' HTTP client (in the role that holds the keys), the clock, the identifier generators and the logger.
 - It reads the deployment's configuration and refuses to start, with an error that names the cause, when a provider does not meet the data policy, when a model is not allowed, when a secret cannot be read, or when a provider's declaration is incomplete (#155, [ADR 0015](adr/0015-inference-providers-and-data-policy.md)). Nothing is skipped silently.
   - Both roles read one configuration, and each checks the policy and the models.
-  - In the role that holds the keys, it reads the secrets, hands them to the adapters and creates the providers' HTTP client, one per process.
+  - Each role reads the secrets it needs: both read the database's credentials; the role that holds the keys also reads the providers' keys and the APNs key, and creates the providers' HTTP client, one per process. It hands the secrets to the adapters.
 - It starts as `serve`, as `work`, or, in the local profile, as both. It composes the router per role.
 - It shuts down cleanly on SIGTERM: the job in hand is finished or released back to the queue.
 

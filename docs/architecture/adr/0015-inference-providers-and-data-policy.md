@@ -20,7 +20,7 @@
 - This ADR's own architecture:
   - where the data policy's types and its rule live;
   - how `ServerInference` and the executable share the work;
-  - which role reads the secrets, and that the executable reads them, not an adapter.
+  - which role reads the providers' keys, and that the executable reads them, not an adapter.
 - This ADR also refines the owner's wording:
   - a provider declares the regions it *may* run in, not the one it runs in, because a router chooses among several;
   - structured output is a capability of a model (*whether* it is supported), while the dialect is *how* an endpoint is asked for it;
@@ -61,7 +61,7 @@
   - The registry's declarations and the data-policy port need no client and no key. The `serve` role can answer `GET /v1/policy` while only the `work` role holds the keys ([ADR 0014](0014-server-modular-monolith.md)).
 - **The `PrestoCVServer` executable reads the configuration and refuses to start,** with an error that names the cause, when a provider does not meet the policy, when a secret cannot be read, or when a model is not allowed (#155). Nothing is skipped silently: a provider whose declaration is incomplete stops the start too.
   - The refusal is a typed error (R7). It carries a code, the aliases and the secret names the operator wrote in the configuration, never a key. The executable words it for the operator.
-  - Both roles read one configuration. Every role checks the policy and the models. Only the role that holds the keys, `work` or both roles in the local profile, reads the secrets. This split is this ADR's own architecture.
+  - Both roles read one configuration. Every role checks the policy and the models. Only the role that holds the keys, `work` or both roles in the local profile, reads the providers' keys; each role reads the other secrets it needs, such as the database's credentials. This split is this ADR's own architecture.
 - **Secrets are read by the executable,** the composition root, and handed to the adapters. An adapter never reads the environment or a secret store itself (R4). In the role that holds the keys, the executable also creates the providers' HTTP client, one per process (R4).
 - **The policy has a version.** It is derived from everything that `GET /v1/policy` serves, the requirements and the processors, so both roles derive the same one. A provider swap that still meets the requirements changes it, and the user is asked again.
   - The start request carries the version the app showed the user. Start refuses a different one, and the job records it.
