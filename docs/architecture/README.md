@@ -22,28 +22,32 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 | **AI Drafting** | supporting | Producing a CV draft from a free-text description with the on-device model | `CVGeneratorAI` |
 | **CV Tailoring** | core domain | Tailoring one CV to a job advert and writing its cover letter, and holding both to their sources: advert analysis, content checks, the provenance gate, the tailoring loop | `CVTailoring` |
 | **App** | integration and presentation | Cross-context workflows, the mappers between contexts, view models, views, the composition root | `PrestoCVApp` package + Xcode app target |
+| **Server** | integration and composition | The HTTP API, the jobs, and the adapters that run tailorings with a model | `PrestoCVServer` |
 
 CV Tailoring is the context [ADR 0005](adr/0005-remove-ai-tailoring-and-json-resume.md) reserved ([ADR 0013](adr/0013-cv-tailoring-context.md)). It runs in the app and on the server; the tailoring loop runs only on the server. JSON Resume is not supported (ADR 0005).
+
+The server is an integration and composition package beside the app, in two roles, `serve` and `work` ([ADR 0014](adr/0014-server-modular-monolith.md)). Like the app, it has a composition root of its own ([R4](rules.md#r4-one-composition-root-per-executable)).
 
 ## Context map
 
 ```
-                          ┌───────────────────────────────────── App ──────────────────────────────────────┐
-                          │          Views ──▶ ViewModels ──▶ Workflows + Mappers ◀── Composition          │
-                          └───────┬───────────────────┬──────────────────────┬───────────────────────┬─────┘
-            conformist to its     │                   │                      │                       │
-            published language    ▼                   ▼                      ▼                       ▼
-                          ┌───────────────┐  ┌──────────────────────────┐  ┌──────────────┐  ┌───────────────┐
-                          │ CV Authoring  │  │ Design Catalog           │  │ AI Drafting  │  │ CV Tailoring  │
-                          │ (PrestoCVCore)    │  │ Document Rendering       │  │ (CVGenerator │  │ (CVTailoring) │
-                          │               │  │ (CVPDFExporter)          │  │  AI)         │  │               │
+                          ┌───────────────────────────────────── App ──────────────────────────────────────┐   ┌─────────────── Server ───────────────┐
+                          │          Views ──▶ ViewModels ──▶ Workflows + Mappers ◀── Composition          │   │  HTTP ──▶ Use cases ◀── Composition  │
+                          └───────┬───────────────────┬──────────────────────┬───────────────────────┬─────┘   └───────────────────┬──────────────────┘
+            conformist to its     │                   │                      │                       │                             │
+            published language    ▼                   ▼                      ▼                       ▼                             │
+                          ┌───────────────┐  ┌──────────────────────────┐  ┌──────────────┐  ┌───────────────┐                     │
+                          │ CV Authoring  │  │ Design Catalog           │  │ AI Drafting  │  │ CV Tailoring  │                     │
+                          │ (PrestoCVCore)    │  │ Document Rendering       │  │ (CVGenerator │  │ (CVTailoring) │                     │
+                          │               │  │ (CVPDFExporter)          │  │  AI)         │  │               │◀────────────────────┘
                           └───────────────┘  └──────────────────────────┘  └──────────────┘  └───────────────┘
                               no arrows between the four packages
 ```
 
 - The four domain packages **never import each other**. Each publishes its own model: `CV` in Authoring, `CVDocument` in Rendering, `CVDraft` in Drafting, `SourceCV` and `TailoredCV` in Tailoring.
 - Inside `CVPDFExporter`, Document Rendering is downstream of Design Catalog: it consumes validated stylesheets and palettes. That is the only edge between contexts inside a package, and it goes one way ([R1](rules.md#r1-packages-are-isolated-contexts-depend-only-along-documented-edges)).
-- All translation between contexts happens in one place: the app's integration layer (`PrestoCVIntegration`). Each mapper is exhaustive and tested ([ADR 0007](adr/0007-each-package-owns-its-model.md)).
+- All translation between contexts happens in one place per executable: `PrestoCVIntegration` in the app, and `ServerHTTP` in the server. Each mapper is exhaustive and tested ([ADR 0007](adr/0007-each-package-owns-its-model.md), [ADR 0014](adr/0014-server-modular-monolith.md)).
+- The server sits beside the app. It conforms to CV Tailoring's published model and to no other context's.
 - `CVPDFExporter` is reusable outside the app, including on a Linux backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)).
 
 ## Target graph
@@ -69,6 +73,13 @@ CVPDFExporter package   CVDocumentModel ◀── CVRendering ──▶ CVDesign
                         CVRendering ◀── CVRenderingPDFKitInspector
 CVGeneratorAI package   CVDrafting ◀── CVDraftingFoundationModels
 CVTailoring package     TailoringModel ◀── AdvertAnalysis, ContentChecks ◀── Provenance ◀── Tailoring
+
+PrestoCVServer package
+  PrestoCVServer (executable, composition root) ──▶ every target below, Hummingbird, Logging, ServiceLifecycle
+  ServerHTTP ──▶ ServerApplication, TailoringModel, PrestoCVAPITypes, PrestoCVAPIServer
+  ServerApplication ──▶ TailoringModel, Tailoring
+  ServerInference ──▶ Tailoring, TailoringModel
+  ServerStorePostgres, ServerQueueCloudTasks, ServerLocalProfile ──▶ ServerApplication
 ```
 
 Arrows point from the importer to the imported module. The authoritative list is [modules.md](modules.md).
@@ -98,6 +109,7 @@ Dependencies point inwards only. The domain knows nothing about storage, UI, loc
 | `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector` | ✓ | ✓ | |
 | `CVRenderingIOS` | ✓ | | |
 | `CVRenderingMacOS` | | ✓ | |
+| Server targets: `ServerApplication`, `ServerInference`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `PrestoCVServer` | | ✓ for development | ✓ must build and test |
 | Test-support targets | ✓ | ✓ | ✓ |
 | `CVDraftingFoundationModels` | ✓ 26 | ✓ 26 | |
 | Xcode app target | ✓ 26 | ✓ 26 | |

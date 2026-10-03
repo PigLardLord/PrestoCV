@@ -50,7 +50,14 @@
   "Features/",
   "DesignSystem/",
   "Platform/",
-  "Resources/"
+  "Resources/",
+  "ServerApplication",
+  "ServerInference",
+  "ServerStorePostgres",
+  "ServerQueueCloudTasks",
+  "ServerLocalProfile",
+  "ServerHTTP",
+  "PrestoCVServer"
  ],
  "targets": [
   {

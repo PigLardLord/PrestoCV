@@ -34,6 +34,10 @@ One word, one meaning, in code, UI copy, tickets and translations. Today "templa
 | **Question** | What the user is asked. Before a tailoring: what the advert asks for that the source CV does not evidence, and the letter fields the advert asks for that the defaults do not give. After it: what the model says it would have needed. Never written into the CV. | — | Tailoring |
 | **Answer** | What the user replies to a question. It is a source for that tailoring only, and only in its question's scope. | An edit of the CV (an answer never changes it); the model's reply | Tailoring |
 | **Cover letter** | The letter a tailoring writes for one advert. It is held to the source CV, the advert and the letter defaults: whom it addresses comes from the advert, what it argues from the source. | — | Tailoring |
+| **Role** | What one run of the server binary does: `serve` answers the API, `work` runs tailorings. The local profile runs both in one process. | A user's role: the server has none | Server |
+| **Profile** | `hosted` or `local`: the set of adapters a composition root picks from configuration. | Environment | Server |
+| **Environment** | Where the server runs: `local`, `staging` or `production`. `local` uses the local profile, the other two the hosted one. | Profile | Server |
+| **Job** | One tailoring the server runs: its state, its CV and its result. It is erased once the app has the result, and 24 hours after it ends at the latest. | Tailoring, which is the work; the job is the server's record of it | Server |
 
 ## UI copy in other languages
 

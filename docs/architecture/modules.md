@@ -263,6 +263,81 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 
 ---
 
+## Package `PrestoCVServer` — the server
+
+A package of its own, next to the app's, in this repository ([ADR 0014](adr/0014-server-modular-monolith.md)). It is an integration and composition package, like `PrestoCVApp`, and not one of the isolated context packages (R1). It builds and tests on Linux, and runs on macOS for development.
+
+The targets are created by #158 part 2 and the tickets named below. Until then they are declared not yet implemented in the checker's `rules.json`.
+
+| Target | Layer | Platforms | May import |
+|---|---|---|---|
+| `ServerApplication` | application | Linux ✓, macOS | `TailoringModel`, `Tailoring`, Foundation |
+| `ServerInference` | outbound adapter | Linux ✓, macOS | `Tailoring`, `TailoringModel`, `AsyncHTTPClient`, Foundation |
+| `ServerStorePostgres` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `PostgresNIO`, Foundation |
+| `ServerQueueCloudTasks` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `AsyncHTTPClient`, Foundation |
+| `ServerLocalProfile` | outbound adapter | Linux ✓, macOS | `ServerApplication`, Foundation |
+| `ServerHTTP` | inbound adapter | Linux ✓, macOS | `ServerApplication`, `TailoringModel`, `PrestoCVAPITypes`, `PrestoCVAPIServer`, `Hummingbird`, `OpenAPIRuntime`, Foundation |
+| `PrestoCVServer` | executable and composition root | Linux ✓, macOS | `ServerApplication`, `ServerInference`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `Hummingbird`, `Logging`, `ServiceLifecycle`, Foundation |
+
+**`ServerApplication`** (#157)
+- **Use cases:** start a tailoring, run it, get it and delete it.
+  - Start checks the caller's quota, records the job under its idempotency key and queues it. The same key returns the same job.
+  - Run is the `work` role's use case: it loads the job, runs the loop of `Tailoring`, and stores the result or the failure.
+  - Get returns the job to its owner only. Delete erases it.
+- **The job lifecycle:** queued, running, succeeded, failed, expired. A job is erased once the app has confirmed its result, and 24 hours after it ends at the latest (#166).
+- **Ports it owns (R3):** the job store, the job queue, the quota and the clock.
+- **Typed errors** (R7). It imports no external package.
+
+**`ServerInference`** (#154, #155)
+- The adapters behind the inference port that `Tailoring` owns: the first one speaks the chat-completions API that most providers and local model servers share, with a dialect for each endpoint.
+- The provider registry and the deployment's data policy, read from configuration.
+- It never logs a prompt, an answer or a key.
+
+**`ServerStorePostgres`** (#160)
+- The job store and the quota store on Postgres, through PostgresNIO.
+- The versioned SQL migrations (R12). Only the binary's `migrate` command applies them, never `serve` or `work`.
+
+**`ServerQueueCloudTasks`** (#161)
+- The job queue on Cloud Tasks, over AsyncHTTPClient. A task is named after its job and calls the worker with the queue's own identity.
+- The dispatch deadline is 30 minutes, retries use backoff, and a running job holds a lease.
+
+**`ServerLocalProfile`** (#157, #158)
+- The in-memory job store and quota store, and the in-process queue, of the local profile.
+- They are adapters of a profile the executable ships, not test doubles (R14). Each passes the contract suite of its port.
+
+**`ServerHTTP`** (#175, #178)
+- The inbound adapter: the Hummingbird routes, the middleware, and the handlers that implement the generated API.
+- It maps the generated types to the use cases and back. The generated types never leave it.
+- `PrestoCVAPITypes` and `PrestoCVAPIServer` are targets of the `PrestoCVAPI` package, which #175 and #177 add to this file.
+
+**`PrestoCVServer`**
+- The executable and the server's composition root (R4). It reads the configuration, picks the profile's adapters, and creates the infrastructure: the database pool, the queue client, the inference providers' clients, the clock, the identifier generators and the logger.
+- It starts as `serve`, as `work`, or, in the local profile, as both.
+- It answers `GET /health` and shuts down cleanly on SIGTERM: the job in hand is finished or released back to the queue.
+
+**Roles.**
+- **`serve`** answers the API. Hosted, it is its own Cloud Run service. It records a job and hands it to the queue.
+- **`work`** runs tailorings. Hosted, it is its own Cloud Run service, and it is private: only the queue's identity may call it, and the platform refuses everyone else before any code runs. Only the worker holds the model providers' keys.
+- A tailoring finishes within the queue's dispatch deadline of 30 minutes.
+- The binary has one more command, `migrate` (#160, #162). It is not a role.
+
+**Profiles.** A profile is a set of adapters that the composition root picks from configuration.
+- **`hosted`:** the Postgres store and the Cloud Tasks queue.
+- **`local`:** the in-memory store and the in-process queue of `ServerLocalProfile`, with both roles in one process. It is for development only, and it refuses to start on any address but 127.0.0.1.
+
+**Environments.** `local` uses the local profile. `staging` and `production` use the hosted profile, each with its own configuration, database and queue. Staging accepts App Attest's development environment and production only the production one. How a change reaches each belongs to the infrastructure layer of #133.
+
+**Translation.** On the server, only `ServerHTTP` translates between the API's types and the tailoring model, as only `PrestoCVIntegration` does in the app ([ADR 0007](adr/0007-each-package-owns-its-model.md)).
+
+**Dependencies.**
+- External packages are imported only by adapters and by the executable, never by `ServerApplication`. Each is pinned in the committed `Package.resolved`. A new one changes this file in the same pull request, and the checker's `--packages` rule holds it.
+- The package depends on `CVTailoring`, and on `PrestoCVAPI` once #177 exists. It depends on none of the app's packages.
+- The targets for authentication, logs and notifications are set by their tickets' decisions (#167, #168, #180) and added to this file then.
+
+**Test support.** None yet. The contract suites of the ports (#157) live in a test-support target that #157 adds to this file.
+
+---
+
 ## Xcode app target `PrestoCV` (iOS 26, macOS 26)
 
 A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-app.md)). The checker maps each folder as its own target.
@@ -290,7 +365,14 @@ PrestoCV (app) ─▶ PrestoCVPresentation ─▶ PrestoCVWorkflowPorts ─▶ P
                                 CVRenderingWebKitSupport, CVRenderingIOS | CVRenderingMacOS,
                                 CVRenderingPDFKitInspector, CVDraftingFoundationModels
 
+PrestoCVServer (executable) ─┬─▶ ServerHTTP ─┬─▶ ServerApplication ─▶ TailoringModel, Tailoring
+                         │               └─▶ TailoringModel, PrestoCVAPITypes, PrestoCVAPIServer
+                         ├─▶ ServerInference ─▶ Tailoring, TailoringModel
+                         └─▶ ServerStorePostgres, ServerQueueCloudTasks, ServerLocalProfile ─▶ ServerApplication
+
 Forbidden: any edge between PrestoCVCore, CVPDFExporter, CVGeneratorAI and CVTailoring.
 Forbidden: any edge from a domain, application or port target to an adapter target.
 Forbidden: PrestoCVPresentation → PrestoCVIntegration.
+Forbidden: any edge from ServerApplication to an external package.
+Forbidden: any edge from the server's package to PrestoCVApp, PrestoCVCore or CVGeneratorAI.
 ```
