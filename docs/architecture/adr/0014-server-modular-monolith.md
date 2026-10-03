@@ -21,7 +21,8 @@
 - **A modular monolith.** One package, `PrestoCVServer`, in this repository. Its modules are targets, and the compiler and the checker hold their boundaries, as in the app. There are no microservices.
 - **One binary, two roles, two services.** `serve` answers the API and `work` runs tailorings. Hosted, each role runs as its own Cloud Run service, and both are built from one image.
   - The API records the job and hands it to a managed queue, Cloud Tasks. The queue calls the worker, the tailoring runs inside that request, and the queue retries it with backoff.
-  - The worker is private. Only the queue's identity may call it, and the platform refuses everyone else before any code runs.
+  - The worker is private. Only the queue's identity may call it, and the platform refuses everyone else before any code runs (#161).
+  - The route the queue calls to run a job lives in `ServerHTTP`. It is mounted only in the `work` role, and it is not part of the public API (`openapi.yaml`). The executable composes the router per role.
   - Only the worker holds the model providers' keys.
   - A tailoring finishes within the queue's dispatch deadline of 30 minutes. The tailoring's own time limit is set below it (#152, #161).
 - **Two profiles, `hosted` and `local`.** A profile is a set of adapters that the composition root picks from configuration. The local profile is for development only. It uses an in-memory store and an in-process queue, runs both roles in one process, and refuses to start on any address but 127.0.0.1.

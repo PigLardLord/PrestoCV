@@ -308,11 +308,12 @@ The targets are created by #158 part 2 and the tickets named below. Until then t
 **`ServerHTTP`** (#175, #178)
 - The inbound adapter: the Hummingbird routes, the middleware, and the handlers that implement the generated API.
 - It maps the generated types to the use cases and back. The generated types never leave it.
+- **The worker's route.** The route the queue calls to run a job lives here too. It is mounted only in the `work` role, and it is not part of the public API (`openapi.yaml`). The platform admits only the queue's identity before any code runs (#161).
 - `PrestoCVAPITypes` and `PrestoCVAPIServer` are targets of the `PrestoCVAPI` package, which #175 and #177 add to this file.
 
 **`PrestoCVServer`**
 - The executable and the server's composition root (R4). It reads the configuration, picks the profile's adapters, and creates the infrastructure: the database pool, the queue client, the inference providers' clients, the clock, the identifier generators and the logger.
-- It starts as `serve`, as `work`, or, in the local profile, as both.
+- It starts as `serve`, as `work`, or, in the local profile, as both. It composes the router per role.
 - It answers `GET /health` and shuts down cleanly on SIGTERM: the job in hand is finished or released back to the queue.
 
 **Roles.**
