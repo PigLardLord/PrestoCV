@@ -33,7 +33,8 @@ struct WordListsDocumentTests {
         #expect(shapes["A number word"] == Set(WordListFormat.numberKeys))
         #expect(shapes["A group of synonyms"] == Set(WordListFormat.synonymKeys))
         #expect(shapes["A word of a form of address"] == Set(WordListFormat.formKeys))
-        #expect(shapes.count == 7, "a shape the decoder does not know is described")
+        #expect(shapes["A word that claims a rank"] == Set(WordListFormat.rankKeys))
+        #expect(shapes.count == 8, "a shape the decoder does not know is described")
     }
 
     @Test("the version and the size limit the page states are the code's")
@@ -43,6 +44,12 @@ struct WordListsDocumentTests {
         #expect(versions == [String(WordListFormat.version)])
         let sizes = Page.matches(#"at most ([\d,]+) bytes"#, in: page).map { $0.replacingOccurrences(of: ",", with: "") }
         #expect(sizes == [String(WordListFormat.maxFileBytes)])
+    }
+
+    @Test("the ranks the page names are the ranks the decoder knows")
+    func ranks() throws {
+        let listed = Page.backticked(try Page.section(from: "### Ranks", to: "#"))
+        #expect(listed == Rank.allCases.map(\.rawValue))
     }
 
     @Test("the page names each of the six language codes in its list of languages")

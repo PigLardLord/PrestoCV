@@ -88,6 +88,7 @@ struct EnglishWordListsTests {
         rows[.provenanceNotPlurals] = row(lists.provenance.notPlurals)
         rows[.provenanceLegalForms] = row(lists.provenance.legalForms)
         rows[.provenanceFirstPerson] = row(lists.provenance.firstPerson)
+        rows[.provenanceRanks] = row(lists.provenance.ranks)
         rows[.fieldsTechnologies] = row(lists.technologies)
         return rows
     }
@@ -152,6 +153,7 @@ struct EnglishWordListsTests {
         counts[.provenanceNotPlurals] = 9  // core/ProvenanceCheck.js NOT_PLURALS
         counts[.provenanceLegalForms] = 25  // LEGAL_FORM: its 16 alternatives written out, with and without the optional dots and space
         counts[.provenanceFirstPerson] = 9  // ProvenanceCheck.names: "I" and I'm, I've, I'd, I'll with either apostrophe
+        counts[.provenanceRanks] = 10  // RANKS: 8 of its 14 patterns are English, senior, lead|leading, principal, staff, head|chief, director, manager, architect
         counts[.fieldsTechnologies] = 49  // domain/TechnologyLexicon.js TECHNOLOGIES
         return counts
     }()
@@ -270,6 +272,10 @@ struct EnglishWordListsTests {
     func provenanceWords() throws {
         let provenance = try english().provenance
         #expect(provenance.notPlurals.entries == ["news", "goods", "means", "series", "species", "lens", "gas", "bus", "sales"])
+        #expect(provenance.ranks.entries.map(\.word) == ["senior", "lead", "leading", "principal", "staff", "head", "chief", "director", "manager", "architect"])
+        #expect(provenance.ranks.entries.first == RankWord(word: "senior", ranks: [.senior]))
+        #expect(provenance.ranks.entries.first { $0.word == "chief" }?.ranks == [.head])
+        #expect(provenance.ranks.entries.first { $0.word == "leading" }?.ranks == [.lead])
         #expect(provenance.firstPerson.entries == ["I", "I'm", "I've", "I'd", "I'll", "I\u{2019}m", "I\u{2019}ve", "I\u{2019}d", "I\u{2019}ll"])
         let forms = provenance.legalForms.entries
         for form in ["gmbh", "ggmbh", "ag", "ltd", "ltd.", "limited", "inc", "inc.", "llc", "plc", "e.v.", "e. v.", "s.a.", "b.v."] {

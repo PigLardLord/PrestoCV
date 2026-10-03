@@ -27,4 +27,7 @@ enum WordListFormat {
     static let numberKeys = ["word", "value"]
     static let synonymKeys = ["forms"]
     static let formKeys = ["form", "word"]
+
+    /// The keys of a word that claims a rank.
+    static let rankKeys = ["word", "ranks"]
 }

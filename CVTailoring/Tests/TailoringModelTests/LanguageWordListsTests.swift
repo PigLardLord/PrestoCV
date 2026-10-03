@@ -28,6 +28,7 @@ struct LanguageWordListsTests {
         #expect(lists.letter.formsOfAddress.entries == [FormOfAddressWord(form: .ms, word: "alpha"), FormOfAddressWord(form: .mr, word: "beta")])
         #expect(lists.provenance.notPlurals.entries == ["alpha", "beta"] && lists.provenance.legalForms.entries == ["alpha", "beta"])
         #expect(lists.provenance.firstPerson.entries == ["alpha", "beta"])
+        #expect(lists.provenance.ranks.entries == [RankWord(word: "alpha", ranks: [.senior]), RankWord(word: "beta", ranks: [.lead, .head])])
         #expect(lists.letter.academicTitles.entries == ["alpha", "beta"] && lists.letter.notGivenNames.entries == ["alpha", "beta"])
         #expect(lists.technologies.entries == ["alpha", "beta"])
     }
@@ -106,7 +107,7 @@ struct LanguageWordListsTests {
     static let unknownEntryKeyCases: [WordListKey] = {
         var values: [WordListKey] = []
         values.append(contentsOf: [.datesMonths, .numbersWords, .spansCountWords, .advertSynonyms])
-        values.append(contentsOf: [.letterFormsOfAddress])
+        values.append(contentsOf: [.letterFormsOfAddress, .provenanceRanks])
         return values
     }()
 
@@ -503,5 +504,72 @@ struct LanguageWordListsTests {
             $0["entries"] = [["form": "ms", "word": "ms"], ["form": "ms", "word": "mrs"], ["form": "mr", "word": "mr"]]
         }
         #expect(try decode(data).letter.formsOfAddress.entries.map(\.word) == ["ms", "mrs", "mr"])
+    }
+
+    // MARK: - Ranks
+
+    @Test("the ranks of the format are the ones the check knows")
+    func ranksOfTheFormat() {
+        #expect(Rank.allCases.map(\.rawValue) == ["senior", "lead", "principal", "staff", "head", "director", "manager", "architect"])
+    }
+
+    static let unknownRankCases: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["", "Senior", "seniorr", " senior", "chief", "junior"])
+        return values
+    }()
+
+    @Test("a rank the format does not know is corrupt", arguments: unknownRankCases)
+    func unknownRank(rank: String) throws {
+        let data = try WordListFixture.data(editing: .provenanceRanks) { $0["entries"] = [["word": "alpha", "ranks": ["senior", rank]]] }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    @Test("a word that claims no rank, or one rank twice, is corrupt")
+    func noRankOrTwice() throws {
+        var lists: [[String]] = [[]]
+        lists.append(["lead", "lead"])
+        for ranks in lists {
+            let data = try WordListFixture.data(editing: .provenanceRanks) { $0["entries"] = [["word": "alpha", "ranks": ranks]] }
+            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        }
+    }
+
+    @Test("ranks that are not an array of strings, or are missing, are corrupt")
+    func ranksNotAnArray() throws {
+        var values: [Any] = ["senior"]
+        values.append(1)
+        values.append(NSNull())
+        values.append([1])
+        for ranks in values {
+            let data = try WordListFixture.data(editing: .provenanceRanks) { $0["entries"] = [["word": "alpha", "ranks": ranks]] }
+            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        }
+        let missing = try WordListFixture.data(editing: .provenanceRanks) { $0["entries"] = [["word": "alpha"]] }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(missing) }
+    }
+
+    @Test("a word of a rank that is empty or not trimmed is corrupt")
+    func badRankWord() throws {
+        for word in Self.badEntries {
+            let data = try WordListFixture.data(editing: .provenanceRanks) { $0["entries"] = [["word": word, "ranks": ["lead"]]] }
+            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        }
+    }
+
+    @Test("a word that is two entries once folded is corrupt, though it claims two ranks")
+    func rankWordRepeated() throws {
+        let data = try WordListFixture.data(editing: .provenanceRanks) {
+            $0["entries"] = [["word": "lead", "ranks": ["lead"]], ["word": "LEAD", "ranks": ["head"]]]
+        }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    @Test("a word may claim several ranks, in the order the file writes them")
+    func severalRanks() throws {
+        let data = try WordListFixture.data(editing: .provenanceRanks) {
+            $0["entries"] = [["word": "leiter", "ranks": ["lead", "head", "manager", "director"]]]
+        }
+        #expect(try decode(data).provenance.ranks.entries == [RankWord(word: "leiter", ranks: [.lead, .head, .manager, .director])])
     }
 }

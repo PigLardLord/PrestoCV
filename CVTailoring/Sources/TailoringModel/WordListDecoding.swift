@@ -128,6 +128,18 @@ private struct RawFormWord: Decodable {
     }
 }
 
+private struct RawRankWord: Decodable {
+    let word: String
+    let ranks: [String]
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicKey.self)
+        try container.allowOnly(WordListFormat.rankKeys)
+        word = try container.decode(String.self, forKey: "word")
+        ranks = try container.decode([String].self, forKey: "ranks")
+    }
+}
+
 private struct RawSynonym: Decodable {
     let forms: [String]
 
@@ -225,11 +237,13 @@ private struct RawLetter {
 
 private struct RawProvenance {
     let notPlurals, legalForms, firstPerson: RawList<String>
+    let ranks: RawList<RawRankWord>
 
     init(_ group: RawGroup) throws {
         notPlurals = try group.list(.provenanceNotPlurals)
         legalForms = try group.list(.provenanceLegalForms)
         firstPerson = try group.list(.provenanceFirstPerson)
+        ranks = try group.list(.provenanceRanks)
     }
 }
 
@@ -325,7 +339,8 @@ private struct WordListReading {
         ProvenanceWords(
             notPlurals: try texts(raw.notPlurals, .provenanceNotPlurals),
             legalForms: try texts(raw.legalForms, .provenanceLegalForms),
-            firstPerson: try texts(raw.firstPerson, .provenanceFirstPerson)
+            firstPerson: try texts(raw.firstPerson, .provenanceFirstPerson),
+            ranks: try ranks(raw.ranks, .provenanceRanks)
         )
     }
 
@@ -345,6 +360,18 @@ private struct WordListReading {
         try check(raw, key, words: raw.entries.map(\.word))
         guard raw.entries.allSatisfy({ $0.value >= 0 }) else { throw corrupt }
         return WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { NumberWord(word: $0.word, value: $0.value) })
+    }
+
+    /// A word claims at least one rank, each a rank the format knows and none twice.
+    func ranks(_ raw: RawList<RawRankWord>, _ key: WordListKey) throws(TailoringModelError) -> WordList<RankWord> {
+        try check(raw, key, words: raw.entries.map(\.word))
+        var entries: [RankWord] = []
+        for entry in raw.entries {
+            let ranks = entry.ranks.compactMap(Rank.init(rawValue:))
+            guard !ranks.isEmpty, ranks.count == entry.ranks.count, Set(ranks).count == ranks.count else { throw corrupt }
+            entries.append(RankWord(word: entry.word, ranks: ranks))
+        }
+        return WordList(source: raw.source, licence: raw.licence, entries: entries)
     }
 
     /// A form is `ms` or `mr`: the neutral form has no word of its own.

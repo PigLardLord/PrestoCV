@@ -44,6 +44,7 @@ public enum WordListKey: String, CaseIterable, Hashable, Sendable {
     case provenanceNotPlurals = "provenance.notPlurals"
     case provenanceLegalForms = "provenance.legalForms"
     case provenanceFirstPerson = "provenance.firstPerson"
+    case provenanceRanks = "provenance.ranks"
     case fieldsTechnologies = "fields.technologies"
 
     /// The group of the file the list belongs to: `advert`, `dates`, `numbers`, `spans`, `letter`, `provenance` or `fields`.

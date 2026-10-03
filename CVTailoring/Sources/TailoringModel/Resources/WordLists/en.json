@@ -668,6 +668,22 @@
     }
   },
   "provenance": {
+    "ranks": {
+      "source": "cv-giovanni 6e28147 core/ProvenanceCheck.js RANKS (the English words)",
+      "licence": "ISC",
+      "entries": [
+        { "word": "senior", "ranks": ["senior"] },
+        { "word": "lead", "ranks": ["lead"] },
+        { "word": "leading", "ranks": ["lead"] },
+        { "word": "principal", "ranks": ["principal"] },
+        { "word": "staff", "ranks": ["staff"] },
+        { "word": "head", "ranks": ["head"] },
+        { "word": "chief", "ranks": ["head"] },
+        { "word": "director", "ranks": ["director"] },
+        { "word": "manager", "ranks": ["manager"] },
+        { "word": "architect", "ranks": ["architect"] }
+      ]
+    },
     "notPlurals": {
       "source": "cv-giovanni 6e28147 core/ProvenanceCheck.js NOT_PLURALS",
       "licence": "ISC",

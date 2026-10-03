@@ -43,6 +43,7 @@ enum WordListFixture {
         var shaped: [WordListKey] = []
         shaped.append(contentsOf: [.datesMonths, .numbersWords, .spansCountWords])
         shaped.append(contentsOf: [.advertSynonyms, .spansTiedCounts, .letterFormsOfAddress])
+        shaped.append(.provenanceRanks)
         return WordListKey.allCases.filter { !shaped.contains($0) }
     }
 
@@ -69,6 +70,11 @@ enum WordListFixture {
             return groups
         case .spansTiedCounts:
             return ["{count} of them at {employer}"]
+        case .provenanceRanks:
+            var ranks: [Any] = []
+            ranks.append(["word": "alpha", "ranks": ["senior"]] as Object)
+            ranks.append(["word": "beta", "ranks": ["lead", "head"]] as Object)
+            return ranks
         case .letterFormsOfAddress:
             var forms: [Any] = []
             forms.append(["form": "ms", "word": "alpha"] as Object)

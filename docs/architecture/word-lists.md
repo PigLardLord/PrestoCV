@@ -35,17 +35,23 @@ The supported languages are the ones the index names, each with its file. An ind
 | A number word | `word`, `value` |
 | A group of synonyms | `forms` |
 | A word of a form of address | `form`, `word` |
+| A word that claims a rank | `word`, `ranks` |
 
 - `version` is the whole number 1. A file of another version is refused, and the version is read before anything else, so a newer format is never read as a file with lists missing.
 - Each group holds the lists named in the key table, and no other. Every list is an object with a `source`, a `licence` and its `entries`.
-- An entry is a string, except in five lists:
+- An entry is a string, except in six lists:
   - `dates.months`: `{ "name": "january", "month": 1 }`, a month from 1 to 12;
   - `numbers.words` and `spans.countWords`: `{ "word": "two", "value": 2 }`, a value that is not negative;
   - `advert.synonyms`: `{ "forms": ["ui", "user interface"] }`, two forms at least;
-  - `letter.formsOfAddress`: `{ "form": "ms", "word": "mrs" }`, a form that is `ms` or `mr`, since the neutral form has no word of its own.
+  - `letter.formsOfAddress`: `{ "form": "ms", "word": "mrs" }`, a form that is `ms` or `mr`, since the neutral form has no word of its own;
+  - `provenance.ranks`: `{ "word": "chief", "ranks": ["head"] }`, one rank at least, each from the set below and none twice.
 - `advert.streets` also says where the language writes the word of a street, in `order`: `joined` to the name ("Hauptstraße 1"), `after` it with the number first ("221B Baker Street"), or `before` it with the number last ("Via Roma 1").
 - `spans.tiedCounts` holds templates: literal words around `{count}` and `{employer}`, each exactly once and no other brace. A language puts the count before or after the employer as it writes it.
 - Entries are kept as written. A match folds both sides with `TextFold.fold`, the one normalisation in `TailoringModel`: case, accents and ligatures are dropped, `ß` is `ss`, and runs of white space are one space.
+
+### Ranks
+
+A word of a title claims the ranks it may mean, and a tailored title may claim no rank its source does not. The ranks are a closed set, the same in every language: `senior`, `lead`, `principal`, `staff`, `head`, `director`, `manager`, `architect`. An entry is a whole word, and it may mean several ranks: German writes a lead and a head alike.
 
 ### Keys
 
@@ -91,6 +97,7 @@ Every file holds every key below. A file that lacks one is refused as incomplete
 | `provenance.notPlurals` | Words that end like a plural and are none ("news", "series") | `Provenance` finds a word in both its numbers, and does not make "new" of "news" |
 | `provenance.legalForms` | The legal forms a company's name ends in, every spelling written out ("gmbh", "ltd.", "gmbh & co. kg"). A legal form belongs to a jurisdiction and not to a language, so every file holds the whole list, as it holds the technologies | `Provenance` finds a recipient's company as a letter writes it in prose, without its legal form |
 | `provenance.firstPerson` | The capitalised words of the first person, with either apostrophe ("I", "I'm") | `Provenance` does not read them as names |
+| `provenance.ranks` | The words of a title that claim a rank, each with the ranks it may mean ("senior", "chief" for head) | `Provenance` refuses a title that claims a rank its source does not write |
 | `fields.technologies` | Names of technologies that are never ordinary words of the language ("Kotlin", "SwiftUI") | `Provenance` holds a mention to the source however it is written; a name that is also an ordinary word stays out, and is read from its capitals |
 
 ### What stays in code
