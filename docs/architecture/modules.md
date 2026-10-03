@@ -285,7 +285,8 @@ The targets are created by #158 part 2 and the tickets named below. Until then t
   - Run is the `work` role's use case: it loads the job, runs the loop of `Tailoring`, and stores the result or the failure.
   - Get returns the job to its owner only. Delete erases it.
 - **The job lifecycle:** queued, running, succeeded, failed, expired. A job is erased once the app has confirmed its result, and 24 hours after it ends at the latest (#166).
-- **Ports it owns (R3):** the job store, the job queue, the quota and the clock.
+- **Ports it owns (R3):** the job store, the job queue, the quota, the clock and the log events.
+- **Log events** are typed and never carry a CV, a prompt or a key (#167). The adapters and the executable bridge the port to swift-log.
 - **Typed errors** (R7). It imports no external package.
 
 **`ServerInference`** (#154, #155)
@@ -332,6 +333,7 @@ The targets are created by #158 part 2 and the tickets named below. Until then t
 
 **Dependencies.**
 - External packages are imported only by adapters and by the executable, never by `ServerApplication`. Each is pinned in the committed `Package.resolved`. A new one changes this file in the same pull request, and the checker's `--packages` rule holds it.
+- The tickets that add logging and metrics (#167, #178) extend the adapters' allow-lists with `Logging` and `Metrics` in this file.
 - The package depends on `CVTailoring`, and on `PrestoCVAPI` once #177 exists. It never depends on `PrestoCVApp`, `PrestoCVCore` or `CVGeneratorAI`.
 - It may depend on `CVPDFExporter`, which is reusable on a backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)). The ticket that needs that edge adds it to this file, for example #94.
 - The targets for authentication, logs and notifications are set by their tickets' decisions (#167, #168, #180) and added to this file then.
