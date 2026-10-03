@@ -58,10 +58,14 @@
   "ServerLocalProfile",
   "ServerHTTP",
   "PrestoCVServer",
+  "ServerAuth",
+  "ServerAttestApple",
+  "ServerSessionJWT",
   "PrestoCVAPITypes",
   "PrestoCVAPIServer",
   "PrestoCVAPIClient",
-  "PrestoCVAPIAdapter"
+  "PrestoCVAPIAdapter",
+  "PrestoCVAppAttest"
  ],
  "targets": [
   {

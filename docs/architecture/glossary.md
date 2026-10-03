@@ -48,6 +48,11 @@ One word, one meaning, in code, UI copy, tickets and translations. Today "templa
 | **Spec** | `openapi.yaml`: the single source of the API between the app and the server, and its documentation. The types, the server's protocol and the app's client are generated from it. | The generated code, which follows the spec and is never edited by hand | App, Server |
 | **Problem** | An error response of the API, in problem+json, with a stable `type` that the spec documents. Its `type` URI is its code; `title` and `detail` are for developers and never shown. | A typed error of a context (R7), which an adapter maps from or to a problem | App, Server |
 | **Minimum app version** | The oldest version of the app that the server accepts. An older one is refused with a problem that tells the user to update. | The app's minimum operating system | App, Server |
+| **Installation** | One copy of the app on one device, and the API's caller. The server knows installations, not users, and keeps no account. In the server's code it is a device, named by a `DeviceID`. | A user or an account, which PrestoCV does not have. A person with two devices is two installations | App, Server |
+| **Attestation** | Apple's proof that a key, created in the device's Secure Enclave, belongs to a genuine copy of the app. The server verifies it once, when it registers the device (#169). | An assertion. App Attest's environments, development and production, are not the server's environments | App, Server |
+| **Assertion** | A signature by the attested key over a challenge or over a request's body, with a counter that must be greater than the last one the server saw. So a replayed assertion fails. | An attestation, which proves the key and is made once | App, Server |
+| **Session token** | A JWT signed with Ed25519 and valid for 15 minutes. The server issues it for a valid assertion and verifies it without the database. It says who is calling, and starting a tailoring needs a fresh assertion as well. | A development token | Server |
+| **Development token** | The token that the local profile and the Simulator use in place of an attestation. No hosted profile accepts it, and no release build sends it (#173). | A session token | App, Server |
 
 ## UI copy in other languages
 

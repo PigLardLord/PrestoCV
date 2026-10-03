@@ -22,11 +22,11 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 | **AI Drafting** | supporting | Producing a CV draft from a free-text description with the on-device model | `CVGeneratorAI` |
 | **CV Tailoring** | core domain | Tailoring one CV to a job advert and writing its cover letter, and holding both to their sources: advert analysis, content checks, the provenance gate, the tailoring loop | `CVTailoring` |
 | **App** | integration and presentation | Cross-context workflows, the mappers between contexts, view models, views, the composition root | `PrestoCVApp` package + Xcode app target |
-| **Server** | integration and composition | The HTTP API, the jobs, and the adapters that run tailorings with a model | `PrestoCVServer` package |
+| **Server** | integration and composition | The HTTP API, the jobs, the authentication of installations, and the adapters that run tailorings with a model | `PrestoCVServer` package |
 
 CV Tailoring is the context [ADR 0005](adr/0005-remove-ai-tailoring-and-json-resume.md) reserved ([ADR 0013](adr/0013-cv-tailoring-context.md)). It runs in the app and on the server; the tailoring loop runs only on the server. JSON Resume is not supported (ADR 0005).
 
-The server is an integration and composition package beside the app, in two roles, `serve` and `work` ([ADR 0014](adr/0014-server-modular-monolith.md)). Like the app, it has a composition root of its own ([R4](rules.md#r4-one-composition-root-per-executable)). It reaches models through the providers its deployment configures, each held to the deployment's data policy ([ADR 0015](adr/0015-inference-providers-and-data-policy.md)). Hosted, it runs on Cloud Run in the EU, erases a job once the app has its result (24 hours after it ends at the latest), and limits what it spends ([ADR 0017](adr/0017-hosting-storage-and-cost.md)).
+The server is an integration and composition package beside the app, in two roles, `serve` and `work` ([ADR 0014](adr/0014-server-modular-monolith.md)). Like the app, it has a composition root of its own ([R4](rules.md#r4-one-composition-root-per-executable)). It reaches models through the providers its deployment configures, each held to the deployment's data policy ([ADR 0015](adr/0015-inference-providers-and-data-policy.md)). Hosted, it runs on Cloud Run in the EU, erases a job once the app has its result (24 hours after it ends at the latest), and limits what it spends ([ADR 0017](adr/0017-hosting-storage-and-cost.md)). Installations, not users, authenticate: the app proves with Apple's App Attest that it is a genuine copy, and the server keeps no account ([ADR 0018](adr/0018-app-attest.md)).
 
 ## Context map
 
@@ -67,8 +67,9 @@ PrestoCVApp package                    │
                                    └──▶ TailoringModel, AdvertAnalysis, ContentChecks
   PrestoCVComposition ──▶ PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns,
                       CVRenderingWebKitSupport, CVRenderingIOS (iOS) / CVRenderingMacOS (macOS),
-                      CVRenderingPDFKitInspector, CVDraftingFoundationModels, PrestoCVAPIAdapter
+                      CVRenderingPDFKitInspector, CVDraftingFoundationModels, PrestoCVAPIAdapter, PrestoCVAppAttest
   PrestoCVAPIAdapter ──▶ PrestoCVIntegration, TailoringModel, PrestoCVAPITypes, PrestoCVAPIClient
+  PrestoCVAppAttest ──▶ PrestoCVIntegration    (iOS 26, macOS 27; DeviceCheck, CryptoKit, Security)
 
 PrestoCVCore package        PrestoCVDomain ◀── PrestoCVApplication ◀── PrestoCVPersistence
 CVPDFExporter package   CVDocumentModel ◀── CVRendering ──▶ CVDesignCatalog ◀── CVDesignCatalogFileStore, CVBundledDesigns
@@ -79,12 +80,15 @@ CVTailoring package     TailoringModel ◀── AdvertAnalysis, ContentChecks �
 PrestoCVAPI package         PrestoCVAPITypes ◀── PrestoCVAPIServer, PrestoCVAPIClient    (generated from openapi.yaml, imports no PrestoCV package)
 
 PrestoCVServer package
-  PrestoCVServer (executable, composition root) ──▶ every target below, and Tailoring
-  ServerHTTP ──▶ ServerApplication, TailoringModel, PrestoCVAPITypes, PrestoCVAPIServer
+  PrestoCVServer (executable, composition root) ──▶ every target below, Tailoring and JWTKit
+  ServerHTTP ──▶ ServerApplication, ServerAuth, TailoringModel, PrestoCVAPITypes, PrestoCVAPIServer
   ServerApplication ──▶ TailoringModel, Tailoring
+  ServerAuth ──▶ ServerApplication
   ServerInference ──▶ ServerApplication, Tailoring, TailoringModel
-  ServerStorePostgres ──▶ ServerApplication, TailoringModel
-  ServerQueueCloudTasks, ServerLocalProfile ──▶ ServerApplication
+  ServerAttestApple, ServerSessionJWT ──▶ ServerAuth
+  ServerStorePostgres ──▶ ServerApplication, ServerAuth, TailoringModel
+  ServerLocalProfile ──▶ ServerApplication, ServerAuth
+  ServerQueueCloudTasks ──▶ ServerApplication
 ```
 
 Arrows point from the importer to the imported module. The authoritative list is [modules.md](modules.md).
@@ -114,11 +118,12 @@ Dependencies point inwards only. The domain knows nothing about storage, UI, loc
 | `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector` | ✓ | ✓ | |
 | `CVRenderingIOS` | ✓ | | |
 | `CVRenderingMacOS` | | ✓ | |
-| Server targets: `ServerApplication`, `ServerInference`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `PrestoCVServer` | | ✓ for development | ✓ must build and test |
+| Server targets: `ServerApplication`, `ServerAuth`, `ServerInference`, `ServerAttestApple`, `ServerSessionJWT`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `PrestoCVServer` | | ✓ for development | ✓ must build and test |
 | `PrestoCVAPITypes`, `PrestoCVAPIClient`, `PrestoCVAPIAdapter` | ✓ | ✓ | ✓ must build and test |
 | `PrestoCVAPIServer` | | ✓ for development | ✓ must build and test |
 | Test-support targets | ✓ | ✓ | ✓ |
 | `CVDraftingFoundationModels` | ✓ 26 | ✓ 26 | |
+| `PrestoCVAppAttest` | ✓ 26 | ✓ 27 | builds empty (R11) |
 | Xcode app target | ✓ 26 | ✓ 26 | |
 
 Linux support is not a nice-to-have. It is what proves that platform code stayed in the adapters ([R11](rules.md#r11-platform-code-lives-only-in-adapters)), and it is where the renderer for a backend will run.
