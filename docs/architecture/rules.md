@@ -18,9 +18,9 @@ The checker applies to **production targets**: domain, application, integration,
 
 ## R1. Packages are isolated; contexts depend only along documented edges
 
-- **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter`, `CVGeneratorAI` and `CVTailoring` never import one another. Translation between them happens only in `PrestoCVIntegration`.
+- **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter`, `CVGeneratorAI` and `CVTailoring` never import one another. Translation between them happens, in the app, only in `PrestoCVIntegration`.
 - **The server's package is not one of them.** The `PrestoCVServer` package is an integration and composition package, like `PrestoCVApp`. It imports the context packages it serves. It never imports `PrestoCVApp` or `PrestoCVCore`. It may import the Linux targets of `CVPDFExporter` and of `CVGeneratorAI` (`CVDrafting`), which are reusable on a backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)), once [modules.md](modules.md) lists the edge.
-- **On the server, the API's generated types are translated to and from the tailoring model only in `ServerHTTP`, and never leave it** (#175, [ADR 0014](adr/0014-server-modular-monolith.md)). A translation between two context packages on the server lives in a server target that [modules.md](modules.md) names, or needs an ADR.
+- **On the server, the API's generated types are translated to and from the tailoring model only in `ServerHTTP`, and never leave it** (#175, [ADR 0014](adr/0014-server-modular-monolith.md)). A translation between two context packages on the server lives in a server target that [modules.md](modules.md) designates for that translation, or needs an ADR.
 - **Inside a package, contexts depend only along the edges listed in [modules.md](modules.md).** There is exactly one such edge today: in `CVPDFExporter`, Document Rendering is downstream of Design Catalog (`CVRendering` imports `CVDesignCatalog`). The reverse is forbidden.
 - **Any other edge** between contexts needs an ADR and an update to [modules.md](modules.md).
 - **`@_exported import` is banned.** It would re-export a module to every importer.
@@ -157,7 +157,7 @@ Continuations resume exactly once, time out where they wait on the outside world
 
 ## R10. Tests are fast, hermetic and at the right level
 
-- **Rules without I/O.** Domain rules and use cases are tested without I/O, using the in-memory adapters from `…TestSupport` targets.
+- **Rules without I/O.** Domain rules and use cases are tested without I/O, using the in-memory adapters from `…TestSupport` targets or, on the server, the local profile's adapters ([ADR 0014](adr/0014-server-modular-monolith.md)).
 - **Contract tests.** Every adapter passes the contract tests of its port. All PDF renderers run the same contract suite, on their real platform.
 - **Golden tests.** Rendering compares a fixture document against a **committed golden HTML file**. Changing that file is reviewed like code.
 - **Mapper completeness.** A Mirror-based test proves that every populated `CV` field reaches the `CVDocument`.
