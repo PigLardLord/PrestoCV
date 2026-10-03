@@ -54,7 +54,7 @@
 
 - **(a) The stores.** The job store and the quota store are ports of `ServerApplication`, and `ServerStorePostgres` implements them on Postgres (#160).
   - The device registry that authentication needs (#170) is a port of `ServerApplication` or of the target that #168 decides. Its Postgres adapter is in `ServerStorePostgres`, and its in-memory adapter is in `ServerLocalProfile`.
-  - Erasing an idle device goes through a port that `ServerApplication` owns.
+  - Erasing an idle device, and sweeping expired challenges and address counts, go through ports that `ServerApplication` owns.
   - One schema and one migration history cover the server's own tables, unless #168 decides otherwise for the tables of authentication.
 - **(b) The schema.** It is versioned SQL, applied only by the binary's `migrate` command, never by `serve` or `work` (#160). Its constraints live in the schema. Its rows are DTOs of the store's own, built from the types of `TailoringModel` (R12): the domain never reaches the database.
 - **(c) Erasure is a use case of `ServerApplication`** (#166). It is one rule with two entries.
@@ -63,7 +63,9 @@
   - **A schedule runs it for everything that is due.** The schedule is Cloud Scheduler, which the owner names in #166, in `europe-west1`. It calls the worker on a route that, like the one the queue calls, is mounted only in `work` and is not in `openapi.yaml`. The queue's identity authenticates it, as [ADR 0014](0014-server-modular-monolith.md) decides.
   - **The 24 hours hold at the latest.** The period is the 24 hours, and the interval is the schedule's. Each run erases every job that ended at least the period minus the interval ago, whether it succeeded, failed or expired, because the next run would find it past its period. So no job outlives its period. A job can go up to one interval early.
   - **Every job ends.** The same run first expires every job that has not ended within its queue's retry window after it was recorded. A job stuck in `queued` or `running` ends, and is erased 24 hours after that at the latest.
-  - The period, the interval and the retry window are configuration. The interval is longer than Neon's five idle minutes, so the database can suspend between runs (#163, #166).
+  - The retry window is no shorter than the queue's own retry limit in `infra/` (#161, #163), so a job that the queue still retries is not expired. A worker neither runs nor writes a job that has ended.
+  - The period, the interval and the retry window are configuration.
+  - The interval is no shorter than the schedule's in `infra/` (#163). It is longer than Neon's five idle minutes, so the database can suspend between runs, and at most an hour, so the counts of hashed addresses are swept within the hour (#172). So the app has at least the period minus the interval to fetch a result. The executable refuses an interval that is not well below the period (#166).
   - The same run sweeps what has expired in the stores of authentication and of the address limits: the challenges (#170) and the counts of hashed addresses (#172).
   - Quota counts go with their device at the latest. When they go sooner is left to #165.
 - **(d) The cost limits are checked by `ServerApplication`, before a job is recorded** (#165). The per-device limit and the limit for everyone are both checked there. Over one, the API answers 429 with when to retry.
@@ -77,10 +79,10 @@
 - **(g) The platform's work is bounded in `infra/`** (#163). Each Cloud Run service has a maximum number of instances, and the queue has a maximum dispatch rate. The daily limits bound the tailorings, and these caps bound the work the platform does, whatever reaches it. #163 sizes them to what the daily limit of 100 tailorings needs.
 - **(h) A task carries the job's ID and nothing else** (#161). The CV and the advert are in the job store only, so erasing a job erases the CV from the one place the server keeps it. The queue holds no copy of it.
 - **(i) A database branch holds one environment's data.**
-  - Each branch has its own role and its own password, so staging's credentials never open production's.
-  - No branch is made from another environment's data, and none is reset from its parent. Staging's branch is made before production holds any data, or as a schema-only branch, and `migrate` builds the schema (#160, #163).
-  - Neon keeps a history of the database for restores. The project's restore window is the shortest that still allows a restore (#163).
-- **(j) Secrets.** The executable reads every secret and hands it to the adapters, so no adapter reads a secret store (R4, [ADR 0015](0015-inference-providers-and-data-policy.md)).
+  - Each branch has its own role and its own password, so staging's credentials never open production's. The runbook says whether the passwords of the branch roles may be in OpenTofu's state or are created outside it (#163).
+  - No branch is made from another environment's data, and none is reset from its parent. Staging's branch is made empty, before production holds any data, and `migrate` builds its schema (#160, #163).
+  - Neon keeps a history of the database for restores. The project's restore window is as short as the owner accepts for a restore, and the runbook records the value (#163).
+- **(j) Secrets.** The executable reads every secret and hands it to the adapters, so no adapter reads a secret store (R4, [ADR 0015](0015-inference-providers-and-data-policy.md)). Each secret is readable only by the identities that need it: its service, and CI's identity for the Neon credentials it needs (#164).
   - Each role reads the secrets it needs. Both read the database's credentials, and `migrate` reads them too. The worker alone reads the providers' keys and the APNs key, so `serve` reads no provider's key.
   - How the executable reads Secret Manager, mounted into the service or through the API, is #163's choice. The executable does the reading.
   - The queue adapter gets its access token from a token provider that the executable creates and hands in.
@@ -110,10 +112,10 @@
   - **Every query crosses from Belgium to Frankfurt.** Both are in the EU, and they are not the same place.
   - **The queue's deadline of 30 minutes** ([ADR 0014](0014-server-modular-monolith.md)) bounds a tailoring.
   - **The budget alert does not stop spending.** The hosted router's credit limit is the hard cap on what the router charges. The daily limits bound the tailorings, and the instance and dispatch caps bound the platform's work. No cap stops Google's bill, and the alert warns.
-  - **A burst past the caps waits or is refused.** A bound on the cost is a bound on the capacity.
+  - **A burst past the caps waits or is refused.** A bound on the cost is a bound on the capacity. The log exclusion also drops the record of the requests that the platform refuses at the instance caps, and the server's own log never sees them.
   - **A free plan can change,** and the vendor decides when. For Google, the alert at 1 € is how the owner would notice. A change of Neon's plan reaches the owner through Neon (#163).
   - **An erased row can outlive its erasure in Neon's history,** at least for the project's restore window and until Neon's storage reclaims it. The runbook records the window and Neon's deletion terms (#163), and the privacy policy states retention with them (#190).
-  - **A job can be erased up to one interval early.** The bound assumes that the schedule runs, and a run that does not happen delays erasure until the next one.
+  - **A job can be erased up to one interval early.** The bound assumes that the schedule runs. A run that does not happen delays erasure until the next one, and an alert on a failed run, set in `infra/` (#163), says so.
   - **A job that is stuck lives for the retry window and 24 hours.**
   - **Setting up is partly by hand:** the secrets' values, the router's credit limit and, if Neon's OpenTofu provider does not hold up, Neon itself. `tofu apply` is the owner's step (#163).
 - **Enforced by:**
@@ -132,6 +134,8 @@
       - on confirmation, and of an idle device, with the idle device's quota counts gone with it;
       - for each final state, and for a job stuck in `queued` or `running`, which the run expires first;
       - for a given interval, no job outlives its period: the test runs the schedule on the injected clock;
+      - the executable refuses an interval that is not well below the period: a startup-refusal test;
+      - a worker that resumes after its job expired leaves it expired (#161, #166);
       - run twice, with the row gone and not marked;
       - a `DELETE` during a run leaves no row, and the worker's later write does not bring it back;
       - the challenges and the counts of hashed addresses that have expired are swept (#170, #172);
@@ -139,7 +143,7 @@
     - the router test of #178, which proves that `serve` does not answer the worker's routes, the erasure route among them;
     - the marker test of #167, which proves that no CV or advert reaches anything the server emits;
   - the infrastructure, reviewed in pull requests: `tofu plan` runs in CI when `infra/` changes, `apply` is the owner's step, and production's plan differs from staging's only in its variables (#163);
-  - the runbook and review of `infra/` (#163), for what no test sees: each branch's own role and password, how staging got its schema without data, the restore window, the log exclusion and the log bucket's location, and the instance and dispatch caps;
+  - the runbook and review of `infra/` (#163), for what no test sees: each branch's own role and password and where the password lives, how staging's branch was made empty, the restore window, the log exclusion and the log bucket's location, the instance and dispatch caps, and the alert on a failed run of the schedule;
   - CI (#164): it authenticates through Workload Identity Federation only, a pull request from a fork never reaches a deploy or a secret, and a tag deploys the image digest that staging ran, without a rebuild;
   - review, until a check exists: the repository holds no cloud key and no credential for Neon, in its workflows or its settings;
   - the runbook and the providers, outside the code: the credit limit is set at the provider, and the runbook lists every limit, where it is set and how to change it (#163, #165).
