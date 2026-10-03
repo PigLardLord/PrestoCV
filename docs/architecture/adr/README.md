@@ -25,5 +25,6 @@ Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected*
 | [0013](0013-cv-tailoring-context.md) | Tailor a CV in a context of its own, behind a provenance gate | Accepted |
 | [0014](0014-server-modular-monolith.md) | Run the server as a modular monolith in two roles | Accepted |
 | [0015](0015-inference-providers-and-data-policy.md) | Reach models through configured providers, held to the deployment's data policy | Accepted |
+| [0016](0016-api-contract.md) | Generate both sides of the API from one versioned spec | Accepted |
 
 New ADRs copy [template.md](template.md).
