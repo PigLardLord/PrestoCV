@@ -1,8 +1,10 @@
 /// The checks the initialisers of the model share, so a bound is written once (R8).
 enum Bounds {
+    /// The one check of a text: its size first, then that it holds no hidden character (`TextRules`).
     static func text(_ value: String, _ field: TailoringModelError.Field,
                      maxBytes: Int = TailoringLimits.maxTextBytes) throws(TailoringModelError) {
         guard value.utf8.count <= maxBytes else { throw .tooLarge(field) }
+        guard !TextRules.hiddenCharacter(in: value, multiLine: field.isMultiLine) else { throw .hiddenCharacter(field) }
     }
 
     /// An optional text is nil when it is absent, so a present one must say something.
@@ -10,12 +12,13 @@ enum Bounds {
         if let value { try requiredText(value, field) }
     }
 
-    /// Text that must say something: its size is checked first, and then that it holds a character that shows. The
-    /// value itself is kept as written.
+    /// Text that must say something: its size is checked first, then that it holds a character that shows, and then
+    /// the check of `text`. So a blank text is empty whatever its controls. The value itself is kept as written.
     static func requiredText(_ value: String, _ field: TailoringModelError.Field,
                              maxBytes: Int = TailoringLimits.maxTextBytes) throws(TailoringModelError) {
-        try text(value, field, maxBytes: maxBytes)
+        guard value.utf8.count <= maxBytes else { throw .tooLarge(field) }
         guard value.contains(where: { !isBlank($0) }) else { throw .emptyField(field) }
+        try text(value, field, maxBytes: maxBytes)
     }
 
     // MARK: Blank and trimmed
@@ -60,5 +63,17 @@ enum Bounds {
         try count(profiles.count, atMost: TailoringLimits.maxEntriesPerSection, .profiles)
         try count(interests.count, atMost: TailoringLimits.maxEntriesPerSection, .interests)
         for interest in interests { try text(interest, .interest) }
+    }
+}
+
+extension TailoringModelError.Field {
+    /// Whether a text of this field may hold line breaks and tabs (`TextRules`): a description, the summary and the
+    /// advert. A statement is a line of a description: a tab is allowed in it, and its breaks are refused by
+    /// `Statement` itself as `notOneLine`.
+    var isMultiLine: Bool {
+        switch self {
+        case .description, .summary, .advert, .statement: true
+        default: false
+        }
     }
 }
