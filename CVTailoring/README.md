@@ -8,3 +8,5 @@ Like `CVPDFExporter`, it imports no PrestoCV package. In the app, only `PrestoCV
 swift build --package-path CVTailoring
 swift test --package-path CVTailoring
 ```
+
+`Tools/GenerateFoldCorpus.mjs` writes the corpus that holds `TextFold` to cv-giovanni's `fold` on every platform (`Tests/TailoringModelTests/Resources/FoldCorpus.json`); its header says how to run it.
