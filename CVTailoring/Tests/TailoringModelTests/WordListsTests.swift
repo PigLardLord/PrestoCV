@@ -15,9 +15,12 @@ struct WordListsTests {
         do { return try WordListFixture.data(object) } catch { throw .corruptWordList(.index, nil) }
     }
 
-    /// Files for the languages named, each a complete file; any other language has none.
-    private func files(for available: [TailoringLanguage]) -> (TailoringLanguage) throws(TailoringModelError) -> Data? {
-        return { language in available.contains(language) ? try Self.complete(language) : nil }
+    /// Files for the languages named, each a complete file; a language without one is the error the resources give.
+    private func files(for available: [TailoringLanguage]) -> (TailoringLanguage) throws(TailoringModelError) -> Data {
+        return { language throws(TailoringModelError) in
+            guard available.contains(language) else { throw .corruptWordList(.language(language), nil) }
+            return try Self.complete(language)
+        }
     }
 
     private func lists(_ codes: [String], available: [TailoringLanguage]) throws(TailoringModelError) -> WordLists {

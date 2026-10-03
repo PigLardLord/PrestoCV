@@ -9,14 +9,13 @@ public struct WordLists: Hashable, Sendable {
     public let languages: [TailoringLanguage]
     private let lists: [TailoringLanguage: LanguageWordLists]
 
-    /// Reads the index, then the file of each language it names. `files` returns the bytes of a language's file, or
-    /// nil when it has none, which for a listed language is an error.
-    init(index: Data, files: (TailoringLanguage) throws(TailoringModelError) -> Data?) throws(TailoringModelError) {
+    /// Reads the index, then the file of each language it names. `files` returns the bytes of a language's file, and
+    /// throws when it has none: a language the index lists without a file is an error.
+    init(index: Data, files: (TailoringLanguage) throws(TailoringModelError) -> Data) throws(TailoringModelError) {
         let languages = try Self.languages(in: index)
         var lists: [TailoringLanguage: LanguageWordLists] = [:]
         for language in languages {
-            guard let data = try files(language) else { throw .corruptWordList(.language(language), nil) }
-            lists[language] = try LanguageWordLists(decoding: data, language: language)
+            lists[language] = try LanguageWordLists(decoding: try files(language), language: language)
         }
         self.languages = languages
         self.lists = lists
@@ -24,7 +23,7 @@ public struct WordLists: Hashable, Sendable {
 
     /// Reads the index and the files of this package's resources. The caller loads once and injects the value (R4).
     public static func load() throws(TailoringModelError) -> WordLists {
-        guard let index = try WordListResources.data(named: "index", as: .index) else { throw .corruptWordList(.index, nil) }
+        let index = try WordListResources.data(named: "index", as: .index)
         return try WordLists(index: index) { language throws(TailoringModelError) in
             try WordListResources.data(named: language.code, as: .language(language))
         }

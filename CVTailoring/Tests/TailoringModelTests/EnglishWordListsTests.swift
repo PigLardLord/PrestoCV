@@ -22,6 +22,16 @@ struct EnglishWordListsTests {
 
     // MARK: - The directory and the index
 
+    @Test("the resources give the index and the file of English, and name a file they do not have as corrupt")
+    func resources() throws {
+        #expect(try !WordListResources.data(named: "index", as: .index).isEmpty)
+        #expect(try !WordListResources.data(named: "en", as: .language(.english)).isEmpty)
+        #expect(throws: TailoringModelError.corruptWordList(.language(.german), nil)) {
+            try WordListResources.data(named: "de", as: .language(.german))
+        }
+        #expect(throws: TailoringModelError.corruptWordList(.index, nil)) { try WordListResources.data(named: "none", as: .index) }
+    }
+
     private func filesOnDisk() throws -> [String] {
         let directory = try #require(WordListResources.directory())
         return try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted()
