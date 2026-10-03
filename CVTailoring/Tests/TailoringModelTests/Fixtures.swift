@@ -34,3 +34,30 @@ enum Sample {
     static func certification() throws -> SourceCertification { try SourceCertification(name: "CKA", issuer: "CNCF") }
     static func profile() throws -> SourceProfile { try SourceProfile(platform: "GitHub", link: "https://github.com/ada") }
 }
+
+extension Sample {
+    /// Two experiences: the first with three statements, the second with one.
+    static func source() throws -> SourceCV {
+        var experiences: [SourceExperience] = []
+        experiences.append(try experience("First", description: "- built the API\n- cut costs by 30%\n- trained two juniors"))
+        experiences.append(try experience("Second", description: "- ran the on-call rota"))
+        return try SourceCV(language: .english, personal: personal(), summary: "An analyst.", experiences: experiences)
+    }
+
+    /// Six experiences of five statements each: it holds references a smaller snapshot does not have.
+    static func biggerSource() throws -> SourceCV {
+        var experiences: [SourceExperience] = []
+        for index in 0..<6 {
+            experiences.append(try experience("Role \(index)", description: "- one\n- two\n- three\n- four\n- five"))
+        }
+        return try SourceCV(language: .english, personal: personal(), experiences: experiences)
+    }
+
+    static func line(_ text: String, _ sources: [StatementRef] = []) throws -> TailoredLine {
+        try TailoredLine(text: Statement(text: text), sources: sources)
+    }
+
+    static func tailoredExperience(source: ExperienceRef, lines: [TailoredLine] = []) throws -> TailoredExperience {
+        try TailoredExperience(source: source, role: "Engineer", company: "Acme", lines: lines)
+    }
+}

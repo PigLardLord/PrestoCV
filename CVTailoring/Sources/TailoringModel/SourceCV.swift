@@ -53,4 +53,8 @@ public struct SourceCV: Hashable, Sendable {
     public func statement(_ ref: StatementRef) -> Statement {
         experiences[ref.experience.index].statements[ref.line]
     }
+
+    func contains(_ ref: StatementRef) -> Bool {
+        experiences.indices.contains(ref.experience.index) && experiences[ref.experience.index].statements.indices.contains(ref.line)
+    }
 }

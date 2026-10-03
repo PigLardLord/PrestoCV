@@ -30,6 +30,6 @@ public enum TailoringModelError: Error, Hashable, Sendable {
     /// The lists of the model, by what they hold, not by which type holds them.
     public enum Collection: Hashable, Sendable {
         case experiences, education, skills, languages, certifications, profiles, interests
-        case statements
+        case statements, lines, sources
     }
 }
