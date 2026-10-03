@@ -20,7 +20,7 @@ The files are resources of the `TailoringModel` target, read through `Bundle.mod
 - A file names its own language in `language`. The decoder refuses a file whose language is not the one the index lists it for.
 - Every file is JSON and at most 1,048,576 bytes (1 MiB). The size is checked before the bytes are decoded.
 - The format is closed. A key that is not in the tables below is refused wherever it is: at the top of a file, in a group, in a list and in an entry.
-- The decoder is the JSON decoder of Foundation, so a key that appears twice in one object is read as its last value, and the format does not detect it. This is a known limit.
+- The decoder is the JSON decoder of Foundation, which does not refuse a key written twice in one object. This is a known limit of the format. A test scans every bundled file, at any depth, for a repeated key.
 
 ### Languages
 
