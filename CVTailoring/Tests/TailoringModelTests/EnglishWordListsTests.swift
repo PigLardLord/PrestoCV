@@ -64,7 +64,7 @@ struct EnglishWordListsTests {
 
     // MARK: - Source and licence
 
-    /// Every list of a language, by key, with what it states about itself. Naming all 28 here is the check that the
+    /// Every list of a language, by key, with what it states about itself. Naming every list here is the check that the
     /// table below, and the format, leave none out.
     private func summary(of lists: LanguageWordLists) -> [WordListKey: (source: String, licence: String, count: Int)] {
         func row<Entry>(_ list: WordList<Entry>) -> (source: String, licence: String, count: Int) { (list.source, list.licence, list.entries.count) }
@@ -188,29 +188,89 @@ struct EnglishWordListsTests {
         #expect(Set(Self.countsAtSource.keys) == Set(WordListKey.allCases))
     }
 
-    @Test("the small English lists are exactly cv-giovanni's")
-    func smallLists() throws {
+    // MARK: - Every list of at most 50 entries, written out
+
+    @Test("the advert lists are exactly cv-giovanni's")
+    func advertLists() throws {
         let lists = try english()
-        #expect(lists.advert.genderMarkers.entries == ["all genders", "any gender"])
-        #expect(lists.advert.plainWords.entries == ["new", "time", "set", "use", "get", "make", "keep", "drive", "after", "knowledge"])
-        #expect(lists.advert.dimensions.entries == ["performance", "stability", "quality", "speed", "efficiency"])
-        #expect(lists.advert.requirementHeadings.entries.first == "requirements" && lists.advert.requirementHeadings.entries.last == "we are looking for")
-        #expect(lists.advert.offerHeadings.entries.first == "we offer" && lists.advert.offerHeadings.entries.last == "how we work")
-        #expect(lists.advert.structuralHeadings.entries.first == "role" && lists.advert.structuralHeadings.entries.last == "location")
-        #expect(lists.advert.streets.order == .after)
-        #expect(lists.advert.streets.list.entries == ["street", "st.", "road", "rd.", "avenue", "ave.", "lane", "boulevard", "blvd."])
-        #expect(lists.spans.floorLeadIns.entries == ["over", "more than", "at least"])
-        #expect(lists.spans.yearWords.entries == ["year", "years"] && lists.spans.monthWords.entries == ["month", "months"])
-        #expect(lists.spans.tiedCounts.entries == ["{count} of them at {employer}", "{count} of which at {employer}", "{count} of those at {employer}"])
-        #expect(lists.spans.employerEndWords.entries == ["and"])
-        #expect(lists.letter.statedTermWords.entries == ["is", "of", "range", "applies"])
+        #expect(lists.advert.plainWords.entries == EnglishExpected.advertPlainWords, "advertPlainWords")
+        #expect(lists.advert.dimensions.entries == EnglishExpected.advertDimensions, "advertDimensions")
+        #expect(lists.advert.boilerplate.entries == EnglishExpected.advertBoilerplate, "advertBoilerplate")
+        #expect(lists.advert.genderMarkers.entries == EnglishExpected.advertGenderMarkers, "advertGenderMarkers")
+        #expect(lists.advert.instructions.entries == EnglishExpected.advertInstructions, "advertInstructions")
+        #expect(lists.advert.streets.list.entries == EnglishExpected.advertStreets, "advertStreets")
+        #expect(lists.advert.names.entries == EnglishExpected.advertNames, "advertNames")
+        #expect(lists.advert.synonyms.entries.map(\.forms) == EnglishExpected.advertSynonyms, "advertSynonyms")
+        #expect(lists.advert.requirementHeadings.entries == EnglishExpected.advertRequirementHeadings, "advertRequirementHeadings")
+        #expect(lists.advert.offerHeadings.entries == EnglishExpected.advertOfferHeadings, "advertOfferHeadings")
+        #expect(lists.advert.structuralHeadings.entries == EnglishExpected.advertStructuralHeadings, "advertStructuralHeadings")
     }
 
-    @Test("the stopwords open and close as cv-giovanni's do")
+    @Test("the date, number and span lists are exactly cv-giovanni's")
+    func dateNumberAndSpanLists() throws {
+        let lists = try english()
+        #expect(lists.dates.months.entries == EnglishExpected.datesMonths, "datesMonths")
+        #expect(lists.dates.presentWords.entries == EnglishExpected.datesPresentWords, "datesPresentWords")
+        #expect(lists.dates.sinceWords.entries == EnglishExpected.datesSinceWords, "datesSinceWords")
+        #expect(lists.dates.rangeSeparatorWords.entries == EnglishExpected.datesRangeSeparatorWords, "datesRangeSeparatorWords")
+        #expect(lists.dates.durationUnitWords.entries == EnglishExpected.datesDurationUnitWords, "datesDurationUnitWords")
+        #expect(lists.numbers.words.entries == EnglishExpected.numbersWords, "numbersWords")
+        #expect(lists.spans.floorLeadIns.entries == EnglishExpected.spansFloorLeadIns, "spansFloorLeadIns")
+        #expect(lists.spans.yearWords.entries == EnglishExpected.spansYearWords, "spansYearWords")
+        #expect(lists.spans.monthWords.entries == EnglishExpected.spansMonthWords, "spansMonthWords")
+        #expect(lists.spans.countWords.entries == EnglishExpected.spansCountWords, "spansCountWords")
+        #expect(lists.spans.tiedCounts.entries == EnglishExpected.spansTiedCounts, "spansTiedCounts")
+        #expect(lists.spans.employerEndWords.entries == EnglishExpected.spansEmployerEndWords, "spansEmployerEndWords")
+    }
+
+    @Test("the letter lists are exactly cv-giovanni's")
+    func letterLists() throws {
+        let lists = try english()
+        #expect(lists.letter.greetings.entries == EnglishExpected.letterGreetings, "letterGreetings")
+        #expect(lists.letter.salutations.entries == EnglishExpected.letterSalutations, "letterSalutations")
+        #expect(lists.letter.addressees.entries == EnglishExpected.letterAddressees, "letterAddressees")
+        #expect(lists.letter.addresseesAtClauseEnd.entries == EnglishExpected.letterAddresseesAtClauseEnd, "letterAddresseesAtClauseEnd")
+        #expect(lists.letter.addresseeNouns.entries == EnglishExpected.letterAddresseeNouns, "letterAddresseeNouns")
+        #expect(lists.letter.valedictions.entries == EnglishExpected.letterValedictions, "letterValedictions")
+        #expect(lists.letter.salaryExpectationAsks.entries == EnglishExpected.letterSalaryExpectationAsks, "letterSalaryExpectationAsks")
+        #expect(lists.letter.startDateAsks.entries == EnglishExpected.letterStartDateAsks, "letterStartDateAsks")
+        #expect(lists.letter.statedTermWords.entries == EnglishExpected.letterStatedTermWords, "letterStatedTermWords")
+        #expect(lists.letter.formsOfAddress.entries == EnglishExpected.letterFormsOfAddress, "letterFormsOfAddress")
+        #expect(lists.letter.academicTitles.entries == EnglishExpected.letterAcademicTitles, "letterAcademicTitles")
+        #expect(lists.letter.notGivenNames.entries == EnglishExpected.letterNotGivenNames, "letterNotGivenNames")
+    }
+
+    @Test("the provenance lists and the technologies are exactly cv-giovanni's")
+    func provenanceAndTechnologyLists() throws {
+        let lists = try english()
+        #expect(lists.provenance.ranks.entries == EnglishExpected.provenanceRanks, "provenanceRanks")
+        #expect(lists.provenance.notPlurals.entries == EnglishExpected.provenanceNotPlurals, "provenanceNotPlurals")
+        #expect(lists.provenance.legalForms.entries == EnglishExpected.provenanceLegalForms, "provenanceLegalForms")
+        #expect(lists.provenance.firstPerson.entries == EnglishExpected.provenanceFirstPerson, "provenanceFirstPerson")
+        #expect(lists.technologies.entries == EnglishExpected.fieldsTechnologies, "fieldsTechnologies")
+    }
+
+    /// FNV-1a 64 over the UTF-8 bytes: a stable digest the test can compute without a library.
+    private func fnv1a64(_ text: String) -> UInt64 {
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        for byte in text.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x0000_0100_0000_01b3
+        }
+        return hash
+    }
+
+    /// The 159 stopwords are too many to write out. Their digest is that of `ADVERT.stopwords.en` of cv-giovanni at 6e28147,
+    /// joined by a line feed. With `domain/AdvertLexicon.js` and `domain/fold.js` saved from `git show 6e28147:<path>` in
+    /// one directory, run in it:
+    ///
+    ///     node --input-type=module -e "import {ADVERT} from './AdvertLexicon.js'; let h=0xcbf29ce484222325n; for (const b of Buffer.from(ADVERT.stopwords.en.join('\n'))) h=((h^BigInt(b))*0x100000001b3n)&0xffffffffffffffffn; console.log(h.toString(16))"
+    @Test("the stopwords are exactly cv-giovanni's, by their count, their first and last and their digest")
     func stopwords() throws {
         let stopwords = try english().advert.stopwords.entries
+        #expect(stopwords.count == 159)
         #expect(stopwords.first == "the" && stopwords.last == "optimise")
-        #expect(stopwords.contains("hands-on") && stopwords.contains("please"))
+        #expect(fnv1a64(stopwords.joined(separator: "\n")) == 0x9ebb_4a5a_802e_5cf6)
     }
 
     @Test("the months, with and without an abbreviation, carry their numbers")
@@ -220,15 +280,6 @@ struct EnglishWordListsTests {
         #expect(month("january") == 1 && month("jan") == 1 && month("may") == 5 && month("sept") == 9 && month("sep") == 9)
         #expect(month("december") == 12 && month("dec") == 12 && month("mai") == nil && month("marz") == nil)
         #expect(Set(months.map(\.month)) == Set(1...12))
-    }
-
-    @Test("the words of a period written in text are cv-giovanni's")
-    func periodWords() throws {
-        let dates = try english().dates
-        #expect(dates.presentWords.entries == ["present", "now", "current", "ongoing"])
-        #expect(dates.sinceWords.entries == ["since"])
-        #expect(dates.rangeSeparatorWords.entries == ["to"])
-        #expect(dates.durationUnitWords.entries == ["year", "years", "yr", "yrs", "month", "months", "mo", "mos"])
     }
 
     @Test("the number words carry their values, and one is not among them")
@@ -242,33 +293,6 @@ struct EnglishWordListsTests {
         #expect(counts.first == NumberWord(word: "one", value: 1) && counts.last == NumberWord(word: "twelve", value: 12))
     }
 
-    @Test("the synonyms are the English forms of cv-giovanni's groups")
-    func synonyms() throws {
-        let groups = try english().advert.synonyms.entries.map(\.forms)
-        #expect(groups.first == ["mdm", "mobile device management"])
-        #expect(groups.contains(["ci/cd", "continuous integration", "continuous delivery", "continuous deployment"]))
-        #expect(groups.contains(["developer", "developers", "engineer", "engineers"]))
-        #expect(groups.last == ["mobile development", "mobile app development"])
-        #expect(groups.allSatisfy { $0.count >= 2 })
-    }
-
-    @Test("the valedictions are the forms the regular expression allows, written out")
-    func valedictions() throws {
-        let valedictions = try english().letter.valedictions.entries
-        #expect(valedictions.contains("kind regards") && valedictions.contains("with warmest regards") && valedictions.contains("yours faithfully"))
-        #expect(valedictions.contains("sincerely") && valedictions.contains("sincerely yours") && valedictions.contains("best wishes"))
-    }
-
-    @Test("the asks are the phrases the regular expressions allow, written out")
-    func asks() throws {
-        let letter = try english().letter
-        #expect(letter.salaryExpectationAsks.entries == [
-            "salary expectation", "salary expectations", "salary requirement", "salary requirements", "expected salary", "desired salary",
-        ])
-        #expect(letter.startDateAsks.entries.contains("earliest possible start date") && letter.startDateAsks.entries.contains("notice period"))
-        #expect(letter.startDateAsks.entries.contains("when you could start") && letter.startDateAsks.entries.contains("availability date"))
-    }
-
     static let ordinaryWordsStayOutCases: [String] = {
         var values: [String] = []
         values.append(contentsOf: ["Swift", "React", "Combine", "Room"])
@@ -277,50 +301,10 @@ struct EnglishWordListsTests {
         return values
     }()
 
-    @Test("the words that follow a greeting are split by how they are read")
-    func addressees() throws {
-        let letter = try english().letter
-        #expect(letter.addresseesAtClauseEnd.entries == ["there"])
-        #expect(!letter.addressees.entries.contains("there"))
-        #expect(letter.addressees.entries == ["ms", "mrs", "mr", "dr", "prof", "sir", "madam", "all", "everyone", "friends", "recruiter", "recruiters", "colleagues"])
-    }
-
-    @Test("the words of the form of address check are cv-giovanni's")
-    func formsOfAddress() throws {
-        let letter = try english().letter
-        #expect(letter.formsOfAddress.entries == [
-            FormOfAddressWord(form: .ms, word: "ms"), FormOfAddressWord(form: .ms, word: "mrs"), FormOfAddressWord(form: .mr, word: "mr"),
-        ])
-        #expect(letter.academicTitles.entries == ["dr", "prof"])
-        #expect(letter.notGivenNames.entries == ["ms", "mrs", "miss", "mr", "and", "or"])
-    }
-
-    @Test("the words the provenance check reads for English are cv-giovanni's")
-    func provenanceWords() throws {
-        let provenance = try english().provenance
-        #expect(provenance.notPlurals.entries == ["news", "goods", "means", "series", "species", "lens", "gas", "bus", "sales"])
-        #expect(provenance.ranks.entries.map(\.word) == ["senior", "lead", "leading", "principal", "staff", "head", "chief", "director", "manager", "architect"])
-        #expect(provenance.ranks.entries.first == RankWord(word: "senior", ranks: [.senior]))
-        #expect(provenance.ranks.entries.first { $0.word == "chief" }?.ranks == [.head])
-        #expect(provenance.ranks.entries.first { $0.word == "leading" }?.ranks == [.lead])
-        #expect(provenance.firstPerson.entries == ["I", "I'm", "I've", "I'd", "I'll", "I\u{2019}m", "I\u{2019}ve", "I\u{2019}d", "I\u{2019}ll"])
-        let forms = provenance.legalForms.entries
-        for form in ["gmbh", "ggmbh", "ag", "ltd", "ltd.", "limited", "inc", "inc.", "llc", "plc", "e.v.", "e. v.", "s.a.", "b.v."] {
-            #expect(forms.contains(form), "\(form)")
-        }
-        #expect(forms.contains("gmbh & co. kg") && forms.contains("gmbh & co kgaa") && forms.contains("ug (haftungsbeschr\u{00E4}nkt)"))
-    }
-
     @Test("a technology that is also an ordinary word stays out, as the source's lexicon explains", arguments: ordinaryWordsStayOutCases)
     func ordinaryWordsStayOut(name: String) throws {
         let technologies = try english().technologies.entries.map(TextFold.fold)
         #expect(!technologies.contains(TextFold.fold(name)))
     }
 
-    @Test("the technologies hold names that no other word has")
-    func technologies() throws {
-        let technologies = try english().technologies.entries
-        #expect(technologies.first == "Kotlin" && technologies.last == "PyTorch")
-        #expect(technologies.contains("SwiftUI") && technologies.contains("fastlane") && technologies.contains("Node.js"))
-    }
 }
