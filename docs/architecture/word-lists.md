@@ -139,7 +139,15 @@ cv-giovanni reads the stopwords, the headings and the months of every language a
 
 ### What stays in code
 
-A shape is the same in every language, so it is not a list: the letters of a gender marker joined by slashes ("m/w/d"), a house number, a postcode, an American state and its ZIP code, the dashes and the tilde between two dates, the floor written "11+ years", a figure in numerals, and a tens word joined to a unit by a hyphen. The checks that read them are in the targets that use them.
+What is not a list stays in the code of the check that reads it (#138, #139, #140, #141). Some of those shapes are the same in every language: the dashes and the tilde between two dates, the floor written "11+ years", a figure in numerals, a house number, and an American state with its ZIP code. Others carry words of one language, and they are not the same in every language. Each goes to a key of that language's ticket, or to that language's code:
+
+- **The Italian articulated prepositions in the `before` street shape** ("Via della Pace 1": `da`, `de`, `di`, `du`, `del`, `della`, `delle`, `dello`, `dei`, `degli`, `d'`) → Italian (#145).
+- **The German "-er" adjective of a town in the `joined` street shape** ("Frankfurter Str. 5") → German (#142).
+- **The words of the postcode shape** ("60311 Frankfurt am Main": `am`, `an der`, `im`, `in der`, `ob der`, `bei`) and **its country prefixes** (`A-`, `CH-`, `D-`, `FL-`, `I-`) → German (#142) and Italian (#145). The shape has no Portuguese postcode, `NNNN-NNN` ("1000-001 Lisboa"), which the Portuguese ticket adds.
+- **The gender letters joined by slashes** ("m/w/d", "f/m/d/x") have no French "H/F" → French (#144).
+- **`spellings()`**, which reads "ä", "ö" and "ü" also as "ae", "oe" and "ue", is German orthography → German (#142).
+- **The tens, a hyphen and a unit** ("twenty-five") are how English composes a number. German ("fünfundzwanzig"), Italian ("venticinque"), Spanish ("veinticinco", "treinta y cinco"), Portuguese ("vinte e cinco") and French ("vingt-cinq", "soixante-dix") compose it differently → the ticket of each language.
+- **The rule that a greeting which opens a valediction is no greeting** ("Liebe Grüße" is a sign-off, "Liebe Frau Müller" a salutation) → German (#142).
 
 ### Not in the word lists
 
@@ -153,7 +161,7 @@ cv-giovanni holds more than the files do. What stays out, and why:
 - **The question wordings of `Tailor.js`** are text for the user. The app words a question from its codes ([R13](rules.md#r13-localisation-happens-at-the-edges)).
 - **`LANGUAGES`, the names of the languages in `Tailor.js`**, belong to the prompt (#151).
 - **`IDENTITY`, `COPIED` and `WORDED`** are field names of cv-giovanni's profile, not words of a language.
-- **The shapes** above go to the checks that read them (#138, #139).
+- **The shapes** of "What stays in code" go to the checks that read them or, where they carry words, to the key or the code of the language that section names.
 
 ### Source and licence
 
