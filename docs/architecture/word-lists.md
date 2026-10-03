@@ -1,6 +1,6 @@
 # Word lists
 
-Every rule of the CV Tailoring context that depends on a language reads it from data, one file per language ([ADR 0013](adr/0013-cv-tailoring-context.md), [R13](rules.md#r13-localisation-happens-at-the-edges)). The words an advert wastes, how it names its sections, the months, the numbers in words, how a floor of years is written, how a letter greets and closes, and the names of technologies are all in the file of the language. Adding a language adds a file and an index entry, and changes no code.
+Every rule of the CV Tailoring context that depends on a language reads it from data, one file per language ([ADR 0013](adr/0013-cv-tailoring-context.md), [R13](rules.md#r13-localisation-happens-at-the-edges)). The words an advert wastes, how it names its sections, the months, the numbers in words, how a floor of years is written, how a letter greets and closes, and the names of technologies are all in the file of the language. Adding a language adds a file and an index entry. The words are data. A language's morphology is not: the plural rules of English are code of the checks (see "Not in the word lists"), and a language whose checks need rules of its own gets them there.
 
 The files are resources of the `TailoringModel` target, read through `Bundle.module` ([R2](rules.md#r2-pure-layers-read-no-ambient-state)) the way `HeadingsCatalog` reads the heading tables. They are in `CVTailoring/Sources/TailoringModel/Resources/WordLists/`.
 
@@ -116,6 +116,8 @@ A shape is the same in every language, so it is not a list: the letters of a gen
 cv-giovanni holds more than the files do. What stays out, and why:
 
 - **The German forms of the synonym groups, `ALSO_ENGLISH_WORDS`, `SHARED_NOUNS`, `NOT_RANKS`, the German abbreviations and every other German list** belong to the file of German (#142). `Flutter`, the one name of `ALSO_ENGLISH_WORDS`, is an ordinary English word: English leaves it out of `fields.technologies` and reads it from its capital, and German lists it. The synonym group for "architecture" has one English form, so English holds no group for it. "Managerin", the German feminine of "manager", is German's.
+- **The Italian lists of cv-giovanni** go to the Italian file (#145): every `it` list of `AdvertLexicon.js` (stopwords, boilerplate, the three kinds of headings, names, gender markers, plain words, dimensions, instructions, streets), the Italian months, and the Italian words of a period (present, since, `al`, `anni` and `mesi`). Spanish, French and Portuguese have no source in cv-giovanni, so their files are new work, each list with a source and a licence of its own.
+- **The English morphology in `ProvenanceCheck.js`**: the rules that give a word in both its numbers in `numbers()` and that take a possessive off a name in `candidates()` are code of the check (#140), and English-only. `provenance.notPlurals` is the data those plural rules read.
 - **`SectionLexicon.js`**, the headings of a CV, serves the ATS audit (#148).
 - **`PlaceLexicon.js`**, the countries and regions of a location, serves the ATS parser (#148) and the date line of the letter page, which is rendering. No check of a tailoring reads it.
 - **The question wordings of `Tailor.js`** are text for the user. The app words a question from its codes ([R13](rules.md#r13-localisation-happens-at-the-edges)).
@@ -158,4 +160,4 @@ Every refusal is a typed error that carries codes and no text ([R7](rules.md#r7-
 1. Add `<code>.json` to `Resources/WordLists/`, with the `version`, its own `language` and every list of the key table at format version 1. Each list states its source and its licence.
 2. Add the code to `index.json`.
 
-Nothing else changes: no code, no manifest line. The folder is copied whole, and `TailoringLanguage` already knows the six codes. Two tests keep the files honest: the files in the folder, but the index, are exactly the languages of the index, and a file that lacks a key another file has is refused as incomplete, because every file must hold every key.
+Nothing else changes for the lists: no word in code, no manifest line. A rule of the language's own morphology that a check needs is code of that check, as English's plural rules are. The folder is copied whole, and `TailoringLanguage` already knows the six codes. Two tests keep the files honest: the files in the folder, but the index, are exactly the languages of the index, and a file that lacks a key another file has is refused as incomplete, because every file must hold every key.
