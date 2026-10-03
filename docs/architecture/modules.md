@@ -180,7 +180,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 ## Package `CVTailoring` — CV Tailoring
 
-Standalone, like `CVPDFExporter`. It depends on no PrestoCV package ([ADR 0013](adr/0013-cv-tailoring-context.md)): the app and the server each map their own types into its model. The targets are empty until the tickets named below fill them.
+Standalone, like `CVPDFExporter`. It depends on no PrestoCV package ([ADR 0013](adr/0013-cv-tailoring-context.md)): the app and the server each map their own types into its model. `TailoringModel` holds the model; the other targets are empty until the tickets named below fill them.
 
 In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` and `ContentChecks` only: the loop runs on the server. No type shares its module's name, so a qualified name always means the module (the loop is not a type called `Tailoring`, nor the gate one called `Provenance`).
 
@@ -193,8 +193,44 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 | `Tailoring` | application | iOS, macOS, Linux ✓ | `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, `Provenance`, Foundation |
 
 **`TailoringModel`** (#135, #136)
-- The snapshot types: the source CV, its statements and typed references to them, the advert, the letter defaults, the questions and answers, the tailored CV, the cover letter and the report.
-- The word lists, one JSON file per language plus an index, read through `Bundle.module`; the supported languages are those with a file (#136).
+- **`SourceCV`**, a snapshot of the CV as it stood when the tailoring started. It holds:
+  - the language, the personal details and the summary;
+  - experiences, education, skills, languages, certifications, profiles and interests.
+- **Statements.** An experience's description is held as `Statement`s, one per line as written.
+  - `Statement.split(_:)` is the one rule that makes them, and every target uses it:
+    - a line ends at any newline (`\r\n` is one);
+    - each line is trimmed;
+    - one leading bullet (`•`, `◦`, `▪`, `‣`, `·`, `-`, `*`, `–`, `—`) is removed when a space follows it or it ends the line, so `-5% churn` keeps its sign and `1.` is not a bullet;
+    - a line empty after that is dropped, so a description of one paragraph is one statement.
+  - A `Statement` built from text (a line a model wrote) is trimmed, not empty and bounded.
+- **Typed references.** `ExperienceRef` and `StatementRef` read "experience n, line m", counted from 0.
+  - Only a `SourceCV` makes them, through `experience(_:)` and `statement(experience:line:)`. A position the snapshot does not have is `referenceOutOfRange`.
+  - A reference is meaningful only for the snapshot that made it.
+- **`TailoredCV`**, the same shape with each experience naming its source experience and each line the source statements it comes from.
+  - It keeps its source, and refuses a reference outside it (`referenceOutOfRange`), so one from another snapshot cannot join it.
+  - It checks structure only. A line with no source, or a source from another experience, is a value: the provenance gate reports it (#140).
+- **`CoverLetter`** (with `LetterRecipient` and `FormOfAddress`: `ms`, `mr`, `neutral`), **`LetterDefaults`** (salary expectation, start date, a note, as the user wrote them) and **`Advert`** (its text and its language).
+- **`TailoringReport`** (the argument, and what was cut, moved and reworded) and **`Question`** (`QuestionKind`, `QuestionScope`, `LetterField`). Answers, with their scope, arrive with #153.
+- **Value objects.**
+  - `TailoringLanguage`: English, German, Spanish, French, Italian, Portuguese, read from a BCP 47 tag by its primary language subtag. Any other tag is `unsupportedLanguage`, never English.
+  - `TailoringDate` (year 1900–2200, month 1–12 or none) and `TailoringPeriod`, whose end is a date, "current" or unknown and is never before its start; months are compared only when both are known.
+  - `LanguageLevel` (CEFR + native), and a skill level from 1 to 5.
+  - The e-mail address, the phone number and the links are plain strings that the app's mapper has already validated; this model only bounds them.
+- **Bounds (R8)**, in `TailoringLimits`, checked by every initialiser and measured in UTF-8 bytes:
+
+| Limit | Value |
+|---|---|
+| a text field, a statement included | 10,000 bytes |
+| an advert | 50,000 bytes |
+| statements per experience | 200 |
+| entries per section: experiences, education, skills, languages, certifications, profiles, interests, tailored lines per experience, report items | 200 |
+| sources per tailored line | 200 |
+| body paragraphs of a letter, attachments of a letter | 20 each |
+| address lines | 6 |
+
+- **`TailoringModelError`**: `unsupportedLanguage`, `emptyField`, `tooLarge`, `tooMany`, `invalidDate`, `invalidPeriod`, `invalidSkillLevel`, `referenceOutOfRange`. The field and the list are codes (R7, R13).
+- The model has no `Codable`: JSON crosses through DTOs in the targets that need it (#152).
+- Planned (#136): the word lists, one JSON file per language plus an index, read through `Bundle.module`; the supported languages are those with a file.
 
 **`AdvertAnalysis`** (#138, #153)
 - What an advert asks for, and where the source CV evidences it.
@@ -214,7 +250,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 - The prompt and its schema.
 - Decoding the model's reply through one anti-corruption layer (R8).
 
-**Test support.** None yet; `CVTailoringTestSupport` arrives with the first port (#150).
+**Test support and tests.** `TailoringModelTests` may import Testing, Foundation, `TailoringModel`. `CVTailoringTestSupport` arrives with the first port (#150).
 
 ---
 
