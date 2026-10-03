@@ -32,7 +32,7 @@ The checker applies to **production targets**: domain, application, integration,
 - **compiler:** the target dependencies.
 - **checker:** a per-target import allow-list, and the `exportedImport` detector. SwiftPM lets a target import its dependencies' dependencies, so declared dependencies are not enough.
 - **checker (`--packages`):** every dependency declared in a `Package.swift` must be an allowed import.
-- **checker (`requiredImportAccess`), once `ServerHTTP` and `PrestoCVAPIAdapter` exist:** the targets of `PrestoCVAPI` must be imported `internal`, so the generated types cannot leave them.
+- **checker (`requiredImportAccess`), once `ServerHTTP` and `PrestoCVAPIAdapter` exist:** the targets of `PrestoCVAPI` must be imported `internal`, so the generated types cannot leave them. The checker reports it as R5's `importAccess`.
 
 ## R2. Pure layers read no ambient state
 
@@ -63,7 +63,7 @@ A protocol with one implementation exists only if it is a port or has a test dou
 
 ## R4. One composition root per executable
 
-Each executable has one composition root, and only that root creates infrastructure. The app's root is `PrestoCVComposition`. The server's root is the `PrestoCVServer` executable target ([ADR 0014](adr/0014-server-modular-monolith.md)). Infrastructure is: repositories, stores, renderers, the compiled web-view rule list, the AI adapter, file locations, time sources, identifier generators and loggers. On the server it also includes the database pool, the queue client and the inference providers' clients. A future executable, such as an app extension, has one root as well.
+Each executable has one composition root, and only that root creates infrastructure. The app's root is `PrestoCVComposition`. The server's root is the `PrestoCVServer` executable target ([ADR 0014](adr/0014-server-modular-monolith.md)). Infrastructure is: repositories, stores, renderers, the compiled web-view rule list, the AI adapter, file locations, time sources, identifier generators and loggers. On the server it also includes the database pool, the queue client and the inference providers' clients. In the app it also includes the API's transport. A future executable, such as an app extension, has one root as well.
 
 - Each executable creates its composition **once**: the app's `@main` App type as a `static let`, the server's `@main` command at start. That is the only process-wide instance.
 - Libraries do not provide `init()`s or default arguments that create infrastructure.
@@ -73,8 +73,8 @@ Each executable has one composition root, and only that root creates infrastruct
 **Why.** Today objects are built in four places, the template subsystem exists three times over the same files, and the export sheet builds its own container every time it opens. Issue #1 is a direct consequence.
 
 **Enforced by:**
-- **checker:** detectors `singleton`, and `infrastructureConstruction` for the adapter types listed in `rules.json` and for `FileManager.default`, `Bundle.main` and `UserDefaults.standard`. On the server, every target except the executable carries both, and `infrastructureTypes` lists `PostgresClient` and `HTTPClient` once the targets exist.
-- **review:** what the detectors do not see. A static accessor such as `HTTPClient.shared` stays with review until the checker learns it.
+- **checker:** detectors `singleton`, and `infrastructureConstruction` for the adapter types listed in `rules.json` and for `FileManager.default`, `Bundle.main` and `UserDefaults.standard`. On the server, every target except the executable carries both, and `infrastructureTypes` lists `PostgresClient` and `HTTPClient` once the targets exist. In the app, `PrestoCVAPIAdapter` carries both too, and `infrastructureTypes` lists `URLSessionTransport` once it exists ([ADR 0016](adr/0016-api-contract.md)).
+- **review:** what the detectors do not see. A static accessor such as `HTTPClient.shared` stays with review until the checker learns it, and so does the API's transport in the app until `URLSessionTransport` is listed.
 
 ## R5. Views render; view models present; neither decides
 

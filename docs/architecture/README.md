@@ -48,7 +48,7 @@ The server is an integration and composition package beside the app, in two role
 - Inside `CVPDFExporter`, Document Rendering is downstream of Design Catalog: it consumes validated stylesheets and palettes. That is the only edge between contexts inside a package, and it goes one way ([R1](rules.md#r1-packages-are-isolated-contexts-depend-only-along-documented-edges)).
 - All translation between contexts happens today in one place: the app's integration layer (`PrestoCVIntegration`). Each mapper is exhaustive and tested ([ADR 0007](adr/0007-each-package-owns-its-model.md)).
 - On the server, `ServerHTTP` maps the API's generated types to the tailoring model and back. That is not a translation between contexts, and the generated types never leave it ([ADR 0014](adr/0014-server-modular-monolith.md)).
-- The API between the app and the server is one spec, `openapi.yaml`, in the `PrestoCVAPI` package. The types, the server's protocol and the app's client are generated from it and committed, and CI keeps them current and compatible. The package is not a context. Its generated types are imported only by `ServerHTTP` and, in the app, by the outbound adapter `PrestoCVAPIAdapter`, and never leave them ([ADR 0016](adr/0016-api-contract.md)).
+- The API between the app and the server is one spec, `openapi.yaml`, in the `PrestoCVAPI` package. The types, the server's protocol and the app's client are generated from it and committed, and CI keeps them current and compatible. The package is not a context. Its generated types are imported only by `ServerHTTP` and, in the app, by the outbound adapter `PrestoCVAPIAdapter`, which is the app's only client of the API, and never leave them ([ADR 0016](adr/0016-api-contract.md)).
 - The server sits beside the app. Today it conforms only to CV Tailoring's published model.
 - `CVPDFExporter` is reusable outside the app, including on a Linux backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)).
 
@@ -115,9 +115,8 @@ Dependencies point inwards only. The domain knows nothing about storage, UI, loc
 | `CVRenderingIOS` | ✓ | | |
 | `CVRenderingMacOS` | | ✓ | |
 | Server targets: `ServerApplication`, `ServerInference`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `PrestoCVServer` | | ✓ for development | ✓ must build and test |
-| `PrestoCVAPITypes` | ✓ | ✓ | ✓ must build and test |
+| `PrestoCVAPITypes`, `PrestoCVAPIClient`, `PrestoCVAPIAdapter` | ✓ | ✓ | ✓ must build and test |
 | `PrestoCVAPIServer` | | ✓ for development | ✓ must build and test |
-| `PrestoCVAPIClient`, `PrestoCVAPIAdapter` | ✓ | ✓ | ✓ if the client's transport builds there (#177) |
 | Test-support targets | ✓ | ✓ | ✓ |
 | `CVDraftingFoundationModels` | ✓ 26 | ✓ 26 | |
 | Xcode app target | ✓ 26 | ✓ 26 | |
