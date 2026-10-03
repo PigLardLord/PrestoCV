@@ -270,23 +270,46 @@ private struct WordListReading {
     }
 
     func texts(_ raw: RawList<String>, _ key: WordListKey) throws(TailoringModelError) -> WordList<String> {
-        WordList(source: raw.source, licence: raw.licence, entries: raw.entries)
+        try check(raw, key, words: raw.entries)
+        return WordList(source: raw.source, licence: raw.licence, entries: raw.entries)
     }
 
     func months(_ raw: RawList<RawMonth>, _ key: WordListKey) throws(TailoringModelError) -> WordList<MonthName> {
-        WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { MonthName(name: $0.name, month: $0.month) })
+        try check(raw, key, words: raw.entries.map(\.name))
+        return WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { MonthName(name: $0.name, month: $0.month) })
     }
 
     func numbers(_ raw: RawList<RawNumber>, _ key: WordListKey) throws(TailoringModelError) -> WordList<NumberWord> {
-        WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { NumberWord(word: $0.word, value: $0.value) })
+        try check(raw, key, words: raw.entries.map(\.word))
+        return WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { NumberWord(word: $0.word, value: $0.value) })
     }
 
     func synonyms(_ raw: RawList<RawSynonym>, _ key: WordListKey) throws(TailoringModelError) -> WordList<SynonymGroup> {
-        WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { SynonymGroup(forms: $0.forms) })
+        try check(raw, key, words: raw.entries.flatMap(\.forms))
+        return WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { SynonymGroup(forms: $0.forms) })
     }
 
     func streets(_ raw: RawStreets) throws(TailoringModelError) -> StreetWords {
-        guard let order = StreetOrder(rawValue: raw.order) else { throw .corruptWordList(.language(language)) }
+        guard let order = StreetOrder(rawValue: raw.order) else { throw corrupt }
         return StreetWords(list: try texts(raw.list, .advertStreets), order: order)
+    }
+
+    // MARK: The rules every list shares
+
+    private var corrupt: TailoringModelError { .corruptWordList(.language(language)) }
+
+    /// A list states its source and its licence, holds an entry, and each word of it is trimmed, says something once
+    /// folded, and is not another word of the list once folded: a repeat would count a word twice.
+    private func check<Entry>(_ raw: RawList<Entry>, _ key: WordListKey, words: [String]) throws(TailoringModelError) {
+        guard isStated(raw.source), isStated(raw.licence) else { throw corrupt }
+        guard !raw.entries.isEmpty else { throw .incompleteWordList(language, key) }
+        var folded = Set<String>()
+        for word in words {
+            guard isStated(word), folded.insert(TextFold.fold(word)).inserted else { throw corrupt }
+        }
+    }
+
+    private func isStated(_ text: String) -> Bool {
+        !text.isEmpty && text == text.trimmingCharacters(in: .whitespacesAndNewlines) && !TextFold.fold(text).isEmpty
     }
 }

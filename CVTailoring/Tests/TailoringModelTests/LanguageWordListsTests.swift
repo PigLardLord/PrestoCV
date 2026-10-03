@@ -141,4 +141,114 @@ struct LanguageWordListsTests {
     func capValue() {
         #expect(WordListFormat.maxFileBytes == 1_048_576)
     }
+
+    // MARK: - Source and licence
+
+    @Test("a list without a source or a licence is corrupt", arguments: WordListKey.allCases)
+    func noSourceOrLicence(key: WordListKey) throws {
+        for field in ["source", "licence"] {
+            let data = try WordListFixture.data(editing: key) { $0[field] = nil }
+            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        }
+    }
+
+    @Test("a source or a licence that is empty or not trimmed is corrupt", arguments: ["", " ", " ISC", "ISC ", "\n", "ISC\n"])
+    func blankSourceOrLicence(text: String) throws {
+        for key in WordListKey.allCases {
+            for field in ["source", "licence"] {
+                let data = try WordListFixture.data(editing: key) { $0[field] = text }
+                #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+            }
+        }
+    }
+
+    // MARK: - Entries
+
+    @Test("a list with no entry is incomplete", arguments: WordListKey.allCases)
+    func noEntries(key: WordListKey) throws {
+        let data = try WordListFixture.data(editing: key) { $0["entries"] = [Any]() }
+        #expect(throws: TailoringModelError.incompleteWordList(.english, key)) { try decode(data) }
+    }
+
+    private static let badEntries = ["", " ", " a", "a ", "\n", "a\n", "\t", "\u{00A0}", "\u{FEFF}"]
+
+    @Test("an entry that is empty or not trimmed is corrupt", arguments: WordListFixture.textKeys)
+    func badText(key: WordListKey) throws {
+        for entry in Self.badEntries {
+            let data = try WordListFixture.data(editing: key) { $0["entries"] = ["alpha", entry] }
+            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        }
+    }
+
+    @Test("a month name, a number word and a synonym form that is empty or not trimmed is corrupt")
+    func badEntriesOfOtherShapes() throws {
+        for entry in Self.badEntries {
+            let month = try WordListFixture.data(editing: .datesMonths) { list in
+                var months = list["entries"] as? [WordListFixture.Object] ?? []
+                months[0]["name"] = entry
+                list["entries"] = months
+            }
+            let number = try WordListFixture.data(editing: .numbersWords) { list in
+                var numbers = list["entries"] as? [WordListFixture.Object] ?? []
+                numbers[0]["word"] = entry
+                list["entries"] = numbers
+            }
+            let count = try WordListFixture.data(editing: .spansCountWords) { list in
+                var numbers = list["entries"] as? [WordListFixture.Object] ?? []
+                numbers[0]["word"] = entry
+                list["entries"] = numbers
+            }
+            let synonym = try WordListFixture.data(editing: .advertSynonyms) { $0["entries"] = [["forms": ["ui", entry]]] }
+            let tied = try WordListFixture.data(editing: .spansTiedCounts) { $0["entries"] = [entry] }
+            for data in [month, number, count, synonym, tied] {
+                #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+            }
+        }
+    }
+
+    @Test("an entry repeated once folded is corrupt, however it is written", arguments: [
+        ["Café", "cafe"], ["Straße", "STRASSE"], ["A", "a"], ["a  b", "A b"], ["Zoë", "zoe"],
+    ])
+    func repeatedText(entries: [String]) throws {
+        for key in WordListFixture.textKeys {
+            let data = try WordListFixture.data(editing: key) { $0["entries"] = ["alpha"] + entries }
+            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        }
+    }
+
+    @Test("a month name, a number word and a synonym form repeated once folded is corrupt")
+    func repeatedOfOtherShapes() throws {
+        let month = try WordListFixture.data(editing: .datesMonths) { list in
+            var months = list["entries"] as? [WordListFixture.Object] ?? []
+            months.append(["name": "MONTH1", "month": 1])
+            list["entries"] = months
+        }
+        let number = try WordListFixture.data(editing: .numbersWords) { list in
+            var numbers = list["entries"] as? [WordListFixture.Object] ?? []
+            numbers.append(["word": "Two", "value": 2])
+            list["entries"] = numbers
+        }
+        let count = try WordListFixture.data(editing: .spansCountWords) { list in
+            var numbers = list["entries"] as? [WordListFixture.Object] ?? []
+            numbers.append(["word": "Two", "value": 2])
+            list["entries"] = numbers
+        }
+        let withinAGroup = try WordListFixture.data(editing: .advertSynonyms) { $0["entries"] = [["forms": ["ui", "UI"]]] }
+        let acrossGroups = try WordListFixture.data(editing: .advertSynonyms) {
+            $0["entries"] = [["forms": ["ui", "user interface"]], ["forms": ["gui", "User Interface"]]]
+        }
+        let tied = try WordListFixture.data(editing: .spansTiedCounts) {
+            $0["entries"] = ["{count} of them at {employer}", "{COUNT} OF THEM AT {employer}"]
+        }
+        for data in [month, number, count, withinAGroup, acrossGroups, tied] {
+            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        }
+    }
+
+    @Test("the same entry in two different lists is fine")
+    func sameEntryInTwoLists() throws {
+        _ = try decode(WordListFixture.data())
+        let stopwords = try #require(try decode(WordListFixture.data()).advert.stopwords.entries.first)
+        #expect(try decode(WordListFixture.data()).advert.plainWords.entries.contains(stopwords))
+    }
 }

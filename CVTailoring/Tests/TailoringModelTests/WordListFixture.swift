@@ -38,6 +38,11 @@ enum WordListFixture {
         }
     }
 
+    /// The lists whose entries are plain words, with no rule beyond the ones every list shares.
+    static var textKeys: [WordListKey] {
+        WordListKey.allCases.filter { ![.datesMonths, .numbersWords, .spansCountWords, .advertSynonyms, .spansTiedCounts].contains($0) }
+    }
+
     static func list(for key: WordListKey) -> Object {
         var list: Object = ["source": "a test", "licence": "ISC", "entries": entries(for: key)]
         if key == .advertStreets { list["order"] = "after" }
