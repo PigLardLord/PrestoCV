@@ -71,7 +71,7 @@
     - `requiredImportAccess` on `ServerHTTP`, so the targets of `PrestoCVAPI` are imported `internal`;
     - R4's detectors on every server target except the executable: `singleton`, and `infrastructureConstruction` for the types in `infrastructureTypes`, which gains `PostgresClient` and `HTTPClient` when the targets are created;
     - R2's detectors on `ServerApplication`;
-    - the R1, R7, R9 and R14 detectors on every server target;
+    - the R1, R7, R9, R13 and R14 detectors on every server target;
   - review, until the checker learns it: a static accessor such as `HTTPClient.shared`, which the detectors do not see today. Review also holds the API mappers in `ServerHTTP` deterministic, with their tests, because R2 cannot run on an adapter that creates request identifiers;
   - the contract suites of #157;
   - the loopback test of #158, which proves that the local profile refuses any other address;
