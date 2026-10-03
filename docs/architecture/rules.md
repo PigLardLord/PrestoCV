@@ -62,7 +62,7 @@ A protocol with one implementation exists only if it is a port or has a test dou
 
 ## R4. One composition root per executable
 
-Each executable has one composition root, and only that root creates infrastructure. The app's root is `PrestoCVComposition`. The server's root is the `PrestoCVServer` executable target ([ADR 0014](adr/0014-server-modular-monolith.md)). Infrastructure is: repositories, stores, renderers, the compiled web-view rule list, the AI adapter, file locations, time sources, identifier generators and loggers. On the server it also includes the database pool, the queue client and the inference providers' clients.
+Each executable has one composition root, and only that root creates infrastructure. The app's root is `PrestoCVComposition`. The server's root is the `PrestoCVServer` executable target ([ADR 0014](adr/0014-server-modular-monolith.md)). Infrastructure is: repositories, stores, renderers, the compiled web-view rule list, the AI adapter, file locations, time sources, identifier generators and loggers. On the server it also includes the database pool, the queue client and the inference providers' clients. A future executable, such as an app extension, has one root as well.
 
 - Each executable creates its composition **once**: the app's `@main` App type as a `static let`, the server's `@main` command at start. That is the only process-wide instance.
 - Libraries do not provide `init()`s or default arguments that create infrastructure.
@@ -71,7 +71,9 @@ Each executable has one composition root, and only that root creates infrastruct
 
 **Why.** Today objects are built in four places, the template subsystem exists three times over the same files, and the export sheet builds its own container every time it opens. Issue #1 is a direct consequence.
 
-**Enforced by:** checker (detectors `singleton`, and `infrastructureConstruction` for the adapter types listed in `rules.json` and for `FileManager.default`, `Bundle.main`, `UserDefaults.standard`) and review.
+**Enforced by:**
+- **checker:** detectors `singleton`, and `infrastructureConstruction` for the adapter types listed in `rules.json` and for `FileManager.default`, `Bundle.main` and `UserDefaults.standard`. On the server, every target except the executable carries both, and `infrastructureTypes` lists `PostgresClient` and `HTTPClient` once the targets exist.
+- **review:** what the detectors do not see. A static accessor such as `HTTPClient.shared` stays with review until the checker learns it.
 
 ## R5. Views render; view models present; neither decides
 
