@@ -332,7 +332,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - It shuts down cleanly on SIGTERM: the job in hand is finished or released back to the queue.
 
 **Roles.**
-- **`serve`** answers the API. Hosted, it is its own Cloud Run service. It records a job and hands it to the queue. It checks the data policy at start and serves it, and it reads no secret.
+- **`serve`** answers the API. Hosted, it is its own Cloud Run service. It records a job and hands it to the queue. It checks the data policy at start and serves it, and it reads no provider's key.
 - **`work`** runs tailorings. Hosted, it is its own Cloud Run service, and it is private: only the queue's identity, which the erasure schedule (#166) also uses, may call it, and the platform refuses everyone else before any code runs. Only the worker holds the model providers' keys.
 - A tailoring finishes within the queue's dispatch deadline of 30 minutes.
 - The binary has one more command, `migrate` (#160, #162). It is not a role.

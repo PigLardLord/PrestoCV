@@ -98,7 +98,7 @@
     - the policy's version: derived from everything the endpoint serves, so a provider swap changes it; a start that carries another one is refused; a worker refuses a job recorded under another one;
     - the adapter against recorded responses for each dialect, with no network in CI, and every request to a router carrying the routing preferences of the policy;
     - no prompt, answer or key reaches the log;
-  - the composition test that [ADR 0014](0014-server-modular-monolith.md) names, which also proves that `serve` reads no secret;
+  - the composition test that [ADR 0014](0014-server-modular-monolith.md) names, which also proves that `serve` reads no provider's key;
   - review, until the checker learns it: no server target but the executable reads the environment or a secret store;
   - review: `GET /v1/policy` calls the use case that reads the policy, not the port;
   - review, until the checker learns it: no provider name or model identifier anywhere in the repository except the published privacy policy and the hosted deployment's runbook. A mechanical check can only be an allow-list of invented names or a list of real names held outside the repository.
