@@ -27,7 +27,7 @@ public struct TailoredExperience: Hashable, Sendable {
         try Bounds.text(role, .role)
         try Bounds.text(company, .company)
         try Bounds.text(location, .location)
-        try Bounds.count(lines.count, atMost: TailoringLimits.maxEntriesPerSection, .lines)
+        try Bounds.count(lines.count, atMost: TailoringLimits.maxStatementsPerExperience, .lines)
         self.source = source
         self.role = role
         self.company = company

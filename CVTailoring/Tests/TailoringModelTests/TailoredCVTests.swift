@@ -177,13 +177,15 @@ struct TailoredCVTests {
         #expect(throws: TailoringModelError.tooMany(.sources)) { try TailoredLine(statement: Statement(text: "Text."), sources: Array(repeating: ref, count: 201)) }
     }
 
-    @Test("an experience holds at most 200 lines")
+    @Test("a tailored experience holds as many lines as a source experience holds statements")
     func linesPerExperience() throws {
         let source = try Sample.source()
         let line = try Sample.line("Text.", [source.statementRef(experience: 0, line: 0)])
         let experience = try source.experienceRef(at: 0)
-        _ = try Sample.tailoredExperience(source: experience, lines: Array(repeating: line, count: 200))
-        #expect(throws: TailoringModelError.tooMany(.lines)) { try Sample.tailoredExperience(source: experience, lines: Array(repeating: line, count: 201)) }
+        let limit = TailoringLimits.maxStatementsPerExperience
+        #expect(limit == 200)
+        _ = try Sample.tailoredExperience(source: experience, lines: Array(repeating: line, count: limit))
+        #expect(throws: TailoringModelError.tooMany(.lines)) { try Sample.tailoredExperience(source: experience, lines: Array(repeating: line, count: limit + 1)) }
     }
 
     static let sections: [SectionCase] = {

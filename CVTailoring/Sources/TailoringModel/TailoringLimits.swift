@@ -6,10 +6,10 @@ public enum TailoringLimits {
     public static let maxTextBytes = 10_000
 
     /// The entries of one section of a CV: experiences, education, skills, languages, certifications, profiles,
-    /// interests; the lines of a tailored experience; and the items of each list of a report.
+    /// interests; and the items of each list of a report.
     public static let maxEntriesPerSection = 200
 
-    /// The statements of one experience.
+    /// The statements of one experience, and the lines of one tailored experience.
     public static let maxStatementsPerExperience = 200
 
     /// The text of an advert.
