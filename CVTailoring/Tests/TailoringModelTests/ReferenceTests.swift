@@ -35,8 +35,8 @@ struct ReferenceTests {
         let ref = try cv.statement(experience: 0, line: 2)
         #expect(ref.experience == (try cv.experience(0)))
         #expect(ref.line == 2)
-        #expect(cv.statement(ref).text == "c")
-        #expect(cv.statement(try cv.statement(experience: 1, line: 0)).text == "only line")
+        #expect(try cv.statement(ref).text == "c")
+        #expect(try cv.statement(cv.statement(experience: 1, line: 0)).text == "only line")
     }
 
     @Test("every line of every experience can be referred to, and resolves to its own statement")
@@ -44,7 +44,7 @@ struct ReferenceTests {
         let cv = try snapshot()
         for (index, experience) in cv.experiences.enumerated() {
             for (line, statement) in experience.statements.enumerated() {
-                #expect(cv.statement(try cv.statement(experience: index, line: line)) == statement)
+                #expect(try cv.statement(cv.statement(experience: index, line: line)) == statement)
             }
         }
     }
@@ -69,5 +69,22 @@ struct ReferenceTests {
         #expect(Set([one, same]).count == 1)
         #expect(one != (try cv.statement(experience: 0, line: 2)))
         #expect(one != (try cv.statement(experience: 1, line: 0)))
+    }
+
+    @Test("a reference made by a bigger snapshot is refused by a smaller one, whether its experience or its line is out of range")
+    func foreignReference() throws {
+        let cv = try snapshot(), bigger = try Sample.biggerSource()
+        let farExperience = try bigger.statement(experience: 4, line: 0)   // the snapshot has three experiences
+        let farLine = try bigger.statement(experience: 1, line: 4)         // its second experience has one statement
+        let emptyExperience = try bigger.statement(experience: 2, line: 0) // its third experience has no statement
+        for foreign in [farExperience, farLine, emptyExperience] {
+            #expect(throws: TailoringModelError.referenceOutOfRange) { try cv.statement(foreign) }
+        }
+    }
+
+    @Test("a reference made by an equal snapshot resolves")
+    func equalSnapshotReference() throws {
+        let cv = try snapshot(), same = try snapshot()
+        #expect(try cv.statement(same.statement(experience: 0, line: 1)).text == "b")
     }
 }

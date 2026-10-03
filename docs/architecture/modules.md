@@ -205,9 +205,9 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
   - A `Statement` built from text (a line a model wrote) is trimmed, not empty and bounded.
 - **Typed references.** `ExperienceRef` and `StatementRef` read "experience n, line m", counted from 0.
   - Only a `SourceCV` makes them, through `experience(_:)` and `statement(experience:line:)`. A position the snapshot does not have is `referenceOutOfRange`.
-  - A reference is meaningful only for the snapshot that made it.
+  - A reference is meaningful only for the snapshot that made it. `statement(_:)` resolves one and refuses a reference that does not fit the snapshot with `referenceOutOfRange`; it never traps (R9).
 - **`TailoredCV`**, the same shape with each experience naming its source experience and each line the source statements it comes from.
-  - It keeps its source, and refuses a reference outside it (`referenceOutOfRange`), so one from another snapshot cannot join it.
+  - It keeps its source, and refuses a reference outside it (`referenceOutOfRange`), so one from another snapshot cannot join it and every reference it holds resolves against its own `source`.
   - It checks structure only. A line with no source, or a source from another experience, is a value: the provenance gate reports it (#140).
 - **`CoverLetter`** (with `LetterRecipient` and `FormOfAddress`: `ms`, `mr`, `neutral`), **`LetterDefaults`** (salary expectation, start date, a note, as the user wrote them) and **`Advert`** (its text and its language).
 - **`TailoringReport`** (the argument, and what was cut, moved and reworded) and **`Question`** (`QuestionKind`, `QuestionScope`, `LetterField`). Answers, with their scope, arrive with #153.

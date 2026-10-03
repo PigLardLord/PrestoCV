@@ -77,6 +77,16 @@ struct TailoredCVTests {
         #expect(throws: TailoringModelError.referenceOutOfRange) { try tailored(source, experiences: [experience]) }
     }
 
+    @Test("every reference of a tailored CV resolves against its own source")
+    func referencesResolveAgainstTheSource() throws {
+        let source = try Sample.source()
+        let refs = [try source.statement(experience: 0, line: 1), try source.statement(experience: 1, line: 0)]
+        let experience = try Sample.tailoredExperience(source: source.experience(0), lines: [Sample.line("One.", [refs[0]]), Sample.line("Two.", [refs[1]])])
+        let cv = try tailored(source, experiences: [experience])
+        let resolved = try cv.experiences.flatMap(\.lines).flatMap(\.sources).map { try cv.source.statement($0).text }
+        #expect(resolved == ["cut costs by 30%", "ran the on-call rota"])
+    }
+
     @Test("a reference made by an equal snapshot is accepted")
     func referenceOfAnEqualSnapshot() throws {
         let source = try Sample.source(), same = try Sample.source()

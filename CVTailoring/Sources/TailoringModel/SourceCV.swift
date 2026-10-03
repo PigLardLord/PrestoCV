@@ -47,11 +47,12 @@ public struct SourceCV: Hashable, Sendable {
         return StatementRef(experience: experienceRef, line: line)
     }
 
-    /// The statement a reference names. It is total for a reference this snapshot made, which is always in range. A
-    /// reference is meaningful only for the snapshot that made it: `TailoredCV` checks every reference it is given
-    /// against its own source, so one from another snapshot cannot join a tailored CV.
-    public func statement(_ ref: StatementRef) -> Statement {
-        experiences[ref.experience.index].statements[ref.line]
+    /// The statement a reference names. A reference is meaningful only for the snapshot that made it, so one that does
+    /// not fit this snapshot, in its experience or in its line, is `referenceOutOfRange`, never a trap (R9). The
+    /// references of a `TailoredCV` always resolve against its own `source`.
+    public func statement(_ ref: StatementRef) throws(TailoringModelError) -> Statement {
+        guard contains(ref) else { throw .referenceOutOfRange }
+        return experiences[ref.experience.index].statements[ref.line]
     }
 
     func contains(_ ref: StatementRef) -> Bool {
