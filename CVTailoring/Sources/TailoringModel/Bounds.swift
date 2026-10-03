@@ -13,4 +13,8 @@ enum Bounds {
         guard value.contains(where: { !$0.isWhitespace }) else { throw .emptyField(field) }
         try text(value, field)
     }
+
+    static func count(_ count: Int, atMost limit: Int, _ collection: TailoringModelError.Collection) throws(TailoringModelError) {
+        guard count <= limit else { throw .tooMany(collection) }
+    }
 }

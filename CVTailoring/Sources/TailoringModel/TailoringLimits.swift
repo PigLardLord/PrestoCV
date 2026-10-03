@@ -3,4 +3,7 @@
 public enum TailoringLimits {
     /// One text field, a statement included.
     public static let maxTextBytes = 10_000
+
+    /// The statements of one experience.
+    public static let maxStatementsPerExperience = 200
 }
