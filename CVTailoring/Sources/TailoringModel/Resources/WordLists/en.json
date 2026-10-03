@@ -714,7 +714,7 @@
       ]
     },
     "legalForms": {
-      "source": "cv-giovanni 6e28147 core/ProvenanceCheck.js LEGAL_FORM (every form, expanded)",
+      "source": "cv-giovanni 6e28147 core/ProvenanceCheck.js LEGAL_FORM, the forms of its alternatives, with its optional spaces left to the check",
       "licence": "ISC",
       "entries": [
         "gmbh & co kg",
@@ -732,7 +732,6 @@
         "kg",
         "ug",
         "e.v.",
-        "e. v.",
         "s.a.",
         "b.v.",
         "ltd",

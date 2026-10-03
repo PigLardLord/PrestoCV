@@ -342,16 +342,15 @@ enum EnglishExpected {
         return values
     }()
 
-    /// cv-giovanni 6e28147 core/ProvenanceCheck.js LEGAL_FORM (every form, expanded)
+    /// cv-giovanni 6e28147 core/ProvenanceCheck.js LEGAL_FORM, the forms of its alternatives, with its optional spaces left to the check
     static let provenanceLegalForms: [String] = {
         var values: [String] = []
         values.append(contentsOf: ["gmbh & co kg", "gmbh & co kga", "gmbh & co kgaa", "gmbh & co. kg"])
         values.append(contentsOf: ["gmbh & co. kga", "gmbh & co. kgaa", "ug (haftungsbeschränkt)", "gmbh"])
         values.append(contentsOf: ["ggmbh", "kgaa", "ag", "se"])
-        values.append(contentsOf: ["kg", "ug", "e.v.", "e. v."])
-        values.append(contentsOf: ["s.a.", "b.v.", "ltd", "ltd."])
-        values.append(contentsOf: ["limited", "inc", "inc.", "llc"])
-        values.append(contentsOf: ["plc"])
+        values.append(contentsOf: ["kg", "ug", "e.v.", "s.a."])
+        values.append(contentsOf: ["b.v.", "ltd", "ltd.", "limited"])
+        values.append(contentsOf: ["inc", "inc.", "llc", "plc"])
         return values
     }()
 

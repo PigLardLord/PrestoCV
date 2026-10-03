@@ -171,7 +171,7 @@ struct EnglishWordListsTests {
         counts[.letterAcademicTitles] = 2  // the titles between a form and a name: dr, prof
         counts[.letterNotGivenNames] = 6  // the words that are no given name: ms, mrs, miss, mr, and, or; frau, herr, und, oder and sowie are German
         counts[.provenanceNotPlurals] = 9  // core/ProvenanceCheck.js NOT_PLURALS
-        counts[.provenanceLegalForms] = 25  // LEGAL_FORM: its 16 alternatives written out, with and without the optional dots and space
+        counts[.provenanceLegalForms] = 24  // LEGAL_FORM: its 16 alternatives written out, with and without the optional dots; the optional spaces are the check's
         counts[.provenanceFirstPerson] = 9  // ProvenanceCheck.names: "I" and I'm, I've, I'd, I'll with either apostrophe
         counts[.provenanceRanks] = 10  // RANKS: 8 of its 14 patterns are English, senior, lead|leading, principal, staff, head|chief, director, manager, architect
         counts[.fieldsTechnologies] = 49  // domain/TechnologyLexicon.js TECHNOLOGIES
