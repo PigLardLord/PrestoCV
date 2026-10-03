@@ -11,6 +11,15 @@ enum WordListFormat {
     /// compatible with ISC and with the App Store.
     static let allowedLicences: Set<String> = ["ISC"]
 
+    /// The months a language names: each number from 1 to 12 at least once.
+    static let monthNumbers = 1...12
+
+    /// The fewest forms a group of synonyms holds: a group of one links nothing.
+    static let minSynonymForms = 2
+
+    /// The form of address a word writes, by the code of the form in the file. The neutral form has no word of its own.
+    static let formsOfAddress: [String: FormOfAddress] = ["ms": .ms, "mr": .mr]
+
     /// The groups of a file, in the order of the keys.
     static var groups: [String] {
         var seen = Set<String>()

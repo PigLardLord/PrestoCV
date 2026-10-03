@@ -46,7 +46,9 @@ The supported languages are the ones the index names, each with its file. An ind
   - `advert.synonyms`: `{ "forms": ["ui", "user interface"] }`, two forms at least;
   - `letter.formsOfAddress`: `{ "form": "ms", "word": "mrs" }`, a form that is `ms` or `mr`, since the neutral form has no word of its own;
   - `provenance.ranks`: `{ "word": "chief", "ranks": ["head"] }`, one rank at least, each from the set below and none twice.
-- `advert.streets` also says where the language writes the word of a street, in `order`: `joined` to the name ("Hauptstraße 1"), `after` it with the number first ("221B Baker Street"), or `before` it with the number last ("Via Roma 1").
+- `advert.streets` also says where the language writes the word of a street, in `order`.
+- The street orders: `joined` to the name ("Hauptstraße 1"), `after` it with the number first ("221B Baker Street"), `before` it with the number last ("Via Roma 1").
+- The forms of address: `ms`, `mr`. The neutral form has no word of its own.
 - `spans.tiedCounts` holds templates: literal words around `{count}` and `{employer}`, each exactly once, no other brace, and a word between them. A language puts the count before or after the employer as it writes it.
 - A source, a licence and every entry is one line of text that shows something. It holds no hidden character: the model's `TextRules` refuse control characters, bidirectional marks, embeddings and overrides, and tag characters. It has no blank at either end by the model's one rule of trimming. And it is not empty once folded: an entry that folds to nothing, such as a lone combining mark, is corrupt.
 - Entries are kept as written. A match folds both sides with `TextFold.fold`, the one normalisation in `TailoringModel`: case, accents and ligatures are dropped, `ß` is `ss`, and runs of white space are one space.
@@ -63,7 +65,7 @@ Every file holds every key below. A file that lacks one is refused as incomplete
 |---|---|---|
 | `version` | The format version | Refused unless it is the one this page describes |
 | `language` | The code of the language the file is the file of, as the index lists it | Refused unless it is the language the index names for this file, so a file copied under another name is caught |
-| `advert.stopwords` | Words that carry no information about a role, however often an advert uses them | `AdvertAnalysis` leaves them out of the terms it ranks, and guesses an advert's language from the share of its words that a language's stopwords make |
+| `advert.stopwords` | Words that carry no information about a role, however often an advert uses them | `AdvertAnalysis` leaves them out of the terms it ranks, and guesses an advert's language from the share of its words that a language's stopwords make; `Provenance` does not hold them to the source as words the advert writes |
 | `advert.plainWords` | Ordinary words of an advert's prose that a tailoring may write although the CV does not, because each is a word of some technology's name ("new", "time") | `Provenance` lets them pass in the check of names; `AdvertAnalysis` still ranks them |
 | `advert.dimensions` | Nouns that name what a claim measures ("performance", "stability") | `Provenance` holds the figure beside one to the source, and refuses one beside no figure as a claim |
 | `advert.boilerplate` | Phrases and words that belong to the posting and not to the job ("equal opportunity", "full time") | `AdvertAnalysis` drops a phrase as furniture; a one-word entry counts only on a short line |
@@ -71,7 +73,7 @@ Every file holds every key below. A file that lacks one is refused as incomplete
 | `advert.instructions` | What an advert asks of the applicant and not of the job ("please state", "notice period") | `AdvertAnalysis` takes them out of a line as words before it reads it |
 | `advert.streets` | The words a street's name carries ("street", "road"), and where the language writes them | `AdvertAnalysis` reads an address line as the posting's and not as a requirement, only beside a house number |
 | `advert.names` | Names written in several words that are read whole ("github actions", "time series") | `AdvertAnalysis` reads each as one term and not as its words |
-| `advert.synonyms` | Groups of forms that mean the same ("ci/cd", "continuous integration") | `AdvertAnalysis` finds evidence through a group and reports it as a synonym and never as exact |
+| `advert.synonyms` | Groups of forms that mean the same ("ci/cd", "continuous integration") | `AdvertAnalysis` finds evidence through a group and reports it as a synonym and never as exact; `Provenance` finds an advert's word in its source through a group ("engineers" where the source writes "developers") |
 | `advert.requirementHeadings` | Headings under which an advert states what it will not compromise on ("requirements", "must have") | `AdvertAnalysis` marks the terms below one as required |
 | `advert.offerHeadings` | Headings under which an advert talks about itself: what it offers and who it is ("we offer", "about us") | `AdvertAnalysis` ranks the terms below one lower |
 | `advert.structuralHeadings` | Headings that organise an advert without demanding or offering anything ("tech stack", "location") | `AdvertAnalysis` reads their own words as structure, so "tech stack" is no technology |

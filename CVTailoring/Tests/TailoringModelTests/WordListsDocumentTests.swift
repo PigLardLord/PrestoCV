@@ -54,6 +54,31 @@ struct WordListsDocumentTests {
         #expect(Set(Page.backticked(line)) == WordListFormat.allowedLicences)
     }
 
+    @Test("the street orders the page names are the decoder's")
+    func streetOrders() throws {
+        let lines = Page.matches(#"^- The street orders: (.*)$"#, in: try Page.text())
+        #expect(lines.count == 1)
+        let line = try #require(lines.first, "no line naming the street orders")
+        #expect(Page.backticked(line) == StreetOrder.allCases.map(\.rawValue))
+    }
+
+    @Test("the forms of address the page names are the ones the decoder maps")
+    func formsOfAddress() throws {
+        let lines = Page.matches(#"^- The forms of address: (.*)$"#, in: try Page.text())
+        #expect(lines.count == 1)
+        let line = try #require(lines.first, "no line naming the forms of address")
+        #expect(Set(Page.backticked(line)) == Set(WordListFormat.formsOfAddress.keys))
+        #expect(WordListFormat.formsOfAddress["ms"] == .ms && WordListFormat.formsOfAddress["mr"] == .mr)
+    }
+
+    @Test("the month range and the smallest group of synonyms the page states are the decoder's")
+    func bounds() throws {
+        let page = try Page.text()
+        let range = try #require(Page.pairs(#"outside (\d+) to (\d+)"#, in: page).first)
+        #expect(range.0 == String(WordListFormat.monthNumbers.lowerBound) && range.1 == String(WordListFormat.monthNumbers.upperBound))
+        #expect(Page.matches(#"fewer than (\d+) forms"#, in: page) == [String(WordListFormat.minSynonymForms)])
+    }
+
     @Test("the ranks the page names are the ranks the decoder knows")
     func ranks() throws {
         let listed = Page.backticked(try Page.section(from: "### Ranks", to: "#"))
@@ -101,6 +126,16 @@ private enum Page {
     }
 
     static func backticked(_ text: String) -> [String] { matches("`([^`]+)`", in: text) }
+
+    /// The first two capture groups of every match.
+    static func pairs(_ pattern: String, in text: String) -> [(String, String)] {
+        let regex: NSRegularExpression
+        do { regex = try NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines]) } catch { return [] }
+        let ns = text as NSString
+        return regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).map {
+            (ns.substring(with: $0.range(at: 1)), ns.substring(with: $0.range(at: 2)))
+        }
+    }
 
     /// The first capture group of every match.
     static func matches(_ pattern: String, in text: String) -> [String] {

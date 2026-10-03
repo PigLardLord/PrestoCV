@@ -364,8 +364,8 @@ private struct WordListReading {
 
     func months(_ raw: RawList<RawMonth>, _ key: WordListKey) throws(TailoringModelError) -> WordList<MonthName> {
         try check(raw, key, words: raw.entries.map(\.name))
-        guard raw.entries.allSatisfy({ (1...12).contains($0.month) }) else { throw corrupt(key) }
-        guard Set(raw.entries.map(\.month)).count == 12 else { throw .incompleteWordList(language, key) }
+        guard raw.entries.allSatisfy({ WordListFormat.monthNumbers.contains($0.month) }) else { throw corrupt(key) }
+        guard Set(raw.entries.map(\.month)).count == WordListFormat.monthNumbers.count else { throw .incompleteWordList(language, key) }
         return WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { MonthName(name: $0.name, month: $0.month) })
     }
 
@@ -392,18 +392,15 @@ private struct WordListReading {
         try check(raw, key, words: raw.entries.map(\.word))
         var entries: [FormOfAddressWord] = []
         for entry in raw.entries {
-            switch entry.form {
-            case "ms": entries.append(FormOfAddressWord(form: .ms, word: entry.word))
-            case "mr": entries.append(FormOfAddressWord(form: .mr, word: entry.word))
-            default: throw corrupt(key)
-            }
+            guard let form = WordListFormat.formsOfAddress[entry.form] else { throw corrupt(key) }
+            entries.append(FormOfAddressWord(form: form, word: entry.word))
         }
         return WordList(source: raw.source, licence: raw.licence, entries: entries)
     }
 
     func synonyms(_ raw: RawList<RawSynonym>, _ key: WordListKey) throws(TailoringModelError) -> WordList<SynonymGroup> {
         try check(raw, key, words: raw.entries.flatMap(\.forms))
-        guard raw.entries.allSatisfy({ $0.forms.count >= 2 }) else { throw corrupt(key) }
+        guard raw.entries.allSatisfy({ $0.forms.count >= WordListFormat.minSynonymForms }) else { throw corrupt(key) }
         return WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { SynonymGroup(forms: $0.forms) })
     }
 
