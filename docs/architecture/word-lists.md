@@ -70,7 +70,7 @@ The "Read" column says how cv-giovanni matches a list, and so how the format tel
 - **as written (case-insensitive)**: the entry is matched as written in a text, without regard to case.
 - **as written (case-sensitive)**: the entry is matched as written, with its case: a street word is capitalised first, and "I" is the first person only as a capital.
 
-A list that is not folded tells two entries apart by their lower-case form. A port of cv-giovanni's lists dedupes accordingly. Its Italian stopwords are read folded, so "e" and "è" are one entry, and "come", which it writes twice, is one (#145); its German streets "straße" and "strasse" are one (#142).
+A list that is not folded tells two entries apart by their lower-case form. A port of cv-giovanni's lists dedupes accordingly. Its Italian stopwords are read folded, so "e" and "è" are one entry, and "come", which it writes twice, is one (#145); its German streets are read as written, so "straße" and "strasse" stay two entries (#142).
 
 | Key | Holds | Read | May be empty | Used by |
 |---|---|---|---|---|
@@ -184,7 +184,7 @@ Every refusal is a typed error that carries codes and no text ([R7](rules.md#r7-
 | `corruptWordList(.language(l), key)` | The list `key` has a key the format does not know, lacks its `source`, `licence` or `entries`, or holds a value of the wrong type |
 | `corruptWordList(.language(l), key)` | The `licence` of the list is not one of the allowed set |
 | `corruptWordList(.language(l), key)` | A `source`, a `licence` or an entry is empty, is not trimmed, hides a character, holds an invisible one, mixes Latin letters with Greek or Cyrillic, or folds to nothing |
-| `corruptWordList(.language(l), key)` | Two entries of the list are the same once folded, so a word two forms of address or two ranks share counts too |
+| `corruptWordList(.language(l), key)` | Two entries of the list are the same as the list is read: once folded for a folded list, once lower-cased for the others, and for the legal forms without the spaces around "&", "." and "(". So a word two forms of address or two ranks share counts too |
 | `corruptWordList(.language(l), key)` | A month is outside 1 to 12, a value is negative or above 1,000,000,000,000, or a group of synonyms has fewer than 2 forms |
 | `corruptWordList(.language(l), key)` | A tied count does not hold `{count}` and `{employer}` once each, holds another brace, or has no word between them |
 | `corruptWordList(.language(l), key)` | The `order` of the streets is missing or is none of the three |
