@@ -124,8 +124,9 @@ Every list states where its entries come from and under which licence, beside th
 
 - `source` is free text that names the origin precisely enough to find the entries again: a repository, a commit, the list inside it. A list that is a port says so ("cv-giovanni 6e28147 domain/AdvertLexicon.js ADVERT.stopwords.en").
 - `licence` is an SPDX identifier. The entries of cv-giovanni are under ISC.
-- The licences a list may carry are a closed set, in `EnglishWordListsTests`. Widening it is a reviewed change: a licence must be compatible with ISC and with the App Store.
-- A list with no source or no licence is refused.
+- The licences a list may carry: `ISC`.
+- That set is closed and the decoder refuses any other licence. Widening it is a reviewed change: a licence must be compatible with ISC and with the App Store.
+- A list with no source or no licence, or with a licence outside the set, is refused.
 
 ### Refusals
 

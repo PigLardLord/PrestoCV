@@ -7,6 +7,10 @@ enum WordListFormat {
     /// The largest file read, in bytes. A file is untrusted input, so the size is checked before it is decoded (R8).
     static let maxFileBytes = 1_048_576
 
+    /// The licences a list may carry, as SPDX identifiers. Widening the set is a reviewed change: a licence must be
+    /// compatible with ISC and with the App Store.
+    static let allowedLicences: Set<String> = ["ISC"]
+
     /// The groups of a file, in the order of the keys.
     static var groups: [String] {
         var seen = Set<String>()

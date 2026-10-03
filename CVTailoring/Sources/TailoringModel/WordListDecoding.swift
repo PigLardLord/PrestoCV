@@ -418,10 +418,10 @@ private struct WordListReading {
 
     private var corrupt: TailoringModelError { .corruptWordList(.language(language)) }
 
-    /// A list states its source and its licence, holds an entry, and each word of it is one line of text that shows
+    /// A list states its source and a licence of the allowed set, holds an entry, and each word of it is one line of text that shows
     /// something (`isStated`) and is not another word of the list once folded: a repeat would count a word twice.
     private func check<Entry>(_ raw: RawList<Entry>, _ key: WordListKey, words: [String]) throws(TailoringModelError) {
-        guard isStated(raw.source), isStated(raw.licence) else { throw corrupt }
+        guard isStated(raw.source), WordListFormat.allowedLicences.contains(raw.licence) else { throw corrupt }
         guard !raw.entries.isEmpty else { throw .incompleteWordList(language, key) }
         var folded = Set<String>()
         for word in words {

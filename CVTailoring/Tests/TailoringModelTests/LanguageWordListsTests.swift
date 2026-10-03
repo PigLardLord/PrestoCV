@@ -576,4 +576,26 @@ struct LanguageWordListsTests {
         }
         #expect(try decode(data).provenance.ranks.entries == [RankWord(word: "leiter", ranks: [.lead, .head, .manager, .director])])
     }
+
+    // MARK: - Licences
+
+    @Test("the licences a list may carry are ISC alone, and widening the set is a reviewed change")
+    func allowedLicences() {
+        #expect(WordListFormat.allowedLicences == ["ISC"])
+    }
+
+    static let otherLicenceCases: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["MIT", "isc", "ISC OR MIT", "GPL-3.0-only"])
+        values.append(contentsOf: ["Apache-2.0", "proprietary", "ISC-like"])
+        return values
+    }()
+
+    @Test("a licence that is not in the allowed set is corrupt, however well formed", arguments: otherLicenceCases)
+    func licenceNotAllowed(licence: String) throws {
+        for key in WordListKey.allCases {
+            let data = try WordListFixture.data(editing: key) { $0["licence"] = licence }
+            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        }
+    }
 }

@@ -46,6 +46,14 @@ struct WordListsDocumentTests {
         #expect(sizes == [String(WordListFormat.maxFileBytes)])
     }
 
+    @Test("the licences the page allows are the decoder's")
+    func licences() throws {
+        let lines = Page.matches(#"^- The licences a list may carry: (.*)$"#, in: try Page.text())
+        let line = try #require(lines.first, "no line naming the licences")
+        #expect(lines.count == 1)
+        #expect(Set(Page.backticked(line)) == WordListFormat.allowedLicences)
+    }
+
     @Test("the ranks the page names are the ranks the decoder knows")
     func ranks() throws {
         let listed = Page.backticked(try Page.section(from: "### Ranks", to: "#"))

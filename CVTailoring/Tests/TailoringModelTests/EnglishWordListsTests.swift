@@ -94,10 +94,6 @@ struct EnglishWordListsTests {
         return rows
     }
 
-    /// The licences a list may carry. Widening it is a reviewed change: every licence must be compatible with ISC and with
-    /// the App Store.
-    private static let allowedLicences: Set<String> = ["ISC"]
-
     @Test("every list of every language states a source and a licence from the allowed set")
     func sourceAndLicence() throws {
         let lists = try WordLists.load()
@@ -106,7 +102,7 @@ struct EnglishWordListsTests {
             #expect(Set(rows.keys) == Set(WordListKey.allCases), "\(language) is missing a list in this test")
             for (key, row) in rows {
                 #expect(!row.source.isEmpty, "\(language) \(key.rawValue) has no source")
-                #expect(Self.allowedLicences.contains(row.licence), "\(language) \(key.rawValue) is under \(row.licence)")
+                #expect(WordListFormat.allowedLicences.contains(row.licence), "\(language) \(key.rawValue) is under \(row.licence)")
             }
         }
     }
