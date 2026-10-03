@@ -11,6 +11,8 @@ public enum TailoringModelError: Error, Hashable, Sendable {
     case tooMany(Collection)
     /// A skill level outside 1 to 5.
     case invalidSkillLevel
+    /// A reference to an experience or a statement the snapshot does not have.
+    case referenceOutOfRange
     /// A year outside 1900 to 2200, or a month outside 1 to 12.
     case invalidDate
     /// A period that ends before it starts.

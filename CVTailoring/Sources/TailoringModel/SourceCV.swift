@@ -31,4 +31,26 @@ public struct SourceCV: Hashable, Sendable {
         self.profiles = profiles
         self.interests = interests
     }
+
+    // MARK: References
+
+    /// A reference to the experience at `index`, counted from 0.
+    public func experience(_ index: Int) throws(TailoringModelError) -> ExperienceRef {
+        guard experiences.indices.contains(index) else { throw .referenceOutOfRange }
+        return ExperienceRef(index: index)
+    }
+
+    /// A reference to a line of an experience, both counted from 0.
+    public func statement(experience: Int, line: Int) throws(TailoringModelError) -> StatementRef {
+        let experienceRef = try self.experience(experience)
+        guard experiences[experienceRef.index].statements.indices.contains(line) else { throw .referenceOutOfRange }
+        return StatementRef(experience: experienceRef, line: line)
+    }
+
+    /// The statement a reference names. It is total for a reference this snapshot made, which is always in range. A
+    /// reference is meaningful only for the snapshot that made it: `TailoredCV` checks every reference it is given
+    /// against its own source, so one from another snapshot cannot join a tailored CV.
+    public func statement(_ ref: StatementRef) -> Statement {
+        experiences[ref.experience.index].statements[ref.line]
+    }
 }
