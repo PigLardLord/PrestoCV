@@ -263,3 +263,63 @@ struct StatementInitTests {
         #expect(Statement.split("- Cut costs") == [try Statement(text: "Cut costs")])
     }
 }
+
+@Suite("ADR 0013 / R8 · a statement from a line somebody wrote")
+struct WrittenLineTests {
+    static let writtenLines: [(String, String)] = {
+        var cases: [(String, String)] = []
+        cases.append(("\u{2022} Led the team", "Led the team"))
+        cases.append(("- - x", "- x"))
+        cases.append(("  - x  ", "x"))
+        cases.append(("*\tx", "x"))
+        cases.append(("Led the team", "Led the team"))
+        cases.append(("-5% churn", "-5% churn"))
+        cases.append(("1. Led the team", "1. Led the team"))
+        cases.append(("\u{FEFF}- text", "text"))
+        cases.append(("- \u{200B}text\u{FEFF}", "text"))
+        cases.append(("-\u{0301}x", "-\u{0301}x"))
+        cases.append(("Cut costs\n", "Cut costs"))
+        return cases
+    }()
+
+    @Test("the split's rule on one line: trim, remove one bullet, trim", arguments: writtenLines)
+    func rule(text: String, expected: String) throws {
+        #expect(try Statement(writtenLine: text).text == expected)
+    }
+
+    @Test("a written line is the one statement the split makes of it", arguments: writtenLines)
+    func sameAsTheSplit(text: String, expected: String) throws {
+        #expect(Statement.split(text) == [try Statement(writtenLine: text)])
+    }
+
+    static let emptyLines: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["\u{2022}", "-", "*", " - ", "\u{2022} ", "-\u{200B}", "\u{FEFF}\u{2022}"])
+        values.append(contentsOf: blankStrings)
+        return values
+    }()
+
+    @Test("a line that says nothing, or only a bullet, is refused", arguments: emptyLines)
+    func nothingToSay(text: String) {
+        #expect(throws: TailoringModelError.emptyField(.statement)) { try Statement(writtenLine: text) }
+    }
+
+    @Test("a line that spans lines is refused, whatever breaks it", arguments: StatementInitTests.multiLineTexts)
+    func spansLines(text: String) {
+        #expect(throws: TailoringModelError.notOneLine(.statement)) { try Statement(writtenLine: text) }
+    }
+
+    @Test("the bound is 10,000 UTF-8 bytes of the line once its bullet is removed")
+    func bounded() throws {
+        #expect(try Statement(writtenLine: "- " + ascii(10_000)).text.utf8.count == 10_000)
+        #expect(throws: TailoringModelError.tooLarge(.statement)) { try Statement(writtenLine: "- " + ascii(10_001)) }
+        #expect(try Statement(writtenLine: twoByteCharacters(bytes: 10_000)).text.count == 5_000)
+        #expect(throws: TailoringModelError.tooLarge(.statement)) { try Statement(writtenLine: twoByteCharacters(bytes: 10_002)) }
+    }
+
+    @Test("a statement built from text keeps its bullet, as a snapshot's statements are rebuilt verbatim")
+    func textKeepsTheBullet() throws {
+        #expect(try Statement(text: "- x").text == "- x")
+        #expect(try Statement(writtenLine: "- x").text == "x")
+    }
+}
