@@ -282,7 +282,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
 **`ServerApplication`** (#157)
 - **Use cases:** start a tailoring, run it, get it and delete it.
   - Start checks the caller's quota, records the job under its idempotency key and queues it. The same key returns the same job.
-  - Run is the `work` role's use case: it loads the job, runs the loop of `Tailoring`, and stores the result or the failure.
+  - Run is the `work` role's use case: it loads the job, runs the loop of `Tailoring`, stores the result or the failure, and notifies the device (#180).
   - Get returns the job to its owner only. Delete erases it.
 - **The job lifecycle:** queued, running, succeeded, failed, expired. A job is erased once the app confirms it has saved the result, and 24 hours after the job ends at the latest (#166).
 - **The lease.** A running job holds a lease, and a job whose lease has expired is taken over by the retry (#161). The lease belongs to the job's lifecycle and to its contract suite, not to the queue adapter.
@@ -327,11 +327,11 @@ The targets are created by #158 and the tickets named below. Until the targets e
 
 **Profiles.** A profile is a set of adapters that the composition root picks from configuration.
 - **`hosted`:** the Postgres store and the Cloud Tasks queue.
-- **`local`:** the in-memory store and the in-process queue of `ServerLocalProfile`, with both roles in one process. It is for development only, and it refuses to start on any address but 127.0.0.1.
+- **`local`:** the in-memory stores and the in-process queue of `ServerLocalProfile`, with both roles in one process. It is for development only, and it refuses to start on any address but 127.0.0.1.
 
 **Environments.** `local` uses the local profile. `staging` and `production` use the hosted profile, each with its own configuration, database and queue. Staging accepts App Attest's development environment and production only the production one. How a change reaches each belongs to the infrastructure layer of #133.
 
-**Translation.** On the server, the API's generated types are translated to and from the tailoring model only in `ServerHTTP`, and never leave it. A translation between two context packages on the server lives in a server target that this file names, or needs an ADR (R1).
+**Translation.** On the server, the API's generated types are translated to and from the tailoring model only in `ServerHTTP`, and never leave it. A translation between two context packages on the server lives in a server target that this file designates for that translation, or needs an ADR (R1).
 
 **Dependencies.**
 - External packages are imported only by adapters and by the executable, never by `ServerApplication`. Each is pinned in the committed `Package.resolved`. A new one changes this file in the same pull request, and the checker's `--packages` rule holds it.
