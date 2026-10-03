@@ -23,6 +23,15 @@ One word, one meaning, in code, UI copy, tickets and translations. Today "templa
 | **Preview** | HTML rendered on screen from the same pipeline and policy as the PDF. | — | Rendering |
 | **Render policy** | Required fields and page limits, the same for preview and export. | — | Rendering |
 | **Workflow** | An app-level use case that spans contexts (export a CV, draft with AI, browse designs). | Use case (single context) | App integration |
+| **Tailoring** | Rewriting one CV and writing a cover letter for one advert, then holding both to the source. | Translation: a CV is tailored in its own language | Tailoring |
+| **Advert** | The job advert a tailoring is for: its text and what it asks for. | — | Tailoring |
+| **Source CV** | The snapshot of the CV a tailoring starts from. | The stored CV, which can change meanwhile | Tailoring |
+| **Tailored CV** | The CV a tailoring produces: the source CV rewritten for one advert, each rewritten line naming its source statements. | Draft, source CV | Tailoring |
+| **Statement** | One line of an experience's description, as written, without its leading bullet. The unit of provenance. | An entry, or a whole description | Tailoring |
+| **Evidence** | Where the source CV states a term the advert asks for: in prose, only listed, or absent. Only prose counts as evidence. | A skills list, which names a term without showing it | Tailoring |
+| **Provenance** | The source statements a tailored line names, and the gate that refuses anything they do not state. | — | Tailoring |
+| **Question** | What the advert asks for that the source CV does not evidence, asked to the user. Never written into the CV. | — | Tailoring |
+| **Cover letter** | The letter a tailoring writes for one advert. It is held to the source CV like the tailored CV. | — | Tailoring |
 
 ## UI copy in other languages
 
