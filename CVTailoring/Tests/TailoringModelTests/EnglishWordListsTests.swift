@@ -7,14 +7,22 @@ import Foundation
 struct EnglishWordListsTests {
     private func english() throws -> LanguageWordLists { try WordLists.load().forLanguage(.english) }
 
-    @Test("the bundled lists load, and English is the one language with a file")
+    @Test("the bundled lists load, English has a file, and every language the index names has its lists")
     func loads() throws {
         let lists = try WordLists.load()
-        #expect(lists.languages == [.english])
-        #expect(try lists.forLanguage(.english).language == .english)
+        #expect(lists.languages.contains(.english))
+        for language in lists.languages { #expect(try lists.forLanguage(language).language == language) }
     }
 
-    @Test("every other language is unsupported until it has a file", arguments: TailoringLanguage.allCases.filter { $0 != .english })
+    /// The languages that have no file: the six minus the ones that load. A failed load leaves all six, and the test below
+    /// then fails for English.
+    static let unsupportedCases: [TailoringLanguage] = {
+        var loaded: [TailoringLanguage] = []
+        do { loaded = try WordLists.load().languages } catch { loaded = [] }
+        return TailoringLanguage.allCases.filter { !loaded.contains($0) }
+    }()
+
+    @Test("a language without a file is unsupported, until it has one", arguments: unsupportedCases)
     func unsupported(language: TailoringLanguage) throws {
         let lists = try WordLists.load()
         #expect(throws: TailoringModelError.unsupportedLanguage) { try lists.forLanguage(language) }
