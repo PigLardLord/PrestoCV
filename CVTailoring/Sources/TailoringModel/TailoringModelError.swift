@@ -3,4 +3,13 @@
 public enum TailoringModelError: Error, Hashable, Sendable {
     /// A language tag that is none of the six (ADR 0013). It never falls back to English.
     case unsupportedLanguage
+    /// A field that must say something is empty, or only whitespace.
+    case emptyField(Field)
+    /// A field longer than `TailoringLimits.maxTextBytes`, or an advert longer than `TailoringLimits.maxAdvertBytes` (R8).
+    case tooLarge(Field)
+
+    /// The text fields of the model, by what they hold, not by which type holds them.
+    public enum Field: Hashable, Sendable {
+        case statement
+    }
 }
