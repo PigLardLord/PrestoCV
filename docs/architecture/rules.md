@@ -21,6 +21,7 @@ The checker applies to **production targets**: domain, application, integration,
 - **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter`, `CVGeneratorAI` and `CVTailoring` never import one another. Translation between them happens, in the app, only in `PrestoCVIntegration`.
 - **The server's package is not one of them.** The `PrestoCVServer` package is an integration and composition package, like `PrestoCVApp`. It imports the context packages it serves. It never imports `PrestoCVApp` or `PrestoCVCore`. It may import the Linux targets of `CVPDFExporter` and of `CVGeneratorAI` (`CVDrafting`), which are reusable on a backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)), once [modules.md](modules.md) lists the edge.
 - **On the server, the API's generated types are translated to and from the tailoring model only in `ServerHTTP`, and never leave it** (#175, [ADR 0014](adr/0014-server-modular-monolith.md)). A translation between two context packages on the server lives in a server target that [modules.md](modules.md) designates for that translation, or needs an ADR.
+- **In the app, the API's generated types are imported only by `PrestoCVAPIAdapter`, and never leave it** ([ADR 0016](adr/0016-api-contract.md)). Like `ServerHTTP`, it translates between the tailoring model and the API, which is not a translation between contexts.
 - **Inside a package, contexts depend only along the edges listed in [modules.md](modules.md).** There is exactly one such edge today: in `CVPDFExporter`, Document Rendering is downstream of Design Catalog (`CVRendering` imports `CVDesignCatalog`). The reverse is forbidden.
 - **Any other edge** between contexts needs an ADR and an update to [modules.md](modules.md).
 - **`@_exported import` is banned.** It would re-export a module to every importer.
@@ -31,7 +32,7 @@ The checker applies to **production targets**: domain, application, integration,
 - **compiler:** the target dependencies.
 - **checker:** a per-target import allow-list, and the `exportedImport` detector. SwiftPM lets a target import its dependencies' dependencies, so declared dependencies are not enough.
 - **checker (`--packages`):** every dependency declared in a `Package.swift` must be an allowed import.
-- **checker (`requiredImportAccess`), once `ServerHTTP` exists:** the targets of `PrestoCVAPI` must be imported `internal`, so the generated types cannot leave it.
+- **checker (`requiredImportAccess`), once `ServerHTTP` and `PrestoCVAPIAdapter` exist:** the targets of `PrestoCVAPI` must be imported `internal`, so the generated types cannot leave them.
 
 ## R2. Pure layers read no ambient state
 

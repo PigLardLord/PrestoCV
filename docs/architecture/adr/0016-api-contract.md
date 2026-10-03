@@ -72,6 +72,7 @@
 
 - **One contract for both sides.** A type, an error and a version are written once. A change to the spec changes the server's protocol and the client together, and a handler or a caller that does not follow fails to compile.
 - **The reference cannot go stale.** It is generated from the spec, so a document-against-code check has nothing to compare for the API (#183).
+- **R1 gains the app's side.** The rule that ADR 0014 wrote for `ServerHTTP` now also names `PrestoCVAPIAdapter`, in its text and in its `requiredImportAccess` check.
 - **modules.md lists the `PrestoCVAPI` package, its three targets and what may import them,** and gains the `PrestoCVAPIAdapter` row. The checker's `rules.json` declares the four targets not yet implemented until #177 and #179 create them. `PrestoCVComposition`'s allowed imports stay as they are until the adapter exists.
 - **Costs:**
   - The generator's output is reviewed in pull requests. A generator upgrade can change every generated file, and the diff is read like code. The generator and the packages the generated code imports are pinned.
