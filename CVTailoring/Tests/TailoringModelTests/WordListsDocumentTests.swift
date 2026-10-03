@@ -57,7 +57,7 @@ struct WordListsDocumentTests {
     @Test("the ranks the page names are the ranks the decoder knows")
     func ranks() throws {
         let listed = Page.backticked(try Page.section(from: "### Ranks", to: "#"))
-        #expect(listed == Rank.allCases.map(\.rawValue))
+        #expect(listed == TitleRank.allCases.map(\.rawValue))
     }
 
     @Test("the page names each of the six language codes in its list of languages")

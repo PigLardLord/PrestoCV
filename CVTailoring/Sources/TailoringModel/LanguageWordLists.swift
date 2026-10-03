@@ -28,14 +28,14 @@ public struct FormOfAddressWord: Hashable, Sendable {
 
 /// What a title claims about a person by its words: "Team Lead" and "Teamleiter" claim one rank, "Begleiter" none. The ranks
 /// are the ones the check holds a title to, in every language.
-public enum Rank: String, CaseIterable, Hashable, Sendable {
+public enum TitleRank: String, CaseIterable, Hashable, Sendable {
     case senior, lead, principal, staff, head, director, manager, architect
 }
 
 /// A word of a title and every rank it may mean: German writes a lead and a head alike.
 public struct RankWord: Hashable, Sendable {
     public let word: String
-    public let ranks: [Rank]
+    public let ranks: [TitleRank]
 }
 
 /// Forms that mean the same thing, as a term and its other spellings: "ci/cd" and "continuous integration".

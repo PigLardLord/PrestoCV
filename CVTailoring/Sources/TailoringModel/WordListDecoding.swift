@@ -380,7 +380,7 @@ private struct WordListReading {
         try check(raw, key, words: raw.entries.map(\.word))
         var entries: [RankWord] = []
         for entry in raw.entries {
-            let ranks = entry.ranks.compactMap(Rank.init(rawValue:))
+            let ranks = entry.ranks.compactMap(TitleRank.init(rawValue:))
             guard !ranks.isEmpty, ranks.count == entry.ranks.count, Set(ranks).count == ranks.count else { throw corrupt(key) }
             entries.append(RankWord(word: entry.word, ranks: ranks))
         }

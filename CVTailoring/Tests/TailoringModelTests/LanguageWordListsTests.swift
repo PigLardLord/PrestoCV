@@ -553,7 +553,7 @@ struct LanguageWordListsTests {
 
     @Test("the ranks of the format are the ones the check knows")
     func ranksOfTheFormat() {
-        #expect(Rank.allCases.map(\.rawValue) == ["senior", "lead", "principal", "staff", "head", "director", "manager", "architect"])
+        #expect(TitleRank.allCases.map(\.rawValue) == ["senior", "lead", "principal", "staff", "head", "director", "manager", "architect"])
     }
 
     static let unknownRankCases: [String] = {
