@@ -38,10 +38,12 @@ struct EnglishWordListsTests {
             try WordListResources.data(named: "de", as: .language(.german))
         }
         #expect(throws: TailoringModelError.corruptWordList(.index, nil)) { try WordListResources.data(named: "none", as: .index) }
+        #expect(WordListResources.url(named: "en") != nil && WordListResources.url(named: "de") == nil)
     }
 
     private func filesOnDisk() throws -> [String] {
-        let directory = try #require(WordListResources.directory())
+        let index = try #require(WordListResources.url(named: "index"))
+        let directory = index.deletingLastPathComponent()
         return try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted()
     }
 
