@@ -61,6 +61,7 @@ struct StatementSplitTests {
         var values: [String] = []
         values.append(contentsOf: ["\u{2022}", "\u{25E6}", "\u{25AA}", "\u{2023}", "\u{00B7}"])
         values.append(contentsOf: ["-", "*", "\u{2013}", "\u{2014}"])
+        values.append(contentsOf: ["\u{25CF}", "\u{25CB}", "\u{25A0}", "\u{27A2}", "\u{27A4}", "\u{2713}", "\u{F0B7}"])
         return values
     }()
 

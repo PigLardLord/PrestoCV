@@ -24,7 +24,8 @@ public struct Statement: Hashable, Sendable {
     /// Splits a description into statements: one per line, where a line ends at any newline (`\r\n` is one).
     /// - Each line is trimmed of whitespace at both ends.
     /// - One leading bullet is removed when a space follows it or it ends the line: `•`, `◦`, `▪`, `‣`, `·`, `-`,
-    ///   `*`, `–`, `—`. So "-5% churn" keeps its sign, and a numbered item ("1. ") is not a bullet.
+    ///   `*`, `–`, `—`, `●`, `○`, `■`, `➢`, `➤`, `✓` and U+F0B7 (the private-use bullet that word processors write).
+    ///   So "-5% churn" keeps its sign, and a numbered item ("1. ") is not a bullet.
     /// - A line that is empty after that is dropped, so a description of one paragraph is one statement.
     public static func split(_ description: String) -> [Statement] {
         var statements: [Statement] = []
@@ -35,7 +36,12 @@ public struct Statement: Hashable, Sendable {
         return statements
     }
 
-    private static let bullets: Set<Character> = ["\u{2022}", "\u{25E6}", "\u{25AA}", "\u{2023}", "\u{00B7}", "-", "*", "\u{2013}", "\u{2014}"]
+    private static let bullets: Set<Character> = {
+        var set: Set<Character> = []
+        set.formUnion(["\u{2022}", "\u{25E6}", "\u{25AA}", "\u{2023}", "\u{00B7}", "-", "*", "\u{2013}", "\u{2014}"])
+        set.formUnion(["\u{25CF}", "\u{25CB}", "\u{25A0}", "\u{27A2}", "\u{27A4}", "\u{2713}", "\u{F0B7}"])
+        return set
+    }()
 
     private static func withoutBullet(_ line: String) -> String {
         guard let first = line.first, bullets.contains(first) else { return line }

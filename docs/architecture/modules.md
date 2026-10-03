@@ -200,7 +200,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
   - `Statement.split(_:)` is the one rule that makes them, and every target uses it:
     - a line ends at any newline (`\r\n` is one);
     - each line is trimmed;
-    - one leading bullet (`•`, `◦`, `▪`, `‣`, `·`, `-`, `*`, `–`, `—`) is removed when a space follows it or it ends the line, so `-5% churn` keeps its sign and `1.` is not a bullet;
+    - one leading bullet (`•`, `◦`, `▪`, `‣`, `·`, `-`, `*`, `–`, `—`, `●`, `○`, `■`, `➢`, `➤`, `✓` and U+F0B7) is removed when a space follows it or it ends the line, so `-5% churn` keeps its sign and `1.` is not a bullet;
     - a line empty after that is dropped, so a description of one paragraph is one statement.
   - A `Statement` is always one line. One built from text (a line a model wrote) is trimmed and bounded, and refused when it is empty or holds a line break.
 - **Typed references.** `ExperienceRef` and `StatementRef` read "experience n, line m", counted from 0.
