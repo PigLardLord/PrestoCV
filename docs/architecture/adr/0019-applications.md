@@ -84,7 +84,7 @@
   - The composition root gives the locations and creates each repository and store once (R4).
 - **(d) Rendering (`CVDocumentModel`, `CVRendering`).**
   - **`LetterDocument`** is a second published document type of `CVPDFExporter`, beside `CVDocument` (#187). It is plain values and imports no PrestoCV package, so the package stays standalone ([ADR 0002](0002-cvpdfexporter-standalone-and-portable.md)). Like `CVDocument`, it carries a `schemaVersion`, and a letter that arrives as JSON passes a validator of its own before it is rendered (R8).
-  - **One built-in stylesheet** renders it. The stylesheet is not a design: it is not in the catalog, nobody installs it, and no `DesignChoice` selects it. It passes the same CSS policy as a design's, through the same tokenizer and allow-list, and a test holds it.
+  - **One built-in stylesheet** renders it. The stylesheet is not a design: it is not in the catalog, nobody installs it, and no design choice can select it. It passes the same CSS policy as a design's, through the same tokenizer and allow-list, and a test holds it.
   - **The typed builder** of [ADR 0011](0011-typed-html-builder.md) produces the markup: closed tags, and per-scalar escaping. The PDF is checked node by node against it (R8). The letter is one A4 page. A letter that does not fit is an error, never a truncated page.
   - **The page writes the salutation and the valediction.** The language conventions, the date format, the salutations and the valedictions, come from data and never from the layout: one JSON file per language and an index, for the six languages of [ADR 0013](0013-cv-tailoring-context.md). A test fails if a language lacks a key, and an unsupported language is a typed error (R13).
 - **(e) Integration (`PrestoCVIntegration`).**
