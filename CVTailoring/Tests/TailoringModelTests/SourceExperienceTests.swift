@@ -35,13 +35,15 @@ struct SourceExperienceTests {
         #expect(try SourceExperience(role: "r", company: "c", description: "Did the work.").statements.count == 1)
     }
 
-    static let fields: [TextFieldCase] = [
-        TextFieldCase(.role) { _ = try SourceExperience(role: $0, company: "x") },
-        TextFieldCase(.company) { _ = try SourceExperience(role: "x", company: $0) },
-        TextFieldCase(.location) { _ = try SourceExperience(role: "x", company: "x", location: $0) },
-        TextFieldCase(.statement) { _ = try SourceExperience(role: "x", company: "x", description: $0) },
-        TextFieldCase(.statement) { _ = try SourceExperience(role: "x", company: "x", description: "first\n" + $0 + "\nlast") },
-    ]
+    static let fields: [TextFieldCase] = {
+        var cases: [TextFieldCase] = []
+        cases.append(TextFieldCase(.role) { _ = try SourceExperience(role: $0, company: "x") })
+        cases.append(TextFieldCase(.company) { _ = try SourceExperience(role: "x", company: $0) })
+        cases.append(TextFieldCase(.location) { _ = try SourceExperience(role: "x", company: "x", location: $0) })
+        cases.append(TextFieldCase(.statement) { _ = try SourceExperience(role: "x", company: "x", description: $0) })
+        cases.append(TextFieldCase(.statement) { _ = try SourceExperience(role: "x", company: "x", description: "first\n" + $0 + "\nlast") })
+        return cases
+    }()
 
     @Test("each field, and each statement, accepts 10,000 bytes and refuses one more", arguments: fields)
     func bounds(field: TextFieldCase) throws {

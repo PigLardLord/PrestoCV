@@ -34,14 +34,16 @@ struct SourceEntryTests {
         #expect(try SourcePersonalDetails(fullName: "  Ada Lovelace ").fullName == "  Ada Lovelace ")
     }
 
-    static let personalFields: [TextFieldCase] = [
-        TextFieldCase(.fullName) { _ = try SourcePersonalDetails(fullName: $0) },
-        TextFieldCase(.professionalTitle) { _ = try SourcePersonalDetails(fullName: "A", professionalTitle: $0) },
-        TextFieldCase(.email) { _ = try SourcePersonalDetails(fullName: "A", email: $0) },
-        TextFieldCase(.phone) { _ = try SourcePersonalDetails(fullName: "A", phone: $0) },
-        TextFieldCase(.location) { _ = try SourcePersonalDetails(fullName: "A", location: $0) },
-        TextFieldCase(.website) { _ = try SourcePersonalDetails(fullName: "A", website: $0) },
-    ]
+    static let personalFields: [TextFieldCase] = {
+        var cases: [TextFieldCase] = []
+        cases.append(TextFieldCase(.fullName) { _ = try SourcePersonalDetails(fullName: $0) })
+        cases.append(TextFieldCase(.professionalTitle) { _ = try SourcePersonalDetails(fullName: "A", professionalTitle: $0) })
+        cases.append(TextFieldCase(.email) { _ = try SourcePersonalDetails(fullName: "A", email: $0) })
+        cases.append(TextFieldCase(.phone) { _ = try SourcePersonalDetails(fullName: "A", phone: $0) })
+        cases.append(TextFieldCase(.location) { _ = try SourcePersonalDetails(fullName: "A", location: $0) })
+        cases.append(TextFieldCase(.website) { _ = try SourcePersonalDetails(fullName: "A", website: $0) })
+        return cases
+    }()
 
     @Test("each personal field accepts 10,000 bytes and refuses one more", arguments: personalFields)
     func personalBounds(field: TextFieldCase) throws {
@@ -89,12 +91,14 @@ struct SourceEntryTests {
         #expect(profile.link == "https://github.com/ada")
     }
 
-    static let entryFields: [TextFieldCase] = [
-        TextFieldCase(.skillName) { _ = try SourceSkill(name: $0) },
-        TextFieldCase(.languageName) { _ = try SourceLanguage(name: $0, proficiency: .b2) },
-        TextFieldCase(.platform) { _ = try SourceProfile(platform: $0, link: "x") },
-        TextFieldCase(.link) { _ = try SourceProfile(platform: "x", link: $0) },
-    ]
+    static let entryFields: [TextFieldCase] = {
+        var cases: [TextFieldCase] = []
+        cases.append(TextFieldCase(.skillName) { _ = try SourceSkill(name: $0) })
+        cases.append(TextFieldCase(.languageName) { _ = try SourceLanguage(name: $0, proficiency: .b2) })
+        cases.append(TextFieldCase(.platform) { _ = try SourceProfile(platform: $0, link: "x") })
+        cases.append(TextFieldCase(.link) { _ = try SourceProfile(platform: "x", link: $0) })
+        return cases
+    }()
 
     @Test("each field of a skill, language or profile accepts 10,000 bytes and refuses one more", arguments: entryFields)
     func entryBounds(field: TextFieldCase) throws {
@@ -139,15 +143,17 @@ struct SourceEntryTests {
         #expect(certification.description.isEmpty)
     }
 
-    static let educationFields: [TextFieldCase] = [
-        TextFieldCase(.degree) { _ = try SourceEducation(degree: $0, school: "x") },
-        TextFieldCase(.school) { _ = try SourceEducation(degree: "x", school: $0) },
-        TextFieldCase(.description) { _ = try SourceEducation(degree: "x", school: "x", description: $0) },
-        TextFieldCase(.certificationName) { _ = try SourceCertification(name: $0, issuer: "x") },
-        TextFieldCase(.issuer) { _ = try SourceCertification(name: "x", issuer: $0) },
-        TextFieldCase(.link) { _ = try SourceCertification(name: "x", issuer: "x", link: $0) },
-        TextFieldCase(.description) { _ = try SourceCertification(name: "x", issuer: "x", description: $0) },
-    ]
+    static let educationFields: [TextFieldCase] = {
+        var cases: [TextFieldCase] = []
+        cases.append(TextFieldCase(.degree) { _ = try SourceEducation(degree: $0, school: "x") })
+        cases.append(TextFieldCase(.school) { _ = try SourceEducation(degree: "x", school: $0) })
+        cases.append(TextFieldCase(.description) { _ = try SourceEducation(degree: "x", school: "x", description: $0) })
+        cases.append(TextFieldCase(.certificationName) { _ = try SourceCertification(name: $0, issuer: "x") })
+        cases.append(TextFieldCase(.issuer) { _ = try SourceCertification(name: "x", issuer: $0) })
+        cases.append(TextFieldCase(.link) { _ = try SourceCertification(name: "x", issuer: "x", link: $0) })
+        cases.append(TextFieldCase(.description) { _ = try SourceCertification(name: "x", issuer: "x", description: $0) })
+        return cases
+    }()
 
     @Test("each field of an education entry or a certification accepts 10,000 bytes and refuses one more", arguments: educationFields)
     func educationBounds(field: TextFieldCase) throws {

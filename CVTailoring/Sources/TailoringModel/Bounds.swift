@@ -17,4 +17,18 @@ enum Bounds {
     static func count(_ count: Int, atMost limit: Int, _ collection: TailoringModelError.Collection) throws(TailoringModelError) {
         guard count <= limit else { throw .tooMany(collection) }
     }
+
+    /// What a source CV and a tailored CV hold alike: the summary, and the sections an experience is not part of.
+    static func cvSections(summary: String, education: [SourceEducation], skills: [SourceSkill], languages: [SourceLanguage],
+                           certifications: [SourceCertification], profiles: [SourceProfile],
+                           interests: [String]) throws(TailoringModelError) {
+        try text(summary, .summary)
+        try count(education.count, atMost: TailoringLimits.maxEntriesPerSection, .education)
+        try count(skills.count, atMost: TailoringLimits.maxEntriesPerSection, .skills)
+        try count(languages.count, atMost: TailoringLimits.maxEntriesPerSection, .languages)
+        try count(certifications.count, atMost: TailoringLimits.maxEntriesPerSection, .certifications)
+        try count(profiles.count, atMost: TailoringLimits.maxEntriesPerSection, .profiles)
+        try count(interests.count, atMost: TailoringLimits.maxEntriesPerSection, .interests)
+        for interest in interests { try text(interest, .interest) }
+    }
 }

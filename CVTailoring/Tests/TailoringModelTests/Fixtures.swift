@@ -17,3 +17,20 @@ struct TextFieldCase: Sendable, CustomTestStringConvertible {
     }
     var testDescription: String { "\(field)" }
 }
+
+/// One entry of each section of a CV, so a test names only what it varies.
+enum Sample {
+    static func personal() throws -> SourcePersonalDetails {
+        try SourcePersonalDetails(fullName: "Ada Lovelace", professionalTitle: "Analyst", email: "ada@example.com", location: "London")
+    }
+
+    static func experience(_ name: String = "Engineer", description: String = "") throws -> SourceExperience {
+        try SourceExperience(role: name, company: "Acme", description: description)
+    }
+
+    static func education() throws -> SourceEducation { try SourceEducation(degree: "BSc", school: "University") }
+    static func skill() throws -> SourceSkill { try SourceSkill(name: "Swift", level: 4) }
+    static func language() throws -> SourceLanguage { try SourceLanguage(name: "Italian", proficiency: .native) }
+    static func certification() throws -> SourceCertification { try SourceCertification(name: "CKA", issuer: "CNCF") }
+    static func profile() throws -> SourceProfile { try SourceProfile(platform: "GitHub", link: "https://github.com/ada") }
+}

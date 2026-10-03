@@ -22,10 +22,12 @@ public enum TailoringModelError: Error, Hashable, Sendable {
         case skillName, languageName, platform, link
         case degree, school, certificationName, issuer, description
         case role, company, statement
+        case summary, interest
     }
 
     /// The lists of the model, by what they hold, not by which type holds them.
     public enum Collection: Hashable, Sendable {
+        case experiences, education, skills, languages, certifications, profiles, interests
         case statements
     }
 }
