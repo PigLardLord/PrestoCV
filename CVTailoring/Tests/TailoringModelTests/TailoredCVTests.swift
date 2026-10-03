@@ -106,6 +106,20 @@ struct TailoredCVTests {
         #expect(resolved == ["cut costs by 30%", "ran the on-call rota"])
     }
 
+    @Test("a reference made by another snapshot is refused even when its indices are in range of the source")
+    func otherSnapshotInRange() throws {
+        let source = try Sample.source(), other = try Sample.otherSource()
+        let ownExperience = try source.experienceRef(at: 0)
+        let foreignExperience = try other.experienceRef(at: 0)
+        let foreignStatement = try other.statementRef(experience: 0, line: 0)
+        let foreignSource = try Sample.tailoredExperience(source: foreignExperience)
+        #expect(throws: TailoringModelError.referenceOutOfRange) { try tailored(source, experiences: [foreignSource]) }
+        let foreignLine = try Sample.tailoredExperience(source: ownExperience, lines: [Sample.line("Text.", [foreignStatement])])
+        #expect(throws: TailoringModelError.referenceOutOfRange) { try tailored(source, experiences: [foreignLine]) }
+        let ownLine = try Sample.tailoredExperience(source: foreignExperience, lines: [Sample.line("Text.", [foreignStatement])])
+        _ = try tailored(other, experiences: [foreignSource, ownLine])
+    }
+
     @Test("a reference made by an equal snapshot is accepted")
     func referenceOfAnEqualSnapshot() throws {
         let source = try Sample.source(), same = try Sample.source()

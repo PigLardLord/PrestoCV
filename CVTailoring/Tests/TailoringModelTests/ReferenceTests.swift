@@ -133,4 +133,38 @@ struct ReferenceTests {
         let cv = try snapshot(), same = try snapshot()
         #expect(try cv.experience(same.experienceRef(at: 1)).role == "Second")
     }
+
+    // MARK: A reference carries its snapshot
+
+    @Test("a reference made by another snapshot is refused even when its indices are in range of this one")
+    func otherSnapshotInRange() throws {
+        let cv = try Sample.source(), other = try Sample.otherSource()
+        #expect(cv != other)
+        let foreignStatement = try other.statementRef(experience: 0, line: 1)
+        let foreignExperience = try other.experienceRef(at: 1)
+        #expect(throws: TailoringModelError.referenceOutOfRange) { try cv.statement(foreignStatement) }
+        #expect(throws: TailoringModelError.referenceOutOfRange) { try cv.experience(foreignExperience) }
+        #expect(try other.statement(foreignStatement).text == "cut costs by 40%")
+        #expect(try other.experience(foreignExperience).role == "Second")
+    }
+
+    @Test("references to the same place of different snapshots are different, and of equal snapshots are equal")
+    func referencesAndSnapshots() throws {
+        let cv = try Sample.source(), same = try Sample.source(), other = try Sample.otherSource()
+        #expect(try cv.experienceRef(at: 0) == same.experienceRef(at: 0))
+        #expect(try cv.statementRef(experience: 0, line: 2) == same.statementRef(experience: 0, line: 2))
+        #expect(try cv.experienceRef(at: 0) != other.experienceRef(at: 0))
+        #expect(try cv.statementRef(experience: 0, line: 2) != other.statementRef(experience: 0, line: 2))
+        #expect(try Set([cv.statementRef(experience: 0, line: 0), same.statementRef(experience: 0, line: 0)]).count == 1)
+    }
+
+    @Test("a snapshot that differs in one word makes references of its own")
+    func oneWordApart() throws {
+        let cv = try Sample.source()
+        var experiences = cv.experiences
+        experiences[1] = try Sample.experience("Second", description: "- ran the on-call rotas")
+        let changed = try SourceCV(language: cv.language, personal: cv.personal, summary: cv.summary, experiences: experiences)
+        let ref = try changed.statementRef(experience: 1, line: 0)
+        #expect(throws: TailoringModelError.referenceOutOfRange) { try cv.statement(ref) }
+    }
 }

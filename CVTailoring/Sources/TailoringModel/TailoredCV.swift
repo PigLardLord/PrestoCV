@@ -40,8 +40,9 @@ public struct TailoredExperience: Hashable, Sendable {
 /// The CV a tailoring produces: the shape of the source CV, with each experience's lines naming the source statements
 /// they come from (ADR 0013).
 ///
-/// It keeps its source, and every reference in it is in range of that source: a reference from another snapshot cannot
-/// join it, and every one resolves with `source.statement(_:)`.
+/// It keeps its source, and every reference in it was made by that source or by a snapshot equal to it, and is in range
+/// there. A reference made by another snapshot is refused, even when its position is in range of the source. So every
+/// one resolves with `source.statement(_:)`.
 ///
 /// It checks structure only: sizes, and that references are in range. That a line names a source, names one of its own
 /// experience, or says only what the source says is for the provenance gate, so the model of a reply that fails those
@@ -59,7 +60,7 @@ public struct TailoredCV: Hashable, Sendable {
     public let profiles: [SourceProfile]
     public let interests: [String]
 
-    /// Refuses a reference outside `source` with `referenceOutOfRange`. Sections hold at most
+    /// Refuses a reference that `source` did not make, or whose position it does not have, with `referenceOutOfRange`. Sections hold at most
     /// `TailoringLimits.maxEntriesPerSection` entries, and each text is bounded (R8).
     public init(source: SourceCV, language: TailoringLanguage, personal: SourcePersonalDetails, summary: String = "",
                 experiences: [TailoredExperience] = [], education: [SourceEducation] = [], skills: [SourceSkill] = [],

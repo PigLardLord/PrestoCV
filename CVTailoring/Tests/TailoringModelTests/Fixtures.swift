@@ -44,6 +44,15 @@ extension Sample {
         return try SourceCV(language: .english, personal: personal(), summary: "An analyst.", experiences: experiences)
     }
 
+    /// The shape of `source()` with other words: its in-range references are in range of `source()` too, but it is
+    /// another snapshot.
+    static func otherSource() throws -> SourceCV {
+        var experiences: [SourceExperience] = []
+        experiences.append(try experience("First", description: "- wrote the API\n- cut costs by 40%\n- trained three juniors"))
+        experiences.append(try experience("Second", description: "- ran the pager rota"))
+        return try SourceCV(language: .english, personal: personal(), summary: "Another analyst.", experiences: experiences)
+    }
+
     /// Six experiences of five statements each: it holds references a smaller snapshot does not have.
     static func biggerSource() throws -> SourceCV {
         var experiences: [SourceExperience] = []
