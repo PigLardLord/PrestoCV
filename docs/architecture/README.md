@@ -10,6 +10,7 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 | [modules.md](modules.md) | Every package and target: responsibility, allowed dependencies, platforms |
 | [glossary.md](glossary.md) | The vocabulary used in code, UI copy and tickets |
 | [markup-contract.md](markup-contract.md) | The HTML structure designs may style, versioned |
+| [word-lists.md](word-lists.md) | The format of the per-language word lists of CV Tailoring, versioned |
 | [adr/](adr/) | Architecture decision records |
 
 ## Bounded contexts

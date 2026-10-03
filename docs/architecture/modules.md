@@ -252,9 +252,14 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
   - A statement is a line of a description: it allows a tab, and refuses its line breaks as `notOneLine`.
   - The size is checked first, and a blank required text is `emptyField` whatever its controls.
 
-- **`TailoringModelError`**: `unsupportedLanguage`, `emptyField`, `notOneLine`, `hiddenCharacter`, `mismatchedScope`, `tooLarge`, `tooMany`, `invalidDate`, `invalidPeriod`, `invalidSkillLevel`, `referenceOutOfRange`. The field and the list are codes (R7, R13).
+- **`TailoringModelError`**: `unsupportedLanguage`, `emptyField`, `notOneLine`, `hiddenCharacter`, `mismatchedScope`, `tooLarge`, `tooMany`, `invalidDate`, `invalidPeriod`, `invalidSkillLevel`, `referenceOutOfRange`, `corruptWordList`, `incompleteWordList`. The field, the list and the word-list file are codes (R7, R13).
 - The model has no `Codable`: JSON crosses through DTOs in the targets that need it (#152).
-- Planned (#136): the word lists, one JSON file per language plus an index, read through `Bundle.module`; the supported languages are those with a file.
+- **Word lists** (#136), one JSON file per language and an index, as resources of the target.
+  - `WordLists.load()` reads them through `Bundle.module` (R2), validates them (R8), and holds them. A composition root loads them once and injects the value (R4); nothing caches them.
+  - `forLanguage(_:)` returns the `LanguageWordLists` of a language, or `unsupportedLanguage`. Its groups are `advert`, `dates`, `numbers`, `spans`, `letter` and `technologies`, and each list states its `source` and its `licence`.
+  - The supported languages are the ones in `Resources/WordLists/index.json`, each with its file: English today. Adding one adds a file and an index entry.
+  - The format, every key and the rule for adding a language are in [word-lists.md](word-lists.md). A test holds that page to the decoder.
+- **`TextFold.fold`**, the one normalisation every word-list match uses: case, accents and ligatures are dropped, `ß` is `ss`, white space is squeezed. `AdvertAnalysis`, `ContentChecks` and `Provenance` share this copy.
 
 **`AdvertAnalysis`** (#138, #153)
 - What an advert asks for, and where the source CV evidences it.

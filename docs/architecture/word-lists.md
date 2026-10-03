@@ -1,0 +1,113 @@
+# Word lists
+
+Every rule of the CV Tailoring context that depends on a language reads it from data, one file per language ([ADR 0013](adr/0013-cv-tailoring-context.md), [R13](rules.md#r13-localisation-happens-at-the-edges)). The words an advert wastes, how it names its sections, the months, the numbers in words, how a floor of years is written, how a letter greets and closes, and the names of technologies are all in the file of the language. Adding a language adds a file and an index entry, and changes no code.
+
+The files are resources of the `TailoringModel` target, read through `Bundle.module` ([R2](rules.md#r2-pure-layers-read-no-ambient-state)) the way `HeadingsCatalog` reads the heading tables. They are in `CVTailoring/Sources/TailoringModel/Resources/WordLists/`.
+
+`TailoringModelTests` hold this page to the decoder. A key the decoder knows that this page does not name fails a test, and so does a key this page names that the decoder does not know.
+
+## Format, version 1
+
+### Files
+
+| File | Holds |
+|---|---|
+| `index.json` | An array of language codes: the languages that have a file, in the order they are listed |
+| `<code>.json` | The lists of one language, as one JSON object |
+
+- `WordLists.load()` reads the index, then the file of every language it names, and validates each one. A composition root calls it once and injects the value ([R4](rules.md#r4-one-composition-root)); nothing caches it.
+- `WordLists.forLanguage(_:)` returns the `LanguageWordLists` of a language, or `unsupportedLanguage` for a language that has no file. It never falls back to English ([R13](rules.md#r13-localisation-happens-at-the-edges)).
+- Every file is JSON and at most 1,048,576 bytes (1 MiB). The size is checked before the bytes are decoded.
+- The format is closed. A key that is not in the tables below is refused wherever it is: at the top of a file, in a group, in a list and in an entry.
+
+### Languages
+
+The supported languages are the ones the index names, each with its file. An index code is one of the six languages of the model: `en`, `de`, `es`, `fr`, `it`, `pt`, written in lower case, and a code is listed once. A seventh language is a change to the language type of the model, and its own decision.
+
+### Shapes
+
+| Shape | Keys |
+|---|---|
+| The file | `version`, `advert`, `dates`, `numbers`, `spans`, `letter`, `fields` |
+| A list | `source`, `licence`, `entries` |
+| The list of streets | `source`, `licence`, `entries`, `order` |
+| A month name | `name`, `month` |
+| A number word | `word`, `value` |
+| A group of synonyms | `forms` |
+
+- `version` is the whole number 1. A file of another version is refused, and the version is read before anything else, so a newer format is never read as a file with lists missing.
+- Each group holds the lists named in the key table, and no other. Every list is an object with a `source`, a `licence` and its `entries`.
+- An entry is a string, except in four lists:
+  - `dates.months`: `{ "name": "january", "month": 1 }`, a month from 1 to 12;
+  - `numbers.words` and `spans.countWords`: `{ "word": "two", "value": 2 }`, a value that is not negative;
+  - `advert.synonyms`: `{ "forms": ["ui", "user interface"] }`, two forms at least.
+- `advert.streets` also says where the language writes the word of a street, in `order`: `joined` to the name ("Hauptstraße 1"), `after` it with the number first ("221B Baker Street"), or `before` it with the number last ("Via Roma 1").
+- `spans.tiedCounts` holds templates: literal words around `{count}` and `{employer}`, each exactly once and no other brace. A language puts the count before or after the employer as it writes it.
+- Entries are kept as written. A match folds both sides with `TextFold.fold`, the one normalisation in `TailoringModel`: case, accents and ligatures are dropped, `ß` is `ss`, and runs of white space are one space.
+
+### Keys
+
+Every file holds every key below. A file that lacks one is refused as incomplete, with the key named.
+
+| Key | Holds | Used by |
+|---|---|---|
+| `version` | The format version | Refused unless it is the one this page describes |
+| `advert.stopwords` | Words that carry no information about a role, however often an advert uses them | `AdvertAnalysis` leaves them out of the terms it ranks, and guesses an advert's language from the share of its words that a language's stopwords make |
+| `advert.plainWords` | Ordinary words of an advert's prose that a tailoring may write although the CV does not, because each is a word of some technology's name ("new", "time") | `Provenance` lets them pass in the check of names; `AdvertAnalysis` still ranks them |
+| `advert.dimensions` | Nouns that name what a claim measures ("performance", "stability") | `Provenance` holds the figure beside one to the source, and refuses one beside no figure as a claim |
+| `advert.boilerplate` | Phrases and words that belong to the posting and not to the job ("equal opportunity", "full time") | `AdvertAnalysis` drops a phrase as furniture; a one-word entry counts only on a short line |
+| `advert.genderMarkers` | Gender markers a job title carries in words ("all genders") | `AdvertAnalysis` takes them out of a line before it reads it |
+| `advert.instructions` | What an advert asks of the applicant and not of the job ("please state", "notice period") | `AdvertAnalysis` takes them out of a line as words before it reads it |
+| `advert.streets` | The words a street's name carries ("street", "road"), and where the language writes them | `AdvertAnalysis` reads an address line as the posting's and not as a requirement, only beside a house number |
+| `advert.names` | Names written in several words that are read whole ("github actions", "time series") | `AdvertAnalysis` reads each as one term and not as its words |
+| `advert.synonyms` | Groups of forms that mean the same ("ci/cd", "continuous integration") | `AdvertAnalysis` finds evidence through a group and reports it as a synonym and never as exact |
+| `advert.requirementHeadings` | Headings under which an advert states what it will not compromise on ("requirements", "must have") | `AdvertAnalysis` marks the terms below one as required |
+| `advert.offerHeadings` | Headings under which an advert talks about itself: what it offers and who it is ("we offer", "about us") | `AdvertAnalysis` ranks the terms below one lower |
+| `advert.structuralHeadings` | Headings that organise an advert without demanding or offering anything ("tech stack", "location") | `AdvertAnalysis` reads their own words as structure, so "tech stack" is no technology |
+| `dates.months` | The names and abbreviations of the twelve months, each with its month; every month has a name at least | `ContentChecks` and `Provenance` read a date written with a month's name as the date of the numbers |
+| `numbers.words` | Numbers written in words, with their value: "two" to "nineteen", the tens, "dozen", "hundred", "thousand", "million". "One" is left out: it is a pronoun as often as a number | `Provenance` reads a figure in words as a figure and holds it to the source; a tens word, a hyphen and a word of 2 to 9 are one figure |
+| `spans.floorLeadIns` | What opens a floor before its count ("over", "more than"); "11+ years" is a shape and needs no entry | `ContentChecks` lets a floor pass, since it only grows truer |
+| `spans.yearWords` | The words for a year, singular and plural | `ContentChecks` reads the unit of a count of time |
+| `spans.monthWords` | The words for a month, singular and plural | `ContentChecks` reads the unit of a count of time |
+| `spans.countWords` | The counts of time that a CV writes in words, "one" to "twelve", with their value | `ContentChecks` reads the count of a span of time |
+| `spans.tiedCounts` | How the language ties a count to an employer, as templates ("{count} of them at {employer}") | `ContentChecks` holds a count tied to a role that has ended to that role's dates |
+| `letter.greetings` | The words that open a salutation ("dear", "hello") | `Provenance` refuses a salutation the model writes, since the page greets the recipient itself |
+| `letter.salutations` | Salutations that stand on their own ("to whom it may concern") | `Provenance`, as for the greetings |
+| `letter.addressees` | The words that, after a greeting, make it a salutation: forms of address, titles and groups ("mr", "dr", "everyone") | `Provenance`, as for the greetings: "hi-fi audio" is prose and "hi everyone" is a greeting |
+| `letter.addresseeNouns` | The nouns an addressee ends in, with up to two words before ("team", "manager") | `Provenance`, as for the greetings: "dear hiring manager" |
+| `letter.valedictions` | How a letter signs off, every form written out ("kind regards", "yours sincerely") | `Provenance` refuses a sign-off the model writes, since the page signs off itself |
+| `letter.salaryExpectationAsks` | How an advert asks for a salary expectation, every phrase written out | `AdvertAnalysis` asks the user when the advert asks and the letter defaults give none |
+| `letter.startDateAsks` | How an advert asks for a start date, every phrase written out ("earliest start date", "notice period") | `AdvertAnalysis`, as for the salary |
+| `letter.statedTermWords` | The words that, right after an ask, show the advert states its own term and asks nothing ("salary range of …") | `AdvertAnalysis` does not ask when an ask is followed by one, by a figure, or by a colon or a dash |
+| `fields.technologies` | Names of technologies that are never ordinary words of the language ("Kotlin", "SwiftUI") | `Provenance` holds a mention to the source however it is written; a name that is also an ordinary word stays out, and is read from its capitals |
+
+### What stays in code
+
+A shape is the same in every language, so it is not a list: the letters of a gender marker joined by slashes ("m/w/d"), a house number, a postcode, an American state and its ZIP code, the floor written "11+ years", a figure in numerals, and a tens word joined to a unit by a hyphen. The checks that read them are in the targets that use them.
+
+### Source and licence
+
+Every list states where its entries come from and under which licence, beside them.
+
+- `source` is free text that names the origin precisely enough to find the entries again: a repository, a commit, the list inside it. A list that is a port says so ("cv-giovanni 6e28147 domain/AdvertLexicon.js ADVERT.stopwords.en").
+- `licence` is an SPDX identifier. The entries of cv-giovanni are under ISC.
+- The licences a list may carry are a closed set, in `EnglishWordListsTests`. Widening it is a reviewed change: a licence must be compatible with ISC and with the App Store.
+- A list with no source or no licence is refused.
+
+### Refusals
+
+Every refusal is a typed error that carries codes and no text ([R7](rules.md#r7-errors-are-typed-per-context-and-translated-at-the-boundary)):
+
+| Error | When |
+|---|---|
+| `corruptWordList(.index)` | The index is not a JSON array of language codes, is empty, names a code that is none of the six, lists a language twice, or is too large |
+| `corruptWordList(.language(l))` | The file of `l` is missing though the index lists it; or is not JSON, is too large, has a version other than 1, has a key the format does not know, or lacks a `source`, a `licence` or `entries` of a list; or a `source` or a `licence` or an entry is empty or not trimmed; or two entries of a list are the same once folded; or a month is out of range, a value is negative, a group of synonyms has fewer than two forms, a template is malformed, or `order` is none of the three |
+| `incompleteWordList(l, key)` | The file of `l` has no group or no list for `key` (a missing group is reported as its first list), a list has no entry, or no month is named for one of the twelve |
+| `unsupportedLanguage` | `forLanguage(_:)` is asked for a language that has no file |
+
+### Adding a language
+
+1. Add `<code>.json` to `Resources/WordLists/`, holding every list of the key table at format version 1. Each list states its source and its licence.
+2. Add the code to `index.json`.
+
+Nothing else changes: no code, no manifest line. The folder is copied whole, and `TailoringLanguage` already knows the six codes. Two tests keep the files honest: the files in the folder, but the index, are exactly the languages of the index, and a file that lacks a key another file has is refused as incomplete, because every file must hold every key.

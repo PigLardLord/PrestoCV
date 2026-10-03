@@ -1,0 +1,96 @@
+import Testing
+import Foundation
+@testable import TailoringModel
+
+/// word-lists.md is the documentation of the file format (ADR 0013): these tests read it and hold it to the decoder. A
+/// key the decoder knows and the page does not name fails, and so does a key the page names and the decoder does not know.
+@Suite("word-lists.md matches the code (#136)")
+struct WordListsDocumentTests {
+    @Test("the key table names exactly the version and the lists the decoder knows, each once")
+    func keyTable() throws {
+        let rows = try Page.rows(after: "### Keys")
+        let named = try rows.map { try #require(Page.backticked($0[0]).first, "a row without a key: \($0)") }
+        #expect(Set(named) == Set(["version"] + WordListKey.allCases.map(\.rawValue)))
+        #expect(named.count == Set(named).count, "a key is named twice")
+    }
+
+    @Test("every row of the key table says what the list holds and how the checks use it")
+    func keyTableIsFilled() throws {
+        for row in try Page.rows(after: "### Keys") {
+            #expect(row.count == 3 && row.allSatisfy { !$0.isEmpty }, "the row of \(row[0]) is incomplete")
+        }
+    }
+
+    @Test("the shape table names exactly the keys the decoder allows in the file, in a list and in each entry")
+    func shapeTable() throws {
+        let rows = try Page.rows(after: "### Shapes")
+        var shapes: [String: Set<String>] = [:]
+        for row in rows { shapes[row[0]] = Set(Page.backticked(row[1])) }
+        #expect(shapes["The file"] == Set(WordListFormat.rootKeys))
+        #expect(shapes["A list"] == Set(WordListFormat.listKeys))
+        #expect(shapes["The list of streets"] == Set(WordListFormat.streetListKeys))
+        #expect(shapes["A month name"] == Set(WordListFormat.monthKeys))
+        #expect(shapes["A number word"] == Set(WordListFormat.numberKeys))
+        #expect(shapes["A group of synonyms"] == Set(WordListFormat.synonymKeys))
+        #expect(shapes.count == 6, "a shape the decoder does not know is described")
+    }
+
+    @Test("the version and the size limit the page states are the code's")
+    func versionAndSize() throws {
+        let page = try Page.text()
+        let versions = Page.matches(#"## Format, version (\d+)"#, in: page)
+        #expect(versions == [String(WordListFormat.version)])
+        let sizes = Page.matches(#"at most ([\d,]+) bytes"#, in: page).map { $0.replacingOccurrences(of: ",", with: "") }
+        #expect(sizes == [String(WordListFormat.maxFileBytes)])
+    }
+
+    @Test("the page names each of the six language codes in its list of languages")
+    func languages() throws {
+        let listed = Page.backticked(try Page.section(from: "### Languages", to: "#"))
+        #expect(Set(listed) == Set(TailoringLanguage.allCases.map(\.code)))
+    }
+}
+
+// MARK: - Reading the page
+
+private enum Page {
+    struct PageError: Error, CustomStringConvertible { let description: String }
+
+    /// The page, from the repository: this file is CVTailoring/Tests/TailoringModelTests/….
+    static func text() throws -> String {
+        var root = URL(fileURLWithPath: #filePath)
+        for _ in 0..<4 { root.deleteLastPathComponent() }
+        return try String(contentsOf: root.appendingPathComponent("docs/architecture/word-lists.md"), encoding: .utf8)
+    }
+
+    /// The text between a heading and the next line that starts with `end`.
+    static func section(from start: String, to end: String) throws -> String {
+        let page = try text()
+        guard let a = page.range(of: start), let b = page.range(of: "\n" + end, range: a.upperBound..<page.endIndex) else {
+            throw PageError(description: "no section from \(start) to \(end)")
+        }
+        return String(page[a.upperBound..<b.lowerBound])
+    }
+
+    /// The cells of each row of the first table after `heading`, without its header and its rule.
+    static func rows(after heading: String) throws -> [[String]] {
+        let page = try text()
+        guard let start = page.range(of: heading) else { throw PageError(description: "no heading \(heading)") }
+        let lines = page[start.upperBound...].components(separatedBy: "\n").drop { !$0.hasPrefix("|") }.prefix { $0.hasPrefix("|") }
+        // Cells split on unescaped pipes; "\|" is a pipe inside a cell.
+        return lines.dropFirst(2).map { line in
+            line.replacingOccurrences(of: #"\|"#, with: "\u{0}").split(separator: "|", omittingEmptySubsequences: false)
+                .dropFirst().dropLast().map { $0.replacingOccurrences(of: "\u{0}", with: "|").trimmingCharacters(in: .whitespaces) }
+        }
+    }
+
+    static func backticked(_ text: String) -> [String] { matches("`([^`]+)`", in: text) }
+
+    /// The first capture group of every match.
+    static func matches(_ pattern: String, in text: String) -> [String] {
+        let regex: NSRegularExpression
+        do { regex = try NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines]) } catch { return [] }
+        let ns = text as NSString
+        return regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).map { ns.substring(with: $0.range(at: 1)) }
+    }
+}
