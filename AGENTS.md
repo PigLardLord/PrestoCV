@@ -19,7 +19,7 @@
 - `swift test --package-path PrestoCVCore` validates the core package in isolation.
 - `Tools/ArchitectureCheck/check.sh` runs the architecture checker on the whole repository (see `Tools/ArchitectureCheck/README.md`).
 - CI (`.github/workflows/ci.yml`) runs on every pull request:
-  - on Linux, the architecture check (with the baseline compared to the base branch) and its self-test;
+  - on Linux, the architecture check (with the baseline compared to the base branch), its self-test, and the build and tests of the new targets;
   - on macOS, on a self-hosted runner on the owner's Mac, the same checks plus the package tests and the app tests on the iOS simulator.
 - `open PrestoCV.xcodeproj` launches Xcode with the configured schemes; prefer running previews via the `PrestoCV` scheme.
 
