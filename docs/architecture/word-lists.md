@@ -1,6 +1,6 @@
 # Word lists
 
-Every rule of the CV Tailoring context that depends on a language reads it from data, one file per language ([ADR 0013](adr/0013-cv-tailoring-context.md), [R13](rules.md#r13-localisation-happens-at-the-edges)). The words an advert wastes, how it names its sections, the months, the numbers in words, how a floor of years is written, how a letter greets and closes, and the names of technologies are all in the file of the language. Adding a language adds a file and an index entry. The words are data. A language's morphology is not: the plural rules of English are code of the checks (see "Not in the word lists"), and a language whose checks need rules of its own gets them there.
+Every rule of the CV Tailoring context that depends on a language reads it from data, one file per language ([ADR 0013](adr/0013-cv-tailoring-context.md), [R13](rules.md#r13-localisation-happens-at-the-edges)). The words an advert wastes, how it names its sections, the months, the numbers in words, how a floor of years is written, how a letter greets and closes, and the names of technologies are all in the file of the language. A language whose words fit format 1, as English does, is added with a file and an index entry. Not every language fits yet: the gaps known today are in "Known gaps", each with the ticket that closes it. A language's morphology is not data either: the plural rules of English are code of the checks (see "Not in the word lists"), and a language whose checks need rules of its own gets them there.
 
 The files are resources of the `TailoringModel` target, read through `Bundle.module` ([R2](rules.md#r2-pure-layers-read-no-ambient-state)) the way `HeadingsCatalog` reads the heading tables. They are in `CVTailoring/Sources/TailoringModel/Resources/WordLists/`.
 
@@ -56,7 +56,7 @@ The supported languages are the ones the index names, each with its file. An ind
 
 ### Ranks
 
-A word of a title claims the ranks it may mean, and a tailored title may claim no rank its source does not. The ranks are a closed set, the same in every language: `senior`, `lead`, `principal`, `staff`, `head`, `director`, `manager`, `architect`. An entry is a whole word, and it may mean several ranks: German writes a lead and a head alike.
+A word of a title claims the ranks it may mean, and a tailored title may claim no rank its source does not. The ranks are a closed set that every language file shares: `senior`, `lead`, `principal`, `staff`, `head`, `director`, `manager`, `architect`. An entry is a whole word: every key is matched as a whole word today, and a match mode for affixes is a gap listed below. A word may mean several ranks, as the German "Leiter" does once its file can match a word by its ending (#142).
 
 ### Keys
 
@@ -118,6 +118,25 @@ A list that is not folded tells two entries apart by their lower-case form. A po
 | `provenance.ranks` | The words of a title that claim a rank, each with the ranks it may mean ("senior", "chief" for head) | folded | no | `Provenance` refuses a title that claims a rank its source does not write |
 | `fields.technologies` | Names of technologies that are never ordinary words of the language ("Kotlin", "SwiftUI") | folded | no | `Provenance` holds a mention to the source however it is written; a name that is also an ordinary word stays out, and is read from its capitals |
 
+### Known gaps
+
+A language whose words fit format 1 is added with a file and an index entry. These do not fit yet, and each waits for the ticket that closes it:
+
+- **German compounds matched by affix.** The rank words `*leiter(in)`, `*leitung`, `*architekt` and `fuhrungs*`, the asks `eintrittstermin*` and `(eintritt|start)*`, and the addressee `kolleg*` are matched by their beginning or ending, not as whole words. They need a match mode on each entry, which #142 adds.
+- **German's own lists.** `ALSO_ENGLISH_WORDS`, `SHARED_NOUNS`, `NOT_RANKS`, the German noun list for reading names and the abbreviation pairs (`ki` for `AI`) need keys and an entry shape, which #142 adds.
+- **The French street order.** "12 rue de la Paix" puts the number before the word and a name after it, which none of the three street orders says. #144 closes it.
+- **A floor written after the count and a tied count with an optional unit.** "10 anni e più" puts the floor word after the count, and German's "davon 8 Jahre bei" may or may not carry the unit, which a template cannot say without a `{unit}` placeholder. #145 and #142 close them.
+
+### Evolution
+
+- A new key is added in one change to the decoder, to this page and to every language file. A file that lacks a key the decoder knows is refused, so no change adds a key to some files only.
+- The files ship in the same bundle as their decoder, so no build reads the files of another build. An additive key therefore keeps version 1.
+- A change of meaning bumps the version: a key read differently, a key removed, a shape of an entry changed, a read mode changed. A file of another version is refused, and the version is read before anything else.
+
+### Open decisions
+
+cv-giovanni reads the stopwords, the headings and the months of every language at once, and its synonym groups bridge English and German ("testautomatisierung" beside "test automation"). The Swift API reads one language, through `forLanguage(_:)`. Where bridging groups live, as the German forms beside the English or as a bridge between two files, is open for #138 and is decided by #142.
+
 ### What stays in code
 
 A shape is the same in every language, so it is not a list: the letters of a gender marker joined by slashes ("m/w/d"), a house number, a postcode, an American state and its ZIP code, the dashes and the tilde between two dates, the floor written "11+ years", a figure in numerals, and a tens word joined to a unit by a hyphen. The checks that read them are in the targets that use them.
@@ -171,4 +190,4 @@ Every refusal is a typed error that carries codes and no text ([R7](rules.md#r7-
 1. Add `<code>.json` to `Resources/WordLists/`, with the `version`, its own `language` and every list of the key table at format version 1. Each list states its source and its licence.
 2. Add the code to `index.json`.
 
-Nothing else changes for the lists: no word in code, no manifest line. A rule of the language's own morphology that a check needs is code of that check, as English's plural rules are. The folder is copied whole, and `TailoringLanguage` already knows the six codes. Two tests keep the files honest: the files in the folder, but the index, are exactly the languages of the index, and a file that lacks a key another file has is refused as incomplete, because every file must hold every key.
+For a language whose words fit format 1, nothing else changes for the lists: no word in code, no manifest line. A rule of the language's own morphology that a check needs is code of that check, as English's plural rules are. The folder is copied whole, and `TailoringLanguage` already knows the six codes. Two tests keep the files honest: the files in the folder, but the index, are exactly the languages of the index, and a file that lacks a key another file has is refused as incomplete, because every file must hold every key.

@@ -34,8 +34,8 @@ public struct FormOfAddressWord: Hashable, Sendable {
     package init(form: FormOfAddress, word: String) { self.form = form; self.word = word }
 }
 
-/// What a title claims about a person by its words: "Team Lead" and "Teamleiter" claim one rank, "Begleiter" none. The ranks
-/// are the ones the check holds a title to, in every language.
+/// What a title claims about a person by its words: "Team Lead" claims one rank. A word of a title is a whole word, and the
+/// ranks are the ones the check holds a title to, shared by every language.
 public enum TitleRank: String, CaseIterable, Hashable, Sendable {
     case senior, lead, principal, staff, head, director, manager, architect
 }
