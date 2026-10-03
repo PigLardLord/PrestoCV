@@ -249,6 +249,52 @@ struct RemovingHiddenTests {
         #expect(TextRules.removingHidden(from: "a\tb\nc\u{202E}", multiLine: false) == "a b\nc")
     }
 
+    static let breaksAfterCarriageReturn: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["a\r\u{85}b", "a\r\u{0B}b", "a\r\u{0C}b", "a\r\u{200E}\u{0B}b", "a\r\u{200F}\u{061C}\u{0085}b", "a\r\u{0007}\u{000C}b"])
+        values.append(contentsOf: ["a\r\u{200E}\nb", "a\r\u{202E}\u{0007}\nb"])
+        return values
+    }()
+
+    @Test("a break that replaces a control never merges with a carriage return before it: two breaks stay two", arguments: breaksAfterCarriageReturn)
+    func breaksDoNotMerge(text: String) {
+        for removed in [TextRules.removingHidden(from: text, multiLine: true), TextRules.removingHidden(from: text, field: .advert)] {
+            let breaks = removed.filter { $0.isNewline }.count
+            #expect(breaks == 2)
+            #expect(TextRules.removingHidden(from: removed, multiLine: true) == removed)
+            #expect(!TextRules.hiddenCharacter(in: removed, multiLine: true))
+        }
+    }
+
+    @Test("the exact result of a replaced break after a carriage return")
+    func breakAfterCarriageReturnExactly() {
+        #expect(TextRules.removingHidden(from: "a\r\u{85}b", multiLine: true) == "a\r\n\nb")
+        #expect(TextRules.removingHidden(from: "a\r\u{200E}\u{0B}b", multiLine: true) == "a\r\n\nb")
+        #expect(TextRules.removingHidden(from: "a\r\u{200E}\nb", multiLine: true) == "a\r\n\nb")
+    }
+
+    @Test("a carriage return and a line feed written together are one break, as written")
+    func writtenPairStaysOne() {
+        let removed = TextRules.removingHidden(from: "a\r\nb\r\n\u{0B}c", multiLine: true)
+        #expect(removed == "a\r\nb\r\n\nc")
+        #expect(removed.filter { $0.isNewline }.count == 3)
+        #expect(TextRules.removingHidden(from: "a\r\nb", multiLine: true) == "a\r\nb")
+    }
+
+    @Test("a carriage return followed by a break control in a one-line text is left for the caller")
+    func oneLineLeavesBreaks() {
+        #expect(TextRules.removingHidden(from: "a\r\u{85}b", multiLine: false) == "a\r\u{85}b")
+        #expect(TextRules.removingHidden(from: "a\r\u{200E}\nb", multiLine: false) == "a\r\nb")
+    }
+
+    @Test("a break control at the very start or end of a text becomes a line feed")
+    func replacedAtTheEdges() {
+        #expect(TextRules.removingHidden(from: "\u{0C}a", multiLine: true) == "\na")
+        #expect(TextRules.removingHidden(from: "a\u{0B}", multiLine: true) == "a\n")
+        #expect(TextRules.removingHidden(from: "\u{85}", multiLine: true) == "\n")
+        #expect(TextRules.removingHidden(from: "\u{0C}\u{0B}\u{85}", multiLine: true) == "\n\n\n")
+    }
+
     @Test("a tab in a multi-line text stays a tab")
     func keepsTabInMultiLine() {
         #expect(TextRules.removingHidden(from: "a\tb", multiLine: true) == "a\tb")

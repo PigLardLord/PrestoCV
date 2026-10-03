@@ -40,19 +40,31 @@ public enum TextRules {
     /// `text` cleaned of what `hiddenCharacter(in:multiLine:)` refuses, for a caller that cleans what it reads before
     /// it reaches the model. Each refused character is removed, or replaced where removing it would join two words: a
     /// break-like control (vertical tab, form feed, NEL) in a multi-line text becomes a line feed, and a tab in a
-    /// one-line text becomes a space. Breaks are normalised, never lost. Everything that is not hidden stays: the
-    /// joiners, and in a multi-line text the `\n`, `\r`, tab and separators it keeps. In a one-line text a line break of
-    /// any kind is left alone: whether it is an error is for the caller to decide, and the model reports it as
-    /// `notOneLine`.
+    /// one-line text becomes a space. Breaks are normalised, never lost, and never merged: a replacement that follows a
+    /// carriage return, even after removed characters, gets a line feed of its own, so two breaks stay two. Everything
+    /// that is not hidden stays: the joiners, and in a multi-line text the `\n`, `\r`, tab and separators it keeps. In a
+    /// one-line text a line break of any kind is left alone: whether it is an error is for the caller to decide, and
+    /// the model reports it as `notOneLine`.
     public static func removingHidden(from text: String, multiLine: Bool) -> String {
         var cleaned = String.UnicodeScalarView()
+        var removedSinceLast = false
         for scalar in text.unicodeScalars {
             if !isHidden(scalar, multiLine: multiLine) {
+                // Two breaks stay two: a line feed that follows a carriage return only because characters between
+                // them were removed would merge with it into one `\r\n`.
+                if multiLine && removedSinceLast && scalar == "\n" && cleaned.last == "\r" { cleaned.append("\n") }
                 cleaned.append(scalar)
+                removedSinceLast = false
             } else if isBreak(scalar) {
+                // The replacement is a break of its own, so after a carriage return it takes a line feed of its own.
+                if multiLine && cleaned.last == "\r" { cleaned.append("\n") }
                 cleaned.append(multiLine ? "\n" : scalar)
+                removedSinceLast = false
             } else if !multiLine && scalar == "\t" {
                 cleaned.append(" ")
+                removedSinceLast = false
+            } else {
+                removedSinceLast = true
             }
         }
         return String(cleaned)
