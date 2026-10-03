@@ -210,7 +210,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 
 **`Tailoring`** (#150–#152)
 - The loop: a failure goes back to the model at most twice, then the tailoring fails with every failure listed.
-- The outbound inference port, owned here (R3). Its adapters live on the server.
+- The outbound inference port (#150), owned here (R3): the one way the loop reaches a model, and the port that [ADR 0015](adr/0015-inference-providers-and-data-policy.md) describes. Its adapters live on the server, in `ServerInference`.
 - The prompt and its schema.
 - Decoding the model's reply through one anti-corruption layer (R8).
 
@@ -279,21 +279,26 @@ The targets are created by #158 and the tickets named below. Until the targets e
 | `ServerHTTP` | inbound adapter | Linux ✓, macOS | `ServerApplication`, `TailoringModel`, `PrestoCVAPITypes`, `PrestoCVAPIServer` (both `internal import`), `Hummingbird`, `OpenAPIRuntime`, `OpenAPIHummingbird`, Foundation |
 | `PrestoCVServer` | executable and composition root | Linux ✓, macOS | `ServerApplication`, `ServerInference`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `Tailoring`, `Hummingbird`, `AsyncHTTPClient`, `PostgresNIO`, `ArgumentParser`, `Logging`, `ServiceLifecycle`, Foundation |
 
-**`ServerApplication`** (#157)
+**`ServerApplication`** (#157, #155)
 - **Use cases:** start a tailoring, run it, get it and delete it.
   - Start checks the caller's quota, records the job under its idempotency key and queues it. The same key returns the same job.
   - Run is the `work` role's use case: it loads the job, runs the loop of `Tailoring`, stores the result or the failure, and notifies the device (#180).
   - Get returns the job to its owner only. Delete erases it.
 - **The job lifecycle:** queued, running, succeeded, failed, expired. A job is erased once the app confirms it has saved the result, and 24 hours after the job ends at the latest (#166).
 - **The lease.** A running job holds a lease, and a job whose lease has expired is taken over by the retry (#161). The lease belongs to the job's lifecycle and to its contract suite, not to the queue adapter.
-- **Ports it owns (R3):** the job store, the job queue, the quota, the clock, an identifier generator (R2), a notifier (#180), the log events, and the deployment's data policy (#155).
+- **Ports it owns (R3):** the job store, the job queue, the quota, the clock, an identifier generator (R2), a notifier (#180), the log events, and the data-policy port that `GET /v1/policy` reads (#155, #175).
+- **The data policy** ([ADR 0015](adr/0015-inference-providers-and-data-policy.md)), beside that port:
+  - the types: what a provider declares (whether it keeps prompts, whether it trains on them, its region) and what a deployment requires;
+  - the one rule, "a provider meets a policy". It is pure, reads no ambient state (R2) and is tested without I/O.
 - **Log events** are typed and never carry a CV, a prompt or a key (#167). The executable bridges the port to swift-log. Adapters log through an injected `Logger` once #167 extends their allow-lists with `Logging`.
 - **Typed errors** (R7). It imports no third-party package.
 
-**`ServerInference`** (#154, #155)
-- The adapters behind the inference port that `Tailoring` owns: the first one speaks the chat-completions API that most providers and local model servers share, with a dialect for each endpoint.
-- The provider registry and the deployment's data policy, read from configuration. It implements the data-policy port of `ServerApplication`, so `GET /v1/policy` (#155) reaches the policy. #149 may refine this.
-- It never logs a prompt, an answer or a key.
+**`ServerInference`** (#154, #155, [ADR 0015](adr/0015-inference-providers-and-data-policy.md))
+- The adapters behind the inference port that `Tailoring` owns (#150): the first one speaks the chat-completions API that most providers and local model servers share, with a dialect for each endpoint. A native adapter is written only for a provider with no compatible endpoint.
+- **The registry,** built from configuration. It lists the providers in order of preference, each with its endpoint, the name of the secret that holds its key, its allowed models, its capabilities and its declared data policy. It applies the rule of `ServerApplication` when it is built, so a provider that does not meet the deployment's policy is not in it.
+- **Selection and fallback:** the first available provider answers. When it is unavailable or rate-limited, the next one that meets the policy answers instead.
+- It implements both ports: the inference port of `Tailoring`, and the data-policy port of `ServerApplication`, so `GET /v1/policy` reaches the policy. The registry's declarations and that port need no client and no key.
+- It never logs a prompt, an answer or a key. It never reads a secret or the environment: the executable hands it the keys and the clients.
 
 **`ServerStorePostgres`** (#160)
 - The job store and the quota store on Postgres, through PostgresNIO. Its rows are DTOs of its own, built from the types of `TailoringModel` (R12).
@@ -316,11 +321,12 @@ The targets are created by #158 and the tickets named below. Until the targets e
 
 **The `PrestoCVServer` executable target**
 - The executable and the server's composition root (R4). It reads the command line with ArgumentParser and the configuration, picks the profile's adapters, wires them behind the ports of `ServerApplication` and of `Tailoring`, and creates the infrastructure: the database pool, the queue client, the inference providers' clients, the clock, the identifier generators and the logger.
+- It reads the deployment's configuration and refuses to start, with an error that names the cause, when a provider does not meet the data policy, when a model is not allowed, or when a secret cannot be read (#155, [ADR 0015](adr/0015-inference-providers-and-data-policy.md)). Nothing is skipped silently. In the role that holds the keys, it reads the secrets and hands them to the adapters.
 - It starts as `serve`, as `work`, or, in the local profile, as both. It composes the router per role.
 - It shuts down cleanly on SIGTERM: the job in hand is finished or released back to the queue.
 
 **Roles.**
-- **`serve`** answers the API. Hosted, it is its own Cloud Run service. It records a job and hands it to the queue.
+- **`serve`** answers the API. Hosted, it is its own Cloud Run service. It records a job and hands it to the queue. It checks the data policy at start and serves it, and it reads no secret.
 - **`work`** runs tailorings. Hosted, it is its own Cloud Run service, and it is private: only the queue's identity, which the erasure schedule (#166) also uses, may call it, and the platform refuses everyone else before any code runs. Only the worker holds the model providers' keys.
 - A tailoring finishes within the queue's dispatch deadline of 30 minutes.
 - The binary has one more command, `migrate` (#160, #162). It is not a role.

@@ -38,6 +38,9 @@ One word, one meaning, in code, UI copy, tickets and translations. Today "templa
 | **Profile** | `hosted` or `local`: the set of adapters a composition root picks from configuration. | Environment | Server |
 | **Environment** | Where the server runs: `local`, `staging` or `production`. `local` uses the local profile, the other two the hosted one. | Profile | Server |
 | **Job** | One tailoring the server runs: its state, its CV and its result. It is erased once the app confirms it has saved the result, and 24 hours after the job ends at the latest. | The position an advert offers. Tailoring is the work; the job is the server's record of it | Server |
+| **Provider** | A service that runs models, reached through an adapter: a hosted router, a commercial API, or a model on the same machine. | A model, which a provider runs and the configuration picks | Server |
+| **Dialect** | An endpoint's quirks within the shared chat-completions API: its routing preferences, whether it supports structured output, the extra headers it asks for. | A provider: several providers can share a dialect | Server |
+| **Data policy** | What a provider declares about keeping prompts, training on them and the region it runs in, and what a deployment requires. The server refuses to start when they disagree. | The privacy policy, a document in the repository (#190) | Server |
 
 ## UI copy in other languages
 
