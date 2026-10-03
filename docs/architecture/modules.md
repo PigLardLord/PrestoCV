@@ -259,7 +259,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
   - `forLanguage(_:)` returns the `LanguageWordLists` of a language, or `unsupportedLanguage`. Its groups are `advert`, `dates`, `numbers`, `spans`, `letter`, `provenance` and `technologies`, and each list states its `source` and its `licence`.
   - The supported languages are the ones in `Resources/WordLists/index.json`, each with its file: English today. Adding one adds a file and an index entry.
   - The format, every key and the rule for adding a language are in [word-lists.md](word-lists.md). A test holds that page to the decoder.
-- **`TextFold.fold`**, the one normalisation every word-list match uses: case, accents and ligatures are dropped, `ß` is `ss`, white space is squeezed. `AdvertAnalysis`, `ContentChecks` and `Provenance` share this copy.
+- **`TextFold.fold`**, the one normalisation every word-list match that folds uses: case and accents are dropped, ligatures are expanded ("ﬁ" is "fi") while "œ", "æ", "ø" and "ł" stay, `ß` is `ss` but a capital `ẞ` is `ß`, and white space is squeezed. `AdvertAnalysis`, `ContentChecks` and `Provenance` share this copy.
 
 **`AdvertAnalysis`** (#138, #153)
 - What an advert asks for, and where the source CV evidences it.

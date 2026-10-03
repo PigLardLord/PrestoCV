@@ -116,7 +116,7 @@ A list that is not folded tells two entries apart by their lower-case form. A po
 | `provenance.legalForms` | The legal forms a company's name ends in, with and without the optional dots ("gmbh", "ltd.", "gmbh & co. kg"). The check ignores white space around "&", "." and "(", so an entry is written once however its spaces fall (#141). A legal form belongs to a jurisdiction and not to a language, so every file holds the whole list | as written (case-insensitive) | no | `Provenance` finds a recipient's company as a letter writes it in prose, without its legal form |
 | `provenance.firstPerson` | The capitalised words of the first person, with either apostrophe ("I", "I'm") | as written (case-sensitive) | yes | `Provenance` does not read them as names |
 | `provenance.ranks` | The words of a title that claim a rank, each with the ranks it may mean ("senior", "chief" for head) | folded | no | `Provenance` refuses a title that claims a rank its source does not write |
-| `fields.technologies` | Names of technologies that are never ordinary words of the language ("Kotlin", "SwiftUI") | folded | no | `Provenance` holds a mention to the source however it is written; a name that is also an ordinary word stays out, and is read from its capitals |
+| `fields.technologies` | The names of technologies of the language: those that are not ordinary words of it ("Kotlin", "SwiftUI"). Each file holds its own language's list: English leaves out "Flutter", an ordinary English word, and German lists it | folded | no | `Provenance` holds a mention to the source however it is written; a name that is also an ordinary word stays out, and is read from its capitals |
 
 ### Known gaps
 
