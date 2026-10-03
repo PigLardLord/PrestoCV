@@ -288,7 +288,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - **The lease.** A running job holds a lease, and a job whose lease has expired is taken over by the retry (#161). The lease belongs to the job's lifecycle and to its contract suite, not to the queue adapter.
 - **Ports it owns (R3):** the job store, the job queue, the quota, the clock, an identifier generator (R2), a notifier (#180), the log events, and the deployment's data policy (#155).
 - **Log events** are typed and never carry a CV, a prompt or a key (#167). The executable bridges the port to swift-log. Adapters log through an injected `Logger` once #167 extends their allow-lists with `Logging`.
-- **Typed errors** (R7). It imports no external package.
+- **Typed errors** (R7). It imports no third-party package.
 
 **`ServerInference`** (#154, #155)
 - The adapters behind the inference port that `Tailoring` owns: the first one speaks the chat-completions API that most providers and local model servers share, with a dialect for each endpoint.
@@ -381,6 +381,6 @@ PrestoCVServer (executable) ─┬─▶ ServerHTTP ─┬─▶ ServerApplicati
 Forbidden: any edge between PrestoCVCore, CVPDFExporter, CVGeneratorAI and CVTailoring.
 Forbidden: any edge from a domain, application or port target to an adapter target.
 Forbidden: PrestoCVPresentation → PrestoCVIntegration.
-Forbidden: any edge from ServerApplication to an external package.
+Forbidden: any edge from ServerApplication to a third-party package.
 Forbidden: any edge from the server's package to PrestoCVApp or PrestoCVCore.
 ```
