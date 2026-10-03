@@ -10,7 +10,7 @@ struct WordListsDocumentTests {
     func keyTable() throws {
         let rows = try Page.rows(after: "### Keys")
         let named = try rows.map { try #require(Page.backticked($0[0]).first, "a row without a key: \($0)") }
-        #expect(Set(named) == Set(["version"] + WordListKey.allCases.map(\.rawValue)))
+        #expect(Set(named) == Set(["version", "language"] + WordListKey.allCases.map(\.rawValue)))
         #expect(named.count == Set(named).count, "a key is named twice")
     }
 

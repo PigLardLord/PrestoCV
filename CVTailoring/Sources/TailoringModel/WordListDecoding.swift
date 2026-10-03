@@ -12,6 +12,7 @@ extension LanguageWordLists {
         } catch {
             throw .corruptWordList(.language(language), nil)
         }
+        guard file.language == language.code else { throw .corruptWordList(.language(language), nil) }
         let reading = WordListReading(language: language)
         self.init(
             language: language,
@@ -259,6 +260,7 @@ private struct WordListDocument: Decodable {
     struct Numbers { let words: RawList<RawNumber> }
     struct Fields { let technologies: RawList<String> }
 
+    let language: String
     let advert: RawAdvert
     let dates: RawDates
     let numbers: Numbers
@@ -272,6 +274,7 @@ private struct WordListDocument: Decodable {
         guard try root.decode(Int.self, forKey: "version") == WordListFormat.version else {
             throw DecodingError.dataCorruptedError(forKey: "version", in: root, debugDescription: "a version this code does not read")
         }
+        language = try root.decode(String.self, forKey: "language")
         try root.allowOnly(WordListFormat.rootKeys)
         advert = try RawAdvert(RawGroup(root, startingWith: .advertStopwords))
         dates = try RawDates(RawGroup(root, startingWith: .datesMonths))

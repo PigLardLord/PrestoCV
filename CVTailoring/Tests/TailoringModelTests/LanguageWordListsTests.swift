@@ -15,7 +15,7 @@ struct LanguageWordListsTests {
 
     @Test("a complete file becomes the typed groups of its language")
     func complete() throws {
-        let lists = try decode(WordListFixture.data(), as: .italian)
+        let lists = try decode(WordListFixture.data(language: .italian), as: .italian)
         #expect(lists.language == .italian)
         #expect(lists.advert.stopwords.entries == ["alpha", "beta"])
         #expect(lists.advert.stopwords.source == "a test" && lists.advert.stopwords.licence == "ISC")
@@ -133,7 +133,34 @@ struct LanguageWordListsTests {
         #expect(throws: corrupt(.advertStopwords)) { try decode(data) }
     }
 
-    // MARK: - Version and size
+    // MARK: - Language, version and size
+
+    static let otherLanguageCases: [TailoringLanguage] = {
+        var values: [TailoringLanguage] = []
+        values.append(contentsOf: [.german, .spanish, .french, .italian, .portuguese])
+        return values
+    }()
+
+    @Test("a file that names another language than the one it is read for is corrupt", arguments: otherLanguageCases)
+    func namesAnotherLanguage(language: TailoringLanguage) throws {
+        let data = try WordListFixture.data(language: language)
+        #expect(throws: corrupt()) { try decode(data) }
+        #expect(try decode(data, as: language).language == language)
+    }
+
+    @Test("a language that is not the code of a language, or is missing, is corrupt")
+    func languageNotACode() throws {
+        var values: [Any] = ["", "EN", "english", "xx", " en", "en-GB"]
+        values.append(1)
+        values.append(NSNull())
+        values.append(["en"])
+        for value in values {
+            let data = try WordListFixture.data { $0["language"] = value }
+            #expect(throws: corrupt()) { try decode(data) }
+        }
+        let missing = try WordListFixture.data { $0["language"] = nil }
+        #expect(throws: corrupt()) { try decode(missing) }
+    }
 
     @Test("the format version is 1, and only 1 is read")
     func versionOne() {

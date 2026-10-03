@@ -7,13 +7,17 @@ struct WordListsTests {
     private func index(_ codes: [String]) throws -> Data { try JSONSerialization.data(withJSONObject: codes) }
 
     /// A complete file. Building it cannot fail; the error only keeps the closures below typed.
-    private static func complete(_ edit: ((inout WordListFixture.Object) -> Void)? = nil) throws(TailoringModelError) -> Data {
-        do { return try WordListFixture.data { edit?(&$0) } } catch { throw .corruptWordList(.index, nil) }
+    private static func complete(
+        _ language: TailoringLanguage = .english, _ edit: ((inout WordListFixture.Object) -> Void)? = nil
+    ) throws(TailoringModelError) -> Data {
+        var object = WordListFixture.object(language: language)
+        edit?(&object)
+        do { return try WordListFixture.data(object) } catch { throw .corruptWordList(.index, nil) }
     }
 
     /// Files for the languages named, each a complete file; any other language has none.
     private func files(for available: [TailoringLanguage]) -> (TailoringLanguage) throws(TailoringModelError) -> Data? {
-        return { language in available.contains(language) ? try Self.complete() : nil }
+        return { language in available.contains(language) ? try Self.complete(language) : nil }
     }
 
     private func lists(_ codes: [String], available: [TailoringLanguage]) throws(TailoringModelError) -> WordLists {
@@ -41,11 +45,19 @@ struct WordListsTests {
         #expect(throws: TailoringModelError.corruptWordList(.language(.german), nil)) { try lists(["en", "de"], available: [.english]) }
     }
 
+    @Test("a file that names another language than the index lists it for is corrupt, and names the language the index gave")
+    func fileOfAnotherLanguage() throws {
+        let data = try index(["en"])
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english), nil)) {
+            try WordLists(index: data) { _ throws(TailoringModelError) in try Self.complete(.german) }
+        }
+    }
+
     @Test("a file that cannot be read is corrupt, and names its language")
     func corruptFile() throws {
         let data = try index(["en", "it"])
         #expect(throws: TailoringModelError.corruptWordList(.language(.italian), nil)) {
-            try WordLists(index: data) { language throws(TailoringModelError) in language == .english ? try Self.complete() : Data("nope".utf8) }
+            try WordLists(index: data) { language throws(TailoringModelError) in language == .english ? try Self.complete(language) : Data("nope".utf8) }
         }
     }
 
@@ -53,7 +65,7 @@ struct WordListsTests {
     func incompleteFile() throws {
         let data = try index(["it"])
         #expect(throws: TailoringModelError.incompleteWordList(.italian, .letterGreetings)) {
-            try WordLists(index: data) { _ throws(TailoringModelError) in try Self.complete { $0["letter"] = nil } }
+            try WordLists(index: data) { language throws(TailoringModelError) in try Self.complete(language) { $0["letter"] = nil } }
         }
     }
 

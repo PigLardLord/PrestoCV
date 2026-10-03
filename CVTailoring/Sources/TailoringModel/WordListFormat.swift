@@ -17,8 +17,8 @@ enum WordListFormat {
         return WordListKey.allCases.map(\.group).filter { seen.insert($0).inserted }
     }
 
-    /// The keys at the top of a file: the version and the groups.
-    static var rootKeys: [String] { ["version"] + groups }
+    /// The keys at the top of a file: the version, the language it is the file of, and the groups.
+    static var rootKeys: [String] { ["version", "language"] + groups }
 
     /// The keys of a list.
     static let listKeys = ["source", "licence", "entries"]

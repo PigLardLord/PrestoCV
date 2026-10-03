@@ -17,6 +17,7 @@ The files are resources of the `TailoringModel` target, read through `Bundle.mod
 
 - `WordLists.load()` reads the index, then the file of every language it names, and validates each one. A composition root calls it once and injects the value ([R4](rules.md#r4-one-composition-root)); nothing caches it.
 - `WordLists.forLanguage(_:)` returns the `LanguageWordLists` of a language, or `unsupportedLanguage` for a language that has no file. It never falls back to English ([R13](rules.md#r13-localisation-happens-at-the-edges)).
+- A file names its own language in `language`. The decoder refuses a file whose language is not the one the index lists it for.
 - Every file is JSON and at most 1,048,576 bytes (1 MiB). The size is checked before the bytes are decoded.
 - The format is closed. A key that is not in the tables below is refused wherever it is: at the top of a file, in a group, in a list and in an entry.
 
@@ -28,7 +29,7 @@ The supported languages are the ones the index names, each with its file. An ind
 
 | Shape | Keys |
 |---|---|
-| The file | `version`, `advert`, `dates`, `numbers`, `spans`, `letter`, `provenance`, `fields` |
+| The file | `version`, `language`, `advert`, `dates`, `numbers`, `spans`, `letter`, `provenance`, `fields` |
 | A list | `source`, `licence`, `entries` |
 | The list of streets | `source`, `licence`, `entries`, `order` |
 | A month name | `name`, `month` |
@@ -61,6 +62,7 @@ Every file holds every key below. A file that lacks one is refused as incomplete
 | Key | Holds | Used by |
 |---|---|---|
 | `version` | The format version | Refused unless it is the one this page describes |
+| `language` | The code of the language the file is the file of, as the index lists it | Refused unless it is the language the index names for this file, so a file copied under another name is caught |
 | `advert.stopwords` | Words that carry no information about a role, however often an advert uses them | `AdvertAnalysis` leaves them out of the terms it ranks, and guesses an advert's language from the share of its words that a language's stopwords make |
 | `advert.plainWords` | Ordinary words of an advert's prose that a tailoring may write although the CV does not, because each is a word of some technology's name ("new", "time") | `Provenance` lets them pass in the check of names; `AdvertAnalysis` still ranks them |
 | `advert.dimensions` | Nouns that name what a claim measures ("performance", "stability") | `Provenance` holds the figure beside one to the source, and refuses one beside no figure as a claim |
@@ -135,7 +137,7 @@ Every refusal is a typed error that carries codes and no text ([R7](rules.md#r7-
 | Error | When |
 |---|---|
 | `corruptWordList(.index, nil)` | The index is not a JSON array of language codes, is empty, names a code that is none of the six, lists a language twice, or is too large |
-| `corruptWordList(.language(l), nil)` | A fault of the file of `l` and not of a list: it is missing though the index lists it, is not JSON, is too large, has a version other than 1, or has a key the format does not know at the top or in a group |
+| `corruptWordList(.language(l), nil)` | A fault of the file of `l` and not of a list: it is missing though the index lists it, is not JSON, is too large, has a version other than 1, names another language than the index lists it for, or has a key the format does not know at the top or in a group |
 | `corruptWordList(.language(l), key)` | The list `key` has a key the format does not know, lacks its `source`, `licence` or `entries`, or holds a value of the wrong type |
 | `corruptWordList(.language(l), key)` | The `licence` of the list is not one of the allowed set |
 | `corruptWordList(.language(l), key)` | A `source`, a `licence` or an entry is empty, is not trimmed, hides a character, or folds to nothing |
@@ -150,7 +152,7 @@ Every refusal is a typed error that carries codes and no text ([R7](rules.md#r7-
 
 ### Adding a language
 
-1. Add `<code>.json` to `Resources/WordLists/`, holding every list of the key table at format version 1. Each list states its source and its licence.
+1. Add `<code>.json` to `Resources/WordLists/`, with the `version`, its own `language` and every list of the key table at format version 1. Each list states its source and its licence.
 2. Add the code to `index.json`.
 
 Nothing else changes: no code, no manifest line. The folder is copied whole, and `TailoringLanguage` already knows the six codes. Two tests keep the files honest: the files in the folder, but the index, are exactly the languages of the index, and a file that lacks a key another file has is refused as incomplete, because every file must hold every key.

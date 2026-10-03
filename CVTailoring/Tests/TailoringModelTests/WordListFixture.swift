@@ -6,8 +6,8 @@ import Foundation
 enum WordListFixture {
     typealias Object = [String: Any]
 
-    static func object() -> Object {
-        var object: Object = ["version": 1]
+    static func object(language: TailoringLanguage = .english) -> Object {
+        var object: Object = ["version": 1, "language": language.code]
         for key in WordListKey.allCases {
             var group = object[key.group] as? Object ?? [:]
             group[key.name] = list(for: key)
@@ -18,6 +18,11 @@ enum WordListFixture {
 
     static func data(_ object: Object = object()) throws -> Data {
         try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    }
+
+    /// The fixture as the file of `language`.
+    static func data(language: TailoringLanguage) throws -> Data {
+        try data(object(language: language))
     }
 
     /// The fixture with one change made to it.

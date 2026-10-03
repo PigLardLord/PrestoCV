@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "language": "en",
   "advert": {
     "stopwords": {
       "source": "cv-giovanni 6e28147 domain/AdvertLexicon.js ADVERT.stopwords.en",
