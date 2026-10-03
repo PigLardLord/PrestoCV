@@ -331,7 +331,8 @@ The targets are created by #158 part 2 and the tickets named below. Until then t
 
 **Dependencies.**
 - External packages are imported only by adapters and by the executable, never by `ServerApplication`. Each is pinned in the committed `Package.resolved`. A new one changes this file in the same pull request, and the checker's `--packages` rule holds it.
-- The package depends on `CVTailoring`, and on `PrestoCVAPI` once #177 exists. It depends on none of the app's packages.
+- The package depends on `CVTailoring`, and on `PrestoCVAPI` once #177 exists. It never depends on `PrestoCVApp`, `PrestoCVCore` or `CVGeneratorAI`.
+- It may depend on `CVPDFExporter`, which is reusable on a backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)). The ticket that needs that edge adds it to this file, for example #94.
 - The targets for authentication, logs and notifications are set by their tickets' decisions (#167, #168, #180) and added to this file then.
 
 **Test support.** None yet. The contract suites of the ports (#157) live in a test-support target that #157 adds to this file.

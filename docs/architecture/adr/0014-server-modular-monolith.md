@@ -45,7 +45,7 @@
 - **More targets will follow.** The authentication, logging and notification targets are set by the decisions of their own tickets (#167, #168, #180).
 - **External packages** are imported only by adapters and by the executable, never by `ServerApplication`. Each is pinned in the committed `Package.resolved`. A new one changes [modules.md](../modules.md) in the same pull request, so the checker's `--packages` rule holds it ([ADR 0006](0006-enforce-architecture-mechanically.md)).
 - **Translation.** On the server, only `ServerHTTP` translates between the API's types and the tailoring model, as only `PrestoCVIntegration` does in the app ([ADR 0007](0007-each-package-owns-its-model.md)). The generated types never leave it.
-- **The package depends on `CVTailoring`** (and on `PrestoCVAPI` once #177 exists), never on the app's packages. `PrestoCVAPITypes` and `PrestoCVAPIServer` are targets of the `PrestoCVAPI` package (#175).
+- **The package depends on `CVTailoring`** (and on `PrestoCVAPI` once #177 exists). It never depends on `PrestoCVApp`, `PrestoCVCore` or `CVGeneratorAI`. It may depend on `CVPDFExporter`, which is reusable on a backend ([ADR 0002](0002-cvpdfexporter-standalone-and-portable.md)): the ticket that needs that edge adds it to [modules.md](../modules.md), for example #94. `PrestoCVAPITypes` and `PrestoCVAPIServer` are targets of the `PrestoCVAPI` package (#175).
 
 ## Consequences
 
