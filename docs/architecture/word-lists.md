@@ -47,6 +47,7 @@ The supported languages are the ones the index names, each with its file. An ind
   - `provenance.ranks`: `{ "word": "chief", "ranks": ["head"] }`, one rank at least, each from the set below and none twice.
 - `advert.streets` also says where the language writes the word of a street, in `order`: `joined` to the name ("Hauptstraße 1"), `after` it with the number first ("221B Baker Street"), or `before` it with the number last ("Via Roma 1").
 - `spans.tiedCounts` holds templates: literal words around `{count}` and `{employer}`, each exactly once and no other brace. A language puts the count before or after the employer as it writes it.
+- A source, a licence and every entry is one line of text that shows something. It holds no hidden character: the model's `TextRules` refuse control characters, bidirectional marks, embeddings and overrides, and tag characters. It has no blank at either end by the model's one rule of trimming. And it is not empty once folded: an entry that folds to nothing, such as a lone combining mark, is corrupt.
 - Entries are kept as written. A match folds both sides with `TextFold.fold`, the one normalisation in `TailoringModel`: case, accents and ligatures are dropped, `ß` is `ss`, and runs of white space are one space.
 
 ### Ranks
@@ -133,7 +134,7 @@ Every refusal is a typed error that carries codes and no text ([R7](rules.md#r7-
 | Error | When |
 |---|---|
 | `corruptWordList(.index)` | The index is not a JSON array of language codes, is empty, names a code that is none of the six, lists a language twice, or is too large |
-| `corruptWordList(.language(l))` | The file of `l` is missing though the index lists it; or is not JSON, is too large, has a version other than 1, has a key the format does not know, or lacks a `source`, a `licence` or `entries` of a list; or a `source` or a `licence` or an entry is empty or not trimmed; or two entries of a list are the same once folded; or a month is out of range, a value is negative, a group of synonyms has fewer than two forms, a template is malformed, or `order` is none of the three |
+| `corruptWordList(.language(l))` | The file of `l` is missing though the index lists it; or is not JSON, is too large, has a version other than 1, has a key the format does not know, or lacks a `source`, a `licence` or `entries` of a list; or a `source`, a `licence` or an entry is empty, not trimmed, hides a character, or folds to nothing; or two entries of a list are the same once folded; or a month is out of range, a value is negative, a group of synonyms has fewer than two forms, a template is malformed, or `order` is none of the three |
 | `incompleteWordList(l, key)` | The file of `l` has no group or no list for `key` (a missing group is reported as its first list), a list has no entry, or no month is named for one of the twelve |
 | `unsupportedLanguage` | `forLanguage(_:)` is asked for a language that has no file |
 

@@ -197,10 +197,11 @@ struct LanguageWordListsTests {
         var values: [String] = []
         values.append(contentsOf: ["", " ", " ISC", "ISC "])
         values.append(contentsOf: ["\n", "ISC\n"])
+        values.append(contentsOf: ["IS\u{0007}C", "IS\u{202E}C", "IS\u{E0041}C", "IS\u{200F}C"])
         return values
     }()
 
-    @Test("a source or a licence that is empty or not trimmed is corrupt", arguments: blankSourceOrLicenceCases)
+    @Test("a source or a licence that is empty, hidden or not trimmed is corrupt", arguments: blankSourceOrLicenceCases)
     func blankSourceOrLicence(text: String) throws {
         for key in WordListKey.allCases {
             for field in ["source", "licence"] {
@@ -224,10 +225,12 @@ struct LanguageWordListsTests {
         values.append(contentsOf: ["\n", "a\n", "\t", "\u{00A0}"])
         values.append(contentsOf: ["\u{FEFF}", "\u{200B}", "\u{200B}a", "a\u{200B}"])
         values.append(contentsOf: ["\u{2060}", "\u{2060}a", "a\u{2060}", "\u{200D}a"])
+        values.append(contentsOf: ["a\u{0007}b", "a\u{0000}b", "a\nb", "a\u{202E}b"])
+        values.append(contentsOf: ["a\u{E0041}b", "a\u{200F}b", "\u{0301}"])
         return values
     }()
 
-    @Test("an entry that is empty or not trimmed is corrupt", arguments: WordListFixture.textKeys)
+    @Test("an entry that is empty, hidden or not trimmed is corrupt", arguments: WordListFixture.textKeys)
     func badText(key: WordListKey) throws {
         for entry in Self.badEntries {
             let data = try WordListFixture.data(editing: key) { $0["entries"] = ["alpha", entry] }
@@ -235,7 +238,7 @@ struct LanguageWordListsTests {
         }
     }
 
-    @Test("a month name, a number word and a synonym form that is empty or not trimmed is corrupt")
+    @Test("a month name, a number word and a synonym form that is empty, hidden or not trimmed is corrupt")
     func badEntriesOfOtherShapes() throws {
         for entry in Self.badEntries {
             let month = try WordListFixture.data(editing: .datesMonths) { list in
@@ -483,7 +486,7 @@ struct LanguageWordListsTests {
         #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(noWord) }
     }
 
-    @Test("a word of a form of address that is empty or not trimmed is corrupt")
+    @Test("a word of a form of address that is empty, hidden or not trimmed is corrupt")
     func badFormWord() throws {
         for word in Self.badEntries {
             let data = try WordListFixture.data(editing: .letterFormsOfAddress) { $0["entries"] = [["form": "ms", "word": word]] }
@@ -550,7 +553,7 @@ struct LanguageWordListsTests {
         #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(missing) }
     }
 
-    @Test("a word of a rank that is empty or not trimmed is corrupt")
+    @Test("a word of a rank that is empty, hidden or not trimmed is corrupt")
     func badRankWord() throws {
         for word in Self.badEntries {
             let data = try WordListFixture.data(editing: .provenanceRanks) { $0["entries"] = [["word": word, "ranks": ["lead"]]] }

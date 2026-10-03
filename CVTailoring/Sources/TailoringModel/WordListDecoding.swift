@@ -418,8 +418,8 @@ private struct WordListReading {
 
     private var corrupt: TailoringModelError { .corruptWordList(.language(language)) }
 
-    /// A list states its source and its licence, holds an entry, and each word of it is trimmed, says something once
-    /// folded, and is not another word of the list once folded: a repeat would count a word twice.
+    /// A list states its source and its licence, holds an entry, and each word of it is one line of text that shows
+    /// something (`isStated`) and is not another word of the list once folded: a repeat would count a word twice.
     private func check<Entry>(_ raw: RawList<Entry>, _ key: WordListKey, words: [String]) throws(TailoringModelError) {
         guard isStated(raw.source), isStated(raw.licence) else { throw corrupt }
         guard !raw.entries.isEmpty else { throw .incompleteWordList(language, key) }
@@ -429,9 +429,11 @@ private struct WordListReading {
         }
     }
 
-    /// Not empty, not blank at either end by the model's one rule of trimming, and something once folded.
+    /// One line of text that shows something: no hidden character (`TextRules`), no blank at either end by the model's one
+    /// rule of trimming, and not empty once folded.
     private func isStated(_ text: String) -> Bool {
         let content = Bounds.trimmed(text[...])
-        return !content.isEmpty && content == text[...] && !TextFold.fold(text).isEmpty
+        return !content.isEmpty && content == text[...] && !TextRules.hiddenCharacter(in: text, multiLine: false)
+            && !TextFold.fold(text).isEmpty
     }
 }
