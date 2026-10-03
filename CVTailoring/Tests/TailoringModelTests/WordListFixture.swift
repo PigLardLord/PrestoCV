@@ -40,7 +40,10 @@ enum WordListFixture {
 
     /// The lists whose entries are plain words, with no rule beyond the ones every list shares.
     static var textKeys: [WordListKey] {
-        WordListKey.allCases.filter { ![.datesMonths, .numbersWords, .spansCountWords, .advertSynonyms, .spansTiedCounts].contains($0) }
+        var shaped: [WordListKey] = []
+        shaped.append(contentsOf: [.datesMonths, .numbersWords, .spansCountWords])
+        shaped.append(contentsOf: [.advertSynonyms, .spansTiedCounts])
+        return WordListKey.allCases.filter { !shaped.contains($0) }
     }
 
     static func list(for key: WordListKey) -> Object {

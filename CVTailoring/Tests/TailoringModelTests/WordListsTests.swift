@@ -57,9 +57,15 @@ struct WordListsTests {
         }
     }
 
-    @Test("an index that is not an array of language codes is corrupt", arguments: [
-        "", "nope", "{}", "null", "\"en\"", "[1]", "[null]", "[[\"en\"]]", "[\"en\",", "{\"en\":true}",
-    ])
+    static let notAnIndexCases: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["", "nope", "{}", "null"])
+        values.append(contentsOf: ["\"en\"", "[1]", "[null]", "[[\"en\"]]"])
+        values.append(contentsOf: ["[\"en\",", "{\"en\":true}"])
+        return values
+    }()
+
+    @Test("an index that is not an array of language codes is corrupt", arguments: notAnIndexCases)
     func notAnIndex(text: String) {
         #expect(throws: TailoringModelError.corruptWordList(.index)) {
             try WordLists(index: Data(text.utf8), files: files(for: TailoringLanguage.allCases))
@@ -71,9 +77,20 @@ struct WordListsTests {
         #expect(throws: TailoringModelError.corruptWordList(.index)) { try lists([], available: TailoringLanguage.allCases) }
     }
 
-    @Test("an index code that is not one of the six, or not written as one, is corrupt", arguments: [
-        ["xx"], ["en", "ja"], ["EN"], ["en-GB"], [" en"], ["eng"], [""], ["pt_BR"],
-    ])
+    static let unknownCodeCases: [[String]] = {
+        var values: [[String]] = []
+        values.append(["xx"])
+        values.append(["en", "ja"])
+        values.append(["EN"])
+        values.append(["en-GB"])
+        values.append([" en"])
+        values.append(["eng"])
+        values.append([""])
+        values.append(["pt_BR"])
+        return values
+    }()
+
+    @Test("an index code that is not one of the six, or not written as one, is corrupt", arguments: unknownCodeCases)
     func unknownCode(codes: [String]) {
         #expect(throws: TailoringModelError.corruptWordList(.index)) { try lists(codes, available: TailoringLanguage.allCases) }
     }

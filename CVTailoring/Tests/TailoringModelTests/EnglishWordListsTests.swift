@@ -103,36 +103,38 @@ struct EnglishWordListsTests {
 
     /// The number of entries of each list in cv-giovanni at commit 6e28147, counted from the source. Every list of the
     /// English file is ported from it, so a list that loses an entry, or one that is not ported, fails here.
-    private static let countsAtSource: [WordListKey: Int] = [
-        .advertStopwords: 159,            // domain/AdvertLexicon.js ADVERT.stopwords.en
-        .advertPlainWords: 10,            // ADVERT.plainWords.en
-        .advertDimensions: 5,             // ADVERT.dimensions.en
-        .advertBoilerplate: 28,           // ADVERT.boilerplate.en
-        .advertGenderMarkers: 2,          // ADVERT.genderMarkers.en
-        .advertInstructions: 8,           // ADVERT.instructions.en
-        .advertStreets: 9,                // ADVERT.streets.en
-        .advertNames: 25,                 // ADVERT.names.en
-        .advertSynonyms: 16,              // ADVERT.synonyms: 17 groups, and "architecture" has one English form, so no synonym
-        .advertRequirementHeadings: 10,   // ADVERT.requirementHeadings.en
-        .advertOfferHeadings: 8,          // ADVERT.offerHeadings.en
-        .advertStructuralHeadings: 12,    // ADVERT.structuralHeadings.en
-        .datesMonths: 24,                 // domain/DateRange.js MONTHS.en: 12 names and 12 abbreviations
-        .numbersWords: 30,                // core/ProvenanceCheck.js NUMBERS: two to nine, ten to nineteen, the tens, dozen, hundred, thousand, million
-        .spansFloorLeadIns: 3,            // domain/StatedSpans.js FLOOR: over, more than, at least
-        .spansYearWords: 2,               // UNIT: year, years
-        .spansMonthWords: 2,              // UNIT: month, months
-        .spansCountWords: 12,             // WORDS: one to twelve
-        .spansTiedCounts: 3,              // TIED: "of them at", "of which at", "of those at"
-        .letterGreetings: 3,              // core/ProvenanceCheck.js GREETING: dear, hello, hi
-        .letterSalutations: 1,            // SALUTATION: to whom it may concern
-        .letterAddressees: 14,            // WHOM: there, ms, mrs, mr, dr, prof, sir, madam, all, everyone, friends, recruiter(s), colleagues
-        .letterAddresseeNouns: 4,         // WHOM: team, manager, committee, department
-        .letterValedictions: 14,          // CLOSING: {kind, best, warm, warmest} regards with or without "with", best wishes, 3 yours, 2 sincerely
-        .letterSalaryExpectationAsks: 6,  // core/Tailor.js ASKS.salaryExpectation, expanded
-        .letterStartDateAsks: 13,         // ASKS.startDate, expanded
-        .letterStatedTermWords: 4,        // ASKS: the lookahead's English words, is, of, range, applies
-        .fieldsTechnologies: 49,          // domain/TechnologyLexicon.js TECHNOLOGIES
-    ]
+    private static let countsAtSource: [WordListKey: Int] = {
+        var counts: [WordListKey: Int] = [:]
+        counts[.advertStopwords] = 159  // domain/AdvertLexicon.js ADVERT.stopwords.en
+        counts[.advertPlainWords] = 10  // ADVERT.plainWords.en
+        counts[.advertDimensions] = 5  // ADVERT.dimensions.en
+        counts[.advertBoilerplate] = 28  // ADVERT.boilerplate.en
+        counts[.advertGenderMarkers] = 2  // ADVERT.genderMarkers.en
+        counts[.advertInstructions] = 8  // ADVERT.instructions.en
+        counts[.advertStreets] = 9  // ADVERT.streets.en
+        counts[.advertNames] = 25  // ADVERT.names.en
+        counts[.advertSynonyms] = 16  // ADVERT.synonyms: 17 groups, and "architecture" has one English form, so no synonym
+        counts[.advertRequirementHeadings] = 10  // ADVERT.requirementHeadings.en
+        counts[.advertOfferHeadings] = 8  // ADVERT.offerHeadings.en
+        counts[.advertStructuralHeadings] = 12  // ADVERT.structuralHeadings.en
+        counts[.datesMonths] = 24  // domain/DateRange.js MONTHS.en: 12 names and 12 abbreviations
+        counts[.numbersWords] = 30  // core/ProvenanceCheck.js NUMBERS: two to nine, ten to nineteen, the tens, dozen, hundred, thousand, million
+        counts[.spansFloorLeadIns] = 3  // domain/StatedSpans.js FLOOR: over, more than, at least
+        counts[.spansYearWords] = 2  // UNIT: year, years
+        counts[.spansMonthWords] = 2  // UNIT: month, months
+        counts[.spansCountWords] = 12  // WORDS: one to twelve
+        counts[.spansTiedCounts] = 3  // TIED: "of them at", "of which at", "of those at"
+        counts[.letterGreetings] = 3  // core/ProvenanceCheck.js GREETING: dear, hello, hi
+        counts[.letterSalutations] = 1  // SALUTATION: to whom it may concern
+        counts[.letterAddressees] = 14  // WHOM: there, ms, mrs, mr, dr, prof, sir, madam, all, everyone, friends, recruiter(s), colleagues
+        counts[.letterAddresseeNouns] = 4  // WHOM: team, manager, committee, department
+        counts[.letterValedictions] = 14  // CLOSING: {kind, best, warm, warmest} regards with or without "with", best wishes, 3 yours, 2 sincerely
+        counts[.letterSalaryExpectationAsks] = 6  // core/Tailor.js ASKS.salaryExpectation, expanded
+        counts[.letterStartDateAsks] = 13  // ASKS.startDate, expanded
+        counts[.letterStatedTermWords] = 4  // ASKS: the lookahead's English words, is, of, range, applies
+        counts[.fieldsTechnologies] = 49  // domain/TechnologyLexicon.js TECHNOLOGIES
+        return counts
+    }()
 
     @Test("the English file holds as many entries of each list as cv-giovanni does", arguments: WordListKey.allCases)
     func countsMatchTheSource(key: WordListKey) throws {
@@ -217,9 +219,15 @@ struct EnglishWordListsTests {
         #expect(letter.startDateAsks.entries.contains("when you could start") && letter.startDateAsks.entries.contains("availability date"))
     }
 
-    @Test("a technology that is also an ordinary word stays out, as the source's lexicon explains", arguments: [
-        "Swift", "React", "Combine", "Room", "Realm", "Go", "Rust", "Flutter", "Espresso",
-    ])
+    static let ordinaryWordsStayOutCases: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["Swift", "React", "Combine", "Room"])
+        values.append(contentsOf: ["Realm", "Go", "Rust", "Flutter"])
+        values.append(contentsOf: ["Espresso"])
+        return values
+    }()
+
+    @Test("a technology that is also an ordinary word stays out, as the source's lexicon explains", arguments: ordinaryWordsStayOutCases)
     func ordinaryWordsStayOut(name: String) throws {
         let technologies = try english().technologies.entries.map(TextFold.fold)
         #expect(!technologies.contains(TextFold.fold(name)))
