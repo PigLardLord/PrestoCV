@@ -90,12 +90,13 @@
   - The server turns its typed errors into problems in one place (#178). The adapter turns each documented `type` into a typed error of its workflow (R7).
   - A problem's `type` URI is its code. `title` and `detail` are for developers: a problem carries no user-facing text, and the app words its own (R13).
   - A `type` URI is an identifier that outlives the hosting of the reference (#182): the page may move, and the `type` does not change.
-  - Every operation declares a `default` problem+json response, so a client decodes any error as a problem.
+  - Every operation declares a `default` problem+json response, so a client decodes any error response of the server as a problem.
   - An unknown `type`, or a response that the spec does not document for that operation, becomes a generic typed error in the adapter. It is never a success and never a crash.
+  - A transport failure, or a response that is not a problem (an error page of the hosting platform), becomes a typed error of its own. A cancellation, which the runtime wraps in `ClientError`, leaves the adapter as `CancellationError` (R7).
 - **(f) What a breaking change is,** seen from an app in the field, which cannot be updated at once.
   - Breaking: removing or renaming an operation, a field, a problem `type` or a value the app sends; requiring more of a request or narrowing what it may carry; making a required field of a response optional; any change that an old client cannot decode.
   - Not breaking: adding an operation, an optional request field, a response field or a problem `type`.
-  - **An optional request field reaches the server first.** The server that accepts it ships first, and the app that sends it ships after.
+  - **An optional request field reaches the server first.** The server that accepts it ships first, and the app that sends it ships after. Review and the release runbook hold this; in practice the server deploys on merge and the app ships later through store review.
   - **A new value in a response enum breaks old clients unless the enum is open.** So the spec declares a response enum as `anyOf` its known values and a plain string, as the generator supports, and the adapter maps a value it does not know to a typed "unknown" case (R7). A new value is then not a break.
   - A response schema allows additional properties, so an old client ignores a field it does not know.
 - **(g) The policy's version and the aliases,** as [ADR 0015](0015-inference-providers-and-data-policy.md) decides them. The contract carries them.
@@ -122,7 +123,6 @@
   - the comparison with the spec on `main`, and the rule for what breaks it;
   - the package in the project's test commands.
 
-  The test that the bounds agree is not one of them: it lives in `ServerHTTP`'s tests (#178), and reads the spec by its path.
 - **Costs:**
   - The generator's output is reviewed in pull requests. A generator upgrade can change every generated file, and the diff is read like code.
   - A breaking change needs a new version in the path. The server cannot drop a version while an app that uses it is in the field, which is what the minimum app version is for.
@@ -144,7 +144,7 @@
     - the request and the result round-trip through the generated types, for a CV in each of the six languages (#176);
     - the spec's bounds equal the bounds of the model's validators, in `ServerHTTP`'s tests, which read the spec by its path (#178; #176 states the bounds);
     - router tests for each endpoint and for each error `type` the spec documents, and one that proves that every problem a middleware emits is documented for each operation the middleware covers (#178);
-    - the adapter against a fake server, for each outcome and each error, an unknown `type`, an undocumented status and an unknown enum value among them (#179);
+    - the adapter against a fake server, for each outcome and each error, an unknown `type`, an undocumented status, an unknown enum value, a transport failure and a cancellation among them (#179);
   - review, for the generator's diff, and for R4 on the adapter until `URLSessionTransport` is in `infrastructureTypes`.
 
 ## Alternatives considered
