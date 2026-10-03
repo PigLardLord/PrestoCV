@@ -267,7 +267,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 
 A package of its own, next to the app's, in this repository ([ADR 0014](adr/0014-server-modular-monolith.md)). It is an integration and composition package, like `PrestoCVApp`, and not one of the isolated context packages (R1). It builds and tests on Linux, and runs on macOS for development.
 
-The targets are created by #158 part 2 and the tickets named below. Until then they are declared not yet implemented in the checker's `rules.json`.
+The targets are created by #158 and the tickets named below. Until the targets exist, they are declared not yet implemented in the checker's `rules.json`.
 
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
@@ -284,9 +284,10 @@ The targets are created by #158 part 2 and the tickets named below. Until then t
   - Start checks the caller's quota, records the job under its idempotency key and queues it. The same key returns the same job.
   - Run is the `work` role's use case: it loads the job, runs the loop of `Tailoring`, and stores the result or the failure.
   - Get returns the job to its owner only. Delete erases it.
-- **The job lifecycle:** queued, running, succeeded, failed, expired. A job is erased once the app has confirmed its result, and 24 hours after it ends at the latest (#166).
+- **The job lifecycle:** queued, running, succeeded, failed, expired. A job is erased once the app confirms it has saved the result, and 24 hours after the job ends at the latest (#166).
+- **The lease.** A running job holds a lease, and a job whose lease has expired is taken over by the retry (#161). The lease belongs to the job's lifecycle and to its contract suite, not to the queue adapter.
 - **Ports it owns (R3):** the job store, the job queue, the quota, the clock, an identifier generator (R2), a notifier (#180), the log events, and the deployment's data policy (#155).
-- **Log events** are typed and never carry a CV, a prompt or a key (#167). The adapters and the executable bridge the port to swift-log.
+- **Log events** are typed and never carry a CV, a prompt or a key (#167). The executable bridges the port to swift-log. Adapters log through an injected `Logger` once #167 extends their allow-lists with `Logging`.
 - **Typed errors** (R7). It imports no external package.
 
 **`ServerInference`** (#154, #155)
@@ -300,7 +301,7 @@ The targets are created by #158 part 2 and the tickets named below. Until then t
 
 **`ServerQueueCloudTasks`** (#161)
 - The job queue on Cloud Tasks, over AsyncHTTPClient. A task is named after its job and calls the worker with the queue's own identity.
-- The dispatch deadline is 30 minutes, retries use backoff, and a running job holds a lease.
+- The dispatch deadline is 30 minutes, and retries use backoff.
 
 **`ServerLocalProfile`** (#157, #158)
 - The in-memory job store and quota store, and the in-process queue, of the local profile.
@@ -309,18 +310,18 @@ The targets are created by #158 part 2 and the tickets named below. Until then t
 **`ServerHTTP`** (#175, #178)
 - The inbound adapter: the Hummingbird routes, the middleware, and the handlers that implement the generated API.
 - It maps the generated types to the use cases and back. The generated types never leave it: it imports `PrestoCVAPITypes` and `PrestoCVAPIServer` with `internal import`, so none can appear in its public API.
-- It serves the API on Hummingbird through `OpenAPIHummingbird`.
+- It serves the API on Hummingbird through `OpenAPIHummingbird`. `GET /health` is an endpoint of the spec, and `ServerHTTP` serves it in both roles.
 - **The worker's route.** The route the queue calls to run a job lives here too. It is mounted only in the `work` role, and it is not part of the public API (`openapi.yaml`). The platform admits only the queue's identity before any code runs (#161).
 - `PrestoCVAPITypes` and `PrestoCVAPIServer` are targets of the `PrestoCVAPI` package, which #175 and #177 add to this file.
 
-**`PrestoCVServer`**
+**The `PrestoCVServer` executable target**
 - The executable and the server's composition root (R4). It reads the command line with ArgumentParser and the configuration, picks the profile's adapters, wires them behind the ports of `ServerApplication` and of `Tailoring`, and creates the infrastructure: the database pool, the queue client, the inference providers' clients, the clock, the identifier generators and the logger.
 - It starts as `serve`, as `work`, or, in the local profile, as both. It composes the router per role.
-- It answers `GET /health` and shuts down cleanly on SIGTERM: the job in hand is finished or released back to the queue.
+- It shuts down cleanly on SIGTERM: the job in hand is finished or released back to the queue.
 
 **Roles.**
 - **`serve`** answers the API. Hosted, it is its own Cloud Run service. It records a job and hands it to the queue.
-- **`work`** runs tailorings. Hosted, it is its own Cloud Run service, and it is private: only the queue's identity may call it, and the platform refuses everyone else before any code runs. Only the worker holds the model providers' keys.
+- **`work`** runs tailorings. Hosted, it is its own Cloud Run service, and it is private: only the queue's identity, which the erasure schedule (#166) also uses, may call it, and the platform refuses everyone else before any code runs. Only the worker holds the model providers' keys.
 - A tailoring finishes within the queue's dispatch deadline of 30 minutes.
 - The binary has one more command, `migrate` (#160, #162). It is not a role.
 
@@ -339,7 +340,7 @@ The targets are created by #158 part 2 and the tickets named below. Until then t
 - It may depend on the Linux targets of `CVPDFExporter` and of `CVGeneratorAI` (`CVDrafting`), which are reusable on a backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)). The ticket that needs such an edge adds it to this file, for example #94 or #196.
 - The targets for authentication, logs and notifications are set by their tickets' decisions (#167, #168, #180) and added to this file then.
 
-**Test support.** None yet. The contract suites of the ports (#157) live in a test-support target that #157 adds to this file.
+**Test support.** None yet. The contract suites of the ports (#157) live in a test-support target that #157 adds to this file, as R10 asks. `ServerApplication`'s own tests use the adapters of `ServerLocalProfile`, so there is no second copy of them.
 
 ---
 
