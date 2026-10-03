@@ -300,6 +300,16 @@ struct TextRulesByFieldTests {
         #expect(TailoringModelError.Field.allCases.filter { !$0.isMultiLine }.count == TailoringModelError.Field.allCases.count - 5)
     }
 
+    @Test("the model reports every break in a one-line field as not one line, while the rule counts only the controls as hidden", arguments: HiddenSamples.breaks)
+    func breaksInOneLineField(character: String) {
+        let controls: Set<String> = ["\n", "\r", "\r\n", "\u{000B}", "\u{000C}", "\u{0085}"]
+        let text = "a" + character + "b"
+        #expect(TextRules.hiddenCharacter(in: text, field: .role) == controls.contains(character))
+        let hasBreak = text.contains(where: \.isNewline)
+        #expect(hasBreak)
+        #expect(throws: TailoringModelError.notOneLine(.role)) { try SourceExperience(role: text, company: "Acme") }
+    }
+
     @Test("the field overloads agree with the flags", arguments: TailoringModelError.Field.allCases)
     func overloads(field: TailoringModelError.Field) {
         let text = "a\tb\u{202E}c\nd"

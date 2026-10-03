@@ -30,8 +30,9 @@ public enum TextRules {
     }
 
     /// Whether `text`, written in `field`, holds a hidden character: the same rule, with the field's own
-    /// classification (`Field.isMultiLine`). A line break in a one-line field counts as hidden here; the model
-    /// reports it as `notOneLine`.
+    /// classification (`Field.isMultiLine`). A line break that is a control character counts as hidden here; U+2028
+    /// and U+2029 do not. The model reports every break in a one-line field as `notOneLine`, so a caller that needs the
+    /// model's answer also checks `contains(where: \.isNewline)`.
     public static func hiddenCharacter(in text: String, field: TailoringModelError.Field) -> Bool {
         hiddenCharacter(in: text, multiLine: field.isMultiLine)
     }
