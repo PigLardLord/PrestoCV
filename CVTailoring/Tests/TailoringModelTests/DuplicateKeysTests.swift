@@ -82,7 +82,7 @@ struct DuplicateKeysTests {
 
     @Test("a key written with an escape is the same key")
     func escapedKeys() {
-        #expect(find(#"{"a":1,"a":2}"#) == ["a"])
+        #expect(find(#"{"a":1,"\u0061":2}"#) == ["a"])
     }
 
     @Test("no bundled file writes a key twice")
