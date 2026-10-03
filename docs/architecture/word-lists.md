@@ -104,6 +104,18 @@ Every file holds every key below. A file that lacks one is refused as incomplete
 
 A shape is the same in every language, so it is not a list: the letters of a gender marker joined by slashes ("m/w/d"), a house number, a postcode, an American state and its ZIP code, the dashes and the tilde between two dates, the floor written "11+ years", a figure in numerals, and a tens word joined to a unit by a hyphen. The checks that read them are in the targets that use them.
 
+### Not in the word lists
+
+cv-giovanni holds more than the files do. What stays out, and why:
+
+- **The German forms of the synonym groups, `ALSO_ENGLISH_WORDS`, `SHARED_NOUNS`, `NOT_RANKS`, the German abbreviations and every other German list** belong to the file of German (#142). `Flutter`, the one name of `ALSO_ENGLISH_WORDS`, is an ordinary English word: English leaves it out of `fields.technologies` and reads it from its capital, and German lists it. The synonym group for "architecture" has one English form, so English holds no group for it. "Managerin", the German feminine of "manager", is German's.
+- **`SectionLexicon.js`**, the headings of a CV, serves the ATS audit (#148).
+- **`PlaceLexicon.js`**, the countries and regions of a location, serves the ATS parser (#148) and the date line of the letter page, which is rendering. No check of a tailoring reads it.
+- **The question wordings of `Tailor.js`** are text for the user. The app words a question from its codes ([R13](rules.md#r13-localisation-happens-at-the-edges)).
+- **`LANGUAGES`, the names of the languages in `Tailor.js`**, belong to the prompt (#151).
+- **`IDENTITY`, `COPIED` and `WORDED`** are field names of cv-giovanni's profile, not words of a language.
+- **The shapes** above go to the checks that read them (#138, #139).
+
 ### Source and licence
 
 Every list states where its entries come from and under which licence, beside them.
