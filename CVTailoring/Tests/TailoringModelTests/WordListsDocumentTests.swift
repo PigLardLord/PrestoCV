@@ -32,7 +32,8 @@ struct WordListsDocumentTests {
         #expect(shapes["A month name"] == Set(WordListFormat.monthKeys))
         #expect(shapes["A number word"] == Set(WordListFormat.numberKeys))
         #expect(shapes["A group of synonyms"] == Set(WordListFormat.synonymKeys))
-        #expect(shapes.count == 6, "a shape the decoder does not know is described")
+        #expect(shapes["A word of a form of address"] == Set(WordListFormat.formKeys))
+        #expect(shapes.count == 7, "a shape the decoder does not know is described")
     }
 
     @Test("the version and the size limit the page states are the code's")

@@ -22,8 +22,9 @@ enum WordListFormat {
     /// The keys of the list of streets, which also says where the language writes the word.
     static let streetListKeys = listKeys + ["order"]
 
-    /// The keys of a month name, of a number word and of a group of synonyms.
+    /// The keys of a month name, of a number word, of a group of synonyms and of a word of a form of address.
     static let monthKeys = ["name", "month"]
     static let numberKeys = ["word", "value"]
     static let synonymKeys = ["forms"]
+    static let formKeys = ["form", "word"]
 }

@@ -25,6 +25,8 @@ struct LanguageWordListsTests {
         #expect(lists.spans.countWords.entries == [NumberWord(word: "two", value: 2), NumberWord(word: "three", value: 3)])
         #expect(lists.spans.tiedCounts.entries == ["{count} of them at {employer}"])
         #expect(lists.letter.valedictions.entries == ["alpha", "beta"])
+        #expect(lists.letter.formsOfAddress.entries == [FormOfAddressWord(form: .ms, word: "alpha"), FormOfAddressWord(form: .mr, word: "beta")])
+        #expect(lists.letter.academicTitles.entries == ["alpha", "beta"] && lists.letter.notGivenNames.entries == ["alpha", "beta"])
         #expect(lists.technologies.entries == ["alpha", "beta"])
     }
 
@@ -95,6 +97,7 @@ struct LanguageWordListsTests {
     static let unknownEntryKeyCases: [WordListKey] = {
         var values: [WordListKey] = []
         values.append(contentsOf: [.datesMonths, .numbersWords, .spansCountWords, .advertSynonyms])
+        values.append(contentsOf: [.letterFormsOfAddress])
         return values
     }()
 
@@ -440,5 +443,56 @@ struct LanguageWordListsTests {
     func streetOrderMissing() throws {
         let data = try WordListFixture.data(editing: .advertStreets) { $0["order"] = nil }
         #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    // MARK: - Forms of address
+
+    static let unknownFormCases: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["neutral", "", "MS", "Mr", "x", " ms"])
+        return values
+    }()
+
+    @Test("a form of address that is not ms or mr is corrupt", arguments: unknownFormCases)
+    func unknownForm(form: String) throws {
+        let data = try WordListFixture.data(editing: .letterFormsOfAddress) { $0["entries"] = [["form": form, "word": "alpha"]] }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    @Test("a form of address that is not a string, or has no word, is corrupt")
+    func formNotAString() throws {
+        var forms: [Any] = [1]
+        forms.append(NSNull())
+        forms.append(["ms"])
+        for form in forms {
+            let data = try WordListFixture.data(editing: .letterFormsOfAddress) { $0["entries"] = [["form": form, "word": "alpha"]] }
+            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        }
+        let noWord = try WordListFixture.data(editing: .letterFormsOfAddress) { $0["entries"] = [["form": "ms"]] }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(noWord) }
+    }
+
+    @Test("a word of a form of address that is empty or not trimmed is corrupt")
+    func badFormWord() throws {
+        for word in Self.badEntries {
+            let data = try WordListFixture.data(editing: .letterFormsOfAddress) { $0["entries"] = [["form": "ms", "word": word]] }
+            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        }
+    }
+
+    @Test("a word that is two forms of address once folded is corrupt")
+    func wordUnderTwoForms() throws {
+        let data = try WordListFixture.data(editing: .letterFormsOfAddress) {
+            $0["entries"] = [["form": "ms", "word": "alpha"], ["form": "mr", "word": "ALPHA"]]
+        }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    @Test("one form of address may have several words")
+    func severalWordsForOneForm() throws {
+        let data = try WordListFixture.data(editing: .letterFormsOfAddress) {
+            $0["entries"] = [["form": "ms", "word": "ms"], ["form": "ms", "word": "mrs"], ["form": "mr", "word": "mr"]]
+        }
+        #expect(try decode(data).letter.formsOfAddress.entries.map(\.word) == ["ms", "mrs", "mr"])
     }
 }

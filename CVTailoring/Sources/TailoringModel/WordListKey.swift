@@ -38,6 +38,9 @@ public enum WordListKey: String, CaseIterable, Hashable, Sendable {
     case letterSalaryExpectationAsks = "letter.salaryExpectationAsks"
     case letterStartDateAsks = "letter.startDateAsks"
     case letterStatedTermWords = "letter.statedTermWords"
+    case letterFormsOfAddress = "letter.formsOfAddress"
+    case letterAcademicTitles = "letter.academicTitles"
+    case letterNotGivenNames = "letter.notGivenNames"
     case fieldsTechnologies = "fields.technologies"
 
     /// The group of the file the list belongs to: `advert`, `dates`, `numbers`, `spans`, `letter` or `fields`.

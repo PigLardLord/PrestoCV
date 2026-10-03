@@ -636,6 +636,35 @@
         "range",
         "applies"
       ]
+    },
+    "formsOfAddress": {
+      "source": "cv-giovanni 6e28147 core/ProvenanceCheck.js letterFailures, the words of recipient.form (the English words)",
+      "licence": "ISC",
+      "entries": [
+        { "form": "ms", "word": "ms" },
+        { "form": "ms", "word": "mrs" },
+        { "form": "mr", "word": "mr" }
+      ]
+    },
+    "academicTitles": {
+      "source": "cv-giovanni 6e28147 core/ProvenanceCheck.js letterFailures, the titles between a form of address and a name",
+      "licence": "ISC",
+      "entries": [
+        "dr",
+        "prof"
+      ]
+    },
+    "notGivenNames": {
+      "source": "cv-giovanni 6e28147 core/ProvenanceCheck.js letterFailures, the words that are no given name (the English words)",
+      "licence": "ISC",
+      "entries": [
+        "ms",
+        "mrs",
+        "miss",
+        "mr",
+        "and",
+        "or"
+      ]
     }
   },
   "fields": {

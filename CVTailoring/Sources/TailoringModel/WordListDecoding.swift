@@ -115,6 +115,18 @@ private struct RawNumber: Decodable {
     }
 }
 
+private struct RawFormWord: Decodable {
+    let form: String
+    let word: String
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicKey.self)
+        try container.allowOnly(WordListFormat.formKeys)
+        form = try container.decode(String.self, forKey: "form")
+        word = try container.decode(String.self, forKey: "word")
+    }
+}
+
 private struct RawSynonym: Decodable {
     let forms: [String]
 
@@ -192,7 +204,8 @@ private struct RawSpans {
 
 private struct RawLetter {
     let greetings, salutations, addressees, addresseeNouns, valedictions: RawList<String>
-    let salaryExpectationAsks, startDateAsks, statedTermWords: RawList<String>
+    let salaryExpectationAsks, startDateAsks, statedTermWords, academicTitles, notGivenNames: RawList<String>
+    let formsOfAddress: RawList<RawFormWord>
 
     init(_ group: RawGroup) throws {
         greetings = try group.list(.letterGreetings)
@@ -203,6 +216,9 @@ private struct RawLetter {
         salaryExpectationAsks = try group.list(.letterSalaryExpectationAsks)
         startDateAsks = try group.list(.letterStartDateAsks)
         statedTermWords = try group.list(.letterStatedTermWords)
+        formsOfAddress = try group.list(.letterFormsOfAddress)
+        academicTitles = try group.list(.letterAcademicTitles)
+        notGivenNames = try group.list(.letterNotGivenNames)
     }
 }
 
@@ -285,7 +301,10 @@ private struct WordListReading {
             valedictions: try texts(raw.valedictions, .letterValedictions),
             salaryExpectationAsks: try texts(raw.salaryExpectationAsks, .letterSalaryExpectationAsks),
             startDateAsks: try texts(raw.startDateAsks, .letterStartDateAsks),
-            statedTermWords: try texts(raw.statedTermWords, .letterStatedTermWords)
+            statedTermWords: try texts(raw.statedTermWords, .letterStatedTermWords),
+            formsOfAddress: try forms(raw.formsOfAddress, .letterFormsOfAddress),
+            academicTitles: try texts(raw.academicTitles, .letterAcademicTitles),
+            notGivenNames: try texts(raw.notGivenNames, .letterNotGivenNames)
         )
     }
 
@@ -305,6 +324,20 @@ private struct WordListReading {
         try check(raw, key, words: raw.entries.map(\.word))
         guard raw.entries.allSatisfy({ $0.value >= 0 }) else { throw corrupt }
         return WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { NumberWord(word: $0.word, value: $0.value) })
+    }
+
+    /// A form is `ms` or `mr`: the neutral form has no word of its own.
+    func forms(_ raw: RawList<RawFormWord>, _ key: WordListKey) throws(TailoringModelError) -> WordList<FormOfAddressWord> {
+        try check(raw, key, words: raw.entries.map(\.word))
+        var entries: [FormOfAddressWord] = []
+        for entry in raw.entries {
+            switch entry.form {
+            case "ms": entries.append(FormOfAddressWord(form: .ms, word: entry.word))
+            case "mr": entries.append(FormOfAddressWord(form: .mr, word: entry.word))
+            default: throw corrupt
+            }
+        }
+        return WordList(source: raw.source, licence: raw.licence, entries: entries)
     }
 
     func synonyms(_ raw: RawList<RawSynonym>, _ key: WordListKey) throws(TailoringModelError) -> WordList<SynonymGroup> {

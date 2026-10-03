@@ -82,6 +82,9 @@ struct EnglishWordListsTests {
         rows[.letterSalaryExpectationAsks] = row(lists.letter.salaryExpectationAsks)
         rows[.letterStartDateAsks] = row(lists.letter.startDateAsks)
         rows[.letterStatedTermWords] = row(lists.letter.statedTermWords)
+        rows[.letterFormsOfAddress] = row(lists.letter.formsOfAddress)
+        rows[.letterAcademicTitles] = row(lists.letter.academicTitles)
+        rows[.letterNotGivenNames] = row(lists.letter.notGivenNames)
         rows[.fieldsTechnologies] = row(lists.technologies)
         return rows
     }
@@ -140,6 +143,9 @@ struct EnglishWordListsTests {
         counts[.letterSalaryExpectationAsks] = 6  // core/Tailor.js ASKS.salaryExpectation, expanded
         counts[.letterStartDateAsks] = 13  // ASKS.startDate, expanded
         counts[.letterStatedTermWords] = 4  // ASKS: the lookahead's English words, is, of, range, applies
+        counts[.letterFormsOfAddress] = 3  // core/ProvenanceCheck.js letterFailures, recipient.form: ms and mrs for ms, mr for mr; frau and herr are German
+        counts[.letterAcademicTitles] = 2  // the titles between a form and a name: dr, prof
+        counts[.letterNotGivenNames] = 6  // the words that are no given name: ms, mrs, miss, mr, and, or; frau, herr, und, oder and sowie are German
         counts[.fieldsTechnologies] = 49  // domain/TechnologyLexicon.js TECHNOLOGIES
         return counts
     }()
@@ -243,6 +249,16 @@ struct EnglishWordListsTests {
         values.append(contentsOf: ["Espresso"])
         return values
     }()
+
+    @Test("the words of the form of address check are cv-giovanni's")
+    func formsOfAddress() throws {
+        let letter = try english().letter
+        #expect(letter.formsOfAddress.entries == [
+            FormOfAddressWord(form: .ms, word: "ms"), FormOfAddressWord(form: .ms, word: "mrs"), FormOfAddressWord(form: .mr, word: "mr"),
+        ])
+        #expect(letter.academicTitles.entries == ["dr", "prof"])
+        #expect(letter.notGivenNames.entries == ["ms", "mrs", "miss", "mr", "and", "or"])
+    }
 
     @Test("a technology that is also an ordinary word stays out, as the source's lexicon explains", arguments: ordinaryWordsStayOutCases)
     func ordinaryWordsStayOut(name: String) throws {

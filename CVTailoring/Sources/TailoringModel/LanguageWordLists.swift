@@ -20,6 +20,12 @@ public struct NumberWord: Hashable, Sendable {
     public let value: Int
 }
 
+/// A word with which a letter writes a form of address, and the form it writes: "mrs" is a way to write `ms`.
+public struct FormOfAddressWord: Hashable, Sendable {
+    public let form: FormOfAddress
+    public let word: String
+}
+
 /// Forms that mean the same thing, as a term and its other spellings: "ci/cd" and "continuous integration".
 public struct SynonymGroup: Hashable, Sendable {
     public let forms: [String]
@@ -115,6 +121,12 @@ public struct LetterWords: Hashable, Sendable {
     public let startDateAsks: WordList<String>
     /// Words right after an ask that show the advert states its own term and asks nothing: "is", "of".
     public let statedTermWords: WordList<String>
+    /// The words that write a form of address before a contact's name: "ms" and "mrs" for `ms`, "mr" for `mr`.
+    public let formsOfAddress: WordList<FormOfAddressWord>
+    /// The titles that may stand between a form of address and a name: "dr", "prof".
+    public let academicTitles: WordList<String>
+    /// The words that are no given name before a surname: another form of address, or a conjunction ("and", "or").
+    public let notGivenNames: WordList<String>
 }
 
 /// Every word list of one language (ADR 0013), validated when it was read (R8). Only the decoder makes one, so a value
