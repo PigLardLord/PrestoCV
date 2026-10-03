@@ -44,7 +44,7 @@
 | `PrestoCVServer` | executable and composition root | The roles, the profiles and the configuration |
 
 - **Invariants.** They hold whatever targets are added:
-  - `ServerApplication` imports no external package and no adapter.
+  - `ServerApplication` imports no third-party package and no adapter.
   - Among the package's production targets, only `ServerHTTP` imports the targets of `PrestoCVAPI`, and it imports them with `internal import`, so the generated types cannot leave it.
   - Among the package's production targets, only the `PrestoCVServer` executable target creates infrastructure.
   - Nothing in the package imports `PrestoCVApp` or `PrestoCVCore`.
@@ -56,7 +56,7 @@
 
 ## Consequences
 
-- **R1 and R4 change.** R4 reads "One composition root per executable". R1 gains a rule for the API's generated types, which only `ServerHTTP` translates and which never leave it. R1 also says the `PrestoCVServer` package is an integration and composition package, as `PrestoCVApp` is, not one of the isolated context packages.
+- **R1, R4 and R10 change.** R4 reads "One composition root per executable". R1 scopes its first bullet to the app, gains a rule for the API's generated types, which only `ServerHTTP` translates and which never leave it, and puts a translation between context packages on the server in a target that modules.md designates. R10 lets the server's use-case tests use the local profile's adapters. R1 also says the `PrestoCVServer` package is an integration and composition package, as `PrestoCVApp` is, not one of the isolated context packages.
 - **[ADR 0007](0007-each-package-owns-its-model.md) and [ADR 0008](0008-single-composition-root.md) stay in force for the app.** This ADR extends them to the server and supersedes neither.
 - **modules.md lists the seven targets.** They are created when the repository has been published (#132), under #158 and the tickets named in the table. Until the targets exist, the checker's `rules.json` declares them not yet implemented.
 - **Costs:**
@@ -70,7 +70,7 @@
     - the allow-list of each target, and `--packages` for the manifest's dependencies;
     - `requiredImportAccess` on `ServerHTTP`, so the targets of `PrestoCVAPI` are imported `internal`;
     - R4's detectors on every server target except the executable: `singleton`, and `infrastructureConstruction` for the types in `infrastructureTypes`, which gains `PostgresClient` and `HTTPClient` when the targets are created;
-    - R2's detectors on `ServerApplication`;
+    - R2's and R11's detectors on `ServerApplication`;
     - the R1, R7, R9, R13 and R14 detectors on every server target;
   - review, until the checker learns it: a static accessor such as `HTTPClient.shared`, which the detectors do not see today. Review also holds the API mappers in `ServerHTTP` deterministic, with their tests, because R2 cannot run on an adapter that creates request identifiers;
   - the contract suites of #157;

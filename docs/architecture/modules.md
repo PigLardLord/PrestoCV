@@ -376,7 +376,7 @@ PrestoCVServer (executable) ─┬─▶ ServerHTTP ─┬─▶ ServerApplicati
                          ├─▶ ServerInference ─▶ ServerApplication, Tailoring, TailoringModel
                          ├─▶ ServerStorePostgres ─▶ ServerApplication, TailoringModel
                          ├─▶ ServerQueueCloudTasks, ServerLocalProfile ─▶ ServerApplication
-                         └─▶ Tailoring
+                         └─▶ ServerApplication, Tailoring
 
 Forbidden: any edge between PrestoCVCore, CVPDFExporter, CVGeneratorAI and CVTailoring.
 Forbidden: any edge from a domain, application or port target to an adapter target.
