@@ -27,7 +27,7 @@ public enum TailoringModelError: Error, Hashable, Sendable {
     case invalidPeriod
 
     /// The text fields of the model, by what they hold, not by which type holds them.
-    public enum Field: Hashable, Sendable {
+    public enum Field: CaseIterable, Hashable, Sendable {
         case fullName, professionalTitle, email, phone, location, website
         case skillName, languageName, platform, link
         case degree, school, certificationName, issuer, description

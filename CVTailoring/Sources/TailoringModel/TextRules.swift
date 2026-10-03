@@ -1,6 +1,7 @@
 /// The rule on the characters that hide what a text says, in the one place that holds it. Every initialiser of the
-/// model refuses a text that breaks it (`TailoringModelError.hiddenCharacter`), and a decoder or a request mapper that
-/// reads text before it reaches the model calls this same copy.
+/// model refuses a text that breaks it (`TailoringModelError.hiddenCharacter`). A decoder or a request mapper that
+/// reads text before it reaches the model calls this same copy: `hiddenCharacter` to check, `removingHidden` to clean,
+/// each with the multi-line or one-line classification of a field (`Field.isMultiLine`), so it keeps no second table.
 ///
 /// A character is hidden when it is:
 /// - a control character (general category Cc), except, in a multi-line text, `\n`, `\r` (so `\r\n` too) and tab;
@@ -25,16 +26,49 @@
 public enum TextRules {
     /// Whether `text` holds a hidden character. A multi-line text may hold `\n`, `\r` and tab; a single-line one none.
     public static func hiddenCharacter(in text: String, multiLine: Bool) -> Bool {
-        for scalar in text.unicodeScalars {
-            switch scalar.value {
-            case 0x202A...0x202E, 0x2066...0x2069, 0x200E, 0x200F, 0x061C, 0xE0000...0xE007F:
-                return true
-            default:
-                guard scalar.properties.generalCategory == .control else { continue }
-                if multiLine && (scalar == "\n" || scalar == "\r" || scalar == "\t") { continue }
-                return true
-            }
+        text.unicodeScalars.contains { isHidden($0, multiLine: multiLine) }
+    }
+
+    /// Whether `text`, written in `field`, holds a hidden character: the same rule, with the field's own
+    /// classification (`Field.isMultiLine`). A line break in a one-line field counts as hidden here; the model
+    /// reports it as `notOneLine`.
+    public static func hiddenCharacter(in text: String, field: TailoringModelError.Field) -> Bool {
+        hiddenCharacter(in: text, multiLine: field.isMultiLine)
+    }
+
+    /// `text` without the characters `hiddenCharacter(in:multiLine:)` refuses, for a caller that cleans what it reads
+    /// before it reaches the model. It keeps the joiners and everything else that is not hidden, and in a multi-line
+    /// text the `\n`, `\r` and tab that it keeps. In a one-line text it does not touch a line break of any kind:
+    /// whether a break is an error is for the caller to decide, and the model reports it as `notOneLine`.
+    public static func removingHidden(from text: String, multiLine: Bool) -> String {
+        var kept = String.UnicodeScalarView()
+        for scalar in text.unicodeScalars where !isHidden(scalar, multiLine: multiLine) || (!multiLine && isBreak(scalar)) {
+            kept.append(scalar)
         }
-        return false
+        return String(kept)
+    }
+
+    /// `removingHidden(from:multiLine:)` with the classification of `field`.
+    public static func removingHidden(from text: String, field: TailoringModelError.Field) -> String {
+        removingHidden(from: text, multiLine: field.isMultiLine)
+    }
+
+    private static func isHidden(_ scalar: Unicode.Scalar, multiLine: Bool) -> Bool {
+        switch scalar.value {
+        case 0x202A...0x202E, 0x2066...0x2069, 0x200E, 0x200F, 0x061C, 0xE0000...0xE007F:
+            return true
+        default:
+            guard scalar.properties.generalCategory == .control else { return false }
+            return !(multiLine && (scalar == "\n" || scalar == "\r" || scalar == "\t"))
+        }
+    }
+
+    /// A scalar of the set `Character.isNewline` reads: line feed, vertical tab, form feed, carriage return, NEL, and
+    /// the line and paragraph separators.
+    private static func isBreak(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.value {
+        case 0x000A...0x000D, 0x0085, 0x2028, 0x2029: true
+        default: false
+        }
     }
 }

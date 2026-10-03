@@ -233,13 +233,20 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 | body paragraphs of a letter, attachments of a letter | 20 each |
 | address lines | 6 |
 
-- **Hidden characters**, one rule in `TextRules.hiddenCharacter(in:multiLine:)`, which every initialiser applies with `hiddenCharacter`. It is public, so that the decoder (#152) and the server's request mapper call the same copy. A text is refused when it holds:
+- **Hidden characters**, one rule in `TextRules`, which every initialiser applies with `hiddenCharacter`. It is public, so that the decoder (#152) and the server's request mapper call the same copy and keep no second classification:
+  - `hiddenCharacter(in:multiLine:)` and `hiddenCharacter(in:field:)` say whether a text holds one;
+  - `removingHidden(from:multiLine:)` and `removingHidden(from:field:)` remove exactly what the rule refuses, for intake that cleans what it reads. In a one-line text they never touch a line break: whether a break is an error is for the caller to decide, and the model reports it as `notOneLine`;
+  - `Field.isMultiLine` is the classification of a field, public for the same reason.
+
+  A text is refused when it holds:
   - a control character (general category Cc), except `\n`, `\r` (so `\r\n`) and tab in a multi-line text;
   - a bidirectional embedding or override (U+202A to U+202E), or an isolate (U+2066 to U+2069), which make "12" read as "21";
   - a bidirectional mark: the left-to-right and right-to-left marks (U+200E, U+200F) and the Arabic letter mark (U+061C). Before figures they reverse the display: "1040 → 5308" reads as "5308 → 1040", and "-5%" as "5%-";
   - a tag character (U+E0000 to U+E007F).
 
-  The joiners (ZWJ, ZWNJ), the zero-width space, the byte order mark and the word joiner stay allowed, since scripts and emoji need them. The multi-line texts are an experience's description (checked before it is split), the descriptions of education and certifications, the summary, the advert and the letter note, which a person may write over several lines. Every other text is one line.
+  The joiners (ZWJ, ZWNJ), the zero-width space, the byte order mark and the word joiner stay allowed, since scripts and emoji need them.
+
+  The multi-line fields are an experience's description (checked before it is split), the descriptions of education and certifications, the summary, the advert and the letter note, which a person may write over several lines. Every other text is one line.
   - A one-line text refuses a line break of any kind (`Character.isNewline`: `\n`, `\r`, vertical tab, form feed, NEL, U+2028, U+2029) as `notOneLine`, before the hidden check.
   - A multi-line text keeps `\n`, `\r`, tab and the separators U+2028 and U+2029; NEL, vertical tab and form feed are hidden in it.
   - A statement is a line of a description: it allows a tab, and refuses its line breaks as `notOneLine`.

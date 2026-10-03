@@ -151,6 +151,136 @@ struct TextRulesTests {
     }
 }
 
+@Suite("ADR 0013 / R8 · characters that hide what a text says: removing them at intake")
+struct RemovingHiddenTests {
+    static let mixedTexts: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["", "plain", "Revenue: \u{200F}1040 \u{2192} 5308\u{202E}x\u{E0041}", "a\u{0007}b\u{FEFF}c\u{200D}d\u{061C}-5%"])
+        values.append(contentsOf: ["\u{0000}\u{001B}\u{007F}\u{0080}\u{009F}", HiddenSamples.always.joined(), HiddenSamples.always.joined(separator: "x")])
+        values.append(contentsOf: [HiddenSamples.always.joined(separator: "\u{200D}") + HiddenSamples.allowed.joined()])
+        values.append(contentsOf: ["a\tb\r\nc\u{2028}d\u{0085}e\u{000B}f\u{000C}g\nh\ri", "\u{202E}12\u{202C}\n\u{2066}34\u{2069}\t"])
+        return values
+    }()
+
+    private func filtered(_ text: String, multiLine: Bool) -> String {
+        var kept = String.UnicodeScalarView()
+        for scalar in text.unicodeScalars {
+            let isBreak = Character(scalar).isNewline
+            if !TextRules.hiddenCharacter(in: String(scalar), multiLine: multiLine) || (!multiLine && isBreak) { kept.append(scalar) }
+        }
+        return String(kept)
+    }
+
+    @Test("removing takes out exactly what the rule refuses, but the breaks of a one-line text", arguments: mixedTexts, [false, true])
+    func removesExactlyWhatIsRefused(text: String, multiLine: Bool) {
+        #expect(TextRules.removingHidden(from: text, multiLine: multiLine) == filtered(text, multiLine: multiLine))
+    }
+
+    @Test("a text with its hidden characters removed is clean", arguments: mixedTexts)
+    func removedThenChecked(text: String) {
+        let multiLine = TextRules.removingHidden(from: text, multiLine: true)
+        #expect(!TextRules.hiddenCharacter(in: multiLine, multiLine: true))
+        let oneLine = TextRules.removingHidden(from: text, multiLine: false)
+        let withoutBreaks = String(String.UnicodeScalarView(oneLine.unicodeScalars.filter { !Character($0).isNewline }))
+        #expect(!TextRules.hiddenCharacter(in: withoutBreaks, multiLine: false))
+    }
+
+    @Test("a text with no break in it is clean once its hidden characters are removed, in either mode", arguments: HiddenSamples.always, [false, true])
+    func removedThenCheckedWithoutBreaks(character: String, multiLine: Bool) {
+        let removed = TextRules.removingHidden(from: "a\(character)b\(character)", multiLine: multiLine)
+        #expect(removed == "ab")
+        #expect(!TextRules.hiddenCharacter(in: removed, multiLine: multiLine))
+    }
+
+    @Test("removing twice is removing once", arguments: mixedTexts, [false, true])
+    func idempotent(text: String, multiLine: Bool) {
+        let once = TextRules.removingHidden(from: text, multiLine: multiLine)
+        #expect(TextRules.removingHidden(from: once, multiLine: multiLine) == once)
+    }
+
+    @Test("it removes each class", arguments: HiddenSamples.always, [false, true])
+    func eachClass(character: String, multiLine: Bool) {
+        #expect(TextRules.removingHidden(from: "a" + character + "b", multiLine: multiLine) == "ab")
+        #expect(TextRules.removingHidden(from: character, multiLine: multiLine).isEmpty)
+    }
+
+    @Test("it keeps the joiners and the other invisible characters that are allowed", arguments: HiddenSamples.allowed, [false, true])
+    func keepsAllowed(character: String, multiLine: Bool) {
+        #expect(TextRules.removingHidden(from: "a" + character + "b", multiLine: multiLine) == "a" + character + "b")
+    }
+
+    @Test("it keeps the emoji sequence that a joiner makes")
+    func keepsJoinedEmoji() {
+        let text = "\u{1F469}\u{200D}\u{1F4BB} and a\u{200C}b"
+        #expect(TextRules.removingHidden(from: text, multiLine: false) == text)
+        #expect(TextRules.removingHidden(from: text, multiLine: true) == text)
+    }
+
+    @Test("in a multi-line text it keeps line feed, carriage return, tab and the separators", arguments: HiddenSamples.allowedInMultiLine, HiddenSamples.separators)
+    func keepsMultiLineBreaks(allowed: String, separator: String) {
+        let text = "a" + allowed + "b" + separator + "c"
+        #expect(TextRules.removingHidden(from: text, multiLine: true) == text)
+    }
+
+    @Test("in a multi-line text it removes NEL, vertical tab and form feed", arguments: HiddenSamples.otherBreaks)
+    func removesOtherBreaksInMultiLine(character: String) {
+        #expect(TextRules.removingHidden(from: "a" + character + "b", multiLine: true) == "ab")
+    }
+
+    @Test("in a one-line text it leaves every break for the caller to decide", arguments: HiddenSamples.breaks)
+    func leavesBreaksInOneLine(character: String) {
+        let text = "a" + character + "b"
+        #expect(TextRules.removingHidden(from: text, multiLine: false) == text)
+    }
+
+    @Test("in a one-line text it removes a tab, which is not a break")
+    func removesTabInOneLine() {
+        #expect(TextRules.removingHidden(from: "a\tb", multiLine: false) == "ab")
+        #expect(TextRules.removingHidden(from: "a\tb\nc\u{202E}", multiLine: false) == "ab\nc")
+    }
+
+    @Test("what is left after removing is accepted by the model, or refused only for its breaks")
+    func acceptedAfterRemoving() throws {
+        let skill = TextRules.removingHidden(from: "Swift\u{202E}\u{200F}\u{0007}", field: .skillName)
+        #expect(try SourceSkill(name: skill).name == "Swift")
+        let summary = TextRules.removingHidden(from: "Line one\u{0085}\nLine\u{061C} two", field: .summary)
+        #expect(try SourceCV(language: .english, personal: Sample.personal(), summary: summary).summary == "Line one\nLine two")
+        let role = TextRules.removingHidden(from: "Engineer\u{2028}Manager\u{202E}", field: .role)
+        #expect(role == "Engineer\u{2028}Manager")
+        #expect(throws: TailoringModelError.notOneLine(.role)) { try SourceExperience(role: role, company: "Acme") }
+    }
+}
+
+@Suite("ADR 0013 / R8 · characters that hide what a text says: by field")
+struct TextRulesByFieldTests {
+    static let multiLineFieldSet: Set<TailoringModelError.Field> = [.description, .summary, .advert, .note, .statement]
+
+    @Test("the multi-line fields are the ones the model documents, and no other")
+    func classification() {
+        #expect(Set(TailoringModelError.Field.allCases.filter(\.isMultiLine)) == Self.multiLineFieldSet)
+        #expect(TailoringModelError.Field.allCases.filter { !$0.isMultiLine }.count == TailoringModelError.Field.allCases.count - 5)
+    }
+
+    @Test("the field overloads agree with the flags", arguments: TailoringModelError.Field.allCases)
+    func overloads(field: TailoringModelError.Field) {
+        let text = "a\tb\u{202E}c\nd"
+        #expect(TextRules.hiddenCharacter(in: text, field: field) == TextRules.hiddenCharacter(in: text, multiLine: field.isMultiLine))
+        #expect(TextRules.removingHidden(from: text, field: field) == TextRules.removingHidden(from: text, multiLine: field.isMultiLine))
+        #expect(TextRules.hiddenCharacter(in: "a\tb", field: field) == !field.isMultiLine)
+        #expect(TextRules.removingHidden(from: "a\tb\u{202E}c", field: field) == (field.isMultiLine ? "a\tbc" : "abc"))
+    }
+
+    @Test("every field the model checks is classified as the model checks it", arguments: HiddenSamples.allFields)
+    func agreesWithTheModel(field: TextFieldCase) {
+        // A tab is hidden in a one-line field and allowed in a multi-line one: the overload says what the model does.
+        let classified = TextRules.hiddenCharacter(in: "a\tb", field: field.field)
+        let refused: Bool = {
+            do { try field.build("a\tb"); return false } catch { return true }
+        }()
+        #expect(classified == refused)
+    }
+}
+
 @Suite("ADR 0013 / R8 · characters that hide what a text says: in every field of the model")
 struct HiddenCharacterFieldTests {
     @Test("a hidden character is refused in every text a field accepts, wherever the field is", arguments: HiddenSamples.allFields, HiddenSamples.always)
