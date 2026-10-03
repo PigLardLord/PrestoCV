@@ -18,7 +18,7 @@ The checker applies to **production targets**: domain, application, integration,
 
 ## R1. Packages are isolated; contexts depend only along documented edges
 
-- **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI` never import one another. Translation between them happens only in `PrestoCVIntegration`.
+- **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter`, `CVGeneratorAI` and `CVTailoring` never import one another. Translation between them happens only in `PrestoCVIntegration`.
 - **Inside a package, contexts depend only along the edges listed in [modules.md](modules.md).** There is exactly one such edge today: in `CVPDFExporter`, Document Rendering is downstream of Design Catalog (`CVRendering` imports `CVDesignCatalog`). The reverse is forbidden.
 - **Any other edge** between contexts needs an ADR and an update to [modules.md](modules.md).
 - **`@_exported import` is banned.** It would re-export a module to every importer.

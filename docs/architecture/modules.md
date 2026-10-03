@@ -178,6 +178,42 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 ---
 
+## Package `CVTailoring` — CV Tailoring
+
+Standalone, like `CVPDFExporter`. It depends on no PrestoCV package ([ADR 0013](adr/0013-cv-tailoring-context.md)): the app and the server each map their own types into its model. The targets are empty until the tickets named below fill them.
+
+| Target | Layer | Platforms | May import |
+|---|---|---|---|
+| `TailoringModel` | domain | iOS, macOS, Linux ✓ | Foundation |
+| `AdvertAnalysis` | domain | iOS, macOS, Linux ✓ | `TailoringModel`, Foundation |
+| `ContentChecks` | domain | iOS, macOS, Linux ✓ | `TailoringModel`, Foundation |
+| `Provenance` | domain | iOS, macOS, Linux ✓ | `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, Foundation |
+| `Tailoring` | application | iOS, macOS, Linux ✓ | `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, `Provenance`, Foundation |
+
+**`TailoringModel`** (#135, #136)
+- The snapshot types: the source CV, its statements and the typed references to them, the tailored CV, the cover letter and its defaults, the advert, the six languages, the report and the questions.
+- The per-language word lists, one resource file per language, read through `Bundle.module`.
+
+**`AdvertAnalysis`** (#138)
+- What an advert asks for, and where the source CV evidences it.
+- Language detection.
+
+**`ContentChecks`** (#139)
+- Spans that stay true, and figures as the CV writes them.
+
+**`Provenance`** (#140, #141)
+- The gate for the tailored CV and for the cover letter.
+- Typed errors per check, with codes. Their wording is produced at the edges (R7, R13).
+
+**`Tailoring`** (#150–#153)
+- The tailoring loop: a failure goes back to the model at most twice, then the tailoring fails with every failure listed.
+- The outbound inference port, owned here (R3). Its adapters live on the server.
+- The prompt, questions and answers.
+
+**Test support.** None yet; `CVTailoringTestSupport` arrives with the first port (#150).
+
+---
+
 ## Package `PrestoCVApp` — App integration and presentation
 
 A local package next to the Xcode project. The compiler holds the app's layers too, and everything except the composition builds and tests on Linux.
@@ -185,7 +221,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
 | `PrestoCVWorkflowPorts` | app ports | iOS, macOS, Linux ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation |
-| `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, Foundation |
+| `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, `Provenance`, `Tailoring`, Foundation |
 | `PrestoCVPresentation` | inbound adapter | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain` (both `internal import`), Observation, Foundation |
 | `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels` |
 
@@ -200,6 +236,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - `BrowseDesigns`;
   - `DraftCVWithAI`: availability, then draft, then an unsaved CV plus its gaps.
 - **Mappers:** `CV → CVDocument` and `CVDraft → CV`. They are exhaustive and deterministic, with typed dates. The draft mapper uses `Period.make` and reports every gap.
+  - `CV → SourceCV` (planned, #188).
 
 **`PrestoCVPresentation`**
 - `@Observable @MainActor` view models whose public API holds presentation types only: status enums, and no domain types.
@@ -243,12 +280,13 @@ PrestoCV (app) ─▶ PrestoCVPresentation ─▶ PrestoCVWorkflowPorts ─▶ P
      │                                     ▲
      │                     PrestoCVIntegration ┴─▶ CVRendering ─┬─▶ CVDocumentModel
      │                                    │                └─▶ CVDesignCatalog
-     │                                    └─▶ CVDrafting
+     │                                    ├─▶ CVDrafting
+     │                                    └─▶ TailoringModel, AdvertAnalysis, ContentChecks, Provenance, Tailoring
      └────▶ PrestoCVComposition ─▶ (all of the above) + PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns,
                                 CVRenderingWebKitSupport, CVRenderingIOS | CVRenderingMacOS,
                                 CVRenderingPDFKitInspector, CVDraftingFoundationModels
 
-Forbidden: any edge between PrestoCVCore, CVPDFExporter and CVGeneratorAI.
+Forbidden: any edge between PrestoCVCore, CVPDFExporter, CVGeneratorAI and CVTailoring.
 Forbidden: any edge from a domain, application or port target to an adapter target.
 Forbidden: PrestoCVPresentation → PrestoCVIntegration.
 ```

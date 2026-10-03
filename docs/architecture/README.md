@@ -20,27 +20,28 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 | **Design Catalog** | supporting | Design packages (`.mcvt`), their validation, installation, versions and listing | `CVPDFExporter` |
 | **Document Rendering** | generic | Turning a document plus a design into HTML, and HTML into PDF, per platform | `CVPDFExporter` |
 | **AI Drafting** | supporting | Producing a CV draft from a free-text description with the on-device model | `CVGeneratorAI` |
+| **CV Tailoring** | core domain | Tailoring one CV and a cover letter to a job advert, and holding the result to its source: advert analysis, content checks, the provenance gate, the tailoring loop | `CVTailoring` |
 | **App** | integration and presentation | Cross-context workflows, the mappers between contexts, view models, views, the composition root | `PrestoCVApp` package + Xcode app target |
 
-CV optimisation will come later from external APIs, as a separate context. AI tailoring and JSON Resume are removed ([ADR 0005](adr/0005-remove-ai-tailoring-and-json-resume.md)).
+CV Tailoring is the context [ADR 0005](adr/0005-remove-ai-tailoring-and-json-resume.md) reserved ([ADR 0013](adr/0013-cv-tailoring-context.md)). It runs in the app and on the server. JSON Resume stays removed (ADR 0005).
 
 ## Context map
 
 ```
-                          ┌──────────────────────────── App ────────────────────────────┐
-                          │ Views ──▶ ViewModels ──▶ Workflows + Mappers ◀── Composition │
-                          └───────┬───────────────────┬──────────────────────┬──────────┘
-            conformist to its     │                   │                      │
-            published language    ▼                   ▼                      ▼
-                          ┌───────────────┐  ┌──────────────────────────┐  ┌──────────────┐
-                          │ CV Authoring  │  │ Design Catalog           │  │ AI Drafting  │
-                          │ (PrestoCVCore)    │  │ Document Rendering       │  │ (CVGenerator │
-                          │               │  │ (CVPDFExporter)          │  │  AI)         │
-                          └───────────────┘  └──────────────────────────┘  └──────────────┘
-                              no arrows between the three packages
+                          ┌───────────────────────────────────── App ──────────────────────────────────────┐
+                          │          Views ──▶ ViewModels ──▶ Workflows + Mappers ◀── Composition          │
+                          └───────┬───────────────────┬──────────────────────┬───────────────────────┬─────┘
+            conformist to its     │                   │                      │                       │
+            published language    ▼                   ▼                      ▼                       ▼
+                          ┌───────────────┐  ┌──────────────────────────┐  ┌──────────────┐  ┌───────────────┐
+                          │ CV Authoring  │  │ Design Catalog           │  │ AI Drafting  │  │ CV Tailoring  │
+                          │ (PrestoCVCore)    │  │ Document Rendering       │  │ (CVGenerator │  │ (CVTailoring) │
+                          │               │  │ (CVPDFExporter)          │  │  AI)         │  │               │
+                          └───────────────┘  └──────────────────────────┘  └──────────────┘  └───────────────┘
+                              no arrows between the four packages
 ```
 
-- The three domain packages **never import each other**. Each publishes its own model: `CV` in Authoring, `CVDocument` in Rendering, `CVDraft` in Drafting.
+- The four domain packages **never import each other**. Each publishes its own model: `CV` in Authoring, `CVDocument` in Rendering, `CVDraft` in Drafting, `SourceCV` and `TailoredCV` in Tailoring.
 - Inside `CVPDFExporter`, Document Rendering is downstream of Design Catalog: it consumes validated stylesheets and palettes. That is the only edge between contexts inside a package, and it goes one way ([R1](rules.md#r1-packages-are-isolated-contexts-depend-only-along-documented-edges)).
 - All translation between contexts happens in one place: the app's integration layer (`PrestoCVIntegration`). Each mapper is exhaustive and tested ([ADR 0007](adr/0007-each-package-owns-its-model.md)).
 - `CVPDFExporter` is reusable outside the app, including on a Linux backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)).
@@ -56,7 +57,8 @@ Xcode app target "PrestoCV" (iOS 26, macOS 26) — SwiftUI views, design system,
 PrestoCVApp package                    │
   PrestoCVIntegration ─────────────────┼──▶ PrestoCVWorkflowPorts, PrestoCVApplication, PrestoCVDomain
                                    ├──▶ CVDocumentModel, CVDesignCatalog, CVRendering
-                                   └──▶ CVDrafting
+                                   ├──▶ CVDrafting
+                                   └──▶ TailoringModel, AdvertAnalysis, ContentChecks, Provenance, Tailoring
   PrestoCVComposition ──▶ PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns,
                       CVRenderingWebKitSupport, CVRenderingIOS (iOS) / CVRenderingMacOS (macOS),
                       CVRenderingPDFKitInspector, CVDraftingFoundationModels
@@ -66,6 +68,7 @@ CVPDFExporter package   CVDocumentModel ◀── CVRendering ──▶ CVDesign
                         CVRendering ◀── CVRenderingWebKitSupport ◀── CVRenderingIOS / CVRenderingMacOS
                         CVRendering ◀── CVRenderingPDFKitInspector
 CVGeneratorAI package   CVDrafting ◀── CVDraftingFoundationModels
+CVTailoring package     TailoringModel ◀── AdvertAnalysis, ContentChecks ◀── Provenance ◀── Tailoring
 ```
 
 Arrows point from the importer to the imported module. The authoritative list is [modules.md](modules.md).
@@ -91,7 +94,7 @@ Dependencies point inwards only. The domain knows nothing about storage, UI, loc
 
 | Module group | iOS | macOS | Linux |
 |---|---|---|---|
-| Domain, application, persistence, design catalog, rendering core, drafting core, integration, presentation | ✓ | ✓ | ✓ must build and test |
+| Domain, application, persistence, design catalog, rendering core, drafting core, tailoring, integration, presentation | ✓ | ✓ | ✓ must build and test |
 | `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector` | ✓ | ✓ | |
 | `CVRenderingIOS` | ✓ | | |
 | `CVRenderingMacOS` | | ✓ | |
