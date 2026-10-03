@@ -57,10 +57,9 @@ public struct Statement: Hashable, Sendable {
     }
 
     private static let bullets: Set<Character> = {
-        var set: Set<Character> = []
-        set.formUnion(["\u{2022}", "\u{25E6}", "\u{25AA}", "\u{2023}", "\u{00B7}", "-", "*", "\u{2013}", "\u{2014}"])
-        set.formUnion(["\u{25CF}", "\u{25CB}", "\u{25A0}", "\u{27A2}", "\u{27A4}", "\u{2713}", "\u{F0B7}"])
-        return set
+        let common: [Character] = ["\u{2022}", "\u{25E6}", "\u{25AA}", "\u{2023}", "\u{00B7}", "-", "*", "\u{2013}", "\u{2014}"]
+        let wordProcessors: [Character] = ["\u{25CF}", "\u{25CB}", "\u{25A0}", "\u{27A2}", "\u{27A4}", "\u{2713}", "\u{F0B7}"]
+        return Set(common + wordProcessors)
     }()
 
     /// The rule for one line, which the split and `init(writtenLine:)` share: trim, remove one bullet, trim.
