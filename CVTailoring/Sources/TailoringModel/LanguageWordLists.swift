@@ -6,24 +6,32 @@ public struct WordList<Entry: Hashable & Sendable>: Hashable, Sendable {
     /// The SPDX identifier of the licence the entries are under.
     public let licence: String
     public let entries: [Entry]
+
+    package init(source: String, licence: String, entries: [Entry]) { self.source = source; self.licence = licence; self.entries = entries }
 }
 
 /// A month name or abbreviation as a CV writes it, with its month, 1 to 12.
 public struct MonthName: Hashable, Sendable {
     public let name: String
     public let month: Int
+
+    package init(name: String, month: Int) { self.name = name; self.month = month }
 }
 
 /// A number written in words, with its value.
 public struct NumberWord: Hashable, Sendable {
     public let word: String
     public let value: Int
+
+    package init(word: String, value: Int) { self.word = word; self.value = value }
 }
 
 /// A word with which a letter writes a form of address, and the form it writes: "mrs" is a way to write `ms`.
 public struct FormOfAddressWord: Hashable, Sendable {
     public let form: FormOfAddress
     public let word: String
+
+    package init(form: FormOfAddress, word: String) { self.form = form; self.word = word }
 }
 
 /// What a title claims about a person by its words: "Team Lead" and "Teamleiter" claim one rank, "Begleiter" none. The ranks
@@ -36,11 +44,15 @@ public enum TitleRank: String, CaseIterable, Hashable, Sendable {
 public struct RankWord: Hashable, Sendable {
     public let word: String
     public let ranks: [TitleRank]
+
+    package init(word: String, ranks: [TitleRank]) { self.word = word; self.ranks = ranks }
 }
 
 /// Forms that mean the same thing, as a term and its other spellings: "ci/cd" and "continuous integration".
 public struct SynonymGroup: Hashable, Sendable {
     public let forms: [String]
+
+    package init(forms: [String]) { self.forms = forms }
 }
 
 /// Where a language writes the word of a street in an address.
@@ -57,6 +69,8 @@ public enum StreetOrder: String, CaseIterable, Hashable, Sendable {
 public struct StreetWords: Hashable, Sendable {
     public let list: WordList<String>
     public let order: StreetOrder
+
+    package init(list: WordList<String>, order: StreetOrder) { self.list = list; self.order = order }
 }
 
 /// What an advert says that is not about the job, and how it names its sections.
@@ -83,6 +97,34 @@ public struct AdvertWords: Hashable, Sendable {
     public let offerHeadings: WordList<String>
     /// Headings that organise an advert without demanding or offering anything: "tech stack".
     public let structuralHeadings: WordList<String>
+
+    package init(
+        stopwords: WordList<String>,
+        plainWords: WordList<String>,
+        dimensions: WordList<String>,
+        boilerplate: WordList<String>,
+        genderMarkers: WordList<String>,
+        instructions: WordList<String>,
+        streets: StreetWords,
+        names: WordList<String>,
+        synonyms: WordList<SynonymGroup>,
+        requirementHeadings: WordList<String>,
+        offerHeadings: WordList<String>,
+        structuralHeadings: WordList<String>
+    ) {
+        self.stopwords = stopwords
+        self.plainWords = plainWords
+        self.dimensions = dimensions
+        self.boilerplate = boilerplate
+        self.genderMarkers = genderMarkers
+        self.instructions = instructions
+        self.streets = streets
+        self.names = names
+        self.synonyms = synonyms
+        self.requirementHeadings = requirementHeadings
+        self.offerHeadings = offerHeadings
+        self.structuralHeadings = structuralHeadings
+    }
 }
 
 /// The month names of a language, and the words of a period written in text.
@@ -96,11 +138,27 @@ public struct DateWords: Hashable, Sendable {
     public let rangeSeparatorWords: WordList<String>
     /// The units of the length a period may carry after its dates: "years", "mos".
     public let durationUnitWords: WordList<String>
+
+    package init(
+        months: WordList<MonthName>,
+        presentWords: WordList<String>,
+        sinceWords: WordList<String>,
+        rangeSeparatorWords: WordList<String>,
+        durationUnitWords: WordList<String>
+    ) {
+        self.months = months
+        self.presentWords = presentWords
+        self.sinceWords = sinceWords
+        self.rangeSeparatorWords = rangeSeparatorWords
+        self.durationUnitWords = durationUnitWords
+    }
 }
 
 /// The numbers a language writes in words.
 public struct NumberWords: Hashable, Sendable {
     public let words: WordList<NumberWord>
+
+    package init(words: WordList<NumberWord>) { self.words = words }
 }
 
 /// How a language states a span of time: a floor, a count tied to a role.
@@ -115,6 +173,22 @@ public struct SpanWords: Hashable, Sendable {
     public let tiedCounts: WordList<String>
     /// The words that end an employer's name in a tied count, beside a comma, a full stop or a semicolon: "and".
     public let employerEndWords: WordList<String>
+
+    package init(
+        floorLeadIns: WordList<String>,
+        yearWords: WordList<String>,
+        monthWords: WordList<String>,
+        countWords: WordList<NumberWord>,
+        tiedCounts: WordList<String>,
+        employerEndWords: WordList<String>
+    ) {
+        self.floorLeadIns = floorLeadIns
+        self.yearWords = yearWords
+        self.monthWords = monthWords
+        self.countWords = countWords
+        self.tiedCounts = tiedCounts
+        self.employerEndWords = employerEndWords
+    }
 }
 
 /// How a letter greets, closes, and how an advert asks it for a figure.
@@ -143,6 +217,34 @@ public struct LetterWords: Hashable, Sendable {
     public let academicTitles: WordList<String>
     /// The words that are no given name before a surname: another form of address, or a conjunction ("and", "or").
     public let notGivenNames: WordList<String>
+
+    package init(
+        greetings: WordList<String>,
+        salutations: WordList<String>,
+        addressees: WordList<String>,
+        addresseesAtClauseEnd: WordList<String>,
+        addresseeNouns: WordList<String>,
+        valedictions: WordList<String>,
+        salaryExpectationAsks: WordList<String>,
+        startDateAsks: WordList<String>,
+        statedTermWords: WordList<String>,
+        formsOfAddress: WordList<FormOfAddressWord>,
+        academicTitles: WordList<String>,
+        notGivenNames: WordList<String>
+    ) {
+        self.greetings = greetings
+        self.salutations = salutations
+        self.addressees = addressees
+        self.addresseesAtClauseEnd = addresseesAtClauseEnd
+        self.addresseeNouns = addresseeNouns
+        self.valedictions = valedictions
+        self.salaryExpectationAsks = salaryExpectationAsks
+        self.startDateAsks = startDateAsks
+        self.statedTermWords = statedTermWords
+        self.formsOfAddress = formsOfAddress
+        self.academicTitles = academicTitles
+        self.notGivenNames = notGivenNames
+    }
 }
 
 /// What the check of a tailoring against its source reads in a language beyond the lists above.
@@ -155,10 +257,23 @@ public struct ProvenanceWords: Hashable, Sendable {
     public let firstPerson: WordList<String>
     /// The words of a title that claim a rank: a tailored title may claim no rank its source does not.
     public let ranks: WordList<RankWord>
+
+    package init(
+        notPlurals: WordList<String>,
+        legalForms: WordList<String>,
+        firstPerson: WordList<String>,
+        ranks: WordList<RankWord>
+    ) {
+        self.notPlurals = notPlurals
+        self.legalForms = legalForms
+        self.firstPerson = firstPerson
+        self.ranks = ranks
+    }
 }
 
-/// Every word list of one language (ADR 0013), validated when it was read (R8). Only the decoder makes one, so a value
-/// of this type always holds every list, each with its source and its licence.
+/// Every word list of one language (ADR 0013), validated when it was read (R8). Outside the package only the decoder
+/// makes one, so a value that reaches the app holds every list, each with its source and its licence. The `package`
+/// initialisers of the lists let the tests of the package's other targets build small ones without a file.
 public struct LanguageWordLists: Hashable, Sendable {
     public let language: TailoringLanguage
     public let advert: AdvertWords
@@ -170,4 +285,24 @@ public struct LanguageWordLists: Hashable, Sendable {
     /// The names of technologies that are never ordinary words of the language, so a mention is held to the source
     /// however it is written. Read from `fields.technologies`.
     public let technologies: WordList<String>
+
+    package init(
+        language: TailoringLanguage,
+        advert: AdvertWords,
+        dates: DateWords,
+        numbers: NumberWords,
+        spans: SpanWords,
+        letter: LetterWords,
+        provenance: ProvenanceWords,
+        technologies: WordList<String>
+    ) {
+        self.language = language
+        self.advert = advert
+        self.dates = dates
+        self.numbers = numbers
+        self.spans = spans
+        self.letter = letter
+        self.provenance = provenance
+        self.technologies = technologies
+    }
 }
