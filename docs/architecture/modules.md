@@ -194,7 +194,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 
 **`TailoringModel`** (#135, #136)
 - The snapshot types: the source CV, its statements and typed references to them, the advert, the letter defaults, the questions and answers, the tailored CV, the cover letter and the report.
-- The word lists, one file per language, embedded at build time; the supported languages are those with a file (#136).
+- The word lists, one JSON file per language plus an index, read through `Bundle.module`; the supported languages are those with a file (#136).
 
 **`AdvertAnalysis`** (#138, #153)
 - What an advert asks for, and where the source CV evidences it.
@@ -212,7 +212,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 - The loop: a failure goes back to the model at most twice, then the tailoring fails with every failure listed.
 - The outbound inference port, owned here (R3). Its adapters live on the server.
 - The prompt and its schema.
-- Decoding the model's answer through one anti-corruption layer (R8).
+- Decoding the model's reply through one anti-corruption layer (R8).
 
 **Test support.** None yet; `CVTailoringTestSupport` arrives with the first port (#150).
 

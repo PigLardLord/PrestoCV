@@ -18,7 +18,7 @@
   - Like `CVPDFExporter`, it imports no PrestoCV package. In the app, only `PrestoCVIntegration` translates into and out of its model ([ADR 0007](0007-each-package-owns-its-model.md)). The server's targets that import it are set by the server's ADR (#158).
   - It builds and tests on iOS, macOS and Linux.
 - **It owns its model** ([ADR 0007](0007-each-package-owns-its-model.md)): a snapshot of the source CV, the advert, the letter defaults and the user's answers. The app maps its `CV` into it in `PrestoCVIntegration`. The server maps its API types into it.
-- **It refines [ADR 0005](0005-remove-ai-tailoring-and-json-resume.md) without superseding it.** This is the context ADR 0005 reserved. The app reaches a tailoring through a port its own workflow owns, as ADR 0005 says; the adapter behind that port calls the server (#179). The inference port is a different port: `Tailoring` owns it, and only the server uses it (#149, #150). **The loop never runs on the device:** `PrestoCVIntegration` may not import `Tailoring`. The checker refuses that import, in the sources and in the manifest, and the compiler then refuses any use of the loop in the app.
+- **It refines [ADR 0005](0005-remove-ai-tailoring-and-json-resume.md) without superseding it.** This is the context ADR 0005 reserved. The app reaches a tailoring through a port its own workflow owns, as ADR 0005 says; the adapter behind that port calls the server (#179). The inference port is a different port: `Tailoring` owns it, and only the server uses it (#149, #150). **The loop never runs on the device:** no app target may import `Tailoring`. The checker refuses it in `PrestoCVApp`'s sources and manifest, and in the app target's folders once they leave legacy ([ADR 0012](0012-legacy-targets-during-migration.md)).
 - **A tailoring produces a CV and a cover letter.**
 - **The check is a gate, not an audit.**
   - No field lifts it.
@@ -27,7 +27,7 @@
   - The gate's failures are values with codes. The app words them for the user (R13); the prompt in `Tailoring` words them for the model, from the same codes.
 - **The unit of provenance is a line of an experience's description,** called a statement. Each rewritten line names the lines of the same experience it comes from. PrestoCV's CV model does not change.
 - **Any profession.** The checks stay general. Word lists that know a field's names, starting with technologies, are a floor that grows. The check never depends on them.
-- **Six languages in the first version:** English, German, Spanish, French, Italian and Portuguese, each one as data, one file per language. The supported languages are exactly the ones that have a file, so adding a language adds a file. Any other language is a typed error, never a weaker check that reads as a pass. The files are part of `TailoringModel` and embedded at build time: a domain target reads no bundle and no file at run time, and a server image needs no resource bundle beside its binary (#136).
+- **Six languages in the first version:** English, German, Spanish, French, Italian and Portuguese, each one as data, one file per language. The supported languages are exactly the ones that have a file, so adding a language adds a file. Any other language is a typed error, never a weaker check that reads as a pass. The files are resources of `TailoringModel`, one JSON file per language plus an index, read through `Bundle.module` as the rendering's heading tables are (R2, R13). A server image ships the package's resource bundle beside its binary, as it already must for those headings (#136, #162).
 - **No translation in the first version.** A CV is tailored in its own language (#147).
 - **Errors are typed per context** (R7) and carry codes, never text.
 - **Five targets,** with these layers and allowed imports:
@@ -38,7 +38,7 @@
 | `AdvertAnalysis` | domain | what an advert asks for, where the CV evidences it, and its language; the questions asked before a tailoring | `TailoringModel`, Foundation |
 | `ContentChecks` | domain | spans that stay true, and figures as the CV writes them | `TailoringModel`, Foundation |
 | `Provenance` | domain | the gate for the tailored CV and for the cover letter | `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, Foundation |
-| `Tailoring` | application | the loop, its outbound inference port (R3), the prompt, and the decoding of the model's answer | `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, `Provenance`, Foundation |
+| `Tailoring` | application | the loop, its outbound inference port (R3), the prompt, and the decoding of the model's reply | `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, `Provenance`, Foundation |
 
 ## Consequences
 
@@ -51,7 +51,7 @@
   - reading names in German is open until #142, so German is a typed error in the provenance check until then.
 - **Enforced by:**
   - the compiler, through the target graph;
-  - the checker: the allow-lists, the R1, R2, R4, R7, R9, R11, R13 and R14 detectors on the five targets, and the manifest rules, which also keep the loop off the device;
+  - the checker: the allow-lists, applied to the sources and, through `--packages`, to the manifests (R1), which also keep the loop off the device; the R1, R2, R4, R7, R9, R11, R13 and R14 detectors on the five targets; and the language-mode rule on the manifest (R9);
   - the tests that each ticket of #133 adds.
 
 ## Alternatives considered
