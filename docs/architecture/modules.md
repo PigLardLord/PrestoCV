@@ -272,12 +272,12 @@ The targets are created by #158 part 2 and the tickets named below. Until then t
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
 | `ServerApplication` | application | Linux ✓, macOS | `TailoringModel`, `Tailoring`, Foundation |
-| `ServerInference` | outbound adapter | Linux ✓, macOS | `Tailoring`, `TailoringModel`, `AsyncHTTPClient`, Foundation |
-| `ServerStorePostgres` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `PostgresNIO`, Foundation |
+| `ServerInference` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `Tailoring`, `TailoringModel`, `AsyncHTTPClient`, Foundation |
+| `ServerStorePostgres` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `TailoringModel`, `PostgresNIO`, Foundation |
 | `ServerQueueCloudTasks` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `AsyncHTTPClient`, Foundation |
 | `ServerLocalProfile` | outbound adapter | Linux ✓, macOS | `ServerApplication`, Foundation |
-| `ServerHTTP` | inbound adapter | Linux ✓, macOS | `ServerApplication`, `TailoringModel`, `PrestoCVAPITypes`, `PrestoCVAPIServer`, `Hummingbird`, `OpenAPIRuntime`, Foundation |
-| `PrestoCVServer` | executable and composition root | Linux ✓, macOS | `ServerApplication`, `ServerInference`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `Hummingbird`, `Logging`, `ServiceLifecycle`, Foundation |
+| `ServerHTTP` | inbound adapter | Linux ✓, macOS | `ServerApplication`, `TailoringModel`, `PrestoCVAPITypes`, `PrestoCVAPIServer` (both `internal import`), `Hummingbird`, `OpenAPIRuntime`, `OpenAPIHummingbird`, Foundation |
+| `PrestoCVServer` | executable and composition root | Linux ✓, macOS | `ServerApplication`, `ServerInference`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `Tailoring`, `Hummingbird`, `ArgumentParser`, `Logging`, `ServiceLifecycle`, Foundation |
 
 **`ServerApplication`** (#157)
 - **Use cases:** start a tailoring, run it, get it and delete it.
@@ -285,17 +285,17 @@ The targets are created by #158 part 2 and the tickets named below. Until then t
   - Run is the `work` role's use case: it loads the job, runs the loop of `Tailoring`, and stores the result or the failure.
   - Get returns the job to its owner only. Delete erases it.
 - **The job lifecycle:** queued, running, succeeded, failed, expired. A job is erased once the app has confirmed its result, and 24 hours after it ends at the latest (#166).
-- **Ports it owns (R3):** the job store, the job queue, the quota, the clock and the log events.
+- **Ports it owns (R3):** the job store, the job queue, the quota, the clock, an identifier generator (R2), a notifier (#180), the log events, and the deployment's data policy (#155).
 - **Log events** are typed and never carry a CV, a prompt or a key (#167). The adapters and the executable bridge the port to swift-log.
 - **Typed errors** (R7). It imports no external package.
 
 **`ServerInference`** (#154, #155)
 - The adapters behind the inference port that `Tailoring` owns: the first one speaks the chat-completions API that most providers and local model servers share, with a dialect for each endpoint.
-- The provider registry and the deployment's data policy, read from configuration.
+- The provider registry and the deployment's data policy, read from configuration. It implements the data-policy port of `ServerApplication`, so `GET /v1/policy` (#155) reaches the policy. #149 may refine this.
 - It never logs a prompt, an answer or a key.
 
 **`ServerStorePostgres`** (#160)
-- The job store and the quota store on Postgres, through PostgresNIO.
+- The job store and the quota store on Postgres, through PostgresNIO. Its rows are DTOs of its own, built from the types of `TailoringModel` (R12).
 - The versioned SQL migrations (R12). Only the binary's `migrate` command applies them, never `serve` or `work`.
 
 **`ServerQueueCloudTasks`** (#161)
@@ -308,12 +308,13 @@ The targets are created by #158 part 2 and the tickets named below. Until then t
 
 **`ServerHTTP`** (#175, #178)
 - The inbound adapter: the Hummingbird routes, the middleware, and the handlers that implement the generated API.
-- It maps the generated types to the use cases and back. The generated types never leave it.
+- It maps the generated types to the use cases and back. The generated types never leave it: it imports `PrestoCVAPITypes` and `PrestoCVAPIServer` with `internal import`, so none can appear in its public API.
+- It serves the API on Hummingbird through `OpenAPIHummingbird`.
 - **The worker's route.** The route the queue calls to run a job lives here too. It is mounted only in the `work` role, and it is not part of the public API (`openapi.yaml`). The platform admits only the queue's identity before any code runs (#161).
 - `PrestoCVAPITypes` and `PrestoCVAPIServer` are targets of the `PrestoCVAPI` package, which #175 and #177 add to this file.
 
 **`PrestoCVServer`**
-- The executable and the server's composition root (R4). It reads the configuration, picks the profile's adapters, and creates the infrastructure: the database pool, the queue client, the inference providers' clients, the clock, the identifier generators and the logger.
+- The executable and the server's composition root (R4). It reads the command line with ArgumentParser and the configuration, picks the profile's adapters, wires them behind the ports of `ServerApplication` and of `Tailoring`, and creates the infrastructure: the database pool, the queue client, the inference providers' clients, the clock, the identifier generators and the logger.
 - It starts as `serve`, as `work`, or, in the local profile, as both. It composes the router per role.
 - It answers `GET /health` and shuts down cleanly on SIGTERM: the job in hand is finished or released back to the queue.
 
