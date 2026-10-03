@@ -301,7 +301,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
     - then every job that ended at least 24 hours minus the schedule's interval ago, so that no job outlives its 24 hours, whether it succeeded, failed or expired;
     - a device unused for 90 days;
     - the expired challenges (#170) and counts of hashed addresses (#172).
-  - A `DELETE` during a run erases the job, and the worker's later write finds no row and does not bring it back. Erase does no harm run twice.
+  - A `DELETE` during a run erases the job, and the worker's later write finds no row and does not bring it back. A worker neither runs nor writes a job that has ended. Erase does no harm run twice.
 - **The job lifecycle:** queued, running, succeeded, failed, expired. A job is erased once the app confirms it has saved the result, and 24 hours after the job ends at the latest (#166). A job that never ends is expired by the schedule's run.
 - **Retention and the cost limits** ([ADR 0017](adr/0017-hosting-storage-and-cost.md)):
   - Erasure reads the time from the injected clock (R2).
@@ -309,7 +309,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
   - The limits, the retention periods, the schedule's interval and the queue's retry window are values the executable reads from configuration and hands in. The hosted defaults are the owner's: 5 tailorings a device a day, 100 for everyone, 24 hours for a job and 90 days for an idle device.
   - The other two limits live outside the code: the hosted router's credit limit and the Google budget alert (#163, #165).
 - **The lease.** A running job holds a lease, and a job whose lease has expired is taken over by the retry (#161). The lease belongs to the job's lifecycle and to its contract suite, not to the queue adapter.
-- **Ports it owns (R3):** the job store, the job queue, the quota, the device registry (#170), unless #168 gives its port to another target, and a port for erasing an idle device (#166), the clock, an identifier generator (R2), a notifier (#180), the log events, and the data-policy port that `GET /v1/policy` reads (#155, #175).
+- **Ports it owns (R3):** the job store, the job queue, the quota, the device registry (#170), unless #168 gives its port to another target, and the ports that erasing an idle device (#166), sweeping expired challenges (#170) and sweeping address counts (#172) go through, the clock, an identifier generator (R2), a notifier (#180), the log events, and the data-policy port that `GET /v1/policy` reads (#155, #175).
 - **The data policy** ([ADR 0015](adr/0015-inference-providers-and-data-policy.md)), beside that port:
   - the types: what a provider declares (whether it keeps prompts, whether it trains on them, the regions it may run in), what a deployment requires, and the policy that `GET /v1/policy` serves: the requirements and the processors, which are the registry's providers named as the published privacy policy names them (#190);
   - the policy's version, derived from everything that endpoint serves, so a provider swap that still meets the requirements changes it. The start request carries the version the app showed the user, Start refuses a different one, the job records it, and the worker refuses to run it under another (#155, #176, #190);
@@ -357,7 +357,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
   - Both roles read one configuration, and each checks the policy and the models.
   - Each role reads the secrets it needs: both read the database's credentials, and `migrate` reads them too; the role that holds the keys also reads the providers' keys and the APNs key, and creates the providers' HTTP client, one per process. It hands the secrets to the adapters.
   - How it reads Secret Manager, mounted into the service or through the API, is #163's choice. The executable does the reading, never an adapter ([ADR 0017](adr/0017-hosting-storage-and-cost.md)).
-- It reads the cost limits, the retention periods, the schedule's interval and the queue's retry window from configuration and hands them to the use cases as values ([ADR 0017](adr/0017-hosting-storage-and-cost.md)).
+- It reads the cost limits, the retention periods, the schedule's interval and the queue's retry window from configuration and hands them to the use cases as values ([ADR 0017](adr/0017-hosting-storage-and-cost.md)). It refuses an interval that is not well below the 24 hours (#166).
 - It starts as `serve`, as `work`, or, in the local profile, as both. It composes the router per role.
 - It shuts down cleanly on SIGTERM: the job in hand is finished or released back to the queue.
 
@@ -374,8 +374,8 @@ The targets are created by #158 and the tickets named below. Until the targets e
 **Environments.** `local` uses the local profile. `staging` and `production` use the hosted profile, each with its own configuration, database and queue. Staging accepts App Attest's development environment and production only the production one. A merge to `main` deploys to staging, and a tag promotes the same image to production ([ADR 0017](adr/0017-hosting-storage-and-cost.md); the pipeline is #164).
 
 **Where it runs** ([ADR 0017](adr/0017-hosting-storage-and-cost.md)). Hosted, both roles run on Cloud Run in `europe-west1`, with Cloud Tasks and the Cloud Scheduler job that runs erasure (#166) in the same region, and Postgres on Neon in Frankfurt.
-- The secrets are in Secret Manager, one set per environment, and each is readable only by the service that needs it.
-- The infrastructure is OpenTofu code in `infra/` (#163). It also sets each Cloud Run service's maximum number of instances, the queue's maximum dispatch rate, and a log exclusion that drops the public service's platform request logs, which carry the caller's address.
+- The secrets are in Secret Manager, one set per environment, and each is readable only by the identities that need it: its service, and CI's identity for the Neon credentials it needs (#164).
+- The infrastructure is OpenTofu code in `infra/` (#163). It also sets each Cloud Run service's maximum number of instances, the queue's maximum dispatch rate, a log exclusion that drops the public service's platform request logs, which carry the caller's address, and an alert on a failed run of the erasure schedule.
 - CI deploys through Workload Identity Federation. No long-lived key and no credential for Neon is stored in GitHub (#164).
 
 **Translation.** On the server, the API's generated types are translated to and from the tailoring model only in `ServerHTTP`, and never leave it. A translation between two context packages on the server lives in a server target that this file designates for that translation, or needs an ADR (R1).
