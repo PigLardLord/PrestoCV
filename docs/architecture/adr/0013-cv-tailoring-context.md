@@ -18,7 +18,7 @@
   - Like `CVPDFExporter`, it imports no PrestoCV package. In the app, only `PrestoCVIntegration` translates into and out of its model ([ADR 0007](0007-each-package-owns-its-model.md)). The server's targets that import it are set by the server's ADR (#158).
   - It builds and tests on iOS, macOS and Linux.
 - **It owns its model** ([ADR 0007](0007-each-package-owns-its-model.md)): a snapshot of the source CV, the advert, the letter defaults and the user's answers. The app maps its `CV` into it in `PrestoCVIntegration`. The server maps its API types into it.
-- **It refines [ADR 0005](0005-remove-ai-tailoring-and-json-resume.md) without superseding it.** This is the context ADR 0005 reserved. The app reaches a tailoring through a port its own workflow owns, as ADR 0005 says; the adapter behind that port calls the server (#179). The inference port is a different port: `Tailoring` owns it, and only the server uses it (#149, #150). **The loop never runs on the device:** `PrestoCVIntegration` may not import `Tailoring`, so the compiler holds that.
+- **It refines [ADR 0005](0005-remove-ai-tailoring-and-json-resume.md) without superseding it.** This is the context ADR 0005 reserved. The app reaches a tailoring through a port its own workflow owns, as ADR 0005 says; the adapter behind that port calls the server (#179). The inference port is a different port: `Tailoring` owns it, and only the server uses it (#149, #150). **The loop never runs on the device:** `PrestoCVIntegration` may not import `Tailoring`. The checker refuses that import, in the sources and in the manifest, and the compiler then refuses any use of the loop in the app.
 - **A tailoring produces a CV and a cover letter.**
 - **The check is a gate, not an audit.**
   - No field lifts it.
@@ -50,8 +50,8 @@
   - word lists to keep in six languages;
   - reading names in German is open until #142, so German is a typed error in the provenance check until then.
 - **Enforced by:**
-  - the compiler, through the target graph, which also keeps the loop off the device;
-  - the checker: the allow-lists, the R1, R2, R4, R7, R9, R11, R13 and R14 detectors on the five targets, and the manifest rules;
+  - the compiler, through the target graph;
+  - the checker: the allow-lists, the R1, R2, R4, R7, R9, R11, R13 and R14 detectors on the five targets, and the manifest rules, which also keep the loop off the device;
   - the tests that each ticket of #133 adds.
 
 ## Alternatives considered
