@@ -79,7 +79,7 @@
 - **(c) Generated code and the checker.**
   - The three targets hold only generated code. A header marks each file, and nobody edits one by hand (#177).
   - They are held by their import allow-lists and by the regeneration in CI, which fails when a file differs from the generator's output.
-  - No detector runs on them, R11's `platformCondition` included: the generator wraps its Foundation imports in `#if os(Linux)`. Nobody may edit generated code, so a finding there could never be fixed. Their import allow-lists still apply, and R1's ban on `@_exported import` holds everywhere.
+  - One detector runs on them, R1's `exportedImport`, because generated code satisfies it and R1 bans `@_exported import` everywhere. No other detector runs on them, R11's `platformCondition` included: the generator wraps its Foundation imports in `#if os(Linux)`, and nobody may edit generated code, so a finding there could never be fixed. Their import allow-lists still apply.
   - The checker gains a `generated` target kind for them (#177). Until then, [modules.md](../modules.md) lists the targets and `rules.json` declares them not yet implemented.
   - The package's manifest is held like every manifest: Swift 6, no unsafe flags (R9).
   - The generator is pinned in a tool package, not in `PrestoCVAPI`'s manifest, because a package that depends on `PrestoCVAPI` ignores the `Package.resolved` of `PrestoCVAPI` (#177).
