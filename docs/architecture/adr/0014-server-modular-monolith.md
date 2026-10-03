@@ -36,7 +36,7 @@
 | Target | Layer | Responsibility |
 |---|---|---|
 | `ServerApplication` | application | The tailoring use cases and the job lifecycle (#157), and their ports, among them the job store, the job queue, the quota and the clock |
-| `ServerInference` | outbound adapter | The inference providers behind `Tailoring`'s port, and the deployment's data policy (#154, #155) |
+| `ServerInference` | outbound adapter | The inference providers behind `Tailoring`'s port, and their registry built from configuration (#154, #155) |
 | `ServerStorePostgres` | outbound adapter | The job store and the quota store on Postgres (#160) |
 | `ServerQueueCloudTasks` | outbound adapter | The job queue on Cloud Tasks (#161) |
 | `ServerLocalProfile` | outbound adapter | The in-memory stores and the in-process queue of the local profile (#157, #158) |
