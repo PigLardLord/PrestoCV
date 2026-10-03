@@ -17,10 +17,19 @@ struct WordListsDocumentTests {
     @Test("every row of the key table says what the list holds, whether it may be empty, and how the checks use it")
     func keyTableIsFilled() throws {
         for row in try Page.table(after: "### Keys") {
-            for column in ["Key", "Holds", "May be empty", "Used by"] {
+            for column in ["Key", "Holds", "Read", "May be empty", "Used by"] {
                 #expect(!(row[column] ?? "").isEmpty, "the row of \(row["Key"] ?? "?") has no \(column)")
             }
         }
+    }
+
+    @Test("how the page says each list is read is how the decoder reads it, and tells two entries apart")
+    func readColumn() throws {
+        var read: [String: String] = [:]
+        for row in try Page.table(after: "### Keys") { read[Page.backticked(row["Key"] ?? "").first ?? "?"] = row["Read"] }
+        for key in WordListKey.allCases { #expect(read[key.rawValue] == key.read.rawValue, "\(key.rawValue)") }
+        #expect(read["version"] == "—" && read["language"] == "—")
+        #expect(Set(WordListKey.allCases.map(\.read.rawValue)) == ["folded", "lower-cased", "as written (case-insensitive)", "as written (case-sensitive)"])
     }
 
     @Test("the lists the page says may be empty are the ones the decoder accepts empty")

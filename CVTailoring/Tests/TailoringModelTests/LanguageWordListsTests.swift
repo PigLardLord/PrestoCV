@@ -356,12 +356,52 @@ struct LanguageWordListsTests {
         return values
     }()
 
-    @Test("an entry repeated once folded is corrupt, however it is written", arguments: repeatedTextCases)
+    @Test("an entry repeated once folded is corrupt in a list read folded, however it is written", arguments: repeatedTextCases)
     func repeatedText(entries: [String]) throws {
+        for key in WordListFixture.textKeys where key.read == .folded {
+            let data = try WordListFixture.data(editing: key) { $0["entries"] = ["alpha"] + entries }
+            #expect(throws: corrupt(key)) { try decode(data) }
+        }
+    }
+
+    static let repeatedByCaseCases: [[String]] = {
+        var values: [[String]] = []
+        values.append(["A", "a"])
+        values.append(["Ab cd", "ab cd"])
+        values.append(["I'm", "i'm"])
+        return values
+    }()
+
+    @Test("an entry repeated but for its case is corrupt in every list", arguments: repeatedByCaseCases)
+    func repeatedByCase(entries: [String]) throws {
         for key in WordListFixture.textKeys {
             let data = try WordListFixture.data(editing: key) { $0["entries"] = ["alpha"] + entries }
             #expect(throws: corrupt(key)) { try decode(data) }
         }
+    }
+
+    static let foldedOnlyPairs: [[String]] = {
+        var values: [[String]] = []
+        values.append(["Café", "cafe"])
+        values.append(["Straße", "strasse"])
+        values.append(["a  b", "a b"])
+        return values
+    }()
+
+    @Test("two entries that only fold alike are two entries in a list that is not read folded", arguments: foldedOnlyPairs)
+    func foldedOnlyPair(entries: [String]) throws {
+        for key in WordListFixture.textKeys where key.read != .folded {
+            let data = try WordListFixture.data(editing: key) { $0["entries"] = entries }
+            _ = try decode(data)
+        }
+    }
+
+    @Test("the lists read as written or lower-cased are the ones cv-giovanni matches that way")
+    func readModes() {
+        #expect(WordListKey.advertGenderMarkers.read == .lowerCased)
+        #expect(WordListKey.advertInstructions.read == .asWrittenInsensitive && WordListKey.provenanceLegalForms.read == .asWrittenInsensitive)
+        #expect(WordListKey.advertStreets.read == .asWrittenSensitive && WordListKey.provenanceFirstPerson.read == .asWrittenSensitive)
+        #expect(WordListKey.advertStopwords.read == .folded && WordListKey.datesMonths.read == .folded && WordListKey.fieldsTechnologies.read == .folded)
     }
 
     @Test("a month name, a number word and a synonym form repeated once folded is corrupt")

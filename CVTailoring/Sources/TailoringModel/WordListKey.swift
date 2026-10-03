@@ -65,3 +65,50 @@ public enum WordListKey: String, CaseIterable, Hashable, Sendable {
     /// The name of the list inside its group.
     var name: String { String(rawValue.drop { $0 != "." }.dropFirst()) }
 }
+
+/// How a list is read when a check matches it, which is also how the format tells two entries of a list apart. The mode of
+/// each list is how cv-giovanni matches it (`docs/architecture/word-lists.md`).
+enum WordListRead: String {
+    /// Both sides folded by `TextFold.fold`: case, accents, ligatures and white space do not tell two entries apart.
+    case folded = "folded"
+    /// The entry lower-cased and not folded, since folding would strip a letter the line still carries.
+    case lowerCased = "lower-cased"
+    /// The entry as written, and the text matched without regard to case.
+    case asWrittenInsensitive = "as written (case-insensitive)"
+    /// The entry as written, and the text matched with its case.
+    case asWrittenSensitive = "as written (case-sensitive)"
+
+    /// What two entries must differ in to be two: a folded list tells them apart by their fold, the others by their
+    /// lower-case form.
+    func identity(of entry: String) -> String {
+        switch self {
+        case .folded: TextFold.fold(entry)
+        case .lowerCased, .asWrittenInsensitive, .asWrittenSensitive: entry.lowercased()
+        }
+    }
+}
+
+extension WordListKey {
+    /// How cv-giovanni reads the list: the stopwords and every list it folds on both sides, the gender markers lower-cased,
+    /// the lists its regular expressions match case-insensitively on the text as written, and the lists it matches with
+    /// their case.
+    var read: WordListRead {
+        switch self {
+        case .advertGenderMarkers:
+            .lowerCased
+        case .advertInstructions, .numbersWords, .datesSinceWords, .datesDurationUnitWords,
+             .spansFloorLeadIns, .spansYearWords, .spansMonthWords, .spansCountWords, .spansTiedCounts, .spansEmployerEndWords,
+             .letterGreetings, .letterSalutations, .letterValedictions, .letterSalaryExpectationAsks, .letterStartDateAsks,
+             .letterStatedTermWords, .provenanceLegalForms:
+            .asWrittenInsensitive
+        case .advertStreets, .datesRangeSeparatorWords, .letterAddressees, .letterAddresseesAtClauseEnd, .letterAddresseeNouns,
+             .provenanceFirstPerson:
+            .asWrittenSensitive
+        case .advertStopwords, .advertPlainWords, .advertDimensions, .advertBoilerplate, .advertNames, .advertSynonyms,
+             .advertRequirementHeadings, .advertOfferHeadings, .advertStructuralHeadings, .datesMonths, .datesPresentWords,
+             .letterFormsOfAddress, .letterAcademicTitles, .letterNotGivenNames, .provenanceNotPlurals, .provenanceRanks,
+             .fieldsTechnologies:
+            .folded
+        }
+    }
+}
