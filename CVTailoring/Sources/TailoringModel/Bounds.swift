@@ -14,6 +14,12 @@ enum Bounds {
         try text(value, field)
     }
 
+    static func texts(_ values: [String], _ field: TailoringModelError.Field, atMost limit: Int,
+                      _ collection: TailoringModelError.Collection) throws(TailoringModelError) {
+        try count(values.count, atMost: limit, collection)
+        for value in values { try text(value, field) }
+    }
+
     static func count(_ count: Int, atMost limit: Int, _ collection: TailoringModelError.Collection) throws(TailoringModelError) {
         guard count <= limit else { throw .tooMany(collection) }
     }

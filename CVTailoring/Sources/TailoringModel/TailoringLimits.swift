@@ -11,6 +11,18 @@ public enum TailoringLimits {
     /// The statements of one experience.
     public static let maxStatementsPerExperience = 200
 
+    /// The text of an advert.
+    public static let maxAdvertBytes = 50_000
+
+    /// The lines of a recipient's address.
+    public static let maxAddressLines = 6
+
+    /// The paragraphs of a letter's body.
+    public static let maxParagraphs = 20
+
+    /// The documents a letter lists as attached.
+    public static let maxAttachments = 20
+
     /// The statements one tailored line names as its sources.
     public static let maxSourcesPerLine = 200
 }
