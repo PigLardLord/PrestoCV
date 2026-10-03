@@ -51,7 +51,7 @@
   - **The use case that imports a document,** `DraftFromDocument`. It validates the document, structures it through a port, checks the draft through a second port, and sends the failures back to the structurer at most twice. Then it returns the draft, or fails with every failure listed (R7). It validates the draft on every path, as `DraftCV` does. It is the one loop, for the device and for the server.
   - **The ports it owns (R3):**
     - `DocumentExtracting`: the bytes of a PDF or of an image in, an `ExtractedDocument` out;
-    - `DocumentStructuring`: an `ExtractedDocument` and the failures of the last attempt in, a `CVDraft` out. It uses untyped `throws`, so cancellation passes;
+    - `DocumentStructuring`: an `ExtractedDocument` and the failures of the last attempt in, a `CVDraft` out. Both use untyped `throws`, so cancellation passes;
     - `DraftChecking`: a draft and its document in, the failures out;
     - `ArchiveReading`: an archive's bytes in, the bytes of the files that the mapping reads out.
   - **Failures are values with codes** (R7), like the provenance gate's. Each names the field and what it states that the text does not. The app words them for the user (R13), and each structurer words them for its model.
@@ -80,7 +80,7 @@
   - It takes whether the on-device model is available, how much of its context the text takes, and a reserve for the draft. It answers the device or the server.
   - The availability port of `CVDrafting` reports the model's room and measures a text against it, as numbers of the consumer's language (R3). No framework type leaves the adapter.
   - **Only availability and fit decide.** A failed check does not move an import to the server: the import fails. The server gets text only in the case the owner names.
-  - **Consent comes first** (#190). When the rule says "server", the workflow asks the consent port for the policy's current version. Without it, nothing leaves the device, and the import ends with a typed outcome that the app words (R13).
+  - **Consent comes first** (#190). When the rule says "server", the workflow needs the user's consent to the policy's current version. Without it, nothing leaves the device, and the import ends with a typed outcome that the app words (R13).
   - A view, a view model or an adapter never decides (R5).
 - **(f) The server's draft job** (#196) is a new job kind, `draft`, in `ServerApplication`, beside the tailoring.
   - **Its lifecycle is a tailoring's:** the same states, the same queue, where a task carries the job's ID and nothing else, and the same erasure, on the app's confirmation and 24 hours after the job ends at the latest ([ADR 0017](0017-hosting-storage-and-cost.md)). The job holds the extracted text and its result, and both go with it. It starts under an idempotency key, and only its owner reads it. The worker's route runs either kind.
@@ -92,7 +92,7 @@
   - **Only an `ExtractedDocument` can go.** In the app, a port that `PrestoCVIntegration` owns (R3) carries the draft job: start, read and confirm, in the drafting model and typed errors. It takes an `ExtractedDocument` and nothing else, so an image or a PDF cannot be sent by mistake. `PrestoCVAPIAdapter` implements it. The app runs no loop on this path: it starts the job, reads it and confirms the result.
   - **The edges are planned** (#196). All of them reach Linux ✓ targets, and none reaches `PrestoCVApp` or `PrestoCVCore`:
     - `ServerApplication` imports `CVDrafting`, `ContentChecks` and `Provenance`;
-    - `ServerInference`, `ServerHTTP` and the `PrestoCVServer` executable import `CVDrafting`;
+    - `ServerInference`, `ServerHTTP`, `ServerStorePostgres` and the `PrestoCVServer` executable import `CVDrafting`: the first implements its port, the second maps the API's types to its model, the third builds its rows from it (R12), and the fourth wires its ports;
     - `PrestoCVAPIAdapter` imports `CVDrafting`.
   - [ADR 0014](0014-server-modular-monolith.md) already authorised the edge to `CVDrafting`. R1's rule that only `ServerHTTP` and `PrestoCVAPIAdapter` translate the API's types now covers the drafting model as well as the tailoring model.
 - **(g) Composition and review.**
@@ -112,6 +112,8 @@
   - no figure, name, date or employer that the document lacks reaches the review;
   - one draft, one review and one retry loop serve every source, on the device and on the server;
   - an image or a PDF stays on the device, by the type of the port that reaches the server.
+- **R1 and R8 change.** R1's rules for the API's generated types name the drafting model as well as the tailoring model, and it names the one translation between two context packages that modules.md designates on the server. R8 lists imported documents, and the text extracted from them, among untrusted input.
+- **modules.md lists `CVImportVision` and `CVImportArchive`,** and the edges of (d) and (f): `Provenance` for `PrestoCVIntegration`, and `CVDrafting` for `ServerApplication`, `ServerInference`, `ServerHTTP`, `ServerStorePostgres`, `PrestoCVServer` and `PrestoCVAPIAdapter`, with `ContentChecks` and `Provenance` for `ServerApplication`. The checker's `rules.json` declares the two new targets not yet implemented, and keeps the allow-lists of the targets that exist as they are. The checker lets `rules.json` be stricter than modules.md. The glossary gains **Import** and **Extracted text**.
 - **Costs:**
   - **Extraction is Apple-only.** It needs iOS 26 or macOS 26, and a Linux backend cannot extract. That is acceptable, because extraction always runs on the device.
   - **OCR quality bounds a scan's draft.** A draft cannot correct a misread name, because the corrected name is not in the text. The check refuses it, so the draft keeps the misreading and the user corrects it in the review.

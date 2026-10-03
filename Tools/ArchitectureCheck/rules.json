@@ -61,7 +61,9 @@
   "PrestoCVAPITypes",
   "PrestoCVAPIServer",
   "PrestoCVAPIClient",
-  "PrestoCVAPIAdapter"
+  "PrestoCVAPIAdapter",
+  "CVImportVision",
+  "CVImportArchive"
  ],
  "targets": [
   {

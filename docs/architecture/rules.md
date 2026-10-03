@@ -20,8 +20,8 @@ The checker applies to **production targets**: domain, application, integration,
 
 - **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter`, `CVGeneratorAI` and `CVTailoring` never import one another. Translation between them happens, in the app, only in `PrestoCVIntegration`.
 - **The server's package is not one of them.** The `PrestoCVServer` package is an integration and composition package, like `PrestoCVApp`. It imports the context packages it serves. It never imports `PrestoCVApp` or `PrestoCVCore`. It may import the Linux targets of `CVPDFExporter` and of `CVGeneratorAI` (`CVDrafting`), which are reusable on a backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)), once [modules.md](modules.md) lists the edge.
-- **On the server, the API's generated types are translated to and from the tailoring model only in `ServerHTTP`, and never leave it** (#175, [ADR 0014](adr/0014-server-modular-monolith.md)). A translation between two context packages on the server lives in a server target that [modules.md](modules.md) designates for that translation, or needs an ADR.
-- **In the app, the API's generated types are imported only by `PrestoCVAPIAdapter`, and never leave it** ([ADR 0016](adr/0016-api-contract.md)). Like `ServerHTTP`, it translates between the tailoring model and the API, which is not a translation between contexts.
+- **On the server, the API's generated types are translated to and from the tailoring and drafting models only in `ServerHTTP`, and never leave it** (#175, #196, [ADR 0014](adr/0014-server-modular-monolith.md), [ADR 0020](adr/0020-import.md)). A translation between two context packages on the server lives in a server target that [modules.md](modules.md) designates for that translation, or needs an ADR. modules.md designates one: `ServerApplication`, for a draft and its text into the content checks of `CVTailoring` ([ADR 0020](adr/0020-import.md)).
+- **In the app, the API's generated types are imported only by `PrestoCVAPIAdapter`, and never leave it** ([ADR 0016](adr/0016-api-contract.md)). Like `ServerHTTP`, it translates between the tailoring and drafting models and the API, which is not a translation between contexts.
 - **Inside a package, contexts depend only along the edges listed in [modules.md](modules.md).** There is exactly one such edge today: in `CVPDFExporter`, Document Rendering is downstream of Design Catalog (`CVRendering` imports `CVDesignCatalog`). The reverse is forbidden.
 - **Any other edge** between contexts needs an ADR and an update to [modules.md](modules.md).
 - **`@_exported import` is banned.** It would re-export a module to every importer.
@@ -119,7 +119,7 @@ Each executable has one composition root, and only that root creates infrastruct
 
 ## R8. Untrusted input enters through one validating boundary
 
-Untrusted input is: design packages, AI output, persisted files, and on a backend every request. Each kind enters through one anti-corruption layer that validates it into domain types or rejects it.
+Untrusted input is: design packages, AI output, persisted files, imported documents and the text extracted from them, and on a backend every request. Each kind enters through one anti-corruption layer that validates it into domain types or rejects it.
 
 - **Design packages** ([ADR 0011](adr/0011-typed-html-builder.md)):
   - validated on the raw bytes: size cap first, then strict decoding (unknown keys and any `htmlContent` key are rejected), identifier `[a-z0-9-]{1,64}`, the supported markup contract version, and a PNG preview within size;
@@ -137,11 +137,15 @@ Untrusted input is: design packages, AI output, persisted files, and on a backen
 - **Installing a design.** A design is stored only after it has been validated and has rendered a fixture document completely. The fixture exercises every section; a truncated render is a failure. The catalog owns the rendering-gate port, and `CVRendering` implements it. The renderer contract runs the same check.
 - **Native evidence.** The native renderers must also pass a geometric check: each field inside the page, and legible. It is pending until they exist ([ADR 0003](adr/0003-one-pdf-renderer-per-platform.md)).
 - **Documents** arriving as JSON (backend) pass `CVDocumentValidator`: supported version, required name, bounded text and counts, valid dates and ratings.
+- **Imported documents** ([ADR 0020](adr/0020-import.md)): a PDF, an image or a LinkedIn archive is bounded in bytes before it is read, and then in pages, in entries and in the text it yields.
+  - An archive is read in memory. It writes nothing to disk, follows no path inside it and inflates only the files it reads.
+  - The text that extraction yields enters as an `ExtractedDocument`, validated when it is made: bounded, with no control characters.
+  - A model's draft from it is AI output. The check holds it to that text, and the user reviews it before it is saved.
 - **Persisted files**: see R12.
 
 **Why.** See issue #9 and the security review of 2026-09-27: a regex deny-list let 34 of 34 content-hiding constructs through, and could be bypassed with CSS comments and strings. On a backend, a `<style>` breakout would be server-side request forgery.
 
-**Enforced by:** test (one per attack, listed in the Design Catalog and Rendering tests) and the type system (`ValidatedStylesheet` can only be created by the validator).
+**Enforced by:** test (one per attack, listed in the Design Catalog and Rendering tests, and in the import tests of #193 and #194) and the type system (`ValidatedStylesheet` can only be created by the validator).
 
 ## R9. Swift 6, complete concurrency checking, no escape hatches
 

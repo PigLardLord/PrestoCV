@@ -159,22 +159,49 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 ## Package `CVGeneratorAI` — AI Drafting
 
+The context grows into import ([ADR 0020](adr/0020-import.md)). Its sources are a description, a PDF, a photo or a scan, and LinkedIn's data archive. Every one produces a `CVDraft`, which the user reviews (#18) before it becomes a CV.
+
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
 | `CVDrafting` | domain + application | iOS, macOS, Linux ✓ | Foundation |
 | `CVDraftingFoundationModels` | outbound adapter | iOS 26, macOS 26 | `CVDrafting`, FoundationModels, Foundation |
+| `CVImportVision` | outbound adapter | iOS 26, macOS 26 | `CVDrafting`, PDFKit, Vision, Foundation |
+| `CVImportArchive` | outbound adapter | iOS, macOS, Linux ✓ | `CVDrafting`, Foundation |
+
+`CVImportVision` and `CVImportArchive` are planned (#194, #193). Until they exist, they are declared not yet implemented in the checker's `rules.json`.
 
 **`CVDrafting`**
-- **`CVDraft`:** plain `Sendable` structs; optional wherever the user may not have said it. A job has an optional start year, an optional end year and whether it is current.
-- **Use case:** `DraftCV` validates the input, generates, then validates the output. Streaming follows the same path.
-- **Ports:** `DraftGenerating` (untyped `throws`, cancellable) and `DraftAvailability`.
-- **`DraftingError`:** one case per model failure.
+- **`CVDraft`:** plain `Sendable` structs; optional wherever the user may not have said it. A job has an optional start, an optional end and whether it is current. Dates grow from a year to a year or a month, so LinkedIn's "Jan 2020" keeps its month (#193).
+- **Use cases:**
+  - `DraftCV` validates the input, generates, then validates the output. Streaming follows the same path. A description is drafted on the device only, as today.
+  - `DraftFromDocument` (planned, #195): validates an `ExtractedDocument`, structures it through a port, checks the draft through a second port, and sends the failures back to the structurer at most twice. Then it returns the draft, or fails with every failure listed. It validates the draft on every path, and it is the one loop, for the device and for the server ([ADR 0020](adr/0020-import.md)).
+  - `DraftFromLinkedInArchive` (planned, #193): reads the six files through `ArchiveReading` and maps their CSV to a draft, with no model. The CSV is parsed strictly and within bounds (R8).
+- **`ExtractedDocument`** (planned, #194): what extraction reads from a PDF or an image, with its structure. It is a list of blocks in reading order, each a title, a paragraph, a list of items or a table of rows, and holds text only. It is untrusted input (R8), validated when it is made: bounded in blocks and in characters, with no control characters. Its format is documented beside it, and the server's request holds the same bounds.
+- **Ports:**
+  - `DraftGenerating` (untyped `throws`, cancellable) and `DraftAvailability`, which also reports the model's room and measures a text against it, as numbers (R3);
+  - `DocumentExtracting` (planned, #194): the bytes of a PDF or of an image in, an `ExtractedDocument` out. Untyped `throws`, cancellable;
+  - `DocumentStructuring` (planned, #195): an `ExtractedDocument` and the failures of the last attempt in, a `CVDraft` out. Untyped `throws`, cancellable. The on-device model implements it, and so does the server's adapter, `ServerInference`;
+  - `DraftChecking` (planned, #195): a draft and its document in, the failures out. The integration layers implement it, in the app and on the server, because the checks live in `CVTailoring`, which this package cannot import (R1);
+  - `ArchiveReading` (planned, #193): an archive's bytes in, the bytes of the files that the mapping reads out.
+- **`DraftingError`:** one case per model failure, and one per way an import can fail. The check's failures are values with codes, like the provenance gate's (R7). The app words them (R13), and each structurer words them for its model.
 
 **`CVDraftingFoundationModels`**
 - Internal `@Generable` schema, a session with instructions, availability from `SystemLanguageModel`.
+- It also implements `DocumentStructuring` with guided generation, and reports the model's room to the availability port (#195).
 - Until it is implemented it throws a typed "unavailable" error; it never returns an empty draft.
 
-**Test support.** `CVDraftingTestSupport` holds a fake generator and fixtures.
+**`CVImportVision`** (planned, #194, [ADR 0020](adr/0020-import.md))
+- The outbound adapter that implements `DocumentExtracting`, on the device. PDFKit reads a PDF's text layer in reading order. A PDF with no text layer, and every image, go through Vision's `RecognizeDocumentsRequest`, which returns the text with its structure: titles, paragraphs, lists and tables.
+- It is a target of its own, not part of `CVDraftingFoundationModels`: extraction must work on a device that has no model, because the server fallback needs the text. It imports no PrestoCV package other than `CVDrafting`, and it opens no connection.
+- Every file is wrapped entirely in its platform condition (R11). The bytes it reads are untrusted: a size cap comes first, then a bound on pages and on the text it yields (R8).
+- It presents nothing. VisionKit's document camera on iOS, Continuity Camera on macOS and the pickers are views of the app target's `Platform/` folder, which hand it bytes.
+
+**`CVImportArchive`** (planned, #193, [ADR 0020](adr/0020-import.md))
+- The outbound adapter that implements `ArchiveReading`, for LinkedIn's data archive. It reads the ZIP in memory under three limits (R8): its size, its uncompressed size and its number of entries. It writes nothing to disk, so a path inside the archive is never followed.
+- It returns the bytes of `Profile.csv`, `Positions.csv`, `Education.csv`, `Skills.csv`, `Languages.csv` and `Certifications.csv` and of no other file, matched by exact name. It inflates nothing else. A missing file is not an error.
+- Linux ✓ is the requirement, so that the hostile-archive tests run in the Linux job. #193 chooses the ZIP reader and proves that it builds and tests on Linux, and then adds the reader's module to the allow-list above. If none does, #193 makes the target Apple-only, with every file wrapped in its platform condition (R11), and says so here.
+
+**Test support.** `CVDraftingTestSupport` holds a fake generator and fixtures, and gains a scripted structurer, a fake extractor and invented documents and archives (#193 to #195).
 
 ---
 
@@ -182,7 +209,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 Standalone, like `CVPDFExporter`. It depends on no PrestoCV package ([ADR 0013](adr/0013-cv-tailoring-context.md)): the app and the server each map their own types into its model. The targets are empty until the tickets named below fill them.
 
-In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` and `ContentChecks` only: the loop runs on the server. No type shares its module's name, so a qualified name always means the module (the loop is not a type called `Tailoring`, nor the gate one called `Provenance`).
+In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis`, `ContentChecks` and `Provenance` only: the loop runs on the server. `Provenance` is there for the check of an imported draft, which needs the reading of names ([ADR 0020](adr/0020-import.md)). No type shares its module's name, so a qualified name always means the module (the loop is not a type called `Tailoring`, nor the gate one called `Provenance`).
 
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
@@ -203,9 +230,11 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 
 **`ContentChecks`** (#139)
 - Spans that stay true, and figures as the CV writes them.
+- They also hold an imported draft to its text, in the app and on the server ([ADR 0020](adr/0020-import.md)).
 
 **`Provenance`** (#140, #141)
 - The gate for the tailored CV and for the cover letter.
+- Its reading of names is also what the check of an imported draft calls, in the app and on the server ([ADR 0020](adr/0020-import.md)). German is a typed error there until #142.
 - Its failures are values with codes. The app words them for the user (R13); `Tailoring`'s prompt words them for the model.
 
 **`Tailoring`** (#150–#152)
@@ -225,10 +254,10 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
 | `PrestoCVWorkflowPorts` | app ports | iOS, macOS, Linux ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation |
-| `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, Foundation |
+| `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, `Provenance`, Foundation |
 | `PrestoCVPresentation` | inbound adapter | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain` (both `internal import`), Observation, Foundation |
-| `PrestoCVAPIAdapter` | outbound adapter | iOS, macOS, Linux ✓ | `PrestoCVIntegration`, `TailoringModel`, `PrestoCVAPITypes`, `PrestoCVAPIClient` (both `internal import`), `OpenAPIRuntime`, `HTTPTypes`, Foundation |
-| `PrestoCVComposition` | composition root | iOS, macOS | `PrestoCVIntegration`, `PrestoCVPresentation`, `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `PrestoCVAPIAdapter`, `PrestoCVPersistence`, `CVDocumentModel`, `CVDesignCatalog`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVRendering`, `CVRenderingWebKitSupport`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingPDFKitInspector`, `CVDrafting`, `CVDraftingFoundationModels`, `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, `OpenAPIURLSession`, Foundation |
+| `PrestoCVAPIAdapter` | outbound adapter | iOS, macOS, Linux ✓ | `PrestoCVIntegration`, `TailoringModel`, `CVDrafting`, `PrestoCVAPITypes`, `PrestoCVAPIClient` (both `internal import`), `OpenAPIRuntime`, `HTTPTypes`, Foundation |
+| `PrestoCVComposition` | composition root | iOS, macOS | `PrestoCVIntegration`, `PrestoCVPresentation`, `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `PrestoCVAPIAdapter`, `PrestoCVPersistence`, `CVDocumentModel`, `CVDesignCatalog`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVRendering`, `CVRenderingWebKitSupport`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingPDFKitInspector`, `CVDrafting`, `CVDraftingFoundationModels`, `CVImportVision`, `CVImportArchive`, `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, `OpenAPIURLSession`, Foundation |
 
 **`PrestoCVWorkflowPorts`**
 - The ports that view models consume: `CVEditing` (new, save, load) and `CVExporting` (untyped `throws`, so cancellation passes through).
@@ -239,10 +268,15 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - `EditCVWorkflow`;
   - `ExportCVWorkflow`: from the editor snapshot, with the document language, through the renderer, then the completeness check on the actual PDF;
   - `BrowseDesigns`;
-  - `DraftCVWithAI`: availability, then draft, then an unsaved CV plus its gaps.
+  - `DraftCVWithAI`: availability, then draft, then an unsaved CV plus its gaps. It grows into the import workflow (planned, #195, [ADR 0020](adr/0020-import.md)): from a description, a document or an archive, it extracts, picks the device or the server, drafts and checks. For a document, it also returns the extracted text beside the draft, so the review (#18) can mark what the text does not back and show the text behind a field. The text lives for the review and is not saved.
 - **Mappers:** `CV → CVDocument` and `CVDraft → CV`. They are exhaustive and deterministic, with typed dates. The draft mapper uses `Period.make` and reports every gap.
   - `CV → SourceCV`, and the tailoring result into the app's own types (planned, #184, #188).
-- **Outbound ports that reach the server,** owned here (R3): the tailoring workflow's (start, read, cancel and confirm), the policy's (#190) and the push token's (#181). They speak the tailoring model and the workflow's typed errors, never a generated type. `PrestoCVAPIAdapter` implements them (planned, #179, #188).
+- **The check of an imported draft** (planned, #195, [ADR 0020](adr/0020-import.md)). `PrestoCVIntegration` implements `CVDrafting`'s `DraftChecking`. That is a translation between two contexts, so it lives here, and it touches no infrastructure.
+  - It maps the draft and the extracted text into the tailoring model's types. It runs `ContentChecks`, with a date from the injected `TimeSource` (R2), and the reading of names of `Provenance`. `Provenance` is the one edge it gains, and it is still not `Tailoring`, so the loop stays off the device.
+  - A text in a language outside the six is a typed error, never an unchecked pass. German is one until #142.
+  - Its failures are values with codes, and the app words them (R13).
+- **The rule that picks the device or the server** (planned, #195). It is a pure function here, tested as a table and documented where it is made. It takes whether the on-device model is available, how much of its context the text takes, and a reserve for the draft. Only availability and fit decide: a failed check does not move an import to the server. Before the server, the workflow asks for the user's consent to the policy's current version (#190), and without it nothing leaves the device.
+- **Outbound ports that reach the server,** owned here (R3): the tailoring workflow's (start, read, cancel and confirm), the policy's (#190) and the push token's (#181), and the draft job's (start, read and confirm, #196). They speak the tailoring or drafting model and the workflow's typed errors, never a generated type. The draft job's port takes an `ExtractedDocument` and nothing else, so an image or a PDF cannot be sent. `PrestoCVAPIAdapter` implements them (planned, #179, #188, #196).
 - **The attestation port,** owned here (R3), not by `PrestoCVAPIAdapter` that calls it, so that no edge joins two adapters: it signs the encoded body of a start and proves the installation (#174). `PrestoCVAPIAdapter` calls it. The App Attest adapter of #174, a target that the ADR of #168 adds to this file, implements it and never calls the API.
 
 **`PrestoCVPresentation`**
@@ -254,7 +288,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 
 **`PrestoCVAPIAdapter`** (planned, #179, [ADR 0016](adr/0016-api-contract.md))
 - The outbound adapter that implements the ports that reach the server. It is the app's only client of the API, for every endpoint the app calls: the tailorings, the policy, the push token, and the challenges, registration and sessions. It is the only target of the app that imports the API's generated client and types, and it imports both with `internal import`, so no generated type appears in its public API.
-- It maps the tailoring model to the request, and the result back, exhaustively and under test ([ADR 0007](adr/0007-each-package-owns-its-model.md)). It maps each documented problem `type` to a typed error of the workflow (R7): "update the app", "try again at this time", "no provider meets the policy", and "consent again" for a policy version that is not the current one (#190). A `type` it does not know, or a response the spec does not document for that operation, becomes a generic typed error, and an enum value it does not know becomes a typed "unknown" case.
+- It maps the tailoring model to the request, and the result back, exhaustively and under test ([ADR 0007](adr/0007-each-package-owns-its-model.md)). It does the same for the draft job, in the drafting model (planned, #196, [ADR 0020](adr/0020-import.md)). It maps each documented problem `type` to a typed error of the workflow (R7): "update the app", "try again at this time", "no provider meets the policy", and "consent again" for a policy version that is not the current one (#190). A `type` it does not know, or a response the spec does not document for that operation, becomes a generic typed error, and an enum value it does not know becomes a typed "unknown" case.
 - It opens and renews the session, and signs the encoded body of a start through the attestation port, which `PrestoCVIntegration` owns and the App Attest adapter of #174 implements. The attestation adapter never calls the API.
 - It offers one read of a job per call, and it sends the `DELETE` that confirms a saved result when the workflow asks (#166). The workflow drives the polling, which ends when the job is final, and its caller cancels it when the app leaves the foreground (R3: cancellation passes through). The backoff goes through an injected clock or sleeper (R2, R10).
 - The composition root creates it, and the URLSession transport it runs on (R4). It carries R4's detectors, and the checker's `infrastructureTypes` lists `URLSessionTransport` once it exists. Until `URLSessionTransport` is listed in `infrastructureTypes`, review holds it.
@@ -267,6 +301,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - the web-view rule list, compiled once;
   - the platform renderer and the PDFKit inspector;
   - the AI adapter, `TimeSource`, `IDGenerator` and logger;
+  - the extraction adapter and the archive reader (planned, #193, #194);
   - the API adapter, with the URLSession transport it runs on (planned, #179);
   - the `ScreenFactory`.
 - **UI tests and previews** use the production `FileCVRepository` on a temporary directory seeded from fixture JSON. A launch argument selects it. No production target depends on a test-support target.
@@ -279,17 +314,17 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 
 A package of its own, next to the app's, in this repository ([ADR 0014](adr/0014-server-modular-monolith.md)). It is an integration and composition package, like `PrestoCVApp`, and not one of the isolated context packages (R1). It builds and tests on Linux, and runs on macOS for development.
 
-The targets are created by #158 and the tickets named below. Until the targets exist, they are declared not yet implemented in the checker's `rules.json`.
+The targets are created by #158 and the tickets named below. Until the targets exist, they are declared not yet implemented in the checker's `rules.json`. The edges to `CVDrafting`, `ContentChecks` and `Provenance` that the draft job needs (#196, [ADR 0020](adr/0020-import.md)) are planned with the targets that hold them.
 
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
-| `ServerApplication` | application | Linux ✓, macOS | `TailoringModel`, `Tailoring`, Foundation |
-| `ServerInference` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `Tailoring`, `TailoringModel`, `AsyncHTTPClient`, Foundation |
-| `ServerStorePostgres` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `TailoringModel`, `PostgresNIO`, Foundation |
+| `ServerApplication` | application | Linux ✓, macOS | `TailoringModel`, `Tailoring`, `CVDrafting`, `ContentChecks`, `Provenance`, Foundation |
+| `ServerInference` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `Tailoring`, `TailoringModel`, `CVDrafting`, `AsyncHTTPClient`, Foundation |
+| `ServerStorePostgres` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `TailoringModel`, `CVDrafting`, `PostgresNIO`, Foundation |
 | `ServerQueueCloudTasks` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `AsyncHTTPClient`, Foundation |
 | `ServerLocalProfile` | outbound adapter | Linux ✓, macOS | `ServerApplication`, Foundation |
-| `ServerHTTP` | inbound adapter | Linux ✓, macOS | `ServerApplication`, `TailoringModel`, `PrestoCVAPITypes`, `PrestoCVAPIServer` (both `internal import`), `Hummingbird`, `OpenAPIRuntime`, `OpenAPIHummingbird`, Foundation |
-| `PrestoCVServer` | executable and composition root | Linux ✓, macOS | `ServerApplication`, `ServerInference`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `Tailoring`, `Hummingbird`, `AsyncHTTPClient`, `PostgresNIO`, `ArgumentParser`, `Logging`, `ServiceLifecycle`, Foundation |
+| `ServerHTTP` | inbound adapter | Linux ✓, macOS | `ServerApplication`, `TailoringModel`, `CVDrafting`, `PrestoCVAPITypes`, `PrestoCVAPIServer` (both `internal import`), `Hummingbird`, `OpenAPIRuntime`, `OpenAPIHummingbird`, Foundation |
+| `PrestoCVServer` | executable and composition root | Linux ✓, macOS | `ServerApplication`, `ServerInference`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `Tailoring`, `CVDrafting`, `Hummingbird`, `AsyncHTTPClient`, `PostgresNIO`, `ArgumentParser`, `Logging`, `ServiceLifecycle`, Foundation |
 
 **`ServerApplication`** (#157, #155, #165, #166)
 - **Use cases:** start a tailoring, run it, get it, erase (#166), and read the data policy (#155), which `GET /v1/policy` calls.
@@ -308,6 +343,13 @@ The targets are created by #158 and the tickets named below. Until the targets e
   - **The cost limits** are checked here, before a job is recorded (#165). The quota store counts tailorings per device and for everyone, per day. The tailoring is counted in the same transaction that records the job, so two starts that race for the last tailoring of a day record one job. Over a limit, the API answers 429 with when to retry.
   - The limits, the retention periods, the schedule's interval and the queue's retry window are values the executable reads from configuration and hands in. The hosted defaults are the owner's: 5 tailorings a device a day, 100 for everyone, 24 hours for a job and 90 days for an idle device.
   - The other two limits live outside the code: the hosted router's credit limit and the Google budget alert (#163, #165).
+- **The `draft` job kind** (planned, #196, [ADR 0020](adr/0020-import.md)). It runs an import's structuring when the device cannot.
+  - It has a tailoring's lifecycle, queue and erasure. A task carries the job's ID and nothing else, and the job's text and result go with it. It starts under an idempotency key, only its owner reads it, and the worker's route runs either kind.
+  - It has its own quota: its own counts and limits, per device and for everyone, in configuration. The credit limit of the hosted router's key bounds both kinds of work. The hosted defaults are the owner's, set by #165 and #196.
+  - A start carries the policy version that the app showed the user. Start refuses another one, the job records it, and the worker refuses to run it under another.
+  - No log event carries the extracted text, the draft or the reply (#167).
+  - The run is `CVDrafting`'s `DraftFromDocument`, with a structurer behind `CVDrafting`'s `DocumentStructuring` (`ServerInference` implements it) and a checker behind `DraftChecking`.
+  - **The checker.** `ServerApplication` implements `DraftChecking` for the server, as `PrestoCVIntegration` does in the app. It maps a draft and its text into the content checks, `ContentChecks` and the reading of names of `Provenance`, with a date from the injected clock. **This file designates `ServerApplication` for that translation between two context packages** (R1). The two mappings are separate code, and one corpus of drafts, texts and verdicts, read by both packages' tests, holds them equal.
 - **The lease.** A running job holds a lease, and a job whose lease has expired is taken over by the retry (#161). The lease belongs to the job's lifecycle and to its contract suite, not to the queue adapter.
 - **Ports it owns (R3):** the job store, the job queue, the quota, the device registry (#170), unless #168 gives its port to another target, and the ports that erasing an idle device (#166), sweeping expired challenges (#170) and sweeping address counts (#172) go through, the clock, an identifier generator (R2), a notifier (#180), the log events, and the data-policy port that `GET /v1/policy` reads (#155, #175).
 - **The data policy** ([ADR 0015](adr/0015-inference-providers-and-data-policy.md)), beside that port:
@@ -323,6 +365,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - **Building the registry** applies the rule of `ServerApplication`. It fails with the refusal described under the executable when a provider does not meet the policy, so no running registry holds one and no fallback can reach one.
 - **Selection and fallback:** the first available provider answers. When it is unavailable or rate-limited, the next one that meets the policy answers instead. No other error triggers a fallback, a refusal for lack of credit included (#165).
 - It implements both ports: the inference port of `Tailoring`, and the data-policy port of `ServerApplication`, so `GET /v1/policy` reaches the policy. The registry's declarations and that port need no client and no key.
+- **The draft job's structurer** (planned, #196, [ADR 0020](adr/0020-import.md)). It also implements `CVDrafting`'s `DocumentStructuring`, over the registry's selection and fallback, so a draft goes through the same registry and policy as a tailoring. It holds the draft's versioned prompt and schema, and decodes the model's reply through one anti-corruption layer (R8). The model a draft uses is configuration, as a tailoring's is.
 - **A router's dialect** derives its routing preferences from the deployment's policy (#154). A router's declaration covers the upstreams its routing preferences allow (#154): it keeps prompts, trains on them or runs in a region if it or any of those upstreams does.
 - The adapter decodes the endpoint's envelope into the port's reply and errors, with a size cap. The model's text is decoded once, in `Tailoring` (R8).
 - It never logs a prompt, an answer or a key. It never reads a secret, the environment or a secret store: the executable hands it the keys and the clients.
@@ -331,6 +374,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - The job store, the quota store and the adapter of the device registry (#170) on Postgres, through PostgresNIO. Hosted, the database is Neon's, in Frankfurt: one project, with one branch per environment.
   - Each branch has its own role and password. No branch is made from another environment's data, and none is reset from its parent.
 - Its rows are DTOs of its own, built from the types of `TailoringModel` (R12). What authentication keeps beyond the registry, and whether its tables share this schema, is decided by its own ADR (#168).
+- A draft job's rows hold its extracted text and its result, and are erased with it (#196). They are DTOs of the store's own as well, built from the types of `CVDrafting`, which is why it imports it (R12).
 - The versioned SQL migrations (R12), in one history for the server's own tables. Only the binary's `migrate` command applies them, never `serve` or `work`.
 - **Retention** (#166): it deletes the rows that `ServerApplication`'s erasure names, and marks nothing as deleted. Quota counts go with their device at the latest.
 
@@ -347,6 +391,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
 **`ServerHTTP`** (#175, #178)
 - The inbound adapter: the Hummingbird routes, the middleware, and the handlers that implement the generated API.
 - It maps the generated types to the use cases and back. The generated types never leave it: it imports `PrestoCVAPITypes` and `PrestoCVAPIServer` with `internal import`, so none can appear in its public API.
+- It maps the draft job's endpoints the same way, to the use cases and to `CVDrafting`'s types, and validates a request into an `ExtractedDocument` (planned, #196, [ADR 0020](adr/0020-import.md)). A test proves that the spec's bounds equal the type's.
 - It serves the API on Hummingbird through `OpenAPIHummingbird`. `GET /health` is an endpoint of the spec, and `ServerHTTP` serves it in both roles.
 - **The worker's routes.** The route the queue calls to run a job, and the one the schedule calls to erase what is due (#166), live here too. They are mounted only in the `work` role, and they are not part of the public API (`openapi.yaml`). The platform admits only the queue's identity before any code runs (#161).
 - `PrestoCVAPITypes` and `PrestoCVAPIServer` are targets of the `PrestoCVAPI` package, listed below ([ADR 0016](adr/0016-api-contract.md)).
@@ -363,7 +408,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
 
 **Roles.**
 - **`serve`** answers the API. Hosted, it is its own Cloud Run service. It records a job and hands it to the queue. It checks the data policy at start and serves it, and it reads no provider's key.
-- **`work`** runs tailorings. Hosted, it is its own Cloud Run service, and it is private: only the queue's identity, which the erasure schedule (#166) also uses, may call it, and the platform refuses everyone else before any code runs. Only the worker holds the model providers' keys and the APNs key (#180).
+- **`work`** runs tailorings, and drafts once #196 exists. Hosted, it is its own Cloud Run service, and it is private: only the queue's identity, which the erasure schedule (#166) also uses, may call it, and the platform refuses everyone else before any code runs. Only the worker holds the model providers' keys and the APNs key (#180).
 - A tailoring finishes within the queue's dispatch deadline of 30 minutes.
 - The binary has one more command, `migrate` (#160, #162). It is not a role.
 
@@ -378,13 +423,13 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - The infrastructure is OpenTofu code in `infra/` (#163). It also sets each Cloud Run service's maximum number of instances, the queue's maximum dispatch rate, a log exclusion that drops the public service's platform request logs, which carry the caller's address, and an alert on a failed run of the erasure schedule.
 - CI deploys through Workload Identity Federation. No long-lived key and no credential for Neon is stored in GitHub (#164).
 
-**Translation.** On the server, the API's generated types are translated to and from the tailoring model only in `ServerHTTP`, and never leave it. A translation between two context packages on the server lives in a server target that this file designates for that translation, or needs an ADR (R1).
+**Translation.** On the server, the API's generated types are translated to and from the tailoring and drafting models only in `ServerHTTP`, and never leave it. A translation between two context packages on the server lives in a server target that this file designates for that translation, or needs an ADR (R1). This file designates one: `ServerApplication`, for a draft and its text into the content checks ([ADR 0020](adr/0020-import.md)).
 
 **Dependencies.**
 - External packages are imported only by adapters and by the executable, never by `ServerApplication`. Each is pinned in the committed `Package.resolved`. A new one changes this file in the same pull request, and the checker's `--packages` rule holds it.
 - The tickets that add logging and metrics (#167, #178) extend the adapters' allow-lists with `Logging` and `Metrics` in this file.
-- The package depends on `CVTailoring`, and on `PrestoCVAPI` once #177 exists. It never depends on `PrestoCVApp` or `PrestoCVCore`.
-- It may depend on the Linux targets of `CVPDFExporter` and of `CVGeneratorAI` (`CVDrafting`), which are reusable on a backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)). The ticket that needs such an edge adds it to this file, for example #94 or #196.
+- The package depends on `CVTailoring`, on `CVGeneratorAI` once #196 exists, and on `PrestoCVAPI` once #177 exists. It never depends on `PrestoCVApp` or `PrestoCVCore`.
+- It may depend on the Linux targets of `CVPDFExporter` and of `CVGeneratorAI` (`CVDrafting`), which are reusable on a backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)). The ticket that needs such an edge adds it to this file. #196's edges are listed above ([ADR 0020](adr/0020-import.md)), and #94's is still to come.
 - The targets for authentication, logs and notifications are set by their tickets' decisions (#167, #168, #180) and added to this file then.
 
 **Test support.** None yet. The contract suites of the ports (#157) live in a test-support target that #157 adds to this file, as R10 asks. `ServerApplication`'s own tests use the adapters of `ServerLocalProfile`, so there is no second copy of them.
@@ -406,6 +451,7 @@ The targets are created by #177, from the spec of #176. Until they exist, they a
 **The spec** (#176)
 - `openapi.yaml`, in OpenAPI 3.1, is the single source of the API. It sits in the package and is excluded from every target: it is not a SwiftPM resource, so no binary carries it. Its endpoints are versioned in the path (`/v1`).
 - Every endpoint, schema, field and error `type` has a description in it. The public reference is generated from them (#182, #183).
+- The draft job's endpoints, `POST /v1/drafts`, `GET /v1/drafts/{id}` and `DELETE /v1/drafts/{id}`, are added by #196. They are additive to v1 ([ADR 0020](adr/0020-import.md)).
 - Every operation declares a `default` problem+json response, so a client decodes any error as a problem.
 - It describes the public API only. The route that the queue calls to run a job is not in it ([ADR 0014](adr/0014-server-modular-monolith.md)).
 
@@ -444,7 +490,7 @@ A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-
 | `App/` | `@main` (holds the composition), scenes and macOS commands; `#if os` allowed here | SwiftUI, `PrestoCVComposition`, `PrestoCVPresentation` |
 | `Features/` | SwiftUI views per screen; `NavigationSplitView` navigation; no `#if` | SwiftUI, `PrestoCVPresentation` |
 | `DesignSystem/` | tokens and reusable components | SwiftUI |
-| `Platform/` | the platform shims: iOS-only modifiers wrapped for `Features/`, HTML and PDF previews, sharing, pasteboard, file import and export | SwiftUI, UIKit, AppKit, WebKit, PDFKit, QuickLook, UniformTypeIdentifiers, `CVRenderingWebKitSupport`, `PrestoCVPresentation` |
+| `Platform/` | the platform shims: iOS-only modifiers wrapped for `Features/`, HTML and PDF previews, sharing, pasteboard, file import and export, and the capture of a document to import (VisionKit's document camera on iOS, Continuity Camera and the pickers on macOS), which hands bytes to the view model ([ADR 0020](adr/0020-import.md)) | SwiftUI, UIKit, AppKit, WebKit, PDFKit, QuickLook, VisionKit, UniformTypeIdentifiers, `CVRenderingWebKitSupport`, `PrestoCVPresentation` |
 | `Resources/` | `Localizable.xcstrings`, sample CV JSON, assets | — |
 
 ---
@@ -457,20 +503,22 @@ PrestoCV (app) ─▶ PrestoCVPresentation ─▶ PrestoCVWorkflowPorts ─▶ P
      │                     PrestoCVIntegration ┴─▶ CVRendering ─┬─▶ CVDocumentModel
      │                                    │                └─▶ CVDesignCatalog
      │                                    ├─▶ CVDrafting
-     │                                    └─▶ TailoringModel, AdvertAnalysis, ContentChecks
+     │                                    └─▶ TailoringModel, AdvertAnalysis, ContentChecks, Provenance
      └────▶ PrestoCVComposition ─▶ (all of the above) + PrestoCVAPIAdapter, PrestoCVPersistence, CVDesignCatalogFileStore,
                                 CVBundledDesigns, CVRenderingWebKitSupport, CVRenderingIOS | CVRenderingMacOS,
-                                CVRenderingPDFKitInspector, CVDraftingFoundationModels
+                                CVRenderingPDFKitInspector, CVDraftingFoundationModels, CVImportVision, CVImportArchive
 
-PrestoCVAPIAdapter ─┬─▶ PrestoCVIntegration, TailoringModel
+CVGeneratorAI package: CVDraftingFoundationModels, CVImportVision, CVImportArchive ─▶ CVDrafting
+
+PrestoCVAPIAdapter ─┬─▶ PrestoCVIntegration, TailoringModel, CVDrafting
                 └─▶ PrestoCVAPITypes, PrestoCVAPIClient
 
-PrestoCVServer (executable) ─┬─▶ ServerHTTP ─┬─▶ ServerApplication ─▶ TailoringModel, Tailoring
-                         │               └─▶ TailoringModel, PrestoCVAPITypes, PrestoCVAPIServer
-                         ├─▶ ServerInference ─▶ ServerApplication, Tailoring, TailoringModel
-                         ├─▶ ServerStorePostgres ─▶ ServerApplication, TailoringModel
+PrestoCVServer (executable) ─┬─▶ ServerHTTP ─┬─▶ ServerApplication ─▶ TailoringModel, Tailoring, CVDrafting, ContentChecks, Provenance
+                         │               └─▶ TailoringModel, CVDrafting, PrestoCVAPITypes, PrestoCVAPIServer
+                         ├─▶ ServerInference ─▶ ServerApplication, Tailoring, TailoringModel, CVDrafting
+                         ├─▶ ServerStorePostgres ─▶ ServerApplication, TailoringModel, CVDrafting
                          ├─▶ ServerQueueCloudTasks, ServerLocalProfile ─▶ ServerApplication
-                         └─▶ ServerApplication, Tailoring
+                         └─▶ ServerApplication, Tailoring, CVDrafting
 
 PrestoCVAPI package: PrestoCVAPIServer, PrestoCVAPIClient ─▶ PrestoCVAPITypes     (generated; imports no PrestoCV package)
 
@@ -478,6 +526,8 @@ Forbidden: any edge between PrestoCVCore, CVPDFExporter, CVGeneratorAI and CVTai
 Forbidden: any edge from a domain, application or port target to an adapter target.
 Forbidden: PrestoCVPresentation → PrestoCVIntegration.
 Forbidden: any edge from ServerApplication to a third-party package.
+Forbidden: CVImportVision and CVImportArchive importing a PrestoCV package other than CVDrafting.
+Forbidden: any app target importing Tailoring.
 Forbidden: any edge from the server's package to PrestoCVApp or PrestoCVCore.
 Forbidden: any import of a PrestoCVAPI target by a production target outside the package, except by ServerHTTP and PrestoCVAPIAdapter.
 Forbidden: ServerHTTP importing PrestoCVAPIClient, and PrestoCVAPIAdapter importing PrestoCVAPIServer.
