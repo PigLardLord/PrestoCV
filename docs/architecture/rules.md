@@ -12,13 +12,14 @@ Each rule says what is required, why, and what enforces it:
 - **test**: a required test fails.
 - **review**: nothing automatic can catch it. Kept to a minimum, and marked as such.
 
-The checker applies to **production targets**: domain, application, integration, presentation and adapter targets, and the composition root. Test, test-support and tool targets get the import allow-lists only. Legacy targets are exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)).
+The checker applies to **production targets**: domain, application, integration, presentation and adapter targets, and the composition roots. Test, test-support and tool targets get the import allow-lists only. Legacy targets are exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)).
 
 ---
 
 ## R1. Packages are isolated; contexts depend only along documented edges
 
-- **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter`, `CVGeneratorAI` and `CVTailoring` never import one another. Translation between them happens only in `PrestoCVIntegration`.
+- **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter`, `CVGeneratorAI` and `CVTailoring` never import one another. Translation between packages happens only in `PrestoCVIntegration`, in the app, and in `ServerHTTP`, in the server ([ADR 0014](adr/0014-server-modular-monolith.md)).
+- **The server's package is not one of them.** `PrestoCVServer` is an integration and composition package, like `PrestoCVApp`. It imports the context packages it serves, and none of the app's packages.
 - **Inside a package, contexts depend only along the edges listed in [modules.md](modules.md).** There is exactly one such edge today: in `CVPDFExporter`, Document Rendering is downstream of Design Catalog (`CVRendering` imports `CVDesignCatalog`). The reverse is forbidden.
 - **Any other edge** between contexts needs an ADR and an update to [modules.md](modules.md).
 - **`@_exported import` is banned.** It would re-export a module to every importer.
@@ -57,11 +58,11 @@ A protocol with one implementation exists only if it is a port or has a test dou
 
 **Enforced by:** compiler (target graph) and review.
 
-## R4. One composition root
+## R4. One composition root per executable
 
-Only `PrestoCVComposition` creates infrastructure: repositories, stores, renderers, the compiled web-view rule list, the AI adapter, file locations, time sources, identifier generators and loggers.
+Each executable has one composition root, and only that root creates infrastructure. The app's root is `PrestoCVComposition`. The server's root is the `PrestoCVServer` executable target ([ADR 0014](adr/0014-server-modular-monolith.md)). Infrastructure is: repositories, stores, renderers, the compiled web-view rule list, the AI adapter, file locations, time sources, identifier generators and loggers. On the server it also includes the database pool, the queue client and the inference providers' clients.
 
-- The `@main` App type creates the composition **once**, as a `static let`. That is the only process-wide instance.
+- Each executable creates its composition **once**: the app's `@main` App type as a `static let`, the server's `@main` command at start. That is the only process-wide instance.
 - Libraries do not provide `init()`s or default arguments that create infrastructure.
 - Libraries contain no containers, service locators or `static let shared` singletons.
 - Each stateful resource (the design store, the CV store) exists once per process. Across processes, the file store serialises writers with a lock ([ADR 0009](adr/0009-persisted-schema-v1.md)).
