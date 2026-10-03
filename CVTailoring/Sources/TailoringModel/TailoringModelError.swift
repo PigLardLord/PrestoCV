@@ -25,6 +25,12 @@ public enum TailoringModelError: Error, Hashable, Sendable {
     case invalidDate
     /// A period that ends before it starts.
     case invalidPeriod
+    /// A word-list file the format cannot read (`docs/architecture/word-lists.md`): not JSON, an unsupported version, a
+    /// key the format does not know, a list without its source or licence, an entry that is empty, not trimmed or
+    /// repeated, a file that is too large, or an index that names a language with no file.
+    case corruptWordList(WordListFile)
+    /// A word-list file that lacks a list the format requires, or holds a list with no entry, or no name for a month.
+    case incompleteWordList(TailoringLanguage, WordListKey)
 
     /// The text fields of the model, by what they hold, not by which type holds them.
     public enum Field: CaseIterable, Hashable, Sendable {
