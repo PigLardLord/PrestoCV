@@ -14,6 +14,8 @@ struct StatementSplitTests {
     static let blankDescriptions: [String] = {
         var values: [String] = []
         values.append(contentsOf: ["", " ", "\n", " \n\t\n  ", "\r\n\r\n"])
+        values.append(contentsOf: blankStrings)
+        values.append(contentsOf: ["\n\u{200B}\n\u{FEFF}\n\u{00A0}\n"])
         return values
     }()
 
@@ -99,6 +101,7 @@ struct StatementSplitTests {
     static let bulletOnlyLines: [String] = {
         var values: [String] = []
         values.append(contentsOf: ["-", "\u{2022}", "*", " \u{2014} ", "\u{2022} "])
+        values.append(contentsOf: ["-\u{200B}", "\u{FEFF}\u{2022}", "\u{FEFF}- \u{200B}", "-\u{00A0}", "\u{3000}*\u{2003}"])
         return values
     }()
 
@@ -142,6 +145,51 @@ struct StatementSplitTests {
         }
     }
 
+    @Test("whitespace of any width and invisible format characters around a line are trimmed", arguments: invisibleCharacters)
+    func aroundText(padding: String) {
+        #expect(texts("\(padding)text\(padding)") == ["text"])
+        #expect(texts("\(padding)\(padding)two words\(padding)\nnext\(padding)") == ["two words", "next"])
+    }
+
+    @Test("an invisible character between words stays where it was written")
+    func insideText() {
+        #expect(texts("a\u{200B}b") == ["a\u{200B}b"])
+        #expect(texts("a \u{00A0} b") == ["a \u{00A0} b"])
+    }
+
+    @Test("a bullet is removed when whitespace follows it, and what follows that is trimmed", arguments: invisibleCharacters)
+    func afterABullet(invisible: String) {
+        #expect(texts("- \(invisible)text") == ["text"])
+        #expect(texts("\u{2022}\u{00A0}\(invisible)text\(invisible)") == ["text"])
+    }
+
+    @Test("an invisible character before the bullet is trimmed first", arguments: invisibleCharacters)
+    func beforeABullet(invisible: String) {
+        #expect(texts("\(invisible)- text") == ["text"])
+        #expect(texts("\(invisible)\u{2022} text") == ["text"])
+    }
+
+    @Test("a bullet that no whitespace follows keeps what is written, an invisible character included")
+    func bulletThenInvisible() {
+        #expect(texts("-\u{200B}text") == ["-\u{200B}text"])
+        #expect(texts("*\u{FEFF} text") == ["*\u{FEFF} text"])
+    }
+
+    @Test("a combining mark on a bullet or on the space after it keeps the bullet, with nothing left orphaned")
+    func markedBullet() {
+        #expect(texts("-\u{0301}x") == ["-\u{0301}x"])
+        #expect(texts("- \u{0301}x") == ["- \u{0301}x"])
+        #expect(texts("\u{2022}\u{0301} x") == ["\u{2022}\u{0301} x"])
+    }
+
+    @Test("a space that carries a combining mark is content, for the split and for a statement alike")
+    func markedSpaceIsContent() throws {
+        #expect(texts(markedSpace) == [markedSpace])
+        #expect(texts("a\n\(markedSpace)\nb") == ["a", markedSpace, "b"])
+        #expect(try Statement(text: markedSpace).text == markedSpace)
+        #expect(try Statement(text: "\u{200B}\(markedSpace)\u{FEFF}").text == markedSpace)
+    }
+
     @Test("a mixed description keeps the lines that say something")
     func mixed() {
         let description = "\u{2022} Led the platform team\r\n\r\n- Cut cost by -5%\n   \n* Hired 3 people  \n2. Ran the on-call rota"
@@ -159,7 +207,7 @@ struct StatementInitTests {
 
     static let blankTexts: [String] = {
         var values: [String] = []
-        values.append(contentsOf: ["", " ", "\n", " \t\r\n "])
+        values.append(contentsOf: blankStrings)
         return values
     }()
 
@@ -185,6 +233,12 @@ struct StatementInitTests {
         values.append(contentsOf: ["\nCut costs", "Cut costs\r\n", "\r\n Cut costs \u{2028}"])
         return values
     }()
+
+    @Test("the same invisible characters are trimmed from a statement built from text", arguments: invisibleCharacters)
+    func paddedWithInvisible(padding: String) throws {
+        #expect(try Statement(text: "\(padding)Cut costs\(padding)").text == "Cut costs")
+        #expect(try Statement(text: "\(padding)- Cut costs").text == "- Cut costs")
+    }
 
     @Test("a line break at either end is trimmed, and does not make a second line", arguments: paddedTexts)
     func breaksAtTheEnds(text: String) throws {

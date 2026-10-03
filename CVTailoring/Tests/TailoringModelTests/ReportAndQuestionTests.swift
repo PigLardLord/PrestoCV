@@ -72,7 +72,7 @@ struct ReportAndQuestionTests {
 
     static let blankTexts: [String] = {
         var texts: [String] = []
-        texts.append(contentsOf: ["", " ", "\n\t"])
+        texts.append(contentsOf: blankStrings)
         return texts
     }()
 
@@ -80,6 +80,12 @@ struct ReportAndQuestionTests {
     func emptyText(text: String) {
         #expect(throws: TailoringModelError.emptyField(.term)) { try Question(kind: .unevidencedTerm(text), scope: .skills) }
         #expect(throws: TailoringModelError.emptyField(.request)) { try Question(kind: .modelRequest(text), scope: .summary) }
+    }
+
+    @Test("a term or a request of a space with a combining mark is not empty: the mark shows")
+    func markedSpaceQuestion() throws {
+        _ = try Question(kind: .unevidencedTerm(markedSpace), scope: .skills)
+        _ = try Question(kind: .modelRequest(markedSpace), scope: .summary)
     }
 
     @Test("a term or a request accepts 10,000 bytes and refuses one more")

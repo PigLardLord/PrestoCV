@@ -132,13 +132,18 @@ struct CoverLetterTests {
 
     static let blankAdverts: [String] = {
         var texts: [String] = []
-        texts.append(contentsOf: ["", " ", "\n\t \r\n", "\u{00A0}"])
+        texts.append(contentsOf: blankStrings)
         return texts
     }()
 
     @Test("an advert with no text is refused", arguments: blankAdverts)
     func advertWithoutText(text: String) {
         #expect(throws: TailoringModelError.emptyField(.advert)) { try Advert(text: text, language: .english) }
+    }
+
+    @Test("an advert of a space with a combining mark is not empty: the mark shows")
+    func markedSpaceAdvert() throws {
+        #expect(try Advert(text: markedSpace, language: .english).text == markedSpace)
     }
 
     @Test("an advert holds at most 50,000 UTF-8 bytes")

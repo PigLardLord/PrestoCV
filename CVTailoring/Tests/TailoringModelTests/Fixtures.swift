@@ -61,3 +61,22 @@ extension Sample {
         try TailoredExperience(source: source, role: "Engineer", company: "Acme", lines: lines)
     }
 }
+
+/// Strings that show nothing: whitespace of every width, and invisible format characters.
+let blankStrings: [String] = {
+    var values: [String] = []
+    values.append(contentsOf: ["", " ", "\t", "\n", "\r\n", " \t\r\n "])
+    values.append(contentsOf: ["\u{00A0}", "\u{2003}", "\u{3000}", "\u{2028}"])
+    values.append(contentsOf: ["\u{200B}", "\u{FEFF}", "\u{2060}", "\u{200B}\u{FEFF} \u{00A0}"])
+    return values
+}()
+
+/// The same kinds of character, one each, to put around text or after a bullet.
+let invisibleCharacters: [String] = {
+    var values: [String] = []
+    values.append(contentsOf: [" ", "\t", "\u{00A0}", "\u{2003}", "\u{3000}", "\u{200B}", "\u{FEFF}", "\u{2060}"])
+    return values
+}()
+
+/// A space that carries a combining mark: not blank, since the mark shows.
+let markedSpace = " \u{0301}"

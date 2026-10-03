@@ -26,13 +26,18 @@ struct SourceEntryTests {
 
     static let blankNames: [String] = {
         var names: [String] = []
-        names.append(contentsOf: ["", " ", "\t\n ", "\u{00A0}"])
+        names.append(contentsOf: blankStrings)
         return names
     }()
 
     @Test("a name that is empty after trimming is refused", arguments: blankNames)
     func personalDetailsNeedAName(name: String) {
         #expect(throws: TailoringModelError.emptyField(.fullName)) { try SourcePersonalDetails(fullName: name) }
+    }
+
+    @Test("a name made of a space with a combining mark is not empty: the mark shows")
+    func markedSpaceName() throws {
+        #expect(try SourcePersonalDetails(fullName: markedSpace).fullName == markedSpace)
     }
 
     @Test("the name keeps its spaces as written")

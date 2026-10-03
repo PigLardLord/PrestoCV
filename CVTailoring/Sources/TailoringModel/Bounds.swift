@@ -1,17 +1,40 @@
 /// The checks the initialisers of the model share, so a bound is written once (R8).
 enum Bounds {
-    static func text(_ value: String, _ field: TailoringModelError.Field) throws(TailoringModelError) {
-        guard value.utf8.count <= TailoringLimits.maxTextBytes else { throw .tooLarge(field) }
+    static func text(_ value: String, _ field: TailoringModelError.Field,
+                     maxBytes: Int = TailoringLimits.maxTextBytes) throws(TailoringModelError) {
+        guard value.utf8.count <= maxBytes else { throw .tooLarge(field) }
     }
 
     static func optionalText(_ value: String?, _ field: TailoringModelError.Field) throws(TailoringModelError) {
         if let value { try text(value, field) }
     }
 
-    /// Text that must say something: not empty once its whitespace is trimmed. The value itself is kept as written.
-    static func requiredText(_ value: String, _ field: TailoringModelError.Field) throws(TailoringModelError) {
-        guard value.contains(where: { !$0.isWhitespace }) else { throw .emptyField(field) }
-        try text(value, field)
+    /// Text that must say something: its size is checked first, and then that it holds a character that shows. The
+    /// value itself is kept as written.
+    static func requiredText(_ value: String, _ field: TailoringModelError.Field,
+                             maxBytes: Int = TailoringLimits.maxTextBytes) throws(TailoringModelError) {
+        try text(value, field, maxBytes: maxBytes)
+        guard value.contains(where: { !isBlank($0) }) else { throw .emptyField(field) }
+    }
+
+    // MARK: Blank and trimmed
+
+    /// A character that shows nothing: made only of whitespace scalars, or of default-ignorable ones (a zero-width
+    /// space, a byte order mark, a word joiner). A space that carries a combining mark is not blank: the mark shows.
+    static func isBlank(_ character: Character) -> Bool {
+        character.unicodeScalars.allSatisfy { $0.properties.isWhitespace || $0.properties.isDefaultIgnorableCodePoint }
+    }
+
+    /// A character made only of whitespace scalars, so nothing of it is left behind when it is taken away.
+    static func isSpace(_ character: Character) -> Bool {
+        character.unicodeScalars.allSatisfy { $0.properties.isWhitespace }
+    }
+
+    /// The text without the blank characters at either end. It is the one rule of trimming: statements, the split and
+    /// every check that needs text to say something use it.
+    static func trimmed(_ text: Substring) -> Substring {
+        guard let first = text.firstIndex(where: { !isBlank($0) }), let last = text.lastIndex(where: { !isBlank($0) }) else { return "" }
+        return text[first...last]
     }
 
     static func texts(_ values: [String], _ field: TailoringModelError.Field, atMost limit: Int,

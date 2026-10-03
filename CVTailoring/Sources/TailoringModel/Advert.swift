@@ -5,8 +5,7 @@ public struct Advert: Hashable, Sendable {
 
     /// The text must say something, and holds at most `TailoringLimits.maxAdvertBytes` UTF-8 bytes (R8).
     public init(text: String, language: TailoringLanguage) throws(TailoringModelError) {
-        guard text.contains(where: { !$0.isWhitespace }) else { throw .emptyField(.advert) }
-        guard text.utf8.count <= TailoringLimits.maxAdvertBytes else { throw .tooLarge(.advert) }
+        try Bounds.requiredText(text, .advert, maxBytes: TailoringLimits.maxAdvertBytes)
         self.text = text
         self.language = language
     }
