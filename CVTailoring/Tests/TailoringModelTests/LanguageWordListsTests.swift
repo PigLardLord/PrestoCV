@@ -13,6 +13,27 @@ struct LanguageWordListsTests {
         try LanguageWordLists(decoding: data, language: language)
     }
 
+    static let expectedNumberWords: [NumberWord] = {
+        var values: [NumberWord] = []
+        values.append(NumberWord(word: "two", value: 2))
+        values.append(NumberWord(word: "three", value: 3))
+        return values
+    }()
+
+    static let expectedFormWords: [FormOfAddressWord] = {
+        var values: [FormOfAddressWord] = []
+        values.append(FormOfAddressWord(form: .ms, word: "alpha"))
+        values.append(FormOfAddressWord(form: .mr, word: "beta"))
+        return values
+    }()
+
+    static let expectedRankWords: [RankWord] = {
+        var values: [RankWord] = []
+        values.append(RankWord(word: "alpha", ranks: [.senior]))
+        values.append(RankWord(word: "beta", ranks: [.lead, .head]))
+        return values
+    }()
+
     @Test("a complete file becomes the typed groups of its language")
     func complete() throws {
         let lists = try decode(WordListFixture.data(language: .italian), as: .italian)
@@ -26,15 +47,15 @@ struct LanguageWordListsTests {
         #expect(lists.dates.months.entries.first == MonthName(name: "month1", month: 1))
         #expect(lists.dates.presentWords.entries == ["alpha", "beta"] && lists.dates.durationUnitWords.entries == ["alpha", "beta"])
         #expect(lists.dates.sinceWords.entries == ["alpha", "beta"] && lists.dates.rangeSeparatorWords.entries == ["alpha", "beta"])
-        #expect(lists.numbers.words.entries == [NumberWord(word: "two", value: 2), NumberWord(word: "three", value: 3)])
-        #expect(lists.spans.countWords.entries == [NumberWord(word: "two", value: 2), NumberWord(word: "three", value: 3)])
+        #expect(lists.numbers.words.entries == Self.expectedNumberWords)
+        #expect(lists.spans.countWords.entries == Self.expectedNumberWords)
         #expect(lists.spans.tiedCounts.entries == ["{count} of them at {employer}"])
         #expect(lists.spans.employerEndWords.entries == ["alpha", "beta"])
         #expect(lists.letter.valedictions.entries == ["alpha", "beta"])
-        #expect(lists.letter.formsOfAddress.entries == [FormOfAddressWord(form: .ms, word: "alpha"), FormOfAddressWord(form: .mr, word: "beta")])
+        #expect(lists.letter.formsOfAddress.entries == Self.expectedFormWords)
         #expect(lists.provenance.notPlurals.entries == ["alpha", "beta"] && lists.provenance.legalForms.entries == ["alpha", "beta"])
         #expect(lists.provenance.firstPerson.entries == ["alpha", "beta"])
-        #expect(lists.provenance.ranks.entries == [RankWord(word: "alpha", ranks: [.senior]), RankWord(word: "beta", ranks: [.lead, .head])])
+        #expect(lists.provenance.ranks.entries == Self.expectedRankWords)
         #expect(lists.letter.addresseesAtClauseEnd.entries == ["alpha", "beta"])
         #expect(lists.letter.academicTitles.entries == ["alpha", "beta"] && lists.letter.notGivenNames.entries == ["alpha", "beta"])
         #expect(lists.technologies.entries == ["alpha", "beta"])
