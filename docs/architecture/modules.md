@@ -235,7 +235,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 
 - **Hidden characters**, one rule in `TextRules`, which every initialiser applies with `hiddenCharacter`. It is public, so that the decoder (#152) and the server's request mapper call the same copy and keep no second classification:
   - `hiddenCharacter(in:multiLine:)` and `hiddenCharacter(in:field:)` say whether a text holds one;
-  - `removingHidden(from:multiLine:)` and `removingHidden(from:field:)` remove exactly what the rule refuses, for intake that cleans what it reads. In a one-line text they never touch a line break: whether a break is an error is for the caller to decide, and the model reports it as `notOneLine`;
+  - `removingHidden(from:multiLine:)` and `removingHidden(from:field:)` clean what the rule refuses, for intake that cleans what it reads: each refused character is removed, or replaced where removing it would join two words. A break-like control (vertical tab, form feed, NEL) in a multi-line text becomes a line feed, and a tab in a one-line text becomes a space; breaks are normalised, never lost. In a one-line text they never touch a line break: whether a break is an error is for the caller to decide, and the model reports it as `notOneLine`;
   - `Field.isMultiLine` is the classification of a field, public for the same reason.
 
   A text is refused when it holds:

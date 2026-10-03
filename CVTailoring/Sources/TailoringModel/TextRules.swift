@@ -36,16 +36,25 @@ public enum TextRules {
         hiddenCharacter(in: text, multiLine: field.isMultiLine)
     }
 
-    /// `text` without the characters `hiddenCharacter(in:multiLine:)` refuses, for a caller that cleans what it reads
-    /// before it reaches the model. It keeps the joiners and everything else that is not hidden, and in a multi-line
-    /// text the `\n`, `\r` and tab that it keeps. In a one-line text it does not touch a line break of any kind:
-    /// whether a break is an error is for the caller to decide, and the model reports it as `notOneLine`.
+    /// `text` cleaned of what `hiddenCharacter(in:multiLine:)` refuses, for a caller that cleans what it reads before
+    /// it reaches the model. Each refused character is removed, or replaced where removing it would join two words: a
+    /// break-like control (vertical tab, form feed, NEL) in a multi-line text becomes a line feed, and a tab in a
+    /// one-line text becomes a space. Breaks are normalised, never lost. Everything that is not hidden stays: the
+    /// joiners, and in a multi-line text the `\n`, `\r`, tab and separators it keeps. In a one-line text a line break of
+    /// any kind is left alone: whether it is an error is for the caller to decide, and the model reports it as
+    /// `notOneLine`.
     public static func removingHidden(from text: String, multiLine: Bool) -> String {
-        var kept = String.UnicodeScalarView()
-        for scalar in text.unicodeScalars where !isHidden(scalar, multiLine: multiLine) || (!multiLine && isBreak(scalar)) {
-            kept.append(scalar)
+        var cleaned = String.UnicodeScalarView()
+        for scalar in text.unicodeScalars {
+            if !isHidden(scalar, multiLine: multiLine) {
+                cleaned.append(scalar)
+            } else if isBreak(scalar) {
+                cleaned.append(multiLine ? "\n" : scalar)
+            } else if !multiLine && scalar == "\t" {
+                cleaned.append(" ")
+            }
         }
-        return String(kept)
+        return String(cleaned)
     }
 
     /// `removingHidden(from:multiLine:)` with the classification of `field`.

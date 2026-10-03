@@ -166,12 +166,20 @@ struct RemovingHiddenTests {
         var kept = String.UnicodeScalarView()
         for scalar in text.unicodeScalars {
             let isBreak = Character(scalar).isNewline
-            if !TextRules.hiddenCharacter(in: String(scalar), multiLine: multiLine) || (!multiLine && isBreak) { kept.append(scalar) }
+            if !TextRules.hiddenCharacter(in: String(scalar), multiLine: multiLine) {
+                kept.append(scalar)
+            } else if multiLine && isBreak {
+                kept.append("\n")
+            } else if !multiLine && scalar == "\t" {
+                kept.append(" ")
+            } else if !multiLine && isBreak {
+                kept.append(scalar)
+            }
         }
         return String(kept)
     }
 
-    @Test("removing takes out exactly what the rule refuses, but the breaks of a one-line text", arguments: mixedTexts, [false, true])
+    @Test("removing takes out what the rule refuses, but a break-like control becomes a line feed, a one-line tab a space, and a one-line break stays", arguments: mixedTexts, [false, true])
     func removesExactlyWhatIsRefused(text: String, multiLine: Bool) {
         #expect(TextRules.removingHidden(from: text, multiLine: multiLine) == filtered(text, multiLine: multiLine))
     }
@@ -222,9 +230,10 @@ struct RemovingHiddenTests {
         #expect(TextRules.removingHidden(from: text, multiLine: true) == text)
     }
 
-    @Test("in a multi-line text it removes NEL, vertical tab and form feed", arguments: HiddenSamples.otherBreaks)
-    func removesOtherBreaksInMultiLine(character: String) {
-        #expect(TextRules.removingHidden(from: "a" + character + "b", multiLine: true) == "ab")
+    @Test("in a multi-line text it turns NEL, vertical tab and form feed into a line feed, which never joins two words", arguments: HiddenSamples.otherBreaks)
+    func turnsOtherBreaksIntoLineFeeds(character: String) {
+        #expect(TextRules.removingHidden(from: "a" + character + "b", multiLine: true) == "a\nb")
+        #expect(TextRules.removingHidden(from: "one." + character + "Two " + character + character + "three", multiLine: true) == "one.\nTwo \n\nthree")
     }
 
     @Test("in a one-line text it leaves every break for the caller to decide", arguments: HiddenSamples.breaks)
@@ -233,10 +242,40 @@ struct RemovingHiddenTests {
         #expect(TextRules.removingHidden(from: text, multiLine: false) == text)
     }
 
-    @Test("in a one-line text it removes a tab, which is not a break")
-    func removesTabInOneLine() {
-        #expect(TextRules.removingHidden(from: "a\tb", multiLine: false) == "ab")
-        #expect(TextRules.removingHidden(from: "a\tb\nc\u{202E}", multiLine: false) == "ab\nc")
+    @Test("in a one-line text it turns a tab into a space, which never joins two words")
+    func turnsTabIntoSpaceInOneLine() {
+        #expect(TextRules.removingHidden(from: "a\tb", multiLine: false) == "a b")
+        #expect(TextRules.removingHidden(from: "a\t\tb\tc\u{202E}", multiLine: false) == "a  b c")
+        #expect(TextRules.removingHidden(from: "a\tb\nc\u{202E}", multiLine: false) == "a b\nc")
+    }
+
+    @Test("a tab in a multi-line text stays a tab")
+    func keepsTabInMultiLine() {
+        #expect(TextRules.removingHidden(from: "a\tb", multiLine: true) == "a\tb")
+    }
+
+    @Test("a salary written with a tab is cleaned to a space, and the model accepts it")
+    func salaryWithATab() throws {
+        let salary = TextRules.removingHidden(from: "55k\tEUR", field: .salaryExpectation)
+        #expect(salary == "55k EUR")
+        #expect(try LetterDefaults(salaryExpectation: salary).salaryExpectation == "55k EUR")
+    }
+
+    @Test("an advert with a vertical tab, NEL or a form feed is cleaned to line feeds, and the model accepts it")
+    func advertWithBreakControls() throws {
+        let requirements = TextRules.removingHidden(from: "Requirements:\u{000B}Swift\u{0085}5 years", field: .advert)
+        #expect(requirements == "Requirements:\nSwift\n5 years")
+        #expect(try Advert(text: requirements, language: .english).text == requirements)
+        let recruiter = TextRules.removingHidden(from: "Recruiter.\u{000C}Apply.", field: .advert)
+        #expect(recruiter == "Recruiter.\nApply.")
+        #expect(try Advert(text: recruiter, language: .english).text == recruiter)
+        #expect(throws: TailoringModelError.hiddenCharacter(.advert)) { try Advert(text: "Recruiter.\u{000C}Apply.", language: .english) }
+    }
+
+    @Test("a description written with break controls keeps its lines once cleaned")
+    func descriptionWithBreakControls() throws {
+        let description = TextRules.removingHidden(from: "- Built the API\u{000B}- Cut costs\u{0085}- Trained juniors\u{000C}", field: .description)
+        #expect(try SourceExperience(role: "r", company: "c", description: description).statements.map(\.text) == ["Built the API", "Cut costs", "Trained juniors"])
     }
 
     @Test("what is left after removing is accepted by the model, or refused only for its breaks")
@@ -244,7 +283,7 @@ struct RemovingHiddenTests {
         let skill = TextRules.removingHidden(from: "Swift\u{202E}\u{200F}\u{0007}", field: .skillName)
         #expect(try SourceSkill(name: skill).name == "Swift")
         let summary = TextRules.removingHidden(from: "Line one\u{0085}\nLine\u{061C} two", field: .summary)
-        #expect(try SourceCV(language: .english, personal: Sample.personal(), summary: summary).summary == "Line one\nLine two")
+        #expect(try SourceCV(language: .english, personal: Sample.personal(), summary: summary).summary == "Line one\n\nLine two")
         let role = TextRules.removingHidden(from: "Engineer\u{2028}Manager\u{202E}", field: .role)
         #expect(role == "Engineer\u{2028}Manager")
         #expect(throws: TailoringModelError.notOneLine(.role)) { try SourceExperience(role: role, company: "Acme") }
@@ -267,7 +306,7 @@ struct TextRulesByFieldTests {
         #expect(TextRules.hiddenCharacter(in: text, field: field) == TextRules.hiddenCharacter(in: text, multiLine: field.isMultiLine))
         #expect(TextRules.removingHidden(from: text, field: field) == TextRules.removingHidden(from: text, multiLine: field.isMultiLine))
         #expect(TextRules.hiddenCharacter(in: "a\tb", field: field) == !field.isMultiLine)
-        #expect(TextRules.removingHidden(from: "a\tb\u{202E}c", field: field) == (field.isMultiLine ? "a\tbc" : "abc"))
+        #expect(TextRules.removingHidden(from: "a\tb\u{202E}c", field: field) == (field.isMultiLine ? "a\tbc" : "a bc"))
     }
 
     @Test("every field the model checks is classified as the model checks it", arguments: HiddenSamples.allFields)
