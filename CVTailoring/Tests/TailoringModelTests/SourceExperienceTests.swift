@@ -158,4 +158,21 @@ struct SourceExperienceTests {
             try SourceExperience(role: "r", company: "c", statements: Array(repeating: one, count: 201))
         }
     }
+
+    // MARK: A snapshot survives being rebuilt
+
+    @Test("the text of every statement of a split rebuilds that same statement", arguments: awkwardDescriptions)
+    func statementRoundTrip(description: String) throws {
+        for statement in Statement.split(description) {
+            #expect(try Statement(text: statement.text) == statement)
+        }
+    }
+
+    @Test("an experience rebuilt from the texts of its statements equals the one built from the description", arguments: awkwardDescriptions)
+    func experienceRoundTrip(description: String) throws {
+        let built = try SourceExperience(role: "r", company: "c", description: description)
+        let rebuilt = try SourceExperience(role: "r", company: "c", statements: built.statements.map { try Statement(text: $0.text) })
+        #expect(rebuilt == built)
+        #expect(rebuilt.statements.map(\.text) == built.statements.map(\.text))
+    }
 }

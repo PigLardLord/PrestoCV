@@ -89,3 +89,12 @@ let invisibleCharacters: [String] = {
 
 /// A space that carries a combining mark: not blank, since the mark shows.
 let markedSpace = " \u{0301}"
+
+/// Descriptions that are hard on the split: several lines, bullets, blanks, invisible characters, combining marks and tabs.
+let awkwardDescriptions: [String] = {
+    var values: [String] = []
+    values.append(contentsOf: ["", "one paragraph", "first\nsecond\r\nthird\rfourth", "\u{2022} a\n\n- b\n* c\n\u{25CF} d\n\u{F0B7} e"])
+    values.append(contentsOf: ["- - x", "-5% churn\n1. numbered\n-- notes", "\u{FEFF}- text\n \u{200B}\n\u{00A0}- other", "-\u{0301}x\n- \u{0301}y\n\u{2022}\u{0301} z"])
+    values.append(contentsOf: ["a\tb\n\tc\t", "a\u{200B}b \u{2060} c", markedSpace + "\n" + markedSpace + "x", "-\u{200B}text\n*\u{FEFF} text", "r\u{00E9}sum\u{00E9}\n\u{2014} 30 % \u{00E0} Paris"])
+    return values
+}()
