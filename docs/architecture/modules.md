@@ -281,25 +281,26 @@ The targets are created by #158 and the tickets named below. Until the targets e
 
 **`ServerApplication`** (#157, #155)
 - **Use cases:** start a tailoring, run it, get it and delete it, and read the data policy (#155), which `GET /v1/policy` calls.
-  - Start checks the caller's quota, records the job under its idempotency key and queues it. The same key returns the same job.
+  - Start checks the caller's quota, records the job under its idempotency key and queues it. The same key returns the same job. It refuses a request that carries another policy version than the current one.
   - Run is the `work` role's use case: it loads the job, runs the loop of `Tailoring`, stores the result or the failure, and notifies the device (#180).
   - Get returns the job to its owner only. Delete erases it.
 - **The job lifecycle:** queued, running, succeeded, failed, expired. A job is erased once the app confirms it has saved the result, and 24 hours after the job ends at the latest (#166).
 - **The lease.** A running job holds a lease, and a job whose lease has expired is taken over by the retry (#161). The lease belongs to the job's lifecycle and to its contract suite, not to the queue adapter.
 - **Ports it owns (R3):** the job store, the job queue, the quota, the clock, an identifier generator (R2), a notifier (#180), the log events, and the data-policy port that `GET /v1/policy` reads (#155, #175).
 - **The data policy** ([ADR 0015](adr/0015-inference-providers-and-data-policy.md)), beside that port:
-  - the types: what a provider declares (whether it keeps prompts, whether it trains on them, the regions it may run in) and what a deployment requires, and the policy's version, derived from its content. A job records the version it started under, and the worker refuses to run it under another (#155, #190);
+  - the types: what a provider declares (whether it keeps prompts, whether it trains on them, the regions it may run in), what a deployment requires, and the policy that `GET /v1/policy` serves: the requirements and the processors, which are the registry's providers named as the published privacy policy names them (#190);
+  - the policy's version, derived from everything that endpoint serves, so a provider swap that still meets the requirements changes it. The start request carries the version the app showed the user, Start refuses a different one, the job records it, and the worker refuses to run it under another (#155, #176, #190);
   - the one rule, "a provider meets a policy": it keeps prompts and trains on them only where the policy allows it, and runs only in regions the policy accepts. A provider stricter than the policy meets it. The rule is pure, reads no ambient state (R2) and is tested without I/O.
 - **Log events** are typed and never carry a CV, a prompt or a key (#167). The executable bridges the port to swift-log. Adapters log through an injected `Logger` once #167 extends their allow-lists with `Logging`.
 - **Typed errors** (R7). It imports no third-party package.
 
 **`ServerInference`** (#154, #155, [ADR 0015](adr/0015-inference-providers-and-data-policy.md))
 - The adapters behind the inference port that `Tailoring` owns (#150): the first one speaks the chat-completions API that most providers and local model servers share, with a dialect for each endpoint. A native adapter is written only for a provider with no compatible endpoint.
-- **The registry,** built from configuration. It lists the providers in order of preference, each with its dialect, its endpoint, the name of the secret that holds its key (a provider that needs no key declares so), its allowed models, its capabilities, its declared data policy, and an alias. The alias is the only name of the provider or model that leaves the server: in a result, a log or a report (#156, #176).
+- **The registry,** built from configuration. It lists the providers in order of preference, each with its dialect, its endpoint, the name of the secret that holds its key (a provider that needs no key declares so), its allowed models with the capabilities of each (whether it supports structured output, its context size), its declaration, its name as the published privacy policy names it (#190), and an alias. The alias is the only name of a provider or model in a result, a log or a report (#156, #176).
 - **Building the registry** applies the rule of `ServerApplication`. It fails with the refusal described under the executable when a provider does not meet the policy, so no running registry holds one and no fallback can reach one.
 - **Selection and fallback:** the first available provider answers. When it is unavailable or rate-limited, the next one that meets the policy answers instead. No other error triggers a fallback, a refusal for lack of credit included (#165).
 - It implements both ports: the inference port of `Tailoring`, and the data-policy port of `ServerApplication`, so `GET /v1/policy` reaches the policy. The registry's declarations and that port need no client and no key.
-- **A router's dialect** derives its routing preferences from the deployment's policy (#154).
+- **A router's dialect** derives its routing preferences from the deployment's policy (#154). A router's declaration covers its upstreams: its regions are its own and those of the upstreams its routing preferences allow, and it keeps prompts if it or any of those upstreams does.
 - The adapter decodes the endpoint's envelope into the port's reply and errors, with a size cap. The model's text is decoded once, in `Tailoring` (R8).
 - It never logs a prompt, an answer or a key. It never reads a secret, the environment or a secret store: the executable hands it the keys and the clients.
 
@@ -323,7 +324,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - `PrestoCVAPITypes` and `PrestoCVAPIServer` are targets of the `PrestoCVAPI` package, which #175 and #177 add to this file.
 
 **The `PrestoCVServer` executable target**
-- The executable and the server's composition root (R4). It reads the command line with ArgumentParser and the configuration, picks the profile's adapters, wires them behind the ports of `ServerApplication` and of `Tailoring`, and creates the infrastructure: the database pool, the queue client, the inference providers' clients, the clock, the identifier generators and the logger.
+- The executable and the server's composition root (R4). It reads the command line with ArgumentParser and the configuration, picks the profile's adapters, wires them behind the ports of `ServerApplication` and of `Tailoring`, and creates the infrastructure: the database pool, the queue client, the inference providers' HTTP client (in the role that holds the keys), the clock, the identifier generators and the logger.
 - It reads the deployment's configuration and refuses to start, with an error that names the cause, when a provider does not meet the data policy, when a model is not allowed, when a secret cannot be read, or when a provider's declaration is incomplete (#155, [ADR 0015](adr/0015-inference-providers-and-data-policy.md)). Nothing is skipped silently.
   - Both roles read one configuration, and each checks the policy and the models.
   - In the role that holds the keys, it reads the secrets, hands them to the adapters and creates the providers' HTTP client, one per process.
