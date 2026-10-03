@@ -60,6 +60,24 @@ struct TailoringLanguageTests {
         #expect(try TailoringLanguage(bcp47: "en-a") == .english)
     }
 
+    /// A tag of the given length whose every subtag is well formed, so only its length can refuse it.
+    private func wellFormedTag(bytes: Int) -> String {
+        var tag = "en"
+        while tag.utf8.count + 9 <= bytes { tag += "-abcdefgh" }
+        let rest = bytes - tag.utf8.count
+        if rest >= 2 { tag += "-" + String(repeating: "a", count: rest - 1) }
+        return tag
+    }
+
+    @Test("a tag of 64 UTF-8 bytes is read, one of 65 is refused before it is split")
+    func tagLength() throws {
+        #expect(wellFormedTag(bytes: 64).utf8.count == 64)
+        #expect(wellFormedTag(bytes: 65).utf8.count == 65)
+        #expect(try TailoringLanguage(bcp47: wellFormedTag(bytes: 64)) == .english)
+        #expect(throws: TailoringModelError.unsupportedLanguage) { try TailoringLanguage(bcp47: wellFormedTag(bytes: 65)) }
+        #expect(throws: TailoringModelError.unsupportedLanguage) { try TailoringLanguage(bcp47: wellFormedTag(bytes: 1_000_000)) }
+    }
+
     static let unsupportedTags: [String] = {
         var tags: [String] = []
         tags.append(contentsOf: ["", " ", "und", "eng", "e", "ja", "zh-Hans", "nl"])

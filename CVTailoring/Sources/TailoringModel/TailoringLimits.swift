@@ -23,6 +23,9 @@ public enum TailoringLimits {
     /// The documents a letter lists as attached.
     public static let maxAttachments = 20
 
+    /// A BCP 47 language tag, which is read only up to this length.
+    public static let maxLanguageTagBytes = 64
+
     /// The statements one tailored line names as its sources.
     public static let maxSourcesPerLine = 200
 }

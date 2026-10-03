@@ -28,9 +28,11 @@ public struct SourceExperience: Hashable, Sendable {
     }
 
     /// An experience from the description a person wrote: it is split once, by `Statement.split`, into the statements
-    /// the experience then holds.
+    /// the experience then holds. A description over `TailoringLimits.maxTextBytes` is refused before it is split, so
+    /// the cost of the split is bounded (R8).
     public init(role: String, company: String, location: String = "", period: TailoringPeriod? = nil,
                 description: String = "") throws(TailoringModelError) {
+        try Bounds.text(description, .description)
         try self.init(role: role, company: company, location: location, period: period, statements: Statement.split(description))
     }
 }

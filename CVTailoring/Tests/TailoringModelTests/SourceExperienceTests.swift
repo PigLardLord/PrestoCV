@@ -40,21 +40,37 @@ struct SourceExperienceTests {
         cases.append(TextFieldCase(.role) { _ = try SourceExperience(role: $0, company: "x") })
         cases.append(TextFieldCase(.company) { _ = try SourceExperience(role: "x", company: $0) })
         cases.append(TextFieldCase(.location) { _ = try SourceExperience(role: "x", company: "x", location: $0) })
-        cases.append(TextFieldCase(.statement) { _ = try SourceExperience(role: "x", company: "x", description: $0) })
-        cases.append(TextFieldCase(.statement) { _ = try SourceExperience(role: "x", company: "x", description: "first\n" + $0 + "\nlast") })
+        cases.append(TextFieldCase(.description) { _ = try SourceExperience(role: "x", company: "x", description: $0) })
         return cases
     }()
 
-    @Test("each field, and each statement, accepts 10,000 bytes and refuses one more", arguments: fields)
+    @Test("each field, and the description, accepts 10,000 bytes and refuses one more", arguments: fields)
     func bounds(field: TextFieldCase) throws {
         try field.build(ascii(10_000))
         #expect(throws: TailoringModelError.tooLarge(field.field)) { try field.build(ascii(10_001)) }
     }
 
-    @Test("a statement is bounded after its bullet is removed")
-    func boundAfterBullet() throws {
-        _ = try SourceExperience(role: "r", company: "c", description: "- " + ascii(10_000))
-        #expect(throws: TailoringModelError.tooLarge(.statement)) { try SourceExperience(role: "r", company: "c", description: "- " + ascii(10_001)) }
+    @Test("the description is bounded as written, its bullets and blank lines included")
+    func descriptionBoundCountsEverything() throws {
+        _ = try SourceExperience(role: "r", company: "c", description: "- " + ascii(9_998))
+        #expect(throws: TailoringModelError.tooLarge(.description)) { try SourceExperience(role: "r", company: "c", description: "- " + ascii(9_999)) }
+        _ = try SourceExperience(role: "r", company: "c", description: ascii(5_000) + "\n\n\n" + ascii(4_997))
+        #expect(throws: TailoringModelError.tooLarge(.description)) { try SourceExperience(role: "r", company: "c", description: ascii(5_000) + "\n\n\n" + ascii(4_998)) }
+    }
+
+    @Test("the description limit counts bytes, not characters")
+    func descriptionBytes() throws {
+        _ = try SourceExperience(role: "r", company: "c", description: twoByteCharacters(bytes: 10_000))
+        #expect(throws: TailoringModelError.tooLarge(.description)) { try SourceExperience(role: "r", company: "c", description: twoByteCharacters(bytes: 10_002)) }
+    }
+
+    @Test("an oversized description is refused for its size before it is split, whatever else is wrong with it")
+    func sizeBeforeSplit() {
+        let manyLines = (0..<3_000).map { _ in "line" }.joined(separator: "\n")
+        #expect(manyLines.utf8.count > TailoringLimits.maxTextBytes)
+        #expect(throws: TailoringModelError.tooLarge(.description)) { try SourceExperience(role: "r", company: "c", description: manyLines) }
+        let blanks = String(repeating: "\n", count: 1_000_000)
+        #expect(throws: TailoringModelError.tooLarge(.description)) { try SourceExperience(role: "r", company: "c", description: blanks) }
     }
 
     private func lines(_ count: Int) -> String { (0..<count).map { "line \($0)" }.joined(separator: "\n") }

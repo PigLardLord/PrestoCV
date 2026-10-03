@@ -222,6 +222,8 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 | Limit | Value |
 |---|---|
 | a text field, a statement included | 10,000 bytes |
+| the description of an experience, checked before it is split | 10,000 bytes |
+| a language tag, checked before it is split | 64 bytes |
 | an advert | 50,000 bytes |
 | statements per experience | 200 |
 | entries per section: experiences, education, skills, languages, certifications, profiles, interests, tailored lines per experience, report items | 200 |
