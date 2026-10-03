@@ -258,9 +258,12 @@ struct StatementInitTests {
         #expect(throws: TailoringModelError.tooLarge(.statement)) { try Statement(text: twoByteCharacters(bytes: 10_002)) }
     }
 
-    @Test("a statement made by the split equals one built from the same text")
+    @Test("a statement made by the split equals the one built from its own text, and from the same text written plainly")
     func sameValue() throws {
-        #expect(Statement.split("- Cut costs") == [try Statement(text: "Cut costs")])
+        let made = Statement.split("- Cut costs")
+        #expect(made.map(\.text) == ["Cut costs"])
+        #expect(made == [try Statement(text: made[0].text)])
+        #expect(Statement.split("Cut costs") == [try Statement(text: "Cut costs")])
     }
 }
 

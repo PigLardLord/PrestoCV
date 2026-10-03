@@ -42,15 +42,22 @@ struct TailoringLanguageTests {
         #expect(try TailoringLanguage(bcp47: tag) == language)
     }
 
-    static let caseVariants: [String] = {
-        var tags: [String] = []
-        tags.append(contentsOf: ["EN", "En", "eN-gb", "PT-br", "DE"])
-        return tags
+    static let caseVariants: [(String, TailoringLanguage)] = {
+        var cases: [(String, TailoringLanguage)] = []
+        cases.append(("EN", .english))
+        cases.append(("En", .english))
+        cases.append(("eN-gb", .english))
+        cases.append(("PT-br", .portuguese))
+        cases.append(("DE", .german))
+        cases.append(("eS", .spanish))
+        cases.append(("FR-ca", .french))
+        cases.append(("iT-CH", .italian))
+        return cases
     }()
 
     @Test("case does not matter", arguments: caseVariants)
-    func caseInsensitive(tag: String) throws {
-        _ = try TailoringLanguage(bcp47: tag)
+    func caseInsensitive(tag: String, language: TailoringLanguage) throws {
+        #expect(try TailoringLanguage(bcp47: tag) == language)
     }
 
     @Test("a subtag of eight characters is a subtag, one of nine is not")
