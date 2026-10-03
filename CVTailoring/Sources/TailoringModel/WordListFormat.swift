@@ -14,6 +14,9 @@ enum WordListFormat {
     /// The months a language names: each number from 1 to 12 at least once.
     static let monthNumbers = 1...12
 
+    /// The largest value of a number word: a million million, which no figure of a CV reaches.
+    static let maxNumberValue = 1_000_000_000_000
+
     /// The fewest forms a group of synonyms holds: a group of one links nothing.
     static let minSynonymForms = 2
 

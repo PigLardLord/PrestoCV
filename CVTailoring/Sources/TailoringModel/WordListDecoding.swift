@@ -371,7 +371,7 @@ private struct WordListReading {
 
     func numbers(_ raw: RawList<RawNumber>, _ key: WordListKey) throws(TailoringModelError) -> WordList<NumberWord> {
         try check(raw, key, words: raw.entries.map(\.word))
-        guard raw.entries.allSatisfy({ $0.value >= 0 }) else { throw corrupt(key) }
+        guard raw.entries.allSatisfy({ (0...WordListFormat.maxNumberValue).contains($0.value) }) else { throw corrupt(key) }
         return WordList(source: raw.source, licence: raw.licence, entries: raw.entries.map { NumberWord(word: $0.word, value: $0.value) })
     }
 

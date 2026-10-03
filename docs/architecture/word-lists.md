@@ -43,7 +43,7 @@ The supported languages are the ones the index names, each with its file. An ind
 - Each group holds the lists named in the key table, and no other. Every list is an object with a `source`, a `licence` and its `entries`.
 - An entry is a string, except in six lists:
   - `dates.months`: `{ "name": "january", "month": 1 }`, a month from 1 to 12;
-  - `numbers.words` and `spans.countWords`: `{ "word": "two", "value": 2 }`, a value that is not negative;
+  - `numbers.words` and `spans.countWords`: `{ "word": "two", "value": 2 }`, a value from 0 to 1,000,000,000,000;
   - `advert.synonyms`: `{ "forms": ["ui", "user interface"] }`, two forms at least;
   - `letter.formsOfAddress`: `{ "form": "ms", "word": "mrs" }`, a form that is `ms` or `mr`, since the neutral form has no word of its own;
   - `provenance.ranks`: `{ "word": "chief", "ranks": ["head"] }`, one rank at least, each from the set below and none twice.
@@ -158,7 +158,7 @@ Every refusal is a typed error that carries codes and no text ([R7](rules.md#r7-
 | `corruptWordList(.language(l), key)` | The `licence` of the list is not one of the allowed set |
 | `corruptWordList(.language(l), key)` | A `source`, a `licence` or an entry is empty, is not trimmed, hides a character, or folds to nothing |
 | `corruptWordList(.language(l), key)` | Two entries of the list are the same once folded, so a word two forms of address or two ranks share counts too |
-| `corruptWordList(.language(l), key)` | A month is outside 1 to 12, a value is negative, or a group of synonyms has fewer than 2 forms |
+| `corruptWordList(.language(l), key)` | A month is outside 1 to 12, a value is negative or above 1,000,000,000,000, or a group of synonyms has fewer than 2 forms |
 | `corruptWordList(.language(l), key)` | A tied count does not hold `{count}` and `{employer}` once each, holds another brace, or has no word between them |
 | `corruptWordList(.language(l), key)` | The `order` of the streets is missing or is none of the three |
 | `corruptWordList(.language(l), key)` | The form of a form of address is not `ms` or `mr` |

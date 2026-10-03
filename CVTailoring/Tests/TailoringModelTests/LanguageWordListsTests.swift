@@ -505,6 +505,25 @@ struct LanguageWordListsTests {
         return values
     }()
 
+    @Test("a number word with a value above the largest is corrupt, and one at it is read", arguments: numberValueCases)
+    func numberValueCap(key: WordListKey) throws {
+        #expect(WordListFormat.maxNumberValue == 1_000_000_000_000)
+        for value in [WordListFormat.maxNumberValue + 1, Int.max] {
+            let data = try WordListFixture.data(editing: key) { list in
+                var entries = list["entries"] as? [WordListFixture.Object] ?? []
+                entries[0]["value"] = value
+                list["entries"] = entries
+            }
+            #expect(throws: corrupt(key)) { try decode(data) }
+        }
+        let atTheCap = try WordListFixture.data(editing: key) { list in
+            var entries = list["entries"] as? [WordListFixture.Object] ?? []
+            entries[0]["value"] = WordListFormat.maxNumberValue
+            list["entries"] = entries
+        }
+        _ = try decode(atTheCap)
+    }
+
     @Test("a number word with a value below 0, or that is not a whole number, is corrupt", arguments: numberValueCases)
     func numberValue(key: WordListKey) throws {
         var values: [Any] = [-1]

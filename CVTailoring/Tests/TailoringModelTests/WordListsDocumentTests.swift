@@ -103,6 +103,12 @@ struct WordListsDocumentTests {
         #expect(Page.matches(#"fewer than (\d+) forms"#, in: page) == [String(WordListFormat.minSynonymForms)])
     }
 
+    @Test("the largest value of a number word the page states is the decoder's")
+    func largestValue() throws {
+        let values = Page.matches(#"above ([\d,]+)"#, in: try Page.text()).map { $0.replacingOccurrences(of: ",", with: "") }
+        #expect(values == [String(WordListFormat.maxNumberValue)])
+    }
+
     @Test("the ranks the page names are the ranks the decoder knows")
     func ranks() throws {
         let listed = Page.backticked(try Page.section(from: "### Ranks", to: "#"))
