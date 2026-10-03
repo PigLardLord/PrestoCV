@@ -53,6 +53,13 @@ struct TailoringLanguageTests {
         _ = try TailoringLanguage(bcp47: tag)
     }
 
+    @Test("a subtag of eight characters is a subtag, one of nine is not")
+    func subtagLength() throws {
+        #expect(try TailoringLanguage(bcp47: "en-abcdefgh") == .english)
+        #expect(throws: TailoringModelError.unsupportedLanguage) { try TailoringLanguage(bcp47: "en-abcdefghi") }
+        #expect(try TailoringLanguage(bcp47: "en-a") == .english)
+    }
+
     static let unsupportedTags: [String] = {
         var tags: [String] = []
         tags.append(contentsOf: ["", " ", "und", "eng", "e", "ja", "zh-Hans", "nl"])

@@ -69,6 +69,25 @@ struct TailoredCVTests {
         }
     }
 
+    @Test("a foreign reference is refused in a later experience, and in a later line of the first one")
+    func foreignReferenceLate() throws {
+        let source = try Sample.source(), bigger = try Sample.biggerSource()
+        let valid = try source.statementRef(experience: 0, line: 0)
+        let farExperience = try bigger.statementRef(experience: 4, line: 0)
+        let farLine = try bigger.statementRef(experience: 1, line: 4)
+        let first = try Sample.tailoredExperience(source: source.experienceRef(at: 0), lines: [Sample.line("Fine.", [valid])])
+        _ = try tailored(source, experiences: [first, first])
+
+        let secondForeignSource = try Sample.tailoredExperience(source: bigger.experienceRef(at: 5))
+        #expect(throws: TailoringModelError.referenceOutOfRange) { try tailored(source, experiences: [first, secondForeignSource]) }
+        for foreign in [farExperience, farLine] {
+            let secondForeignLine = try Sample.tailoredExperience(source: source.experienceRef(at: 1), lines: [Sample.line("Text.", [foreign])])
+            #expect(throws: TailoringModelError.referenceOutOfRange) { try tailored(source, experiences: [first, secondForeignLine]) }
+            let lateLine = try Sample.tailoredExperience(source: source.experienceRef(at: 0), lines: [Sample.line("Fine.", [valid]), Sample.line("Text.", [foreign])])
+            #expect(throws: TailoringModelError.referenceOutOfRange) { try tailored(source, experiences: [lateLine]) }
+        }
+    }
+
     @Test("one foreign reference among valid ones is enough to refuse the tailored CV")
     func oneForeignReference() throws {
         let source = try Sample.source(), bigger = try Sample.biggerSource()

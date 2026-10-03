@@ -44,9 +44,17 @@ struct StatementSplitTests {
         return values
     }()
 
-    @Test("a line break is any newline, and \\r\\n is one break", arguments: twoLineDescriptions)
+    @Test("a line ends at any newline", arguments: twoLineDescriptions)
     func newlines(description: String) {
         #expect(texts(description) == ["first", "second"])
+    }
+
+    @Test("a carriage return and a line feed leave no carriage return behind, and two pairs in a row are one blank line")
+    func carriageReturnLineFeed() {
+        #expect(texts("a\r\nb") == ["a", "b"])
+        #expect(texts("a\r\n\r\nb") == ["a", "b"])
+        #expect(texts("a\r\n") == ["a"])
+        #expect(Statement.split("a\r\nb").map { $0.text.utf8.count } == [1, 1])
     }
 
     static let bulletCharacters: [String] = {
