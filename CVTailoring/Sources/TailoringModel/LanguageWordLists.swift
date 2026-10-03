@@ -113,6 +113,8 @@ public struct SpanWords: Hashable, Sendable {
     public let countWords: WordList<NumberWord>
     /// How a count is tied to an employer, with `{count}` and `{employer}`: "{count} of them at {employer}".
     public let tiedCounts: WordList<String>
+    /// The words that end an employer's name in a tied count, beside a comma, a full stop or a semicolon: "and".
+    public let employerEndWords: WordList<String>
 }
 
 /// How a letter greets, closes, and how an advert asks it for a figure.

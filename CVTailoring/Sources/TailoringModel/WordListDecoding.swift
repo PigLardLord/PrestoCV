@@ -203,7 +203,7 @@ private struct RawDates {
 }
 
 private struct RawSpans {
-    let floorLeadIns, yearWords, monthWords, tiedCounts: RawList<String>
+    let floorLeadIns, yearWords, monthWords, tiedCounts, employerEndWords: RawList<String>
     let countWords: RawList<RawNumber>
 
     init(_ group: RawGroup) throws {
@@ -212,6 +212,7 @@ private struct RawSpans {
         monthWords = try group.list(.spansMonthWords)
         countWords = try group.list(.spansCountWords)
         tiedCounts = try group.list(.spansTiedCounts)
+        employerEndWords = try group.list(.spansEmployerEndWords)
     }
 }
 
@@ -315,7 +316,8 @@ private struct WordListReading {
             yearWords: try texts(raw.yearWords, .spansYearWords),
             monthWords: try texts(raw.monthWords, .spansMonthWords),
             countWords: try numbers(raw.countWords, .spansCountWords),
-            tiedCounts: try tiedCounts(raw.tiedCounts)
+            tiedCounts: try tiedCounts(raw.tiedCounts),
+            employerEndWords: try texts(raw.employerEndWords, .spansEmployerEndWords)
         )
     }
 

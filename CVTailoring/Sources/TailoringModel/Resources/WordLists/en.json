@@ -527,6 +527,13 @@
         "{count} of which at {employer}",
         "{count} of those at {employer}"
       ]
+    },
+    "employerEndWords": {
+      "source": "cv-giovanni 6e28147 domain/StatedSpans.js EMPLOYER, the English word",
+      "licence": "ISC",
+      "entries": [
+        "and"
+      ]
     }
   },
   "letter": {

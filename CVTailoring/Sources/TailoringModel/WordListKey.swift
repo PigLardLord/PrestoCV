@@ -30,6 +30,7 @@ public enum WordListKey: String, CaseIterable, Hashable, Sendable {
     case spansMonthWords = "spans.monthWords"
     case spansCountWords = "spans.countWords"
     case spansTiedCounts = "spans.tiedCounts"
+    case spansEmployerEndWords = "spans.employerEndWords"
     case letterGreetings = "letter.greetings"
     case letterSalutations = "letter.salutations"
     case letterAddressees = "letter.addressees"

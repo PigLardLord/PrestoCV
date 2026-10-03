@@ -24,6 +24,7 @@ struct LanguageWordListsTests {
         #expect(lists.numbers.words.entries == [NumberWord(word: "two", value: 2), NumberWord(word: "three", value: 3)])
         #expect(lists.spans.countWords.entries == [NumberWord(word: "two", value: 2), NumberWord(word: "three", value: 3)])
         #expect(lists.spans.tiedCounts.entries == ["{count} of them at {employer}"])
+        #expect(lists.spans.employerEndWords.entries == ["alpha", "beta"])
         #expect(lists.letter.valedictions.entries == ["alpha", "beta"])
         #expect(lists.letter.formsOfAddress.entries == [FormOfAddressWord(form: .ms, word: "alpha"), FormOfAddressWord(form: .mr, word: "beta")])
         #expect(lists.provenance.notPlurals.entries == ["alpha", "beta"] && lists.provenance.legalForms.entries == ["alpha", "beta"])

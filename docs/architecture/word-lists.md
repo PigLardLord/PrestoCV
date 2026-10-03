@@ -83,6 +83,7 @@ Every file holds every key below. A file that lacks one is refused as incomplete
 | `spans.monthWords` | The words for a month, singular and plural | `ContentChecks` reads the unit of a count of time |
 | `spans.countWords` | The counts of time that a CV writes in words, "one" to "twelve", with their value | `ContentChecks` reads the count of a span of time |
 | `spans.tiedCounts` | How the language ties a count to an employer, as templates ("{count} of them at {employer}") | `ContentChecks` holds a count tied to a role that has ended to that role's dates |
+| `spans.employerEndWords` | The words that end an employer's name in a tied count, as a comma, a full stop or a semicolon do ("8 of them at PigLardLord and …"): "and" | `ContentChecks` reads where the employer's name ends |
 | `letter.greetings` | The words that open a salutation ("dear", "hello") | `Provenance` refuses a salutation the model writes, since the page greets the recipient itself |
 | `letter.salutations` | Salutations that stand on their own ("to whom it may concern") | `Provenance`, as for the greetings |
 | `letter.addressees` | The words that, after a greeting, make it a salutation: forms of address, titles and groups ("mr", "dr", "everyone") | `Provenance`, as for the greetings: "hi-fi audio" is prose and "hi everyone" is a greeting |

@@ -74,6 +74,7 @@ struct EnglishWordListsTests {
         rows[.spansMonthWords] = row(lists.spans.monthWords)
         rows[.spansCountWords] = row(lists.spans.countWords)
         rows[.spansTiedCounts] = row(lists.spans.tiedCounts)
+        rows[.spansEmployerEndWords] = row(lists.spans.employerEndWords)
         rows[.letterGreetings] = row(lists.letter.greetings)
         rows[.letterSalutations] = row(lists.letter.salutations)
         rows[.letterAddressees] = row(lists.letter.addressees)
@@ -139,6 +140,7 @@ struct EnglishWordListsTests {
         counts[.spansMonthWords] = 2  // UNIT: month, months
         counts[.spansCountWords] = 12  // WORDS: one to twelve
         counts[.spansTiedCounts] = 3  // TIED: "of them at", "of which at", "of those at"
+        counts[.spansEmployerEndWords] = 1  // EMPLOYER: and; und is German
         counts[.letterGreetings] = 3  // core/ProvenanceCheck.js GREETING: dear, hello, hi
         counts[.letterSalutations] = 1  // SALUTATION: to whom it may concern
         counts[.letterAddressees] = 14  // WHOM: there, ms, mrs, mr, dr, prof, sir, madam, all, everyone, friends, recruiter(s), colleagues
@@ -184,6 +186,7 @@ struct EnglishWordListsTests {
         #expect(lists.spans.floorLeadIns.entries == ["over", "more than", "at least"])
         #expect(lists.spans.yearWords.entries == ["year", "years"] && lists.spans.monthWords.entries == ["month", "months"])
         #expect(lists.spans.tiedCounts.entries == ["{count} of them at {employer}", "{count} of which at {employer}", "{count} of those at {employer}"])
+        #expect(lists.spans.employerEndWords.entries == ["and"])
         #expect(lists.letter.statedTermWords.entries == ["is", "of", "range", "applies"])
     }
 
