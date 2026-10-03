@@ -220,14 +220,15 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 
 ## Package `PrestoCVApp` — App integration and presentation
 
-A local package next to the Xcode project. The compiler holds the app's layers too, and everything except the composition builds and tests on Linux.
+A local package next to the Xcode project. The compiler holds the app's layers too, and everything except the composition and the API adapter builds and tests on Linux. The adapter follows the client, which builds on Linux only if its transport does ([ADR 0016](adr/0016-api-contract.md), #177).
 
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
 | `PrestoCVWorkflowPorts` | app ports | iOS, macOS, Linux ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation |
 | `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, Foundation |
 | `PrestoCVPresentation` | inbound adapter | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain` (both `internal import`), Observation, Foundation |
-| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels` |
+| `PrestoCVAPIAdapter` | outbound adapter | iOS, macOS | `PrestoCVIntegration`, `TailoringModel`, `PrestoCVAPITypes`, `PrestoCVAPIClient` (both `internal import`), Foundation |
+| `PrestoCVComposition` | composition root | iOS, macOS | everything above, including `PrestoCVAPIAdapter`, plus `PrestoCVPersistence`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels` |
 
 **`PrestoCVWorkflowPorts`**
 - The ports that view models consume: `CVEditing` (new, save, load) and `CVExporting` (untyped `throws`, so cancellation passes through).
@@ -241,6 +242,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - `DraftCVWithAI`: availability, then draft, then an unsaved CV plus its gaps.
 - **Mappers:** `CV → CVDocument` and `CVDraft → CV`. They are exhaustive and deterministic, with typed dates. The draft mapper uses `Period.make` and reports every gap.
   - `CV → SourceCV`, and the tailoring result into the app's own types (planned, #184, #188).
+- **The tailoring workflow's outbound port,** owned here (R3): the one way the app reaches the server. It speaks the tailoring model and the workflow's typed errors, never a generated type. `PrestoCVAPIAdapter` implements it (planned, #179, #188).
 
 **`PrestoCVPresentation`**
 - `@Observable @MainActor` view models whose public API holds presentation types only: status enums, and no domain types.
@@ -249,6 +251,12 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 - **Conflict** offers reload or save as a copy; **deleted elsewhere** offers save as a copy.
 - **View-model initialisers do no I/O.** Loading happens in the view's `.task`, so the factory can be called on every view init.
 
+**`PrestoCVAPIAdapter`** (planned, #179, [ADR 0016](adr/0016-api-contract.md))
+- The outbound adapter that implements the tailoring workflow's port. It is the only target of the app that imports the API's generated client and types, and it imports both with `internal import`, so no generated type appears in its public API.
+- It maps the tailoring model to the request, and the result back, exhaustively and under test ([ADR 0007](adr/0007-each-package-owns-its-model.md)). It maps each documented problem `type` to a typed error of the workflow (R7), among them "update the app", "try again at this time" and "no provider meets the policy".
+- It polls while the app is in the foreground, with backoff, and confirms a saved result with the `DELETE` (#166, #179). The session it sends comes from #174.
+- The composition root creates it (R4).
+
 **`PrestoCVComposition`**
 - The app's composition root, and the only place in the app that creates infrastructure (R4). The `@main` App type holds it in a `static let`. It owns:
   - file locations under Application Support;
@@ -256,6 +264,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - the web-view rule list, compiled once;
   - the platform renderer and the PDFKit inspector;
   - the AI adapter, `TimeSource`, `IDGenerator` and logger;
+  - the API adapter, with the transport it calls through (planned, #179);
   - the `ScreenFactory`.
 - **UI tests and previews** use the production `FileCVRepository` on a temporary directory seeded from fixture JSON. A launch argument selects it. No production target depends on a test-support target.
 
@@ -321,7 +330,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - It maps the generated types to the use cases and back. The generated types never leave it: it imports `PrestoCVAPITypes` and `PrestoCVAPIServer` with `internal import`, so none can appear in its public API.
 - It serves the API on Hummingbird through `OpenAPIHummingbird`. `GET /health` is an endpoint of the spec, and `ServerHTTP` serves it in both roles.
 - **The worker's route.** The route the queue calls to run a job lives here too. It is mounted only in the `work` role, and it is not part of the public API (`openapi.yaml`). The platform admits only the queue's identity before any code runs (#161).
-- `PrestoCVAPITypes` and `PrestoCVAPIServer` are targets of the `PrestoCVAPI` package, which #175 and #177 add to this file.
+- `PrestoCVAPITypes` and `PrestoCVAPIServer` are targets of the `PrestoCVAPI` package, listed below ([ADR 0016](adr/0016-api-contract.md)).
 
 **The `PrestoCVServer` executable target**
 - The executable and the server's composition root (R4). It reads the command line with ArgumentParser and the configuration, picks the profile's adapters, wires them behind the ports of `ServerApplication` and of `Tailoring`, and creates the infrastructure: the database pool, the queue client, the inference providers' HTTP client (in the role that holds the keys), the clock, the identifier generators and the logger.
@@ -356,6 +365,50 @@ The targets are created by #158 and the tickets named below. Until the targets e
 
 ---
 
+## Package `PrestoCVAPI` — the API contract
+
+A package of its own in this repository, which holds the API between the app and the server: the spec, and the code generated from it ([ADR 0016](adr/0016-api-contract.md)). It depends on no PrestoCV package, so the app and the server can both depend on it. It is not a context, and its targets hold generated code only.
+
+The targets are created by #177, from the spec of #176. Until they exist, they are declared not yet implemented in the checker's `rules.json`.
+
+| Target | Layer | Platforms | May import |
+|---|---|---|---|
+| `PrestoCVAPITypes` | generated | iOS, macOS, Linux ✓ | `OpenAPIRuntime`, Foundation |
+| `PrestoCVAPIServer` | generated | macOS, Linux ✓ | `PrestoCVAPITypes`, `OpenAPIRuntime`, Foundation |
+| `PrestoCVAPIClient` | generated | iOS, macOS | `PrestoCVAPITypes`, `OpenAPIRuntime`, `OpenAPIURLSession`, Foundation |
+
+`PrestoCVAPIClient` builds on Linux too if its transport does. #177 decides.
+
+**The spec** (#176)
+- `openapi.yaml`, in OpenAPI 3.1, is a resource of the package and the single source of the API. Its endpoints are versioned in the path (`/v1`).
+- Every endpoint, schema, field and error `type` has a description in it. The public reference is generated from them (#182, #183).
+- It describes the public API only. The route that the queue calls to run a job is not in it ([ADR 0014](adr/0014-server-modular-monolith.md)).
+
+**`PrestoCVAPITypes`**
+- The schemas, and the input and output of each operation.
+
+**`PrestoCVAPIServer`**
+- The protocol that the server implements, and its registration on a transport. `ServerHTTP` implements the protocol, and supplies the Hummingbird transport.
+
+**`PrestoCVAPIClient`**
+- The client, which calls each operation through a transport. The app's transport is URLSession.
+
+**Who may import them**
+- On the server, only `ServerHTTP`, which imports `PrestoCVAPITypes` and `PrestoCVAPIServer` with `internal import`.
+- In the app, only `PrestoCVAPIAdapter`, which imports `PrestoCVAPITypes` and `PrestoCVAPIClient` with `internal import`.
+- No other production target outside the package imports one. The generated types never leave those two adapters.
+
+**Generated code, held by regeneration (#177)**
+- A header marks each generated file, and nobody edits one by hand. The sources are committed, so a change to the spec shows its effect in the pull request, and Xcode needs no plugin.
+- CI regenerates the code and fails when it differs from what is committed. It also compares the spec with the one on `main` and fails on a breaking change, which needs a new version in the path.
+- The checker gets a `generated` target kind for these targets (#177): the import allow-lists apply, and the detectors do not.
+
+**Dependencies.** `OpenAPIRuntime` for the three targets, and `OpenAPIURLSession` for the client. Each is pinned in the committed `Package.resolved`. The generator is a tool run by one documented command, not an import. `OpenAPIHummingbird` is a dependency of `ServerHTTP`, not of this package.
+
+**Test support.** None yet.
+
+---
+
 ## Xcode app target `PrestoCV` (iOS 26, macOS 26)
 
 A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-app.md)). The checker maps each folder as its own target.
@@ -379,9 +432,12 @@ PrestoCV (app) ─▶ PrestoCVPresentation ─▶ PrestoCVWorkflowPorts ─▶ P
      │                                    │                └─▶ CVDesignCatalog
      │                                    ├─▶ CVDrafting
      │                                    └─▶ TailoringModel, AdvertAnalysis, ContentChecks
-     └────▶ PrestoCVComposition ─▶ (all of the above) + PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns,
-                                CVRenderingWebKitSupport, CVRenderingIOS | CVRenderingMacOS,
+     └────▶ PrestoCVComposition ─▶ (all of the above) + PrestoCVAPIAdapter, PrestoCVPersistence, CVDesignCatalogFileStore,
+                                CVBundledDesigns, CVRenderingWebKitSupport, CVRenderingIOS | CVRenderingMacOS,
                                 CVRenderingPDFKitInspector, CVDraftingFoundationModels
+
+PrestoCVAPIAdapter ─┬─▶ PrestoCVIntegration, TailoringModel
+                └─▶ PrestoCVAPITypes, PrestoCVAPIClient
 
 PrestoCVServer (executable) ─┬─▶ ServerHTTP ─┬─▶ ServerApplication ─▶ TailoringModel, Tailoring
                          │               └─▶ TailoringModel, PrestoCVAPITypes, PrestoCVAPIServer
@@ -390,9 +446,14 @@ PrestoCVServer (executable) ─┬─▶ ServerHTTP ─┬─▶ ServerApplicati
                          ├─▶ ServerQueueCloudTasks, ServerLocalProfile ─▶ ServerApplication
                          └─▶ ServerApplication, Tailoring
 
+PrestoCVAPI package: PrestoCVAPIServer, PrestoCVAPIClient ─▶ PrestoCVAPITypes     (generated; imports no PrestoCV package)
+
 Forbidden: any edge between PrestoCVCore, CVPDFExporter, CVGeneratorAI and CVTailoring.
 Forbidden: any edge from a domain, application or port target to an adapter target.
 Forbidden: PrestoCVPresentation → PrestoCVIntegration.
 Forbidden: any edge from ServerApplication to a third-party package.
 Forbidden: any edge from the server's package to PrestoCVApp or PrestoCVCore.
+Forbidden: any import of a PrestoCVAPI target from outside the package, except by ServerHTTP and PrestoCVAPIAdapter.
+Forbidden: ServerHTTP importing PrestoCVAPIClient, and PrestoCVAPIAdapter importing PrestoCVAPIServer.
+Forbidden: any edge from a PrestoCVAPI target to another package of this repository.
 ```

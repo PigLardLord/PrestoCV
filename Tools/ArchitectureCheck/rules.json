@@ -57,7 +57,11 @@
   "ServerQueueCloudTasks",
   "ServerLocalProfile",
   "ServerHTTP",
-  "PrestoCVServer"
+  "PrestoCVServer",
+  "PrestoCVAPITypes",
+  "PrestoCVAPIServer",
+  "PrestoCVAPIClient",
+  "PrestoCVAPIAdapter"
  ],
  "targets": [
   {
