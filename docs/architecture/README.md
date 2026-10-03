@@ -20,10 +20,10 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 | **Design Catalog** | supporting | Design packages (`.mcvt`), their validation, installation, versions and listing | `CVPDFExporter` |
 | **Document Rendering** | generic | Turning a document plus a design into HTML, and HTML into PDF, per platform | `CVPDFExporter` |
 | **AI Drafting** | supporting | Producing a CV draft from a free-text description with the on-device model | `CVGeneratorAI` |
-| **CV Tailoring** | core domain | Tailoring one CV and a cover letter to a job advert, and holding the result to its source: advert analysis, content checks, the provenance gate, the tailoring loop | `CVTailoring` |
+| **CV Tailoring** | core domain | Tailoring one CV to a job advert and writing its cover letter, and holding both to their sources: advert analysis, content checks, the provenance gate, the tailoring loop | `CVTailoring` |
 | **App** | integration and presentation | Cross-context workflows, the mappers between contexts, view models, views, the composition root | `PrestoCVApp` package + Xcode app target |
 
-CV Tailoring is the context [ADR 0005](adr/0005-remove-ai-tailoring-and-json-resume.md) reserved ([ADR 0013](adr/0013-cv-tailoring-context.md)). It runs in the app and on the server. JSON Resume stays removed (ADR 0005).
+CV Tailoring is the context [ADR 0005](adr/0005-remove-ai-tailoring-and-json-resume.md) reserved ([ADR 0013](adr/0013-cv-tailoring-context.md)). It runs in the app and on the server; the tailoring loop runs only on the server. JSON Resume is not supported (ADR 0005).
 
 ## Context map
 
@@ -58,7 +58,7 @@ PrestoCVApp package                    │
   PrestoCVIntegration ─────────────────┼──▶ PrestoCVWorkflowPorts, PrestoCVApplication, PrestoCVDomain
                                    ├──▶ CVDocumentModel, CVDesignCatalog, CVRendering
                                    ├──▶ CVDrafting
-                                   └──▶ TailoringModel, AdvertAnalysis, ContentChecks, Provenance, Tailoring
+                                   └──▶ TailoringModel, AdvertAnalysis, ContentChecks
   PrestoCVComposition ──▶ PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns,
                       CVRenderingWebKitSupport, CVRenderingIOS (iOS) / CVRenderingMacOS (macOS),
                       CVRenderingPDFKitInspector, CVDraftingFoundationModels

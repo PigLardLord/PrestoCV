@@ -15,45 +15,48 @@
 ## Decision
 
 - **A package of its own, `CVTailoring`,** at the repository root.
-  - Like `CVPDFExporter`, it imports no PrestoCV package, and no PrestoCV package imports it except `PrestoCVIntegration`. The server's targets are added by the server's ADR.
+  - Like `CVPDFExporter`, it imports no PrestoCV package. In the app, only `PrestoCVIntegration` translates into and out of its model ([ADR 0007](0007-each-package-owns-its-model.md)). The server's targets that import it are set by the server's ADR (#158).
   - It builds and tests on iOS, macOS and Linux.
-- **It owns its model** ([ADR 0007](0007-each-package-owns-its-model.md)): a snapshot of the source CV, the advert and the letter defaults. The app maps its `CV` into it in `PrestoCVIntegration`. The server maps its API types into it.
+- **It owns its model** ([ADR 0007](0007-each-package-owns-its-model.md)): a snapshot of the source CV, the advert, the letter defaults and the user's answers. The app maps its `CV` into it in `PrestoCVIntegration`. The server maps its API types into it.
+- **It refines [ADR 0005](0005-remove-ai-tailoring-and-json-resume.md) without superseding it.** This is the context ADR 0005 reserved. The app reaches a tailoring through a port its own workflow owns, as ADR 0005 says; the adapter behind that port calls the server (#179). The inference port is a different port: `Tailoring` owns it, and only the server uses it (#149, #150). **The loop never runs on the device:** `PrestoCVIntegration` may not import `Tailoring`, so the compiler holds that.
 - **A tailoring produces a CV and a cover letter.**
 - **The check is a gate, not an audit.**
   - No field lifts it.
   - A failure goes back to the model at most twice. After that the tailoring fails, with every failure listed.
   - Whatever the advert asks for that the CV does not evidence becomes a question for the user, never a line of the CV.
+  - The gate's failures are values with codes. The app words them for the user (R13); the prompt in `Tailoring` words them for the model, from the same codes.
 - **The unit of provenance is a line of an experience's description,** called a statement. Each rewritten line names the lines of the same experience it comes from. PrestoCV's CV model does not change.
 - **Any profession.** The checks stay general. Word lists that know a field's names, starting with technologies, are a floor that grows. The check never depends on them.
-- **Six languages in the first version:** English, German, Spanish, French, Italian and Portuguese, each one as data (one resource file per language). Any other language is a typed error, never a weaker check that reads as a pass.
+- **Six languages in the first version:** English, German, Spanish, French, Italian and Portuguese, each one as data, one file per language. The supported languages are exactly the ones that have a file, so adding a language adds a file. Any other language is a typed error, never a weaker check that reads as a pass. The files are part of `TailoringModel` and embedded at build time: a domain target reads no bundle and no file at run time, and a server image needs no resource bundle beside its binary (#136).
 - **No translation in the first version.** A CV is tailored in its own language (#147).
-- **Errors are typed per check** (R7) and carry codes. Their wording is produced at the edges (R13).
+- **Errors are typed per context** (R7) and carry codes, never text.
 - **Five targets,** with these layers and allowed imports:
 
-| Target | Layer | Holds | May import |
+| Target | Layer | Responsibility | May import |
 |---|---|---|---|
-| `TailoringModel` | domain | the snapshot types (source CV, statements and typed references, tailored CV, cover letter, letter defaults, advert, the six languages, the report and the questions) and the per-language word lists as resources read through `Bundle.module` | Foundation |
-| `AdvertAnalysis` | domain | what an advert asks for, and where the CV evidences it; language detection | `TailoringModel`, Foundation |
+| `TailoringModel` | domain | the snapshot: the source CV, its statements and typed references, the advert, the letter defaults, the questions and answers, the tailored CV, the cover letter and the report; the supported languages and their word lists | Foundation |
+| `AdvertAnalysis` | domain | what an advert asks for, where the CV evidences it, and its language; the questions asked before a tailoring | `TailoringModel`, Foundation |
 | `ContentChecks` | domain | spans that stay true, and figures as the CV writes them | `TailoringModel`, Foundation |
 | `Provenance` | domain | the gate for the tailored CV and for the cover letter | `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, Foundation |
-| `Tailoring` | application | the tailoring loop, its outbound inference port (owned here, R3; adapters live on the server), the prompt, questions and answers | `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, `Provenance`, Foundation |
+| `Tailoring` | application | the loop, its outbound inference port (R3), the prompt, and the decoding of the model's answer | `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, `Provenance`, Foundation |
 
 ## Consequences
 
 - **R1** lists four isolated packages: `PrestoCVCore`, `CVPDFExporter`, `CVGeneratorAI` and `CVTailoring`. [modules.md](../modules.md) and the checker's `rules.json` gain the package, and CI builds it on Linux and macOS.
 - **The same checks run on the device and on the server.** The date a span is checked against is passed in (R2).
-- **A model's reply is untrusted input** (R8). Nothing it writes reaches a CV except through the gate.
+- **A model's reply is untrusted input** (R8). `Tailoring` decodes it through one anti-corruption layer. Nothing it writes reaches the tailored CV or the letter except through the gate. Its report and its questions reach the user as the model's own words, never as part of the CV or the letter.
 - **Costs:**
-  - a fourth model of a CV, and one more mapper in `PrestoCVIntegration`;
+  - a fourth model of a CV, and mappers in `PrestoCVIntegration` in both directions: the CV into the snapshot, and the result into the app's own types;
   - word lists to keep in six languages;
   - reading names in German is open until #142, so German is a typed error in the provenance check until then.
 - **Enforced by:**
-  - the compiler, through the target graph;
-  - the checker: the allow-lists, and the R1, R2, R9, R11, R13 and R14 detectors;
+  - the compiler, through the target graph, which also keeps the loop off the device;
+  - the checker: the allow-lists, the R1, R2, R4, R7, R9, R11, R13 and R14 detectors on the five targets, and the manifest rules;
   - the tests that each ticket of #133 adds.
 
 ## Alternatives considered
 
+- **Highlights and entry ids in `CV`.** Rejected by the owner: PrestoCV's CV model does not change, and a line of an experience's description is enough to name a source.
 - **Tailoring inside `PrestoCVCore`.** Rejected: the server would carry the authoring package and its persistence, and the contexts would share a model, against [ADR 0007](0007-each-package-owns-its-model.md).
 - **Calling cv-giovanni's JavaScript from a Node service.** Rejected by the owner: one Swift core runs on the device, on the server and on a developer's machine, and the rules are ported with their tests.
 - **One target for the whole context.** Rejected: the compiler would not keep the domain checks apart from the loop and its port.

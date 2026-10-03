@@ -544,8 +544,6 @@
     "TailoringModel",
     "AdvertAnalysis",
     "ContentChecks",
-    "Provenance",
-    "Tailoring",
     "Foundation"
    ],
    "rules": [

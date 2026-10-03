@@ -182,6 +182,8 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 Standalone, like `CVPDFExporter`. It depends on no PrestoCV package ([ADR 0013](adr/0013-cv-tailoring-context.md)): the app and the server each map their own types into its model. The targets are empty until the tickets named below fill them.
 
+In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` and `ContentChecks` only: the loop runs on the server. No type shares its module's name, so a qualified name always means the module (the loop is not a type called `Tailoring`, nor the gate one called `Provenance`).
+
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
 | `TailoringModel` | domain | iOS, macOS, Linux ✓ | Foundation |
@@ -191,24 +193,26 @@ Standalone, like `CVPDFExporter`. It depends on no PrestoCV package ([ADR 0013](
 | `Tailoring` | application | iOS, macOS, Linux ✓ | `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, `Provenance`, Foundation |
 
 **`TailoringModel`** (#135, #136)
-- The snapshot types: the source CV, its statements and the typed references to them, the tailored CV, the cover letter and its defaults, the advert, the six languages, the report and the questions.
-- The per-language word lists, one resource file per language, read through `Bundle.module`.
+- The snapshot types: the source CV, its statements and typed references to them, the advert, the letter defaults, the questions and answers, the tailored CV, the cover letter and the report.
+- The word lists, one file per language, embedded at build time; the supported languages are those with a file (#136).
 
-**`AdvertAnalysis`** (#138)
+**`AdvertAnalysis`** (#138, #153)
 - What an advert asks for, and where the source CV evidences it.
 - Language detection.
+- The questions asked before a tailoring: required terms the CV does not evidence, and the letter fields the advert asks for that the defaults do not give (#153).
 
 **`ContentChecks`** (#139)
 - Spans that stay true, and figures as the CV writes them.
 
 **`Provenance`** (#140, #141)
 - The gate for the tailored CV and for the cover letter.
-- Typed errors per check, with codes. Their wording is produced at the edges (R7, R13).
+- Its failures are values with codes. The app words them for the user (R13); `Tailoring`'s prompt words them for the model.
 
-**`Tailoring`** (#150–#153)
-- The tailoring loop: a failure goes back to the model at most twice, then the tailoring fails with every failure listed.
+**`Tailoring`** (#150–#152)
+- The loop: a failure goes back to the model at most twice, then the tailoring fails with every failure listed.
 - The outbound inference port, owned here (R3). Its adapters live on the server.
-- The prompt, questions and answers.
+- The prompt and its schema.
+- Decoding the model's answer through one anti-corruption layer (R8).
 
 **Test support.** None yet; `CVTailoringTestSupport` arrives with the first port (#150).
 
@@ -221,7 +225,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
 | `PrestoCVWorkflowPorts` | app ports | iOS, macOS, Linux ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation |
-| `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, `Provenance`, `Tailoring`, Foundation |
+| `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, Foundation |
 | `PrestoCVPresentation` | inbound adapter | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain` (both `internal import`), Observation, Foundation |
 | `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels` |
 
@@ -236,7 +240,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - `BrowseDesigns`;
   - `DraftCVWithAI`: availability, then draft, then an unsaved CV plus its gaps.
 - **Mappers:** `CV → CVDocument` and `CVDraft → CV`. They are exhaustive and deterministic, with typed dates. The draft mapper uses `Period.make` and reports every gap.
-  - `CV → SourceCV` (planned, #188).
+  - `CV → SourceCV`, and the tailoring result into the app's own types (planned, #184, #188).
 
 **`PrestoCVPresentation`**
 - `@Observable @MainActor` view models whose public API holds presentation types only: status enums, and no domain types.
@@ -281,7 +285,7 @@ PrestoCV (app) ─▶ PrestoCVPresentation ─▶ PrestoCVWorkflowPorts ─▶ P
      │                     PrestoCVIntegration ┴─▶ CVRendering ─┬─▶ CVDocumentModel
      │                                    │                └─▶ CVDesignCatalog
      │                                    ├─▶ CVDrafting
-     │                                    └─▶ TailoringModel, AdvertAnalysis, ContentChecks, Provenance, Tailoring
+     │                                    └─▶ TailoringModel, AdvertAnalysis, ContentChecks
      └────▶ PrestoCVComposition ─▶ (all of the above) + PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns,
                                 CVRenderingWebKitSupport, CVRenderingIOS | CVRenderingMacOS,
                                 CVRenderingPDFKitInspector, CVDraftingFoundationModels
