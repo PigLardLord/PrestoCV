@@ -1,0 +1,234 @@
+import Testing
+import Foundation
+@testable import TailoringModel
+
+/// The English file against cv-giovanni at commit 6e28147, and the bundled files against the index.
+@Suite("ADR 0013 / R13 · the bundled word lists (#136)")
+struct EnglishWordListsTests {
+    private func english() throws -> LanguageWordLists { try WordLists.load().forLanguage(.english) }
+
+    @Test("the bundled lists load, and English is the one language with a file")
+    func loads() throws {
+        let lists = try WordLists.load()
+        #expect(lists.languages == [.english])
+        #expect(try lists.forLanguage(.english).language == .english)
+    }
+
+    @Test("every other language is unsupported until it has a file", arguments: TailoringLanguage.allCases.filter { $0 != .english })
+    func unsupported(language: TailoringLanguage) throws {
+        let lists = try WordLists.load()
+        #expect(throws: TailoringModelError.unsupportedLanguage) { try lists.forLanguage(language) }
+    }
+
+    // MARK: - The directory and the index
+
+    private func filesOnDisk() throws -> [String] {
+        let directory = try #require(WordListResources.directory())
+        return try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted()
+    }
+
+    @Test("every language in the index has a file, and every file but the index is in the index")
+    func parity() throws {
+        let indexed = try WordLists.load().languages.map { "\($0.code).json" }.sorted()
+        let files = try filesOnDisk()
+        #expect(files.contains("index.json"))
+        #expect(files.filter { $0 != "index.json" } == indexed)
+    }
+
+    @Test("each file is named for a language code")
+    func fileNames() throws {
+        let codes = Set(TailoringLanguage.allCases.map(\.code))
+        for file in try filesOnDisk() where file != "index.json" {
+            #expect(codes.contains(String(file.dropLast(".json".count))), "\(file) is no language")
+            #expect(file.hasSuffix(".json"), "\(file) is no JSON file")
+        }
+    }
+
+    // MARK: - Source and licence
+
+    /// Every list of a language, by key, with what it states about itself. Naming all 28 here is the check that the
+    /// table below, and the format, leave none out.
+    private func summary(of lists: LanguageWordLists) -> [WordListKey: (source: String, licence: String, count: Int)] {
+        func row<Entry>(_ list: WordList<Entry>) -> (source: String, licence: String, count: Int) { (list.source, list.licence, list.entries.count) }
+        var rows: [WordListKey: (source: String, licence: String, count: Int)] = [:]
+        rows[.advertStopwords] = row(lists.advert.stopwords)
+        rows[.advertPlainWords] = row(lists.advert.plainWords)
+        rows[.advertDimensions] = row(lists.advert.dimensions)
+        rows[.advertBoilerplate] = row(lists.advert.boilerplate)
+        rows[.advertGenderMarkers] = row(lists.advert.genderMarkers)
+        rows[.advertInstructions] = row(lists.advert.instructions)
+        rows[.advertStreets] = row(lists.advert.streets.list)
+        rows[.advertNames] = row(lists.advert.names)
+        rows[.advertSynonyms] = row(lists.advert.synonyms)
+        rows[.advertRequirementHeadings] = row(lists.advert.requirementHeadings)
+        rows[.advertOfferHeadings] = row(lists.advert.offerHeadings)
+        rows[.advertStructuralHeadings] = row(lists.advert.structuralHeadings)
+        rows[.datesMonths] = row(lists.dates.months)
+        rows[.numbersWords] = row(lists.numbers.words)
+        rows[.spansFloorLeadIns] = row(lists.spans.floorLeadIns)
+        rows[.spansYearWords] = row(lists.spans.yearWords)
+        rows[.spansMonthWords] = row(lists.spans.monthWords)
+        rows[.spansCountWords] = row(lists.spans.countWords)
+        rows[.spansTiedCounts] = row(lists.spans.tiedCounts)
+        rows[.letterGreetings] = row(lists.letter.greetings)
+        rows[.letterSalutations] = row(lists.letter.salutations)
+        rows[.letterAddressees] = row(lists.letter.addressees)
+        rows[.letterAddresseeNouns] = row(lists.letter.addresseeNouns)
+        rows[.letterValedictions] = row(lists.letter.valedictions)
+        rows[.letterSalaryExpectationAsks] = row(lists.letter.salaryExpectationAsks)
+        rows[.letterStartDateAsks] = row(lists.letter.startDateAsks)
+        rows[.letterStatedTermWords] = row(lists.letter.statedTermWords)
+        rows[.fieldsTechnologies] = row(lists.technologies)
+        return rows
+    }
+
+    /// The licences a list may carry. Widening it is a reviewed change: every licence must be compatible with ISC and with
+    /// the App Store.
+    private static let allowedLicences: Set<String> = ["ISC"]
+
+    @Test("every list of every language states a source and a licence from the allowed set")
+    func sourceAndLicence() throws {
+        let lists = try WordLists.load()
+        for language in lists.languages {
+            let rows = summary(of: try lists.forLanguage(language))
+            #expect(Set(rows.keys) == Set(WordListKey.allCases), "\(language) is missing a list in this test")
+            for (key, row) in rows {
+                #expect(!row.source.isEmpty, "\(language) \(key.rawValue) has no source")
+                #expect(Self.allowedLicences.contains(row.licence), "\(language) \(key.rawValue) is under \(row.licence)")
+            }
+        }
+    }
+
+    // MARK: - English holds what cv-giovanni holds
+
+    /// The number of entries of each list in cv-giovanni at commit 6e28147, counted from the source. Every list of the
+    /// English file is ported from it, so a list that loses an entry, or one that is not ported, fails here.
+    private static let countsAtSource: [WordListKey: Int] = [
+        .advertStopwords: 159,            // domain/AdvertLexicon.js ADVERT.stopwords.en
+        .advertPlainWords: 10,            // ADVERT.plainWords.en
+        .advertDimensions: 5,             // ADVERT.dimensions.en
+        .advertBoilerplate: 28,           // ADVERT.boilerplate.en
+        .advertGenderMarkers: 2,          // ADVERT.genderMarkers.en
+        .advertInstructions: 8,           // ADVERT.instructions.en
+        .advertStreets: 9,                // ADVERT.streets.en
+        .advertNames: 25,                 // ADVERT.names.en
+        .advertSynonyms: 16,              // ADVERT.synonyms: 17 groups, and "architecture" has one English form, so no synonym
+        .advertRequirementHeadings: 10,   // ADVERT.requirementHeadings.en
+        .advertOfferHeadings: 8,          // ADVERT.offerHeadings.en
+        .advertStructuralHeadings: 12,    // ADVERT.structuralHeadings.en
+        .datesMonths: 24,                 // domain/DateRange.js MONTHS.en: 12 names and 12 abbreviations
+        .numbersWords: 30,                // core/ProvenanceCheck.js NUMBERS: two to nine, ten to nineteen, the tens, dozen, hundred, thousand, million
+        .spansFloorLeadIns: 3,            // domain/StatedSpans.js FLOOR: over, more than, at least
+        .spansYearWords: 2,               // UNIT: year, years
+        .spansMonthWords: 2,              // UNIT: month, months
+        .spansCountWords: 12,             // WORDS: one to twelve
+        .spansTiedCounts: 3,              // TIED: "of them at", "of which at", "of those at"
+        .letterGreetings: 3,              // core/ProvenanceCheck.js GREETING: dear, hello, hi
+        .letterSalutations: 1,            // SALUTATION: to whom it may concern
+        .letterAddressees: 14,            // WHOM: there, ms, mrs, mr, dr, prof, sir, madam, all, everyone, friends, recruiter(s), colleagues
+        .letterAddresseeNouns: 4,         // WHOM: team, manager, committee, department
+        .letterValedictions: 14,          // CLOSING: {kind, best, warm, warmest} regards with or without "with", best wishes, 3 yours, 2 sincerely
+        .letterSalaryExpectationAsks: 6,  // core/Tailor.js ASKS.salaryExpectation, expanded
+        .letterStartDateAsks: 13,         // ASKS.startDate, expanded
+        .letterStatedTermWords: 4,        // ASKS: the lookahead's English words, is, of, range, applies
+        .fieldsTechnologies: 49,          // domain/TechnologyLexicon.js TECHNOLOGIES
+    ]
+
+    @Test("the English file holds as many entries of each list as cv-giovanni does", arguments: WordListKey.allCases)
+    func countsMatchTheSource(key: WordListKey) throws {
+        let rows = summary(of: try english())
+        let row = try #require(rows[key])
+        #expect(row.count == Self.countsAtSource[key], "\(key.rawValue)")
+    }
+
+    @Test("the table of counts names every list of the format")
+    func countsNameEveryList() {
+        #expect(Set(Self.countsAtSource.keys) == Set(WordListKey.allCases))
+    }
+
+    @Test("the small English lists are exactly cv-giovanni's")
+    func smallLists() throws {
+        let lists = try english()
+        #expect(lists.advert.genderMarkers.entries == ["all genders", "any gender"])
+        #expect(lists.advert.plainWords.entries == ["new", "time", "set", "use", "get", "make", "keep", "drive", "after", "knowledge"])
+        #expect(lists.advert.dimensions.entries == ["performance", "stability", "quality", "speed", "efficiency"])
+        #expect(lists.advert.requirementHeadings.entries.first == "requirements" && lists.advert.requirementHeadings.entries.last == "we are looking for")
+        #expect(lists.advert.offerHeadings.entries.first == "we offer" && lists.advert.offerHeadings.entries.last == "how we work")
+        #expect(lists.advert.structuralHeadings.entries.first == "role" && lists.advert.structuralHeadings.entries.last == "location")
+        #expect(lists.advert.streets.order == .after)
+        #expect(lists.advert.streets.list.entries == ["street", "st.", "road", "rd.", "avenue", "ave.", "lane", "boulevard", "blvd."])
+        #expect(lists.spans.floorLeadIns.entries == ["over", "more than", "at least"])
+        #expect(lists.spans.yearWords.entries == ["year", "years"] && lists.spans.monthWords.entries == ["month", "months"])
+        #expect(lists.spans.tiedCounts.entries == ["{count} of them at {employer}", "{count} of which at {employer}", "{count} of those at {employer}"])
+        #expect(lists.letter.statedTermWords.entries == ["is", "of", "range", "applies"])
+    }
+
+    @Test("the stopwords open and close as cv-giovanni's do")
+    func stopwords() throws {
+        let stopwords = try english().advert.stopwords.entries
+        #expect(stopwords.first == "the" && stopwords.last == "optimise")
+        #expect(stopwords.contains("hands-on") && stopwords.contains("please"))
+    }
+
+    @Test("the months, with and without an abbreviation, carry their numbers")
+    func months() throws {
+        let months = try english().dates.months.entries
+        func month(_ name: String) -> Int? { months.first { $0.name == name }?.month }
+        #expect(month("january") == 1 && month("jan") == 1 && month("may") == 5 && month("sept") == 9 && month("sep") == 9)
+        #expect(month("december") == 12 && month("dec") == 12 && month("mai") == nil && month("marz") == nil)
+        #expect(Set(months.map(\.month)) == Set(1...12))
+    }
+
+    @Test("the number words carry their values, and one is not among them")
+    func numberWords() throws {
+        let words = try english().numbers.words.entries
+        func value(_ word: String) -> Int? { words.first { $0.word == word }?.value }
+        #expect(value("two") == 2 && value("nineteen") == 19 && value("twenty") == 20 && value("ninety") == 90)
+        #expect(value("dozen") == 12 && value("hundred") == 100 && value("thousand") == 1000 && value("million") == 1_000_000)
+        #expect(value("one") == nil)
+        let counts = try english().spans.countWords.entries
+        #expect(counts.first == NumberWord(word: "one", value: 1) && counts.last == NumberWord(word: "twelve", value: 12))
+    }
+
+    @Test("the synonyms are the English forms of cv-giovanni's groups")
+    func synonyms() throws {
+        let groups = try english().advert.synonyms.entries.map(\.forms)
+        #expect(groups.first == ["mdm", "mobile device management"])
+        #expect(groups.contains(["ci/cd", "continuous integration", "continuous delivery", "continuous deployment"]))
+        #expect(groups.contains(["developer", "developers", "engineer", "engineers"]))
+        #expect(groups.last == ["mobile development", "mobile app development"])
+        #expect(groups.allSatisfy { $0.count >= 2 })
+    }
+
+    @Test("the valedictions are the forms the regular expression allows, written out")
+    func valedictions() throws {
+        let valedictions = try english().letter.valedictions.entries
+        #expect(valedictions.contains("kind regards") && valedictions.contains("with warmest regards") && valedictions.contains("yours faithfully"))
+        #expect(valedictions.contains("sincerely") && valedictions.contains("sincerely yours") && valedictions.contains("best wishes"))
+    }
+
+    @Test("the asks are the phrases the regular expressions allow, written out")
+    func asks() throws {
+        let letter = try english().letter
+        #expect(letter.salaryExpectationAsks.entries == [
+            "salary expectation", "salary expectations", "salary requirement", "salary requirements", "expected salary", "desired salary",
+        ])
+        #expect(letter.startDateAsks.entries.contains("earliest possible start date") && letter.startDateAsks.entries.contains("notice period"))
+        #expect(letter.startDateAsks.entries.contains("when you could start") && letter.startDateAsks.entries.contains("availability date"))
+    }
+
+    @Test("a technology that is also an ordinary word stays out, as the source's lexicon explains", arguments: [
+        "Swift", "React", "Combine", "Room", "Realm", "Go", "Rust", "Flutter", "Espresso",
+    ])
+    func ordinaryWordsStayOut(name: String) throws {
+        let technologies = try english().technologies.entries.map(TextFold.fold)
+        #expect(!technologies.contains(TextFold.fold(name)))
+    }
+
+    @Test("the technologies hold names that no other word has")
+    func technologies() throws {
+        let technologies = try english().technologies.entries
+        #expect(technologies.first == "Kotlin" && technologies.last == "PyTorch")
+        #expect(technologies.contains("SwiftUI") && technologies.contains("fastlane") && technologies.contains("Node.js"))
+    }
+}

@@ -13,7 +13,7 @@ let package = Package(
         .library(name: "Tailoring", targets: ["Tailoring"]),
     ],
     targets: [
-        .target(name: "TailoringModel"),
+        .target(name: "TailoringModel", resources: [.copy("Resources")]),
         .target(name: "AdvertAnalysis", dependencies: ["TailoringModel"]),
         .target(name: "ContentChecks", dependencies: ["TailoringModel"]),
         .target(name: "Provenance", dependencies: ["TailoringModel", "AdvertAnalysis", "ContentChecks"]),

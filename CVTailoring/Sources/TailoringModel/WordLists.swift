@@ -22,6 +22,14 @@ public struct WordLists: Hashable, Sendable {
         self.lists = lists
     }
 
+    /// Reads the index and the files of this package's resources. The caller loads once and injects the value (R4).
+    public static func load() throws(TailoringModelError) -> WordLists {
+        guard let index = try WordListResources.data(named: "index", as: .index) else { throw .corruptWordList(.index) }
+        return try WordLists(index: index) { language throws(TailoringModelError) in
+            try WordListResources.data(named: language.code, as: .language(language))
+        }
+    }
+
     /// The lists of one language, or `unsupportedLanguage` when it has no file. It never falls back to another (R13).
     public func forLanguage(_ language: TailoringLanguage) throws(TailoringModelError) -> LanguageWordLists {
         guard let found = lists[language] else { throw .unsupportedLanguage }
