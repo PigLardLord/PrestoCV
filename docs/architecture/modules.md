@@ -257,7 +257,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 - **Word lists** (#136), one JSON file per language and an index, as resources of the target.
   - `WordLists.load()` reads them through `Bundle.module` (R2), validates them (R8), and holds them. A composition root loads them once and injects the value (R4); nothing caches them.
   - `forLanguage(_:)` returns the `LanguageWordLists` of a language, or `unsupportedLanguage`. Its groups are `advert`, `dates`, `numbers`, `spans`, `letter`, `provenance` and `technologies`, and each list states its `source` and its `licence`.
-  - The supported languages are the ones in `Resources/WordLists/index.json`, each with its file: English today. Adding one adds a file and an index entry.
+  - The supported languages are the ones in `Resources/WordLists/index.json`, each with its file: English today. Adding one adds a file and an index entry when its words fit format 1 ([word-lists.md](word-lists.md), Known gaps).
   - The format, every key and the rule for adding a language are in [word-lists.md](word-lists.md). A test holds that page to the decoder.
 - **`TextFold.fold`**, the one normalisation every word-list match that folds uses: case and accents are dropped, ligatures are expanded ("ﬁ" is "fi") while "œ", "æ", "ø" and "ł" stay, `ß` is `ss` but a capital `ẞ` is `ß`, and white space is squeezed. `AdvertAnalysis`, `ContentChecks` and `Provenance` share this copy.
 

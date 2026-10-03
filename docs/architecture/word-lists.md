@@ -125,6 +125,7 @@ A language whose words fit format 1 is added with a file and an index entry. The
 - **German compounds matched by affix.** The rank words `*leiter(in)`, `*leitung`, `*architekt` and `fuhrungs*`, the asks `eintrittstermin*` and `(eintritt|start)*`, and the addressee `kolleg*` are matched by their beginning or ending, not as whole words. They need a match mode on each entry, which #142 adds.
 - **German's own lists.** `ALSO_ENGLISH_WORDS`, `SHARED_NOUNS`, `NOT_RANKS`, the German noun list for reading names and the abbreviation pairs (`ki` for `AI`) need keys and an entry shape, which #142 adds.
 - **The French street order.** "12 rue de la Paix" puts the number before the word and a name after it, which none of the three street orders says. #144 closes it.
+- **Street particles.** The `before` street shape reads the Italian particles in code (#145). Spanish ("Calle de los Olivos 3": `la`, `los`, `las`) and Portuguese ("Rua das Flores 12": `do`, `dos`, `das`) have their own, which need a key or code of their own: #143 and #146, next to #145.
 - **A floor written after the count and a tied count with an optional unit.** "10 anni e più" puts the floor word after the count, and German's "davon 8 Jahre bei" may or may not carry the unit, which a template cannot say without a `{unit}` placeholder. #145 and #142 close them.
 
 ### Evolution
