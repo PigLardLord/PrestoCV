@@ -93,4 +93,52 @@ struct LanguageWordListsTests {
         let data = try WordListFixture.data(editing: .advertStopwords) { $0["entries"] = [["word": "the"]] }
         #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
     }
+
+    // MARK: - Version and size
+
+    @Test("the format version is 1, and only 1 is read")
+    func versionOne() {
+        #expect(WordListFormat.version == 1)
+    }
+
+    @Test("a version other than 1 is corrupt", arguments: [0, 2, 3, -1, 100])
+    func otherVersion(version: Int) throws {
+        let data = try WordListFixture.data { $0["version"] = version }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    @Test("a version that is not a whole number is corrupt")
+    func versionNotANumber() throws {
+        var versions: [Any] = ["1"]
+        versions.append(1.5)
+        versions.append(NSNull())
+        versions.append(true)
+        versions.append([1])
+        versions.append("")
+        for version in versions {
+            let data = try WordListFixture.data { $0["version"] = version }
+            #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+        }
+    }
+
+    @Test("a file without a version is corrupt")
+    func noVersion() throws {
+        let data = try WordListFixture.data { $0["version"] = nil }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    @Test("a file of the largest size is read, and one byte more is corrupt")
+    func sizeCap() throws {
+        let complete = try WordListFixture.data()
+        let padding = WordListFormat.maxFileBytes - complete.count
+        let atTheCap = complete + Data(repeating: UInt8(ascii: " "), count: padding)
+        #expect(atTheCap.count == WordListFormat.maxFileBytes)
+        _ = try decode(atTheCap)
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(atTheCap + Data(" ".utf8)) }
+    }
+
+    @Test("the largest size is 1 MiB")
+    func capValue() {
+        #expect(WordListFormat.maxFileBytes == 1_048_576)
+    }
 }

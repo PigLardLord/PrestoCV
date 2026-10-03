@@ -3,6 +3,7 @@ import Foundation
 extension LanguageWordLists {
     /// Reads the file of one language (`docs/architecture/word-lists.md`) into its typed lists, or refuses it (R8).
     init(decoding data: Data, language: TailoringLanguage) throws(TailoringModelError) {
+        guard data.count <= WordListFormat.maxFileBytes else { throw .corruptWordList(.language(language)) }
         let file: WordListDocument
         do {
             file = try JSONDecoder().decode(WordListDocument.self, from: data)
@@ -209,6 +210,9 @@ private struct WordListDocument: Decodable {
 
     init(from decoder: any Decoder) throws {
         let root = try decoder.container(keyedBy: DynamicKey.self)
+        guard try root.decode(Int.self, forKey: "version") == WordListFormat.version else {
+            throw DecodingError.dataCorruptedError(forKey: "version", in: root, debugDescription: "a version this code does not read")
+        }
         try root.allowOnly(["version"] + WordListKey.allCases.map(\.group))
         advert = try RawAdvert(RawGroup(root, startingWith: .advertStopwords))
         dates = Dates(months: try RawGroup(root, startingWith: .datesMonths).list(.datesMonths))
