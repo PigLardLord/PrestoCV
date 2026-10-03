@@ -49,14 +49,28 @@ private struct DynamicKey: CodingKey, ExpressibleByStringLiteral {
     init?(intValue: Int) { return nil }
 }
 
+extension KeyedDecodingContainer where Key == DynamicKey {
+    /// Refuses a key that is not among `known`: the format is closed, so a key it does not name is a mistake or a newer
+    /// format, and neither is read as if it were not there.
+    func allowOnly(_ known: [String]) throws {
+        guard allKeys.allSatisfy({ known.contains($0.stringValue) }) else {
+            throw DecodingError.dataCorrupted(.init(codingPath: codingPath, debugDescription: "a key the format does not know"))
+        }
+    }
+}
+
 /// A list as the file writes it, before any rule is applied.
 private struct RawList<Entry: Decodable>: Decodable {
+    static var keys: [String] { ["source", "licence", "entries"] }
+
     let source: String
     let licence: String
     let entries: [Entry]
 
     init(from decoder: any Decoder) throws {
-        try self.init(container: decoder.container(keyedBy: DynamicKey.self))
+        let container = try decoder.container(keyedBy: DynamicKey.self)
+        try container.allowOnly(Self.keys)
+        try self.init(container: container)
     }
 
     init(container: KeyedDecodingContainer<DynamicKey>) throws {
@@ -72,6 +86,7 @@ private struct RawStreets: Decodable {
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicKey.self)
+        try container.allowOnly(RawList<String>.keys + ["order"])
         list = try RawList(container: container)
         order = try container.decode(String.self, forKey: "order")
     }
@@ -80,15 +95,35 @@ private struct RawStreets: Decodable {
 private struct RawMonth: Decodable {
     let name: String
     let month: Int
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicKey.self)
+        try container.allowOnly(["name", "month"])
+        name = try container.decode(String.self, forKey: "name")
+        month = try container.decode(Int.self, forKey: "month")
+    }
 }
 
 private struct RawNumber: Decodable {
     let word: String
     let value: Int
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicKey.self)
+        try container.allowOnly(["word", "value"])
+        word = try container.decode(String.self, forKey: "word")
+        value = try container.decode(Int.self, forKey: "value")
+    }
 }
 
 private struct RawSynonym: Decodable {
     let forms: [String]
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicKey.self)
+        try container.allowOnly(["forms"])
+        forms = try container.decode([String].self, forKey: "forms")
+    }
 }
 
 /// One group of the file, opened to read its lists by key.
@@ -99,6 +134,7 @@ private struct RawGroup {
     init(_ root: KeyedDecodingContainer<DynamicKey>, startingWith first: WordListKey) throws {
         guard root.contains(DynamicKey(first.group)) else { throw WordListFailure.missing(first) }
         container = try root.nestedContainer(keyedBy: DynamicKey.self, forKey: DynamicKey(first.group))
+        try container.allowOnly(WordListKey.allCases.filter { $0.group == first.group }.map(\.name))
     }
 
     func list<Value: Decodable>(_ key: WordListKey, as type: Value.Type = Value.self) throws -> Value {
@@ -173,6 +209,7 @@ private struct WordListDocument: Decodable {
 
     init(from decoder: any Decoder) throws {
         let root = try decoder.container(keyedBy: DynamicKey.self)
+        try root.allowOnly(["version"] + WordListKey.allCases.map(\.group))
         advert = try RawAdvert(RawGroup(root, startingWith: .advertStopwords))
         dates = Dates(months: try RawGroup(root, startingWith: .datesMonths).list(.datesMonths))
         numbers = Numbers(words: try RawGroup(root, startingWith: .numbersWords).list(.numbersWords))

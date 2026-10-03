@@ -51,4 +51,46 @@ struct LanguageWordListsTests {
     func errorNamesTheLanguage() {
         #expect(throws: TailoringModelError.corruptWordList(.language(.french))) { try decode(Data("nope".utf8), as: .french) }
     }
+
+    // MARK: - Keys the format does not know
+
+    @Test("a key the format does not know at the top of the file is corrupt")
+    func unknownRootKey() throws {
+        let data = try WordListFixture.data { $0["extra"] = 1 }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    @Test("a key the format does not know in a group is corrupt", arguments: ["advert", "dates", "numbers", "spans", "letter", "fields"])
+    func unknownGroupKey(group: String) throws {
+        let data = try WordListFixture.data { object in
+            var members = object[group] as? WordListFixture.Object ?? [:]
+            members["extra"] = WordListFixture.list(for: .advertStopwords)
+            object[group] = members
+        }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    @Test("a key the format does not know in a list is corrupt", arguments: WordListKey.allCases)
+    func unknownListKey(key: WordListKey) throws {
+        let data = try WordListFixture.data(editing: key) { $0["extra"] = 1 }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    @Test("a key the format does not know in an entry is corrupt", arguments: [
+        WordListKey.datesMonths, .numbersWords, .spansCountWords, .advertSynonyms,
+    ])
+    func unknownEntryKey(key: WordListKey) throws {
+        let data = try WordListFixture.data(editing: key) { list in
+            var entries = list["entries"] as? [WordListFixture.Object] ?? []
+            entries[0]["extra"] = 1
+            list["entries"] = entries
+        }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
+
+    @Test("an entry of a list of words that is an object is corrupt")
+    func objectInAListOfWords() throws {
+        let data = try WordListFixture.data(editing: .advertStopwords) { $0["entries"] = [["word": "the"]] }
+        #expect(throws: TailoringModelError.corruptWordList(.language(.english))) { try decode(data) }
+    }
 }
