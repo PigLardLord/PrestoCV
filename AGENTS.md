@@ -10,6 +10,7 @@
 - `PrestoCV/` hosts the SwiftUI application: `App/` and `Features/` contain screens, `DesignSystem/` centralizes reusable views, `Navigation/` wires routing, and `Resources/` plus `Assets.xcassets` store localized strings and images.
 - `PrestoCVCore/` is a Swift Package with domain models and services; use it for shareable logic and keep UI-dependent code in the app target.
 - `CVPDFExporter/` is an auxiliary package for generating PDFs; its demos and template viewer live in the separate `CVPDFExporterExamples/` package and should stay decoupled from app code.
+- `CVTailoring/` is the CV Tailoring package (ADR 0013); it depends on no other PrestoCV package and builds on Linux.
 - Unit tests reside in `PrestoCVTests/` (Swift Testing-based) and `PrestoCVCore/Tests/`; UI automation lives in `PrestoCVUITests/`.
 
 ## Build, Test, and Development Commands

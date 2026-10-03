@@ -44,7 +44,7 @@ jobs:
       - name: Build and test the new targets
         # On Linux only the new targets exist; the legacy ones are declared for Apple hosts only (ADR 0012).
         run: |
-          for package in CVGeneratorAI PrestoCVApp; do
+          for package in CVGeneratorAI CVTailoring PrestoCVApp; do
             swift build --package-path "$package"
           done
           swift test --package-path PrestoCVCore
@@ -87,6 +87,9 @@ jobs:
       - name: Build the app package
         # PrestoCVApp has no tests until step 5 (#88); building it checks its targets and cross-package dependencies.
         run: swift build --package-path PrestoCVApp
+      - name: Build the tailoring package
+        # CVTailoring has no tests until #135; building it checks its targets and their dependencies.
+        run: swift build --package-path CVTailoring
       - name: Build the exporter examples
         # The demos and the template viewer, apart from the library (R14); they use the legacy exporter, Apple hosts only.
         run: swift build --package-path CVPDFExporterExamples

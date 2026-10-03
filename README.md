@@ -17,6 +17,7 @@ The current app and packages are the legacy code the migration replaces, one con
 | `docs/architecture/` | The target architecture: overview and migration strategy, rules R1–R14, modules and allowed imports, document markup contract, glossary, ADRs. |
 | `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). |
 | `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The current packages (legacy, being replaced). |
+| `CVTailoring/` | The CV Tailoring context ([ADR 0013](docs/architecture/adr/0013-cv-tailoring-context.md)), built on the target architecture from the start; empty until the tailoring tickets fill it. |
 | `Tools/ArchitectureCheck/` | The checker that enforces the rules, and its pre-commit hook. |
 | `Prototypes/ADRValidation/` | The throwaway prototype that validated the ADRs. It is outside the app's build; its README says how to run it. |
 
