@@ -414,6 +414,43 @@ struct LanguageWordListsTests {
         }
     }
 
+    static let legalFormSpacePairs: [[String]] = {
+        var values: [[String]] = []
+        values.append(["e.v.", "e. v."])
+        values.append(["gmbh & co. kg", "gmbh&co.kg"])
+        values.append(["ug (haftungsbeschr\u{00E4}nkt)", "ug(haftungsbeschr\u{00E4}nkt)"])
+        values.append(["gmbh & co. kg", "gmbh &co. kg"])
+        values.append(["Ltd.", "ltd."])
+        return values
+    }()
+
+    @Test("two legal forms that differ only by the spaces around &, . or ( are one, however their case falls", arguments: legalFormSpacePairs)
+    func legalFormSpaces(entries: [String]) throws {
+        let data = try WordListFixture.data(editing: .provenanceLegalForms) { $0["entries"] = entries }
+        #expect(throws: corrupt(.provenanceLegalForms)) { try decode(data) }
+    }
+
+    static let legalFormsThatDiffer: [[String]] = {
+        var values: [[String]] = []
+        values.append(["ltd", "ltd."])
+        values.append(["gmbh & co kg", "gmbh & co. kg"])
+        values.append(["gmbh", "ggmbh"])
+        values.append(["gmbh & co. kg", "gmbh & co. kga"])
+        return values
+    }()
+
+    @Test("legal forms that differ by a dot, a letter or a space elsewhere are two", arguments: legalFormsThatDiffer)
+    func legalFormsApart(entries: [String]) throws {
+        let data = try WordListFixture.data(editing: .provenanceLegalForms) { $0["entries"] = entries }
+        #expect(try decode(data).provenance.legalForms.entries == entries)
+    }
+
+    @Test("the same spaces tell two entries apart in a list that is read folded")
+    func spacesCountElsewhere() throws {
+        let data = try WordListFixture.data(editing: .advertStopwords) { $0["entries"] = ["e.v.", "e. v."] }
+        #expect(try decode(data).advert.stopwords.entries == ["e.v.", "e. v."])
+    }
+
     @Test("the lists read as written or lower-cased are the ones cv-giovanni matches that way")
     func readModes() {
         #expect(WordListKey.advertGenderMarkers.read == .lowerCased)

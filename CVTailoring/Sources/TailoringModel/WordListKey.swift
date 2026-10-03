@@ -112,3 +112,26 @@ extension WordListKey {
         }
     }
 }
+
+extension WordListKey {
+    /// What two entries of the list must differ in to be two: how the list is read, and for the legal forms also not the
+    /// spaces around "&", "." and "(", which the check ignores, so "e.v." and "e. v." are one form.
+    func identity(of entry: String) -> String {
+        let identity = read.identity(of: entry)
+        return self == .provenanceLegalForms ? Self.withoutSpaces(around: ["&", ".", "("], in: identity) : identity
+    }
+
+    private static func withoutSpaces(around symbols: Set<Character>, in text: String) -> String {
+        let characters = Array(text)
+        var kept: [Character] = []
+        for (index, character) in characters.enumerated() {
+            if character.isWhitespace {
+                let before = kept.last
+                let after = characters[(index + 1)...].first { !$0.isWhitespace }
+                if before.map(symbols.contains) == true || after.map(symbols.contains) == true { continue }
+            }
+            kept.append(character)
+        }
+        return String(kept)
+    }
+}

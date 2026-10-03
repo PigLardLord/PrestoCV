@@ -438,7 +438,7 @@ private struct WordListReading {
         guard !raw.entries.isEmpty || key.mayBeEmpty else { throw .incompleteWordList(language, key) }
         var identities = Set<String>()
         for word in words {
-            guard isStated(word), identities.insert(key.read.identity(of: word)).inserted else { throw corrupt(key) }
+            guard isStated(word), identities.insert(key.identity(of: word)).inserted else { throw corrupt(key) }
         }
     }
 
