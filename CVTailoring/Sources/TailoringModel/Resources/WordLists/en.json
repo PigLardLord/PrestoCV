@@ -667,6 +667,69 @@
       ]
     }
   },
+  "provenance": {
+    "notPlurals": {
+      "source": "cv-giovanni 6e28147 core/ProvenanceCheck.js NOT_PLURALS",
+      "licence": "ISC",
+      "entries": [
+        "news",
+        "goods",
+        "means",
+        "series",
+        "species",
+        "lens",
+        "gas",
+        "bus",
+        "sales"
+      ]
+    },
+    "legalForms": {
+      "source": "cv-giovanni 6e28147 core/ProvenanceCheck.js LEGAL_FORM (every form, expanded)",
+      "licence": "ISC",
+      "entries": [
+        "gmbh & co kg",
+        "gmbh & co kga",
+        "gmbh & co kgaa",
+        "gmbh & co. kg",
+        "gmbh & co. kga",
+        "gmbh & co. kgaa",
+        "ug (haftungsbeschränkt)",
+        "gmbh",
+        "ggmbh",
+        "kgaa",
+        "ag",
+        "se",
+        "kg",
+        "ug",
+        "e.v.",
+        "e. v.",
+        "s.a.",
+        "b.v.",
+        "ltd",
+        "ltd.",
+        "limited",
+        "inc",
+        "inc.",
+        "llc",
+        "plc"
+      ]
+    },
+    "firstPerson": {
+      "source": "cv-giovanni 6e28147 core/ProvenanceCheck.js ProvenanceCheck.names (the first person, expanded)",
+      "licence": "ISC",
+      "entries": [
+        "I",
+        "I'm",
+        "I've",
+        "I'd",
+        "I'll",
+        "I’m",
+        "I’ve",
+        "I’d",
+        "I’ll"
+      ]
+    }
+  },
   "fields": {
     "technologies": {
       "source": "cv-giovanni 6e28147 domain/TechnologyLexicon.js TECHNOLOGIES",

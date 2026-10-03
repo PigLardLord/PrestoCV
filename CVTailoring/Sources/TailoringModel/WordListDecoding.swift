@@ -20,6 +20,7 @@ extension LanguageWordLists {
             numbers: NumberWords(words: try reading.numbers(file.numbers.words, .numbersWords)),
             spans: try reading.spans(file.spans),
             letter: try reading.letter(file.letter),
+            provenance: try reading.provenance(file.provenance),
             technologies: try reading.texts(file.fields.technologies, .fieldsTechnologies)
         )
     }
@@ -222,6 +223,16 @@ private struct RawLetter {
     }
 }
 
+private struct RawProvenance {
+    let notPlurals, legalForms, firstPerson: RawList<String>
+
+    init(_ group: RawGroup) throws {
+        notPlurals = try group.list(.provenanceNotPlurals)
+        legalForms = try group.list(.provenanceLegalForms)
+        firstPerson = try group.list(.provenanceFirstPerson)
+    }
+}
+
 /// The whole file as written.
 private struct WordListDocument: Decodable {
     struct Numbers { let words: RawList<RawNumber> }
@@ -232,6 +243,7 @@ private struct WordListDocument: Decodable {
     let numbers: Numbers
     let spans: RawSpans
     let letter: RawLetter
+    let provenance: RawProvenance
     let fields: Fields
 
     init(from decoder: any Decoder) throws {
@@ -245,6 +257,7 @@ private struct WordListDocument: Decodable {
         numbers = Numbers(words: try RawGroup(root, startingWith: .numbersWords).list(.numbersWords))
         spans = try RawSpans(RawGroup(root, startingWith: .spansFloorLeadIns))
         letter = try RawLetter(RawGroup(root, startingWith: .letterGreetings))
+        provenance = try RawProvenance(RawGroup(root, startingWith: .provenanceNotPlurals))
         fields = Fields(technologies: try RawGroup(root, startingWith: .fieldsTechnologies).list(.fieldsTechnologies))
     }
 }
@@ -305,6 +318,14 @@ private struct WordListReading {
             formsOfAddress: try forms(raw.formsOfAddress, .letterFormsOfAddress),
             academicTitles: try texts(raw.academicTitles, .letterAcademicTitles),
             notGivenNames: try texts(raw.notGivenNames, .letterNotGivenNames)
+        )
+    }
+
+    func provenance(_ raw: RawProvenance) throws(TailoringModelError) -> ProvenanceWords {
+        ProvenanceWords(
+            notPlurals: try texts(raw.notPlurals, .provenanceNotPlurals),
+            legalForms: try texts(raw.legalForms, .provenanceLegalForms),
+            firstPerson: try texts(raw.firstPerson, .provenanceFirstPerson)
         )
     }
 

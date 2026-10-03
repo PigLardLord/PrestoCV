@@ -129,6 +129,16 @@ public struct LetterWords: Hashable, Sendable {
     public let notGivenNames: WordList<String>
 }
 
+/// What the check of a tailoring against its source reads in a language beyond the lists above.
+public struct ProvenanceWords: Hashable, Sendable {
+    /// Words that end like a plural and are none: "news", "series".
+    public let notPlurals: WordList<String>
+    /// The legal forms a company's name ends in, which its prose leaves out, every spelling written out: "gmbh", "ltd.".
+    public let legalForms: WordList<String>
+    /// The capitalised words of the first person, which are no names: "I", "I'm".
+    public let firstPerson: WordList<String>
+}
+
 /// Every word list of one language (ADR 0013), validated when it was read (R8). Only the decoder makes one, so a value
 /// of this type always holds every list, each with its source and its licence.
 public struct LanguageWordLists: Hashable, Sendable {
@@ -138,6 +148,7 @@ public struct LanguageWordLists: Hashable, Sendable {
     public let numbers: NumberWords
     public let spans: SpanWords
     public let letter: LetterWords
+    public let provenance: ProvenanceWords
     /// The names of technologies that are never ordinary words of the language, so a mention is held to the source
     /// however it is written. Read from `fields.technologies`.
     public let technologies: WordList<String>

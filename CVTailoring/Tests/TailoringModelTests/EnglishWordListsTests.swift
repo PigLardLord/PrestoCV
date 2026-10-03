@@ -85,6 +85,9 @@ struct EnglishWordListsTests {
         rows[.letterFormsOfAddress] = row(lists.letter.formsOfAddress)
         rows[.letterAcademicTitles] = row(lists.letter.academicTitles)
         rows[.letterNotGivenNames] = row(lists.letter.notGivenNames)
+        rows[.provenanceNotPlurals] = row(lists.provenance.notPlurals)
+        rows[.provenanceLegalForms] = row(lists.provenance.legalForms)
+        rows[.provenanceFirstPerson] = row(lists.provenance.firstPerson)
         rows[.fieldsTechnologies] = row(lists.technologies)
         return rows
     }
@@ -146,6 +149,9 @@ struct EnglishWordListsTests {
         counts[.letterFormsOfAddress] = 3  // core/ProvenanceCheck.js letterFailures, recipient.form: ms and mrs for ms, mr for mr; frau and herr are German
         counts[.letterAcademicTitles] = 2  // the titles between a form and a name: dr, prof
         counts[.letterNotGivenNames] = 6  // the words that are no given name: ms, mrs, miss, mr, and, or; frau, herr, und, oder and sowie are German
+        counts[.provenanceNotPlurals] = 9  // core/ProvenanceCheck.js NOT_PLURALS
+        counts[.provenanceLegalForms] = 25  // LEGAL_FORM: its 16 alternatives written out, with and without the optional dots and space
+        counts[.provenanceFirstPerson] = 9  // ProvenanceCheck.names: "I" and I'm, I've, I'd, I'll with either apostrophe
         counts[.fieldsTechnologies] = 49  // domain/TechnologyLexicon.js TECHNOLOGIES
         return counts
     }()
@@ -258,6 +264,18 @@ struct EnglishWordListsTests {
         ])
         #expect(letter.academicTitles.entries == ["dr", "prof"])
         #expect(letter.notGivenNames.entries == ["ms", "mrs", "miss", "mr", "and", "or"])
+    }
+
+    @Test("the words the provenance check reads for English are cv-giovanni's")
+    func provenanceWords() throws {
+        let provenance = try english().provenance
+        #expect(provenance.notPlurals.entries == ["news", "goods", "means", "series", "species", "lens", "gas", "bus", "sales"])
+        #expect(provenance.firstPerson.entries == ["I", "I'm", "I've", "I'd", "I'll", "I\u{2019}m", "I\u{2019}ve", "I\u{2019}d", "I\u{2019}ll"])
+        let forms = provenance.legalForms.entries
+        for form in ["gmbh", "ggmbh", "ag", "ltd", "ltd.", "limited", "inc", "inc.", "llc", "plc", "e.v.", "e. v.", "s.a.", "b.v."] {
+            #expect(forms.contains(form), "\(form)")
+        }
+        #expect(forms.contains("gmbh & co. kg") && forms.contains("gmbh & co kgaa") && forms.contains("ug (haftungsbeschr\u{00E4}nkt)"))
     }
 
     @Test("a technology that is also an ordinary word stays out, as the source's lexicon explains", arguments: ordinaryWordsStayOutCases)

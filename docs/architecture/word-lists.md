@@ -28,7 +28,7 @@ The supported languages are the ones the index names, each with its file. An ind
 
 | Shape | Keys |
 |---|---|
-| The file | `version`, `advert`, `dates`, `numbers`, `spans`, `letter`, `fields` |
+| The file | `version`, `advert`, `dates`, `numbers`, `spans`, `letter`, `provenance`, `fields` |
 | A list | `source`, `licence`, `entries` |
 | The list of streets | `source`, `licence`, `entries`, `order` |
 | A month name | `name`, `month` |
@@ -88,6 +88,9 @@ Every file holds every key below. A file that lacks one is refused as incomplete
 | `letter.formsOfAddress` | The words that write a form of address before a contact's name, each with its form, `ms` or `mr`: "ms" and "mrs" for `ms`, "mr" for `mr` | `Provenance` accepts a form of address only when the advert writes one of its words before the contact's name; otherwise the form is neutral |
 | `letter.academicTitles` | The titles that may stand between a form of address and a name ("dr", "prof") | `Provenance`, as for the forms of address: "Ms Dr Grace Hopper" |
 | `letter.notGivenNames` | The words that are no given name before a surname: another form of address, or a conjunction ("miss", "and", "or") | `Provenance`, as for the forms of address: "Ms Müller and Mr Hopper" writes no "Ms" before Hopper |
+| `provenance.notPlurals` | Words that end like a plural and are none ("news", "series") | `Provenance` finds a word in both its numbers, and does not make "new" of "news" |
+| `provenance.legalForms` | The legal forms a company's name ends in, every spelling written out ("gmbh", "ltd.", "gmbh & co. kg"). A legal form belongs to a jurisdiction and not to a language, so every file holds the whole list, as it holds the technologies | `Provenance` finds a recipient's company as a letter writes it in prose, without its legal form |
+| `provenance.firstPerson` | The capitalised words of the first person, with either apostrophe ("I", "I'm") | `Provenance` does not read them as names |
 | `fields.technologies` | Names of technologies that are never ordinary words of the language ("Kotlin", "SwiftUI") | `Provenance` holds a mention to the source however it is written; a name that is also an ordinary word stays out, and is read from its capitals |
 
 ### What stays in code

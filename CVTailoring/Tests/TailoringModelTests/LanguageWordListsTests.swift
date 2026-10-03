@@ -26,6 +26,8 @@ struct LanguageWordListsTests {
         #expect(lists.spans.tiedCounts.entries == ["{count} of them at {employer}"])
         #expect(lists.letter.valedictions.entries == ["alpha", "beta"])
         #expect(lists.letter.formsOfAddress.entries == [FormOfAddressWord(form: .ms, word: "alpha"), FormOfAddressWord(form: .mr, word: "beta")])
+        #expect(lists.provenance.notPlurals.entries == ["alpha", "beta"] && lists.provenance.legalForms.entries == ["alpha", "beta"])
+        #expect(lists.provenance.firstPerson.entries == ["alpha", "beta"])
         #expect(lists.letter.academicTitles.entries == ["alpha", "beta"] && lists.letter.notGivenNames.entries == ["alpha", "beta"])
         #expect(lists.technologies.entries == ["alpha", "beta"])
     }
@@ -58,6 +60,13 @@ struct LanguageWordListsTests {
         #expect(throws: TailoringModelError.incompleteWordList(.english, .letterGreetings)) { try decode(data) }
     }
 
+    @Test("a missing group is incomplete, named by its first list, whichever group it is", arguments: unknownGroupKeyCases)
+    func missingEachGroup(group: String) throws {
+        let first = try #require(WordListKey.allCases.first { $0.group == group })
+        let data = try WordListFixture.data { $0[group] = nil }
+        #expect(throws: TailoringModelError.incompleteWordList(.english, first)) { try decode(data) }
+    }
+
     @Test("the error names the language the file was read for")
     func errorNamesTheLanguage() {
         #expect(throws: TailoringModelError.corruptWordList(.language(.french))) { try decode(Data("nope".utf8), as: .french) }
@@ -74,7 +83,7 @@ struct LanguageWordListsTests {
     static let unknownGroupKeyCases: [String] = {
         var values: [String] = []
         values.append(contentsOf: ["advert", "dates", "numbers", "spans"])
-        values.append(contentsOf: ["letter", "fields"])
+        values.append(contentsOf: ["letter", "provenance", "fields"])
         return values
     }()
 
