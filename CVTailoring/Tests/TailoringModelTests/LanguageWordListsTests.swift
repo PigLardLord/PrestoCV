@@ -451,11 +451,12 @@ struct LanguageWordListsTests {
         var values: [String] = []
         values.append(contentsOf: ["of them at", "{count} of them at", "of them at {employer}", "{count} {count} at {employer}"])
         values.append(contentsOf: ["{count} at {employer} {employer}", "{count} at {employer} {unit}", "{count at {employer}", "{count} at {employer}}"])
-        values.append(contentsOf: ["{employer} of {count}{"])
+        values.append(contentsOf: ["{employer} of {count}{", "{count}{employer}", "{count} {employer}", "{employer}{count}"])
+        values.append(contentsOf: ["{employer}  {count}", "{count}\u{00A0}{employer}", "{count}\u{200B}{employer}"])
         return values
     }()
 
-    @Test("a tied count holds {count} and {employer} once each, and no other braces", arguments: tiedCountPlaceholdersCases)
+    @Test("a tied count holds {count} and {employer} once each, a word between them, and no other braces", arguments: tiedCountPlaceholdersCases)
     func tiedCountPlaceholders(template: String) throws {
         let data = try WordListFixture.data(editing: .spansTiedCounts) { $0["entries"] = [template] }
         #expect(throws: corrupt(.spansTiedCounts)) { try decode(data) }
@@ -463,7 +464,7 @@ struct LanguageWordListsTests {
 
     static let tiedCountShapesCases: [String] = {
         var values: [String] = []
-        values.append(contentsOf: ["{count} of them at {employer}", "davon {count} bei {employer}", "{employer}: {count}", "{count}{employer}"])
+        values.append(contentsOf: ["{count} of them at {employer}", "davon {count} bei {employer}", "{employer}: {count}", "{count}: {employer}"])
         return values
     }()
 
