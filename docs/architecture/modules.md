@@ -250,7 +250,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 - **View-model initialisers do no I/O.** Loading happens in the view's `.task`, so the factory can be called on every view init.
 
 **`PrestoCVComposition`**
-- The only place that creates infrastructure (R4). The `@main` App type holds it in a `static let`. It owns:
+- The app's composition root, and the only place in the app that creates infrastructure (R4). The `@main` App type holds it in a `static let`. It owns:
   - file locations under Application Support;
   - one `FileCVRepository` and one `FileDesignStore`;
   - the web-view rule list, compiled once;
