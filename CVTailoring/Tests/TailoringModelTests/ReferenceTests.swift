@@ -16,7 +16,13 @@ struct ReferenceTests {
         #expect(try snapshot().experience(index).index == index)
     }
 
-    @Test("an experience outside the snapshot cannot be referred to", arguments: [Int.min, -1, 3, 4, Int.max])
+    static let experiencesOutOfRange: [Int] = {
+        var indices: [Int] = []
+        indices.append(contentsOf: [Int.min, -1, 3, 4, Int.max])
+        return indices
+    }()
+
+    @Test("an experience outside the snapshot cannot be referred to", arguments: experiencesOutOfRange)
     func experienceOutOfRange(index: Int) throws {
         let cv = try snapshot()
         #expect(throws: TailoringModelError.referenceOutOfRange) { try cv.experience(index) }
@@ -49,13 +55,32 @@ struct ReferenceTests {
         }
     }
 
-    @Test("a line outside its experience cannot be referred to", arguments: [(0, -1), (0, 3), (0, Int.max), (1, 1), (2, 0), (2, -1)])
+    static let linesOutOfRange: [(Int, Int)] = {
+        var cases: [(Int, Int)] = []
+        cases.append((0, -1))
+        cases.append((0, 3))
+        cases.append((0, Int.max))
+        cases.append((1, 1))
+        cases.append((2, 0))
+        cases.append((2, -1))
+        return cases
+    }()
+
+    @Test("a line outside its experience cannot be referred to", arguments: linesOutOfRange)
     func lineOutOfRange(experience: Int, line: Int) throws {
         let cv = try snapshot()
         #expect(throws: TailoringModelError.referenceOutOfRange) { try cv.statement(experience: experience, line: line) }
     }
 
-    @Test("a line of an experience outside the snapshot cannot be referred to", arguments: [(-1, 0), (3, 0), (Int.max, 0)])
+    static let linesOfExperiencesOutOfRange: [(Int, Int)] = {
+        var cases: [(Int, Int)] = []
+        cases.append((-1, 0))
+        cases.append((3, 0))
+        cases.append((Int.max, 0))
+        return cases
+    }()
+
+    @Test("a line of an experience outside the snapshot cannot be referred to", arguments: linesOfExperiencesOutOfRange)
     func experienceOfLineOutOfRange(experience: Int, line: Int) throws {
         let cv = try snapshot()
         #expect(throws: TailoringModelError.referenceOutOfRange) { try cv.statement(experience: experience, line: line) }

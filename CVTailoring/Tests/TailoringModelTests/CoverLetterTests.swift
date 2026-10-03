@@ -40,7 +40,14 @@ struct CoverLetterTests {
         #expect(recipient.address == ["1 Main Street", "10115 Berlin"])
     }
 
-    @Test("a recipient needs only a company, and a form of address is ms, mr or neutral", arguments: [nil, .ms, .mr, .neutral] as [FormOfAddress?])
+    static let forms: [FormOfAddress?] = {
+        var forms: [FormOfAddress?] = []
+        forms.append(nil)
+        forms.append(contentsOf: [FormOfAddress.ms, FormOfAddress.mr, FormOfAddress.neutral])
+        return forms
+    }()
+
+    @Test("a recipient needs only a company, and a form of address is ms, mr or neutral", arguments: forms)
     func recipientMinimal(form: FormOfAddress?) throws {
         let recipient = try LetterRecipient(company: "Globex", form: form)
         #expect(recipient.form == form)
@@ -123,7 +130,13 @@ struct CoverLetterTests {
         #expect(advert.language == .german)
     }
 
-    @Test("an advert with no text is refused", arguments: ["", " ", "\n\t \r\n", "\u{00A0}"])
+    static let blankAdverts: [String] = {
+        var texts: [String] = []
+        texts.append(contentsOf: ["", " ", "\n\t \r\n", "\u{00A0}"])
+        return texts
+    }()
+
+    @Test("an advert with no text is refused", arguments: blankAdverts)
     func advertWithoutText(text: String) {
         #expect(throws: TailoringModelError.emptyField(.advert)) { try Advert(text: text, language: .english) }
     }

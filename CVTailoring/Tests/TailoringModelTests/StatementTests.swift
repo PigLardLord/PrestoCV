@@ -11,7 +11,13 @@ struct StatementSplitTests {
                 == ["Led a team of five engineers and cut release time by 30% in 2021."])
     }
 
-    @Test("an empty description, or one of blanks, has no statements", arguments: ["", " ", "\n", " \n\t\n  ", "\r\n\r\n"])
+    static let blankDescriptions: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["", " ", "\n", " \n\t\n  ", "\r\n\r\n"])
+        return values
+    }()
+
+    @Test("an empty description, or one of blanks, has no statements", arguments: blankDescriptions)
     func empty(description: String) {
         #expect(Statement.split(description).isEmpty)
     }
@@ -31,16 +37,26 @@ struct StatementSplitTests {
         #expect(texts("   first  \n\tsecond\t\n  third word  ") == ["first", "second", "third word"])
     }
 
-    @Test("a line break is any newline, and \\r\\n is one break", arguments: [
-        "first\nsecond", "first\r\nsecond", "first\rsecond", "first\u{2028}second", "first\u{2029}second", "first\u{0085}second",
-    ])
+    static let twoLineDescriptions: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["first\nsecond", "first\r\nsecond", "first\rsecond"])
+        values.append(contentsOf: ["first\u{2028}second", "first\u{2029}second", "first\u{0085}second"])
+        return values
+    }()
+
+    @Test("a line break is any newline, and \\r\\n is one break", arguments: twoLineDescriptions)
     func newlines(description: String) {
         #expect(texts(description) == ["first", "second"])
     }
 
-    @Test("one leading bullet followed by a space is not part of the statement", arguments: [
-        "\u{2022}", "\u{25E6}", "\u{25AA}", "\u{2023}", "\u{00B7}", "-", "*", "\u{2013}", "\u{2014}",
-    ])
+    static let bulletCharacters: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["\u{2022}", "\u{25E6}", "\u{25AA}", "\u{2023}", "\u{00B7}"])
+        values.append(contentsOf: ["-", "*", "\u{2013}", "\u{2014}"])
+        return values
+    }()
+
+    @Test("one leading bullet followed by a space is not part of the statement", arguments: bulletCharacters)
     func bullets(bullet: String) {
         #expect(texts("\(bullet) Reduced churn") == ["Reduced churn"])
         #expect(texts("  \(bullet)   Reduced churn  ") == ["Reduced churn"])
@@ -48,9 +64,14 @@ struct StatementSplitTests {
         #expect(texts("\(bullet) first\n\(bullet) second") == ["first", "second"])
     }
 
-    @Test("a bullet with no space after it belongs to the statement", arguments: [
-        "-5% churn", "*emphasis* matters", "\u{2022}text", "\u{2013}5 points", "\u{2014}dash", "--flag", "-- notes",
-    ])
+    static let unspacedBullets: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["-5% churn", "*emphasis* matters", "\u{2022}text", "\u{2013}5 points"])
+        values.append(contentsOf: ["\u{2014}dash", "--flag", "-- notes"])
+        return values
+    }()
+
+    @Test("a bullet with no space after it belongs to the statement", arguments: unspacedBullets)
     func bulletWithoutSpace(line: String) {
         #expect(texts(line) == [line])
     }
@@ -66,13 +87,25 @@ struct StatementSplitTests {
         #expect(texts("- Built a well-known - and loved - tool") == ["Built a well-known - and loved - tool"])
     }
 
-    @Test("a line that is only a bullet is dropped", arguments: ["-", "\u{2022}", "*", " \u{2014} ", "\u{2022} "])
+    static let bulletOnlyLines: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["-", "\u{2022}", "*", " \u{2014} ", "\u{2022} "])
+        return values
+    }()
+
+    @Test("a line that is only a bullet is dropped", arguments: bulletOnlyLines)
     func lineOfABullet(line: String) {
         #expect(texts("first\n\(line)\nsecond") == ["first", "second"])
         #expect(Statement.split(line).isEmpty)
     }
 
-    @Test("a numbered item is not a bullet", arguments: ["1. Led the team", "2) Shipped it", "a. Wrote tests"])
+    static let numberedItems: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["1. Led the team", "2) Shipped it", "a. Wrote tests"])
+        return values
+    }()
+
+    @Test("a numbered item is not a bullet", arguments: numberedItems)
     func numbered(line: String) {
         #expect(texts(line) == [line])
     }
@@ -82,9 +115,14 @@ struct StatementSplitTests {
         #expect(texts("\u{2022} R\u{00E9}duit les co\u{00FB}ts de 30 % \u{2014} \u{00E0} Paris") == ["R\u{00E9}duit les co\u{00FB}ts de 30 % \u{2014} \u{00E0} Paris"])
     }
 
-    @Test("every statement of a description is one line", arguments: [
-        "a\nb\r\nc\rd\u{2028}e\u{2029}f\u{0085}g\u{000B}h\u{000C}i", "- a\n\n* b\r\n\r\n\u{2022} c", "one paragraph", "\n\n a \n\n b \n",
-    ])
+    static let multiLineDescriptions: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["a\nb\r\nc\rd\u{2028}e\u{2029}f\u{0085}g\u{000B}h\u{000C}i"])
+        values.append(contentsOf: ["- a\n\n* b\r\n\r\n\u{2022} c", "one paragraph", "\n\n a \n\n b \n"])
+        return values
+    }()
+
+    @Test("every statement of a description is one line", arguments: multiLineDescriptions)
     func oneLineEach(description: String) {
         let statements = Statement.split(description)
         #expect(!statements.isEmpty)
@@ -110,19 +148,36 @@ struct StatementInitTests {
         #expect(try Statement(text: "- Cut costs").text == "- Cut costs")
     }
 
-    @Test("a statement of nothing is refused", arguments: ["", " ", "\n", " \t\r\n "])
+    static let blankTexts: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["", " ", "\n", " \t\r\n "])
+        return values
+    }()
+
+    @Test("a statement of nothing is refused", arguments: blankTexts)
     func empty(text: String) {
         #expect(throws: TailoringModelError.emptyField(.statement)) { try Statement(text: text) }
     }
 
-    @Test("text that spans lines is refused, whatever breaks the line", arguments: [
-        "a\nb", "a\r\nb", "a\rb", "a\u{2028}b", "a\u{2029}b", "a\u{0085}b", "a\u{000B}b", "a\u{000C}b", "- a\n- b", "a\n\nb", "a \n b",
-    ])
+    static let multiLineTexts: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["a\nb", "a\r\nb", "a\rb", "a\u{2028}b", "a\u{2029}b", "a\u{0085}b", "a\u{000B}b", "a\u{000C}b"])
+        values.append(contentsOf: ["- a\n- b", "a\n\nb", "a \n b"])
+        return values
+    }()
+
+    @Test("text that spans lines is refused, whatever breaks the line", arguments: multiLineTexts)
     func manyLines(text: String) {
         #expect(throws: TailoringModelError.notOneLine(.statement)) { try Statement(text: text) }
     }
 
-    @Test("a line break at either end is trimmed, and does not make a second line", arguments: ["\nCut costs", "Cut costs\r\n", "\r\n Cut costs \u{2028}"])
+    static let paddedTexts: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["\nCut costs", "Cut costs\r\n", "\r\n Cut costs \u{2028}"])
+        return values
+    }()
+
+    @Test("a line break at either end is trimmed, and does not make a second line", arguments: paddedTexts)
     func breaksAtTheEnds(text: String) throws {
         #expect(try Statement(text: text).text == "Cut costs")
     }

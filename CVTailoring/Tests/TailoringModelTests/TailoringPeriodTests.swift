@@ -3,13 +3,25 @@ import TailoringModel
 
 @Suite("ADR 0013 / R6 · dates and periods")
 struct TailoringPeriodTests {
-    @Test("a year from 1900 to 2200 is a date, with or without a month", arguments: [1900, 1999, 2020, 2200])
+    static let validYears: [Int] = {
+        var years: [Int] = []
+        years.append(contentsOf: [1900, 1999, 2020, 2200])
+        return years
+    }()
+
+    @Test("a year from 1900 to 2200 is a date, with or without a month", arguments: validYears)
     func years(year: Int) throws {
         #expect(try TailoringDate(year: year).month == nil)
         #expect(try TailoringDate(year: year, month: 6).year == year)
     }
 
-    @Test("a year outside 1900 to 2200 is an invalid date", arguments: [Int.min, -1, 0, 1899, 2201, Int.max])
+    static let invalidYears: [Int] = {
+        var years: [Int] = []
+        years.append(contentsOf: [Int.min, -1, 0, 1899, 2201, Int.max])
+        return years
+    }()
+
+    @Test("a year outside 1900 to 2200 is an invalid date", arguments: invalidYears)
     func yearsOutOfRange(year: Int) {
         #expect(throws: TailoringModelError.invalidDate) { try TailoringDate(year: year) }
     }
@@ -19,7 +31,13 @@ struct TailoringPeriodTests {
         #expect(try TailoringDate(year: 2020, month: month).month == month)
     }
 
-    @Test("a month outside 1 to 12 is an invalid date", arguments: [Int.min, -1, 0, 13, 100, Int.max])
+    static let invalidMonths: [Int] = {
+        var months: [Int] = []
+        months.append(contentsOf: [Int.min, -1, 0, 13, 100, Int.max])
+        return months
+    }()
+
+    @Test("a month outside 1 to 12 is an invalid date", arguments: invalidMonths)
     func monthsOutOfRange(month: Int) {
         #expect(throws: TailoringModelError.invalidDate) { try TailoringDate(year: 2020, month: month) }
     }
@@ -36,9 +54,16 @@ struct TailoringPeriodTests {
         #expect(try TailoringPeriod(start: start, end: .date(try date(2020, 6))).start == start)
     }
 
-    @Test("an end date before the start is an invalid period", arguments: [
-        (2020, 5, 2019, 12), (2020, 5, 2020, 4), (2020, 12, 2020, 1), (2021, 1, 2020, 12),
-    ])
+    static let endsBeforeStart: [(Int, Int, Int, Int)] = {
+        var cases: [(Int, Int, Int, Int)] = []
+        cases.append((2020, 5, 2019, 12))
+        cases.append((2020, 5, 2020, 4))
+        cases.append((2020, 12, 2020, 1))
+        cases.append((2021, 1, 2020, 12))
+        return cases
+    }()
+
+    @Test("an end date before the start is an invalid period", arguments: endsBeforeStart)
     func endBeforeStart(startYear: Int, startMonth: Int, endYear: Int, endMonth: Int) throws {
         let start = try date(startYear, startMonth), end = try date(endYear, endMonth)
         #expect(throws: TailoringModelError.invalidPeriod) { try TailoringPeriod(start: start, end: .date(end)) }

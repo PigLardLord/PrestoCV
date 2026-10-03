@@ -24,7 +24,13 @@ struct SourceEntryTests {
         #expect(details.email == nil && details.phone == nil && details.website == nil)
     }
 
-    @Test("a name that is empty after trimming is refused", arguments: ["", " ", "\t\n ", "\u{00A0}"])
+    static let blankNames: [String] = {
+        var names: [String] = []
+        names.append(contentsOf: ["", " ", "\t\n ", "\u{00A0}"])
+        return names
+    }()
+
+    @Test("a name that is empty after trimming is refused", arguments: blankNames)
     func personalDetailsNeedAName(name: String) {
         #expect(throws: TailoringModelError.emptyField(.fullName)) { try SourcePersonalDetails(fullName: name) }
     }
@@ -53,14 +59,27 @@ struct SourceEntryTests {
 
     // MARK: Skills, languages, profiles
 
-    @Test("a skill has a name and an optional level from 1 to 5", arguments: [nil, 1, 2, 3, 4, 5] as [Int?])
+    static let skillLevels: [Int?] = {
+        var levels: [Int?] = []
+        levels.append(nil)
+        levels.append(contentsOf: [1, 2, 3, 4, 5])
+        return levels
+    }()
+
+    @Test("a skill has a name and an optional level from 1 to 5", arguments: skillLevels)
     func skill(level: Int?) throws {
         let skill = try SourceSkill(name: "Swift", level: level)
         #expect(skill.name == "Swift")
         #expect(skill.level == level)
     }
 
-    @Test("a skill level outside 1 to 5 is refused", arguments: [Int.min, -1, 0, 6, 10, Int.max])
+    static let invalidSkillLevels: [Int] = {
+        var levels: [Int] = []
+        levels.append(contentsOf: [Int.min, -1, 0, 6, 10, Int.max])
+        return levels
+    }()
+
+    @Test("a skill level outside 1 to 5 is refused", arguments: invalidSkillLevels)
     func skillLevelOutOfRange(level: Int) {
         #expect(throws: TailoringModelError.invalidSkillLevel) { try SourceSkill(name: "Swift", level: level) }
     }
@@ -70,9 +89,14 @@ struct SourceEntryTests {
         #expect(try SourceSkill(name: "Swift").level == nil)
     }
 
-    @Test("a language has a name and a level, CEFR or native", arguments: [
-        LanguageLevel.a1, .a2, .b1, .b2, .c1, .c2, .native,
-    ])
+    static let proficiencies: [LanguageLevel] = {
+        var levels: [LanguageLevel] = []
+        levels.append(contentsOf: [LanguageLevel.a1, LanguageLevel.a2, LanguageLevel.b1, LanguageLevel.b2])
+        levels.append(contentsOf: [LanguageLevel.c1, LanguageLevel.c2, LanguageLevel.native])
+        return levels
+    }()
+
+    @Test("a language has a name and a level, CEFR or native", arguments: proficiencies)
     func language(level: LanguageLevel) throws {
         let language = try SourceLanguage(name: "Italian", proficiency: level)
         #expect(language.name == "Italian")

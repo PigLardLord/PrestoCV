@@ -70,7 +70,13 @@ struct ReportAndQuestionTests {
         #expect(LetterField.allCases.count == 2)
     }
 
-    @Test("a term or a request with nothing in it is refused", arguments: ["", " ", "\n\t"])
+    static let blankTexts: [String] = {
+        var texts: [String] = []
+        texts.append(contentsOf: ["", " ", "\n\t"])
+        return texts
+    }()
+
+    @Test("a term or a request with nothing in it is refused", arguments: blankTexts)
     func emptyText(text: String) {
         #expect(throws: TailoringModelError.emptyField(.term)) { try Question(kind: .unevidencedTerm(text), scope: .skills) }
         #expect(throws: TailoringModelError.emptyField(.request)) { try Question(kind: .modelRequest(text), scope: .summary) }
@@ -84,7 +90,7 @@ struct ReportAndQuestionTests {
         #expect(throws: TailoringModelError.tooLarge(.request)) { try Question(kind: .modelRequest(ascii(10_001)), scope: .summary) }
     }
 
-    @Test("a question that needs no text is always valid", arguments: [LetterField.salaryExpectation, .startDate])
+    @Test("a question that needs no text is always valid", arguments: LetterField.allCases)
     func letterFieldQuestion(field: LetterField) throws {
         _ = try Question(kind: .letterField(field), scope: .letter(field))
     }
