@@ -324,7 +324,9 @@ private struct WordListReading {
         }
     }
 
+    /// Not empty, not blank at either end by the model's one rule of trimming, and something once folded.
     private func isStated(_ text: String) -> Bool {
-        !text.isEmpty && text == text.trimmingCharacters(in: .whitespacesAndNewlines) && !TextFold.fold(text).isEmpty
+        let content = Bounds.trimmed(text[...])
+        return !content.isEmpty && content == text[...] && !TextFold.fold(text).isEmpty
     }
 }

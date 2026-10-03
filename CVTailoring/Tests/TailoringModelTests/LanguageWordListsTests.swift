@@ -206,7 +206,8 @@ struct LanguageWordListsTests {
         var values: [String] = []
         values.append(contentsOf: ["", " ", " a", "a "])
         values.append(contentsOf: ["\n", "a\n", "\t", "\u{00A0}"])
-        values.append(contentsOf: ["\u{FEFF}"])
+        values.append(contentsOf: ["\u{FEFF}", "\u{200B}", "\u{200B}a", "a\u{200B}"])
+        values.append(contentsOf: ["\u{2060}", "\u{2060}a", "a\u{2060}", "\u{200D}a"])
         return values
     }()
 
