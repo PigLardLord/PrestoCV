@@ -73,8 +73,8 @@
     - It implements the ports that reach the server, which `PrestoCVIntegration` owns. They speak the workflow's language: the tailoring model and typed errors, no generated type, no HTTP status.
     - It imports `PrestoCVAPITypes` and `PrestoCVAPIClient` with `internal import`, and never the server's protocol. It maps the tailoring model to the request and the result back (exhaustively, [ADR 0007](0007-each-package-owns-its-model.md)), and the problems to the workflow's typed errors.
     - It is a target of its own because R3 puts an adapter in its own target, and so that `PrestoCVIntegration` depends neither on the client nor on its transport.
-    - The composition root creates it, and creates the URLSession transport that the client runs on, which is infrastructure (R4). The root is the one target that imports `OpenAPIURLSession`. `PrestoCVAPIAdapter` carries R4's detectors, with `URLSessionTransport` in the checker's `infrastructureTypes` once the adapter exists. Until then, review holds it.
-    - How the transport reaches the adapter's initialiser is #179's. If that needs a type of `OpenAPIRuntime` in the adapter, #179 adds it to the allow-list in [modules.md](../modules.md), without a new ADR, while this ADR's invariants hold.
+    - The composition root creates it, and creates the URLSession transport that the client runs on, which is infrastructure (R4). The root is the one target that imports `OpenAPIURLSession`. `PrestoCVAPIAdapter` carries R4's detectors, and the checker's `infrastructureTypes` lists `URLSessionTransport` once the adapter exists. Until `URLSessionTransport` is listed in `infrastructureTypes`, review holds it.
+    - It also imports the runtime's modules, `OpenAPIRuntime` and `HTTPTypes`, which the middleware that signs a start and sends the session needs. How the transport reaches its initialiser is #179's. If that needs more, #179 extends the allow-list in [modules.md](../modules.md), without a new ADR, while this ADR's invariants hold.
   - No other production target outside the package imports `PrestoCVAPI`. Test targets are held by the allow-lists of their own.
 - **(c) Generated code and the checker.**
   - The three targets hold only generated code. A header marks each file, and nobody edits one by hand (#177).
@@ -82,18 +82,20 @@
   - One detector runs on them, R1's `exportedImport`, because generated code satisfies it and R1 bans `@_exported import` everywhere. No other detector runs on them, R11's `platformCondition` included: the generator wraps its Foundation imports in `#if os(Linux)`, and nobody may edit generated code, so a finding there could never be fixed. Their import allow-lists still apply.
   - The checker gains a `generated` target kind for them (#177). Until then, [modules.md](../modules.md) lists the targets and `rules.json` declares them not yet implemented.
   - The package's manifest is held like every manifest: Swift 6, no unsafe flags (R9).
-  - The generator is pinned in a tool package, not in `PrestoCVAPI`'s manifest, because a package that depends on `PrestoCVAPI` ignores the `Package.resolved` of `PrestoCVAPI` (#177).
+  - The generator is pinned in a tool package of its own, not in `PrestoCVAPI`'s manifest, so that it and its dependencies never enter the dependency graph of the app and the server (#177).
 - **(d) A request is untrusted input** (R8).
   - The spec states the bounds of every string, list and number (#176). The generated code does not enforce `maxLength`, `maxItems`, `minimum`, `maximum` or `pattern`.
-  - So `ServerHTTP` is the one boundary that validates a request into the tailoring model, or refuses it with a problem. A test proves that the spec's bounds equal the bounds of the model's validators (#176 states them, #177 holds the test).
+  - So `ServerHTTP` is the one boundary that validates a request into the tailoring model, or refuses it with a problem. A test proves that the spec's bounds equal the bounds of the model's validators. It lives in `ServerHTTP`'s tests (#178), because it needs `TailoringModel`, which `PrestoCVAPI` does not import, and it reads the spec by its path (#176 states the bounds).
 - **(e) Problems.**
   - The server turns its typed errors into problems in one place (#178). The adapter turns each documented `type` into a typed error of its workflow (R7).
   - A problem's `type` URI is its code. `title` and `detail` are for developers: a problem carries no user-facing text, and the app words its own (R13).
   - A `type` URI is an identifier that outlives the hosting of the reference (#182): the page may move, and the `type` does not change.
-  - An unknown `type` becomes a generic typed error in the adapter. It is never a success and never a crash.
+  - Every operation declares a `default` problem+json response, so a client decodes any error as a problem.
+  - An unknown `type`, or a response that the spec does not document for that operation, becomes a generic typed error in the adapter. It is never a success and never a crash.
 - **(f) What a breaking change is,** seen from an app in the field, which cannot be updated at once.
   - Breaking: removing or renaming an operation, a field, a problem `type` or a value the app sends; requiring more of a request or narrowing what it may carry; making a required field of a response optional; any change that an old client cannot decode.
   - Not breaking: adding an operation, an optional request field, a response field or a problem `type`.
+  - **An optional request field reaches the server first.** The server that accepts it ships first, and the app that sends it ships after.
   - **A new value in a response enum breaks old clients unless the enum is open.** So the spec declares a response enum as `anyOf` its known values and a plain string, as the generator supports, and the adapter maps a value it does not know to a typed "unknown" case (R7). A new value is then not a break.
   - A response schema allows additional properties, so an old client ignores a field it does not know.
 - **(g) The policy's version and the aliases,** as [ADR 0015](0015-inference-providers-and-data-policy.md) decides them. The contract carries them.
@@ -118,12 +120,13 @@
   - the entry of `PrestoCVAPI`'s manifest in `rules.json`, and `PrestoCVAPI` in the `--packages` list of `check.sh`;
   - the generator's tool package;
   - the comparison with the spec on `main`, and the rule for what breaks it;
-  - the test that the bounds agree;
   - the package in the project's test commands.
+
+  The test that the bounds agree is not one of them: it lives in `ServerHTTP`'s tests (#178), and reads the spec by its path.
 - **Costs:**
   - The generator's output is reviewed in pull requests. A generator upgrade can change every generated file, and the diff is read like code.
   - A breaking change needs a new version in the path. The server cannot drop a version while an app that uses it is in the field, which is what the minimum app version is for.
-  - No detector holds generated code, so its quality is the generator's, and the checks below hold it instead.
+  - Apart from R1's `exportedImport`, no detector holds generated code, so its quality is the generator's, and the checks below hold it instead.
   - The bounds are written twice, in the spec and in the model's validators, and a test keeps them equal.
   - The spec gets longer and more exact, because its descriptions are the reference.
 - **Enforced by:**
@@ -139,9 +142,9 @@
   - the linter on the spec's descriptions (#176);
   - tests:
     - the request and the result round-trip through the generated types, for a CV in each of the six languages (#176);
-    - the spec's bounds equal the bounds of the model's validators (#176, #177);
+    - the spec's bounds equal the bounds of the model's validators, in `ServerHTTP`'s tests, which read the spec by its path (#178; #176 states the bounds);
     - router tests for each endpoint and for each error `type` the spec documents, and one that proves that every problem a middleware emits is documented for each operation the middleware covers (#178);
-    - the adapter against a fake server, for each outcome and each error, an unknown `type` and an unknown enum value among them (#179);
+    - the adapter against a fake server, for each outcome and each error, an unknown `type`, an undocumented status and an unknown enum value among them (#179);
   - review, for the generator's diff, and for R4 on the adapter until `URLSessionTransport` is in `infrastructureTypes`.
 
 ## Alternatives considered
@@ -150,4 +153,4 @@
 - **Code-first, with the spec generated from the server.** Rejected by the owner: the spec is the source, and the code follows it.
 - **Generating at build time, with the plugin, and not committing the output.** Rejected by the owner: changes to the generated code would not show in pull requests, builds would be slower, and Xcode would need the plugin enabled.
 - **GraphQL, or a custom RPC.** Rejected: the generator and the public reference come with OpenAPI.
-- **Browser clients.** Rejected by the owner: a request that carries an `Origin` header is refused in every profile.
+- **Browser clients.** Rejected by the owner (#175).
