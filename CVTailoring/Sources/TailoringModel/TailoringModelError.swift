@@ -5,7 +5,8 @@ public enum TailoringModelError: Error, Hashable, Sendable {
     case unsupportedLanguage
     /// A field that must say something is empty, or only whitespace.
     case emptyField(Field)
-    /// A field that is one line holds a line break.
+    /// A text that must be one line holds a line break of any kind: a line feed, a carriage return, a vertical tab, a
+    /// form feed, NEL, or the line and paragraph separators U+2028 and U+2029.
     case notOneLine(Field)
     /// A field that holds a character that hides what a text says (`TextRules`).
     case hiddenCharacter(Field)

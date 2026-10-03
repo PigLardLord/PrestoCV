@@ -129,8 +129,8 @@ struct CoverLetterTests {
 
     @Test("the salary expectation and the start date are one line each")
     func otherDefaultsAreOneLine() {
-        #expect(throws: TailoringModelError.hiddenCharacter(.salaryExpectation)) { try LetterDefaults(salaryExpectation: "55k\n60k") }
-        #expect(throws: TailoringModelError.hiddenCharacter(.startDate)) { try LetterDefaults(startDate: "1 March\n1 April") }
+        #expect(throws: TailoringModelError.notOneLine(.salaryExpectation)) { try LetterDefaults(salaryExpectation: "55k\n60k") }
+        #expect(throws: TailoringModelError.notOneLine(.startDate)) { try LetterDefaults(startDate: "1 March\n1 April") }
     }
 
     // MARK: Advert

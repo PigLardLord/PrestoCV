@@ -23,7 +23,22 @@ enum HiddenSamples {
         return values
     }()
 
-    /// Other controls that break a line: hidden in every text.
+    /// Every character that breaks a line: in a one-line text each is `notOneLine`. In a multi-line one the separators
+    /// U+2028 and U+2029 are breaks the text keeps, and NEL, VT and FF are hidden.
+    static let breaks: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["\n", "\r", "\r\n", "\u{000B}", "\u{000C}", "\u{0085}", "\u{2028}", "\u{2029}"])
+        return values
+    }()
+
+    /// The separators: breaks that a multi-line text keeps, and that are not hidden.
+    static let separators: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["\u{2028}", "\u{2029}"])
+        return values
+    }()
+
+    /// Other controls that break a line: hidden in every multi-line text.
     static let otherBreaks: [String] = {
         var values: [String] = []
         values.append(contentsOf: ["\u{0085}", "\u{000B}", "\u{000C}"])
@@ -143,9 +158,21 @@ struct HiddenCharacterFieldTests {
         #expect(throws: TailoringModelError.hiddenCharacter(field.field)) { try field.build("a" + character + "b") }
     }
 
-    @Test("a tab or a line break is hidden in a single-line field", arguments: HiddenSamples.singleLineFields, HiddenSamples.allowedInMultiLine)
+    @Test("a line break of any kind in a one-line field is not one line", arguments: HiddenSamples.singleLineFields, HiddenSamples.breaks)
     func singleLineRefusesBreaks(field: TextFieldCase, character: String) {
-        #expect(throws: TailoringModelError.hiddenCharacter(field.field)) { try field.build("a" + character + "b") }
+        #expect(throws: TailoringModelError.notOneLine(field.field)) { try field.build("a" + character + "b") }
+    }
+
+    @Test("a tab is hidden in a one-line field", arguments: HiddenSamples.singleLineFields)
+    func singleLineRefusesTab(field: TextFieldCase) {
+        #expect(throws: TailoringModelError.hiddenCharacter(field.field)) { try field.build("a\tb") }
+    }
+
+    @Test("a role of two lines separated by U+2028 is refused")
+    func roleWithSeparator() {
+        #expect(throws: TailoringModelError.notOneLine(.role)) { try SourceExperience(role: "Engineer\u{2028}Manager", company: "Acme") }
+        #expect(throws: TailoringModelError.notOneLine(.role)) { try SourceExperience(role: "Engineer\u{2029}Manager", company: "Acme") }
+        #expect(throws: TailoringModelError.notOneLine(.fullName)) { try SourcePersonalDetails(fullName: "Ada\u{2028}Lovelace") }
     }
 
     @Test("a tab and a line break are allowed in a multi-line field", arguments: HiddenSamples.multiLineFields, HiddenSamples.allowedInMultiLine)
@@ -153,9 +180,14 @@ struct HiddenCharacterFieldTests {
         try field.build("a" + character + "b")
     }
 
-    @Test("a control that breaks a line otherwise is hidden in every field but a statement, which refuses it as a break", arguments: HiddenSamples.otherBreaks)
+    @Test("a tab, a line feed and the separators are allowed in a multi-line field, apart from a statement", arguments: HiddenSamples.multiLineFields, HiddenSamples.separators)
+    func multiLineAllowsSeparators(field: TextFieldCase, character: String) throws {
+        try field.build("a" + character + "b")
+    }
+
+    @Test("NEL, vertical tab and form feed are hidden in a multi-line field, and a statement refuses them as breaks", arguments: HiddenSamples.otherBreaks)
     func otherBreaksRefused(character: String) {
-        for field in HiddenSamples.singleLineFields + HiddenSamples.multiLineFields {
+        for field in HiddenSamples.multiLineFields {
             #expect(throws: TailoringModelError.hiddenCharacter(field.field)) { try field.build("a" + character + "b") }
         }
         #expect(throws: TailoringModelError.notOneLine(.statement)) { try Statement(text: "a" + character + "b") }
@@ -164,7 +196,6 @@ struct HiddenCharacterFieldTests {
 
     @Test("joiners and the other unlisted invisible characters are allowed in every field", arguments: HiddenSamples.allFields, HiddenSamples.allowed)
     func allowed(field: TextFieldCase, character: String) throws {
-        guard !(field.field == .statement && (character == "\u{2028}" || character == "\u{2029}")) else { return }
         try field.build("a" + character + "b")
     }
 

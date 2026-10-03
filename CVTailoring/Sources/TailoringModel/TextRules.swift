@@ -15,8 +15,13 @@
 /// and emoji need them.
 ///
 /// Whether a field is multi-line is the model's to say: an experience's description, the descriptions of education and
-/// certifications, the summary, the advert and the letter note are; every other text is one line. A statement is a line of a
-/// description, so a tab is allowed in it, and its line breaks are refused as `notOneLine`.
+/// certifications, the summary, the advert and the letter note are; every other text is one line.
+/// - A one-line text holds no line break of any kind (`Character.isNewline`: `\n`, `\r`, vertical tab, form feed, NEL,
+///   U+2028, U+2029). The model refuses one as `notOneLine`, before it looks for hidden characters.
+/// - A multi-line text keeps `\n`, `\r`, tab and the separators U+2028 and U+2029, which are breaks there and not
+///   hidden. NEL, vertical tab and form feed are hidden in it.
+/// - A statement is a line of a description, so a tab is allowed in it, and its line breaks are refused as `notOneLine`.
+///
 public enum TextRules {
     /// Whether `text` holds a hidden character. A multi-line text may hold `\n`, `\r` and tab; a single-line one none.
     public static func hiddenCharacter(in text: String, multiLine: Bool) -> Bool {

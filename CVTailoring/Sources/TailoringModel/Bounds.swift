@@ -1,9 +1,11 @@
 /// The checks the initialisers of the model share, so a bound is written once (R8).
 enum Bounds {
-    /// The one check of a text: its size first, then that it holds no hidden character (`TextRules`).
+    /// The one check of a text: its size first; then, for a one-line field, that it holds no line break of any kind
+    /// (`Character.isNewline`, the rule `Statement` uses); then that it holds no hidden character (`TextRules`).
     static func text(_ value: String, _ field: TailoringModelError.Field,
                      maxBytes: Int = TailoringLimits.maxTextBytes) throws(TailoringModelError) {
         guard value.utf8.count <= maxBytes else { throw .tooLarge(field) }
+        if !field.isMultiLine, value.contains(where: \.isNewline) { throw .notOneLine(field) }
         guard !TextRules.hiddenCharacter(in: value, multiLine: field.isMultiLine) else { throw .hiddenCharacter(field) }
     }
 
