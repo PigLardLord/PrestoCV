@@ -120,15 +120,34 @@ struct SourceExperienceTests {
         cases.append(TextFieldCase(.role) { _ = try SourceExperience(role: $0, company: "x", statements: []) })
         cases.append(TextFieldCase(.company) { _ = try SourceExperience(role: "x", company: $0, statements: []) })
         cases.append(TextFieldCase(.location) { _ = try SourceExperience(role: "x", company: "x", location: $0, statements: []) })
-        cases.append(TextFieldCase(.statement) { _ = try SourceExperience(role: "x", company: "x", statements: Statement.split($0)) })
-        cases.append(TextFieldCase(.statement) { _ = try SourceExperience(role: "x", company: "x", statements: Statement.split("first\n" + $0)) })
+        cases.append(TextFieldCase(.description) { _ = try SourceExperience(role: "x", company: "x", statements: Statement.split($0)) })
         return cases
     }()
 
-    @Test("each field, and each statement, of an experience built from statements accepts 10,000 bytes and refuses one more", arguments: statementFields)
+    @Test("each field, and the statements as a whole, of an experience built from statements accept 10,000 bytes and refuse one more", arguments: statementFields)
     func statementBounds(field: TextFieldCase) throws {
         try field.build(ascii(10_000))
         #expect(throws: TailoringModelError.tooLarge(field.field)) { try field.build(ascii(10_001)) }
+    }
+
+    @Test("the statements of an experience hold at most 10,000 UTF-8 bytes together, the bound of its description")
+    func statementsTotal() throws {
+        func statements(_ sizes: [Int]) throws -> [Statement] { try sizes.map { try Statement(text: ascii($0)) } }
+        _ = try SourceExperience(role: "r", company: "c", statements: statements([5_000, 5_000]))
+        _ = try SourceExperience(role: "r", company: "c", statements: statements([10_000]))
+        _ = try SourceExperience(role: "r", company: "c", statements: statements(Array(repeating: 50, count: 200)))
+        let tooMuch = try statements([5_000, 5_001])
+        #expect(throws: TailoringModelError.tooLarge(.description)) { try SourceExperience(role: "r", company: "c", statements: tooMuch) }
+        let manyTooMuch = try statements(Array(repeating: 51, count: 200))
+        #expect(throws: TailoringModelError.tooLarge(.description)) { try SourceExperience(role: "r", company: "c", statements: manyTooMuch) }
+    }
+
+    @Test("an experience built from statements counts bytes, not characters")
+    func statementsTotalBytes() throws {
+        let half = try Statement(text: twoByteCharacters(bytes: 5_000))
+        _ = try SourceExperience(role: "r", company: "c", statements: [half, half])
+        let over = try Statement(text: twoByteCharacters(bytes: 5_002))
+        #expect(throws: TailoringModelError.tooLarge(.description)) { try SourceExperience(role: "r", company: "c", statements: [half, over]) }
     }
 
     @Test("an experience built from statements holds at most 200")

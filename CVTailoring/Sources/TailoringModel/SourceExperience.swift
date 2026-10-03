@@ -12,13 +12,16 @@ public struct SourceExperience: Hashable, Sendable {
     public let statements: [Statement]
 
     /// An experience with the statements it already has, kept as they are and never split again. There are at most
-    /// `TailoringLimits.maxStatementsPerExperience`, and each is at most `TailoringLimits.maxTextBytes` (R8).
+    /// `TailoringLimits.maxStatementsPerExperience`, and together they hold at most `TailoringLimits.maxTextBytes`
+    /// bytes, the bound of the description they come from: `tooLarge(.description)` (R8).
     public init(role: String, company: String, location: String = "", period: TailoringPeriod? = nil,
                 statements: [Statement]) throws(TailoringModelError) {
         try Bounds.text(role, .role)
         try Bounds.text(company, .company)
         try Bounds.text(location, .location)
         try Bounds.count(statements.count, atMost: TailoringLimits.maxStatementsPerExperience, .statements)
+        let bytes = statements.reduce(0) { $0 + $1.text.utf8.count }
+        guard bytes <= TailoringLimits.maxTextBytes else { throw .tooLarge(.description) }
         for statement in statements { try Bounds.text(statement.text, .statement) }
         self.role = role
         self.company = company
