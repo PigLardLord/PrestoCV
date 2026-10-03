@@ -38,7 +38,7 @@
   - its dialect and its endpoint;
   - the *name* of the secret that holds its key, never the key. A provider that needs no key, such as a model on the same machine, declares so explicitly;
   - the models it may use and, for each model it may use, whether it supports structured output and its context size;
-  - **its declaration**: whether it keeps prompts, whether it trains on them, and which regions it may run in. For a router, its regions are its own and those of the upstreams its routing preferences allow (#154), and it keeps prompts if it or any of those upstreams does;
+  - **its declaration**: whether it keeps prompts, whether it trains on them, and which regions it may run in. A router's declaration covers the upstreams its routing preferences allow (#154): it keeps prompts, trains on them or runs in a region if it or any of those upstreams does;
   - its name, as the published privacy policy names it (#190);
   - an alias, the only name of a provider or model in a result, a log or a report (#156, #176).
 - **The deployment's policy is enforced.** The deployment states what it requires, for example no retention and EU only. The server refuses to start when a configured provider does not meet it. A failing provider falls back to the next one, but only within the policy.
@@ -67,7 +67,7 @@
   - The start request carries the version the app showed the user. Start refuses a different one, and the job records it.
   - The worker refuses to run a job under a version other than the one it recorded, because the user consented to that one.
   - #155, #176 and #190 implement it.
-- **Left to #155:** which model a fallback provider uses, whether "allowed" is decided per provider, and whether a provider's capabilities choose which provider answers.
+- **Left to #155:** which model a fallback provider uses, whether "allowed" is decided per provider, whether a provider's capabilities choose which provider answers, and (with #157) what a job the worker refuses becomes and whether it counts against the quota (#165).
 - **No new edge between targets.** `ServerInference` imports `AsyncHTTPClient` and `ServerApplication`, and the executable imports `ServerInference` and `AsyncHTTPClient`, so it can create that client. [modules.md](../modules.md) describes what each target now holds.
 - **It is consistent with [ADR 0014](0014-server-modular-monolith.md):** its invariants hold.
 
@@ -78,14 +78,14 @@
   - switching, reordering or adding providers without an app release, and without code where an endpoint speaks the shared API in a dialect already written;
   - a consent text tied to the policy and its version (#190): the server does not start unless every provider meets the requirements, and a change of what the text says asks the user again.
 - **Costs:**
-  - **A provider's declaration is written by the operator, and it can be wrong.** The server holds the declaration, not the provider's real behaviour. The check is only as true as what the operator wrote.
+  - **A provider's declaration is written by the operator, and it can be wrong.** The server holds the declaration, not the provider's real behaviour. The check is only as true as what the operator wrote. The processors' names are written by the operator too: a deploy check, or the runbook (#163), keeps them in step with the privacy policy.
   - **A fallback can change the provider that answers and its price.** The reply names the provider and the model (#150), and the loop records them for every attempt (#152); the result carries only their aliases (#176).
   - **A wrong configuration stops the server** instead of running with a weaker policy. That is deliberate.
   - **A provider swap asks every user for consent again,** even when it still meets the requirements, because the version covers the processors.
   - **Each dialect is code to keep** current with its endpoint.
   - **A prompt or a model change needs a run of the evaluation harness (#156) before it ships.** It is run by hand, because it calls real providers and costs money.
 - **Enforced by:**
-  - the compiler, through the target graph: `ServerApplication` imports no adapter, and `ServerHTTP` reaches the policy only through the use case that reads it;
+  - the compiler, through the target graph: `ServerApplication` imports no adapter, and `ServerHTTP` cannot reach `ServerInference`;
   - the checker:
     - the allow-lists of [modules.md](../modules.md);
     - R4's detectors on every server target except the executable, so a provider's client is created only in the root;
@@ -100,7 +100,8 @@
     - no prompt, answer or key reaches the log;
   - the composition test that [ADR 0014](0014-server-modular-monolith.md) names, which also proves that `serve` reads no secret;
   - review, until the checker learns it: no server target but the executable reads the environment or a secret store;
-  - review, until the checker learns it: no provider name or model identifier in code, tests, configuration examples or technical documents. A mechanical check can only be an allow-list of invented names or a list of real names held outside the repository.
+  - review: `GET /v1/policy` calls the use case that reads the policy, not the port;
+  - review, until the checker learns it: no provider name or model identifier anywhere in the repository except the published privacy policy and the hosted deployment's runbook. A mechanical check can only be an allow-list of invented names or a list of real names held outside the repository.
 
 ## Alternatives considered
 

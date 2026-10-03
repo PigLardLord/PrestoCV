@@ -300,7 +300,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - **Building the registry** applies the rule of `ServerApplication`. It fails with the refusal described under the executable when a provider does not meet the policy, so no running registry holds one and no fallback can reach one.
 - **Selection and fallback:** the first available provider answers. When it is unavailable or rate-limited, the next one that meets the policy answers instead. No other error triggers a fallback, a refusal for lack of credit included (#165).
 - It implements both ports: the inference port of `Tailoring`, and the data-policy port of `ServerApplication`, so `GET /v1/policy` reaches the policy. The registry's declarations and that port need no client and no key.
-- **A router's dialect** derives its routing preferences from the deployment's policy (#154). A router's declaration covers its upstreams: its regions are its own and those of the upstreams its routing preferences allow, and it keeps prompts if it or any of those upstreams does.
+- **A router's dialect** derives its routing preferences from the deployment's policy (#154). A router's declaration covers the upstreams its routing preferences allow (#154): it keeps prompts, trains on them or runs in a region if it or any of those upstreams does.
 - The adapter decodes the endpoint's envelope into the port's reply and errors, with a size cap. The model's text is decoded once, in `Tailoring` (R8).
 - It never logs a prompt, an answer or a key. It never reads a secret, the environment or a secret store: the executable hands it the keys and the clients.
 
