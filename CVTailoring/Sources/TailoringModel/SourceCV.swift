@@ -35,27 +35,38 @@ public struct SourceCV: Hashable, Sendable {
     // MARK: References
 
     /// A reference to the experience at `index`, counted from 0.
-    public func experience(_ index: Int) throws(TailoringModelError) -> ExperienceRef {
+    public func experienceRef(at index: Int) throws(TailoringModelError) -> ExperienceRef {
         guard experiences.indices.contains(index) else { throw .referenceOutOfRange }
         return ExperienceRef(index: index)
     }
 
     /// A reference to a line of an experience, both counted from 0.
-    public func statement(experience: Int, line: Int) throws(TailoringModelError) -> StatementRef {
-        let experienceRef = try self.experience(experience)
-        guard experiences[experienceRef.index].statements.indices.contains(line) else { throw .referenceOutOfRange }
-        return StatementRef(experience: experienceRef, line: line)
+    public func statementRef(experience: Int, line: Int) throws(TailoringModelError) -> StatementRef {
+        let ref = try experienceRef(at: experience)
+        guard experiences[ref.index].statements.indices.contains(line) else { throw .referenceOutOfRange }
+        return StatementRef(experience: ref, line: line)
     }
 
-    /// The statement a reference names. A reference is meaningful only for the snapshot that made it, so one that does
-    /// not fit this snapshot, in its experience or in its line, is `referenceOutOfRange`, never a trap (R9). The
-    /// references of a `TailoredCV` always resolve against its own `source`.
+    /// The experience a reference names. A reference is meaningful only for the snapshot that made it, so one that does
+    /// not fit this snapshot is `referenceOutOfRange`, never a trap (R9). The references of a `TailoredCV` always
+    /// resolve against its own `source`.
+    public func experience(_ ref: ExperienceRef) throws(TailoringModelError) -> SourceExperience {
+        guard contains(ref) else { throw .referenceOutOfRange }
+        return experiences[ref.index]
+    }
+
+    /// The statement a reference names, with the same guarantee as `experience(_:)`: a reference whose experience or
+    /// whose line this snapshot does not have is `referenceOutOfRange`.
     public func statement(_ ref: StatementRef) throws(TailoringModelError) -> Statement {
         guard contains(ref) else { throw .referenceOutOfRange }
         return experiences[ref.experience.index].statements[ref.line]
     }
 
+    func contains(_ ref: ExperienceRef) -> Bool {
+        experiences.indices.contains(ref.index)
+    }
+
     func contains(_ ref: StatementRef) -> Bool {
-        experiences.indices.contains(ref.experience.index) && experiences[ref.experience.index].statements.indices.contains(ref.line)
+        contains(ref.experience) && experiences[ref.experience.index].statements.indices.contains(ref.line)
     }
 }

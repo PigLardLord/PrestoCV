@@ -69,7 +69,7 @@ public struct TailoredCV: Hashable, Sendable {
         try Bounds.cvSections(summary: summary, education: education, skills: skills, languages: languages,
                               certifications: certifications, profiles: profiles, interests: interests)
         for experience in experiences {
-            guard source.experiences.indices.contains(experience.source.index) else { throw .referenceOutOfRange }
+            guard source.contains(experience.source) else { throw .referenceOutOfRange }
             for line in experience.lines where !line.sources.allSatisfy(source.contains) { throw .referenceOutOfRange }
         }
         self.source = source

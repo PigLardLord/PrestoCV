@@ -53,7 +53,7 @@ struct ReportAndQuestionTests {
     @Test("a question asks about a term, a letter field or a request, within a scope")
     func question() throws {
         let source = try Sample.source()
-        let experience = try source.experience(1)
+        let experience = try source.experienceRef(at: 1)
         let term = try Question(kind: .unevidencedTerm("Kubernetes"), scope: .experience(experience))
         #expect(term.kind == .unevidencedTerm("Kubernetes"))
         #expect(term.scope == .experience(experience))
