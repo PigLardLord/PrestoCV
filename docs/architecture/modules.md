@@ -236,9 +236,10 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 - **Hidden characters**, one rule in `TextRules.hiddenCharacter(in:multiLine:)`, which every initialiser applies with `hiddenCharacter`. It is public, so that the decoder (#152) and the server's request mapper call the same copy. A text is refused when it holds:
   - a control character (general category Cc), except `\n`, `\r` (so `\r\n`) and tab in a multi-line text;
   - a bidirectional embedding or override (U+202A to U+202E), or an isolate (U+2066 to U+2069), which make "12" read as "21";
+  - a bidirectional mark: the left-to-right and right-to-left marks (U+200E, U+200F) and the Arabic letter mark (U+061C). Before figures they reverse the display: "1040 → 5308" reads as "5308 → 1040", and "-5%" as "5%-";
   - a tag character (U+E0000 to U+E007F).
 
-  The joiners (ZWJ, ZWNJ), the zero-width space, the byte order mark, the word joiner and the left-to-right and right-to-left marks stay allowed, since scripts and emoji need them. The multi-line texts are an experience's description (checked before it is split), the descriptions of education and certifications, the summary and the advert. Every other text is one line. A statement is a line of a description: it allows a tab, and refuses its line breaks as `notOneLine`. The size is checked first, and a blank required text is `emptyField` whatever its controls.
+  The joiners (ZWJ, ZWNJ), the zero-width space, the byte order mark and the word joiner stay allowed, since scripts and emoji need them. The multi-line texts are an experience's description (checked before it is split), the descriptions of education and certifications, the summary and the advert. Every other text is one line. A statement is a line of a description: it allows a tab, and refuses its line breaks as `notOneLine`. The size is checked first, and a blank required text is `emptyField` whatever its controls.
 
 - **`TailoringModelError`**: `unsupportedLanguage`, `emptyField`, `notOneLine`, `hiddenCharacter`, `mismatchedScope`, `tooLarge`, `tooMany`, `invalidDate`, `invalidPeriod`, `invalidSkillLevel`, `referenceOutOfRange`. The field and the list are codes (R7, R13).
 - The model has no `Codable`: JSON crosses through DTOs in the targets that need it (#152).

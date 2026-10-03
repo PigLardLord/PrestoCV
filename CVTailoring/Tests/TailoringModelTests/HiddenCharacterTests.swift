@@ -4,12 +4,13 @@ import TailoringModel
 /// The classes of character that hide what a text says, and the ones that look similar but stay allowed.
 enum HiddenSamples {
     /// Hidden in every text: control characters that are not line breaks, bidirectional embeddings, overrides and
-    /// isolates, and tag characters.
+    /// isolates, the bidirectional marks, and tag characters.
     static let always: [String] = {
         var values: [String] = []
         values.append(contentsOf: ["\u{0000}", "\u{0007}", "\u{001B}", "\u{007F}", "\u{0080}", "\u{009F}"])
         values.append(contentsOf: ["\u{202A}", "\u{202B}", "\u{202C}", "\u{202D}", "\u{202E}"])
         values.append(contentsOf: ["\u{2066}", "\u{2067}", "\u{2068}", "\u{2069}"])
+        values.append(contentsOf: ["\u{200E}", "\u{200F}", "\u{061C}"])
         values.append(contentsOf: ["\u{E0000}", "\u{E0020}", "\u{E0041}", "\u{E007F}"])
         return values
     }()
@@ -29,12 +30,11 @@ enum HiddenSamples {
         return values
     }()
 
-    /// Invisible or directional characters that stay allowed: joiners, the zero-width space, the byte order mark, the
-    /// word joiner and the left-to-right and right-to-left marks.
+    /// Invisible characters that stay allowed: joiners, the zero-width space, the byte order mark and the word joiner.
     static let allowed: [String] = {
         var values: [String] = []
-        values.append(contentsOf: ["\u{200D}", "\u{200C}", "\u{200B}", "\u{FEFF}", "\u{2060}", "\u{200E}", "\u{200F}"])
-        values.append(contentsOf: ["\u{2028}", "\u{2029}", "\u{00A0}", "\u{202F}", "\u{2065}", "\u{206A}", "\u{E0080}", "\u{0301}"])
+        values.append(contentsOf: ["\u{200D}", "\u{200C}", "\u{200B}", "\u{FEFF}", "\u{2060}"])
+        values.append(contentsOf: ["\u{00A0}", "\u{202F}", "\u{2065}", "\u{206A}", "\u{E0080}", "\u{0301}", "\u{200D}\u{1F4BB}"])
         return values
     }()
 
@@ -104,6 +104,23 @@ struct TextRulesTests {
         #expect(!TextRules.hiddenCharacter(in: text, multiLine: multiLine))
     }
 
+    static let figuresWithMarks: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["Revenue: 1040 \u{200F}\u{2192} 5308", "Revenue: \u{200F}1040 \u{2192} 5308", "Revenue: 1040 \u{200E}\u{2192} \u{200F}5308"])
+        values.append(contentsOf: ["Churn \u{061C}-5%", "Churn -\u{061C}5%", "Churn -5\u{200F}%", "Growth +\u{200F}12 %"])
+        return values
+    }()
+
+    @Test("a right-to-left or an Arabic letter mark before figures is refused: it reverses how they display", arguments: figuresWithMarks, [false, true])
+    func marksBeforeFigures(text: String, multiLine: Bool) {
+        #expect(TextRules.hiddenCharacter(in: text, multiLine: multiLine))
+    }
+
+    @Test("the same figures without a mark are not hidden", arguments: [false, true])
+    func figuresWithoutMarks(multiLine: Bool) {
+        #expect(!TextRules.hiddenCharacter(in: "Revenue: 1040 \u{2192} 5308, churn -5%, growth +12 %", multiLine: multiLine))
+    }
+
     @Test("the right-to-left override that makes 12 read as 21 is hidden")
     func override() {
         #expect(TextRules.hiddenCharacter(in: "Total: \u{202E}12\u{202C}", multiLine: false))
@@ -157,6 +174,12 @@ struct HiddenCharacterFieldTests {
             #expect(throws: TailoringModelError.hiddenCharacter(field.field)) { try field.build("Total: \u{202E}12\u{202C}") }
         }
         #expect(try Statement(text: "\u{202E}12\u{202C}").text == "12")
+    }
+
+    @Test("a right-to-left mark before figures is refused wherever a text is written", arguments: HiddenSamples.allFields)
+    func marksBeforeFigures(field: TextFieldCase) {
+        #expect(throws: TailoringModelError.hiddenCharacter(field.field)) { try field.build("Revenue: 1040 \u{200F}\u{2192} 5308") }
+        #expect(throws: TailoringModelError.hiddenCharacter(field.field)) { try field.build("Churn \u{061C}-5%") }
     }
 
     @Test("a statement of a split that holds a hidden character cannot join an experience")
