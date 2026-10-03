@@ -4,15 +4,17 @@ import Foundation
 /// (ADR 0013): a rewritten line names the statements of the source it comes from.
 ///
 /// `split(_:)` is the only rule that turns a description into statements, and every target uses it. A statement from
-/// the split is trimmed and not empty; its size is bounded where it joins a snapshot.
+/// the split is trimmed, not empty and one line, as is one built from text; its size is bounded where it joins a
+/// snapshot.
 public struct Statement: Hashable, Sendable {
     public let text: String
 
-    /// A statement of text written elsewhere, such as a line a model wrote. The text is trimmed and kept as it is, and
-    /// must not be empty or longer than `TailoringLimits.maxTextBytes`.
+    /// A statement of text written elsewhere, such as a line a model wrote. The text is trimmed and kept as it is. It
+    /// must not be empty, hold a line break (`notOneLine`) or be longer than `TailoringLimits.maxTextBytes`.
     public init(text: String) throws(TailoringModelError) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw .emptyField(.statement) }
+        guard !trimmed.contains(where: \.isNewline) else { throw .notOneLine(.statement) }
         try Bounds.text(trimmed, .statement)
         self.text = trimmed
     }

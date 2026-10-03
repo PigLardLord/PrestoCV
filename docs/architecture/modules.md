@@ -202,7 +202,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
     - each line is trimmed;
     - one leading bullet (`•`, `◦`, `▪`, `‣`, `·`, `-`, `*`, `–`, `—`) is removed when a space follows it or it ends the line, so `-5% churn` keeps its sign and `1.` is not a bullet;
     - a line empty after that is dropped, so a description of one paragraph is one statement.
-  - A `Statement` built from text (a line a model wrote) is trimmed, not empty and bounded.
+  - A `Statement` is always one line. One built from text (a line a model wrote) is trimmed and bounded, and refused when it is empty or holds a line break.
 - **Typed references.** `ExperienceRef` and `StatementRef` read "experience n, line m", counted from 0.
   - Only a `SourceCV` makes them, through `experience(_:)` and `statement(experience:line:)`. A position the snapshot does not have is `referenceOutOfRange`.
   - A reference is meaningful only for the snapshot that made it. `statement(_:)` resolves one and refuses a reference that does not fit the snapshot with `referenceOutOfRange`; it never traps (R9).
@@ -228,7 +228,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 | body paragraphs of a letter, attachments of a letter | 20 each |
 | address lines | 6 |
 
-- **`TailoringModelError`**: `unsupportedLanguage`, `emptyField`, `tooLarge`, `tooMany`, `invalidDate`, `invalidPeriod`, `invalidSkillLevel`, `referenceOutOfRange`. The field and the list are codes (R7, R13).
+- **`TailoringModelError`**: `unsupportedLanguage`, `emptyField`, `notOneLine`, `tooLarge`, `tooMany`, `invalidDate`, `invalidPeriod`, `invalidSkillLevel`, `referenceOutOfRange`. The field and the list are codes (R7, R13).
 - The model has no `Codable`: JSON crosses through DTOs in the targets that need it (#152).
 - Planned (#136): the word lists, one JSON file per language plus an index, read through `Bundle.module`; the supported languages are those with a file.
 

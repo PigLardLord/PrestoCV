@@ -5,6 +5,8 @@ public enum TailoringModelError: Error, Hashable, Sendable {
     case unsupportedLanguage
     /// A field that must say something is empty, or only whitespace.
     case emptyField(Field)
+    /// A field that is one line holds a line break.
+    case notOneLine(Field)
     /// A field longer than `TailoringLimits.maxTextBytes`, or an advert longer than `TailoringLimits.maxAdvertBytes` (R8).
     case tooLarge(Field)
     /// A section with more entries than `TailoringLimits` allows (R8).

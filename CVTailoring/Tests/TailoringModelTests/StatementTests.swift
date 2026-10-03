@@ -82,6 +82,19 @@ struct StatementSplitTests {
         #expect(texts("\u{2022} R\u{00E9}duit les co\u{00FB}ts de 30 % \u{2014} \u{00E0} Paris") == ["R\u{00E9}duit les co\u{00FB}ts de 30 % \u{2014} \u{00E0} Paris"])
     }
 
+    @Test("every statement of a description is one line", arguments: [
+        "a\nb\r\nc\rd\u{2028}e\u{2029}f\u{0085}g\u{000B}h\u{000C}i", "- a\n\n* b\r\n\r\n\u{2022} c", "one paragraph", "\n\n a \n\n b \n",
+    ])
+    func oneLineEach(description: String) {
+        let statements = Statement.split(description)
+        #expect(!statements.isEmpty)
+        for statement in statements {
+            let hasLineBreak = statement.text.contains(where: \.isNewline)
+            #expect(!hasLineBreak)
+            #expect(!statement.text.isEmpty)
+        }
+    }
+
     @Test("a mixed description keeps the lines that say something")
     func mixed() {
         let description = "\u{2022} Led the platform team\r\n\r\n- Cut cost by -5%\n   \n* Hired 3 people  \n2. Ran the on-call rota"
@@ -100,6 +113,18 @@ struct StatementInitTests {
     @Test("a statement of nothing is refused", arguments: ["", " ", "\n", " \t\r\n "])
     func empty(text: String) {
         #expect(throws: TailoringModelError.emptyField(.statement)) { try Statement(text: text) }
+    }
+
+    @Test("text that spans lines is refused, whatever breaks the line", arguments: [
+        "a\nb", "a\r\nb", "a\rb", "a\u{2028}b", "a\u{2029}b", "a\u{0085}b", "a\u{000B}b", "a\u{000C}b", "- a\n- b", "a\n\nb", "a \n b",
+    ])
+    func manyLines(text: String) {
+        #expect(throws: TailoringModelError.notOneLine(.statement)) { try Statement(text: text) }
+    }
+
+    @Test("a line break at either end is trimmed, and does not make a second line", arguments: ["\nCut costs", "Cut costs\r\n", "\r\n Cut costs \u{2028}"])
+    func breaksAtTheEnds(text: String) throws {
+        #expect(try Statement(text: text).text == "Cut costs")
     }
 
     @Test("the limit is 10,000 UTF-8 bytes: accepted at the limit, refused one over")
