@@ -122,6 +122,7 @@ struct TextFoldTests {
         cases.append(FoldCase("a\u{0300}\u{0316}", "a"))
         cases.append(FoldCase("\u{0345}", ""))
         cases.append(FoldCase("\u{1FB3}", "\u{03B1}"))
+        cases.append(FoldCase("a\u{036F}", "a"))
         return cases
     }()
 
@@ -145,6 +146,7 @@ struct TextFoldTests {
         cases.append(FoldCase("ΑΣ.", "ας."))
         cases.append(FoldCase("ΑΣ\u{0301}", "ας"))
         cases.append(FoldCase("ὈΔΥΣΣΕΎΣ", "οδυσσευς"))
+        cases.append(FoldCase("Α'Σ", "α'ς"))
         return cases
     }()
 
