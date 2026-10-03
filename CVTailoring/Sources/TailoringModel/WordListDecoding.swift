@@ -435,7 +435,7 @@ private struct WordListReading {
     /// something (`isStated`) and is not another word of the list once folded: a repeat would count a word twice.
     private func check<Entry>(_ raw: RawList<Entry>, _ key: WordListKey, words: [String]) throws(TailoringModelError) {
         guard isStated(raw.source), WordListFormat.allowedLicences.contains(raw.licence) else { throw corrupt(key) }
-        guard !raw.entries.isEmpty else { throw .incompleteWordList(language, key) }
+        guard !raw.entries.isEmpty || key.mayBeEmpty else { throw .incompleteWordList(language, key) }
         var folded = Set<String>()
         for word in words {
             guard isStated(word), folded.insert(TextFold.fold(word)).inserted else { throw corrupt(key) }

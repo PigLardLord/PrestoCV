@@ -60,55 +60,55 @@ A word of a title claims the ranks it may mean, and a tailored title may claim n
 
 ### Keys
 
-Every file holds every key below. A file that lacks one is refused as incomplete, with the key named.
+Every file holds every key below. A file that lacks one is refused as incomplete, with the key named. So is a list with no entry, unless the "May be empty" column says "yes": a language may leave those lists empty, since they hold words that only some languages have. Those three are filled by English alone today.
 
 cv-giovanni has three kinds of headings, which it calls required, offer and neutral, and this format calls `requirementHeadings`, `offerHeadings` and `structuralHeadings`: not the four kinds (requirements, nice to have, company, benefits) that the issue of #136 names. The format follows the source.
 
-| Key | Holds | Used by |
-|---|---|---|
-| `version` | The format version | Refused unless it is the one this page describes |
-| `language` | The code of the language the file is the file of, as the index lists it | Refused unless it is the language the index names for this file, so a file copied under another name is caught |
-| `advert.stopwords` | Words that carry no information about a role, however often an advert uses them | `AdvertAnalysis` leaves them out of the terms it ranks, and guesses an advert's language from the share of its words that a language's stopwords make; `Provenance` does not hold them to the source as words the advert writes |
-| `advert.plainWords` | Ordinary words of an advert's prose that a tailoring may write although the CV does not, because each is a word of some technology's name ("new", "time") | `Provenance` lets them pass in the check of names; `AdvertAnalysis` still ranks them |
-| `advert.dimensions` | Nouns that name what a claim measures ("performance", "stability") | `Provenance` holds the figure beside one to the source, and refuses one beside no figure as a claim |
-| `advert.boilerplate` | Phrases and words that belong to the posting and not to the job ("equal opportunity", "full time") | `AdvertAnalysis` drops a phrase as furniture; a one-word entry counts only on a short line |
-| `advert.genderMarkers` | Gender markers a job title carries in words ("all genders") | `AdvertAnalysis` takes them out of a line before it reads it |
-| `advert.instructions` | What an advert asks of the applicant and not of the job ("please state", "notice period") | `AdvertAnalysis` takes them out of a line as words before it reads it |
-| `advert.streets` | The words a street's name carries ("street", "road"), and where the language writes them | `AdvertAnalysis` reads an address line as the posting's and not as a requirement, only beside a house number |
-| `advert.names` | Names written in several words that are read whole ("github actions", "time series") | `AdvertAnalysis` reads each as one term and not as its words |
-| `advert.synonyms` | Groups of forms that mean the same ("ci/cd", "continuous integration") | `AdvertAnalysis` finds evidence through a group and reports it as a synonym and never as exact; `Provenance` finds an advert's word in its source through a group ("engineers" where the source writes "developers") |
-| `advert.requirementHeadings` | Headings under which an advert states what it will not compromise on ("requirements", "must have") | `AdvertAnalysis` marks the terms below one as required |
-| `advert.offerHeadings` | Headings under which an advert talks about itself: what it offers and who it is ("we offer", "about us") | `AdvertAnalysis` ranks the terms below one lower |
-| `advert.structuralHeadings` | Headings that organise an advert without demanding or offering anything ("tech stack", "location") | `AdvertAnalysis` reads their own words as structure, so "tech stack" is no technology |
-| `dates.months` | The names and abbreviations of the twelve months, each with its month; every month has a name at least | `ContentChecks` and `Provenance` read a date written with a month's name as the date of the numbers |
-| `dates.presentWords` | How a period says it has not ended ("present", "ongoing") | `ContentChecks` reads a period written in text: a role still running cannot bear a count tied to it, since the calendar overtakes it |
-| `dates.sinceWords` | What a period says before its start when it began and has not ended ("since") | `ContentChecks` reads it as a period that runs to the present |
-| `dates.rangeSeparatorWords` | The words between the two dates of a period ("to"); the dashes and the tilde are a shape | `ContentChecks` splits a period into its two dates |
-| `dates.durationUnitWords` | The units of the length a period carries after its dates ("3 years", "8 mos"), every form written out | `ContentChecks` takes the length off a period, since what a reader compares is the dates |
-| `numbers.words` | Numbers written in words, with their value: "two" to "nineteen", the tens, "dozen", "hundred", "thousand", "million". "One" is left out: it is a pronoun as often as a number | `Provenance` reads a figure in words as a figure and holds it to the source; a tens word, a hyphen and a word of 2 to 9 are one figure |
-| `spans.floorLeadIns` | What opens a floor before its count ("over", "more than"); "11+ years" is a shape and needs no entry | `ContentChecks` lets a floor pass, since it only grows truer |
-| `spans.yearWords` | The words for a year, singular and plural | `ContentChecks` reads the unit of a count of time |
-| `spans.monthWords` | The words for a month, singular and plural | `ContentChecks` reads the unit of a count of time |
-| `spans.countWords` | The counts of time that a CV writes in words, "one" to "twelve", with their value | `ContentChecks` reads the count of a span of time |
-| `spans.tiedCounts` | How the language ties a count to an employer, as templates ("{count} of them at {employer}") | `ContentChecks` holds a count tied to a role that has ended to that role's dates |
-| `spans.employerEndWords` | The words that end an employer's name in a tied count, as a comma, a full stop or a semicolon do ("8 of them at PigLardLord and …"): "and" | `ContentChecks` reads where the employer's name ends |
-| `letter.greetings` | The words that open a salutation ("dear", "hello") | `Provenance` refuses a salutation the model writes, since the page greets the recipient itself |
-| `letter.salutations` | Salutations that stand on their own ("to whom it may concern") | `Provenance`, as for the greetings |
-| `letter.addressees` | The words that, right after a greeting and as a whole word, make it a salutation: forms of address, titles and groups ("mr", "dr", "everyone") | `Provenance`, as for the greetings: "hi-fi audio" is prose and "hi everyone" is a greeting |
-| `letter.addresseesAtClauseEnd` | The words that make a greeting a salutation only when a comma, a "!" or the end of the text follows them ("there": "hi there," greets, "hi there is a place" is prose) | `Provenance`, as for the greetings |
-| `letter.addresseeNouns` | The nouns an addressee ends in, with up to two words before ("team", "manager") | `Provenance`, as for the greetings: "dear hiring manager" |
-| `letter.valedictions` | How a letter signs off, every form written out ("kind regards", "yours sincerely") | `Provenance` refuses a sign-off the model writes, since the page signs off itself |
-| `letter.salaryExpectationAsks` | How an advert asks for a salary expectation, every phrase written out | `AdvertAnalysis` asks the user when the advert asks and the letter defaults give none |
-| `letter.startDateAsks` | How an advert asks for a start date, every phrase written out ("earliest start date", "notice period") | `AdvertAnalysis`, as for the salary |
-| `letter.statedTermWords` | The words that, right after an ask, show the advert states its own term and asks nothing ("salary range of …") | `AdvertAnalysis` does not ask when an ask is followed by one, by a figure, or by a colon or a dash |
-| `letter.formsOfAddress` | The words that write a form of address before a contact's name, each with its form, `ms` or `mr`: "ms" and "mrs" for `ms`, "mr" for `mr` | `Provenance` accepts a form of address only when the advert writes one of its words before the contact's name; otherwise the form is neutral |
-| `letter.academicTitles` | The titles that may stand between a form of address and a name ("dr", "prof") | `Provenance`, as for the forms of address: "Ms Dr Grace Hopper" |
-| `letter.notGivenNames` | The words that are no given name before a surname: another form of address, or a conjunction ("miss", "and", "or") | `Provenance`, as for the forms of address: "Ms Müller and Mr Hopper" writes no "Ms" before Hopper |
-| `provenance.notPlurals` | Words that end like a plural and are none ("news", "series") | `Provenance` finds a word in both its numbers, and does not make "new" of "news" |
-| `provenance.legalForms` | The legal forms a company's name ends in, every spelling written out ("gmbh", "ltd.", "gmbh & co. kg"). A legal form belongs to a jurisdiction and not to a language, so every file holds the whole list, as it holds the technologies | `Provenance` finds a recipient's company as a letter writes it in prose, without its legal form |
-| `provenance.firstPerson` | The capitalised words of the first person, with either apostrophe ("I", "I'm") | `Provenance` does not read them as names |
-| `provenance.ranks` | The words of a title that claim a rank, each with the ranks it may mean ("senior", "chief" for head) | `Provenance` refuses a title that claims a rank its source does not write |
-| `fields.technologies` | Names of technologies that are never ordinary words of the language ("Kotlin", "SwiftUI") | `Provenance` holds a mention to the source however it is written; a name that is also an ordinary word stays out, and is read from its capitals |
+| Key | Holds | May be empty | Used by |
+|---|---|---|---|
+| `version` | The format version | — | Refused unless it is the one this page describes |
+| `language` | The code of the language the file is the file of, as the index lists it | — | Refused unless it is the language the index names for this file, so a file copied under another name is caught |
+| `advert.stopwords` | Words that carry no information about a role, however often an advert uses them | no | `AdvertAnalysis` leaves them out of the terms it ranks, and guesses an advert's language from the share of its words that a language's stopwords make; `Provenance` does not hold them to the source as words the advert writes |
+| `advert.plainWords` | Ordinary words of an advert's prose that a tailoring may write although the CV does not, because each is a word of some technology's name ("new", "time") | no | `Provenance` lets them pass in the check of names; `AdvertAnalysis` still ranks them |
+| `advert.dimensions` | Nouns that name what a claim measures ("performance", "stability") | no | `Provenance` holds the figure beside one to the source, and refuses one beside no figure as a claim |
+| `advert.boilerplate` | Phrases and words that belong to the posting and not to the job ("equal opportunity", "full time") | no | `AdvertAnalysis` drops a phrase as furniture; a one-word entry counts only on a short line |
+| `advert.genderMarkers` | Gender markers a job title carries in words ("all genders") | no | `AdvertAnalysis` takes them out of a line before it reads it |
+| `advert.instructions` | What an advert asks of the applicant and not of the job ("please state", "notice period") | no | `AdvertAnalysis` takes them out of a line as words before it reads it |
+| `advert.streets` | The words a street's name carries ("street", "road"), and where the language writes them | no | `AdvertAnalysis` reads an address line as the posting's and not as a requirement, only beside a house number |
+| `advert.names` | Names written in several words that are read whole ("github actions", "time series") | no | `AdvertAnalysis` reads each as one term and not as its words |
+| `advert.synonyms` | Groups of forms that mean the same ("ci/cd", "continuous integration") | no | `AdvertAnalysis` finds evidence through a group and reports it as a synonym and never as exact; `Provenance` finds an advert's word in its source through a group ("engineers" where the source writes "developers") |
+| `advert.requirementHeadings` | Headings under which an advert states what it will not compromise on ("requirements", "must have") | no | `AdvertAnalysis` marks the terms below one as required |
+| `advert.offerHeadings` | Headings under which an advert talks about itself: what it offers and who it is ("we offer", "about us") | no | `AdvertAnalysis` ranks the terms below one lower |
+| `advert.structuralHeadings` | Headings that organise an advert without demanding or offering anything ("tech stack", "location") | no | `AdvertAnalysis` reads their own words as structure, so "tech stack" is no technology |
+| `dates.months` | The names and abbreviations of the twelve months, each with its month; every month has a name at least | no | `ContentChecks` and `Provenance` read a date written with a month's name as the date of the numbers |
+| `dates.presentWords` | How a period says it has not ended ("present", "ongoing") | no | `ContentChecks` reads a period written in text: a role still running cannot bear a count tied to it, since the calendar overtakes it |
+| `dates.sinceWords` | What a period says before its start when it began and has not ended ("since") | no | `ContentChecks` reads it as a period that runs to the present |
+| `dates.rangeSeparatorWords` | The words between the two dates of a period ("to"); the dashes and the tilde are a shape | no | `ContentChecks` splits a period into its two dates |
+| `dates.durationUnitWords` | The units of the length a period carries after its dates ("3 years", "8 mos"), every form written out | no | `ContentChecks` takes the length off a period, since what a reader compares is the dates |
+| `numbers.words` | Numbers written in words, with their value: "two" to "nineteen", the tens, "dozen", "hundred", "thousand", "million". "One" is left out: it is a pronoun as often as a number | no | `Provenance` reads a figure in words as a figure and holds it to the source; a tens word, a hyphen and a word of 2 to 9 are one figure |
+| `spans.floorLeadIns` | What opens a floor before its count ("over", "more than"); "11+ years" is a shape and needs no entry | no | `ContentChecks` lets a floor pass, since it only grows truer |
+| `spans.yearWords` | The words for a year, singular and plural | no | `ContentChecks` reads the unit of a count of time |
+| `spans.monthWords` | The words for a month, singular and plural | no | `ContentChecks` reads the unit of a count of time |
+| `spans.countWords` | The counts of time that a CV writes in words, "one" to "twelve", with their value | no | `ContentChecks` reads the count of a span of time |
+| `spans.tiedCounts` | How the language ties a count to an employer, as templates ("{count} of them at {employer}") | no | `ContentChecks` holds a count tied to a role that has ended to that role's dates |
+| `spans.employerEndWords` | The words that end an employer's name in a tied count, as a comma, a full stop or a semicolon do ("8 of them at PigLardLord and …"): "and" | no | `ContentChecks` reads where the employer's name ends |
+| `letter.greetings` | The words that open a salutation ("dear", "hello") | no | `Provenance` refuses a salutation the model writes, since the page greets the recipient itself |
+| `letter.salutations` | Salutations that stand on their own ("to whom it may concern") | no | `Provenance`, as for the greetings |
+| `letter.addressees` | The words that, right after a greeting and as a whole word, make it a salutation: forms of address, titles and groups ("mr", "dr", "everyone") | no | `Provenance`, as for the greetings: "hi-fi audio" is prose and "hi everyone" is a greeting |
+| `letter.addresseesAtClauseEnd` | The words that make a greeting a salutation only when a comma, a "!" or the end of the text follows them ("there": "hi there," greets, "hi there is a place" is prose) | yes | `Provenance`, as for the greetings |
+| `letter.addresseeNouns` | The nouns an addressee ends in, with up to two words before ("team", "manager") | no | `Provenance`, as for the greetings: "dear hiring manager" |
+| `letter.valedictions` | How a letter signs off, every form written out ("kind regards", "yours sincerely") | no | `Provenance` refuses a sign-off the model writes, since the page signs off itself |
+| `letter.salaryExpectationAsks` | How an advert asks for a salary expectation, every phrase written out | no | `AdvertAnalysis` asks the user when the advert asks and the letter defaults give none |
+| `letter.startDateAsks` | How an advert asks for a start date, every phrase written out ("earliest start date", "notice period") | no | `AdvertAnalysis`, as for the salary |
+| `letter.statedTermWords` | The words that, right after an ask, show the advert states its own term and asks nothing ("salary range of …") | no | `AdvertAnalysis` does not ask when an ask is followed by one, by a figure, or by a colon or a dash |
+| `letter.formsOfAddress` | The words that write a form of address before a contact's name, each with its form, `ms` or `mr`: "ms" and "mrs" for `ms`, "mr" for `mr` | no | `Provenance` accepts a form of address only when the advert writes one of its words before the contact's name; otherwise the form is neutral |
+| `letter.academicTitles` | The titles that may stand between a form of address and a name ("dr", "prof") | no | `Provenance`, as for the forms of address: "Ms Dr Grace Hopper" |
+| `letter.notGivenNames` | The words that are no given name before a surname: another form of address, or a conjunction ("miss", "and", "or") | no | `Provenance`, as for the forms of address: "Ms Müller and Mr Hopper" writes no "Ms" before Hopper |
+| `provenance.notPlurals` | Words that end like a plural and are none ("news", "series") | yes | `Provenance` finds a word in both its numbers, and does not make "new" of "news" |
+| `provenance.legalForms` | The legal forms a company's name ends in, every spelling written out ("gmbh", "ltd.", "gmbh & co. kg"). A legal form belongs to a jurisdiction and not to a language, so every file holds the whole list, as it holds the technologies | no | `Provenance` finds a recipient's company as a letter writes it in prose, without its legal form |
+| `provenance.firstPerson` | The capitalised words of the first person, with either apostrophe ("I", "I'm") | yes | `Provenance` does not read them as names |
+| `provenance.ranks` | The words of a title that claim a rank, each with the ranks it may mean ("senior", "chief" for head) | no | `Provenance` refuses a title that claims a rank its source does not write |
+| `fields.technologies` | Names of technologies that are never ordinary words of the language ("Kotlin", "SwiftUI") | no | `Provenance` holds a mention to the source however it is written; a name that is also an ordinary word stays out, and is read from its capitals |
 
 ### What stays in code
 
@@ -155,7 +155,7 @@ Every refusal is a typed error that carries codes and no text ([R7](rules.md#r7-
 | `corruptWordList(.language(l), key)` | The `order` of the streets is missing or is none of the three |
 | `corruptWordList(.language(l), key)` | The form of a form of address is not `ms` or `mr` |
 | `corruptWordList(.language(l), key)` | A rank is none of the eight, or a word claims no rank, or claims one twice |
-| `incompleteWordList(l, key)` | The file of `l` has no group or no list for `key` (a missing group is reported as its first list), a list has no entry, or no month is named for one of the twelve |
+| `incompleteWordList(l, key)` | The file of `l` has no group or no list for `key` (a missing group is reported as its first list), a list that may not be empty has no entry, or no month is named for one of the twelve |
 | `unsupportedLanguage` | `forLanguage(_:)` is asked for a language that has no file |
 
 ### Adding a language

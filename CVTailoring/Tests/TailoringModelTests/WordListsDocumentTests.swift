@@ -14,11 +14,26 @@ struct WordListsDocumentTests {
         #expect(named.count == Set(named).count, "a key is named twice")
     }
 
-    @Test("every row of the key table says what the list holds and how the checks use it")
+    @Test("every row of the key table says what the list holds, whether it may be empty, and how the checks use it")
     func keyTableIsFilled() throws {
-        for row in try Page.rows(after: "### Keys") {
-            #expect(row.count == 3 && row.allSatisfy { !$0.isEmpty }, "the row of \(row[0]) is incomplete")
+        for row in try Page.table(after: "### Keys") {
+            for column in ["Key", "Holds", "May be empty", "Used by"] {
+                #expect(!(row[column] ?? "").isEmpty, "the row of \(row["Key"] ?? "?") has no \(column)")
+            }
         }
+    }
+
+    @Test("the lists the page says may be empty are the ones the decoder accepts empty")
+    func mayBeEmptyColumn() throws {
+        var yes: Set<String> = []
+        for row in try Page.table(after: "### Keys") {
+            let key = try #require(Page.backticked(row["Key"] ?? "").first)
+            let cell = try #require(row["May be empty"])
+            #expect(["yes", "no", "—"].contains(cell), "\(key): \(cell)")
+            if cell == "yes" { yes.insert(key) }
+            if key == "version" || key == "language" { #expect(cell == "—") }
+        }
+        #expect(yes == Set(WordListKey.allCases.filter(\.mayBeEmpty).map(\.rawValue)))
     }
 
     @Test("the shape table names exactly the keys the decoder allows in the file, in a list and in each entry")
@@ -111,6 +126,21 @@ private enum Page {
             throw PageError(description: "no section from \(start) to \(end)")
         }
         return String(page[a.upperBound..<b.lowerBound])
+    }
+
+    /// The rows of the first table after `heading`, each by the name of its column.
+    static func table(after heading: String) throws -> [[String: String]] {
+        let page = try text()
+        guard let start = page.range(of: heading) else { throw PageError(description: "no heading \(heading)") }
+        let lines = page[start.upperBound...].components(separatedBy: "\n").drop { !$0.hasPrefix("|") }.prefix { $0.hasPrefix("|") }
+        let header = cells(of: try #require(lines.first))
+        return lines.dropFirst(2).map { Dictionary(uniqueKeysWithValues: zip(header, cells(of: $0))) }
+    }
+
+    /// The cells of a row. They are split on unescaped pipes; "\|" is a pipe inside a cell.
+    static func cells(of line: String) -> [String] {
+        line.replacingOccurrences(of: #"\|"#, with: "\u{0}").split(separator: "|", omittingEmptySubsequences: false)
+            .dropFirst().dropLast().map { $0.replacingOccurrences(of: "\u{0}", with: "|").trimmingCharacters(in: .whitespaces) }
     }
 
     /// The cells of each row of the first table after `heading`, without its header and its rule.

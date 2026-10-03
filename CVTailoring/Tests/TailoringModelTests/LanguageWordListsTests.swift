@@ -267,10 +267,36 @@ struct LanguageWordListsTests {
 
     // MARK: - Entries
 
-    @Test("a list with no entry is incomplete", arguments: WordListKey.allCases)
+    static let keysWithEntries: [WordListKey] = WordListKey.allCases.filter { !$0.mayBeEmpty }
+
+    @Test("a list with no entry is incomplete, unless its key may be empty", arguments: keysWithEntries)
     func noEntries(key: WordListKey) throws {
         let data = try WordListFixture.data(editing: key) { $0["entries"] = [Any]() }
         #expect(throws: TailoringModelError.incompleteWordList(.english, key)) { try decode(data) }
+    }
+
+    @Test("the lists that may be empty are the three that only English fills today")
+    func mayBeEmptyKeys() {
+        #expect(Set(WordListKey.allCases.filter(\.mayBeEmpty)) == [.letterAddresseesAtClauseEnd, .provenanceFirstPerson, .provenanceNotPlurals])
+    }
+
+    @Test("a list that may be empty is read with no entry, and the others around it are untouched")
+    func emptyLists() throws {
+        var data = try WordListFixture.data()
+        for key in WordListKey.allCases where key.mayBeEmpty {
+            let object = try #require(try JSONSerialization.jsonObject(with: data) as? WordListFixture.Object)
+            var edited = object
+            var group = edited[key.group] as? WordListFixture.Object ?? [:]
+            var list = group[key.name] as? WordListFixture.Object ?? [:]
+            list["entries"] = [Any]()
+            group[key.name] = list
+            edited[key.group] = group
+            data = try WordListFixture.data(edited)
+        }
+        let lists = try decode(data)
+        #expect(lists.letter.addresseesAtClauseEnd.entries.isEmpty)
+        #expect(lists.provenance.firstPerson.entries.isEmpty && lists.provenance.notPlurals.entries.isEmpty)
+        #expect(lists.letter.addressees.entries == ["alpha", "beta"] && lists.provenance.legalForms.entries == ["alpha", "beta"])
     }
 
     private static let badEntries: [String] = {

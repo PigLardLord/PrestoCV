@@ -49,6 +49,16 @@ public enum WordListKey: String, CaseIterable, Hashable, Sendable {
     case provenanceRanks = "provenance.ranks"
     case fieldsTechnologies = "fields.technologies"
 
+    /// Whether a language may leave the list with no entry. A list a language has no use for is empty and not missing:
+    /// the three that only English fills today (`docs/architecture/word-lists.md`). Every other list must hold an entry,
+    /// so a truncated file is refused as incomplete.
+    var mayBeEmpty: Bool {
+        switch self {
+        case .letterAddresseesAtClauseEnd, .provenanceFirstPerson, .provenanceNotPlurals: true
+        default: false
+        }
+    }
+
     /// The group of the file the list belongs to: `advert`, `dates`, `numbers`, `spans`, `letter`, `provenance` or `fields`.
     var group: String { String(rawValue.prefix { $0 != "." }) }
 
