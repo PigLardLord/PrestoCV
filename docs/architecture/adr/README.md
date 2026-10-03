@@ -27,5 +27,6 @@ Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected*
 | [0015](0015-inference-providers-and-data-policy.md) | Reach models through configured providers, held to the deployment's data policy | Accepted |
 | [0016](0016-api-contract.md) | Generate both sides of the API from one versioned spec | Accepted |
 | [0017](0017-hosting-storage-and-cost.md) | Run the server on Cloud Run in the EU, keep little, and limit what it spends | Accepted |
+| [0019](0019-applications.md) | Keep a tailoring as an application in CV Authoring | Accepted |
 
 New ADRs copy [template.md](template.md).
