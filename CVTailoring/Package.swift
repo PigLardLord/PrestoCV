@@ -18,5 +18,6 @@ let package = Package(
         .target(name: "ContentChecks", dependencies: ["TailoringModel"]),
         .target(name: "Provenance", dependencies: ["TailoringModel", "AdvertAnalysis", "ContentChecks"]),
         .target(name: "Tailoring", dependencies: ["TailoringModel", "AdvertAnalysis", "ContentChecks", "Provenance"]),
+        .testTarget(name: "TailoringModelTests", dependencies: ["TailoringModel"]),
     ]
 )
