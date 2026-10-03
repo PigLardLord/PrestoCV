@@ -442,11 +442,39 @@ private struct WordListReading {
         }
     }
 
-    /// One line of text that shows something: no hidden character (`TextRules`), no blank at either end by the model's one
-    /// rule of trimming, and not empty once folded.
+    /// One line of text that shows something: no hidden character (`TextRules`), no format or default-ignorable character
+    /// anywhere (a soft hyphen, a zero-width space, a joiner), no blank at either end by the model's one rule of trimming,
+    /// not empty once folded, and no Latin letters mixed with Greek or Cyrillic ones, which look alike.
     private func isStated(_ text: String) -> Bool {
         let content = Bounds.trimmed(text[...])
         return !content.isEmpty && content == text[...] && !TextRules.hiddenCharacter(in: text, multiLine: false)
-            && !TextFold.fold(text).isEmpty
+            && !text.unicodeScalars.contains(where: Self.isInvisible) && !Self.mixesScripts(text) && !TextFold.fold(text).isEmpty
+    }
+
+    private static func isInvisible(_ scalar: Unicode.Scalar) -> Bool {
+        scalar.properties.isDefaultIgnorableCodePoint || scalar.properties.generalCategory == .format
+    }
+
+    private enum Script: Hashable { case latin, greek, cyrillic }
+
+    /// The script of a letter, for the three that share look-alike letters. A mark, a digit or a sign has none.
+    private static func script(of scalar: Unicode.Scalar) -> Script? {
+        guard scalar.properties.isAlphabetic else { return nil }
+        switch scalar.value {
+        case 0x41...0x5A, 0x61...0x7A, 0xAA, 0xBA, 0xC0...0x24F, 0x1E00...0x1EFF, 0x2C60...0x2C7F, 0xA720...0xA7FF, 0xFF21...0xFF3A,
+             0xFF41...0xFF5A:
+            return .latin
+        case 0x370...0x3FF, 0x1F00...0x1FFF:
+            return .greek
+        case 0x400...0x52F, 0x1C80...0x1C8F, 0x2DE0...0x2DFF, 0xA640...0xA69F:
+            return .cyrillic
+        default:
+            return nil
+        }
+    }
+
+    private static func mixesScripts(_ text: String) -> Bool {
+        let scripts = Set(text.unicodeScalars.compactMap(script(of:)))
+        return scripts.contains(.latin) && (scripts.contains(.greek) || scripts.contains(.cyrillic))
     }
 }

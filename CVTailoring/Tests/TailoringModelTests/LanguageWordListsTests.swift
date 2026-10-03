@@ -252,6 +252,7 @@ struct LanguageWordListsTests {
         values.append(contentsOf: ["", " ", " ISC", "ISC "])
         values.append(contentsOf: ["\n", "ISC\n"])
         values.append(contentsOf: ["IS\u{0007}C", "IS\u{202E}C", "IS\u{E0041}C", "IS\u{200F}C"])
+        values.append(contentsOf: ["IS\u{00AD}C", "IS\u{200B}C", "IS\u{200D}C", "IS\u{FE0F}C", "IS\u{0441}"])
         return values
     }()
 
@@ -299,6 +300,20 @@ struct LanguageWordListsTests {
         #expect(lists.letter.addressees.entries == ["alpha", "beta"] && lists.provenance.legalForms.entries == ["alpha", "beta"])
     }
 
+    static let otherScriptsAlone: [String] = {
+        var values: [String] = []
+        values.append(contentsOf: ["\u{043F}\u{0440}\u{0438}\u{0432}\u{0435}\u{0442}", "\u{03B1}\u{03B2}\u{03B3}", "caf\u{00E9} 24-7", "na\u{00EF}ve c++"])
+        return values
+    }()
+
+    @Test("a word of one script is read, and Latin letters with digits, accents and signs too", arguments: otherScriptsAlone)
+    func oneScript(word: String) throws {
+        for key in WordListFixture.textKeys {
+            let data = try WordListFixture.data(editing: key) { $0["entries"] = ["alpha", word] }
+            _ = try decode(data)
+        }
+    }
+
     private static let badEntries: [String] = {
         var values: [String] = []
         values.append(contentsOf: ["", " ", " a", "a "])
@@ -307,6 +322,9 @@ struct LanguageWordListsTests {
         values.append(contentsOf: ["\u{2060}", "\u{2060}a", "a\u{2060}", "\u{200D}a"])
         values.append(contentsOf: ["a\u{0007}b", "a\u{0000}b", "a\nb", "a\u{202E}b"])
         values.append(contentsOf: ["a\u{E0041}b", "a\u{200F}b", "\u{0301}"])
+        values.append(contentsOf: ["a\u{00AD}b", "a\u{200B}b", "a\u{2060}b", "a\u{200D}b"])
+        values.append(contentsOf: ["a\u{FE0F}b", "a\u{FEFF}b", "a\u{0600}b", "a\u{180E}b"])
+        values.append(contentsOf: ["pa\u{0443}pal", "\u{03B1}b", "ab\u{0391}", "\u{0430}pple"])
         return values
     }()
 
