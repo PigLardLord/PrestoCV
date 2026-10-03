@@ -54,7 +54,7 @@ extension Sample {
     }
 
     static func line(_ text: String, _ sources: [StatementRef] = []) throws -> TailoredLine {
-        try TailoredLine(text: Statement(text: text), sources: sources)
+        try TailoredLine(statement: Statement(text: text), sources: sources)
     }
 
     static func tailoredExperience(source: ExperienceRef, lines: [TailoredLine] = []) throws -> TailoredExperience {

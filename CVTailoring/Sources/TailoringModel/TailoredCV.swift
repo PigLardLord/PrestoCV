@@ -1,14 +1,14 @@
 /// One line of a tailored experience, and the statements of the source it comes from. A line that names none, or one of
 /// another experience, can be built: that is a provenance failure the gate reports, so the model must represent it.
 public struct TailoredLine: Hashable, Sendable {
-    public let text: Statement
+    public let statement: Statement
     public let sources: [StatementRef]
 
     /// A line names at most `TailoringLimits.maxSourcesPerLine` sources, and its text is bounded (R8).
-    public init(text: Statement, sources: [StatementRef]) throws(TailoringModelError) {
-        try Bounds.text(text.text, .statement)
+    public init(statement: Statement, sources: [StatementRef]) throws(TailoringModelError) {
+        try Bounds.text(statement.text, .statement)
         try Bounds.count(sources.count, atMost: TailoringLimits.maxSourcesPerLine, .sources)
-        self.text = text
+        self.statement = statement
         self.sources = sources
     }
 }

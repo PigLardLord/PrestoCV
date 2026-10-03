@@ -25,7 +25,7 @@ struct TailoredCVTests {
         #expect(cv.experiences == [experience])
         #expect(cv.experiences[0].source == (try source.experience(0)))
         #expect(cv.experiences[0].location == "Turin" && cv.experiences[0].period == period)
-        #expect(cv.experiences[0].lines.map(\.text.text) == ["Built the API.", "Cut costs."])
+        #expect(cv.experiences[0].lines.map(\.statement.text) == ["Built the API.", "Cut costs."])
         #expect(cv.experiences[0].lines[1].sources == [try source.statement(experience: 0, line: 1), try source.statement(experience: 0, line: 2)])
         #expect(cv.education.count == 1 && cv.skills.count == 1 && cv.languages.count == 1)
         #expect(cv.certifications.count == 1 && cv.profiles.count == 1)
@@ -115,7 +115,7 @@ struct TailoredCVTests {
         cases.append(TextFieldCase(.role) { _ = try TailoredExperience(source: Sample.source().experience(0), role: $0, company: "x", lines: []) })
         cases.append(TextFieldCase(.company) { _ = try TailoredExperience(source: Sample.source().experience(0), role: "x", company: $0, lines: []) })
         cases.append(TextFieldCase(.location) { _ = try TailoredExperience(source: Sample.source().experience(0), role: "x", company: "x", location: $0, lines: []) })
-        cases.append(TextFieldCase(.statement) { _ = try TailoredLine(text: Statement(text: $0), sources: []) })
+        cases.append(TextFieldCase(.statement) { _ = try TailoredLine(statement: Statement(text: $0), sources: []) })
         cases.append(TextFieldCase(.summary) { _ = try TailoredCV(source: Sample.source(), language: .english, personal: Sample.personal(), summary: $0) })
         cases.append(TextFieldCase(.interest) { _ = try TailoredCV(source: Sample.source(), language: .english, personal: Sample.personal(), interests: [$0]) })
         return cases
@@ -131,8 +131,8 @@ struct TailoredCVTests {
     func lineFromTheSplit() throws {
         let oversized = Statement.split(ascii(10_001))
         #expect(oversized.count == 1)
-        #expect(throws: TailoringModelError.tooLarge(.statement)) { try TailoredLine(text: oversized[0], sources: []) }
-        #expect(try TailoredLine(text: Statement.split(ascii(10_000))[0], sources: []).text.text.utf8.count == 10_000)
+        #expect(throws: TailoringModelError.tooLarge(.statement)) { try TailoredLine(statement: oversized[0], sources: []) }
+        #expect(try TailoredLine(statement: Statement.split(ascii(10_000))[0], sources: []).statement.text.utf8.count == 10_000)
     }
 
     @Test("a line names at most 200 sources")
@@ -140,8 +140,8 @@ struct TailoredCVTests {
         let source = try Sample.source()
         let ref = try source.statement(experience: 0, line: 0)
         #expect(TailoringLimits.maxSourcesPerLine == 200)
-        _ = try TailoredLine(text: Statement(text: "Text."), sources: Array(repeating: ref, count: 200))
-        #expect(throws: TailoringModelError.tooMany(.sources)) { try TailoredLine(text: Statement(text: "Text."), sources: Array(repeating: ref, count: 201)) }
+        _ = try TailoredLine(statement: Statement(text: "Text."), sources: Array(repeating: ref, count: 200))
+        #expect(throws: TailoringModelError.tooMany(.sources)) { try TailoredLine(statement: Statement(text: "Text."), sources: Array(repeating: ref, count: 201)) }
     }
 
     @Test("an experience holds at most 200 lines")
