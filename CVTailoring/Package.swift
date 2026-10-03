@@ -1,7 +1,7 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// CV Tailoring (docs/architecture/modules.md, ADR 0013). The targets are empty until the tailoring tickets fill them.
+// CV Tailoring (docs/architecture/modules.md, ADR 0013). TailoringModel holds the model; the other four targets are empty until their tickets fill them.
 let package = Package(
     name: "CVTailoring",
     platforms: [.iOS("26.0"), .macOS("26.0")],

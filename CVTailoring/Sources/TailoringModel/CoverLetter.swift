@@ -3,7 +3,7 @@ public enum FormOfAddress: Hashable, Sendable {
     case ms, mr, neutral
 }
 
-/// Who a letter is for. Only the company is required; the rest is what the advert or the user gave.
+/// Who a letter is for. The company has no default; the rest is empty unless the advert or the user gave it.
 public struct LetterRecipient: Hashable, Sendable {
     public let company: String
     public let contactName: String
