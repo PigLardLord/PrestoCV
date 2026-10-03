@@ -62,15 +62,13 @@ extension KeyedDecodingContainer where Key == DynamicKey {
 
 /// A list as the file writes it, before any rule is applied.
 private struct RawList<Entry: Decodable>: Decodable {
-    static var keys: [String] { ["source", "licence", "entries"] }
-
     let source: String
     let licence: String
     let entries: [Entry]
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicKey.self)
-        try container.allowOnly(Self.keys)
+        try container.allowOnly(WordListFormat.listKeys)
         try self.init(container: container)
     }
 
@@ -87,7 +85,7 @@ private struct RawStreets: Decodable {
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicKey.self)
-        try container.allowOnly(RawList<String>.keys + ["order"])
+        try container.allowOnly(WordListFormat.streetListKeys)
         list = try RawList(container: container)
         order = try container.decode(String.self, forKey: "order")
     }
@@ -99,7 +97,7 @@ private struct RawMonth: Decodable {
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicKey.self)
-        try container.allowOnly(["name", "month"])
+        try container.allowOnly(WordListFormat.monthKeys)
         name = try container.decode(String.self, forKey: "name")
         month = try container.decode(Int.self, forKey: "month")
     }
@@ -111,7 +109,7 @@ private struct RawNumber: Decodable {
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicKey.self)
-        try container.allowOnly(["word", "value"])
+        try container.allowOnly(WordListFormat.numberKeys)
         word = try container.decode(String.self, forKey: "word")
         value = try container.decode(Int.self, forKey: "value")
     }
@@ -122,7 +120,7 @@ private struct RawSynonym: Decodable {
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicKey.self)
-        try container.allowOnly(["forms"])
+        try container.allowOnly(WordListFormat.synonymKeys)
         forms = try container.decode([String].self, forKey: "forms")
     }
 }
@@ -213,7 +211,7 @@ private struct WordListDocument: Decodable {
         guard try root.decode(Int.self, forKey: "version") == WordListFormat.version else {
             throw DecodingError.dataCorruptedError(forKey: "version", in: root, debugDescription: "a version this code does not read")
         }
-        try root.allowOnly(["version"] + WordListKey.allCases.map(\.group))
+        try root.allowOnly(WordListFormat.rootKeys)
         advert = try RawAdvert(RawGroup(root, startingWith: .advertStopwords))
         dates = Dates(months: try RawGroup(root, startingWith: .datesMonths).list(.datesMonths))
         numbers = Numbers(words: try RawGroup(root, startingWith: .numbersWords).list(.numbersWords))
