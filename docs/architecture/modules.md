@@ -211,7 +211,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
   - It keeps its source, and refuses a reference outside it (`referenceOutOfRange`), so one from another snapshot cannot join it and every reference it holds resolves against its own `source`.
   - It checks structure only. A line with no source, or a source from another experience, is a value: the provenance gate reports it (#140).
 - **`CoverLetter`** (with `LetterRecipient` and `FormOfAddress`: `ms`, `mr`, `neutral`), **`LetterDefaults`** (salary expectation, start date, a note, as the user wrote them) and **`Advert`** (its text and its language).
-- **`TailoringReport`** (the argument, and what was cut, moved and reworded) and **`Question`** (`QuestionKind`, `QuestionScope`, `LetterField`). Answers, with their scope, arrive with #153.
+- **`TailoringReport`** (the argument, and what was cut, moved and reworded) and **`Question`** (`QuestionKind`, `QuestionScope`, `LetterField`). A question about a letter field has the `.letter` scope of that same field, and no other question has a `.letter` scope (`mismatchedScope`). Answers, with their scope, arrive with #153.
 - **Value objects.**
   - `TailoringLanguage`: English, German, Spanish, French, Italian, Portuguese, read from a BCP 47 tag by its primary language subtag. Any other tag is `unsupportedLanguage`, never English.
   - `TailoringDate` (year 1900–2200, month 1–12 or none) and `TailoringPeriod`, whose end is a date, "current" or unknown and is never before its start; months are compared only when both are known.
@@ -231,7 +231,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 | body paragraphs of a letter, attachments of a letter | 20 each |
 | address lines | 6 |
 
-- **`TailoringModelError`**: `unsupportedLanguage`, `emptyField`, `notOneLine`, `tooLarge`, `tooMany`, `invalidDate`, `invalidPeriod`, `invalidSkillLevel`, `referenceOutOfRange`. The field and the list are codes (R7, R13).
+- **`TailoringModelError`**: `unsupportedLanguage`, `emptyField`, `notOneLine`, `mismatchedScope`, `tooLarge`, `tooMany`, `invalidDate`, `invalidPeriod`, `invalidSkillLevel`, `referenceOutOfRange`. The field and the list are codes (R7, R13).
 - The model has no `Codable`: JSON crosses through DTOs in the targets that need it (#152).
 - Planned (#136): the word lists, one JSON file per language plus an index, read through `Bundle.module`; the supported languages are those with a file.
 

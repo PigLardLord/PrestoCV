@@ -13,6 +13,9 @@ public enum TailoringModelError: Error, Hashable, Sendable {
     case tooMany(Collection)
     /// A skill level outside 1 to 5.
     case invalidSkillLevel
+    /// A question whose kind and scope disagree: a letter field asked about something else, or the letter asked about
+    /// something that is not a letter field.
+    case mismatchedScope
     /// A reference to an experience or a statement the snapshot does not have.
     case referenceOutOfRange
     /// A year outside 1900 to 2200, or a month outside 1 to 12.

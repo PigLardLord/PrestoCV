@@ -100,4 +100,23 @@ struct ReportAndQuestionTests {
     func letterFieldQuestion(field: LetterField) throws {
         _ = try Question(kind: .letterField(field), scope: .letter(field))
     }
+
+    @Test("a letter-field question is about the same letter field, and only such a question is about the letter")
+    func scopeMatchesKind() throws {
+        let experience = try Sample.source().experienceRef(at: 0)
+        var otherScopes: [QuestionScope] = []
+        otherScopes.append(.skills)
+        otherScopes.append(.summary)
+        otherScopes.append(.experience(experience))
+        for field in LetterField.allCases {
+            for scope in otherScopes {
+                #expect(throws: TailoringModelError.mismatchedScope) { try Question(kind: .letterField(field), scope: scope) }
+            }
+            for other in LetterField.allCases where other != field {
+                #expect(throws: TailoringModelError.mismatchedScope) { try Question(kind: .letterField(field), scope: .letter(other)) }
+            }
+            #expect(throws: TailoringModelError.mismatchedScope) { try Question(kind: .unevidencedTerm("Docker"), scope: .letter(field)) }
+            #expect(throws: TailoringModelError.mismatchedScope) { try Question(kind: .modelRequest("Which team?"), scope: .letter(field)) }
+        }
+    }
 }

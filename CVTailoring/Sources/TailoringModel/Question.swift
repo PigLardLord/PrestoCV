@@ -27,12 +27,18 @@ public struct Question: Hashable, Sendable {
     public let kind: QuestionKind
     public let scope: QuestionScope
 
-    /// A term or a request must say something, and is bounded (R8).
+    /// A term or a request must say something, and is bounded (R8). A question about a letter field has the `.letter`
+    /// scope of that same field, and no other question has a `.letter` scope; otherwise `mismatchedScope`.
     public init(kind: QuestionKind, scope: QuestionScope) throws(TailoringModelError) {
-        switch kind {
-        case .unevidencedTerm(let term): try Bounds.requiredText(term, .term)
-        case .modelRequest(let request): try Bounds.requiredText(request, .request)
-        case .letterField: break
+        switch (kind, scope) {
+        case (.letterField(let field), .letter(let scoped)):
+            guard field == scoped else { throw .mismatchedScope }
+        case (.letterField, _), (_, .letter):
+            throw .mismatchedScope
+        case (.unevidencedTerm(let term), _):
+            try Bounds.requiredText(term, .term)
+        case (.modelRequest(let request), _):
+            try Bounds.requiredText(request, .request)
         }
         self.kind = kind
         self.scope = scope
