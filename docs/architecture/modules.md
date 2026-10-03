@@ -291,14 +291,20 @@ The targets are created by #158 and the tickets named below. Until the targets e
 | `ServerHTTP` | inbound adapter | Linux ✓, macOS | `ServerApplication`, `TailoringModel`, `PrestoCVAPITypes`, `PrestoCVAPIServer` (both `internal import`), `Hummingbird`, `OpenAPIRuntime`, `OpenAPIHummingbird`, Foundation |
 | `PrestoCVServer` | executable and composition root | Linux ✓, macOS | `ServerApplication`, `ServerInference`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `Tailoring`, `Hummingbird`, `AsyncHTTPClient`, `PostgresNIO`, `ArgumentParser`, `Logging`, `ServiceLifecycle`, Foundation |
 
-**`ServerApplication`** (#157, #155)
-- **Use cases:** start a tailoring, run it, get it and delete it, and read the data policy (#155), which `GET /v1/policy` calls.
-  - Start checks the caller's quota, records the job under its idempotency key and queues it. The same key returns the same job. It refuses a request that carries another policy version than the current one.
+**`ServerApplication`** (#157, #155, #165, #166)
+- **Use cases:** start a tailoring, run it, get it and delete it, erase what retention says is due, and read the data policy (#155), which `GET /v1/policy` calls.
+  - Start checks the caller's cost limits, records the job under its idempotency key and queues it. The same key returns the same job, and counts nothing more. It refuses a request that carries another policy version than the current one.
   - Run is the `work` role's use case: it loads the job, runs the loop of `Tailoring`, stores the result or the failure, and notifies the device (#180).
   - Get returns the job to its owner only. Delete erases it.
+  - Erase (#166, [ADR 0017](adr/0017-hosting-storage-and-cost.md)) deletes what retention says is due: a job 24 hours after it ends, whether it succeeded, failed or expired, and a device unused for 90 days. It runs when the schedule calls the worker, and it does no harm run twice.
 - **The job lifecycle:** queued, running, succeeded, failed, expired. A job is erased once the app confirms it has saved the result, and 24 hours after the job ends at the latest (#166).
+- **Retention and the cost limits** ([ADR 0017](adr/0017-hosting-storage-and-cost.md)):
+  - Erasure reads the time from the injected clock (R2).
+  - **The cost limits** are checked here, before a job is recorded (#165). The quota store counts tailorings per device and for everyone, per day. The tailoring is counted in the same transaction that records the job, so two starts that race for the last tailoring of a day record one job. Over a limit, the API answers 429 with when to retry.
+  - The limits and the retention periods are values the executable reads from configuration and hands in. The hosted defaults are the owner's: 5 tailorings a device a day, 100 for everyone, 24 hours for a job and 90 days for an idle device.
+  - The other two limits live outside the code: the hosted router's credit limit and the Google budget alert (#163, #165).
 - **The lease.** A running job holds a lease, and a job whose lease has expired is taken over by the retry (#161). The lease belongs to the job's lifecycle and to its contract suite, not to the queue adapter.
-- **Ports it owns (R3):** the job store, the job queue, the quota, the clock, an identifier generator (R2), a notifier (#180), the log events, and the data-policy port that `GET /v1/policy` reads (#155, #175).
+- **Ports it owns (R3):** the job store, the job queue, the quota, the device registry (#170), at least as far as erasing an idle device needs it (#166), the clock, an identifier generator (R2), a notifier (#180), the log events, and the data-policy port that `GET /v1/policy` reads (#155, #175).
 - **The data policy** ([ADR 0015](adr/0015-inference-providers-and-data-policy.md)), beside that port:
   - the types: what a provider declares (whether it keeps prompts, whether it trains on them, the regions it may run in), what a deployment requires, and the policy that `GET /v1/policy` serves: the requirements and the processors, which are the registry's providers named as the published privacy policy names them (#190);
   - the policy's version, derived from everything that endpoint serves, so a provider swap that still meets the requirements changes it. The start request carries the version the app showed the user, Start refuses a different one, the job records it, and the worker refuses to run it under another (#155, #176, #190);
@@ -316,12 +322,15 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - The adapter decodes the endpoint's envelope into the port's reply and errors, with a size cap. The model's text is decoded once, in `Tailoring` (R8).
 - It never logs a prompt, an answer or a key. It never reads a secret, the environment or a secret store: the executable hands it the keys and the clients.
 
-**`ServerStorePostgres`** (#160)
-- The job store and the quota store on Postgres, through PostgresNIO. Its rows are DTOs of its own, built from the types of `TailoringModel` (R12).
+**`ServerStorePostgres`** (#160, #170, [ADR 0017](adr/0017-hosting-storage-and-cost.md))
+- The job store, the quota store and the device registry (#170) on Postgres, through PostgresNIO. Hosted, the database is Neon's, in Frankfurt: one project, with one branch per environment, and no branch made from another environment's data.
+- Its rows are DTOs of its own, built from the types of `TailoringModel` (R12). What authentication keeps beyond the registry is decided by its own ADR (#168).
 - The versioned SQL migrations (R12). Only the binary's `migrate` command applies them, never `serve` or `work`.
+- **Retention** (#166): it deletes the rows that `ServerApplication`'s erasure names, and marks nothing as deleted. Quota counts go with their device at the latest.
 
-**`ServerQueueCloudTasks`** (#161)
-- The job queue on Cloud Tasks, over AsyncHTTPClient. A task is named after its job and calls the worker with the queue's own identity.
+**`ServerQueueCloudTasks`** (#161, [ADR 0017](adr/0017-hosting-storage-and-cost.md))
+- The job queue on Cloud Tasks, in `europe-west1` beside the Cloud Run services, over AsyncHTTPClient. A task is named after its job and calls the worker with the queue's own identity.
+- A task carries the job's ID and nothing else. The CV and the advert are in the job store only.
 - The dispatch deadline is 30 minutes, and retries use backoff.
 
 **`ServerLocalProfile`** (#157, #158)
@@ -332,7 +341,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - The inbound adapter: the Hummingbird routes, the middleware, and the handlers that implement the generated API.
 - It maps the generated types to the use cases and back. The generated types never leave it: it imports `PrestoCVAPITypes` and `PrestoCVAPIServer` with `internal import`, so none can appear in its public API.
 - It serves the API on Hummingbird through `OpenAPIHummingbird`. `GET /health` is an endpoint of the spec, and `ServerHTTP` serves it in both roles.
-- **The worker's route.** The route the queue calls to run a job lives here too. It is mounted only in the `work` role, and it is not part of the public API (`openapi.yaml`). The platform admits only the queue's identity before any code runs (#161).
+- **The worker's routes.** The route the queue calls to run a job, and the one the schedule calls to erase what is due (#166), live here too. They are mounted only in the `work` role, and they are not part of the public API (`openapi.yaml`). The platform admits only the queue's identity before any code runs (#161).
 - `PrestoCVAPITypes` and `PrestoCVAPIServer` are targets of the `PrestoCVAPI` package, listed below ([ADR 0016](adr/0016-api-contract.md)).
 
 **The `PrestoCVServer` executable target**
@@ -340,20 +349,23 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - It reads the deployment's configuration and refuses to start, with an error that names the cause, when a provider does not meet the data policy, when a model is not allowed, when a secret cannot be read, or when a provider's declaration is incomplete (#155, [ADR 0015](adr/0015-inference-providers-and-data-policy.md)). Nothing is skipped silently.
   - Both roles read one configuration, and each checks the policy and the models.
   - Each role reads the secrets it needs: both read the database's credentials; the role that holds the keys also reads the providers' keys and the APNs key, and creates the providers' HTTP client, one per process. It hands the secrets to the adapters.
+- It reads the cost limits and the retention periods from configuration and hands them to the use cases as values ([ADR 0017](adr/0017-hosting-storage-and-cost.md)).
 - It starts as `serve`, as `work`, or, in the local profile, as both. It composes the router per role.
 - It shuts down cleanly on SIGTERM: the job in hand is finished or released back to the queue.
 
 **Roles.**
 - **`serve`** answers the API. Hosted, it is its own Cloud Run service. It records a job and hands it to the queue. It checks the data policy at start and serves it, and it reads no provider's key.
-- **`work`** runs tailorings. Hosted, it is its own Cloud Run service, and it is private: only the queue's identity, which the erasure schedule (#166) also uses, may call it, and the platform refuses everyone else before any code runs. Only the worker holds the model providers' keys.
+- **`work`** runs tailorings. Hosted, it is its own Cloud Run service, and it is private: only the queue's identity, which the erasure schedule (#166) also uses, may call it, and the platform refuses everyone else before any code runs. Only the worker holds the model providers' keys and the APNs key (#180).
 - A tailoring finishes within the queue's dispatch deadline of 30 minutes.
 - The binary has one more command, `migrate` (#160, #162). It is not a role.
 
 **Profiles.** A profile is a set of adapters that the composition root picks from configuration.
-- **`hosted`:** the Postgres store and the Cloud Tasks queue.
+- **`hosted`:** the Postgres store, on Neon in Frankfurt, and the Cloud Tasks queue, in `europe-west1` ([ADR 0017](adr/0017-hosting-storage-and-cost.md)).
 - **`local`:** the in-memory stores and the in-process queue of `ServerLocalProfile`, with both roles in one process. It is for development only, and it refuses to start on any address but 127.0.0.1.
 
-**Environments.** `local` uses the local profile. `staging` and `production` use the hosted profile, each with its own configuration, database and queue. Staging accepts App Attest's development environment and production only the production one. How a change reaches each belongs to the infrastructure layer of #133.
+**Environments.** `local` uses the local profile. `staging` and `production` use the hosted profile, each with its own configuration, database and queue. Staging accepts App Attest's development environment and production only the production one. A merge to `main` deploys to staging, and a tag promotes the same image to production ([ADR 0017](adr/0017-hosting-storage-and-cost.md); the pipeline is #164).
+
+**Where it runs** ([ADR 0017](adr/0017-hosting-storage-and-cost.md)). Hosted, both roles run on Cloud Run in `europe-west1`, with Cloud Tasks in the same region and Postgres on Neon in Frankfurt. The secrets are in Secret Manager, one set per environment, and each is readable only by the service that needs it. The infrastructure is OpenTofu code in `infra/` (#163), and CI deploys through Workload Identity Federation, with no long-lived key in GitHub.
 
 **Translation.** On the server, the API's generated types are translated to and from the tailoring model only in `ServerHTTP`, and never leave it. A translation between two context packages on the server lives in a server target that this file designates for that translation, or needs an ADR (R1).
 

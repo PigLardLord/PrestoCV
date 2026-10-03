@@ -26,7 +26,7 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 
 CV Tailoring is the context [ADR 0005](adr/0005-remove-ai-tailoring-and-json-resume.md) reserved ([ADR 0013](adr/0013-cv-tailoring-context.md)). It runs in the app and on the server; the tailoring loop runs only on the server. JSON Resume is not supported (ADR 0005).
 
-The server is an integration and composition package beside the app, in two roles, `serve` and `work` ([ADR 0014](adr/0014-server-modular-monolith.md)). Like the app, it has a composition root of its own ([R4](rules.md#r4-one-composition-root-per-executable)). It reaches models through the providers its deployment configures, each held to the deployment's data policy ([ADR 0015](adr/0015-inference-providers-and-data-policy.md)).
+The server is an integration and composition package beside the app, in two roles, `serve` and `work` ([ADR 0014](adr/0014-server-modular-monolith.md)). Like the app, it has a composition root of its own ([R4](rules.md#r4-one-composition-root-per-executable)). It reaches models through the providers its deployment configures, each held to the deployment's data policy ([ADR 0015](adr/0015-inference-providers-and-data-policy.md)). Hosted, it runs on Cloud Run in the EU, keeps a job only until the app has its result, and caps what it spends ([ADR 0017](adr/0017-hosting-storage-and-cost.md)).
 
 ## Context map
 
