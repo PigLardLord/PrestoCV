@@ -76,11 +76,12 @@ CVGeneratorAI package   CVDrafting ◀── CVDraftingFoundationModels
 CVTailoring package     TailoringModel ◀── AdvertAnalysis, ContentChecks ◀── Provenance ◀── Tailoring
 
 PrestoCVServer package
-  PrestoCVServer (executable, composition root) ──▶ every target below
+  PrestoCVServer (executable, composition root) ──▶ every target below, and Tailoring
   ServerHTTP ──▶ ServerApplication, TailoringModel, PrestoCVAPITypes, PrestoCVAPIServer
   ServerApplication ──▶ TailoringModel, Tailoring
-  ServerInference ──▶ Tailoring, TailoringModel
-  ServerStorePostgres, ServerQueueCloudTasks, ServerLocalProfile ──▶ ServerApplication
+  ServerInference ──▶ ServerApplication, Tailoring, TailoringModel
+  ServerStorePostgres ──▶ ServerApplication, TailoringModel
+  ServerQueueCloudTasks, ServerLocalProfile ──▶ ServerApplication
 ```
 
 Arrows point from the importer to the imported module. The authoritative list is [modules.md](modules.md).
