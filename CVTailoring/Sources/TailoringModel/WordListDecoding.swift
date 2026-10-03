@@ -224,7 +224,7 @@ private struct RawSpans {
 }
 
 private struct RawLetter {
-    let greetings, salutations, addressees, addresseeNouns, valedictions: RawList<String>
+    let greetings, salutations, addressees, addresseesAtClauseEnd, addresseeNouns, valedictions: RawList<String>
     let salaryExpectationAsks, startDateAsks, statedTermWords, academicTitles, notGivenNames: RawList<String>
     let formsOfAddress: RawList<RawFormWord>
 
@@ -232,6 +232,7 @@ private struct RawLetter {
         greetings = try group.list(.letterGreetings)
         salutations = try group.list(.letterSalutations)
         addressees = try group.list(.letterAddressees)
+        addresseesAtClauseEnd = try group.list(.letterAddresseesAtClauseEnd)
         addresseeNouns = try group.list(.letterAddresseeNouns)
         valedictions = try group.list(.letterValedictions)
         salaryExpectationAsks = try group.list(.letterSalaryExpectationAsks)
@@ -335,6 +336,7 @@ private struct WordListReading {
             greetings: try texts(raw.greetings, .letterGreetings),
             salutations: try texts(raw.salutations, .letterSalutations),
             addressees: try texts(raw.addressees, .letterAddressees),
+            addresseesAtClauseEnd: try texts(raw.addresseesAtClauseEnd, .letterAddresseesAtClauseEnd),
             addresseeNouns: try texts(raw.addresseeNouns, .letterAddresseeNouns),
             valedictions: try texts(raw.valedictions, .letterValedictions),
             salaryExpectationAsks: try texts(raw.salaryExpectationAsks, .letterSalaryExpectationAsks),

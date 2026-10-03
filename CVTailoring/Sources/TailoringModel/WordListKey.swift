@@ -34,6 +34,7 @@ public enum WordListKey: String, CaseIterable, Hashable, Sendable {
     case letterGreetings = "letter.greetings"
     case letterSalutations = "letter.salutations"
     case letterAddressees = "letter.addressees"
+    case letterAddresseesAtClauseEnd = "letter.addresseesAtClauseEnd"
     case letterAddresseeNouns = "letter.addresseeNouns"
     case letterValedictions = "letter.valedictions"
     case letterSalaryExpectationAsks = "letter.salaryExpectationAsks"

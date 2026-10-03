@@ -35,6 +35,7 @@ struct LanguageWordListsTests {
         #expect(lists.provenance.notPlurals.entries == ["alpha", "beta"] && lists.provenance.legalForms.entries == ["alpha", "beta"])
         #expect(lists.provenance.firstPerson.entries == ["alpha", "beta"])
         #expect(lists.provenance.ranks.entries == [RankWord(word: "alpha", ranks: [.senior]), RankWord(word: "beta", ranks: [.lead, .head])])
+        #expect(lists.letter.addresseesAtClauseEnd.entries == ["alpha", "beta"])
         #expect(lists.letter.academicTitles.entries == ["alpha", "beta"] && lists.letter.notGivenNames.entries == ["alpha", "beta"])
         #expect(lists.technologies.entries == ["alpha", "beta"])
     }

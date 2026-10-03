@@ -78,6 +78,7 @@ struct EnglishWordListsTests {
         rows[.letterGreetings] = row(lists.letter.greetings)
         rows[.letterSalutations] = row(lists.letter.salutations)
         rows[.letterAddressees] = row(lists.letter.addressees)
+        rows[.letterAddresseesAtClauseEnd] = row(lists.letter.addresseesAtClauseEnd)
         rows[.letterAddresseeNouns] = row(lists.letter.addresseeNouns)
         rows[.letterValedictions] = row(lists.letter.valedictions)
         rows[.letterSalaryExpectationAsks] = row(lists.letter.salaryExpectationAsks)
@@ -139,7 +140,8 @@ struct EnglishWordListsTests {
         counts[.spansEmployerEndWords] = 1  // EMPLOYER: and; und is German
         counts[.letterGreetings] = 3  // core/ProvenanceCheck.js GREETING: dear, hello, hi
         counts[.letterSalutations] = 1  // SALUTATION: to whom it may concern
-        counts[.letterAddressees] = 14  // WHOM: there, ms, mrs, mr, dr, prof, sir, madam, all, everyone, friends, recruiter(s), colleagues
+        counts[.letterAddressees] = 13  // WHOM: ms, mrs, mr, dr, prof, sir, madam, all, everyone, friends, recruiter(s), colleagues; the other six words are German
+        counts[.letterAddresseesAtClauseEnd] = 1  // WHOM: there, which is read only before a comma, a "!" or the end of the text
         counts[.letterAddresseeNouns] = 4  // WHOM: team, manager, committee, department
         counts[.letterValedictions] = 14  // CLOSING: {kind, best, warm, warmest} regards with or without "with", best wishes, 3 yours, 2 sincerely
         counts[.letterSalaryExpectationAsks] = 6  // core/Tailor.js ASKS.salaryExpectation, expanded
@@ -256,6 +258,14 @@ struct EnglishWordListsTests {
         values.append(contentsOf: ["Espresso"])
         return values
     }()
+
+    @Test("the words that follow a greeting are split by how they are read")
+    func addressees() throws {
+        let letter = try english().letter
+        #expect(letter.addresseesAtClauseEnd.entries == ["there"])
+        #expect(!letter.addressees.entries.contains("there"))
+        #expect(letter.addressees.entries == ["ms", "mrs", "mr", "dr", "prof", "sir", "madam", "all", "everyone", "friends", "recruiter", "recruiters", "colleagues"])
+    }
 
     @Test("the words of the form of address check are cv-giovanni's")
     func formsOfAddress() throws {

@@ -558,7 +558,6 @@
       "source": "cv-giovanni 6e28147 core/ProvenanceCheck.js WHOM (the English words that follow a greeting)",
       "licence": "ISC",
       "entries": [
-        "there",
         "ms",
         "mrs",
         "mr",
@@ -572,6 +571,13 @@
         "recruiter",
         "recruiters",
         "colleagues"
+      ]
+    },
+    "addresseesAtClauseEnd": {
+      "source": "cv-giovanni 6e28147 core/ProvenanceCheck.js WHOM (the English word read only before a comma, a bang or the end)",
+      "licence": "ISC",
+      "entries": [
+        "there"
       ]
     },
     "addresseeNouns": {

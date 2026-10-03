@@ -123,8 +123,10 @@ public struct LetterWords: Hashable, Sendable {
     public let greetings: WordList<String>
     /// Salutations that stand on their own: "to whom it may concern".
     public let salutations: WordList<String>
-    /// The words that, after a greeting, make it a salutation: forms of address, titles, groups.
+    /// The words that, right after a greeting, make it a salutation: forms of address, titles, groups.
     public let addressees: WordList<String>
+    /// The words that make a greeting a salutation only when a comma, a "!" or the end of the text follows: "there".
+    public let addresseesAtClauseEnd: WordList<String>
     /// The nouns an addressee ends in, up to two words after a greeting: "team", "manager".
     public let addresseeNouns: WordList<String>
     /// How a letter signs off: "kind regards", "yours sincerely".

@@ -89,7 +89,8 @@ Every file holds every key below. A file that lacks one is refused as incomplete
 | `spans.employerEndWords` | The words that end an employer's name in a tied count, as a comma, a full stop or a semicolon do ("8 of them at PigLardLord and …"): "and" | `ContentChecks` reads where the employer's name ends |
 | `letter.greetings` | The words that open a salutation ("dear", "hello") | `Provenance` refuses a salutation the model writes, since the page greets the recipient itself |
 | `letter.salutations` | Salutations that stand on their own ("to whom it may concern") | `Provenance`, as for the greetings |
-| `letter.addressees` | The words that, after a greeting, make it a salutation: forms of address, titles and groups ("mr", "dr", "everyone") | `Provenance`, as for the greetings: "hi-fi audio" is prose and "hi everyone" is a greeting |
+| `letter.addressees` | The words that, right after a greeting and as a whole word, make it a salutation: forms of address, titles and groups ("mr", "dr", "everyone") | `Provenance`, as for the greetings: "hi-fi audio" is prose and "hi everyone" is a greeting |
+| `letter.addresseesAtClauseEnd` | The words that make a greeting a salutation only when a comma, a "!" or the end of the text follows them ("there": "hi there," greets, "hi there is a place" is prose) | `Provenance`, as for the greetings |
 | `letter.addresseeNouns` | The nouns an addressee ends in, with up to two words before ("team", "manager") | `Provenance`, as for the greetings: "dear hiring manager" |
 | `letter.valedictions` | How a letter signs off, every form written out ("kind regards", "yours sincerely") | `Provenance` refuses a sign-off the model writes, since the page signs off itself |
 | `letter.salaryExpectationAsks` | How an advert asks for a salary expectation, every phrase written out | `AdvertAnalysis` asks the user when the advert asks and the letter defaults give none |
