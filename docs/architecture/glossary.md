@@ -51,8 +51,8 @@ One word, one meaning, in code, UI copy, tickets and translations. Today "templa
 | **Installation** | One copy of the app on one device, and the API's caller. The server knows installations, not users, and keeps no account. In the server's code it is a device, named by a `DeviceID`. | A user or an account, which PrestoCV does not have. A person with two devices is two installations | App, Server |
 | **Attestation** | Apple's proof that a key, created in the device's Secure Enclave, belongs to a genuine copy of the app. The server verifies it once, when it registers the device (#169). | An assertion. App Attest's environments, development and production, are not the server's environments | App, Server |
 | **Assertion** | A signature by the attested key over a challenge or over a request's body, with a counter that must be greater than the last one the server saw. So a replayed assertion fails. | An attestation, which proves the key and is made once | App, Server |
-| **Session token** | A JWT signed with Ed25519 and valid for 15 minutes. The server issues it for a valid assertion and verifies it without the database. It says who is calling, and starting a tailoring needs a fresh assertion as well. | A development token | Server |
-| **Development token** | The token that the local profile and the Simulator use in place of an attestation. No hosted profile accepts it, and no release build sends it (#173). | A session token | App, Server |
+| **Session token** | A JWT signed with Ed25519 and valid for 15 minutes. The server issues it for a valid assertion and verifies it without the database. It says who is calling, and starting a tailoring needs a fresh assertion as well. | A development token | App, Server |
+| **Development token** | The token that the local profile and the Simulator use in place of the whole chain: the challenge, the registration, the session token and the assertion. It names one fixed development device. No hosted profile accepts it, and no release build sends it (#173). | A session token | App, Server |
 
 ## UI copy in other languages
 

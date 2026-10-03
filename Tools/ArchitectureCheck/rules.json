@@ -60,6 +60,7 @@
   "PrestoCVServer",
   "ServerAuth",
   "ServerAttestApple",
+  "ServerAddressHash",
   "ServerSessionJWT",
   "PrestoCVAPITypes",
   "PrestoCVAPIServer",

@@ -69,7 +69,7 @@ PrestoCVApp package                    │
                       CVRenderingWebKitSupport, CVRenderingIOS (iOS) / CVRenderingMacOS (macOS),
                       CVRenderingPDFKitInspector, CVDraftingFoundationModels, PrestoCVAPIAdapter, PrestoCVAppAttest
   PrestoCVAPIAdapter ──▶ PrestoCVIntegration, TailoringModel, PrestoCVAPITypes, PrestoCVAPIClient
-  PrestoCVAppAttest ──▶ PrestoCVIntegration    (iOS 26, macOS 27; DeviceCheck, CryptoKit, Security)
+  PrestoCVAppAttest ──▶ PrestoCVIntegration    (iOS 26, macOS 26, App Attest from macOS 27; DeviceCheck, CryptoKit, Security)
 
 PrestoCVCore package        PrestoCVDomain ◀── PrestoCVApplication ◀── PrestoCVPersistence
 CVPDFExporter package   CVDocumentModel ◀── CVRendering ──▶ CVDesignCatalog ◀── CVDesignCatalogFileStore, CVBundledDesigns
@@ -85,7 +85,7 @@ PrestoCVServer package
   ServerApplication ──▶ TailoringModel, Tailoring
   ServerAuth ──▶ ServerApplication
   ServerInference ──▶ ServerApplication, Tailoring, TailoringModel
-  ServerAttestApple, ServerSessionJWT ──▶ ServerAuth
+  ServerAttestApple, ServerAddressHash, ServerSessionJWT ──▶ ServerAuth
   ServerStorePostgres ──▶ ServerApplication, ServerAuth, TailoringModel
   ServerLocalProfile ──▶ ServerApplication, ServerAuth
   ServerQueueCloudTasks ──▶ ServerApplication
@@ -118,12 +118,12 @@ Dependencies point inwards only. The domain knows nothing about storage, UI, loc
 | `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector` | ✓ | ✓ | |
 | `CVRenderingIOS` | ✓ | | |
 | `CVRenderingMacOS` | | ✓ | |
-| Server targets: `ServerApplication`, `ServerAuth`, `ServerInference`, `ServerAttestApple`, `ServerSessionJWT`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `PrestoCVServer` | | ✓ for development | ✓ must build and test |
+| Server targets: `ServerApplication`, `ServerAuth`, `ServerInference`, `ServerAttestApple`, `ServerAddressHash`, `ServerSessionJWT`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `PrestoCVServer` | | ✓ for development | ✓ must build and test |
 | `PrestoCVAPITypes`, `PrestoCVAPIClient`, `PrestoCVAPIAdapter` | ✓ | ✓ | ✓ must build and test |
 | `PrestoCVAPIServer` | | ✓ for development | ✓ must build and test |
 | Test-support targets | ✓ | ✓ | ✓ |
 | `CVDraftingFoundationModels` | ✓ 26 | ✓ 26 | |
-| `PrestoCVAppAttest` | ✓ 26 | ✓ 27 | builds empty (R11) |
+| `PrestoCVAppAttest` | ✓ 26 | ✓ 26, App Attest from 27 | builds empty (R11) |
 | Xcode app target | ✓ 26 | ✓ 26 | |
 
 Linux support is not a nice-to-have. It is what proves that platform code stayed in the adapters ([R11](rules.md#r11-platform-code-lives-only-in-adapters)), and it is where the renderer for a backend will run.

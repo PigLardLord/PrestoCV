@@ -220,7 +220,7 @@ In the app, `PrestoCVIntegration` may import `TailoringModel`, `AdvertAnalysis` 
 
 ## Package `PrestoCVApp` — App integration and presentation
 
-A local package next to the Xcode project. The compiler holds the app's layers too, and everything except the composition and `PrestoCVAppAttest` builds and tests on Linux. `PrestoCVAppAttest` builds there as an empty target, since every file is wrapped in its platform condition (R11).
+A local package next to the Xcode project. The compiler holds the app's layers too, and everything except the composition and `PrestoCVAppAttest` builds and tests on Linux. `PrestoCVAppAttest` builds there as an empty target, since every file is wrapped in its platform condition (R11), and the Linux job is what holds that.
 
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
@@ -228,7 +228,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 | `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, Foundation |
 | `PrestoCVPresentation` | inbound adapter | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain` (both `internal import`), Observation, Foundation |
 | `PrestoCVAPIAdapter` | outbound adapter | iOS, macOS, Linux ✓ | `PrestoCVIntegration`, `TailoringModel`, `PrestoCVAPITypes`, `PrestoCVAPIClient` (both `internal import`), `OpenAPIRuntime`, `HTTPTypes`, Foundation |
-| `PrestoCVAppAttest` | outbound adapter | iOS 26, macOS 27 | `PrestoCVIntegration`, `DeviceCheck`, `CryptoKit`, `Security`, Foundation |
+| `PrestoCVAppAttest` | outbound adapter | iOS 26, macOS 26 (App Attest from macOS 27) | `PrestoCVIntegration`, `DeviceCheck`, `CryptoKit`, `Security`, Foundation |
 | `PrestoCVComposition` | composition root | iOS, macOS | `PrestoCVIntegration`, `PrestoCVPresentation`, `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `PrestoCVAPIAdapter`, `PrestoCVAppAttest`, `PrestoCVPersistence`, `CVDocumentModel`, `CVDesignCatalog`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVRendering`, `CVRenderingWebKitSupport`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingPDFKitInspector`, `CVDrafting`, `CVDraftingFoundationModels`, `TailoringModel`, `AdvertAnalysis`, `ContentChecks`, `OpenAPIURLSession`, Foundation |
 
 **`PrestoCVWorkflowPorts`**
@@ -244,8 +244,8 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 - **Mappers:** `CV → CVDocument` and `CVDraft → CV`. They are exhaustive and deterministic, with typed dates. The draft mapper uses `Period.make` and reports every gap.
   - `CV → SourceCV`, and the tailoring result into the app's own types (planned, #184, #188).
 - **Outbound ports that reach the server,** owned here (R3): the tailoring workflow's (start, read, cancel and confirm), the policy's (#190) and the push token's (#181). They speak the tailoring model and the workflow's typed errors, never a generated type. `PrestoCVAPIAdapter` implements them (planned, #179, #188).
-- **The attestation port,** owned here (R3), not by `PrestoCVAPIAdapter` that calls it, so that no edge joins two adapters ([ADR 0018](adr/0018-app-attest.md)). It creates a key, attests it against a challenge and signs the encoded body of a start (#174). Its typed errors include "unavailable" (no App Attest here) and "invalid key" (Apple says the key is no longer valid). `PrestoCVAPIAdapter` calls it. `PrestoCVAppAttest` implements it and never calls the API.
-  - An adapter of the port that throws "unavailable" lives here too, beside the port. It holds no platform code and no infrastructure, and the composition root installs it on macOS 26, where `PrestoCVAppAttest` cannot run (R14: never a fake success).
+- **The attestation port,** owned here (R3), not by `PrestoCVAPIAdapter` that calls it, so that no edge joins two adapters ([ADR 0018](adr/0018-app-attest.md)). It has three operations (#174): create a key, which returns its key ID; attest a key against a challenge; assert over the bytes it is given, which are a challenge or a start's encoded body. Its typed errors include "unavailable" (no App Attest here) and "invalid key" (Apple says the key is no longer valid). `PrestoCVAPIAdapter` calls it. `PrestoCVAppAttest` implements it and never calls the API.
+  - `PrestoCVIntegration` carries R11's `platformCondition`, so the port's owner holds no platform check.
 
 **`PrestoCVPresentation`**
 - `@Observable @MainActor` view models whose public API holds presentation types only: status enums, and no domain types.
@@ -257,19 +257,23 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 **`PrestoCVAPIAdapter`** (planned, #179, [ADR 0016](adr/0016-api-contract.md))
 - The outbound adapter that implements the ports that reach the server. It is the app's only client of the API, for every endpoint the app calls: the tailorings, the policy, the push token, and the challenges, registration and sessions. It is the only target of the app that imports the API's generated client and types, and it imports both with `internal import`, so no generated type appears in its public API.
 - It maps the tailoring model to the request, and the result back, exhaustively and under test ([ADR 0007](adr/0007-each-package-owns-its-model.md)). It maps each documented problem `type` to a typed error of the workflow (R7): "update the app", "try again at this time", "no provider meets the policy", and "consent again" for a policy version that is not the current one (#190). A `type` it does not know, or a response the spec does not document for that operation, becomes a generic typed error, and an enum value it does not know becomes a typed "unknown" case.
-- It opens and renews the session, and signs the encoded body of a start through the attestation port, which `PrestoCVIntegration` owns and the App Attest adapter of #174 implements. The attestation adapter never calls the API.
+- It opens and renews the session, and signs the encoded body of a start through the attestation port, which `PrestoCVIntegration` owns and `PrestoCVAppAttest` implements. The attestation adapter never calls the API.
+  - Its middleware signs the encoded bytes of a start and sends exactly those bytes.
+  - It serialises every assertion of a device, renewals of the session included, so the counter goes up in the order the server sees ([ADR 0018](adr/0018-app-attest.md)).
+  - It renews a session on a 401, or from a lifetime the server gives, and never by comparing its own clock with the token's `exp`.
 - It offers one read of a job per call, and it sends the `DELETE` that confirms a saved result when the workflow asks (#166). The workflow drives the polling, which ends when the job is final, and its caller cancels it when the app leaves the foreground (R3: cancellation passes through). The backoff goes through an injected clock or sleeper (R2, R10).
 - The composition root creates it, and the URLSession transport it runs on (R4). It carries R4's detectors, and the checker's `infrastructureTypes` lists `URLSessionTransport` once it exists. Until `URLSessionTransport` is listed in `infrastructureTypes`, review holds it.
 - It imports the runtime's modules, `OpenAPIRuntime` and `HTTPTypes`, which the middleware that signs a start and sends the session needs. How the transport reaches its initialiser is #179's. If that needs more, #179 extends this table, without a new ADR.
 
 **`PrestoCVAppAttest`** (planned, #174, [ADR 0018](adr/0018-app-attest.md))
 - The outbound adapter that implements the attestation port of `PrestoCVIntegration`. It never calls the API, and its allow-list holds no target of `PrestoCVAPI` and no other adapter: `PrestoCVAPIAdapter` fetches the challenge, registers the device, opens and renews the session, and signs a start through the port.
-- It keeps the `isSupported` gate, the key and its Keychain entry, the attestation of a key against a challenge, and the fresh assertion over a body.
+- It keeps the `isSupported` gate, the key and its Keychain entry, the attestation of a key against a challenge, and the fresh assertion over the bytes it is given.
   - The key's ID lives in the Keychain, inside the adapter and available only on this device. Only this adapter uses it, so no port holds it.
   - Where Apple's service reports that it is unsupported, or that the key is invalid, it says so through the port's typed errors.
   - Apple's service and the Keychain sit behind seams internal to the target, so that a fake of each tests it.
-- It imports `DeviceCheck` for Apple's service, `CryptoKit` for the hash of the body that an assertion signs, and `Security` for the Keychain.
-- Its platforms are iOS 26 and later, and macOS 27 and later: the adapter is marked available from those versions, and every file is wrapped entirely in its platform condition (R11). The checker's `platformCondition` detector holds it.
+- **A second adapter of the port throws "unavailable".** It sits outside the `@available` mark and inside the file wrap, so the target builds on macOS 26, and the composition root installs it there. It never returns a fake success (R14).
+- It imports `DeviceCheck` for Apple's service, `CryptoKit` for the hash of the bytes that an assertion signs, and `Security` for the Keychain.
+- The App Attest adapter is marked available from iOS 26 and macOS 27, and every file is wrapped entirely in its platform condition (R11). R11 lets an adapter hold platform conditions, so its `platformCondition` detector does not run on this target, and it does not check that a file is wrapped. The Linux CI job does: it builds `PrestoCVApp`, so a file that imports `DeviceCheck` outside its condition fails there.
 
 **`PrestoCVComposition`**
 - The app's composition root, and the only place in the app that creates infrastructure (R4). The `@main` App type holds it in a `static let`. It owns:
@@ -279,8 +283,8 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - the platform renderer and the PDFKit inspector;
   - the AI adapter, `TimeSource`, `IDGenerator` and logger;
   - the API adapter, with the URLSession transport it runs on (planned, #179);
-  - the attestation adapter: `PrestoCVAppAttest` where the operating system has App Attest, and the "unavailable" adapter of `PrestoCVIntegration` where it has not (planned, #174);
-  - in a debug build only, the development token, read from the Xcode scheme's environment (planned, #173);
+  - the attestation adapter: the App Attest adapter of `PrestoCVAppAttest` where the operating system has App Attest, and its "unavailable" adapter where it has not (planned, #174);
+  - in a debug build only, the development token, read from the Xcode scheme's environment. The root installs the token path in place of the attestation only when the server's address is the local profile's (planned, #173, [ADR 0018](adr/0018-app-attest.md));
   - the `ScreenFactory`.
 - **UI tests and previews** use the production `FileCVRepository` on a temporary directory seeded from fixture JSON. A launch argument selects it. No production target depends on a test-support target.
 
@@ -300,16 +304,17 @@ The targets are created by #158 and the tickets named below. Until the targets e
 | `ServerAuth` | application | Linux ✓, macOS | `ServerApplication`, Foundation |
 | `ServerInference` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `Tailoring`, `TailoringModel`, `AsyncHTTPClient`, Foundation |
 | `ServerAttestApple` | outbound adapter | Linux ✓, macOS | `ServerAuth`, `Crypto`, `X509`, `SwiftASN1`, Foundation |
+| `ServerAddressHash` | outbound adapter | Linux ✓, macOS | `ServerAuth`, `Crypto`, Foundation |
 | `ServerSessionJWT` | outbound adapter | Linux ✓, macOS | `ServerAuth`, `JWTKit`, Foundation |
 | `ServerStorePostgres` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `ServerAuth`, `TailoringModel`, `PostgresNIO`, Foundation |
 | `ServerQueueCloudTasks` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `AsyncHTTPClient`, Foundation |
 | `ServerLocalProfile` | outbound adapter | Linux ✓, macOS | `ServerApplication`, `ServerAuth`, Foundation |
 | `ServerHTTP` | inbound adapter | Linux ✓, macOS | `ServerApplication`, `ServerAuth`, `TailoringModel`, `PrestoCVAPITypes`, `PrestoCVAPIServer` (both `internal import`), `Hummingbird`, `OpenAPIRuntime`, `OpenAPIHummingbird`, Foundation |
-| `PrestoCVServer` | executable and composition root | Linux ✓, macOS | `ServerApplication`, `ServerAuth`, `ServerInference`, `ServerAttestApple`, `ServerSessionJWT`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `Tailoring`, `Hummingbird`, `AsyncHTTPClient`, `PostgresNIO`, `JWTKit`, `ArgumentParser`, `Logging`, `ServiceLifecycle`, Foundation |
+| `PrestoCVServer` | executable and composition root | Linux ✓, macOS | `ServerApplication`, `ServerAuth`, `ServerInference`, `ServerAttestApple`, `ServerAddressHash`, `ServerSessionJWT`, `ServerStorePostgres`, `ServerQueueCloudTasks`, `ServerLocalProfile`, `ServerHTTP`, `Tailoring`, `Hummingbird`, `AsyncHTTPClient`, `PostgresNIO`, `JWTKit`, `ArgumentParser`, `Logging`, `ServiceLifecycle`, Foundation |
 
 **`ServerApplication`** (#157, #155, #165, #166)
 - **Use cases:** start a tailoring, run it, get it, erase (#166), and read the data policy (#155), which `GET /v1/policy` calls.
-  - Start checks the caller's cost limits, records the job under its idempotency key and queues it. A known key returns its job before any limit is checked, and counts nothing more. It refuses a request that carries another policy version than the current one.
+  - Start checks the caller's cost limits, records the job under its idempotency key and queues it. An idempotency key is unique per `DeviceID`, and a known key returns its job, only to its owner, before any limit is checked, and counts nothing more. It refuses a request that carries another policy version than the current one.
   - Run is the `work` role's use case: it loads the job, runs the loop of `Tailoring`, stores the result or the failure, and notifies the device (#180).
   - Get returns the job to its owner only. It compares the job's owner with the caller's `DeviceID`, and a job that another device owns gets the same "not found" as a job that does not exist ([ADR 0018](adr/0018-app-attest.md)).
   - Erase ([ADR 0017](adr/0017-hosting-storage-and-cost.md)) is the one rule that deletes data, with two entries. The app's `DELETE` runs it for one job, the owner's only. The schedule's call to the worker runs it for what is due:
@@ -327,6 +332,7 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - **The lease.** A running job holds a lease, and a job whose lease has expired is taken over by the retry (#161). The lease belongs to the job's lifecycle and to its contract suite, not to the queue adapter.
 - **Ports it owns (R3):** the job store, the job queue, the quota, the ports that erasing an idle device (#166), sweeping expired challenges (#170) and sweeping address counts (#172) go through, the clock, an identifier generator (R2), a notifier (#180), the log events, and the data-policy port that `GET /v1/policy` reads (#155, #175).
   - The ports of erasure and of the sweeps name a time and nothing of how a device was proven. The device registry's port is not among them: it is `ServerAuth`'s ([ADR 0018](adr/0018-app-attest.md)).
+  - **The push token port** (#180): set, clear and read the token of a `DeviceID`. The app sets the token, and an APNs rejection clears it, both through use cases here. The store's adapter implements the port beside the registry, on the registry's row.
 - **The data policy** ([ADR 0015](adr/0015-inference-providers-and-data-policy.md)), beside that port:
   - the types: what a provider declares (whether it keeps prompts, whether it trains on them, the regions it may run in), what a deployment requires, and the policy that `GET /v1/policy` serves: the requirements and the processors, which are the registry's providers named as the published privacy policy names them (#190);
   - the policy's version, derived from everything that endpoint serves, so a provider swap that still meets the requirements changes it. The start request carries the version the app showed the user, Start refuses a different one, the job records it, and the worker refuses to run it under another (#155, #176, #190);
@@ -339,11 +345,13 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - The server's authentication layer, in the application layer. It imports `ServerApplication`, for `DeviceID`, the clock and the identifier generator, and no third-party package and no adapter. The invariant of [ADR 0014](adr/0014-server-modular-monolith.md) holds for it as for `ServerApplication`.
 - **Use cases:**
   - issue a challenge, which is random, single-use and valid for 5 minutes;
-  - register a device: verify an attestation, then record the key ID, the public key, the counter and App Attest's environment;
-  - open a session: verify an assertion over a challenge, then issue a token, which is valid for 15 minutes;
-  - check the assertion over the body of a start.
-- **The counter rule:** an assertion's counter must be greater than the stored one, and it is stored in the same transaction that accepts the assertion, so of two assertions that arrive at once with the same counter, exactly one is accepted. The rule is in the registry port's contract suite (#170).
-- **Ports it owns (R3):** the challenge store, the device registry (which also holds the push token, #180, and when the device was created and last used), the session signer, the session verifier, the verifier of attestations and assertions, the counts of unauthenticated requests per address (#172), and the verifier of the development token (#173). It uses the clock and the identifier generator of `ServerApplication`.
+  - register a device: consume the challenge, verify an attestation, then record the key ID, the public key, the counter and App Attest's environment. A key ID that the registry knows is never registered again, so a counter is never reset;
+  - open a session: the request names the key ID it signs with, which is how the registry finds the device. Consume the challenge, verify an assertion over it against the registered public key, apply the counter rule, then issue a token, which is valid for 15 minutes;
+  - authenticate a request: the session verifier checks the token's signature, algorithm and key ID and returns its claims. This use case compares `exp` and `iat` with the injected clock, refuses a token whose environment claim the deployment does not accept, and returns the caller's `DeviceID`;
+  - check the assertion over the bytes of a start's body, with the key of the device that the session token names. It never uses a key or a key ID that the request names;
+  - limit the unauthenticated requests per address (#172).
+- **The counter rule:** an assertion's counter must be greater than the stored one, and it is stored in the same transaction that accepts the assertion, so of two assertions that arrive at once with the same counter, exactly one is accepted. The rule is in the registry port's contract suite (#170). Consuming a challenge is atomic and happens before any verification, so of two requests that race for one challenge, exactly one proceeds.
+- **Ports it owns (R3):** the challenge store, the device registry (the key ID, the public key, the counter, the App Attest environment, and when the device was created and last used), the session signer, the session verifier, the verifier of attestations and assertions, the address hasher, the counts of unauthenticated requests per address (#172), and the verifier of the development token (#173). It uses the clock and the identifier generator of `ServerApplication`.
 - **Typed errors** (R7). None echoes an attestation, an assertion or a token. A device the registry does not know gets the one that tells the app to register again.
 - Its log events are the typed events of `ServerApplication`'s port, and none carries a token, an assertion, an attestation or an address (#167).
 
@@ -358,20 +366,25 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - It never logs a prompt, an answer or a key. It never reads a secret, the environment or a secret store: the executable hands it the keys and the clients.
 
 **`ServerAttestApple`** (#169, [ADR 0018](adr/0018-app-attest.md))
-- The adapter behind `ServerAuth`'s verifier of attestations and assertions, for Apple's App Attest. It is the only target that imports the cryptographic packages: `Crypto`, `X509` and `SwiftASN1`, which #169 may extend here without a new ADR.
+- The adapter behind `ServerAuth`'s verifier of attestations and assertions, for Apple's App Attest. It is the only target that imports `X509` and `SwiftASN1`, and it imports `Crypto` with `ServerAddressHash`. #169 may extend its list here without a new ADR.
 - It decodes an attestation object with a small CBOR decoder of its own, checks the certificate chain against Apple's App Attest root, and checks the challenge's value, the key ID, the app ID, the counter and the environment. It verifies the new checks of iOS 27 and macOS 27 whenever they are present. It verifies an assertion's signature and app ID.
-- It is the boundary for Apple's bytes (R8): a size cap first, then a typed error for anything it does not understand, never a crash and never an echo of the input (R7).
+- It is the boundary for Apple's bytes (R8): a cap on size, on nesting depth and on the number of certificates first, then a typed error for anything it does not understand, never a crash and never an echo of the input (R7).
 - Apple's root is fixed in this target and passed to the verifier as a parameter, so tests use a root of their own. The app ID and the environments the deployment accepts are configuration, which the executable hands in.
 
 **`ServerSessionJWT`** (#171, [ADR 0018](adr/0018-app-attest.md))
 - The adapter behind `ServerAuth`'s session signer and session verifier. It imports `JWTKit`, and so does the executable, which builds the key collection.
 - A token is a JWT signed with Ed25519 and valid for 15 minutes. It accepts EdDSA only, so any other algorithm, `none` included, is refused. Each key has an ID, and two keys verify during a rotation. A token is verified without the database.
-- It never reads a secret store: the executable hands it the keys.
+- It checks the signature, the algorithm and the key ID, and returns the claims. It reads no clock: `ServerAuth` compares `exp` and `iat`.
+- It never reads a secret store: the executable hands it the keys, one set per environment.
+
+**`ServerAddressHash`** (#172, [ADR 0018](adr/0018-app-attest.md))
+- The adapter behind `ServerAuth`'s address hasher. It imports `ServerAuth` and `Crypto`, and nothing else.
+- The hash is an HMAC under a daily key, which is derived from a secret and the day. The executable reads the secret from Secret Manager and hands it in, and it is never stored beside the counts. A salt that changes every day would not be enough: an IPv4 address has few values, so a hash with a known salt can be reversed.
 
 **`ServerStorePostgres`** (#160, #170, #172, [ADR 0017](adr/0017-hosting-storage-and-cost.md), [ADR 0018](adr/0018-app-attest.md))
-- The job store and the quota store, behind ports of `ServerApplication`, and what authentication keeps, behind ports of `ServerAuth`: the device registry, the challenge store and the per-address counts (#170, #172). They are on Postgres, through PostgresNIO. The adapter also implements the ports of `ServerApplication` that erasure and the sweeps go through, beside them, so one transaction does each. It imports `ServerAuth` for this. Hosted, the database is Neon's, in Frankfurt: one project, with one branch per environment.
+- The job store and the quota store, behind ports of `ServerApplication`, and what authentication keeps, behind ports of `ServerAuth`: the device registry, the challenge store and the per-address counts (#170, #172). They are on Postgres, through PostgresNIO. The adapter also implements the ports of `ServerApplication` that erasure, the sweeps and the push token go through, beside them, so one transaction does each. It imports `ServerAuth` for this. Hosted, the database is Neon's, in Frankfurt: one project, with one branch per environment.
   - Each branch has its own role and password. No branch is made from another environment's data, and none is reset from its parent.
-- Its rows are DTOs of its own, built from the types of `TailoringModel` (R12). Authentication keeps the registry, the challenges and the counts, and nothing else ([ADR 0018](adr/0018-app-attest.md)).
+- Its rows are DTOs of its own, built from the types of `TailoringModel`, of `ServerApplication` and of `ServerAuth` (R12). Authentication keeps the registry, the challenges and the counts, and nothing else ([ADR 0018](adr/0018-app-attest.md)).
 - The versioned SQL migrations (R12), in one history for the server's tables, those of authentication included ([ADR 0018](adr/0018-app-attest.md)). Only the binary's `migrate` command applies them, never `serve` or `work`.
 - **Retention** (#166): it deletes the rows that `ServerApplication`'s erasure names, and marks nothing as deleted. Quota counts go with their device at the latest.
 
@@ -382,13 +395,17 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - The dispatch deadline is 30 minutes, and retries use backoff.
 
 **`ServerLocalProfile`** (#157, #158, #170, #173)
-- The in-memory job store and quota store, and the in-process queue, of the local profile. It also holds the in-memory device registry, challenge store and address counts, the in-memory adapters of the ports that erasure and the sweeps go through, and the verifier of the development token ([ADR 0018](adr/0018-app-attest.md)).
-- They are adapters of a profile the executable ships, not test doubles (R14). Each passes the contract suite of its port.
-- **The development token** is compared in constant time. The executable reads its file and hands the token in, so the profile reads no file (R4). The executable installs the verifier only in the local profile, and refuses to start when a hosted configuration accepts a development token (#173).
+- The in-memory job store and quota store, and the in-process queue, of the local profile. It also holds the in-memory device registry, challenge store and address counts, the in-memory adapters of the ports that erasure, the sweeps and the push token go through, and the verifier of the development token ([ADR 0018](adr/0018-app-attest.md)).
+- They are adapters of a profile the executable ships, not test doubles (R14). Each in-memory port passes the contract suite of its port.
+- **The verifier of the development token** is not a store, and has tests of its own (#173). The token is compared in constant time. The executable reads its file and hands the token in, so the profile reads no file (R4). The executable installs the verifier only in the local profile, and refuses to start when a hosted configuration accepts a development token (#173).
 
 **`ServerHTTP`** (#175, #178)
 - The inbound adapter: the Hummingbird routes, the middleware, and the handlers that implement the generated API.
-- **The authentication middleware** ([ADR 0018](adr/0018-app-attest.md)). It imports `ServerAuth`. It checks the bearer token through the session verifier, without the database, and answers 401 to a missing or invalid one. For a start, it also hands the body, under its size cap (R8), and the assertion to `ServerAuth`. It carries the caller to the handlers in a task-local value, and passes it to each use case as an argument (#171). It guards the public API only: the worker's routes are admitted by the platform, as below.
+- **The authentication middleware** ([ADR 0018](adr/0018-app-attest.md)). It imports `ServerAuth`, and it guards the public API only: the worker's routes are admitted by the platform, as below.
+  - It limits the unauthenticated requests per address, through `ServerAuth`: challenges, registration and opening a session. Over a limit it answers 429 with when to retry.
+  - `GET /health` is exempt from the token and from the limit, and is served without touching the database.
+  - It authenticates the bearer token through `ServerAuth`'s authenticate-a-request use case, and answers 401 to a missing or invalid one. It carries the caller to the handlers in a task-local value, and passes it to each use case as an argument (#171).
+  - For a start, it reads the raw body once, under its size cap (R8), and gives `ServerAuth` those bytes and the assertion. The verifier checks the signature over the bytes as received, before any decoding, and the handler decodes that same buffer.
 - It maps the generated types to the use cases and back. The generated types never leave it: it imports `PrestoCVAPITypes` and `PrestoCVAPIServer` with `internal import`, so none can appear in its public API.
 - It serves the API on Hummingbird through `OpenAPIHummingbird`. `GET /health` is an endpoint of the spec, and `ServerHTTP` serves it in both roles.
 - **The worker's routes.** The route the queue calls to run a job, and the one the schedule calls to erase what is due (#166), live here too. They are mounted only in the `work` role, and they are not part of the public API (`openapi.yaml`). The platform admits only the queue's identity before any code runs (#161).
@@ -401,12 +418,15 @@ The targets are created by #158 and the tickets named below. Until the targets e
   - Each role reads the secrets it needs: both read the database's credentials, and `migrate` reads them too; the role that holds the keys also reads the providers' keys and the APNs key, and creates the providers' HTTP client, one per process. It hands the secrets to the adapters.
   - How it reads Secret Manager, mounted into the service or through the API, is #163's choice. The executable does the reading, never an adapter ([ADR 0017](adr/0017-hosting-storage-and-cost.md)).
 - It reads the cost limits, the retention periods, the schedule's interval and the queue's retry window from configuration and hands them to the use cases as values ([ADR 0017](adr/0017-hosting-storage-and-cost.md)). It refuses an interval that is not well below the 24 hours (#166).
-- **Authentication** ([ADR 0018](adr/0018-app-attest.md)). `serve` reads the session signing keys, and they are readable by its identity alone ([ADR 0017](adr/0017-hosting-storage-and-cost.md)). The executable builds `JWTKit`'s key collection from them and hands it to `ServerSessionJWT`. It reads the App Attest configuration, the app ID and the environments the deployment accepts. In the local profile it reads the development token's file. It hands all of it in, and installs the development token's verifier only in the local profile.
+- **Authentication** ([ADR 0018](adr/0018-app-attest.md)).
+  - `serve` reads the session signing keys and the secret of the address hash, and they are readable by its identity alone ([ADR 0017](adr/0017-hosting-storage-and-cost.md)). Each environment has its own keys. The executable builds `JWTKit`'s key collection from the signing keys and hands it to `ServerSessionJWT`, and hands the secret to `ServerAddressHash`.
+  - It reads the App Attest configuration, the app ID and the environments the deployment accepts. In the local profile it reads the development token's file, and generates the signing keys and the secret at start, in memory.
+  - It installs the development token's verifier only in the local profile. It refuses to start when a hosted configuration accepts a development token, and when production accepts App Attest's development environment (#173, #169).
 - It starts as `serve`, as `work`, or, in the local profile, as both. It composes the router per role.
 - It shuts down cleanly on SIGTERM: the job in hand is finished or released back to the queue.
 
 **Roles.**
-- **`serve`** answers the API. Hosted, it is its own Cloud Run service. It records a job and hands it to the queue. It checks the data policy at start and serves it, and it reads no provider's key. It authenticates the devices, and alone reads the session signing keys.
+- **`serve`** answers the API. Hosted, it is its own Cloud Run service. It records a job and hands it to the queue. It checks the data policy at start and serves it, and it reads no provider's key. It authenticates the devices, and alone reads the session signing keys and the secret of the address hash.
 - **`work`** runs tailorings. Hosted, it is its own Cloud Run service, and it is private: only the queue's identity, which the erasure schedule (#166) also uses, may call it, and the platform refuses everyone else before any code runs. Only the worker holds the model providers' keys and the APNs key (#180).
 - A tailoring finishes within the queue's dispatch deadline of 30 minutes.
 - The binary has one more command, `migrate` (#160, #162). It is not a role.
@@ -429,8 +449,8 @@ The targets are created by #158 and the tickets named below. Until the targets e
 - The tickets that add logging and metrics (#167, #178) extend the adapters' allow-lists with `Logging` and `Metrics` in this file.
 - The package depends on `CVTailoring`, and on `PrestoCVAPI` once #177 exists. It never depends on `PrestoCVApp` or `PrestoCVCore`.
 - It may depend on the Linux targets of `CVPDFExporter` and of `CVGeneratorAI` (`CVDrafting`), which are reusable on a backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)). The ticket that needs such an edge adds it to this file, for example #94 or #196.
-- The targets for logs and notifications are set by their tickets' decisions (#167, #180) and added to this file then. Authentication's are `ServerAuth`, `ServerAttestApple` and `ServerSessionJWT` ([ADR 0018](adr/0018-app-attest.md)).
-- The cryptographic packages are imported only by `ServerAttestApple`, and `JWTKit` only by `ServerSessionJWT` and the executable.
+- The targets for logs and notifications are set by their tickets' decisions (#167, #180) and added to this file then. Authentication's are `ServerAuth`, `ServerAttestApple`, `ServerAddressHash` and `ServerSessionJWT` ([ADR 0018](adr/0018-app-attest.md)).
+- `X509` and `SwiftASN1` are imported only by `ServerAttestApple`, `Crypto` only by it and by `ServerAddressHash`, and `JWTKit` only by `ServerSessionJWT` and the executable.
 
 **Test support.** None yet. The contract suites of the ports (#157, and #170 for the registry and the challenge store) live in a test-support target that #157 adds to this file, as R10 asks. `ServerApplication`'s own tests use the adapters of `ServerLocalProfile`, so there is no second copy of them.
 
@@ -510,13 +530,13 @@ PrestoCV (app) ─▶ PrestoCVPresentation ─▶ PrestoCVWorkflowPorts ─▶ P
 PrestoCVAPIAdapter ─┬─▶ PrestoCVIntegration, TailoringModel
                 └─▶ PrestoCVAPITypes, PrestoCVAPIClient
 
-PrestoCVAppAttest ─▶ PrestoCVIntegration     (iOS 26, macOS 27; DeviceCheck, CryptoKit, Security)
+PrestoCVAppAttest ─▶ PrestoCVIntegration     (iOS 26, macOS 26, App Attest from macOS 27; DeviceCheck, CryptoKit, Security)
 
 PrestoCVServer (executable) ─┬─▶ ServerHTTP ─┬─▶ ServerApplication ─▶ TailoringModel, Tailoring
                          │               ├─▶ ServerAuth ─▶ ServerApplication
                          │               └─▶ TailoringModel, PrestoCVAPITypes, PrestoCVAPIServer
                          ├─▶ ServerInference ─▶ ServerApplication, Tailoring, TailoringModel
-                         ├─▶ ServerAttestApple, ServerSessionJWT ─▶ ServerAuth
+                         ├─▶ ServerAttestApple, ServerAddressHash, ServerSessionJWT ─▶ ServerAuth
                          ├─▶ ServerStorePostgres ─▶ ServerApplication, ServerAuth, TailoringModel
                          ├─▶ ServerLocalProfile ─▶ ServerApplication, ServerAuth
                          ├─▶ ServerQueueCloudTasks ─▶ ServerApplication
@@ -529,7 +549,7 @@ Forbidden: any edge from a domain, application or port target to an adapter targ
 Forbidden: PrestoCVPresentation → PrestoCVIntegration.
 Forbidden: any edge from ServerApplication to a third-party package.
 Forbidden: any edge from ServerApplication to ServerAuth, and any edge from ServerAuth to a third-party package or an adapter.
-Forbidden: the cryptographic packages imported outside ServerAttestApple, and JWTKit outside ServerSessionJWT and the executable.
+Forbidden: X509 and SwiftASN1 imported outside ServerAttestApple, Crypto outside ServerAttestApple and ServerAddressHash, and JWTKit outside ServerSessionJWT and the executable.
 Forbidden: PrestoCVAppAttest importing PrestoCVAPIAdapter or a target of PrestoCVAPI, and DeviceCheck imported outside PrestoCVAppAttest.
 Forbidden: any edge from the server's package to PrestoCVApp or PrestoCVCore.
 Forbidden: any import of a PrestoCVAPI target by a production target outside the package, except by ServerHTTP and PrestoCVAPIAdapter.
