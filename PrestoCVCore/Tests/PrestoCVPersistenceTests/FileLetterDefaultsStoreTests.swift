@@ -156,6 +156,48 @@ struct FileLetterDefaultsStoreTests {
         #expect(!exists(q.appendingPathComponent("1~\(name)")))
     }
 
+    @Test("a corrupt file beside an older copy of the same name is quarantined under the next number, and that is the copy reported")
+    func olderCopyBesideCorruptFile() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        try write("{", to: dir.appendingPathComponent("Quarantine/\(name)"))
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 0)], ofItemAtPath: dir.appendingPathComponent("Quarantine/\(name)").path)
+        try write("{", to: dir.appendingPathComponent(name))
+        let expected = LetterDefaultsError.corrupt(file: "1~\(name)", reason: "no schemaVersion envelope")
+        await #expect(throws: expected) { _ = try await store(dir).load() }
+        #expect(!exists(dir.appendingPathComponent(name)) && exists(dir.appendingPathComponent("Quarantine/1~\(name)")) && exists(dir.appendingPathComponent("Quarantine/\(name)")))
+        await #expect(throws: expected) { _ = try await store(dir).load() }
+    }
+
+    /// Copies in the quarantine, each with the time it entered it and a content that gives its own reason.
+    private func standing(_ copies: [(prefix: String, at: Double, content: String)], in dir: URL) throws {
+        for copy in copies {
+            let url = dir.appendingPathComponent("Quarantine/\(copy.prefix)\(name)")
+            try write(copy.content, to: url)
+            try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: copy.at)], ofItemAtPath: url.path)
+        }
+    }
+    private let badRevision = golden.replacingOccurrences(of: #""revision":3"#, with: #""revision":0"#)
+
+    @Test("the copy reported is the newest by the time it entered the quarantine, not the first by name: 10~ sorts before 2~")
+    func newestCopyByStamp() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        try standing([("1~", 100, "{"), ("10~", 200, "{"), ("2~", 300, badRevision)], in: dir)
+        await #expect(throws: LetterDefaultsError.corrupt(file: "2~\(name)", reason: "revision")) { _ = try await store(dir).load() }
+        let other = tempDir(); defer { try? FileManager.default.removeItem(at: other) }
+        try standing([("1~", 300, badRevision), ("10~", 200, "{"), ("2~", 100, "{")], in: other)
+        await #expect(throws: LetterDefaultsError.corrupt(file: "1~\(name)", reason: "revision")) { _ = try await store(other).load() }
+    }
+
+    @Test("copies that entered the quarantine in the same second are ordered by their number, as they were numbered: 10~ is newer than 2~, and a plain name is the oldest")
+    func newestCopyByNumber() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        try standing([("", 100, "{"), ("1~", 100, "{"), ("2~", 100, "{"), ("10~", 100, badRevision)], in: dir)
+        await #expect(throws: LetterDefaultsError.corrupt(file: "10~\(name)", reason: "revision")) { _ = try await store(dir).load() }
+        let other = tempDir(); defer { try? FileManager.default.removeItem(at: other) }
+        try standing([("", 100, badRevision), ("2~", 99, "{")], in: other)
+        await #expect(throws: LetterDefaultsError.corrupt(file: name, reason: "revision")) { _ = try await store(other).load() }
+    }
+
     @Test("a restore brings the quarantined copy back, and the defaults load again")
     func restoreCopy() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }

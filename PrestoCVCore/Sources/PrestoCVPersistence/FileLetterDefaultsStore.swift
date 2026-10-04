@@ -33,13 +33,23 @@ public actor FileLetterDefaultsStore: LetterDefaultsStore, LetterDefaultsMainten
                         readsBack: { data in try LetterDefaultsFileV1.read(data) == stored })
     }
 
-    /// The corrupt copy that stands in the quarantine, if one does, as the error that reports it. Call it under the lock.
+    /// The corrupt copy that stands in the quarantine, if one does, as the error that reports it: the newest, by the time it entered
+    /// the quarantine and, within the same second, by its number, which a later copy of the same name gets higher (`10~` is newer
+    /// than `2~`, and a name with no number is the oldest). Call it under the lock.
     private func standingCopy() throws(LetterDefaultsError) -> LetterDefaultsError? {
-        let names = try store.quarantineNames().filter { $0.range(of: "^(\\d+~)?" + Self.namePattern + "\\z", options: .regularExpression) != nil }
-        guard let name = names.sorted().first else { return nil }
+        var newest: (name: String, stamp: Date, number: Int)?
+        for name in try store.quarantineNames() where name.range(of: "^(\\d+~)?" + Self.namePattern + "\\z", options: .regularExpression) != nil {
+            let stamp: Date
+            do { stamp = try FileManager.default.attributesOfItem(atPath: store.quarantine.appendingPathComponent(name).path)[.modificationDate] as? Date ?? .distantPast }
+            catch { throw .unreadable(file: name) }
+            let number = Int(name.prefix { $0.isNumber }) ?? 0
+            if let current = newest, (current.stamp, current.number) >= (stamp, number) { continue }
+            newest = (name, stamp, number)
+        }
+        guard let copy = newest else { return nil }
         var reason = "quarantined"
-        if case .corrupt(let found) = read(store.quarantine.appendingPathComponent(name)) { reason = found }
-        return .corrupt(file: name, reason: reason)
+        if case .corrupt(let found) = read(store.quarantine.appendingPathComponent(copy.name)) { reason = found }
+        return .corrupt(file: copy.name, reason: reason)
     }
 
     // MARK: LetterDefaultsStore
