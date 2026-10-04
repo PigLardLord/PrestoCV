@@ -2,7 +2,7 @@
 
 It checks that the documentation matches the repository, because documentation changes with the code in the same pull request and a rule without a check is a wish (ADR 0006). It reads the repository and writes nothing. It is a Swift package with no dependency but Foundation, and it builds and runs on Linux and on macOS.
 
-It reads these Markdown files: everything under `docs/`, every `README.md` (not under `.build/`), and `AGENTS.md`. It makes four checks.
+It reads these Markdown files: everything under `docs/`, every `README.md` (not under `.build/`), `AGENTS.md` and `.github/pull_request_template.md`. It makes four checks.
 
 ## Running it
 

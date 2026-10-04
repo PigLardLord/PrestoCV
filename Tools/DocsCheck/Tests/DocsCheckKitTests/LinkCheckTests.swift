@@ -124,6 +124,14 @@ struct LinkCheckTests {
         }
     }
 
+    @Test("the pull request template is a document: its links and the paths in its code spans are checked")
+    func templateIsADocument() throws {
+        let template = "## Purpose\n\nSee [the rules](docs/gone.md) and `docs/architecture/missing.md`.\n\n## Documents updated\n\nWhich?"
+        #expect(try findings(in: [".github/pull_request_template.md": template])
+                == [".github/pull_request_template.md:3 link-target-missing", ".github/pull_request_template.md:3 path-missing"])
+        #expect(try findings(in: ["README.md": "x", ".github/other.md": "[a](gone.md)"]) == [])
+    }
+
     @Test("findings are sorted by file, then line")
     func ordering() throws {
         let result = try findings(in: ["docs/b.md": "x\n[a](1.md)\n[b](2.md)", "docs/a.md": "[a](1.md)", "README.md": "[a](1.md)"])

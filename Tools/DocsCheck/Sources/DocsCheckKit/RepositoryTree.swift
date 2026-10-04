@@ -12,10 +12,12 @@ struct RepositoryTree {
 
     // MARK: Documents
 
-    /// The Markdown files the checks read: everything under `docs/`, every `README.md`, and `AGENTS.md`. Sorted.
+    /// The Markdown files the checks read: everything under `docs/`, every `README.md`, `AGENTS.md` and the pull
+    /// request template. Sorted.
     func documentPaths() throws(DocsCheckError) -> [String] {
         try markdownFiles(in: "").filter { path in
-            path == "AGENTS.md" || path.hasPrefix("docs/") || path == "README.md" || path.hasSuffix("/README.md")
+            path == "AGENTS.md" || path == ".github/pull_request_template.md" || path.hasPrefix("docs/")
+                || path == "README.md" || path.hasSuffix("/README.md")
         }
     }
 

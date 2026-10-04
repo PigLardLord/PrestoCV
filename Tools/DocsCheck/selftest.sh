@@ -41,7 +41,7 @@ stale() { local name="$1" pat="$2"; shift 2; expect "stale: $name" 1 "$pat" "$@"
 fixed() { local name="$1"; shift; expect "fixed: $name" 0 "" "$@"; }
 
 # --- the repository the cases start from is accepted
-setup; expect "a consistent repository passes" 0 "checked 5 documents: 0 findings"
+setup; expect "a consistent repository passes" 0 "checked 6 documents: 0 findings"
 
 # --- 1. links
 setup; put README.md $'# Project\n\nSee the [guide](docs/missing.md).'
@@ -56,6 +56,8 @@ put docs/guide.md $'# Guide\n\n## Installation\n\nSee [usage](#installation).'; 
 setup; put README.md $'# Project\n\nSee the [guide](docs/guide.md#set-up).'
 stale "an anchor into another file that is not one of its headings" "^README.md:3: link-anchor-missing:"
 put docs/guide.md $'# Guide\n\n## Set `up`!\n\n## Set up'; put README.md $'# Project\n\n[a](docs/guide.md#set-up) [b](docs/guide.md#set-up-1)'; fixed "headings with punctuation and a repeat"
+setup; put .github/pull_request_template.md $'## Documents updated\n\nSee [the guide](docs/gone.md).'
+stale "a link in the pull request template" "^.github/pull_request_template.md:3: link-target-missing:"
 setup; put README.md $'# Project\n\n[Note]: the next paragraph says more, see `docs/guide.md` and not gone.md.'
 fixed "a line that starts like a definition but goes on in words is prose"
 put README.md $'# Project\n\n[Note]: gone.md "Title"'
