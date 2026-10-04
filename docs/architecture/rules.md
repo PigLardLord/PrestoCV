@@ -73,7 +73,7 @@ Each executable has one composition root, and only that root creates infrastruct
 **Why.** Today objects are built in four places, the template subsystem exists three times over the same files, and the export sheet builds its own container every time it opens. Issue #1 is a direct consequence.
 
 **Enforced by:**
-- **checker:** detectors `singleton`, and `infrastructureConstruction` for the adapter types listed in `rules.json` and for `FileManager.default`, `Bundle.main` and `UserDefaults.standard`. `infrastructureTypes` gains `FileApplicationRepository` and `FileLetterDefaultsStore` when #185 adds them ([ADR 0019](adr/0019-applications.md)). On the server, every target except the executable carries both, and `infrastructureTypes` lists `PostgresClient` and `HTTPClient` once the targets exist. In the app, `PrestoCVAPIAdapter` carries both too, and `infrastructureTypes` lists `URLSessionTransport` once it exists ([ADR 0016](adr/0016-api-contract.md)).
+- **checker:** detectors `singleton`, and `infrastructureConstruction` for the adapter types listed in `rules.json` and for `FileManager.default`, `Bundle.main` and `UserDefaults.standard`. `infrastructureTypes` lists `FileCVRepository`, `FileApplicationRepository` and `FileLetterDefaultsStore`, so that only the composition root creates a store ([ADR 0019](adr/0019-applications.md)). On the server, every target except the executable carries both, and `infrastructureTypes` lists `PostgresClient` and `HTTPClient` once the targets exist. In the app, `PrestoCVAPIAdapter` carries both too, and `infrastructureTypes` lists `URLSessionTransport` once it exists ([ADR 0016](adr/0016-api-contract.md)).
 - **review:** what the detectors do not see. A static accessor such as `HTTPClient.shared` stays with review until the checker learns it, and so does the API's transport in the app until `URLSessionTransport` is listed.
 
 ## R5. Views render; view models present; neither decides
@@ -187,7 +187,7 @@ A platform-only target wraps **every file** entirely in its platform condition. 
 
 ([ADR 0009](adr/0009-persisted-schema-v1.md))
 
-- **Which files.** Today CV Authoring's three: `CVFileV1`, `ApplicationFileV1` and `LetterDefaultsFileV1` ([ADR 0019](adr/0019-applications.md)). A new persisted file type joins this list, and each follows everything below.
+- **Which files.** Today CV Authoring's three: `CVFileV1`, `ApplicationFileV1` and `LetterDefaultsFileV1` ([ADR 0019](adr/0019-applications.md)). The CV's content has one DTO, `CVContentV1`, which `CVFileV1` and `ApplicationFileV1` both write, so a new version of the CV's content is a new version of both, each with its migration. A new persisted file type joins this list, and each follows everything below.
 - **DTO, not the domain.** What is written to disk is a DTO, separate from the domain type. Its envelope is frozen: `schemaVersion` is a top-level integer in every future version.
 - **Strict decoding.** Required fields are required. The revision is bounded. Periods pass `Period.make`. Text and list sizes are capped.
 - **Every failure has its own outcome:**

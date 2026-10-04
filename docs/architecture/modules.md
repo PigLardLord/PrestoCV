@@ -39,38 +39,42 @@ Test targets and test-support targets are described below each package. The chec
   - `EmailAddress`, `PhoneNumber`, `WebLink`, `DocumentLanguage`, `DesignChoice`.
 - **`Period.make(start:end:current:)`** is the single rule that turns loose data into a period, or into a typed `PeriodError`.
 - Planned: projects (#54), photo (#53).
-- **Applications** (planned, #185, [ADR 0019](adr/0019-applications.md)): what a tailoring produces and the user keeps.
+- **Applications** ([ADR 0019](adr/0019-applications.md)): what a tailoring produces and the user keeps.
   - **`Application`**, the aggregate:
     - a typed identity (`ApplicationID`);
     - `revision`, `createdAt` (when the user kept it) and `updatedAt`, settable only inside the package;
-    - its tailored `CV`, which is part of the aggregate: it keeps its own `CVID`, is never listed among the user's CVs, and has no revision or timestamps of its own, because the application's are its. An edit of it is conditional on the application's revision, and so is an edit of its letter, so the two conflict (#191);
-    - its `CoverLetter`;
-    - the advert's company, role and text;
-    - its provenance, as plain values that Authoring stores and does not interpret, never Tailoring's types (R1):
-      - the source CV's `CVID`, and the snapshot the tailoring used, stored as its lines;
-      - the report, and the questions as the codes and values Tailoring gives, with their answers;
-      - the override of the letter defaults the tailoring was made with, and the letter defaults as the snapshot held them, after the override;
-      - the prompt version and the aliases of the attempt that passed;
-      - the job's identifier, an opaque value, which the repository reads under its lock so that create is idempotent per job (#188);
-      - the statement and answer references, kept as positions into the stored snapshot's statements.
-      The provenance describes the result as produced, not the CV after the user's edits.
-  - **`CoverLetter`**: the letter the user keeps and edits, as value types that validate on creation. It stores no salutation and no valediction: the page writes them (#187).
-  - **`LetterDefaults`**: the person's salary expectation, start date and note, as the user's own bounded text. They belong to the person, not to a CV. A tailoring's override is a `LetterDefaults` too, and one rule combines it with the person's: `PrestoCVIntegration` applies it when it builds the questions and the snapshot, so the override is entered before the questions are built. An override sets a field and cannot clear one. Nothing re-reads the defaults for a kept application.
+    - its tailored `CV`, which is part of the aggregate: it keeps its own `CVID`, which is given when the application is created and never replaced, is never listed among the user's CVs, and has no revision or timestamps of its own, because the application's are its. `CV.canBeSaved` holds for it on create and on every change. An edit of it is conditional on the application's revision, and so is an edit of its letter, so the two conflict (#191);
+    - its `CoverLetter`, and the `Advert`: the advert's company, role and text;
+    - its `ApplicationProvenance`.
+    The CV and the letter change through `setCV`, which refuses another identity and a CV that cannot be saved, and `setLetter`; the fields are read-only.
+  - **`ApplicationProvenance`**: plain values that Authoring stores, bounds and gives back, and does not interpret, never Tailoring's types (R1). It holds:
+    - the job's identifier (`JobID`), an opaque value, which the repository reads under its lock so that create is idempotent per job (#188);
+    - the source CV's `CVID`, and the snapshot the tailoring used, as the statements of each experience;
+    - the report: the one argument the CV makes, and what was cut, moved and reworded;
+    - the questions, each as a code, its values, its scope (an experience, the skills, the summary or a letter field) and the user's answer, which a skipped question lacks. Tailoring's codes are worded at the edge (R13);
+    - the override of the letter defaults the tailoring was made with, and the letter defaults as the snapshot held them, after the override;
+    - the prompt version and the aliases of the attempt that passed, never the name of a provider or a model;
+    - the statement and answer references of each tailored line, as positions into the stored snapshot's statements and into the questions.
+    It describes the result as produced, not the CV after the user's edits. Positions that point into the snapshot or the answers must point inside them, and the defaults must say what the override set; the positions of a tailored line are only non-negative, because the user's edits move them.
+  - **`CoverLetter`**: the letter the user keeps and edits. It holds a `LetterRecipient` (company, contact name, `FormOfAddress` `ms`, `mr` or `neutral`, title, surname, role and address lines), the reference, the position, the subject, the opening, the body paragraphs, the closing and the attachments. Its parts are value objects that validate on creation, and an edit is a new letter. It stores no salutation and no valediction: the page writes them (#187).
+  - **`LetterDefaults`**: the person's salary expectation, start date and note, as the user's own text, bounded and trimmed. An empty text is a default that is not set. They belong to the person, not to a CV. A tailoring's override is a `LetterDefaults` too, and `applying(override:)` is the one rule that combines it with the person's: a field that the override sets wins, and an override cannot clear one. `PrestoCVIntegration` applies it when it builds the questions and the snapshot, so the override is entered before the questions are built. Nothing re-reads the defaults for a kept application. **`StoredLetterDefaults`** is the defaults as a store holds them, with the revision a save is conditional on.
+  - **Texts** of an application, a letter and the defaults go through one rule (`TextRule`): trimmed, bounded in UTF-8 bytes, and free of control characters (a line break only where a text spans lines) and of bidirectional overrides, as strict as `CVDocumentValidator`. A refusal is an `ApplicationError`, a code that names the field (`ApplicationField`).
 
 **`PrestoCVApplication`**
 - **Ports:**
   - `CVRepository`: create, conditional update, load, list, conditional delete. Typed `RepositoryError`, not cancellable.
   - `CVStoreMaintenance`: restore from quarantine, erase every copy, purge quarantine.
   - `SampleCVSource`, `IDGenerator`, `TimeSource`. `TimeSource` is so named to avoid shadowing `Swift.Clock`.
-  - For applications (planned, #185, #91, [ADR 0019](adr/0019-applications.md)):
-    - `ApplicationRepository`: create, conditional update, load, list, conditional delete. Typed errors, not cancellable, like `CVRepository`. Create for a job it already holds returns that application, the repository checking the job's identifier under its lock. Listing returns the healthy applications, ordered by last change, plus the store's issues;
+  - For applications ([ADR 0019](adr/0019-applications.md)):
+    - `ApplicationRepository`: create, conditional update, load, list, conditional delete. Typed `ApplicationRepositoryError`, not cancellable, like `CVRepository`. Create for a job it already holds returns that application, the repository checking the job's identifier under its lock. Update and delete are conditional on the application's revision, which its CV and its letter share. Listing returns the healthy applications, ordered by last change, plus the store's `StoreIssue`s;
     - `ApplicationStoreMaintenance`: restore from quarantine, erase every copy, purge quarantine;
-    - `LetterDefaultsStore`: load, save conditional on a revision, and erase the person's defaults. Restore and purge from its quarantine are on it or on a maintenance port beside it. `PrestoCVIntegration` reads it, applies the tailoring's override, and hands the defaults to the question builder (#153, #186);
-    - an erase-all on each maintenance port, so that a file no listing returns goes too.
+    - `LetterDefaultsStore`: load, save conditional on a revision (the first save expects revision 0, no file), and erase the person's defaults. Typed `LetterDefaultsError`, not cancellable. Defaults never saved load as `StoredLetterDefaults.unsaved`, and a store that cannot be read is an error, never empty defaults. `PrestoCVIntegration` reads it, applies the tailoring's override, and hands the defaults to the question builder (#153, #186);
+    - `LetterDefaultsMaintenance`: restore and purge from the defaults' quarantine, beside the store so that a use case that only loads and saves never sees them;
+    - an erase-all on each maintenance port, so that a file no listing returns goes too (planned, #91).
 - **Use cases:**
   - `NewCV`, `SaveCV` (create or conditional update, errors translated to `AuthoringError`, including `tooLarge`), `LoadCV`;
   - list (by last change), rename, duplicate, delete, start from a sample, determine onboarding.
-  - For applications (planned, #185): create from a tailoring result, list by last change, load, update its CV, update its letter, delete; and load and save the letter defaults. Create takes values, never Tailoring's types, assigns the application's identity and its CV's through `IDGenerator`, and, for a job the store already holds, returns that application.
+  - For applications: `CreateApplication`, `ListApplications`, `LoadApplication`, `UpdateApplicationCV`, `UpdateApplicationLetter` and `DeleteApplication`; and `LoadLetterDefaults` and `SaveLetterDefaults`. `CreateApplication` takes `ApplicationValues`, never Tailoring's types: the tailored CV's content with no identity, the letter, the advert and the provenance. It assigns the application's identity and its CV's through `IDGenerator`, and, for a job the store already holds, returns that application. A store's failures are translated once into `AuthoringError`: `invalid` carries the `ApplicationError` of a value the domain refuses, `corrupt` and `upgradeRequired` tell a defaults file that stands in quarantine from a newer one, and a write that would not read back is `tooLarge`.
   - **Erase-all** (planned, #91): it erases every CV, every application and the letter defaults, with their quarantined copies, each store under its own lock. A partial failure is a typed outcome that names what remains. Erasing a CV does not erase the applications made from it.
 - **Listing** returns the healthy CVs plus `StoreIssue`s: `corrupt`, `upgradeRequired`, `unreadable`, `tooLarge`, `quarantineFailed`.
 
@@ -82,17 +86,22 @@ Test targets and test-support targets are described below each package. The chec
   - reads classified as described in R12;
   - `Quarantine/` with validated restore, erase and purge.
 - `DirectorySampleCVSource`: sample CVs from an injected directory, in the same v1 format and through the store's own reader. The app ships them in `PrestoCV/Resources/Samples/`.
-- For applications (planned, #185, #91, [ADR 0019](adr/0019-applications.md)):
-  - `FileApplicationRepository`: one `ApplicationFileV1` file per application, named from its id, in a directory of its own with its own lock and `Quarantine/`. It gives the file every guarantee that `FileCVRepository` gives a CV: R12's every outcome, atomic writes, the read-back check, mutations under `flock`, and validated restore, erase and purge. The envelope is stored once, so the tailored CV inside has none of its own, and the content holds the CV's `CVID` beside its content DTO. The CV's content goes through the same content DTO as `CVFileV1`, which #185 extracts without changing `CVFileV1`'s JSON.
-  - `FileLetterDefaultsStore`: the person's defaults in one `LetterDefaultsFileV1` file, in a directory of its own with its own lock and `Quarantine/`. It follows R12 in full. A save is conditional on a revision, and a stale save is a conflict. A missing file is empty defaults, and any other failure is an error, never an empty store. A corrupt file is quarantined and the store remembers it: every load reports `corrupt` until the user restores the copy or saves new defaults.
-  - Erasing a CV leaves the applications made from it. The erase-all removes the CVs, the applications and the letter defaults, with their quarantined copies, each store under its own lock.
+- For applications ([ADR 0019](adr/0019-applications.md)):
+  - `FileApplicationRepository`: one `ApplicationFileV1` file per application (`<id>.application.json`), in a directory of its own with its own lock and `Quarantine/`. It gives the file every guarantee that `FileCVRepository` gives a CV: R12's every outcome, atomic writes, the read-back check, mutations under `flock`, and validated restore, erase and purge. The envelope is stored once, so the tailored CV inside has none of its own, and `cv` holds its `CVID` beside its content. The CV's content goes through `CVContentV1`, the DTO that `CVFileV1` writes too, so `Period.make` and the size caps exist once. Create reads the stored applications for the job under the lock, and a file it cannot read does not hold the job.
+  - `FileLetterDefaultsStore`: the person's defaults in one `LetterDefaultsFileV1` file (`letter-defaults.json`), in a directory of its own with its own lock and `Quarantine/`. The envelope is `schemaVersion`, `revision` and `updatedAt`, with the three texts at the same level. It follows R12 in full. A save is conditional on a revision, and a stale save is a conflict. A missing file is empty defaults, and any other failure is an error, never an empty store. A corrupt file is moved to `Quarantine/` and reported with its reason, and the store remembers it by the copy that stands there: while a copy stands and no file replaces it, every load reports `corrupt`, until the user restores the copy or saves new defaults.
+  - The stores share their mechanics, `StoreDirectory` and `StoredFile`: the lock, the reading of a store that may not be there, the quarantine and its retention, the erasure of every copy, and the write that must read back. Each store keeps its names, its schema and its identity.
+  - Erasing a CV leaves the applications made from it. The erase-all removes the CVs, the applications and the letter defaults, with their quarantined copies, each store under its own lock (planned, #91).
 
 **Test support and tests.**
 - `PrestoCVCoreTestSupport` may import `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Synchronization. It holds:
   - `InMemoryCVRepository`, `SteppingClock`, `SequentialIDGenerator`;
   - the **`CVRepository` contract suite**: round trip with timestamps, create twice, update bumps the revision, stale update and stale delete, 50 concurrent updates from one revision leave exactly one success, update after delete, listing order.
 - File-store behaviour that an in-memory store cannot have is tested in the Core tests, not in the contract: mixed directory, unreadable, oversized and hostile files, restore, erase, purge, and two instances racing.
-- For applications (planned, #185, [ADR 0019](adr/0019-applications.md)): the same target holds `InMemoryApplicationRepository`, an in-memory `LetterDefaultsStore`, and the **`ApplicationRepository` contract suite**, modelled on the `CVRepository` one, with creating twice from one job and concurrent creates for one job added. The in-memory adapter and the file adapter both pass it. The file stores' own cases, for applications and for the letter defaults, are tested in the Core tests, and so is the erase-all (#91).
+- For applications ([ADR 0019](adr/0019-applications.md)): the same target holds `InMemoryApplicationRepository`, `InMemoryLetterDefaultsStore`, the failing doubles that the use cases' error translation is tested with, the fixtures that populate every field (`FixtureApplication`, `FixtureLetter`, `FixtureProvenance`), and two contract suites:
+  - the **`ApplicationRepository` contract suite**, modelled on the `CVRepository` one: round trip with timestamps and the CV's identity, create twice, update bumps the revision, stale update and stale delete, update after delete, listing order, 50 concurrent updates from one revision, an edit of the CV and an edit of the letter from one revision conflicting, creating twice from one job returning the first, and concurrent creates for one job leaving one;
+  - the **`LetterDefaultsStore` contract suite**: a first save over no file, a stale save, a cleared default, concurrent saves from one revision, and erase.
+
+  The in-memory adapters and the file adapters pass them. The file stores' own cases, for applications and for the letter defaults, are tested in the Core tests, and so is the erase-all (#91): hostile, oversized and newer files, quarantine and restore, erasure of every copy, two instances racing, the read-back check, and the bytes of each file type, pinned.
 
 ---
 
@@ -303,7 +312,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 **`PrestoCVComposition`**
 - The app's composition root, and the only place in the app that creates infrastructure (R4). The `@main` App type holds it in a `static let`. It owns:
   - file locations under Application Support;
-  - one `FileCVRepository` and one `FileDesignStore`, and, once #185 lands, one `FileApplicationRepository` and one `FileLetterDefaultsStore`, which R4's `infrastructureTypes` then lists;
+  - one `FileCVRepository`, one `FileApplicationRepository`, one `FileLetterDefaultsStore` and one `FileDesignStore`, which R4's `infrastructureTypes` lists;
   - the web-view rule list, compiled once;
   - the platform renderer and the PDFKit inspector;
   - the AI adapter, `TimeSource`, `IDGenerator` and logger;
