@@ -34,8 +34,8 @@ public struct LetterRecipient: Hashable, Sendable {
 /// which the application then keeps (`Application.setLetter`).
 public struct CoverLetter: Hashable, Sendable {
     /// What a single line holds, in UTF-8 bytes, and what a paragraph holds.
-    public static let maxLineBytes = 256, maxParagraphBytes = 4_000
-    public static let maxAddressLines = 6, maxParagraphs = 20, maxAttachments = 10
+    public static let maxLineBytes = 10_000, maxParagraphBytes = 10_000
+    public static let maxAddressLines = 6, maxParagraphs = 20, maxAttachments = 20
 
     public let recipient: LetterRecipient
     public let reference: String?, position: String?, subject: String?

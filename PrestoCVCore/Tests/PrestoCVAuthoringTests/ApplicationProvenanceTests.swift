@@ -22,6 +22,17 @@ private func provenance(jobID: String = "job-1", snapshot: [P.SourceExperience]?
 
 @Suite("ADR 0019 · application provenance")
 struct ApplicationProvenanceTests {
+    @Test("the provenance's bounds are wide enough for everything Tailoring's model accepts: 200 sources per line, 10,000 bytes in the report")
+    func boundsHoldTailoringsBounds() throws {
+        #expect(P.Limits.sourcesPerLine == 200 && P.Limits.reportBytes == 10_000)
+        let text = String(repeating: "r", count: 10_000)
+        let report = try P.Report(argument: text, cut: [text], moved: [text], reworded: [text])
+        let position = P.StatementPosition(experience: 0, line: 0)
+        let sources = P.LineSources(experience: 0, line: 0, statements: Array(repeating: position, count: 200))
+        let held = try provenance(report: report, sources: [sources])
+        #expect(held.report == report && held.lineSources == [sources])
+    }
+
     @Test("the fixture populates every part, so a completeness test over it sees every leaf")
     func fixtureIsComplete() {
         let leaves = FieldLeaves.of(FixtureProvenance.full())

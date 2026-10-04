@@ -44,6 +44,16 @@ private func expect(_ error: ApplicationError, _ body: () throws -> Void) {
 
 @Suite("ADR 0019 · cover letter")
 struct CoverLetterTests {
+    @Test("the letter's bounds are wide enough for everything Tailoring's model accepts: a line and a paragraph of 10,000 bytes, 20 attachments")
+    func boundsHoldTailoringsBounds() throws {
+        #expect(CoverLetter.maxLineBytes == 10_000 && CoverLetter.maxParagraphBytes == 10_000 && CoverLetter.maxAttachments == 20)
+        let line = String(repeating: "a", count: 10_000), paragraph = String(repeating: "b", count: 10_000)
+        let value = try CoverLetter(recipient: LetterRecipient(company: line, contactName: line, title: line, surname: line, role: line, address: [line]),
+                                    reference: line, position: line, subject: line, opening: paragraph, paragraphs: [paragraph], closing: paragraph,
+                                    attachments: Array(repeating: line, count: 20))
+        #expect(value.attachments.count == 20 && value.opening == paragraph && value.subject == line)
+    }
+
     @Test("the fixture populates every part, so a completeness test over it sees every leaf")
     func fixtureIsComplete() {
         let leaves = FieldLeaves.of(FixtureLetter.full())
