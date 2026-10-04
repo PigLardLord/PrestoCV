@@ -59,7 +59,7 @@ Every `docs/architecture/adr/NNNN-*.md` has a status the ADR README defines, and
 
 - **The line.** `- **Status:** Accepted`, outside fenced code. The first such line is the status.
 - **The statuses.** `Proposed`, `Accepted`, `Rejected`, or `Superseded by [NNNN](NNNN-title.md)`, written exactly so.
-- **Superseded.** The text links to an ADR file of that directory, and that file exists.
+- **Superseded.** The text links to an ADR file of that directory, and that file exists. If the link text shows a number (`[0013]`, `[ADR 0013, the new one]`), it is the number of the file the link points at.
 - **The index.** `docs/architecture/adr/README.md` has a table row for every ADR, `| [NNNN](NNNN-title.md) | Decision | Status |`. A row is matched with the file that the link in its first cell points to, not with a number, and the number it shows must be that file's. Its status says the same as the ADR's: for a superseded ADR, the same replacement. A row without a link to an ADR file is a finding, and so are two ADR files with one number.
 
 Codes: `adr-directory-missing`, `adr-status-missing`, `adr-status-unknown`, `adr-superseded-without-link`, `adr-successor-missing`, `adr-number-duplicated`, `adr-index-missing`, `adr-not-indexed`, `adr-index-unknown`, `adr-index-status-differs`.

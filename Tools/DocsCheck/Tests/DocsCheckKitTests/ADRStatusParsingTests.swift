@@ -49,4 +49,13 @@ struct ADRStatusParsingTests {
         #expect(ADRStatus.accepted.summary == "Accepted")
         #expect(ADRStatus.supersededBy(link: "0013-a.md").summary == "Superseded by 0013")
     }
+
+    @Test("the number a superseded status shows is the first four-digit number in its link text", arguments: [
+        ("Superseded by [0013](0013-new.md)", "0013"), ("Superseded by [ADR 0013](0013-new.md)", "0013"), ("Superseded by [ADR 0013, the new one](x.md)", "0013"),
+        ("Superseded by [the new one](0013-new.md)", nil), ("Superseded by [ADR 13](0013-new.md)", nil), ("Superseded by [00133](0013-new.md)", nil),
+        ("Superseded by 0013", nil), ("Accepted", nil), ("Superseded by (0013) [x](y.md)", nil),
+    ] as [(String, String?)])
+    func shownNumber(text: String, number: String?) {
+        #expect(ADRStatus.shownNumber(inStatusText: text) == number)
+    }
 }

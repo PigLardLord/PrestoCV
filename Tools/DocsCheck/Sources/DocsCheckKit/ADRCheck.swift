@@ -77,6 +77,10 @@ struct ADRCheck {
         guard exists else {
             return (status, [Finding(file: file, line: line, code: .adrSuccessorMissing, message: "\(Finding.quoted(link)) is not an ADR of \(Self.directory)")])
         }
+        if let shown = ADRStatus.shownNumber(inStatusText: text), shown != status.successorNumber {
+            let message = "the status says ADR \(shown), but its link points at \(Finding.quoted(link))"
+            return (status, [Finding(file: file, line: line, code: .adrSuccessorMissing, message: message)])
+        }
         return (status, [])
     }
 

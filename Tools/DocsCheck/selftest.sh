@@ -150,6 +150,9 @@ put $ADR/0001-first.md $'# 0001. First\n\n- **Status:** Proposed'; adr_index '| 
 setup; put $ADR/0001-first.md $'# 0001. First\n\n- **Status:** Superseded by 0002'; adr_index '| [0001](0001-first.md) | First | Superseded by 0002 |'
 put $ADR/0002-second.md $'# 0002. Second\n\n- **Status:** Accepted'
 stale "a superseded ADR that names its replacement without a link" "^$ADR/0001-first.md:3: adr-superseded-without-link:"
+put $ADR/0001-first.md $'# 0001. First\n\n- **Status:** Superseded by [0003](0002-second.md)'
+adr_index '| [0001](0001-first.md) | First | Superseded by [0003](0002-second.md) |' '| [0002](0002-second.md) | Second | Accepted |'
+stale "a superseded status that shows another number than its link's" "^$ADR/0001-first.md:3: adr-successor-missing: the status says ADR 0003"
 put $ADR/0001-first.md $'# 0001. First\n\n- **Status:** Superseded by [0002](0002-second.md)'
 adr_index '| [0001](0001-first.md) | First | Superseded by [0002](0002-second.md) |' '| [0002](0002-second.md) | Second | Accepted |'; fixed "the replacement is linked"
 rm "$ROOT/$ADR/0002-second.md"; adr_index '| [0001](0001-first.md) | First | Superseded by [0002](0002-second.md) |'

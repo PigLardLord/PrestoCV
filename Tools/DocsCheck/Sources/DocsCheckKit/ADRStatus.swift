@@ -41,6 +41,23 @@ enum ADRStatus: Equatable {
         }
     }
 
+    /// The number a `Superseded by [text](link)` status shows: the first number of exactly four digits in the link
+    /// text. Nil if the text is not such a status, or shows no number.
+    static func shownNumber(inStatusText text: String) -> String? {
+        let text = text.trimmingCharacters(in: .whitespaces)
+        guard text.hasPrefix(supersededPrefix), let open = text.firstIndex(of: "["), let close = text[open...].firstIndex(of: "]") else { return nil }
+        var run = ""
+        for character in text[text.index(after: open)..<close] + " " {
+            if character.isASCII, character.isNumber {
+                run.append(character)
+            } else {
+                if run.count == 4 { return run }
+                run = ""
+            }
+        }
+        return nil
+    }
+
     /// The number of a file named `NNNN-title.md`, nil for any other name.
     static func number(ofADRFileNamed name: String) -> String? {
         let number = name.prefix(4)

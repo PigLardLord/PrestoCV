@@ -162,4 +162,27 @@ struct ADRCheckTests {
         let result = try findings(in: ["\(Self.adr)/0002-a.md": adrFile("0002", status: "Accepted"), "\(Self.adr)/README.md": rows])
         #expect(result == ["\(Self.adr)/README.md:6 adr-index-unknown", "\(Self.adr)/README.md:7 adr-index-unknown"])
     }
+
+    @Test("the number a superseded status shows must be the number of the file it links to")
+    func shownNumberDiffers() throws {
+        func result(_ status: String) throws -> [String] {
+            try findings(in: [
+                "\(Self.adr)/0001-first.md": adrFile("0001", status: status),
+                "\(Self.adr)/0002-second.md": adrFile("0002", status: "Accepted"),
+                "\(Self.adr)/README.md": index("| [0001](0001-first.md) | First | \(status) |", "| [0002](0002-second.md) | Second | Accepted |"),
+            ])
+        }
+        #expect(try result("Superseded by [0002](0002-second.md)") == [])
+        #expect(try result("Superseded by [ADR 0002](0002-second.md)") == [])
+        #expect(try result("Superseded by [the second one](0002-second.md)") == [])
+        #expect(try result("Superseded by [0003](0002-second.md)") == ["\(Self.adr)/0001-first.md:3 adr-successor-missing", "\(Self.adr)/README.md:5 adr-successor-missing"])
+    }
+
+    @Test("the first status line of an ADR is its status, and a later one is not read")
+    func firstStatusLine() throws {
+        let both = "# 0001. First\n\n- **Status:** Accepted\n\nLater, a note:\n\n- **Status:** Draft\n"
+        #expect(try findings(in: ["\(Self.adr)/0001-first.md": both]) == [])
+        let reversed = "# 0001. First\n\n- **Status:** Draft\n\n- **Status:** Accepted\n"
+        #expect(try findings(in: ["\(Self.adr)/0001-first.md": reversed]) == ["\(Self.adr)/0001-first.md:3 adr-status-unknown"])
+    }
 }
