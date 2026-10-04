@@ -401,6 +401,17 @@ struct LetterDocumentContractTests {
         #expect(throws: LetterDocumentValidator.Invalid.self) { _ = try LetterDocumentValidator.decode(json: try JSONEncoder().encode(hostile)) }
     }
 
+    @Test("deeply nested JSON, within the size bound, is refused and never crashes the decoder", arguments: [600, 20_000, 380_000])
+    func deepNesting(depth: Int) {
+        let arrays = String(repeating: "[", count: depth) + String(repeating: "]", count: depth)
+        let objects = String(repeating: #"{"a":"#, count: depth) + "1" + String(repeating: "}", count: depth)
+        let inside = #"{"schemaVersion":1,"language":"it","sender":{"name":"A","email":"# + arrays + "}}"
+        for json in [arrays, objects, inside] where json.utf8.count <= LetterDocumentValidator.maxJSONBytes {
+            #expect(throws: LetterDocumentValidator.Invalid(reason: "not a letter document")) { _ = try LetterDocumentValidator.decode(json: Data(json.utf8)) }
+        }
+        #expect(throws: LetterDocumentValidator.Invalid.self) { _ = try LetterDocumentValidator.decode(json: Data(arrays.utf8)) }
+    }
+
     @Test("a form of address outside the three is not a letter document")
     func formOfAddress() throws {
         var object = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(letterFixture)) as? [String: Any])

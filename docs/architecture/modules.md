@@ -134,7 +134,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - it refuses the characters that `CVDocumentValidator` refuses, by the one rule that both share, `DocumentText` (`package` access): control characters, and the bidirectional embeddings, overrides and isolates that reorder what is printed. It lets the rest through, emoji sequences and soft hyphens among them, because Authoring keeps the rest, so a letter or a CV that it saves never fails to render for its characters (R6). The page's own words follow the same rule. The line break is the one control character that a paragraph and the closing may hold, as CV text may; every field that holds one line refuses it;
   - its reasons name the field that was refused, as the CV validator's do, and a field of one line must be trimmed: one that starts or ends with white space is refused, because Authoring trims what it keeps and only a JSON client sends one that is not;
   - a letter that is too long for its page is not invalid: the export refuses it with the number of pages it needed (below);
-  - JSON arrives through `decode(json:)`, which checks the size before decoding and says when the schema version is unsupported.
+  - JSON arrives through `decode(json:)`, which checks the size before decoding, says when the schema version is unsupported, and refuses a document nested too deeply for the decoder, which a test holds at depths up to the size bound.
 - Pending: a committed JSON Schema for each of the two documents.
 
 **`CVDesignCatalog`**
