@@ -69,7 +69,7 @@ Codes: `adr-directory-missing`, `adr-status-missing`, `adr-status-unknown`, `adr
 
 | File | Marker |
 |---|---|
-| `AGENTS.md` | The sentence "documentation changes with the code in the same pull request", whole words in this order, in any case, wrapped over lines, with any emphasis or punctuation. |
+| `AGENTS.md` | The sentence "documentation changes with the code in the same pull request", whole words in this order, in any case, wrapped over lines, with any emphasis or punctuation, in the prose of the file: a comment or a code block that holds it does not state it. |
 | `.github/pull_request_template.md` | A heading, at any level, that reads "Documents updated". |
 
 Codes: `rule-not-stated`, `template-missing`, `template-does-not-ask`.

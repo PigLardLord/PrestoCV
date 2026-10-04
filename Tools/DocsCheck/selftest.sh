@@ -161,6 +161,10 @@ stale "no ADR directory is an error, not a pass" "^$ADR:1: adr-directory-missing
 setup; put AGENTS.md $'# Guidelines\n\n- Documentation is welcome.'
 stale "AGENTS.md does not state the rule" "^AGENTS.md:1: rule-not-stated:"
 put AGENTS.md "$AGENTS_RULE"; fixed "AGENTS.md states the rule"
+setup; put AGENTS.md $'# Guidelines\n\n<!-- Documentation changes with the code in the same pull request. -->'
+stale "AGENTS.md holds the rule only in a comment" "^AGENTS.md:1: rule-not-stated:"
+put AGENTS.md $'# Guidelines\n\n```\nDocumentation changes with the code in the same pull request.\n```'
+stale "AGENTS.md holds the rule only in a code block" "^AGENTS.md:1: rule-not-stated:"
 setup; put AGENTS.md $'# Guidelines\n\nDocumentation changes with the code, in a later pull request.'
 stale "AGENTS.md states a different rule" "^AGENTS.md:1: rule-not-stated:"
 setup; rm "$ROOT/AGENTS.md"

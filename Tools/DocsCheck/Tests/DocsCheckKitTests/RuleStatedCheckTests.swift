@@ -37,6 +37,22 @@ struct RuleStatedCheckTests {
         #expect(try findings(in: ["AGENTS.md": "# Guidelines\n\n" + text]) == ["AGENTS.md:1 rule-not-stated"])
     }
 
+    @Test("the rule is read from the prose: a comment or a code block that holds the sentence does not state it", arguments: [
+        "<!-- Documentation changes with the code in the same pull request. -->",
+        "<!--\nDocumentation changes with the code\nin the same pull request.\n-->",
+        "```\nDocumentation changes with the code in the same pull request.\n```",
+        "~~~markdown\n- **Documentation changes with the code in the same pull request.**\n~~~",
+    ])
+    func ruleOutsideTheProse(text: String) throws {
+        #expect(try findings(in: ["AGENTS.md": "# Guidelines\n\n" + text + "\n"]) == ["AGENTS.md:1 rule-not-stated"])
+    }
+
+    @Test("the rule stated in the prose, with a comment elsewhere in the file, is stated")
+    func ruleBesideAComment() throws {
+        let text = "# Guidelines\n\n<!-- note -->\nDocumentation changes with the code <!-- really --> in the same pull request.\n"
+        #expect(try findings(in: ["AGENTS.md": text]) == [])
+    }
+
     @Test("a missing AGENTS.md is a finding, never a pass")
     func noAgents() throws {
         #expect(try findings(in: [:], removing: ["AGENTS.md"]) == ["AGENTS.md:1 rule-not-stated"])

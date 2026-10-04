@@ -1,8 +1,8 @@
 /// Check 4. `AGENTS.md` states that documentation changes with the code in the same pull request, and the pull
 /// request template asks which documents the change updates. Each is found by a marker, so the wording around it
 /// can change:
-/// - `AGENTS.md` contains the sentence "documentation changes with the code in the same pull request", in any case,
-///   wrapped over lines and with any emphasis or punctuation;
+/// - the prose of `AGENTS.md` (not its comments or code blocks) contains the sentence "documentation changes with the
+///   code in the same pull request", in any case, wrapped over lines and with any emphasis or punctuation;
 /// - the template has a heading, at any level, that reads "Documents updated".
 struct RuleStatedCheck {
     static let agentsPath = "AGENTS.md"
@@ -15,7 +15,8 @@ struct RuleStatedCheck {
     func findings() throws(DocsCheckError) -> [Finding] {
         var findings: [Finding] = []
         if try tree.kind(of: Self.agentsPath) == .file {
-            if !Self.contains(phrase: Self.ruleMarker, in: try tree.text(of: Self.agentsPath)) {
+            let prose = MarkdownDocument(text: try tree.text(of: Self.agentsPath)).proseLines.map(\.text).joined(separator: "\n")
+            if !Self.contains(phrase: Self.ruleMarker, in: prose) {
                 findings.append(Finding(file: Self.agentsPath, line: 1, code: .ruleNotStated,
                                         message: "it does not state that \(Self.ruleMarker)"))
             }
