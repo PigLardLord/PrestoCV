@@ -80,6 +80,15 @@ struct LinkCheckTests {
         #expect(result == ["README.md:1 link-anchor-missing"])
     }
 
+    @Test("a link with plain=1 shows the file's source, so its anchor is a line and is not checked")
+    func plainView() throws {
+        let result = try findings(in: [
+            "README.md": "[a](docs/a.md?plain=1#L10) [b](docs/a.md?x=1&plain=1#L2-L4) [c](docs/a.md?plain=1#nothing) [d](docs/a.md?plain=0#nothing) [e](docs/a.md?x=1#nothing) [f](docs/gone.md?plain=1#L1)",
+            "docs/a.md": "# A",
+        ])
+        #expect(result == ["README.md:1 link-anchor-missing", "README.md:1 link-anchor-missing", "README.md:1 link-target-missing"])
+    }
+
     @Test("an anchor into a file that is not Markdown or into a directory is not checked")
     func anchorElsewhere() throws {
         #expect(try findings(in: ["README.md": "[a](Tools/run.sh#L10) [b](docs/#top)", "Tools/run.sh": "", "docs/x.txt": ""]) == [])

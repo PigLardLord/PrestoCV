@@ -40,7 +40,7 @@ struct LinkCheck {
             guard kind == .file, resolved.hasSuffix(".md") else { return nil }
             path = resolved
         }
-        guard let anchor = target.anchor, !anchor.isEmpty else { return nil }
+        guard let anchor = target.anchor, !anchor.isEmpty, !target.isPlainView else { return nil }
         guard try anchors(of: path).contains(Anchor(anchor)) else {
             return report(.linkAnchorMissing, "\(Finding.quoted(path)) has no heading with the anchor \(Finding.quoted("#" + anchor))")
         }
@@ -66,6 +66,8 @@ struct LinkTarget {
     let path: String?
     /// The fragment, percent-decoded.
     let anchor: String?
+    /// The query has `plain=1`: GitHub shows the file's source, where a fragment names a line, not a heading.
+    let isPlainView: Bool
 
     /// Nil for a link to another site: any destination that starts with a URL scheme or with `//`.
     init?(destination: String) {
@@ -76,9 +78,14 @@ struct LinkTarget {
             fragment = Self.decode(rest[rest.index(after: hash)...])
             rest = rest[..<hash]
         }
-        if let query = rest.firstIndex(of: "?") { rest = rest[..<query] }
+        var plain = false
+        if let query = rest.firstIndex(of: "?") {
+            plain = rest[rest.index(after: query)...].split(separator: "&").contains("plain=1")
+            rest = rest[..<query]
+        }
         path = rest.isEmpty ? nil : Self.decode(rest)
         anchor = fragment
+        isPlainView = plain
     }
 
     private static func hasScheme(_ destination: String) -> Bool {
