@@ -44,11 +44,11 @@ A path written in a code span exists. A word is a path when its first segment is
 
   ```json
   [
-    {"path": "Server/Package.swift", "ticket": 155}
+    {"path": "Tools/DocsCheck/Sources/DocsCheckKit/NewCheck.swift", "ticket": 155}
   ]
   ```
 
-  A declared path that exists is a finding, so is one that no document names, and so is an entry that is not a relative path with a ticket number. The list therefore cannot go stale: the change that creates the file removes its entry. A path whose first segment is not a top-level entry, such as a new top-level directory, is not recognised, so it needs no declaration until its directory exists.
+  A declared path that exists is a finding, so is one that no document names, and so is an entry that is not a relative path with a ticket number. The list therefore cannot go stale: the change that creates the file removes its entry. An entry excuses a path in a code span, not a link: a link to a file that does not exist is always a finding. A path is declared as the document writes it, or as it resolves from the document's directory or one above it. A directory path whose first segment is not a top-level entry, such as a new top-level directory with no file extension, is not recognised, so it needs no declaration until that directory exists.
 
 Codes: `path-missing`, `planned-path-exists`, `planned-path-unused`, `planned-file-invalid`.
 

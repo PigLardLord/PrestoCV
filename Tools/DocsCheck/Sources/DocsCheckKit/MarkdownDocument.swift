@@ -15,7 +15,6 @@ struct MarkdownDocument: Sendable {
 
     struct Heading: Hashable, Sendable {
         let line: Int
-        let level: Int
         let text: String
     }
 
@@ -144,7 +143,7 @@ struct MarkdownDocument: Sendable {
                 while let last = text.last, last == " " || last == "\t" { text = text.dropLast() }
             }
         }
-        return Heading(line: number, level: level, text: String(text))
+        return Heading(line: number, text: String(text))
     }
 
     // MARK: Link definitions

@@ -81,12 +81,12 @@ struct MarkdownDocumentTests {
         ])
     }
 
-    @Test("ATX headings are found by level, with closing hashes removed")
+    @Test("ATX headings of level 1 to 6 are found, with closing hashes removed")
     func headings() {
         let text = "# Title\n## Section ##\n###### Deep\n####### Seven\n#hashtag\n   ### Indented three\n    #### Indented four\n#\n```\n# in a fence\n```\n## `Code` heading"
         #expect(MarkdownDocument(text: text).headings == [
-            .init(line: 1, level: 1, text: "Title"), .init(line: 2, level: 2, text: "Section"), .init(line: 3, level: 6, text: "Deep"),
-            .init(line: 6, level: 3, text: "Indented three"), .init(line: 8, level: 1, text: ""), .init(line: 12, level: 2, text: "`Code` heading"),
+            .init(line: 1, text: "Title"), .init(line: 2, text: "Section"), .init(line: 3, text: "Deep"),
+            .init(line: 6, text: "Indented three"), .init(line: 8, text: ""), .init(line: 12, text: "`Code` heading"),
         ])
     }
 
