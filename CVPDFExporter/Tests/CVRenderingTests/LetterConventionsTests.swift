@@ -46,7 +46,7 @@ struct LetterConventionsTests {
                  salutations: ["Estimado Sr. Rossi:", "Estimada Sra. Rossi:", "Estimados señores y señoras:"],
                  valedictions: ["Atentamente,", "Atentamente,", "Atentamente,"], labels: ["Referencia", "Anexos"]),
         Expected(language: "fr", variant: "fr-FR", dateLine: "Roma, le 4 octobre 2026", date: "4 octobre 2026", firstDateLine: "Roma, le 1er octobre 2026",
-                 salutations: ["Monsieur Rossi,", "Madame Rossi,", "Madame, Monsieur,"],
+                 salutations: ["Monsieur,", "Madame,", "Madame, Monsieur,"],
                  valedictions: ["Je vous prie d’agréer, Monsieur, l’expression de mes salutations distinguées.",
                                 "Je vous prie d’agréer, Madame, l’expression de mes salutations distinguées.",
                                 "Je vous prie d’agréer, Madame, Monsieur, l’expression de mes salutations distinguées."],
@@ -134,6 +134,24 @@ struct LetterConventionsTests {
     @Test("an unsupported language is a typed error, never English", arguments: ["ja", "fil", "fi", "nl", "e", "", "en_GB", "en-\n", "../en", "en/../it", "index", "ENGLISH", "-en", "en-"])
     func unsupportedLanguage(tag: String) {
         #expect(throws: LetterConventionsCatalog.Failure.unsupportedLanguage(tag)) { _ = try LetterConventionsCatalog.conventions(for: tag) }
+    }
+
+    @Test("a salutation that names nobody for a gendered form is written without the family name, in French")
+    func frenchSalutationsHaveNoName() throws {
+        let fr = try LetterConventionsCatalog.conventions(for: "fr")
+        for name in ["Rossi", nil, "", "  ", "{name}"] as [String?] {
+            #expect(fr.salutation(.masculine, familyName: name) == "Monsieur,")
+            #expect(fr.salutation(.feminine, familyName: name) == "Madame,")
+            #expect(fr.salutation(.neutral, familyName: name) == "Madame, Monsieur,")
+        }
+    }
+
+    @Test("a blank family name is no name: a salutation that names the recipient cannot be written with it", arguments: ["", " ", "\t", "\n", " \u{00A0} "])
+    func blankFamilyName(name: String) throws {
+        let en = try LetterConventionsCatalog.conventions(for: "en")
+        #expect(en.salutation(.masculine, familyName: name) == nil && en.salutation(.feminine, familyName: name) == nil)
+        #expect(en.salutation(.neutral, familyName: name) == "Dear Sir or Madam,")
+        #expect(en.salutation(.masculine, familyName: "Rossi") == "Dear Mr Rossi,")
     }
 
     @Test("a name that looks like a hole in a template is text, never read again")
@@ -322,13 +340,24 @@ struct LetterConventionsReaderTests {
         ("date", "format", "{day} {month}"), ("date", "format", "{day} {month} {year} {year}"), ("date", "format", "{day} {month} {year} {name}"),
         ("date", "format", "{day} {month} {yeer}"), ("date", "format", "{day {month} {year}"), ("date", "format", "{day} {month} {year}}"), ("date", "format", "{}{day}{month}{year}"),
         ("date", "withPlace", "{place}"), ("date", "withPlace", "{date}"), ("date", "withPlace", "{place}, {date} {date}"), ("date", "withoutPlace", "{place}"),
-        ("date", "withoutPlace", "today"), ("salutations", "masculine", "Dear Sir,"), ("salutations", "feminine", "Dear {name} {name},"),
+        ("date", "withoutPlace", "today"), ("salutations", "feminine", "Dear {name} {name},"),
         ("salutations", "neutral", "Dear {name},"), ("salutations", "masculine", "Dear {Name},"), ("salutations", "masculine", "Dear { name },"),
     ]
 
     @Test("a template has the holes its place needs, once each, and no other", arguments: badTemplates)
     func templateHoles(path: String, key: String, template: String) throws {
         #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "\(path).\(key)")) { _ = try parse(try setting(path, key, to: template)) }
+    }
+
+    @Test("a gendered salutation has the family name once or not at all, and the neutral one never")
+    func optionalName() throws {
+        let without = try parse(try setting("salutations", "masculine", to: "Dear Sir,"))
+        #expect(without.salutation(.masculine, familyName: "Rossi") == "Dear Sir," && without.salutation(.masculine, familyName: nil) == "Dear Sir,")
+        let with = try parse(try setting("salutations", "feminine", to: "Dear Ms {name},"))
+        #expect(with.salutation(.feminine, familyName: "Rossi") == "Dear Ms Rossi," && with.salutation(.feminine, familyName: nil) == nil)
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "salutations.masculine")) { _ = try parse(try setting("salutations", "masculine", to: "{name} {name}")) }
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "salutations.neutral")) { _ = try parse(try setting("salutations", "neutral", to: "Dear {name},")) }
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "salutations.masculine")) { _ = try parse(try setting("salutations", "masculine", to: "Dear {date},")) }
     }
 
     @Test("a valediction and a label are plain text: a hole in them is refused")

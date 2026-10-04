@@ -20,8 +20,9 @@ struct LetterTemplate: Sendable, Equatable {
     enum Piece: Sendable, Equatable { case text(String), hole(Hole) }
     let pieces: [Piece]
 
-    /// nil when the text has a hole outside `holes`, a hole that is not there exactly once, or a brace that opens or closes no hole.
-    init?(_ text: String, holes: Set<Hole>) {
+    /// nil when the text has a hole that is neither in `holes` nor in `optional`, a hole of `holes` that is not there exactly once,
+    /// a hole of `optional` that is there more than once, or a brace that opens or closes no hole.
+    init?(_ text: String, holes: Set<Hole>, optional: Set<Hole> = []) {
         var pieces: [Piece] = [], literal = String.UnicodeScalarView(), seen: [Hole] = []
         var scalars = text.unicodeScalars[...]
         while let scalar = scalars.popFirst() {
@@ -32,14 +33,14 @@ struct LetterTemplate: Sendable, Equatable {
                     if next == "}" { closed = true; break }
                     name.unicodeScalars.append(next)
                 }
-                guard closed, let hole = Hole(rawValue: name), holes.contains(hole) else { return nil }
+                guard closed, let hole = Hole(rawValue: name), holes.contains(hole) || optional.contains(hole) else { return nil }
                 if !literal.isEmpty { pieces.append(.text(String(literal))); literal = String.UnicodeScalarView() }
                 pieces.append(.hole(hole)); seen.append(hole)
             case "}": return nil
             default: literal.append(scalar)
             }
         }
-        guard Set(seen) == holes, seen.count == holes.count else { return nil }
+        guard Set(seen).isSuperset(of: holes), Set(seen).count == seen.count else { return nil }
         if !literal.isEmpty { pieces.append(.text(String(literal))) }
         self.pieces = pieces
     }
@@ -125,9 +126,10 @@ struct LetterConventions: Sendable, Equatable {
             guard let text = value as? String else { throw Failure.corruptTable(language) }
             return text
         }
-        func template(_ parent: [String: Any], _ key: String, path: String, holes: Set<LetterTemplate.Hole>) throws(Failure) -> LetterTemplate {
+        func template(_ parent: [String: Any], _ key: String, path: String, holes: Set<LetterTemplate.Hole>,
+                      optional: Set<LetterTemplate.Hole> = []) throws(Failure) -> LetterTemplate {
             let text = try string(parent, key, path: path)
-            guard isFit(text), let template = LetterTemplate(text, holes: holes) else { throw Failure.incomplete(language: language, key: path) }
+            guard isFit(text), let template = LetterTemplate(text, holes: holes, optional: optional) else { throw Failure.incomplete(language: language, key: path) }
             return template
         }
 
@@ -151,8 +153,8 @@ struct LetterConventions: Sendable, Equatable {
             variant: variant, dateFormat: try template(date, "format", path: "date.format", holes: [.day, .month, .year]), months: months,
             withPlace: try template(date, "withPlace", path: "date.withPlace", holes: [.place, .date]),
             withoutPlace: try template(date, "withoutPlace", path: "date.withoutPlace", holes: [.date]), firstDay: firstDay,
-            salutations: ByForm(masculine: try template(salutations, "masculine", path: "salutations.masculine", holes: [.name]),
-                                feminine: try template(salutations, "feminine", path: "salutations.feminine", holes: [.name]),
+            salutations: ByForm(masculine: try template(salutations, "masculine", path: "salutations.masculine", holes: [], optional: [.name]),
+                                feminine: try template(salutations, "feminine", path: "salutations.feminine", holes: [], optional: [.name]),
                                 neutral: try template(salutations, "neutral", path: "salutations.neutral", holes: [])),
             valedictions: ByForm(masculine: try plain(try string(valedictions, "masculine", path: "valedictions.masculine"), "valedictions.masculine"),
                                  feminine: try plain(try string(valedictions, "feminine", path: "valedictions.feminine"), "valedictions.feminine"),

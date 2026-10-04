@@ -8,8 +8,8 @@
     "firstDay": "1er"
   },
   "salutations": {
-    "masculine": "Monsieur {name},",
-    "feminine": "Madame {name},",
+    "masculine": "Monsieur,",
+    "feminine": "Madame,",
     "neutral": "Madame, Monsieur,"
   },
   "valedictions": {
