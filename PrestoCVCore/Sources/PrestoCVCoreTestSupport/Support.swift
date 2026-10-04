@@ -37,24 +37,40 @@ public final class SteppingClock: TimeSource {
 public final class SequentialIDGenerator: IDGenerator {
     private let n = Mutex(0)
     public init() {}
-    public func next() -> CVID {
+    public func next() -> CVID { CVID(sequential(prefix: "00000000-0000-0000-0000-")) }
+    /// Applications count on their own scale, so that an application never has the identifier of a CV.
+    public func nextApplication() -> ApplicationID { ApplicationID(sequential(prefix: "00000000-0000-0000-0001-")) }
+
+    private func sequential(prefix: String) -> UUID {
         let value = String(n.withLock { $0 += 1; return $0 })
         let hex = String(repeating: "0", count: max(0, 12 - value.count)) + value
-        guard let uuid = UUID(uuidString: "00000000-0000-0000-0000-" + hex) else { preconditionFailure("more than 10^12 ids in a test") }
-        return CVID(uuid)
+        guard let uuid = UUID(uuidString: prefix + hex) else { preconditionFailure("more than 10^12 ids in a test") }
+        return uuid
     }
 }
 
-public enum CVRepositoryContract {
-    public struct Failure: Error, CustomStringConvertible { public let description: String }
+/// What a contract suite reports when an adapter breaks a rule of its port.
+public struct ContractFailure: Error, CustomStringConvertible { public let description: String }
 
-    static func expect(_ error: RepositoryError, _ body: () async throws -> Void, _ what: String) async throws {
-        do { try await body() } catch let e as RepositoryError {
-            guard e == error else { throw Failure(description: "\(what): got \(e)") }
-            return
-        }
-        throw Failure(description: "\(what): expected \(error)")
+/// Runs `body`, which must fail with exactly `error`.
+private func expectFailure<E: Error & Equatable>(_ error: E, _ body: () async throws -> Void, _ what: String) async throws {
+    do { try await body() } catch let e as E {
+        guard e == error else { throw ContractFailure(description: "\(what): got \(e)") }
+        return
     }
+    throw ContractFailure(description: "\(what): expected \(error)")
+}
+
+func expect(_ error: RepositoryError, _ body: () async throws -> Void, _ what: String) async throws {
+    try await expectFailure(error, body, what)
+}
+
+func expect(_ error: ApplicationRepositoryError, _ body: () async throws -> Void, _ what: String) async throws {
+    try await expectFailure(error, body, what)
+}
+
+public enum CVRepositoryContract {
+    public typealias Failure = ContractFailure
 
     /// Every CVRepository adapter must pass this (R10).
     public static func verify(_ repo: some CVRepository) async throws {

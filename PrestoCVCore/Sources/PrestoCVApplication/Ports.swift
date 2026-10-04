@@ -49,7 +49,10 @@ public enum RepositoryError: Error, Equatable, Sendable {
     case wouldNotReadBack(file: String)
 }
 
-public protocol IDGenerator: Sendable { func next() -> CVID }
+public protocol IDGenerator: Sendable {
+    func next() -> CVID
+    func nextApplication() -> ApplicationID
+}
 /// Named to avoid shadowing Swift.Clock.
 public protocol TimeSource: Sendable { func now() -> Date }
 
