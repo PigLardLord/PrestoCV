@@ -1,0 +1,22 @@
+{
+  "date": {
+    "format": "{day}. {month} {year}",
+    "months": ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
+    "withPlace": "{place}, {date}",
+    "withoutPlace": "{date}"
+  },
+  "salutations": {
+    "masculine": "Sehr geehrter Herr {name},",
+    "feminine": "Sehr geehrte Frau {name},",
+    "neutral": "Sehr geehrte Damen und Herren,"
+  },
+  "valedictions": {
+    "masculine": "Mit freundlichen Grüßen",
+    "feminine": "Mit freundlichen Grüßen",
+    "neutral": "Mit freundlichen Grüßen"
+  },
+  "labels": {
+    "reference": "Bezug",
+    "attachments": "Anlagen"
+  }
+}

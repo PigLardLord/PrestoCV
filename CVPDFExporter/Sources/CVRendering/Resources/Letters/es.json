@@ -1,0 +1,22 @@
+{
+  "date": {
+    "format": "{day} de {month} de {year}",
+    "months": ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
+    "withPlace": "{place}, {date}",
+    "withoutPlace": "{date}"
+  },
+  "salutations": {
+    "masculine": "Estimado Sr. {name}:",
+    "feminine": "Estimada Sra. {name}:",
+    "neutral": "Estimados señores y señoras:"
+  },
+  "valedictions": {
+    "masculine": "Atentamente,",
+    "feminine": "Atentamente,",
+    "neutral": "Atentamente,"
+  },
+  "labels": {
+    "reference": "Referencia",
+    "attachments": "Anexos"
+  }
+}

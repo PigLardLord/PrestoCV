@@ -167,7 +167,12 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - **The cover letter** (planned, #187, [ADR 0019](adr/0019-applications.md)):
   - the letter's markup is a structure of its own, specified in [markup-contract.md](markup-contract.md) beside the CV's and pinned by a golden HTML file. Its classes are not in the table of what a design may select, and a design's CSS cannot select them;
   - one built-in stylesheet renders a `LetterDocument`, with the typed builder, for every design. It is not a design: it is not in the catalog, so no design choice can select it. It passes the same tokenizer and property allow-list as a design's, checked against the letter structure's selectors. Its colours and fonts are its own fixed values;
-  - the page writes the salutation, the valediction and the date, in the document's language. The language conventions, the date format, the salutations and the valedictions, are data for the six languages: one JSON file per language and an index, with a completeness test (R13);
+  - the page writes the salutation, the valediction and the date, in the document's language. The language conventions are data (R13): one JSON file per language and an index, `Resources/Letters/<language>.json` and `index.json`, for `en`, `it`, `de`, `es`, `fr` and `pt`. `LetterConventionsCatalog` reads them, matched by BCP 47 as the headings are, and an unsupported language is a typed error. A file holds:
+    - the date: its format, the twelve month names, and how the place and the date go together, with the place and without it;
+    - the salutation and the valediction for each form of address, `masculine`, `feminine` and `neutral`. A salutation that names the recipient holds one `{name}` hole, and it is filled with the recipient's family name;
+    - the labels of the reference line and of the attachments.
+
+    The reader is strict and bounded: the file's size is checked first, an unknown key is a corrupt table, a missing key or an empty, over-long or hidden-character value is incomplete and names its key, and a template with a hole it does not need, or without one it needs, is incomplete. A hole is filled in one pass, so a family name that looks like a hole is text. Tests hold the six files to the schema, to the index and to `LetterDocument.supportedLanguages`, and pin each language's wording;
   - the letter is one A4 page, and one that does not fit is an error, never a truncated page. The PDF is checked against the builder's text nodes, as for a CV.
 
 **`CVRenderingWebKitSupport`**

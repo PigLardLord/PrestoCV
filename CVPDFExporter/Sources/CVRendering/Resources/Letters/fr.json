@@ -1,0 +1,22 @@
+{
+  "date": {
+    "format": "{day} {month} {year}",
+    "months": ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"],
+    "withPlace": "{place}, le {date}",
+    "withoutPlace": "{date}"
+  },
+  "salutations": {
+    "masculine": "Monsieur {name},",
+    "feminine": "Madame {name},",
+    "neutral": "Madame, Monsieur,"
+  },
+  "valedictions": {
+    "masculine": "Je vous prie d’agréer, Monsieur, l’expression de mes salutations distinguées.",
+    "feminine": "Je vous prie d’agréer, Madame, l’expression de mes salutations distinguées.",
+    "neutral": "Je vous prie d’agréer, Madame, Monsieur, l’expression de mes salutations distinguées."
+  },
+  "labels": {
+    "reference": "Référence",
+    "attachments": "Pièces jointes"
+  }
+}

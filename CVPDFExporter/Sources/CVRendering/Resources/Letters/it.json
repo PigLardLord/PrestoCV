@@ -1,0 +1,22 @@
+{
+  "date": {
+    "format": "{day} {month} {year}",
+    "months": ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"],
+    "withPlace": "{place}, {date}",
+    "withoutPlace": "{date}"
+  },
+  "salutations": {
+    "masculine": "Gentile Sig. {name},",
+    "feminine": "Gentile Sig.ra {name},",
+    "neutral": "Gentili Signore e Signori,"
+  },
+  "valedictions": {
+    "masculine": "Distinti saluti,",
+    "feminine": "Distinti saluti,",
+    "neutral": "Distinti saluti,"
+  },
+  "labels": {
+    "reference": "Riferimento",
+    "attachments": "Allegati"
+  }
+}

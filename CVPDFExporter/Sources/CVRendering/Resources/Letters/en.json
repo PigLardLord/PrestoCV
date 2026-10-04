@@ -1,0 +1,22 @@
+{
+  "date": {
+    "format": "{day} {month} {year}",
+    "months": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+    "withPlace": "{place}, {date}",
+    "withoutPlace": "{date}"
+  },
+  "salutations": {
+    "masculine": "Dear Mr {name},",
+    "feminine": "Dear Ms {name},",
+    "neutral": "Dear Sir or Madam,"
+  },
+  "valedictions": {
+    "masculine": "Yours sincerely,",
+    "feminine": "Yours sincerely,",
+    "neutral": "Yours faithfully,"
+  },
+  "labels": {
+    "reference": "Reference",
+    "attachments": "Enclosures"
+  }
+}

@@ -107,8 +107,9 @@ public enum LetterDocumentValidator {
 
     /// A character that is not shown, or that changes what is shown: controls (a line break among them), the line and
     /// paragraph separators, and every format character, which takes in the bidirectional overrides and isolates that
-    /// reorder what is printed, the zero-width characters and the tag characters. None belongs to a letter in the six languages.
-    static func hidesOrReorders(_ s: Unicode.Scalar) -> Bool {
+    /// reorder what is printed, the zero-width characters and the tag characters. None belongs to a letter in the six languages,
+    /// nor to the page's own words, which are held to the same rule.
+    public static func hidesOrReorders(_ s: Unicode.Scalar) -> Bool {
         switch s.properties.generalCategory {
         case .control, .format, .lineSeparator, .paragraphSeparator: true
         default: false

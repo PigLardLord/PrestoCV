@@ -1,0 +1,22 @@
+{
+  "date": {
+    "format": "{day} de {month} de {year}",
+    "months": ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"],
+    "withPlace": "{place}, {date}",
+    "withoutPlace": "{date}"
+  },
+  "salutations": {
+    "masculine": "Prezado Senhor {name},",
+    "feminine": "Prezada Senhora {name},",
+    "neutral": "Prezados Senhores e Senhoras,"
+  },
+  "valedictions": {
+    "masculine": "Com os melhores cumprimentos,",
+    "feminine": "Com os melhores cumprimentos,",
+    "neutral": "Com os melhores cumprimentos,"
+  },
+  "labels": {
+    "reference": "Referência",
+    "attachments": "Anexos"
+  }
+}
