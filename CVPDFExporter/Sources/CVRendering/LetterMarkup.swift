@@ -6,7 +6,8 @@ enum LetterClass: String, CaseIterable {
     case letter
     case sender = "letter-sender", senderName = "letter-sender-name", senderTitle = "letter-sender-title", senderEmail = "letter-sender-email"
     case senderPhone = "letter-sender-phone", senderLocation = "letter-sender-location", senderWebsite = "letter-sender-website"
-    case recipient = "letter-recipient", recipientName = "letter-recipient-name", recipientCompany = "letter-recipient-company"
+    case recipient = "letter-recipient", recipientName = "letter-recipient-name", recipientTitle = "letter-recipient-title"
+    case recipientCompany = "letter-recipient-company"
     case recipientAddress = "letter-recipient-address"
     case dateline = "letter-dateline"
     case reference = "letter-reference", referenceLabel = "letter-reference-label", referenceValue = "letter-reference-value"

@@ -7,7 +7,7 @@ let letterFixture = LetterDocument(
     language: "it",
     sender: Person(name: "Ada Lovelace", professionalTitle: "Analista", email: "ada@example.com", phone: "+39 06 1234567",
                    location: "Via Roma 1, 00100 Roma", website: "https://ada.example"),
-    recipient: LetterRecipient(formOfAddress: .feminine, name: "Maria Rossi", familyName: "Rossi", company: "Babbage & Co",
+    recipient: LetterRecipient(formOfAddress: .feminine, title: "Dott.ssa", name: "Maria Rossi", familyName: "Rossi", company: "Babbage & Co",
                                address: ["Via Milano 2", "20100 Milano"]),
     place: "Roma",
     date: LetterDate(year: 2026, month: 10, day: 4),
@@ -46,6 +46,7 @@ struct LetterTextField: Sendable, CustomTestStringConvertible {
         add("sender.phone", "the sender's phone", .person) { $0.sender.phone = $1 }
         add("sender.location", "the sender's location", .person) { $0.sender.location = $1 }
         add("sender.website", "the sender's website", .person) { $0.sender.website = $1 }
+        add("recipient.title", "the recipient's title") { $0.recipient.title = $1 }
         add("recipient.name", "the recipient's name") { $0.recipient.name = $1 }
         add("recipient.familyName", "the recipient's family name") { $0.recipient.familyName = $1 }
         add("recipient.company", "the recipient's company") { $0.recipient.company = $1 }
@@ -152,7 +153,7 @@ struct LetterDocumentContractTests {
         let line = fill(LetterDocumentValidator.maxTextBytes), personal = fill(CVDocumentValidator.maxTextBytes)
         var letter = letterFixture
         letter.sender = Person(name: personal, professionalTitle: personal, email: personal, phone: personal, location: personal, website: personal)
-        letter.recipient = LetterRecipient(formOfAddress: .masculine, name: line, familyName: line, company: line,
+        letter.recipient = LetterRecipient(formOfAddress: .masculine, title: line, name: line, familyName: line, company: line,
                                            address: Array(repeating: line, count: LetterDocumentValidator.maxAddressLines))
         letter.place = line; letter.reference = line; letter.subject = line; letter.closing = line; letter.name = line
         letter.body = Array(repeating: line, count: LetterDocumentValidator.maxParagraphs)
@@ -175,12 +176,12 @@ struct LetterDocumentContractTests {
     func everyFieldAtItsBound() throws {
         let line = LetterDocumentValidator.maxTextBytes, personal = CVDocumentValidator.maxTextBytes
         #expect(line == 10_000 && personal == 16_384)
-        // The letter's own fields of one line: the signature, 3 of the recipient, its address lines, the place, the reference and the
+        // The letter's own fields of one line: the signature, 4 of the recipient, its address lines, the place, the reference and the
         // subject, and the attachments. Its fields of several: the paragraphs and the closing. The sender's 6, as a CV's person has them.
-        let lines = 1 + 3 + LetterDocumentValidator.maxAddressLines + 3 + LetterDocumentValidator.maxAttachments
+        let lines = 1 + 4 + LetterDocumentValidator.maxAddressLines + 3 + LetterDocumentValidator.maxAttachments
         let several = LetterDocumentValidator.maxParagraphs + 1
-        #expect(lines == 35 && several == 22)
-        #expect(LetterDocumentValidator.maxLetterTextBytes == (lines + several) * line + 6 * personal && LetterDocumentValidator.maxLetterTextBytes == 668_304)
+        #expect(lines == 36 && several == 22)
+        #expect(LetterDocumentValidator.maxLetterTextBytes == (lines + several) * line + 6 * personal && LetterDocumentValidator.maxLetterTextBytes == 678_304)
         for unit in ["x", "🙂"] {
             let letter = Self.letterAtEveryBound(unit)
             #expect(stringLeaves(of: letter).filter { $0 != letter.language }.reduce(0) { $0 + $1.utf8.count } == LetterDocumentValidator.maxLetterTextBytes)
@@ -211,6 +212,34 @@ struct LetterDocumentContractTests {
         letter.attachments = Array(repeating: line, count: 20)
         try LetterDocumentValidator.validate(letter)
         #expect(try LetterDocumentValidator.decode(json: try JSONEncoder().encode(letter)) == letter)
+    }
+
+    @Test("the recipient as Authoring keeps it fits the document at its bounds, with no join: the title, the contact's name, the surname and the company of 10,000 bytes, and the role and 6 address lines")
+    func recipientAtAuthoringBounds() throws {
+        let line = String(repeating: "x", count: 10_000)
+        // Authoring's recipient: company, contactName, title, surname, role, and up to 6 address lines, each of up to 10,000 bytes. The
+        // title, the name, the family name and the company are fields of the document; the role is the address line after the name.
+        var letter = letterFixture
+        letter.recipient = LetterRecipient(formOfAddress: .feminine, title: line, name: line, familyName: line, company: line,
+                                           address: Array(repeating: line, count: 1 + 6))
+        try LetterDocumentValidator.validate(letter)
+        #expect(letter.recipient.address.count <= LetterDocumentValidator.maxAddressLines)
+        #expect(try LetterDocumentValidator.decode(json: try JSONEncoder().encode(letter)) == letter)
+        // A title and a name joined would be one line of 20,001 bytes, which no field of the document holds.
+        letter.recipient.name = line + " " + line
+        #expect(invalid(letter) == LetterDocumentValidator.textReason("the recipient's name"))
+    }
+
+    @Test("a document without a recipient's title is a valid document, and its JSON has no title")
+    func titleIsOptional() throws {
+        var letter = letterFixture
+        letter.recipient.title = nil
+        try LetterDocumentValidator.validate(letter)
+        let json = try JSONEncoder().encode(letter)
+        #expect(!String(decoding: json, as: UTF8.self).contains("\"title\":\"Dott"))
+        #expect(try LetterDocumentValidator.decode(json: json) == letter)
+        let old = #"{"schemaVersion":1,"language":"it","sender":{"name":"A"},"recipient":{"formOfAddress":"neutral","address":[]},"date":{"year":2026,"month":1,"day":9},"body":[],"name":"A","attachments":[]}"#
+        #expect(try LetterDocumentValidator.decode(json: Data(old.utf8)).recipient.title == nil)
     }
 
     @Test("a line break is accepted in a paragraph and in the closing, and refused in a field that holds one line",

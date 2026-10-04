@@ -82,10 +82,18 @@ public struct LetterHTMLBuilder: Sendable {
         return node(.header, .sender, children)
     }
 
-    /// nil when there is nothing to print: a neutral recipient with no name, company or address.
+    /// nil when there is nothing to print: a neutral recipient with no title, name, company or address.
     private func recipient(_ recipient: LetterRecipient) -> HTML? {
         var children: [HTML] = []
-        if let name = present(recipient.name) { children.append(line(.p, .recipientName, name)) }
+        let title = present(recipient.title), name = present(recipient.name)
+        if title != nil || name != nil {
+            // The title before the name, on the name's line.
+            var nameLine: [HTML] = []
+            if let title { nameLine.append(node(.span, .recipientTitle, [.text(title)])) }
+            if title != nil && name != nil { nameLine.append(.separator) }
+            if let name { nameLine.append(.text(name)) }
+            children.append(node(.p, .recipientName, nameLine))
+        }
         if let company = present(recipient.company) { children.append(line(.p, .recipientCompany, company)) }
         children += recipient.address.compactMap { present($0) }.map { line(.p, .recipientAddress, $0) }
         return children.isEmpty ? nil : node(.section, .recipient, children)

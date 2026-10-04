@@ -151,8 +151,9 @@ html[lang]
         │   ├── p.letter-sender-phone        (if present)
         │   ├── p.letter-sender-location     (if present)
         │   └── a.letter-sender-website[href]  (if present and a valid WebLink; its text is the href)
-        ├── section.letter-recipient         (if the recipient has a name, a company or an address line)
-        │   ├── p.letter-recipient-name      (if present)
+        ├── section.letter-recipient         (if the recipient has a title, a name, a company or an address line)
+        │   ├── p.letter-recipient-name      (if a name or a title is present)
+        │   │   └── span.letter-recipient-title  (if present; before the name, on the name's line)
         │   ├── p.letter-recipient-company   (if present)
         │   └── p.letter-recipient-address   one per address line
         ├── p.letter-dateline                the place and the date, in the language's format
@@ -185,7 +186,7 @@ html[lang]
 | Kind | Values |
 |---|---|
 | Elements | `main`, `header`, `section`, `h1`, `h2`, `p`, `span`, `a` |
-| Classes | `letter`, `letter-sender`, `letter-sender-name`, `letter-sender-title`, `letter-sender-email`, `letter-sender-phone`, `letter-sender-location`, `letter-sender-website`, `letter-recipient`, `letter-recipient-name`, `letter-recipient-company`, `letter-recipient-address`, `letter-dateline`, `letter-reference`, `letter-reference-label`, `letter-reference-value`, `letter-subject`, `letter-salutation`, `letter-paragraph`, `letter-closing`, `letter-valediction`, `letter-signature`, `letter-attachments`, `letter-attachments-title`, `letter-attachment` |
+| Classes | `letter`, `letter-sender`, `letter-sender-name`, `letter-sender-title`, `letter-sender-email`, `letter-sender-phone`, `letter-sender-location`, `letter-sender-website`, `letter-recipient`, `letter-recipient-name`, `letter-recipient-title`, `letter-recipient-company`, `letter-recipient-address`, `letter-dateline`, `letter-reference`, `letter-reference-label`, `letter-reference-value`, `letter-subject`, `letter-salutation`, `letter-paragraph`, `letter-closing`, `letter-valediction`, `letter-signature`, `letter-attachments`, `letter-attachments-title`, `letter-attachment` |
 | Attribute selectors | none |
 | Pseudo-classes | none |
 

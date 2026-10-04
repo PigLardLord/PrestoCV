@@ -19,7 +19,7 @@ func expectedLetterNodes(_ letter: LetterDocument, _ conventions: LetterConventi
     func filled(_ lines: [String]) -> [String] { lines.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
     var nodes = [letter.sender.name]
     nodes += [letter.sender.professionalTitle, letter.sender.email, letter.sender.phone, letter.sender.location, letter.sender.website].compactMap { $0 }
-    nodes += [letter.recipient.name, letter.recipient.company].compactMap { $0 } + filled(letter.recipient.address)
+    nodes += [letter.recipient.title, letter.recipient.name, letter.recipient.company].compactMap { $0 } + filled(letter.recipient.address)
     nodes.append(conventions.dateLine(place: letter.place, date: letter.date) ?? "")
     if let reference = letter.reference { nodes += [conventions.referenceLabel, reference] }
     if let subject = letter.subject { nodes.append(subject) }
@@ -165,6 +165,33 @@ struct LetterBuilderTests {
         #expect(rendered.textNodes.contains("Writes {{title}} {name} {date} literally & <script>alert(1)</script>"))
     }
 
+    @Test("the recipient's title is printed before the name, on the name's line, and alone when there is no name")
+    func recipientTitle() throws {
+        var letter = letterFixture
+        var html = try render(letter).html
+        #expect(html.contains("<p class=\"letter-recipient-name\"><span class=\"letter-recipient-title\">Dott.ssa</span> Maria Rossi</p>"))
+        #expect(try render(letter).textNodes.starts(with: ["Ada Lovelace", "Analista", "ada@example.com", "+39 06 1234567", "Via Roma 1, 00100 Roma", "https://ada.example", "Dott.ssa", "Maria Rossi", "Babbage & Co"]))
+        letter.recipient.name = nil
+        html = try render(letter).html
+        #expect(html.contains("<p class=\"letter-recipient-name\"><span class=\"letter-recipient-title\">Dott.ssa</span></p>"))
+        letter.recipient.title = nil
+        letter.recipient.name = "Maria Rossi"
+        html = try render(letter).html
+        #expect(html.contains("<p class=\"letter-recipient-name\">Maria Rossi</p>") && !html.contains("class=\"letter-recipient-title\""))
+        letter.recipient.name = nil
+        #expect(!(try render(letter).html.contains("class=\"letter-recipient-name\"")))
+    }
+
+    @Test("the recipient at Authoring's bounds is rendered, every text node present")
+    func recipientAtBounds() throws {
+        let line = String(repeating: "x", count: 10_000)
+        var letter = letterFixture
+        letter.recipient = LetterRecipient(formOfAddress: .feminine, title: line, name: line, familyName: line, company: line, address: Array(repeating: line, count: 7))
+        let rendered = try render(letter)
+        #expect(rendered.textNodes == expectedLetterNodes(letter, try LetterConventionsCatalog.conventions(for: "it")))
+        #expect(rendered.textNodes.filter { $0 == line }.count == 1 + 1 + 1 + 7)       // title, name, company and 7 address lines
+    }
+
     @Test("a letter with no body renders its header, its salutation, its valediction and its signature, and no paragraph", arguments: LetterDocumentContractTests.emptyBodies)
     func emptyBody(body: [String]) throws {
         var letter = letterFixture
@@ -240,6 +267,7 @@ struct LetterBuilderTests {
         var letter = letterFixture
         letter.sender.professionalTitle = ""
         letter.sender.email = ""
+        letter.recipient.title = ""
         letter.recipient.name = ""
         letter.recipient.company = nil
         letter.recipient.address = ["", ""]

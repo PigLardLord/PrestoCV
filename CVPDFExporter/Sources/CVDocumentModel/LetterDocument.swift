@@ -7,14 +7,19 @@ public enum FormOfAddress: String, Codable, Sendable, CaseIterable { case mascul
 /// Whom the letter is written to. The salutation is the page's, written from `formOfAddress` and `familyName`.
 public struct LetterRecipient: Codable, Sendable, Equatable {
     public var formOfAddress: FormOfAddress
+    /// "Dr." or "Dott.ssa", as the advert writes it: printed before the name, on its line. It is a field of its own, so a title and a
+    /// name that Authoring keeps at their bounds are never joined into one that no field holds.
+    public var title: String?
     /// As printed in the address block.
     public var name: String?
     /// What the salutation names ("Dear Ms Rossi"). Required unless the form of address is neutral.
     public var familyName: String?
     public var company: String?
     public var address: [String]
-    public init(formOfAddress: FormOfAddress = .neutral, name: String? = nil, familyName: String? = nil, company: String? = nil, address: [String] = []) {
-        self.formOfAddress = formOfAddress; self.name = name; self.familyName = familyName; self.company = company; self.address = address
+    public init(formOfAddress: FormOfAddress = .neutral, title: String? = nil, name: String? = nil, familyName: String? = nil, company: String? = nil,
+                address: [String] = []) {
+        self.formOfAddress = formOfAddress; self.title = title; self.name = name; self.familyName = familyName; self.company = company
+        self.address = address
     }
 }
 
@@ -90,14 +95,14 @@ public enum LetterDocumentValidator {
     /// A letter that is too long for its page is not invalid: the export refuses it, with the number of pages it needed.
     static let maxTextBytes = 10_000
     static let maxParagraphs = 1 + 20, maxAddressLines = 8, maxAttachments = 20
-    /// The most text a letter holds, with every field at its bound: the sender's 6 fields at the CV's bound of 16,384 bytes, and 35
-    /// fields of one line (the signature, the recipient's three, the address lines, the place, the reference, the subject and the
-    /// attachments) and 22 of several (the paragraphs and the closing) at 10,000. That is 98,304 + 570,000 = 668,304 bytes.
+    /// The most text a letter holds, with every field at its bound: the sender's 6 fields at the CV's bound of 16,384 bytes, and 36
+    /// fields of one line (the signature, the recipient's four, the address lines, the place, the reference, the subject and the
+    /// attachments) and 22 of several (the paragraphs and the closing) at 10,000. That is 98,304 + 580,000 = 678,304 bytes.
     static let maxLetterTextBytes = 6 * CVDocumentValidator.maxTextBytes
-        + (1 + 3 + maxAddressLines + 3 + maxAttachments + maxParagraphs + 1) * maxTextBytes
+        + (1 + 4 + maxAddressLines + 3 + maxAttachments + maxParagraphs + 1) * maxTextBytes
     /// The largest JSON document `decode` accepts, checked before decoding. A producer that escapes every scalar outside
     /// ASCII writes a scalar of four bytes in twelve, so a letter at its bounds takes up to three times its text,
-    /// 2,004,912 bytes, and the keys and punctuation take under 10,000 more.
+    /// 2,034,912 bytes, and the keys and punctuation take under 10,000 more.
     public static let maxJSONBytes = 2_100_000
 
     /// The reasons name the field, as the CV validator's do.
@@ -162,7 +167,7 @@ public enum LetterDocumentValidator {
         case .text(let field)?: throw Invalid(reason: textReason("the sender's \(field.label)"))
         case nil: break
         }
-        try text(d.recipient.name, "the recipient's name"); try text(d.recipient.familyName, "the recipient's family name"); try text(d.recipient.company, "the recipient's company")
+        try text(d.recipient.title, "the recipient's title"); try text(d.recipient.name, "the recipient's name"); try text(d.recipient.familyName, "the recipient's family name"); try text(d.recipient.company, "the recipient's company")
         try text(d.place, "the place"); try text(d.reference, "the reference"); try text(d.subject, "the subject")
         for line in d.recipient.address { try text(line, "an address line") }
         for attachment in d.attachments { try text(attachment, "an attachment") }
