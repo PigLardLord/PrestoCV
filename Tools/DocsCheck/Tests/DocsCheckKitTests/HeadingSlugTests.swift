@@ -41,6 +41,18 @@ struct HeadingSlugTests {
         #expect(HeadingSlugger.baseSlug(ofHeading: heading) == slug)
     }
 
+    @Test("only alphabetic characters, marks, decimal digits and connector punctuation are kept, as github-slugger does", arguments: [
+        ("x² and ½ cup", "x-and--cup"),
+        ("Ⓐ circle", "ⓐ-circle"),
+        ("Ⅻ roman", "ⅻ-roman"),
+        ("① one", "-one"),
+        ("٣ digits", "٣-digits"),
+        ("a‿b", "a‿b"),
+    ])
+    func keptSet(heading: String, slug: String) {
+        #expect(HeadingSlugger.baseSlug(ofHeading: heading) == slug)
+    }
+
     @Test("a decomposed accent is kept as it is written")
     func decomposedAccent() {
         #expect(HeadingSlugger.baseSlug(ofHeading: "Cafe\u{0301}") == "cafe\u{0301}")

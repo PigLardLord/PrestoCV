@@ -1,5 +1,5 @@
 /// Turns headings into the anchors GitHub gives them: the heading's text, lower-cased, keeping letters, marks,
-/// numbers, underscores and hyphens, with each space becoming a hyphen. A heading that repeats an earlier slug gets
+/// decimal digits, underscores and hyphens, with each space becoming a hyphen. A heading that repeats an earlier slug gets
 /// `-1`, `-2` and so on, in document order, as GitHub does.
 struct HeadingSlugger {
     private var occurrences: [String: Int] = [:]
@@ -25,13 +25,13 @@ struct HeadingSlugger {
         return slug
     }
 
+    /// What github-slugger keeps: alphabetic characters (letters, and also letter numbers and circled letters),
+    /// combining marks, decimal digits and connector punctuation, plus `-` and space. Other numbers (`²`, `½`, `①`)
+    /// and every symbol are dropped.
     private static func keeps(_ scalar: Unicode.Scalar) -> Bool {
-        if scalar == " " || scalar == "-" { return true }
+        if scalar == " " || scalar == "-" || scalar.properties.isAlphabetic { return true }
         switch scalar.properties.generalCategory {
-        case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter,
-             .nonspacingMark, .spacingMark, .enclosingMark,
-             .decimalNumber, .letterNumber, .otherNumber,
-             .connectorPunctuation:
+        case .nonspacingMark, .spacingMark, .enclosingMark, .decimalNumber, .connectorPunctuation:
             return true
         default:
             return false
