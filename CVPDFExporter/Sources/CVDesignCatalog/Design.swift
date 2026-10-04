@@ -94,6 +94,19 @@ public struct DesignPackageValidator: Sendable {
         let markupContract: Int
     }
 
+    /// The identifier a package claims, read without validating the rest of it: nil unless the bytes are within `maxBytes`
+    /// and are a JSON object whose `manifest` has a string `id` that is a valid identifier. The catalog reserves with it
+    /// the identifier of every bundled package, also of one that fails validation. An identifier that is not valid can
+    /// never be installed, so it needs no reservation.
+    public func claimedIdentifier(in data: Data) -> String? {
+        guard data.count <= maxBytes else { return nil }
+        let parsed: Any
+        do { parsed = try JSONSerialization.jsonObject(with: data) } catch { return nil }
+        guard let object = parsed as? [String: Any], let manifest = object["manifest"] as? [String: Any],
+              let id = manifest["id"] as? String, DesignManifest.isValidID(id) else { return nil }
+        return id
+    }
+
     public func validate(_ data: Data) throws(DesignPackageRejected) -> ValidatedDesign {
         guard data.count <= maxBytes else { throw DesignPackageRejected(violations: [.tooLarge(data.count)]) }
         let parsed: Any

@@ -418,13 +418,34 @@ struct InstallDesignTests {
         #expect(await gate.verified == ["mine"])
     }
 
-    @Test("a bundled package the validator refuses names no identifier, so an import may take it")
-    func refusedBundledPackageReservesNothing() async throws {
+    @Test("every identifier in the bundled source is reserved, also that of a package the validator refuses")
+    func refusedBundledPackageStillReservesItsIdentifier() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let broken = (name: "broken-file", data: designData(".cv{}", id: "modern", manifestExtra: ["version": "1"]))
+        let source = FixedBundledSource(packages: [broken, try bundled("clean")])
+        let install = InstallDesign(source: source, gate: gate, store: store)
+        for id in ["modern", "clean"] {
+            await #expect(throws: DesignCatalogError.bundledIdentifier(id)) { _ = try await install(DesignStoreContract.package(id: id, version: "999999999.0.0")) }
+        }
+        #expect(try await store.installedDesigns().isEmpty)
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("the real bundle's identifiers are reserved today, although every package of it is refused")
+    func realBundleReservesItsIdentifiers() async throws {
+        let install = InstallDesign(source: BundleDesignSource(), gate: FakeRenderingGate(), store: InMemoryDesignStore())
+        for id in ["minimal", "modern", "professional"] {
+            await #expect(throws: DesignCatalogError.bundledIdentifier(id)) { _ = try await install(DesignStoreContract.package(id: id)) }
+        }
+    }
+
+    @Test("a bundled package that names no identifier reserves nothing, and does not stop the import")
+    func unreadableBundledPackageReservesNothing() async throws {
         let store = InMemoryDesignStore()
-        let broken = (name: "modern", data: designData(".cv{}", id: "modern", manifestExtra: ["version": "1"]))
-        let install = InstallDesign(source: FixedBundledSource(packages: [broken]), gate: FakeRenderingGate(), store: store)
-        _ = try await install(DesignStoreContract.package(id: "modern"))
-        #expect(try await store.installedOrigins() == ["modern": .imported])
+        let packages: [(name: String, data: Data)] = [("garbage", Data("not JSON".utf8)), ("no-manifest", Data("{}".utf8))]
+        let install = InstallDesign(source: FixedBundledSource(packages: packages), gate: FakeRenderingGate(), store: store)
+        _ = try await install(DesignStoreContract.package(id: "mine"))
+        #expect(try await store.installedOrigins() == ["mine": .imported])
     }
 
     @Test("a bundled source that cannot be read stops the import: nothing is rendered or stored")

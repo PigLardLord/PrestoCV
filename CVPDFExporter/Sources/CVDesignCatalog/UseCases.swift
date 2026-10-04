@@ -18,9 +18,9 @@ public enum DesignCatalogError: Error, Equatable, Sendable {
 /// renders completely, then store it as an import. Nothing is stored unless every check passes.
 /// - An import that names the identifier of a bundled design is refused (`DesignCatalogError.bundledIdentifier`),
 ///   whatever its version: it would shadow the bundled design, and later fixes would never reach a CV that names it.
-///   Storing it under another identifier would change what the CV's design choice names. A bundled design is one the
-///   source lists and the validator accepts, installed or not, and one the store records as bundled, even if it has left
-///   the bundle.
+///   Storing it under another identifier would change what the CV's design choice names. A bundled identifier is one the
+///   source's packages claim, whether or not the validator accepts the package and whether or not the sync has installed
+///   the design, and one the store records as bundled, even if the design has left the bundle.
 /// - The source is read after the package is validated, so an invalid package is reported as invalid. A source that cannot
 ///   be read stops the import (`DesignCatalogError.bundledDesignsUnavailable`), and so does a store that cannot list its
 ///   origins (`DesignCatalogError.storeUnavailable`), since the identifier cannot be judged.
@@ -47,19 +47,14 @@ public struct InstallDesign: Sendable {
         }
     }
 
-    /// The identifiers of the bundled packages that pass the validator. A package it refuses names nothing.
+    /// The identifiers the bundled packages claim, whether or not the validator accepts them. A package that names no
+    /// valid identifier reserves nothing.
     private func bundledIdentifiers() async throws -> Set<String> {
         let packages: [(name: String, data: Data)]
         do { packages = try await source.bundledPackages() } catch let cancellation as CancellationError { throw cancellation } catch {
             throw DesignCatalogError.bundledDesignsUnavailable
         }
-        var identifiers: Set<String> = []
-        for package in packages {
-            let design: ValidatedDesign
-            do throws(DesignPackageRejected) { design = try validator.validate(package.data) } catch { continue }
-            identifiers.insert(design.manifest.id)
-        }
-        return identifiers
+        return Set(packages.compactMap { validator.claimedIdentifier(in: $0.data) })
     }
 }
 

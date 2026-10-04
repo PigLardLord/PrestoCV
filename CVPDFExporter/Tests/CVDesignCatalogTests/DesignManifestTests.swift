@@ -204,3 +204,37 @@ struct DesignManifestTests {
         #expect(try JSONDecoder().decode(DesignManifest.self, from: JSONEncoder().encode(manifest)) == manifest)
     }
 }
+
+/// Packages that claim no usable identifier, built step by step: a long literal array is slow to type-check.
+private let packagesWithoutIdentifier: [String] = {
+    var texts: [String] = []
+    texts.append(contentsOf: ["not JSON", "[]", "{}", #"{"manifest":[]}"#, #"{"manifest":{}}"#, #"{"manifest":{"id":5}}"#, #"{"manifest":{"id":null}}"#])
+    texts.append(contentsOf: [#"{"manifest":{"id":""}}"#, #"{"manifest":{"id":"../clean"}}"#, #"{"manifest":{"id":"Clean"}}"#, #"{"manifest":{"id":"clean\n"}}"#])
+    texts.append(#"{"manifest":{"id":"\#(String(repeating: "a", count: 65))"}}"#)
+    return texts
+}()
+
+@Suite("the identifier a package claims (#127)")
+struct ClaimedIdentifierTests {
+    @Test("a package's identifier is read whether or not the rest of the package passes the validator")
+    func claimed() {
+        let validator = DesignPackageValidator()
+        #expect(validator.claimedIdentifier(in: designData(".cv-name{color:var(--color-primary)}", id: "clean")) == "clean")
+        let refused = designData(".cv{display:none}", id: "modern", extra: ["htmlContent": "<p>"], manifestExtra: ["version": "1"])
+        #expect(violations(of: refused) != nil)
+        #expect(validator.claimedIdentifier(in: refused) == "modern")
+        #expect(validator.claimedIdentifier(in: designData("", id: "a-1")) == "a-1")
+    }
+
+    @Test("a package that claims no valid identifier names none", arguments: packagesWithoutIdentifier)
+    func notClaimed(json: String) {
+        #expect(DesignPackageValidator().claimedIdentifier(in: Data(json.utf8)) == nil)
+    }
+
+    @Test("a package larger than the validator's cap names none")
+    func tooLarge() {
+        let data = designData(".cv-name{color:var(--color-primary)}", id: "clean")
+        #expect(DesignPackageValidator(maxBytes: data.count).claimedIdentifier(in: data) == "clean")
+        #expect(DesignPackageValidator(maxBytes: data.count - 1).claimedIdentifier(in: data) == nil)
+    }
+}
