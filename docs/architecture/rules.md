@@ -217,7 +217,7 @@ A platform-only target wraps **every file** entirely in its platform condition. 
 - **Language lookup uses BCP 47:** the full tag, then the full primary language subtag. An unsupported language is a typed error, never a silent fallback to English.
 - **The app catalog** marks an entry translated only when it is.
 
-**Enforced by:** checker (detector `localization` outside the app target) and test (heading tables complete; unsupported languages rejected).
+**Enforced by:** checker (detector `localization` outside the app target) and test (heading and letter tables complete; unsupported languages rejected).
 
 ## R14. No dead code, no demos in libraries, no test doubles in production
 

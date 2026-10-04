@@ -135,7 +135,7 @@ A `LetterDocument` is rendered as a structure of its own, beside the CV's. One b
 - **Its elements and classes are its own.** None of its classes is in the table of what a design may select, so a design's CSS cannot select them: the design validator rejects any class outside that table.
 - **Its stylesheet is not a design.** It passes the same tokenizer and property allow-list as a design's, checked against the letter structure's selectors. Its colours and fonts are fixed values of the stylesheet.
 - **The structure is pinned by a golden HTML file** (R10), and a test reads this section and holds the code to it, as `MarkupContractPageTests` does for the CV's structure.
-- **The structure itself is written here when #187 lands:** the tree, the classes and the page rules. Until then this section only states that the letter is separate from the CV's contract.
+- **The structure itself is written here when #187 lands:** the tree, the classes and the page rules. Its headings differ from the CV's `### Structure` and `### Selectable by a design`, which `MarkupContractPageTests` finds by name. Until then this section only states that the letter is separate from the CV's contract.
 
 ## Changelog
 
