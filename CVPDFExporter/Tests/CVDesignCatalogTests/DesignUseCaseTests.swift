@@ -53,6 +53,11 @@ private func bundled(_ id: String, version: String = "1.0.0", css: String = ".cv
 
 private let otherCSS = ".cv-entry-title{font-weight:600}"
 
+/// A design as an earlier sync installed it: the store records it as bundled.
+private func installedBySync(_ design: ValidatedDesign, in store: some DesignStore) async throws {
+    _ = try await store.saveIfNewer(design)
+}
+
 @Suite("syncing the bundled designs (#125)")
 struct SyncBundledDesignsTests {
     // MARK: Installing and upgrading
@@ -71,7 +76,7 @@ struct SyncBundledDesignsTests {
     @Test("a bundled design newer than the installed one is rendered and replaces it", arguments: [("1.0.0", "1.0.1"), ("1.9.9", "2.0.0"), ("1.0.9", "1.0.10")])
     func upgrades(installed: String, bundledVersion: String) async throws {
         let store = InMemoryDesignStore(), gate = FakeRenderingGate()
-        try await store.save(DesignStoreContract.design(id: "clean", version: installed))
+        try await installedBySync(DesignStoreContract.design(id: "clean", version: installed), in: store)
         let newer = try bundled("clean", version: bundledVersion, css: otherCSS)
         let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [newer]), gate: gate, store: store)()
         #expect(report.upgraded == ["clean"])
@@ -85,7 +90,7 @@ struct SyncBundledDesignsTests {
     func equalVersion() async throws {
         let store = InMemoryDesignStore(), gate = FakeRenderingGate()
         let installed = try DesignStoreContract.design(id: "clean", version: "1.2.3")
-        try await store.save(installed)
+        try await installedBySync(installed, in: store)
         let sameVersion = try bundled("clean", version: "1.2.3", css: otherCSS)
         let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [sameVersion]), gate: gate, store: store)()
         #expect(report.unchanged == ["clean"])
@@ -94,11 +99,11 @@ struct SyncBundledDesignsTests {
         #expect(await gate.verified.isEmpty)
     }
 
-    @Test("a bundled design never downgrades a newer one installed by other means", arguments: [("2.0.0", "1.9.9"), ("1.0.10", "1.0.9"), ("1.10.0", "1.9.0")])
+    @Test("a bundled design never downgrades a newer one that is installed as bundled", arguments: [("2.0.0", "1.9.9"), ("1.0.10", "1.0.9"), ("1.10.0", "1.9.0")])
     func neverDowngrades(installed: String, bundledVersion: String) async throws {
         let store = InMemoryDesignStore(), gate = FakeRenderingGate()
         let newer = try DesignStoreContract.design(id: "clean", version: installed)
-        try await store.save(newer)
+        try await installedBySync(newer, in: store)
         let older = try bundled("clean", version: bundledVersion, css: otherCSS)
         let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [older]), gate: gate, store: store)()
         #expect(report.unchanged == ["clean"])
@@ -110,7 +115,7 @@ struct SyncBundledDesignsTests {
     @Test("a mixed source is reported in the order processed")
     func mixed() async throws {
         let store = InMemoryDesignStore(), gate = FakeRenderingGate()
-        for (id, version) in [("b", "1.0.0"), ("c", "1.0.0"), ("d", "2.0.0")] { try await store.save(DesignStoreContract.design(id: id, version: version)) }
+        for (id, version) in [("b", "1.0.0"), ("c", "1.0.0"), ("d", "2.0.0")] { try await installedBySync(DesignStoreContract.design(id: id, version: version), in: store) }
         let source = FixedBundledSource(packages: [try bundled("a"), try bundled("b", version: "1.1.0"), try bundled("c"), try bundled("d")])
         let report = try await SyncBundledDesigns(source: source, gate: gate, store: store)()
         #expect(report.installed == ["a"] && report.upgraded == ["b"] && report.unchanged == ["c", "d"] && report.rejected.isEmpty)
@@ -157,7 +162,7 @@ struct SyncBundledDesignsTests {
     @Test("a newer design saved while the sync renders is not overwritten by the older bundled design", .timeLimit(.minutes(1)))
     func savedWhileRendering() async throws {
         let store = InMemoryDesignStore(), gate = SuspendingRenderingGate(holding: "clean")
-        try await store.save(DesignStoreContract.design(id: "clean", version: "1.0.0"))
+        try await installedBySync(DesignStoreContract.design(id: "clean", version: "1.0.0"), in: store)
         let sync = SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean", version: "2.0.0", css: otherCSS)]), gate: gate, store: store)
         let running = Task { try await sync() }
         guard await gate.waitUntilEntered() else {
@@ -166,12 +171,32 @@ struct SyncBundledDesignsTests {
             return
         }
         let newest = try DesignStoreContract.design(id: "clean", version: "3.0.0", css: ".cv-skill{font-weight:700}")
-        try await store.save(newest)
+        try await installedBySync(newest, in: store)
         await gate.release()
         let report = try await running.value
         #expect(report.unchanged == ["clean"])
         #expect(report.upgraded.isEmpty && report.installed.isEmpty && report.failed.isEmpty && report.notRendered.isEmpty)
         #expect(try await GetDesign(store: store)(id: "clean") == newest)
+    }
+
+    @Test("an imported design saved while the sync renders is not replaced by the bundled design, and is reported as a conflict", .timeLimit(.minutes(1)))
+    func importedWhileRendering() async throws {
+        let store = InMemoryDesignStore(), gate = SuspendingRenderingGate(holding: "clean")
+        let sync = SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean", version: "2.0.0", css: otherCSS)]), gate: gate, store: store)
+        let running = Task { try await sync() }
+        guard await gate.waitUntilEntered() else {
+            Issue.record("the sync did not reach the rendering gate in time")
+            running.cancel()
+            return
+        }
+        let mine = try DesignStoreContract.design(id: "clean", version: "1.0.0")
+        try await store.save(mine)
+        await gate.release()
+        let report = try await running.value
+        #expect(report.conflicts == ["clean"])
+        #expect(report.installed.isEmpty && report.upgraded.isEmpty && report.unchanged.isEmpty && report.failed.isEmpty && report.notRendered.isEmpty)
+        #expect(try await GetDesign(store: store)(id: "clean") == mine)
+        #expect(try await store.installedOrigins() == ["clean": .imported])
     }
 
     @Test("an installed design is listed, never read: one that cannot be read does not stop the sync")
@@ -221,7 +246,7 @@ struct SyncBundledDesignsTests {
     func upgradeNotRendered() async throws {
         let store = InMemoryDesignStore()
         let installed = try DesignStoreContract.design(id: "clean")
-        try await store.save(installed)
+        try await installedBySync(installed, in: store)
         let source = FixedBundledSource(packages: [try bundled("clean", version: "1.1.0", css: otherCSS)])
         let report = try await SyncBundledDesigns(source: source, gate: FakeRenderingGate(refusing: ["clean"]), store: store)()
         #expect(report.notRendered == ["clean"] && report.upgraded.isEmpty)

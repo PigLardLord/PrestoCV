@@ -226,7 +226,7 @@ struct FileDesignStoreTests {
     func keptWritesNothing() async throws {
         try await inTemporaryStore { dir in
             let store = FileDesignStore(directory: dir)
-            try await store.save(DesignStoreContract.design(id: "clean", version: "2.0.0"))
+            _ = try await store.saveIfNewer(DesignStoreContract.design(id: "clean", version: "2.0.0"))
             let index = try Data(contentsOf: dir.index), files = dir.designFiles
             for version in ["2.0.0", "1.9.9", "1.0.0"] {
                 let outcome = try await store.saveIfNewer(DesignStoreContract.design(id: "clean", version: version, css: ".cv-skill{font-weight:700}"))
@@ -234,6 +234,27 @@ struct FileDesignStoreTests {
             }
             #expect(try Data(contentsOf: dir.index) == index)
             #expect(dir.designFiles == files)
+        }
+    }
+
+    @Test("a conditional save over an imported design, or one with no recorded origin, keeps it and writes nothing, whatever the versions")
+    func keptImportedWritesNothing() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            try await store.save(DesignStoreContract.design(id: "clean", version: "2.0.0"))
+            try FileManager.default.removeItem(at: dir.origins)   // "clean" now has no recorded origin
+            try await store.save(DesignStoreContract.design(id: "plain", version: "2.0.0"))   // the record lists "plain" only
+            let index = try Data(contentsOf: dir.index), origins = try Data(contentsOf: dir.origins), files = dir.designFiles
+            for id in ["clean", "plain"] {
+                for version in ["3.0.0", "2.0.0", "1.0.0"] {
+                    let outcome = try await store.saveIfNewer(DesignStoreContract.design(id: id, version: version, css: ".cv-skill{font-weight:700}"))
+                    #expect(outcome == .keptImported)
+                }
+            }
+            #expect(try Data(contentsOf: dir.index) == index)
+            #expect(try Data(contentsOf: dir.origins) == origins)
+            #expect(dir.designFiles == files)
+            #expect(try await store.installedOrigins() == ["plain": .imported])
         }
     }
 

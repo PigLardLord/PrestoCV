@@ -155,6 +155,9 @@ public enum ConditionalSave: Equatable, Sendable {
     case upgraded
     /// The installed design has the same or a newer version: nothing was written.
     case keptInstalled
+    /// The installed design is not one the sync installed (an import, or one with no recorded origin, which counts as
+    /// an import): nothing was written, whatever the versions.
+    case keptImported
 }
 
 /// Stores validated designs, and records where each came from. Owned by the catalog (R3); adapters live in

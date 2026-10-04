@@ -13,6 +13,7 @@ public actor InMemoryDesignStore: DesignStore {
     public func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave {
         let id = design.manifest.id
         guard let installed = designs[id] else { designs[id] = design; origins[id] = .bundled; return .installed }
+        guard origins[id] == .bundled else { return .keptImported }
         guard design.manifest.version > installed.manifest.version else { return .keptInstalled }
         designs[id] = design
         return .upgraded
@@ -64,6 +65,13 @@ public enum DesignStoreContract {
         try check(await store.installedDesigns() == [bold.manifest, cleanV2.manifest, later.manifest], "a conditional save lists a design once")
         try check(await store.installedOrigins() == ["bold": .imported, "clean": .imported, "fresh": .bundled],
                   "a conditional save records the design as bundled, and an upgrade keeps the origin")
+
+        // A conditional save is the sync's: it never replaces a design that an import saved, whatever its version.
+        let mine = try design(id: "mine"), bundledNewer = try design(id: "mine", version: "9.0.0", css: ".cv-skill{font-weight:700}")
+        try await store.save(mine)
+        try check(await store.saveIfNewer(bundledNewer) == .keptImported, "a conditional save keeps an imported design, even an older one")
+        try check(await store.design(id: "mine") == mine, "a kept imported design is not replaced")
+        try check(await store.installedOrigins()["mine"] == .imported, "a kept imported design stays imported")
     }
 
     /// A design as the validator accepts it; `preview` adds a PNG preview, which is stored too.

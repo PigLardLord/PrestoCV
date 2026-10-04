@@ -69,6 +69,8 @@ public struct SyncReport: Equatable, Sendable {
     public internal(set) var notRendered: [String] = []
     /// Not saved: the design is valid and rendered, but the store failed to save it.
     public internal(set) var failed: [String] = []
+    /// Not saved: the store holds a design with this identifier that the sync did not install, so it is left alone.
+    public internal(set) var conflicts: [String] = []
 }
 
 /// Brings the designs that ship with the app into the store, at every launch. Each bundled package is validated, then
@@ -78,7 +80,8 @@ public struct SyncReport: Equatable, Sendable {
 ///   means is never downgraded and the steady state does no rendering and no writing.
 /// - Rendering takes long, and another caller may save the design meanwhile. So the save is `DesignStore.saveIfNewer`,
 ///   which compares again under the store's lock, and the report states what the store did: a design the store kept
-///   because it became the same or a newer version is `unchanged`, and is never overwritten by the older one.
+///   because it became the same or a newer version is `unchanged`, and is never overwritten by the older one. A design
+///   that an import saved meanwhile is kept as well, and is a `conflict`: the sync replaces only what it installed.
 /// - The installed designs are listed once, and only their manifests are compared. An installed design is never read, so
 ///   one whose file is damaged does not stop the sync while the bundled design is unchanged.
 /// - A package fails on its own: the validator refuses it (`rejected`), the gate refuses it or fails (`notRendered`), or
@@ -122,6 +125,7 @@ public struct SyncBundledDesigns: Sendable {
             case .installed: report.installed.append(id)
             case .upgraded: report.upgraded.append(id)
             case .keptInstalled: report.unchanged.append(id)
+            case .keptImported: report.conflicts.append(id)
             }
             versions[id] = max(version, versions[id] ?? version)
         }

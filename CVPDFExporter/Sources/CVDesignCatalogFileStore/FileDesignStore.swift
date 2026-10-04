@@ -82,8 +82,9 @@ public actor FileDesignStore: DesignStore {
         try saveEntry(design, as: .bundled, onlyIfNewer: true)
     }
 
-    /// The one write path. With `onlyIfNewer`, the installed version is compared inside the exclusive lock that the
-    /// write holds, and an installed design of the same or a newer version leaves the store untouched.
+    /// The one write path, which records the design's `origin`. With `onlyIfNewer`, the installed design is judged inside
+    /// the exclusive lock that the write holds: one that the store did not record as bundled, or one of the same or a
+    /// newer version, leaves the store untouched.
     private func saveEntry(_ design: ValidatedDesign, as origin: DesignOrigin, onlyIfNewer: Bool) throws(FileDesignStoreError) -> ConditionalSave {
         let id = design.manifest.id
         let package = try encodeReadingBack(design)
@@ -91,7 +92,10 @@ public actor FileDesignStore: DesignStore {
             let entries = try readIndex()
             var origins = try readOrigins()
             let installed = entries.first { $0.manifest.id == id }
-            if onlyIfNewer, let installed, design.manifest.version <= installed.manifest.version { return .keptInstalled }
+            if onlyIfNewer, let installed {
+                guard origins[id] == .bundled else { return .keptImported }
+                if design.manifest.version <= installed.manifest.version { return .keptInstalled }
+            }
             try removeUnlistedFiles(keeping: entries, for: id)
             let generation = (installed?.generation ?? 0) + 1
             guard generation <= Self.maxGeneration else { throw .wouldNotReadBack(id: id) }

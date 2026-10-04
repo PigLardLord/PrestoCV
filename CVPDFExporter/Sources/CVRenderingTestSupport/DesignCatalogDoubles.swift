@@ -51,8 +51,11 @@ public actor SpyDesignStore: DesignStore {
         let id = design.manifest.id
         if savesFailFor.contains(id) { throw Failure() }
         let outcome: ConditionalSave
-        if let installed = designs[id] { outcome = design.manifest.version > installed.manifest.version ? .upgraded : .keptInstalled } else { outcome = .installed }
-        if outcome != .keptInstalled {
+        if let installed = designs[id] {
+            if origins[id] != .bundled { outcome = .keptImported }
+            else { outcome = design.manifest.version > installed.manifest.version ? .upgraded : .keptInstalled }
+        } else { outcome = .installed }
+        if outcome == .installed || outcome == .upgraded {
             designs[id] = design
             origins[id] = .bundled
             savedIDs.append(id)
