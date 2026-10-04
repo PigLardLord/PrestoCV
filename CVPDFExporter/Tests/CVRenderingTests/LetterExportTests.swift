@@ -70,6 +70,14 @@ struct LetterExportTests {
         #expect(try await requiredPages(letter) >= 2)
     }
 
+    @Test("a letter with no body is exported: one page, every text node")
+    func emptyBody() async throws {
+        var letter = letterFixture
+        letter.body = []
+        let pdf = try await export(letter)
+        #expect(MinimalPDFInspector().pageCount(of: pdf) == 1)
+    }
+
     @Test("a letter with line breaks in its paragraphs is exported complete: the check ignores spacing")
     func multiLine() async throws {
         var letter = letterFixture

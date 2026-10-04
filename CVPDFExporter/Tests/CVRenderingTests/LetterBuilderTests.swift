@@ -16,17 +16,18 @@ func render(_ letter: LetterDocument) throws -> RenderedDocument { try LetterHTM
 /// The text nodes a letter must produce, written from its fields and from the conventions, and nowhere else: the
 /// layout adds no word of its own (R13).
 func expectedLetterNodes(_ letter: LetterDocument, _ conventions: LetterConventions) -> [String] {
+    func filled(_ lines: [String]) -> [String] { lines.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
     var nodes = [letter.sender.name]
     nodes += [letter.sender.professionalTitle, letter.sender.email, letter.sender.phone, letter.sender.location, letter.sender.website].compactMap { $0 }
-    nodes += [letter.recipient.name, letter.recipient.company].compactMap { $0 } + letter.recipient.address
+    nodes += [letter.recipient.name, letter.recipient.company].compactMap { $0 } + filled(letter.recipient.address)
     nodes.append(conventions.dateLine(place: letter.place, date: letter.date) ?? "")
     if let reference = letter.reference { nodes += [conventions.referenceLabel, reference] }
     if let subject = letter.subject { nodes.append(subject) }
     nodes.append(conventions.salutation(letter.recipient.formOfAddress, familyName: letter.recipient.familyName) ?? "")
-    nodes += letter.body
+    nodes += filled(letter.body)
     if let closing = letter.closing { nodes.append(closing) }
     nodes += [conventions.valediction(letter.recipient.formOfAddress), letter.name]
-    if !letter.attachments.isEmpty { nodes += [conventions.attachmentsLabel] + letter.attachments }
+    if !filled(letter.attachments).isEmpty { nodes += [conventions.attachmentsLabel] + filled(letter.attachments) }
     return nodes
 }
 
@@ -162,6 +163,21 @@ struct LetterBuilderTests {
         #expect(!rendered.html.contains("<script>") && !rendered.html.contains("<b>"))
         #expect(try letterTags(rendered.html).count == (try letterTags(try render(letterFixture).html)).count)     // no element was added
         #expect(rendered.textNodes.contains("Writes {{title}} {name} {date} literally & <script>alert(1)</script>"))
+    }
+
+    @Test("a letter with no body renders its header, its salutation, its valediction and its signature, and no paragraph", arguments: LetterDocumentContractTests.emptyBodies)
+    func emptyBody(body: [String]) throws {
+        var letter = letterFixture
+        letter.body = body
+        letter.closing = nil
+        let rendered = try render(letter)
+        #expect(rendered.textNodes == expectedLetterNodes(letter, try LetterConventionsCatalog.conventions(for: "it")))
+        #expect(!rendered.html.contains("class=\"letter-paragraph\"") && !rendered.html.contains("class=\"letter-closing\""))
+        #expect(letterText(rendered.html, "letter-salutation") == "Gentile Sig.ra Rossi," && letterText(rendered.html, "letter-valediction") == "Distinti saluti,")
+        #expect(rendered.html.contains("letter-signature") && rendered.html.contains("letter-sender-name"))
+        var bare = letterMinimal
+        bare.body = []
+        #expect(try render(bare).textNodes == ["Ada Lovelace", "9 January 2026", "Dear Sir or Madam,", "Yours faithfully,", "Ada Lovelace"])
     }
 
     @Test("a line break inside a paragraph or the closing stays in its text node, as the CV's builder keeps one in its text")

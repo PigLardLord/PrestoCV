@@ -135,7 +135,6 @@ public enum LetterDocumentValidator {
         guard isSupported(language: d.language) else { throw Invalid(reason: "language is not supported") }
         guard !blank(d.name) else { throw Invalid(reason: "the name is required") }
         guard !blank(d.sender.name) else { throw Invalid(reason: "the sender's name is required") }
-        guard d.body.contains(where: { !blank($0) }) else { throw Invalid(reason: "a paragraph is required") }
         guard d.recipient.formOfAddress == .neutral || !blank(d.recipient.familyName) else { throw Invalid(reason: "the recipient's family name is required") }
         guard isCalendarDate(d.date) else { throw Invalid(reason: "the date does not exist") }
         guard d.body.count <= maxParagraphs else { throw Invalid(reason: "too many paragraphs") }

@@ -287,17 +287,16 @@ struct LetterDocumentContractTests {
 
     static let requiredCases: [(String, String)] = [
         ("name", "the name is required"), ("sender", "the sender's name is required"),
-        ("body", "a paragraph is required"), ("familyName", "the recipient's family name is required"),
+        ("familyName", "the recipient's family name is required"),
     ]
 
-    @Test("what a letter cannot do without is refused: the signature, the sender's name, a paragraph and a family name to address",
+    @Test("what a letter cannot do without is refused: the signature, the sender's name and a family name to address",
           arguments: requiredCases)
     func required(what: String, reason: String) {
         var letter = letterFixture
         switch what {
         case "name": letter.name = " \t "
         case "sender": letter.sender.name = ""
-        case "body": letter.body = ["", "  "]
         default: letter.recipient.familyName = nil
         }
         #expect(invalid(letter) == reason)
@@ -305,6 +304,18 @@ struct LetterDocumentContractTests {
             letter.recipient.formOfAddress = .neutral
             #expect(invalid(letter) == nil)          // a neutral salutation names nobody
         }
+    }
+
+    static let emptyBodies: [[String]] = [[], [""], ["", "  "], ["\n"]]
+
+    @Test("a letter with no opening and no paragraphs is a valid document: Authoring can keep one while it is being edited", arguments: emptyBodies)
+    func emptyBody(body: [String]) throws {
+        var letter = letterFixture
+        letter.body = body
+        try LetterDocumentValidator.validate(letter)
+        #expect(try LetterDocumentValidator.decode(json: try JSONEncoder().encode(letter)) == letter)
+        letter.closing = nil
+        try LetterDocumentValidator.validate(letter)
     }
 
     static let impossibleDates: [(Int, Int, Int)] = [

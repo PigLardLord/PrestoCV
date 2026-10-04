@@ -161,7 +161,7 @@ html[lang]
         │   └── span.letter-reference-value
         ├── h1.letter-subject                (if present)
         ├── p.letter-salutation              the language's salutation for the form of address
-        ├── p.letter-paragraph               one per body paragraph
+        ├── p.letter-paragraph               one per body paragraph (none, for a letter with no body)
         ├── p.letter-closing                 (if present)
         ├── p.letter-valediction             the language's valediction for the form of address
         ├── p.letter-signature               the name
