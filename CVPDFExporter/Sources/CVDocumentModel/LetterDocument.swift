@@ -99,7 +99,9 @@ public enum LetterDocumentValidator {
     /// 1,890,000 bytes, and the keys and punctuation take under 10,000 more.
     public static let maxJSONBytes = 2_000_000
 
-    static let textReason = "a field is too long, or it has control characters or bidirectional overrides"
+    /// The reasons name the field, as the CV validator's do.
+    static func textReason(_ what: String) -> String { "\(what) is too long, or it has control characters or bidirectional overrides" }
+    static func whitespaceReason(_ what: String) -> String { "\(what) starts or ends with white space" }
 
     /// The entry point for a letter that arrives as JSON: the size is checked before decoding, and the decoded letter is validated.
     public static func decode(json: Data) throws(Invalid) -> LetterDocument {
@@ -141,18 +143,24 @@ public enum LetterDocumentValidator {
         guard d.recipient.address.count <= maxAddressLines else { throw Invalid(reason: "too many address lines") }
         guard d.attachments.count <= maxAttachments else { throw Invalid(reason: "too many attachments") }
 
-        /// A field of one line refuses every control character, a line break among them, by the rule that CV text follows. A
-        /// paragraph and the closing may hold line breaks.
-        func text(_ s: String?, multiline: Bool = false) throws(Invalid) {
+        /// A field of one line refuses every control character, a line break among them, by the rule that CV text follows, and
+        /// is trimmed: Authoring trims what it keeps, so only a JSON client sends one that is not. A paragraph and the closing
+        /// may hold line breaks.
+        func text(_ s: String?, _ what: String, multiline: Bool = false) throws(Invalid) {
             guard let s else { return }
             guard s.utf8.count <= maxTextBytes, !s.unicodeScalars.contains(where: { DocumentText.refuses($0, allowingLineBreak: multiline) }) else {
-                throw Invalid(reason: textReason)
+                throw Invalid(reason: textReason(what))
             }
+            if !multiline, s != s.trimmingCharacters(in: .whitespacesAndNewlines) { throw Invalid(reason: whitespaceReason(what)) }
         }
-        for value in [d.sender.name, d.name] { try text(value) }
-        for value in [d.sender.professionalTitle, d.sender.email, d.sender.phone, d.sender.location, d.sender.website] { try text(value) }
-        for value in [d.recipient.name, d.recipient.familyName, d.recipient.company, d.place, d.reference, d.subject] { try text(value) }
-        for value in d.recipient.address + d.attachments { try text(value) }
-        for value in d.body + [d.closing].compactMap({ $0 }) { try text(value, multiline: true) }
+        try text(d.name, "the name"); try text(d.sender.name, "the sender's name")
+        try text(d.sender.professionalTitle, "the sender's title"); try text(d.sender.email, "the sender's email"); try text(d.sender.phone, "the sender's phone")
+        try text(d.sender.location, "the sender's location"); try text(d.sender.website, "the sender's website")
+        try text(d.recipient.name, "the recipient's name"); try text(d.recipient.familyName, "the recipient's family name"); try text(d.recipient.company, "the recipient's company")
+        try text(d.place, "the place"); try text(d.reference, "the reference"); try text(d.subject, "the subject")
+        for line in d.recipient.address { try text(line, "an address line") }
+        for attachment in d.attachments { try text(attachment, "an attachment") }
+        for paragraph in d.body { try text(paragraph, "a paragraph", multiline: true) }
+        try text(d.closing, "the closing", multiline: true)
     }
 }

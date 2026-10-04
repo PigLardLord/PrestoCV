@@ -133,7 +133,7 @@ struct LetterExportTests {
     }
 
     struct Unreachable: PDFRendering { func render(html: String, page: PageSetup) async throws -> RenderedPDF { Issue.record("rendered"); throw CancellationError() } }
-    @Test("a letter that cannot be rendered never reaches the renderer", arguments: [("ja", "language is not supported"), ("it", LetterDocumentValidator.textReason)])
+    @Test("a letter that cannot be rendered never reaches the renderer", arguments: [("ja", "language is not supported"), ("it", LetterDocumentValidator.textReason("a paragraph"))])
     func invalidNeverRendered(language: String, reason: String) async throws {
         var letter = letterFixture
         letter.language = language

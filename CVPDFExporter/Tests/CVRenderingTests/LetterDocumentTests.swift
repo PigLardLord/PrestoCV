@@ -22,6 +22,8 @@ let letterFixture = LetterDocument(
 /// `fieldsAreComplete` fails when the model gains a field that is not listed here.
 struct LetterTextField: Sendable, CustomTestStringConvertible {
     let name: String
+    /// What the validator calls the field in its reasons.
+    let what: String
     /// A paragraph and the closing may hold line breaks; every other field holds one line.
     let multiline: Bool
     let set: @Sendable (inout LetterDocument, String) -> Void
@@ -29,29 +31,29 @@ struct LetterTextField: Sendable, CustomTestStringConvertible {
 
     static let all: [LetterTextField] = {
         var all: [LetterTextField] = []
-        func add(_ name: String, multiline: Bool = false, _ set: @escaping @Sendable (inout LetterDocument, String) -> Void) {
-            all.append(LetterTextField(name: name, multiline: multiline, set: set))
+        func add(_ name: String, _ what: String, multiline: Bool = false, _ set: @escaping @Sendable (inout LetterDocument, String) -> Void) {
+            all.append(LetterTextField(name: name, what: what, multiline: multiline, set: set))
         }
-        add("sender.name") { $0.sender.name = $1 }
-        add("sender.professionalTitle") { $0.sender.professionalTitle = $1 }
-        add("sender.email") { $0.sender.email = $1 }
-        add("sender.phone") { $0.sender.phone = $1 }
-        add("sender.location") { $0.sender.location = $1 }
-        add("sender.website") { $0.sender.website = $1 }
-        add("recipient.name") { $0.recipient.name = $1 }
-        add("recipient.familyName") { $0.recipient.familyName = $1 }
-        add("recipient.company") { $0.recipient.company = $1 }
-        add("recipient.address[0]") { $0.recipient.address[0] = $1 }
-        add("recipient.address[1]") { $0.recipient.address[1] = $1 }
-        add("place") { $0.place = $1 }
-        add("reference") { $0.reference = $1 }
-        add("subject") { $0.subject = $1 }
-        add("body[0]", multiline: true) { $0.body[0] = $1 }
-        add("body[1]", multiline: true) { $0.body[1] = $1 }
-        add("closing", multiline: true) { $0.closing = $1 }
-        add("name") { $0.name = $1 }
-        add("attachments[0]") { $0.attachments[0] = $1 }
-        add("attachments[1]") { $0.attachments[1] = $1 }
+        add("sender.name", "the sender's name") { $0.sender.name = $1 }
+        add("sender.professionalTitle", "the sender's title") { $0.sender.professionalTitle = $1 }
+        add("sender.email", "the sender's email") { $0.sender.email = $1 }
+        add("sender.phone", "the sender's phone") { $0.sender.phone = $1 }
+        add("sender.location", "the sender's location") { $0.sender.location = $1 }
+        add("sender.website", "the sender's website") { $0.sender.website = $1 }
+        add("recipient.name", "the recipient's name") { $0.recipient.name = $1 }
+        add("recipient.familyName", "the recipient's family name") { $0.recipient.familyName = $1 }
+        add("recipient.company", "the recipient's company") { $0.recipient.company = $1 }
+        add("recipient.address[0]", "an address line") { $0.recipient.address[0] = $1 }
+        add("recipient.address[1]", "an address line") { $0.recipient.address[1] = $1 }
+        add("place", "the place") { $0.place = $1 }
+        add("reference", "the reference") { $0.reference = $1 }
+        add("subject", "the subject") { $0.subject = $1 }
+        add("body[0]", "a paragraph", multiline: true) { $0.body[0] = $1 }
+        add("body[1]", "a paragraph", multiline: true) { $0.body[1] = $1 }
+        add("closing", "the closing", multiline: true) { $0.closing = $1 }
+        add("name", "the name") { $0.name = $1 }
+        add("attachments[0]", "an attachment") { $0.attachments[0] = $1 }
+        add("attachments[1]", "an attachment") { $0.attachments[1] = $1 }
         return all
     }()
 }
@@ -123,7 +125,7 @@ struct LetterDocumentContractTests {
     func oversizedField(field: LetterTextField) {
         var letter = letterFixture
         field.set(&letter, String(repeating: "x", count: LetterDocumentValidator.maxTextBytes + 1))
-        #expect(invalid(letter) == LetterDocumentValidator.textReason)
+        #expect(invalid(letter) == LetterDocumentValidator.textReason(field.what))
         field.set(&letter, String(repeating: "x", count: LetterDocumentValidator.maxTextBytes))
         #expect(invalid(letter) == nil)
     }
@@ -204,7 +206,7 @@ struct LetterDocumentContractTests {
     func lineBreaks(field: LetterTextField, text: String) {
         var letter = letterFixture
         field.set(&letter, text)
-        let reason = LetterDocumentValidator.textReason
+        let reason = LetterDocumentValidator.textReason(field.what)
         #expect(invalid(letter) == (field.multiline ? nil : reason), "\(field.name) with \(text.unicodeScalars.map(\.value))")
     }
 
@@ -238,7 +240,38 @@ struct LetterDocumentContractTests {
     func hostileCharacters(field: LetterTextField, text: String) {
         var letter = letterFixture
         field.set(&letter, text)
-        #expect(invalid(letter) == LetterDocumentValidator.textReason, "\(field.name) accepted \(text.unicodeScalars.map(\.value))")
+        #expect(invalid(letter) == LetterDocumentValidator.textReason(field.what), "\(field.name) accepted \(text.unicodeScalars.map(\.value))")
+    }
+
+    @Test("a reason names the field that was refused, in each field", arguments: LetterTextField.all)
+    func reasonsNameTheField(field: LetterTextField) {
+        var letter = letterFixture
+        field.set(&letter, "a\u{0007}b")
+        #expect(invalid(letter) == "\(field.what) is too long, or it has control characters or bidirectional overrides")
+        #expect(invalid(letter)?.hasPrefix(field.what) == true)
+    }
+
+    /// A field of one line that is not trimmed: Authoring trims, so only a JSON client sends one.
+    static let untrimmed: [String] = [" x", "x ", "  x  ", "\u{00A0}x", "x\u{3000}", "x\u{2028}", "\u{2029}x"]
+    static let oneLineFields: [LetterTextField] = LetterTextField.all.filter { !$0.multiline }
+
+    @Test("a field of one line that starts or ends with white space is refused, and says so", arguments: oneLineFields, untrimmed)
+    func untrimmedLines(field: LetterTextField, text: String) {
+        var letter = letterFixture
+        field.set(&letter, text)
+        #expect(invalid(letter) == "\(field.what) starts or ends with white space", "\(field.name) with \(text.unicodeScalars.map(\.value))")
+    }
+
+    @Test("the place and the family name, which the page prints, are refused when they are not trimmed")
+    func placeAndFamilyName() {
+        var letter = letterFixture
+        letter.place = " Roma"
+        #expect(invalid(letter) == "the place starts or ends with white space")
+        letter = letterFixture
+        letter.recipient.familyName = "Rossi "
+        #expect(invalid(letter) == "the recipient's family name starts or ends with white space")
+        letter.recipient.familyName = "Rossi"
+        #expect(invalid(letter) == nil)
     }
 
     @Test("what Authoring keeps is accepted in every field: emoji sequences, soft hyphens, zero-width and direction marks, tag sequences, separators",

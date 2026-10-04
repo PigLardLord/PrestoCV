@@ -213,16 +213,16 @@ struct LetterBuilderTests {
     func blanks() throws {
         var letter = letterFixture
         letter.sender.professionalTitle = ""
-        letter.sender.email = "  "
+        letter.sender.email = ""
         letter.recipient.name = ""
         letter.recipient.company = nil
-        letter.recipient.address = ["", " "]
-        letter.place = " "
+        letter.recipient.address = ["", ""]
+        letter.place = ""
         letter.reference = ""
         letter.subject = nil
         letter.body = ["First", "", "  ", "Last"]
         letter.closing = ""
-        letter.attachments = ["", " "]
+        letter.attachments = ["", ""]
         let html = try render(letter).html
         for cls in ["letter-sender-title", "letter-sender-email", "letter-recipient", "letter-recipient-name", "letter-recipient-address", "letter-reference",
                     "letter-subject", "letter-closing", "letter-attachments", "letter-attachment"] {
@@ -234,7 +234,7 @@ struct LetterBuilderTests {
     }
 
     static let invalidCases: [(String, String)] = [
-        ("language", "language is not supported"), ("hidden", LetterDocumentValidator.textReason),
+        ("language", "language is not supported"), ("hidden", LetterDocumentValidator.textReason("a paragraph")), ("untrimmed", "the place starts or ends with white space"),
         ("family", "the recipient's family name is required"), ("date", "the date does not exist"),
     ]
 
@@ -244,6 +244,7 @@ struct LetterBuilderTests {
         switch what {
         case "language": letter.language = "ja"
         case "hidden": letter.body[0] = "\u{202E}evil"
+        case "untrimmed": letter.place = "Roma "
         case "family": letter.recipient.familyName = nil
         default: letter.date = LetterDate(year: 2026, month: 2, day: 30)
         }
