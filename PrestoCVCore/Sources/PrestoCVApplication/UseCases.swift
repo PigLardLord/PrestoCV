@@ -4,6 +4,8 @@ import PrestoCVDomain
 /// What presentation needs to know, without the port's error shape (R7).
 public enum AuthoringError: Error, Equatable, Sendable {
     case notEnoughContent, conflict(storedRevision: Int), deletedElsewhere, tooLarge, unavailable
+    /// A value of an application, of its letter or of the letter defaults was refused (R6): which one is the code.
+    case invalid(ApplicationError)
 }
 
 /// A new, unsaved CV with a fresh identity.

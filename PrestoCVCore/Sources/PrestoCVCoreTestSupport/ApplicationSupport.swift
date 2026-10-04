@@ -138,3 +138,23 @@ public enum ApplicationRepositoryContract {
         guard try await repo.list().applications.map(\.id) == [a3.id, b.id] else { throw Failure(description: "list must be sorted by last change") }
     }
 }
+
+/// A repository whose every operation fails with one error, to test how a use case translates it.
+public struct FailingApplicationRepository: ApplicationRepository {
+    let error: ApplicationRepositoryError
+    public init(_ error: ApplicationRepositoryError) { self.error = error }
+    public func create(_ application: Application) async throws(ApplicationRepositoryError) -> Application { throw error }
+    public func update(_ application: Application) async throws(ApplicationRepositoryError) -> Application { throw error }
+    public func load(_ id: ApplicationID) async throws(ApplicationRepositoryError) -> Application { throw error }
+    public func list() async throws(ApplicationRepositoryError) -> ApplicationListing { throw error }
+    public func delete(_ id: ApplicationID, revision: Int) async throws(ApplicationRepositoryError) { throw error }
+}
+
+/// What a tailoring result maps to, for tests of the use cases: every field populated.
+public enum FixtureApplicationValues {
+    public static func full(jobID: String = "job-0001") -> ApplicationValues {
+        let application = FixtureApplication.full(jobID: jobID), cv = application.cv
+        return ApplicationValues(title: cv.title, personal: cv.personal, sections: cv.sections, design: cv.design, language: cv.language,
+                                 letter: application.letter, advert: application.advert, provenance: application.provenance)
+    }
+}
