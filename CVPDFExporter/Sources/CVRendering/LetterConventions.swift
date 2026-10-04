@@ -60,10 +60,14 @@ struct LetterTemplate: Sendable, Equatable {
 }
 
 /// How one language writes a letter (R13, ADR 0019): the date, the salutation and the valediction for each form of
-/// address, and the labels of the page. It is read from the language's JSON file, never from the layout.
+/// address, and the labels of the page, in the regional variant that its file names. It is read from the language's
+/// JSON file, never from the layout.
 struct LetterConventions: Sendable, Equatable {
     static let maxFileBytes = 16_384, maxValueBytes = 200
 
+    /// The regional convention the table is written in, a language and a region (`pt-PT`). A regional tag such as `pt-BR`
+    /// reads its language's table, so every reader of a language gets the one variant that its table names.
+    let variant: String
     private let dateFormat: LetterTemplate, months: [String], withPlace: LetterTemplate, withoutPlace: LetterTemplate
     private let salutations: ByForm<LetterTemplate>, valedictions: ByForm<String>
     let referenceLabel: String, attachmentsLabel: String
@@ -124,7 +128,9 @@ struct LetterConventions: Sendable, Equatable {
             return template
         }
 
-        guard Set(root.keys).isSubset(of: ["date", "salutations", "valedictions", "labels"]) else { throw Failure.corruptTable(language) }
+        guard Set(root.keys).isSubset(of: ["variant", "date", "salutations", "valedictions", "labels"]) else { throw Failure.corruptTable(language) }
+        let variant = try string(root, "variant", path: "variant")
+        guard variant.hasPrefix(language + "-"), String(variant.dropFirst(language.count + 1)).fullyMatches("[A-Z]{2}") else { throw Failure.incomplete(language: language, key: "variant") }
         let date = try object(root, "date", keys: ["format", "months", "withPlace", "withoutPlace"], path: "date")
         let salutations = try object(root, "salutations", keys: ["masculine", "feminine", "neutral"], path: "salutations")
         let valedictions = try object(root, "valedictions", keys: ["masculine", "feminine", "neutral"], path: "valedictions")
@@ -137,7 +143,7 @@ struct LetterConventions: Sendable, Equatable {
         for text in monthTexts { months.append(try plain(text, "date.months")) }
 
         return LetterConventions(
-            dateFormat: try template(date, "format", path: "date.format", holes: [.day, .month, .year]), months: months,
+            variant: variant, dateFormat: try template(date, "format", path: "date.format", holes: [.day, .month, .year]), months: months,
             withPlace: try template(date, "withPlace", path: "date.withPlace", holes: [.place, .date]),
             withoutPlace: try template(date, "withoutPlace", path: "date.withoutPlace", holes: [.date]),
             salutations: ByForm(masculine: try template(salutations, "masculine", path: "salutations.masculine", holes: [.name]),

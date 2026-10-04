@@ -1,4 +1,5 @@
 {
+  "variant": "fr-FR",
   "date": {
     "format": "{day} {month} {year}",
     "months": ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"],

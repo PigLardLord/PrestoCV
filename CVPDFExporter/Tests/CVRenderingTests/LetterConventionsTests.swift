@@ -24,34 +24,34 @@ struct LetterConventionsTests {
     static let languages = ["en", "it", "de", "es", "fr", "pt"]
 
     /// What the files must say. Changing a row is changing the letter's wording, and is reviewed like code.
-    /// (language, the date of 4 October 2026 with the place "Roma", the date alone, masculine, feminine and neutral salutations to "Rossi",
-    ///  masculine, feminine and neutral valedictions, the reference and attachments labels)
+    /// (language, the variant it is written in, the date of 4 October 2026 with the place "Roma", the date alone, masculine, feminine and
+    ///  neutral salutations to "Rossi", masculine, feminine and neutral valedictions, the reference and attachments labels)
     struct Expected: Sendable, CustomTestStringConvertible {
-        let language: String, dateLine: String, date: String
+        let language: String, variant: String, dateLine: String, date: String
         let salutations: [String], valedictions: [String], labels: [String]
         var testDescription: String { language }
     }
     static let expected: [Expected] = [
-        Expected(language: "en", dateLine: "Roma, 4 October 2026", date: "4 October 2026",
+        Expected(language: "en", variant: "en-GB", dateLine: "Roma, 4 October 2026", date: "4 October 2026",
                  salutations: ["Dear Mr Rossi,", "Dear Ms Rossi,", "Dear Sir or Madam,"],
                  valedictions: ["Yours sincerely,", "Yours sincerely,", "Yours faithfully,"], labels: ["Reference", "Enclosures"]),
-        Expected(language: "it", dateLine: "Roma, 4 ottobre 2026", date: "4 ottobre 2026",
+        Expected(language: "it", variant: "it-IT", dateLine: "Roma, 4 ottobre 2026", date: "4 ottobre 2026",
                  salutations: ["Gentile Sig. Rossi,", "Gentile Sig.ra Rossi,", "Gentili Signore e Signori,"],
                  valedictions: ["Distinti saluti,", "Distinti saluti,", "Distinti saluti,"], labels: ["Riferimento", "Allegati"]),
-        Expected(language: "de", dateLine: "Roma, 4. Oktober 2026", date: "4. Oktober 2026",
+        Expected(language: "de", variant: "de-DE", dateLine: "Roma, 4. Oktober 2026", date: "4. Oktober 2026",
                  salutations: ["Sehr geehrter Herr Rossi,", "Sehr geehrte Frau Rossi,", "Sehr geehrte Damen und Herren,"],
                  valedictions: ["Mit freundlichen Grüßen", "Mit freundlichen Grüßen", "Mit freundlichen Grüßen"], labels: ["Bezug", "Anlagen"]),
-        Expected(language: "es", dateLine: "Roma, 4 de octubre de 2026", date: "4 de octubre de 2026",
+        Expected(language: "es", variant: "es-ES", dateLine: "Roma, 4 de octubre de 2026", date: "4 de octubre de 2026",
                  salutations: ["Estimado Sr. Rossi:", "Estimada Sra. Rossi:", "Estimados señores y señoras:"],
                  valedictions: ["Atentamente,", "Atentamente,", "Atentamente,"], labels: ["Referencia", "Anexos"]),
-        Expected(language: "fr", dateLine: "Roma, le 4 octobre 2026", date: "4 octobre 2026",
+        Expected(language: "fr", variant: "fr-FR", dateLine: "Roma, le 4 octobre 2026", date: "4 octobre 2026",
                  salutations: ["Monsieur Rossi,", "Madame Rossi,", "Madame, Monsieur,"],
                  valedictions: ["Je vous prie d’agréer, Monsieur, l’expression de mes salutations distinguées.",
                                 "Je vous prie d’agréer, Madame, l’expression de mes salutations distinguées.",
                                 "Je vous prie d’agréer, Madame, Monsieur, l’expression de mes salutations distinguées."],
                  labels: ["Référence", "Pièces jointes"]),
-        Expected(language: "pt", dateLine: "Roma, 4 de outubro de 2026", date: "4 de outubro de 2026",
-                 salutations: ["Prezado Senhor Rossi,", "Prezada Senhora Rossi,", "Prezados Senhores e Senhoras,"],
+        Expected(language: "pt", variant: "pt-PT", dateLine: "Roma, 4 de outubro de 2026", date: "4 de outubro de 2026",
+                 salutations: ["Exmo. Senhor Rossi,", "Exma. Senhora Rossi,", "Exmos. Senhores,"],
                  valedictions: ["Com os melhores cumprimentos,", "Com os melhores cumprimentos,", "Com os melhores cumprimentos,"],
                  labels: ["Referência", "Anexos"]),
     ]
@@ -74,7 +74,9 @@ struct LetterConventionsTests {
     @Test("every language's file has exactly the keys of the schema, and every value is filled", arguments: languages)
     func completeTables(language: String) throws {
         let object = try LetterData.raw(language)
-        #expect(Set(object.keys) == ["date", "salutations", "valedictions", "labels"], "\(language) top level")
+        #expect(Set(object.keys) == ["variant", "date", "salutations", "valedictions", "labels"], "\(language) top level")
+        let variant = try #require(object["variant"] as? String)
+        #expect(variant.fullyMatches("\(language)-[A-Z]{2}"), "\(language) is written in \(variant)")
         let date = try #require(object["date"] as? [String: Any])
         #expect(Set(date.keys) == ["format", "months", "withPlace", "withoutPlace"], "\(language) date")
         #expect(Set(try #require(object["salutations"] as? [String: Any]).keys) == ["masculine", "feminine", "neutral"], "\(language) salutations")
@@ -88,6 +90,7 @@ struct LetterConventionsTests {
     @Test("each language writes the date, the salutation, the valediction and the labels of its own convention", arguments: expected)
     func writtenText(expected: Expected) throws {
         let conventions = try LetterConventionsCatalog.conventions(for: expected.language)
+        #expect(conventions.variant == expected.variant)
         #expect(conventions.dateText(Self.day) == expected.date)
         #expect(conventions.dateLine(place: "Roma", date: Self.day) == expected.dateLine)
         #expect(conventions.dateLine(place: nil, date: Self.day) == expected.date)
@@ -109,7 +112,7 @@ struct LetterConventionsTests {
     }
 
     static let regionalCases: [(String, String)] = [("pt-BR", "pt"), ("pt-PT", "pt"), ("de-CH", "de"), ("en-GB", "en"), ("EN-us", "en"), ("fr-CA", "fr"), ("es-419", "es"), ("it-IT", "it")]
-    @Test("a regional tag uses its language's conventions", arguments: regionalCases)
+    @Test("a regional tag uses its language's conventions: pt-BR reads the European Portuguese of pt-PT", arguments: regionalCases)
     func regionalTags(tag: String, language: String) throws {
         #expect(try LetterConventionsCatalog.conventions(for: tag) == LetterConventionsCatalog.conventions(for: language))
     }
@@ -142,7 +145,7 @@ struct LetterConventionsReaderTests {
     func base() throws -> [String: Any] { try LetterData.raw("en") }
 
     func parse(_ object: [String: Any]) throws -> LetterConventions {
-        try LetterConventions.parse(try JSONSerialization.data(withJSONObject: object), language: "xx")
+        try LetterConventions.parse(try JSONSerialization.data(withJSONObject: object), language: "en")
     }
 
     func edited(_ change: (inout [String: Any]) -> Void) throws -> [String: Any] {
@@ -172,7 +175,7 @@ struct LetterConventionsReaderTests {
         objects.append(try setting("valedictions", "extra", to: "x"))
         objects.append(try setting("labels", "extra", to: "x"))
         for object in objects {
-            #expect(throws: LetterConventionsCatalog.Failure.corruptTable("xx")) { _ = try parse(object) }
+            #expect(throws: LetterConventionsCatalog.Failure.corruptTable("en")) { _ = try parse(object) }
         }
     }
 
@@ -184,13 +187,28 @@ struct LetterConventionsReaderTests {
     @Test("a missing key names itself", arguments: missingKeys)
     func missingKey(path: String, key: String) throws {
         let object = try setting(path, key, to: nil)
-        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "xx", key: "\(path).\(key)")) { _ = try parse(object) }
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "\(path).\(key)")) { _ = try parse(object) }
+    }
+
+    @Test("a table names the variant it is written in: a missing one is incomplete, and a malformed, foreign or hidden one too",
+          arguments: ["", "en", "en-gb", "EN-GB", "en-GBR", "en_GB", "pt-PT", "de-DE", " en-GB", "en-GB\n", "{name}", "en-G\u{200B}B"])
+    func badVariant(variant: String) throws {
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "variant")) { _ = try parse(try edited { $0["variant"] = variant }) }
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "variant")) { _ = try parse(try edited { $0["variant"] = nil }) }
+        #expect(throws: LetterConventionsCatalog.Failure.corruptTable("en")) { _ = try parse(try edited { $0["variant"] = 3 }) }
+    }
+
+    @Test("a table is read for the language it is written in, and no other")
+    func tableForAnotherLanguage() throws {
+        let data = try JSONSerialization.data(withJSONObject: base())
+        _ = try LetterConventions.parse(data, language: "en")
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "de", key: "variant")) { _ = try LetterConventions.parse(data, language: "de") }
     }
 
     @Test("a missing section names itself", arguments: ["date", "salutations", "valedictions", "labels"])
     func missingSection(path: String) throws {
         let object = try edited { $0[path] = nil }
-        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "xx", key: path)) { _ = try parse(object) }
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: path)) { _ = try parse(object) }
     }
 
     static let emptyValues: [(String, String, String)] = [
@@ -201,15 +219,15 @@ struct LetterConventionsReaderTests {
     @Test("an empty or blank value is incomplete", arguments: emptyValues)
     func emptyValue(path: String, key: String, value: String) throws {
         let object = try setting(path, key, to: value)
-        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "xx", key: "\(path).\(key)")) { _ = try parse(object) }
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "\(path).\(key)")) { _ = try parse(object) }
     }
 
     @Test("the months are twelve, each named", arguments: [0, 1, 11, 13, 40])
     func monthCount(count: Int) throws {
         let object = try setting("date", "months", to: (0..<count).map { "month\($0)" })
-        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "xx", key: "date.months")) { _ = try parse(object) }
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "date.months")) { _ = try parse(object) }
         let blank = try setting("date", "months", to: (0..<12).map { $0 == 5 ? "" : "month\($0)" })
-        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "xx", key: "date.months")) { _ = try parse(blank) }
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "date.months")) { _ = try parse(blank) }
     }
 
     /// A JSON value that is not what the schema asks for.
@@ -232,39 +250,39 @@ struct LetterConventionsReaderTests {
 
     @Test("a value of the wrong type is a corrupt table", arguments: wrongTypes)
     func wrongType(path: String, key: String, value: Wrong) throws {
-        #expect(throws: LetterConventionsCatalog.Failure.corruptTable("xx")) { _ = try parse(try setting(path, key, to: value.value)) }
+        #expect(throws: LetterConventionsCatalog.Failure.corruptTable("en")) { _ = try parse(try setting(path, key, to: value.value)) }
     }
 
     @Test("a section that is not an object is a corrupt table", arguments: ["date", "salutations", "valedictions", "labels"])
     func sectionNotAnObject(path: String) throws {
-        #expect(throws: LetterConventionsCatalog.Failure.corruptTable("xx")) { _ = try parse(try edited { $0[path] = "x" }) }
+        #expect(throws: LetterConventionsCatalog.Failure.corruptTable("en")) { _ = try parse(try edited { $0[path] = "x" }) }
     }
 
     @Test("what is not an object, or not JSON, is a corrupt table", arguments: ["[]", "null", "\"en\"", "not json", "", "{", "3"])
     func notAnObject(json: String) {
-        #expect(throws: LetterConventionsCatalog.Failure.corruptTable("xx")) { _ = try LetterConventions.parse(Data(json.utf8), language: "xx") }
+        #expect(throws: LetterConventionsCatalog.Failure.corruptTable("en")) { _ = try LetterConventions.parse(Data(json.utf8), language: "en") }
     }
 
     @Test("a file over the bound is corrupt before it is read as JSON")
     func oversized() throws {
         let padded = try JSONSerialization.data(withJSONObject: base()) + Data(repeating: 0x20, count: LetterConventions.maxFileBytes)
-        #expect(throws: LetterConventionsCatalog.Failure.corruptTable("xx")) { _ = try LetterConventions.parse(padded, language: "xx") }
+        #expect(throws: LetterConventionsCatalog.Failure.corruptTable("en")) { _ = try LetterConventions.parse(padded, language: "en") }
     }
 
     @Test("a value over the bound is incomplete, and one at the bound is accepted")
     func longValue() throws {
         let over = String(repeating: "x", count: LetterConventions.maxValueBytes + 1)
-        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "xx", key: "labels.reference")) { _ = try parse(try setting("labels", "reference", to: over)) }
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "labels.reference")) { _ = try parse(try setting("labels", "reference", to: over)) }
         _ = try parse(try setting("labels", "reference", to: String(repeating: "x", count: LetterConventions.maxValueBytes)))
         // Bytes, not characters.
         let wide = String(repeating: "é", count: LetterConventions.maxValueBytes / 2 + 1)
-        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "xx", key: "labels.reference")) { _ = try parse(try setting("labels", "reference", to: wide)) }
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "labels.reference")) { _ = try parse(try setting("labels", "reference", to: wide)) }
     }
 
     @Test("control, bidirectional and invisible characters are refused in a value", arguments: ["a\u{0007}b", "a\nb", "\u{202E}x", "x\u{200B}", "x\u{2066}y", "x\u{FEFF}y", "x\u{2028}y"])
     func hiddenCharacters(text: String) throws {
-        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "xx", key: "valedictions.neutral")) { _ = try parse(try setting("valedictions", "neutral", to: text)) }
-        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "xx", key: "date.months")) {
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "valedictions.neutral")) { _ = try parse(try setting("valedictions", "neutral", to: text)) }
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "date.months")) {
             _ = try parse(try setting("date", "months", to: (0..<12).map { $0 == 3 ? text : "month\($0)" }))
         }
     }
@@ -279,12 +297,12 @@ struct LetterConventionsReaderTests {
 
     @Test("a template has the holes its place needs, once each, and no other", arguments: badTemplates)
     func templateHoles(path: String, key: String, template: String) throws {
-        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "xx", key: "\(path).\(key)")) { _ = try parse(try setting(path, key, to: template)) }
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "\(path).\(key)")) { _ = try parse(try setting(path, key, to: template)) }
     }
 
     @Test("a valediction and a label are plain text: a hole in them is refused")
     func noHolesInPlainText() throws {
-        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "xx", key: "valedictions.masculine")) { _ = try parse(try setting("valedictions", "masculine", to: "Yours, {name}")) }
-        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "xx", key: "labels.reference")) { _ = try parse(try setting("labels", "reference", to: "{date}")) }
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "valedictions.masculine")) { _ = try parse(try setting("valedictions", "masculine", to: "Yours, {name}")) }
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "labels.reference")) { _ = try parse(try setting("labels", "reference", to: "{date}")) }
     }
 }
