@@ -73,7 +73,7 @@ Each executable has one composition root, and only that root creates infrastruct
 **Why.** Today objects are built in four places, the template subsystem exists three times over the same files, and the export sheet builds its own container every time it opens. Issue #1 is a direct consequence.
 
 **Enforced by:**
-- **checker:** detectors `singleton`, and `infrastructureConstruction` for the adapter types listed in `rules.json` and for `FileManager.default`, `Bundle.main` and `UserDefaults.standard`. On the server, every target except the executable carries both, and `infrastructureTypes` lists `PostgresClient` and `HTTPClient` once the targets exist. In the app, `PrestoCVAPIAdapter` carries both too, and `infrastructureTypes` lists `URLSessionTransport` once it exists ([ADR 0016](adr/0016-api-contract.md)).
+- **checker:** detectors `singleton`, and `infrastructureConstruction` for the adapter types listed in `rules.json` and for `FileManager.default`, `Bundle.main` and `UserDefaults.standard`. `infrastructureTypes` gains `FileApplicationRepository` and `FileLetterDefaultsStore` when #185 adds them ([ADR 0019](adr/0019-applications.md)). On the server, every target except the executable carries both, and `infrastructureTypes` lists `PostgresClient` and `HTTPClient` once the targets exist. In the app, `PrestoCVAPIAdapter` carries both too, and `infrastructureTypes` lists `URLSessionTransport` once it exists ([ADR 0016](adr/0016-api-contract.md)).
 - **review:** what the detectors do not see. A static accessor such as `HTTPClient.shared` stays with review until the checker learns it, and so does the API's transport in the app until `URLSessionTransport` is listed.
 
 ## R5. Views render; view models present; neither decides
@@ -99,7 +99,7 @@ Each executable has one composition root, and only that root creates infrastruct
 - **Repository-owned state.** The revision and the timestamps are assigned only by repositories (`package` access).
 - **Value objects validate on creation.** `SkillLevel` is bounded. `PartialDate` has year or month precision, and only a partial order. `EmailAddress` and `WebLink` are parsed. Identifiers are typed.
 - **A rule exists once.** Periods are built only by `Period.make(start:end:current:)`, which both persistence and the AI mapper use. A second copy anywhere is a defect.
-- **Two separate validity rules, by design.** "Can be saved" is Authoring's rule. "Can be rendered" is the rendering policy of the published `CVDocument`. A test asserts that every saveable CV maps to a renderable document.
+- **Two separate validity rules, by design.** "Can be saved" is Authoring's rule. "Can be rendered" is the rendering policy of the published `CVDocument`. A test asserts that every saveable CV maps to a renderable document, and that every saveable `CoverLetter` maps to a letter document that its validator accepts ([ADR 0019](adr/0019-applications.md)).
 
 **Why.** Today there are four definitions of "valid CV", three skill scales, three language-level parsers and four period formats.
 
@@ -136,7 +136,7 @@ Untrusted input is: design packages, AI output, persisted files, and on a backen
 - **Completeness.** Every export is checked against its own document. Every text node the builder produced (fields, headings, dates, levels) needs **its own span of the PDF text**, ignoring case and spacing, that no other node uses; longer nodes are placed first. So removing one of two identical entries is detected, so is removing a value that also appears inside another one (a skill named in the summary), and so is a value that only appears across the boundary of two others ("Greg" + "Officer" contains "go"). Link destinations are printed as text ([markup contract](markup-contract.md)), so losing one is detected too, even when the clickable annotation is not part of the PDF. A shortfall fails the export.
 - **Installing a design.** A design is stored only after it has been validated and has rendered a fixture document completely. The fixture exercises every section; a truncated render is a failure. The catalog owns the rendering-gate port, and `CVRendering` implements it. The renderer contract runs the same check.
 - **Native evidence.** The native renderers must also pass a geometric check: each field inside the page, and legible. It is pending until they exist ([ADR 0003](adr/0003-one-pdf-renderer-per-platform.md)).
-- **Documents** arriving as JSON (backend) pass `CVDocumentValidator`: supported version, required name, bounded text and counts, valid dates and ratings.
+- **Documents** arriving as JSON (backend) pass `CVDocumentValidator`: supported version, required name, bounded text and counts, valid dates and ratings. A cover letter passes the letter validator beside it, with its own attack tests ([ADR 0019](adr/0019-applications.md)).
 - **Persisted files**: see R12.
 
 **Why.** See issue #9 and the security review of 2026-09-27: a regex deny-list let 34 of 34 content-hiding constructs through, and could be bypassed with CSS comments and strings. On a backend, a `<style>` breakout would be server-side request forgery.
@@ -161,7 +161,7 @@ Continuations resume exactly once, time out where they wait on the outside world
 - **Rules without I/O.** Domain rules and use cases are tested without I/O, using the in-memory adapters from `…TestSupport` targets or, on the server, the local profile's adapters ([ADR 0014](adr/0014-server-modular-monolith.md)).
 - **Contract tests.** Every adapter passes the contract tests of its port. All PDF renderers run the same contract suite, on their real platform.
 - **Golden tests.** Rendering compares a fixture document against a **committed golden HTML file**. Changing that file is reviewed like code.
-- **Mapper completeness.** A Mirror-based test proves that every populated `CV` field reaches the `CVDocument`.
+- **Mapper completeness.** A Mirror-based test proves that every populated `CV` field reaches the `CVDocument`. Each other mapper has the same test: a `CoverLetter` into its letter document, and a tailoring result into the values an application is created from ([ADR 0019](adr/0019-applications.md)).
 - **Hermetic.** Tests use temporary directories and injected time and identifiers. They never touch the user's home, the real Application Support or `Bundle.main`.
 - **Doubles and waits.** Test doubles use `Mutex`, not `@unchecked Sendable`. Waits are bounded and record an issue when they time out.
 - **Bug fixes start with a failing test.** For key tests, swapping the old implementation back in must make them fail. This was done for the escaping, save-serialisation and golden tests.
@@ -187,7 +187,7 @@ A platform-only target wraps **every file** entirely in its platform condition. 
 
 ([ADR 0009](adr/0009-persisted-schema-v1.md))
 
-- **Which files.** CV Authoring persists three file types: `CVFileV1`, `ApplicationFileV1` and `LetterDefaultsFileV1` ([ADR 0019](adr/0019-applications.md)). Each follows everything below.
+- **Which files.** Today CV Authoring's three: `CVFileV1`, `ApplicationFileV1` and `LetterDefaultsFileV1` ([ADR 0019](adr/0019-applications.md)). A new persisted file type joins this list, and each follows everything below.
 - **DTO, not the domain.** What is written to disk is a DTO, separate from the domain type. Its envelope is frozen: `schemaVersion` is a top-level integer in every future version.
 - **Strict decoding.** Required fields are required. The revision is bounded. Periods pass `Period.make`. Text and list sizes are capped.
 - **Every failure has its own outcome:**
@@ -202,7 +202,7 @@ A platform-only target wraps **every file** entirely in its platform condition. 
   - Timestamps are stored with whole-second precision.
   - Create, update and delete are conditional on the revision, under an exclusive lock on the store (`flock`), so no update is lost across repository instances or processes.
   - Timestamps are assigned by the repository through the injected `TimeSource`. Listing is ordered by last change.
-- **Erasure.** Erasing a CV removes every copy: the stored file whatever its schema, and the quarantined copies. Erasing an application does the same, with the CV inside it. Erasing everything removes the applications and the letter defaults too. Quarantine is purged after a retention period.
+- **Erasure.** Erasing a CV removes every copy: the stored file whatever its schema, and the quarantined copies. Erasing an application does the same, with the CV inside it. **Erasing a CV does not erase the applications made from it:** an application is data of its own, and the app says that it remains. **Erase-all** is a use case of `PrestoCVApplication`: it erases every CV, every application and the letter defaults, with their quarantined copies, each store under its own lock. A partial failure is a typed outcome that names what remains. Quarantine is purged after a retention period.
 - **Migrations.** Schema changes after release ship with a migration and a test for it. Before the first release there is no legacy format to support.
 
 **Enforced by:** test (the repository contract suite, and the file-store tests for every outcome above, for each file type) and review.
@@ -211,7 +211,7 @@ A platform-only target wraps **every file** entirely in its platform condition. 
 
 - **Only two places produce user-facing text:**
   - the views of the app target (UI strings);
-  - rendering, for document headings in the **document's** language.
+  - rendering, for document headings, and for a cover letter's salutation, valediction and date, in the **document's** language.
 - **Every other target returns codes, values, typed errors and status enums.** For example, `SaveStatus.conflict`. A duplicated CV's title is composed by presentation, which knows the language. This also keeps those targets building on Linux, where `String(localized:)` does not exist.
 - **Packages that render text own their translations.** They are JSON resource files, one per language, plus an index, loaded through `Bundle.module`. A test fails if any language lacks a key or has an empty value.
 - **Language lookup uses BCP 47:** the full tag, then the full primary language subtag. An unsupported language is a typed error, never a silent fallback to English.

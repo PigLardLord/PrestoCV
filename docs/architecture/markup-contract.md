@@ -7,6 +7,8 @@ This document defines two things, both normative ([ADR 0011](adr/0011-typed-html
 
 A design declares the contract version it targets in its manifest (`markupContract`), and the validator rejects any other version.
 
+The cover letter has a structure of its own, which no design styles. It is specified below, in its own section ([ADR 0019](adr/0019-applications.md)).
+
 The source of truth is code in `CVDesignCatalog`: `MarkupContract` for the structure, `allowedProperties` for the properties. This page must match that code exactly. That code is `CSS.swift` and `MarkupContract.swift` in `CVPDFExporter/Sources/CVDesignCatalog/`, with the attack fixtures in `CVPDFExporter/Tests/`. `MarkupContractPageTests`, in `CVPDFExporter/Tests/CVDesignCatalogTests/`, reads this page and fails when it and the code disagree: the sets must be equal, and every documented value and bound is probed at its edges.
 
 ## Version 1
@@ -125,6 +127,15 @@ Units and bounds:
 | `break-before`, `break-after` | `auto`, `page`, `avoid` |
 
 Anything that could load a resource, or hide, move, reorder or inject content, is absent from this table by design. That includes `position`, `transform`, `zoom`, `filter`, `mask`, `clip`, `overflow`, `visibility`, `opacity`, `height`, `content`, `list-style`, `quotes`, counters, `direction`, `unicode-bidi`, `order` and grid placement. The palette itself only exists with readable contrast ([R8](rules.md#r8-untrusted-input-enters-through-one-validating-boundary)).
+
+## The cover letter's structure (planned, #187)
+
+A `LetterDocument` is rendered as a structure of its own, beside the CV's. One built-in stylesheet styles it, for every design ([ADR 0019](adr/0019-applications.md)).
+
+- **Its elements and classes are its own.** None of its classes is in the table of what a design may select, so a design's CSS cannot select them: the design validator rejects any class outside that table.
+- **Its stylesheet is not a design.** It passes the same tokenizer and property allow-list as a design's, checked against the letter structure's selectors. Its colours and fonts are fixed values of the stylesheet.
+- **The structure is pinned by a golden HTML file** (R10), and a test reads this section and holds the code to it, as `MarkupContractPageTests` does for the CV's structure.
+- **The structure itself is written here when #187 lands:** the tree, the classes and the page rules. Until then this section only states that the letter is separate from the CV's contract.
 
 ## Changelog
 
