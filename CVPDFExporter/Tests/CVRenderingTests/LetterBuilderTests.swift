@@ -180,9 +180,9 @@ struct LetterBuilderTests {
         #expect(try render(bare).textNodes == ["Ada Lovelace", "9 January 2026", "Dear Sir or Madam,", "Yours faithfully,", "Ada Lovelace"])
     }
 
-    @Test("a line break in a paragraph or the closing is printed: the builder's base style keeps the line breaks of those two, and only those")
+    @Test("a line break in the sender block, a paragraph or the closing is printed: the builder's base style keeps the line breaks of those, and only those")
     func baseStylePrintsLineBreaks() throws {
-        #expect(LetterHTMLBuilder.baseStyle == "\(DocumentHTMLBuilder.baseStyle).letter-paragraph,.letter-closing{white-space:pre-line}")
+        #expect(LetterHTMLBuilder.baseStyle == "\(DocumentHTMLBuilder.baseStyle).letter-sender,.letter-paragraph,.letter-closing{white-space:pre-line}")
         let html = try render(letterFixture).html
         #expect(html.contains("<style>\(LetterHTMLBuilder.baseStyle)</style>"))
         #expect(!LetterHTMLBuilder.baseStyle.contains("<"))
@@ -190,6 +190,20 @@ struct LetterBuilderTests {
         #expect(!(try LetterStyle.stylesheet().css.contains("white-space")))
         #expect(throws: CSSRejection.self) { _ = try ValidatedStylesheet.validating(".letter-paragraph{white-space:pre-line}", against: LetterMarkup.vocabulary) }
         #expect(designRejects(".cv-summary{white-space:pre-line}") && designRejects(".letter-paragraph{white-space:pre-line}"))
+    }
+
+    @Test("a sender as Authoring keeps it is rendered as it is: a location of several lines in one element, an untrimmed name, every text node present",
+          arguments: LetterDocumentContractTests.savedSenders.prefix(3))
+    func savedSender(person: Person) throws {
+        var letter = letterFixture
+        letter.sender = person
+        let rendered = try render(letter)
+        #expect(rendered.textNodes == expectedLetterNodes(letter, try LetterConventionsCatalog.conventions(for: "it")))
+        #expect(rendered.html.contains("<p class=\"letter-sender-name\">\(person.name)</p>"))
+        #expect(rendered.html.contains("<p class=\"letter-sender-location\">\(person.location ?? "")</p>"))
+        #expect(rendered.textNodes.contains(person.location ?? ""))
+        // The block that holds them keeps the line breaks, through the base style.
+        #expect(rendered.html.contains("<header class=\"letter-sender\">") && LetterHTMLBuilder.baseStyle.contains(".letter-sender,"))
     }
 
     @Test("a line break inside a paragraph or the closing stays in its text node, as the CV's builder keeps one in its text")

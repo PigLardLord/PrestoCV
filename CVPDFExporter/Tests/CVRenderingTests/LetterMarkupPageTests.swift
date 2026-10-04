@@ -41,7 +41,7 @@ struct LetterMarkupPageTests {
     func lineBreaks() throws {
         let rows = try LetterPage.table(after: "### The letter's fixed values")
         let cell = LetterPage.backticked(try #require(rows["Line breaks"]))
-        #expect(cell.first == "white-space: pre-line" && cell.dropFirst().count == 2)
+        #expect(cell.first == "white-space: pre-line" && cell.dropFirst().count == 3)
         // The page names the two selectors in the order that the style has them.
         #expect(LetterHTMLBuilder.baseStyle.contains("\(cell.dropFirst().joined(separator: ",")){white-space:pre-line}"))
     }

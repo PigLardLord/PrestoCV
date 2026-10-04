@@ -70,6 +70,14 @@ struct LetterExportTests {
         #expect(try await requiredPages(letter) >= 2)
     }
 
+    @Test("a letter whose sender has a location of several lines is exported complete", arguments: LetterDocumentContractTests.savedSenders.prefix(3))
+    func savedSender(person: Person) async throws {
+        var letter = letterFixture
+        letter.sender = person
+        let pdf = try await export(letter)
+        #expect(MinimalPDFInspector().pageCount(of: pdf) == 1)
+    }
+
     @Test("a letter with no body is exported: one page, every text node")
     func emptyBody() async throws {
         var letter = letterFixture

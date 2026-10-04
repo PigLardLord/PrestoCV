@@ -172,7 +172,7 @@ html[lang]
 
 **The page writes five kinds of text, and nothing else.** The date line, the salutation, the valediction, the reference label and the attachments label come from the language's conventions (R13). Every other text node is a field of the document, and a test compares the text nodes of each language with the fields and the conventions, so the layout holds no word of its own.
 
-**A line break stays in its text, and is printed.** A paragraph and the closing may hold line breaks. The builder keeps one in the text node, as the CV's builder keeps one in a CV's text, and its base style prints it: `white-space: pre-line` on `.letter-paragraph` and `.letter-closing`. The completeness check ignores spacing.
+**A line break stays in its text, and is printed.** The sender's fields (a location of several lines), a paragraph and the closing may hold line breaks. The builder keeps one in the text node, as the CV's builder keeps one in a CV's text, and its base style prints it: `white-space: pre-line` on `.letter-sender`, which its fields inherit, and on `.letter-paragraph` and `.letter-closing`. The completeness check ignores spacing.
 
 **A blank value is absent.** A missing, empty or whitespace-only optional field, paragraph, address line or attachment produces no element, so the page has no empty line.
 
@@ -197,7 +197,7 @@ The grammar and the property table are the design CSS's, above, unchanged: a let
 |---|---|
 | Colours | text `#111111`, primary `#1F3A5F`, background `#FFFFFF`, set as the custom properties `--color-text`, `--color-primary` and `--color-background` |
 | Fonts | `Helvetica,Arial,sans-serif`, set as `--font-body` and `--font-heading`. The stack has one set of metrics on every platform, so a letter takes the same room wherever it is rendered |
-| Line breaks | `white-space: pre-line` on `.letter-paragraph`,`.letter-closing`, set by the builder's base style, as it sets the wrapping of links. No stylesheet can set it, because the property allow-list has no white-space |
+| Line breaks | `white-space: pre-line` on `.letter-sender`,`.letter-paragraph`,`.letter-closing`, set by the builder's base style, as it sets the wrapping of links. No stylesheet can set it, because the property allow-list has no white-space |
 
 The colours pass the palette rules of a design's: text at least 4.5:1 and primary at least 3:1 against the background. They come from no design and no palette.
 
