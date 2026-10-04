@@ -189,7 +189,7 @@ struct StoreDirectory<Failure: StoreFaultConvertible>: Sendable {
             case .unreadable: issues.append(.unreadable(file: name))
             case .tooLarge(let bytes): issues.append(.tooLarge(file: name, bytes: bytes))
             case .corrupt(let reason):
-                issues.append(moveToQuarantine(file) ? .corrupt(file: name, reason: reason) : .quarantineFailed(file: name))
+                issues.append(moveToQuarantine(file) != nil ? .corrupt(file: name, reason: reason) : .quarantineFailed(file: name))
             }
         }
         return (values, issues)
@@ -211,11 +211,12 @@ struct StoreDirectory<Failure: StoreFaultConvertible>: Sendable {
 
     // MARK: Quarantine
 
-    /// Moves a corrupt file into the quarantine, which must be a real directory of the store, never a link.
-    func moveToQuarantine(_ file: URL) -> Bool {
+    /// Moves a corrupt file into the quarantine, which must be a real directory of the store, never a link. Returns where it
+    /// went, or nil when it could not be moved.
+    func moveToQuarantine(_ file: URL) -> URL? {
         do {
             try FileManager.default.createDirectory(at: quarantine, withIntermediateDirectories: true)
-            guard Self.isRealDirectory(quarantine) == true else { return false }
+            guard Self.isRealDirectory(quarantine) == true else { return nil }
             // The retention period starts now: the file's own modification time says nothing about when it was isolated.
             try FileManager.default.setAttributes([.modificationDate: now()], ofItemAtPath: file.path)
             var target = quarantine.appendingPathComponent(file.lastPathComponent)
@@ -224,8 +225,8 @@ struct StoreDirectory<Failure: StoreFaultConvertible>: Sendable {
                 target = quarantine.appendingPathComponent("\(n)~" + file.lastPathComponent); n += 1   // "~" never occurs in a name
             }
             try FileManager.default.moveItem(at: file, to: target)
-            return true
-        } catch { return false }
+            return target
+        } catch { return nil }
     }
 
     /// Brings a quarantined file back, only through the read checks. `pattern` is the whole name a quarantined file of this

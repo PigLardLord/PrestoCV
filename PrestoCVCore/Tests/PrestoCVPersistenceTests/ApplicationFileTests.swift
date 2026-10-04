@@ -15,18 +15,7 @@ private let golden = #"{"advert":{"company":"Acme S.r.l.","role":"iOS Engineer",
 
 private func read(_ json: String) throws -> Application { try ApplicationFileV1.read(Data(json.utf8)) }
 
-/// One change to the pinned file that must make it corrupt.
-struct Mutation: CustomTestStringConvertible, Sendable {
-    let name: String, from: String, to: String
-    var testDescription: String { name }
-    func apply() throws -> String {
-        guard golden.contains(from) else { throw Failure(description: "the pinned file no longer holds \(from)") }
-        return golden.replacingOccurrences(of: from, with: to)
-    }
-    struct Failure: Error, CustomStringConvertible { let description: String }
-}
-
-let corruptMutations: [Mutation] = {
+let applicationMutations: [Mutation] = {
     var all: [Mutation] = []
     all.append(Mutation(name: "revision 0", from: #""revision":3"#, to: #""revision":0"#))
     all.append(Mutation(name: "a newer schema, read as this one", from: #""schemaVersion":1"#, to: #""schemaVersion":2"#))
@@ -103,9 +92,9 @@ struct ApplicationFileTests {
         #expect(try ApplicationFileV1.read(data) == application)
     }
 
-    @Test("every value that is not in its canonical, valid form is corrupt, never normalised or defaulted", arguments: corruptMutations)
+    @Test("every value that is not in its canonical, valid form is corrupt, never normalised or defaulted", arguments: applicationMutations)
     func corrupt(mutation: Mutation) throws {
-        let json = try mutation.apply()
+        let json = try mutation.apply(to: golden)
         #expect(throws: ApplicationFileV1.Invalid.self) { try read(json) }
     }
 
