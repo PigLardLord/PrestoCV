@@ -62,6 +62,8 @@ setup; put README.md $'# Project\n\n[Note]: the next paragraph says more, see `d
 fixed "a line that starts like a definition but goes on in words is prose"
 put README.md $'# Project\n\n[Note]: gone.md "Title"'
 stale "a definition with a title" "^README.md:3: link-target-missing:"
+setup; put README.md $'# Project\n\n<!-- old --> ## Removed section\n\nSee [it](#removed-section).'
+stale "an anchor that only a heading after a leading comment would define" "^README.md:5: link-anchor-missing:"
 setup; put README.md $'# Project\n\n[^note]: gone.md'
 fixed "a footnote definition is not a link definition"
 setup; put README.md $'# Project\n\nSee [line 10](docs/guide.md?plain=1#L10).'

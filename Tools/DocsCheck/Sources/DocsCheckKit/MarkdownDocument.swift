@@ -66,6 +66,9 @@ struct MarkdownDocument: Sendable {
                 fence = opening
                 continue
             }
+            // A line that starts with a comment, or inside one, belongs to an HTML block: what follows the comment on
+            // it is raw HTML, not a heading.
+            let inHTMLBlock = inComment || Self.startsComment(rawLine)
             var inline = InlineScan(line: rawLine, startsInComment: inComment, midLineOpenerMaySpan: false)
             if inline.unclosedMidLineOpener, lookahead.closes(after: offset) {
                 inline = InlineScan(line: rawLine, startsInComment: inComment, midLineOpenerMaySpan: true)
@@ -73,7 +76,7 @@ struct MarkdownDocument: Sendable {
             inComment = inline.endsInComment
             let line = inline.uncommented
             proseLines.append(Line(number: number, text: line))
-            if let heading = Self.heading(in: line, number: number) { headings.append(heading) }
+            if !inHTMLBlock, let heading = Self.heading(in: line, number: number) { headings.append(heading) }
             codeSpans += inline.codeSpans.map { CodeSpan(line: number, text: $0) }
             if let destination = Self.definitionDestination(in: line) {
                 links.append(Link(line: number, destination: destination))

@@ -220,6 +220,21 @@ struct MarkdownDocumentTests {
         #expect(document.anchors == ["alpha--beta", "gammadelta", "eps"])
     }
 
+    @Test("a line that starts with a comment is an HTML block, so what follows the comment is not a heading", arguments: [
+        "<!-- old --> ## Removed section", "   <!-- old --> # Removed", "<!--x--> ### Removed",
+    ])
+    func headingAfterAComment(line: String) {
+        let document = MarkdownDocument(text: line + "\n\nSee [it](#removed-section).")
+        #expect(document.headings.isEmpty)
+        #expect(document.anchors.isEmpty)
+    }
+
+    @Test("a heading that follows a comment that ends on the line before, or has one after it, is a heading")
+    func headingBesideAComment() {
+        let text = "<!-- old -->\n## Kept\n## Also <!-- note -->\ntext <!-- c --> ## not a heading\n<!--\nopen\n--> ## closing line is HTML too\n## After"
+        #expect(MarkdownDocument(text: text).headings.map(\.text) == ["Kept", "Also", "After"])
+    }
+
     @Test("an indented block is read like any other text: reading more can only add findings")
     func indentedCode() {
         #expect(MarkdownDocument(text: "    [a](a.md) `b/c.md`").links.map(\.destination) == ["a.md"])
