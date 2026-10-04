@@ -30,9 +30,28 @@ extension RepositoryError: StoreFaultConvertible {
     }
 }
 
+extension ApplicationRepositoryError: StoreFaultConvertible {
+    init(_ fault: StoreFault) {
+        switch fault {
+        case .unavailable(let failure): self = .storeUnavailable(failure)
+        case .unreadable(let file): self = .unreadable(file: file)
+        case .writeFailed(let file): self = .writeFailed(file: file)
+        case .invalidName(let name): self = .invalidName(name)
+        case .corrupt(let file): self = .corrupt(file: file)
+        case .tooLarge(let file): self = .tooLarge(file: file)
+        case .upgradeRequired(let file, let version): self = .upgradeRequired(file: file, version: version)
+        case .wouldNotReadBack(let file): self = .wouldNotReadBack(file: file)
+        }
+    }
+}
+
 /// The store itself: absent before the first save; unavailable when it cannot be reached, sits behind a link whose
 /// target is gone, or is not a directory. The store may be reached through a link.
 enum StoreState { case present, absent, unavailable(StoreFailure) }
+
+enum StoreNames {
+    static let uuidPattern = "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
+}
 
 /// Atomic, and on Apple platforms unreadable while the device is locked. The simulator does not apply protection.
 enum StoreWriting { static let options: Data.WritingOptions = [.atomic, .completeFileProtection] }
@@ -134,14 +153,19 @@ struct StoreDirectory<Failure: StoreFaultConvertible>: Sendable {
         }
     }
 
-    /// Every stored value of the files that end in `suffix`, and every issue found: a corrupt file is quarantined, and a
-    /// failed quarantine is reported while the listing goes on. Call it under the lock.
-    func scan<Value>(suffix: String, read: (URL) -> StoredFile<Value>) throws(Failure) -> (values: [Value], issues: [StoreIssue]) {
+    /// The files of the store that end in `suffix`, in name order.
+    func entries(suffix: String) throws(Failure) -> [URL] {
         let files: [URL]
         do { files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) }
         catch { throw Failure(.unavailable(.cannotList)) }
+        return files.filter { $0.lastPathComponent.hasSuffix(suffix) }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
+    /// Every stored value of the files that end in `suffix`, and every issue found: a corrupt file is quarantined, and a
+    /// failed quarantine is reported while the listing goes on. Call it under the lock.
+    func scan<Value>(suffix: String, read: (URL) -> StoredFile<Value>) throws(Failure) -> (values: [Value], issues: [StoreIssue]) {
         var values: [Value] = [], issues: [StoreIssue] = []
-        for file in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) where file.lastPathComponent.hasSuffix(suffix) {
+        for file in try entries(suffix: suffix) {
             let name = file.lastPathComponent
             switch read(file) {
             case .absent: continue                                   // removed since the directory was listed

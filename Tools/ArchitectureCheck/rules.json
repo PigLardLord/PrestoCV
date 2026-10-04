@@ -38,6 +38,7 @@
  },
  "infrastructureTypes": [
   "FileCVRepository",
+  "FileApplicationRepository",
   "FileDesignStore",
   "BundleDesignSource",
   "IOSPDFRenderer",

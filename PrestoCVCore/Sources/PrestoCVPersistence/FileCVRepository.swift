@@ -14,7 +14,6 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     }
 
     static let suffix = ".cv.json"
-    static let uuidPattern = "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
     private func url(_ id: CVID) -> URL { store.directory.appendingPathComponent(id.raw.uuidString + Self.suffix) }
 
     // MARK: Reading one file
@@ -97,7 +96,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     // MARK: CVStoreMaintenance
 
     public func restore(quarantined name: String) async throws(RepositoryError) -> CV {
-        try store.restore(quarantined: name, pattern: Self.uuidPattern + "\\.cv\\.json",
+        try store.restore(quarantined: name, pattern: StoreNames.uuidPattern + "\\.cv\\.json",
                           taken: { original in UUID(uuidString: String(original.prefix(36))).map { .alreadyExists(CVID($0)) } },
                           read: { source, original in read(source, asName: original) })
     }
