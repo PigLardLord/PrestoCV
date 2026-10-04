@@ -149,4 +149,35 @@ struct MarkdownDocumentTests {
     func indentedCode() {
         #expect(MarkdownDocument(text: "    [a](a.md) `b/c.md`").links.map(\.destination) == ["a.md"])
     }
+
+    // MARK: Explicit anchors
+
+    @Test("the id and name attributes of an HTML tag are anchors, quoted either way or not at all")
+    func explicitAnchors() {
+        let text = "<a name=\"top\"></a> <h2 id='sec'>x</h2> <div class=\"c\" id=plain>y</div> <a href=\"#\" NAME=\"Mixed\">z</a> <p ID = \"spaced\">"
+        #expect(MarkdownDocument(text: text).explicitAnchors == ["top", "sec", "plain", "Mixed", "spaced"])
+    }
+
+    @Test("other attributes, attribute values and text that only looks like a tag are not anchors")
+    func notExplicitAnchors() {
+        let text = """
+        <span data-id="x" myname="y" title="id=z"> <img alt=" id='q' "> a<b id="c" and 1 < 2 id="d"
+        `<a name="code">` <!-- <a name="comment"> -->
+        ```
+        <a name="fence">
+        ```
+        <a id="">
+        x <2 id="e"> y, a < b id="f"> c, <!x id="g"> and </a id="h">
+        """
+        #expect(MarkdownDocument(text: text).explicitAnchors.isEmpty)
+    }
+
+    @Test("a link may target an explicit anchor of its own file or of another")
+    func explicitAnchorLinks() throws {
+        let result = try findings(in: [
+            "README.md": "<a name=\"top\"></a>\n[ok](#top) [bad](#Top) [other](docs/a.md#custom) [bad2](docs/a.md#nothing) [head](docs/a.md#heading)",
+            "docs/a.md": "# Heading\n<div id=\"custom\"></div>",
+        ])
+        #expect(result == ["README.md:2 link-anchor-missing", "README.md:2 link-anchor-missing"])
+    }
 }

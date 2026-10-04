@@ -1,4 +1,5 @@
-/// What the checks need from a Markdown file: its links and code spans with their lines, and its headings. Fenced code, HTML comments and the inside of code spans are skipped, because none of
+/// What the checks need from a Markdown file: its links and code spans with their lines, its headings, and the
+/// anchors its HTML defines. Fenced code, HTML comments and the inside of code spans are skipped, because none of
 /// them holds a link. It reads CommonMark's inline links, images and link definitions, and ATX headings. Indented
 /// code is read like any other text, since reading more can only add findings.
 struct MarkdownDocument: Sendable {
@@ -28,6 +29,8 @@ struct MarkdownDocument: Sendable {
     private(set) var links: [Link] = []
     private(set) var codeSpans: [CodeSpan] = []
     private(set) var headings: [Heading] = []
+    /// The `id` and `name` attributes of HTML tags, in document order. A link may point at any of them.
+    private(set) var explicitAnchors: [String] = []
 
     /// Headings longer than this many characters are reported, not read.
     static let maximumHeadingLength = 1_000
@@ -72,6 +75,7 @@ struct MarkdownDocument: Sendable {
                 links.append(Link(line: number, destination: destination))
             }
             links += inline.destinations.map { Link(line: number, destination: $0) }
+            explicitAnchors += inline.explicitAnchors
         }
         var slugger = HeadingSlugger()
         for heading in headings {
@@ -163,11 +167,12 @@ struct MarkdownDocument: Sendable {
     }
 }
 
-/// One line of inline Markdown: the contents of its code spans, the destinations of its links, and the line without
-/// its HTML comments. A comment may begin on an earlier line or end on a later one.
+/// One line of inline Markdown: the contents of its code spans, the destinations of its links, the anchors its HTML
+/// tags define, and the line without its HTML comments. A comment may begin on an earlier line or end on a later one.
 private struct InlineScan {
     private(set) var codeSpans: [String] = []
     private(set) var destinations: [String] = []
+    private(set) var explicitAnchors: [String] = []
     private(set) var uncommented = ""
     private(set) var endsInComment = false
 
@@ -191,6 +196,7 @@ private struct InlineScan {
                 index += 1
             }
         }
+        explicitAnchors = Self.anchors(inTagsOf: visible)
     }
 
     /// The line with every HTML comment replaced by spaces, and the same with every code span replaced too. Code
@@ -270,6 +276,73 @@ private struct InlineScan {
             index += 1
         }
         return nil
+    }
+
+    // MARK: Explicit anchors
+
+    /// The `id` and `name` attributes of the HTML tags that start and end on this line. Attribute names are matched
+    /// whole and without regard to case; values are taken as written.
+    private static func anchors(inTagsOf scalars: [Unicode.Scalar]) -> [String] {
+        var anchors: [String] = []
+        var index = 0
+        while index < scalars.count {
+            guard scalars[index] == "<", index + 1 < scalars.count, isASCIILetter(scalars[index + 1]) else {
+                index += 1
+                continue
+            }
+            if let (found, end) = attributes(ofTagAt: index, in: scalars) {
+                anchors += found
+                index = end
+            } else {
+                index += 1
+            }
+        }
+        return anchors
+    }
+
+    /// The anchors of the tag that starts at `start` and the index after its `>`, or nil if the tag does not end on the line.
+    private static func attributes(ofTagAt start: Int, in scalars: [Unicode.Scalar]) -> ([String], Int)? {
+        var index = start + 1
+        while index < scalars.count, isNameScalar(scalars[index]) { index += 1 }
+        var anchors: [String] = []
+        while index < scalars.count {
+            while index < scalars.count, isSpace(scalars[index]) || scalars[index] == "/" { index += 1 }
+            guard index < scalars.count else { return nil }
+            if scalars[index] == ">" { return (anchors, index + 1) }
+            let nameStart = index
+            while index < scalars.count, !isSpace(scalars[index]), !"=>/".unicodeScalars.contains(scalars[index]) { index += 1 }
+            guard index > nameStart else { return nil }
+            let name = string(Array(scalars[nameStart..<index])).lowercased()
+            while index < scalars.count, isSpace(scalars[index]) { index += 1 }
+            guard index < scalars.count, scalars[index] == "=" else { continue }
+            index += 1
+            while index < scalars.count, isSpace(scalars[index]) { index += 1 }
+            guard index < scalars.count else { return nil }
+            var value: [Unicode.Scalar] = []
+            if scalars[index] == "\"" || scalars[index] == "'" {
+                let quote = scalars[index]
+                index += 1
+                while index < scalars.count, scalars[index] != quote { value.append(scalars[index]); index += 1 }
+                guard index < scalars.count else { return nil }
+                index += 1
+            } else {
+                while index < scalars.count, !isSpace(scalars[index]), scalars[index] != ">" { value.append(scalars[index]); index += 1 }
+            }
+            if (name == "id" || name == "name"), !value.isEmpty { anchors.append(string(value)) }
+        }
+        return nil
+    }
+
+    private static func isASCIILetter(_ scalar: Unicode.Scalar) -> Bool {
+        (scalar.value >= 0x41 && scalar.value <= 0x5A) || (scalar.value >= 0x61 && scalar.value <= 0x7A)
+    }
+
+    private static func isNameScalar(_ scalar: Unicode.Scalar) -> Bool {
+        isASCIILetter(scalar) || (scalar.value >= 0x30 && scalar.value <= 0x39) || scalar == "-"
+    }
+
+    private static func isSpace(_ scalar: Unicode.Scalar) -> Bool {
+        scalar == " " || scalar == "\t"
     }
 
     // MARK: Destinations

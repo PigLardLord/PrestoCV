@@ -47,9 +47,9 @@ struct LinkCheck {
         return nil
     }
 
-    /// The anchors of the headings, which a link may point at.
+    /// The headings' anchors and the explicit ones, which a link may point at.
     private static func anchors(of markdown: MarkdownDocument) -> Set<Anchor> {
-        Set(markdown.anchors.map(Anchor.init))
+        Set((markdown.anchors + markdown.explicitAnchors).map(Anchor.init))
     }
 
     private mutating func anchors(of path: String) throws(DocsCheckError) -> Set<Anchor> {
