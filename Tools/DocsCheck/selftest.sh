@@ -75,6 +75,10 @@ setup; put README.md $'# Project\n\n<a name="top"></a>\n\nBack to [the top](#top
 fixed "an explicit HTML anchor is a target"
 put README.md $'# Project\n\n<a name="top"></a>\n\nBack to [the top](#start).'
 stale "a link to an anchor that no heading or tag defines" "^README.md:5: link-anchor-missing:"
+setup; mkdir -p "$ROOT/Tools/Pkg/docs"; put Tools/Pkg/README.md $'# Pkg\n\nSee `docs/beside.md`.'; put Tools/Pkg/docs/beside.md '# Beside'
+fixed "a path that exists beside its document, not at the root"
+rm "$ROOT/Tools/Pkg/docs/beside.md"
+stale "a path that exists neither at the root nor beside its document" "^Tools/Pkg/README.md:3: path-missing:"
 setup; put Package/README.md $'[gone](gone.md)'; put Package/.build/checkouts/dep/README.md $'[gone](gone.md)'
 stale "a README in a package" "^Package/README.md:1: link-target-missing:"
 rm "$ROOT/Package/README.md"; fixed "the README in .build is not read"

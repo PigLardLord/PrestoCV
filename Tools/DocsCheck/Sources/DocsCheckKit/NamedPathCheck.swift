@@ -1,6 +1,6 @@
 /// Check 2. A path a document names in a code span, when its first segment is a top-level entry of the repository,
-/// must exist. A path that is planned is declared in the planned file, and a declaration that is no longer needed
-/// is reported, so the list cannot go stale.
+/// must exist, from the repository root or from the directory of the document. A path that is planned is declared
+/// in the planned file, and a declaration that is no longer needed is reported, so the list cannot go stale.
 struct NamedPathCheck {
     let tree: RepositoryTree
     let planned: PlannedPaths
@@ -16,11 +16,21 @@ struct NamedPathCheck {
         for document in documents {
             for span in document.markdown.codeSpans {
                 for path in PathRecogniser.paths(inCodeSpan: span.text, topLevel: topLevel) {
-                    named.insert(path.path)
-                    let kind = try tree.kind(of: path.path)
-                    if let kind, kind == .directory || !path.mustBeDirectory { continue }
-                    if planned.declares(path.path) { continue }
-                    let problem = kind == nil ? "does not exist" : "is a file, not a directory"
+                    let places = Self.places(of: path.path, in: document.path)
+                    named.formUnion(places)
+                    var existsAsFile = false
+                    var found = false
+                    for place in places {
+                        switch try tree.kind(of: place) {
+                        case .directory?: found = true
+                        case .file?: if path.mustBeDirectory { existsAsFile = true } else { found = true }
+                        case nil: break
+                        }
+                    }
+                    if found || places.contains(where: planned.declares) { continue }
+                    let problem = existsAsFile ? "is a file, not a directory"
+                        : places.count > 1 ? "exists neither from the repository root nor from \(Finding.quoted(Self.directory(of: document.path)))"
+                        : "does not exist"
                     findings.append(Finding(file: document.path, line: span.line, code: .pathMissing, message: "\(Finding.quoted(path.path)) \(problem)"))
                 }
             }
@@ -35,5 +45,16 @@ struct NamedPathCheck {
             }
         }
         return findings
+    }
+
+    /// The paths a name can mean: as written, from the root, and from the directory of the document, when that differs.
+    private static func places(of path: String, in document: String) -> [String] {
+        var places = [path]
+        if let beside = RepositoryPath.resolve(path, from: document), beside != path { places.append(beside) }
+        return places
+    }
+
+    private static func directory(of document: String) -> String {
+        document.split(separator: "/").dropLast().joined(separator: "/")
     }
 }

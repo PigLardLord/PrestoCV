@@ -35,7 +35,7 @@ Codes: `link-target-missing`, `link-anchor-missing`, `heading-too-long`, `headin
 
 ## 2. Named paths
 
-A path written in a code span whose first segment is a top-level entry of the repository, such as `Tools/…`, `PrestoCVCore/…`, `docs/…` or `.github/…`, exists. Every whitespace-separated word of a code span is tried, so a command that names a path is checked too. Fenced code and HTML comments are not read.
+A path written in a code span whose first segment is a top-level entry of the repository, such as `Tools/…`, `PrestoCVCore/…`, `docs/…` or `.github/…`, exists, from the repository root or from the directory of the document that names it. It is a finding only when both places miss. Every whitespace-separated word of a code span is tried, so a command that names a path is checked too. Fenced code and HTML comments are not read.
 
 - **Skipped.** A word that has a placeholder or a glob (`<n>`, `*`, `?`, `{…}`, `[…]`, `…`, `...`, `$VAR`), any character that a path does not have (so URLs and expressions), a path under `~` or `/`, a path with a `.` or `..` segment, and a path through a `.build` directory, which is a build product. A word whose first segment is not a top-level entry of the repository is not a path for this check.
 - **Suffixes.** `file.swift:10`, `file.swift:10:3`, `file.swift:10-20` and `file.swift#L10` name `file.swift`; an `#anchor` is dropped.

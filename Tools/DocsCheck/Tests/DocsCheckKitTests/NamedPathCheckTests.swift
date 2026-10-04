@@ -29,10 +29,30 @@ struct NamedPathCheckTests {
         #expect(try findings(in: ["README.md": readme, "Tools/run.sh": ""]) == [])
     }
 
-    @Test("every kind of document is read, and a path is relative to the repository, not to the document")
-    func relativeToTheRepository() throws {
-        let result = try findings(in: ["docs/a.md": "`Tools/run.sh` `run.sh`", "Tools/run.sh": "", "Tools/README.md": "`Tools/gone.sh` `gone.sh`"])
-        #expect(result == ["Tools/README.md:1 path-missing"])
+    @Test("a path is accepted if it exists from the repository root or from the directory of its document")
+    func rootOrDocumentDirectory() throws {
+        let result = try findings(in: [
+            "Tools/Pkg/README.md": "`docs/here.md` `docs/root.md` `docs/neither.md` `docs/` `Tools/run.sh`",
+            "Tools/Pkg/docs/here.md": "", "docs/root.md": "", "Tools/run.sh": "",
+        ])
+        #expect(result == ["Tools/Pkg/README.md:1 path-missing"])
+    }
+
+    @Test("a directory path needs a directory from one of the two places")
+    func directoryFromEitherPlace() throws {
+        // `Shared` is a file at the root and a directory beside the document, so `Shared/` is satisfied beside it only.
+        #expect(try findings(in: ["Pkg/README.md": "`Shared/`", "Pkg/Shared/here.md": "", "Shared": ""]) == [])
+        #expect(try findings(in: ["Pkg/README.md": "`Shared/`", "Shared": ""]) == ["Pkg/README.md:1 path-missing"])
+    }
+
+    @Test("a path in a document at the root has only the root to be looked for in")
+    func documentAtTheRoot() throws {
+        #expect(try findings(in: ["README.md": "`docs/here.md` `docs/gone.md`", "docs/here.md": ""]) == ["README.md:1 path-missing"])
+    }
+
+    @Test("a path that leaves the repository from the document's directory is not found there")
+    func leavingTheRepository() throws {
+        #expect(try findings(in: ["README.md": "`Tools/x.sh`", "Tools/README.md": "`Tools/y.sh`", "Tools/x.sh": ""]) == ["Tools/README.md:1 path-missing"])
     }
 
     @Test("a path in the text of a link is checked like any other")
@@ -67,6 +87,15 @@ struct NamedPathCheckTests {
         let planned = #"[{"path": "Tools/new", "ticket": 12}]"#
         #expect(try findings(in: ["README.md": "`Tools/new` `Tools/new/x.sh` `Tools/other`", "Tools/run.sh": ""], planned: planned)
                 == ["README.md:1 path-missing", "README.md:1 path-missing"])
+    }
+
+    @Test("a planned path is matched as written or from the directory of the document that names it")
+    func plannedFromTheDocumentDirectory() throws {
+        let planned = #"[{"path": "Tools/Pkg/docs/new.md", "ticket": 12}, {"path": "docs/other.md", "ticket": 13}]"#
+        let result = try findings(in: ["Tools/Pkg/README.md": "`docs/new.md` `docs/other.md`", "docs/a.md": ""], planned: planned)
+        #expect(result == [])
+        let unused = try findings(in: ["Tools/Pkg/README.md": "`docs/new.md`", "docs/a.md": ""], planned: planned)
+        #expect(unused == ["planned.json:1 planned-path-unused"])
     }
 
     @Test("a planned file that is not a list of paths with tickets is a finding", arguments: [
