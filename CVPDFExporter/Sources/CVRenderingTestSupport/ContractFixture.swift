@@ -36,12 +36,15 @@ public enum ContractFixture {
             closing: "I am available for an interview.", name: "Ada Lovelace", attachments: ["Curriculum vitae", "Degree certificate"])
     }
 
-    /// The same letter with as many paragraphs as a letter may have, of two lines each: more than any page holds.
+    /// The same letter with as many paragraphs, address lines and attachments as a letter may have, of two lines each in
+    /// the paragraphs: more than any page holds, and still a letter the validator accepts.
     public static func overlongLetter(language: String) -> LetterDocument {
         var letter = letter(language: language)
-        letter.body = (1...40).map {
+        letter.body = (1...21).map {
             "Paragraph \($0) says something about the role and about the person who applies for it, and it goes on for a second line of text."
         }
+        letter.recipient.address = (1...8).map { "Address line \($0)" }
+        letter.attachments = (1...20).map { "Attachment \($0)" }
         return letter
     }
 

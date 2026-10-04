@@ -28,8 +28,8 @@ public struct LetterDate: Codable, Sendable, Equatable {
 /// layout for every design. Plain values and no PrestoCV type (ADR 0002). Its JSON is hand-written and versioned.
 ///
 /// The salutation, the valediction and the date's words are not fields: the page writes them from the language's
-/// conventions (R13), so the body holds only what the author says. A field holds one line of text; a paragraph is one
-/// element of `body`, and no field carries a line break.
+/// conventions (R13), so the body holds only what the author says. A field holds one line of text, except the
+/// paragraphs of `body` and the `closing`, which may hold line breaks; a paragraph is one element of `body`.
 public struct LetterDocument: Codable, Sendable, Equatable {
     public static let currentSchemaVersion = 1
     /// The primary language subtags the page has conventions for. A test holds this list to the conventions data.
@@ -85,13 +85,21 @@ public struct LetterDocument: Codable, Sendable, Equatable {
 public enum LetterDocumentValidator {
     public struct Invalid: Error, Equatable, Sendable { public let reason: String }
     /// Bounds in UTF-8 bytes, not characters: a letter followed by any number of combining marks is one character.
-    /// A one-page letter is far below them; they only keep a hostile one from costing memory.
-    static let maxTextBytes = 4_096, maxDocumentTextBytes = 32_768
-    static let maxParagraphs = 40, maxAddressLines = 8, maxAttachments = 20
-    /// The largest JSON document `decode` accepts, checked before decoding.
-    public static let maxJSONBytes = 131_072
+    /// They are what Authoring can keep, so a letter it saves is one this accepts (ADR 0019): a line or a paragraph of up to
+    /// 10,000 bytes, an opening and 20 paragraphs (which make the body), 20 attachments and 6 address lines (8 are accepted).
+    /// A letter that is too long for its page is not invalid: the export refuses it, with the number of pages it needed.
+    static let maxTextBytes = 10_000
+    static let maxParagraphs = 1 + 20, maxAddressLines = 8, maxAttachments = 20
+    /// The most text a letter holds, with every field at its bound: 41 fields of one line (the sender's six, the signature,
+    /// the recipient's three, the address lines, the place, the reference, the subject and the attachments) and 22 of
+    /// several (the paragraphs and the closing). 63 fields of 10,000 bytes are 630,000 bytes.
+    static let maxLetterTextBytes = (6 + 1 + 3 + maxAddressLines + 3 + maxAttachments + maxParagraphs + 1) * maxTextBytes
+    /// The largest JSON document `decode` accepts, checked before decoding. A producer that escapes every scalar outside
+    /// ASCII writes a scalar of four bytes in twelve, so a letter at its bounds takes up to three times its text,
+    /// 1,890,000 bytes, and the keys and punctuation take under 10,000 more.
+    public static let maxJSONBytes = 2_000_000
 
-    static let textReason = "a field is too long, the letter is too large, or it has control or hidden characters"
+    static let textReason = "a field is too long, or it has control or hidden characters"
 
     /// The entry point for a letter that arrives as JSON: the size is checked before decoding, and the decoded letter is validated.
     public static func decode(json: Data) throws(Invalid) -> LetterDocument {
@@ -145,17 +153,18 @@ public enum LetterDocumentValidator {
         guard d.recipient.address.count <= maxAddressLines else { throw Invalid(reason: "too many address lines") }
         guard d.attachments.count <= maxAttachments else { throw Invalid(reason: "too many attachments") }
 
-        var total = 0
-        func text(_ s: String?) throws(Invalid) {
+        /// A field of one line refuses every control character, a line break among them. A paragraph and the closing may hold
+        /// line breaks, which the page keeps as the CV's builder keeps them in its text.
+        func text(_ s: String?, multiline: Bool = false) throws(Invalid) {
             guard let s else { return }
-            total += s.utf8.count
-            guard s.utf8.count <= maxTextBytes, total <= maxDocumentTextBytes, !s.unicodeScalars.contains(where: hidesOrReorders) else {
+            guard s.utf8.count <= maxTextBytes, !s.unicodeScalars.contains(where: { hidesOrReorders($0) && !(multiline && $0 == "\n") }) else {
                 throw Invalid(reason: textReason)
             }
         }
         for value in [d.sender.name, d.name] { try text(value) }
         for value in [d.sender.professionalTitle, d.sender.email, d.sender.phone, d.sender.location, d.sender.website] { try text(value) }
-        for value in [d.recipient.name, d.recipient.familyName, d.recipient.company, d.place, d.reference, d.subject, d.closing] { try text(value) }
-        for value in d.recipient.address + d.body + d.attachments { try text(value) }
+        for value in [d.recipient.name, d.recipient.familyName, d.recipient.company, d.place, d.reference, d.subject] { try text(value) }
+        for value in d.recipient.address + d.attachments { try text(value) }
+        for value in d.body + [d.closing].compactMap({ $0 }) { try text(value, multiline: true) }
     }
 }

@@ -172,6 +172,8 @@ html[lang]
 
 **The page writes five kinds of text, and nothing else.** The date line, the salutation, the valediction, the reference label and the attachments label come from the language's conventions (R13). Every other text node is a field of the document, and a test compares the text nodes of each language with the fields and the conventions, so the layout holds no word of its own.
 
+**A line break stays in its text.** A paragraph and the closing may hold line breaks, and the builder keeps one in the text node, as the CV's builder keeps one in a CV's text. HTML shows it as a space, because the property allow-list has no `white-space`; the completeness check ignores spacing.
+
 **A blank value is absent.** A missing, empty or whitespace-only optional field, paragraph, address line or attachment produces no element, so the page has no empty line.
 
 **The sender's website prints its destination,** exactly as its `href`, as a CV link does (above). The builder's base style lets it wrap.

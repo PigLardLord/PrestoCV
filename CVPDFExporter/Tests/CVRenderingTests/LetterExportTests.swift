@@ -45,14 +45,39 @@ struct LetterExportTests {
         return pages
     }
 
-    @Test("a letter that cannot fit is a typed error that says how many pages it needed, never a page that is cut off")
+    @Test("a letter that cannot fit is a typed error, never a page that is cut off")
     func doesNotFit() async throws {
-        let pages = try await requiredPages(overlong())
-        #expect(pages >= 2)
-        var longer = overlong()
-        longer.attachments = (1...LetterDocumentValidator.maxAttachments).map { "Attachment \($0)" }
-        longer.recipient.address = (1...LetterDocumentValidator.maxAddressLines).map { "Address line \($0)" }
-        #expect(try await requiredPages(longer) > pages)
+        #expect(try await requiredPages(overlong()) >= 2)
+    }
+
+    /// Cuts the letter to one page and says how many it needed: three.
+    struct NeedsThreePages: PDFRendering {
+        func render(html: String, page: PageSetup) async throws -> RenderedPDF {
+            let pdf = try await FakePDFRenderer().render(html: html, page: page)
+            return RenderedPDF(data: pdf.data, pageCount: 1, requiredPages: 3)
+        }
+    }
+    @Test("the error says how many pages the letter needed")
+    func pagesNeeded() async throws {
+        #expect(try await requiredPages(letterFixture, with: NeedsThreePages()) == 3)
+    }
+
+    @Test("a letter that the validator accepts and that is too long for the page is the export's error, not an invalid document", arguments: LetterConventionsTests.languages)
+    func validButTooLong(language: String) async throws {
+        let letter = ContractFixture.overlongLetter(language: language)
+        try LetterDocumentValidator.validate(letter)
+        #expect(letter.body.count == LetterDocumentValidator.maxParagraphs && letter.attachments.count == LetterDocumentValidator.maxAttachments)
+        #expect(try await requiredPages(letter) >= 2)
+    }
+
+    @Test("a letter with line breaks in its paragraphs is exported complete: the check ignores spacing")
+    func multiLine() async throws {
+        var letter = letterFixture
+        letter.body[0] = "First line\nSecond line\n\nThird"
+        letter.closing = "Thanks,\nAda"
+        let pdf = try await export(letter)
+        let text = try #require(MinimalPDFInspector().text(of: pdf))
+        #expect(DocumentCompleteness.missing(in: text, expected: try render(letter).textNodes).isEmpty)
     }
 
     /// Cuts the document to its first page and says nothing, as a renderer that does not report truncation would (#8).
@@ -66,7 +91,7 @@ struct LetterExportTests {
     func silentTruncation() async throws {
         let failure = try await #require(throws: LetterPDFExport.Failure.self) { _ = try await export(overlong(), with: SilentlyTruncating()) }
         guard case .missing(let nodes) = failure else { Issue.record("expected missing text, got \(failure)"); return }
-        #expect(nodes.contains("Paragraph 40 says something about the role."))
+        #expect(nodes.contains("Certificato di laurea"))
     }
 
     /// Two pages, which the renderer reports as one.
@@ -100,7 +125,7 @@ struct LetterExportTests {
     }
 
     struct Unreachable: PDFRendering { func render(html: String, page: PageSetup) async throws -> RenderedPDF { Issue.record("rendered"); throw CancellationError() } }
-    @Test("a letter that cannot be rendered never reaches the renderer", arguments: [("ja", "language is not supported"), ("it", "a field is too long, the letter is too large, or it has control or hidden characters")])
+    @Test("a letter that cannot be rendered never reaches the renderer", arguments: [("ja", "language is not supported"), ("it", LetterDocumentValidator.textReason)])
     func invalidNeverRendered(language: String, reason: String) async throws {
         var letter = letterFixture
         letter.language = language

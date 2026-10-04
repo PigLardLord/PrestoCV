@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-import CVDocumentModel
+@testable import CVDocumentModel
 import CVDesignCatalog
 @testable import CVRendering
 
@@ -153,6 +153,20 @@ struct LetterBuilderTests {
         #expect(rendered.textNodes.contains("Writes {{title}} {name} {date} literally & <script>alert(1)</script>"))
     }
 
+    @Test("a line break inside a paragraph or the closing stays in its text node, as the CV's builder keeps one in its text")
+    func lineBreaks() throws {
+        var letter = letterFixture
+        letter.body[0] = "First line\nSecond line"
+        letter.closing = "Thanks,\nAda"
+        let rendered = try render(letter)
+        #expect(rendered.html.contains("<p class=\"letter-paragraph\">First line\nSecond line</p>"))
+        #expect(rendered.html.contains("<p class=\"letter-closing\">Thanks,\nAda</p>"))
+        #expect(rendered.textNodes.contains("First line\nSecond line") && rendered.textNodes.contains("Thanks,\nAda"))
+        let cv = DocumentHTMLBuilder().build(CVDocument(language: "en", person: Person(name: "A"), sections: [.summary("First line\nSecond line")]),
+                                             stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "en"))
+        #expect(cv.contains("<p class=\"cv-summary\">First line\nSecond line</p>"))
+    }
+
     static let websiteCases: [(String, Bool)] = [
         ("https://ada.example", true), ("http://example.org/path?q=1", true), ("javascript:alert(1)", false), ("https://linkedin.com@example.org/", false),
         ("//evil.example", false), ("https://example.org:8443/", false), ("data:text/html,<script>", false), ("https://example.org/ with space", false),
@@ -193,7 +207,7 @@ struct LetterBuilderTests {
     }
 
     static let invalidCases: [(String, String)] = [
-        ("language", "language is not supported"), ("hidden", "a field is too long, the letter is too large, or it has control or hidden characters"),
+        ("language", "language is not supported"), ("hidden", LetterDocumentValidator.textReason),
         ("family", "the recipient's family name is required"), ("date", "the date does not exist"),
     ]
 

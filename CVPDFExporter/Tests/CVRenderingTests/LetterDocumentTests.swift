@@ -22,12 +22,16 @@ let letterFixture = LetterDocument(
 /// `fieldsAreComplete` fails when the model gains a field that is not listed here.
 struct LetterTextField: Sendable, CustomTestStringConvertible {
     let name: String
+    /// A paragraph and the closing may hold line breaks; every other field holds one line.
+    let multiline: Bool
     let set: @Sendable (inout LetterDocument, String) -> Void
     var testDescription: String { name }
 
     static let all: [LetterTextField] = {
         var all: [LetterTextField] = []
-        func add(_ name: String, _ set: @escaping @Sendable (inout LetterDocument, String) -> Void) { all.append(LetterTextField(name: name, set: set)) }
+        func add(_ name: String, multiline: Bool = false, _ set: @escaping @Sendable (inout LetterDocument, String) -> Void) {
+            all.append(LetterTextField(name: name, multiline: multiline, set: set))
+        }
         add("sender.name") { $0.sender.name = $1 }
         add("sender.professionalTitle") { $0.sender.professionalTitle = $1 }
         add("sender.email") { $0.sender.email = $1 }
@@ -42,9 +46,9 @@ struct LetterTextField: Sendable, CustomTestStringConvertible {
         add("place") { $0.place = $1 }
         add("reference") { $0.reference = $1 }
         add("subject") { $0.subject = $1 }
-        add("body[0]") { $0.body[0] = $1 }
-        add("body[1]") { $0.body[1] = $1 }
-        add("closing") { $0.closing = $1 }
+        add("body[0]", multiline: true) { $0.body[0] = $1 }
+        add("body[1]", multiline: true) { $0.body[1] = $1 }
+        add("closing", multiline: true) { $0.closing = $1 }
         add("name") { $0.name = $1 }
         add("attachments[0]") { $0.attachments[0] = $1 }
         add("attachments[1]") { $0.attachments[1] = $1 }
@@ -66,14 +70,17 @@ func invalid(_ document: LetterDocument) -> String? {
     do { try LetterDocumentValidator.validate(document); return nil } catch { return error.reason }
 }
 
-/// Control characters (a line break included: no field can carry one, so none is accepted and then printed as a space),
-/// bidirectional controls that reorder what is printed, and invisible characters that hide text or tell nothing.
+/// Control characters, bidirectional controls that reorder what is printed, line and paragraph separators, and invisible
+/// characters that hide text or tell nothing: refused in every field.
 let hostileLetterText: [String] = [
-    "\u{0007}", "a\u{0000}b", "line\nbreak", "tab\there", "carriage\rreturn", "\u{001B}[31m", "\u{007F}", "x\u{0085}y",
+    "\u{0007}", "a\u{0000}b", "tab\there", "carriage\rreturn", "a\r\nb", "a\u{000B}b", "a\u{000C}b", "\u{001B}[31m", "\u{007F}", "x\u{0085}y",
     "\u{202E}evil", "a\u{2066}b", "x\u{202A}y", "x\u{202B}y", "x\u{202C}y", "x\u{202D}y", "x\u{2067}y", "x\u{2068}y", "x\u{2069}y",
     "x\u{200E}y", "x\u{200F}y", "x\u{061C}y",
     "x\u{200B}y", "x\u{200C}y", "x\u{200D}y", "x\u{2060}y", "\u{FEFF}x", "x\u{00AD}y", "x\u{E0041}y", "x\u{2028}y", "x\u{2029}y",
 ]
+
+/// A line break: accepted in a paragraph and in the closing, refused in a field that holds one line.
+let lineBreakLetterText: [String] = ["a\nb", "a\n\nb", "first\nsecond\nthird", "\nleading", "trailing\n"]
 
 @Suite("ADR 0019 · LetterDocument is a JSON contract")
 struct LetterDocumentContractTests {
@@ -111,7 +118,7 @@ struct LetterDocumentContractTests {
     func oversizedField(field: LetterTextField) {
         var letter = letterFixture
         field.set(&letter, String(repeating: "x", count: LetterDocumentValidator.maxTextBytes + 1))
-        #expect(invalid(letter) == "a field is too long, the letter is too large, or it has control or hidden characters")
+        #expect(invalid(letter) == LetterDocumentValidator.textReason)
         field.set(&letter, String(repeating: "x", count: LetterDocumentValidator.maxTextBytes))
         #expect(invalid(letter) == nil)
     }
@@ -125,13 +132,83 @@ struct LetterDocumentContractTests {
         #expect(invalid(letter) != nil)
     }
 
-    @Test("the whole letter has a budget, not only each field")
-    func letterBudget() {
+    /// A letter with every field at its bound: `filler` is a text of exactly the per-field bound, in bytes.
+    static func letterAtEveryBound(_ filler: String) -> LetterDocument {
         var letter = letterFixture
-        let paragraph = String(repeating: "x", count: LetterDocumentValidator.maxTextBytes)
-        letter.body = Array(repeating: paragraph, count: LetterDocumentValidator.maxDocumentTextBytes / LetterDocumentValidator.maxTextBytes + 1)
-        #expect(letter.body.count <= LetterDocumentValidator.maxParagraphs)
-        #expect(invalid(letter) != nil)
+        letter.sender = Person(name: filler, professionalTitle: filler, email: filler, phone: filler, location: filler, website: filler)
+        letter.recipient = LetterRecipient(formOfAddress: .masculine, name: filler, familyName: filler, company: filler,
+                                           address: Array(repeating: filler, count: LetterDocumentValidator.maxAddressLines))
+        letter.place = filler; letter.reference = filler; letter.subject = filler; letter.closing = filler; letter.name = filler
+        letter.body = Array(repeating: filler, count: LetterDocumentValidator.maxParagraphs)
+        letter.attachments = Array(repeating: filler, count: LetterDocumentValidator.maxAttachments)
+        return letter
+    }
+
+    /// The JSON text of a letter as a producer writes it that escapes every scalar outside ASCII: a scalar of four bytes in
+    /// UTF-8 takes twelve bytes, a surrogate pair of escapes, which is the most any scalar takes.
+    static func escapingEveryNonASCII(_ json: String) -> String {
+        var out = ""
+        for scalar in json.unicodeScalars {
+            if scalar.isASCII { out.unicodeScalars.append(scalar); continue }
+            for unit in String(scalar).utf16 { out += String(format: "\\u%04x", unit) }
+        }
+        return out
+    }
+
+    @Test("a letter with every field at its bound is accepted, however its JSON is written, and the bounds say how large that is")
+    func everyFieldAtItsBound() throws {
+        let bound = LetterDocumentValidator.maxTextBytes
+        // One-line fields: 6 of the sender, the signature, 3 of the recipient, its address lines, the place, the reference and
+        // the subject, and the attachments. Multi-line fields: the paragraphs and the closing.
+        let fields = 6 + 1 + 3 + LetterDocumentValidator.maxAddressLines + 3 + LetterDocumentValidator.maxAttachments + LetterDocumentValidator.maxParagraphs + 1
+        #expect(fields == 63 && LetterDocumentValidator.maxLetterTextBytes == fields * bound && LetterDocumentValidator.maxLetterTextBytes == 630_000)
+        for filler in [String(repeating: "x", count: bound), String(repeating: "🙂", count: bound / 4)] {
+            let letter = Self.letterAtEveryBound(filler)
+            #expect(stringLeaves(of: letter).filter { $0 != letter.language }.reduce(0) { $0 + $1.utf8.count } == LetterDocumentValidator.maxLetterTextBytes)
+            try LetterDocumentValidator.validate(letter)
+            let plain = try JSONEncoder().encode(letter)
+            #expect(plain.count <= LetterDocumentValidator.maxJSONBytes)
+            #expect(try LetterDocumentValidator.decode(json: plain) == letter)
+            let escaped = Data(Self.escapingEveryNonASCII(String(decoding: plain, as: UTF8.self)).utf8)
+            #expect(escaped.count <= LetterDocumentValidator.maxJSONBytes, "\(escaped.count) bytes")
+            #expect(try LetterDocumentValidator.decode(json: escaped) == letter)
+        }
+        // The largest letter in JSON is the one of emoji: three times its text, and still within the bound.
+        let widest = Data(Self.escapingEveryNonASCII(String(decoding: try JSONEncoder().encode(Self.letterAtEveryBound(String(repeating: "🙂", count: bound / 4))), as: UTF8.self)).utf8)
+        #expect(widest.count > 3 * LetterDocumentValidator.maxLetterTextBytes - 1_000 && widest.count <= LetterDocumentValidator.maxJSONBytes)
+    }
+
+    @Test("a letter at the bounds that Authoring keeps is accepted: lines and paragraphs of 10,000 bytes, an opening and 20 paragraphs, 20 attachments, 6 address lines")
+    func authoringBounds() throws {
+        #expect(LetterDocumentValidator.maxTextBytes == 10_000 && LetterDocumentValidator.maxAttachments >= 20)
+        #expect(LetterDocumentValidator.maxParagraphs >= 1 + 20 && LetterDocumentValidator.maxAddressLines >= 6)
+        let line = String(repeating: "x", count: 10_000)
+        let paragraph = String(repeating: "word\n", count: 1_999) + "word"          // 9,995 bytes, multi-line
+        var letter = letterFixture
+        letter.recipient = LetterRecipient(formOfAddress: .feminine, name: line, familyName: line, company: line, address: Array(repeating: line, count: 6))
+        letter.reference = line; letter.subject = line
+        letter.body = Array(repeating: paragraph, count: 1 + 20)      // the opening, and the paragraphs
+        letter.closing = paragraph
+        letter.attachments = Array(repeating: line, count: 20)
+        try LetterDocumentValidator.validate(letter)
+        #expect(try LetterDocumentValidator.decode(json: try JSONEncoder().encode(letter)) == letter)
+    }
+
+    @Test("a line break is accepted in a paragraph and in the closing, and refused in a field that holds one line",
+          arguments: LetterTextField.all, lineBreakLetterText)
+    func lineBreaks(field: LetterTextField, text: String) {
+        var letter = letterFixture
+        field.set(&letter, text)
+        let reason = LetterDocumentValidator.textReason
+        #expect(invalid(letter) == (field.multiline ? nil : reason), "\(field.name) with \(text.unicodeScalars.map(\.value))")
+    }
+
+    @Test("a line break survives the JSON round trip in a paragraph")
+    func lineBreaksInJSON() throws {
+        var letter = letterFixture
+        letter.body[0] = "First line\nSecond line"
+        letter.closing = "Thanks,\nAda"
+        #expect(try LetterDocumentValidator.decode(json: try JSONEncoder().encode(letter)) == letter)
     }
 
     @Test("lists are bounded: paragraphs, address lines and attachments")
@@ -156,7 +233,7 @@ struct LetterDocumentContractTests {
     func hostileCharacters(field: LetterTextField, text: String) {
         var letter = letterFixture
         field.set(&letter, text)
-        #expect(invalid(letter) == "a field is too long, the letter is too large, or it has control or hidden characters", "\(field.name) accepted \(text.unicodeScalars.map(\.value))")
+        #expect(invalid(letter) == LetterDocumentValidator.textReason, "\(field.name) accepted \(text.unicodeScalars.map(\.value))")
     }
 
     @Test("ordinary text in the six languages is accepted: accents, apostrophes, quotes, the euro sign, emoji and CJK names",
