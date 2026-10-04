@@ -145,6 +145,28 @@ struct MarkdownDocumentTests {
         #expect(MarkdownDocument(text: "<!-- - **Status:** Accepted -->\n- **Status:** Proposed").proseLines.map { $0.text.trimmingCharacters(in: .whitespaces) } == ["", "- **Status:** Proposed"])
     }
 
+    @Test("a comment opener in the middle of a line that does not close on its line is text")
+    func midLineOpenerIsText() {
+        let document = MarkdownDocument(text: "In HTML, a comment opens with <!-- and closes later.\n[a](a.md)\n`x/y.md`")
+        #expect(document.links.map(\.destination) == ["a.md"])
+        #expect(document.codeSpans.map(\.text) == ["x/y.md"])
+        #expect(document.proseLines.first?.text == "In HTML, a comment opens with <!-- and closes later.")
+    }
+
+    @Test("a mid-line comment may span lines of its paragraph, and ends there at a blank line")
+    func midLineCommentInAParagraph() {
+        #expect(MarkdownDocument(text: "text <!-- start\n[hidden](h.md)\nend --> after [b](b.md)").links.map(\.destination) == ["b.md"])
+        #expect(MarkdownDocument(text: "text <!-- start\n\n[a](a.md)\nlater -->\n[b](b.md)").links.map(\.destination) == ["a.md", "b.md"])
+    }
+
+    @Test("a comment that starts its line, after at most three spaces, runs to its end whatever lies between")
+    func lineStartComment() {
+        #expect(MarkdownDocument(text: "   <!--\n[h](h.md)\n\n[i](i.md)\n-->\n[c](c.md)").links.map(\.destination) == ["c.md"])
+        #expect(MarkdownDocument(text: "<!-- one --> <!--\n[h](h.md)\n-->\n[c](c.md)").links.map(\.destination) == ["c.md"])
+        #expect(MarkdownDocument(text: "    <!--\n[a](a.md)").links.map(\.destination) == ["a.md"])
+        #expect(MarkdownDocument(text: "x <!-- one --> <!--\n[a](a.md)").links.map(\.destination) == ["a.md"])
+    }
+
     @Test("an indented block is read like any other text: reading more can only add findings")
     func indentedCode() {
         #expect(MarkdownDocument(text: "    [a](a.md) `b/c.md`").links.map(\.destination) == ["a.md"])

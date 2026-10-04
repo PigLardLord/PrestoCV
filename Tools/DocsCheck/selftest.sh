@@ -71,6 +71,10 @@ setup; put README.md "$(head -c 200000 /dev/zero | tr '\0' ']' | sed 's/\]/](/g'
 stale "100,000 link openers on one line are read in linear time, and the finding is one short line" "^README.md:1: link-target-missing: .{1,300}$"
 setup; put README.md $'# Project\n\nA comment hides what is stale: <!-- [gone](gone.md) `Tools/gone.sh` -->\n<!--\n[gone](gone.md)\n-->'; mkdir -p "$ROOT/Tools"
 fixed "a link and a path in an HTML comment are not read"
+setup; put README.md $'# Project\n\nIn HTML, a comment opens with <!-- and closes later.\n\n[gone](gone.md)'
+stale "a mid-line <!-- that closes nowhere hides nothing" "^README.md:5: link-target-missing:"
+setup; put README.md $'# Project\n\nA comment hides what is stale: <!-- start\n[gone](gone.md)\nend --> and nothing else.'
+fixed "a mid-line comment that closes in its paragraph hides what it spans"
 setup; put README.md $'# Project\n\n<a name="top"></a>\n\nBack to [the top](#top).'
 fixed "an explicit HTML anchor is a target"
 put README.md $'# Project\n\n<a name="top"></a>\n\nBack to [the top](#start).'

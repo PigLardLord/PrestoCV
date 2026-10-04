@@ -54,7 +54,8 @@ struct MarkdownDocument: Sendable {
     init(text: String) {
         var fence: Fence?
         var inComment = false
-        for (offset, rawLine) in Self.lines(of: text).enumerated() {
+        let lines = Self.lines(of: text)
+        for (offset, rawLine) in lines.enumerated() {
             let number = offset + 1
             if let open = fence {
                 if open.isClosed(by: rawLine) { fence = nil }
@@ -64,7 +65,10 @@ struct MarkdownDocument: Sendable {
                 fence = opening
                 continue
             }
-            let inline = InlineScan(line: rawLine, startsInComment: inComment)
+            var inline = InlineScan(line: rawLine, startsInComment: inComment, midLineOpenerMaySpan: false)
+            if inline.unclosedMidLineOpener, Self.closes(after: offset, in: lines) {
+                inline = InlineScan(line: rawLine, startsInComment: inComment, midLineOpenerMaySpan: true)
+            }
             inComment = inline.endsInComment
             let line = inline.uncommented
             proseLines.append(Line(number: number, text: line))
@@ -97,6 +101,16 @@ struct MarkdownDocument: Sendable {
             let trimmed = bytes.last == 0x0D ? bytes.dropLast() : bytes
             return String(decoding: trimmed, as: UTF8.self)
         }
+    }
+
+    /// Whether a comment opened in the middle of line `offset` is closed by a later line before the next blank line,
+    /// as it must be to belong to its paragraph.
+    private static func closes(after offset: Int, in lines: [String]) -> Bool {
+        for line in lines[(offset + 1)...] {
+            if line.allSatisfy({ $0 == " " || $0 == "\t" }) { return false }
+            if line.contains("-->") { return true }
+        }
+        return false
     }
 
     // MARK: Fences
@@ -174,11 +188,16 @@ private struct InlineScan {
     private(set) var explicitAnchors: [String] = []
     private(set) var uncommented = ""
     private(set) var endsInComment = false
+    /// A `<!--` in the middle of the line, with no `-->` after it on the line, was read as text.
+    private(set) var unclosedMidLineOpener = false
 
-    init(line: String, startsInComment: Bool) {
+    /// A comment that closes on its line is a comment. One that does not spans lines if its line starts with it
+    /// (after at most three spaces, an HTML block), or, with `midLineOpenerMaySpan`, if it opens in the middle of
+    /// a line. Otherwise it is text.
+    init(line: String, startsInComment: Bool, midLineOpenerMaySpan: Bool) {
         let scalars = Array(line.unicodeScalars)
         endsInComment = startsInComment
-        let (uncommentedScalars, visible) = mask(scalars)
+        let (uncommentedScalars, visible) = mask(scalars, midLineOpenerMaySpan: midLineOpenerMaySpan)
         uncommented = Self.string(uncommentedScalars)
         var index = 0
         while index < visible.count {
@@ -200,7 +219,7 @@ private struct InlineScan {
 
     /// The line with every HTML comment replaced by spaces, and the same with every code span replaced too. Code
     /// spans are recorded. Whichever of a code span and a comment starts first wins, as in CommonMark.
-    private mutating func mask(_ scalars: [Unicode.Scalar]) -> (uncommented: [Unicode.Scalar], visible: [Unicode.Scalar]) {
+    private mutating func mask(_ scalars: [Unicode.Scalar], midLineOpenerMaySpan: Bool) -> (uncommented: [Unicode.Scalar], visible: [Unicode.Scalar]) {
         var uncommented = scalars
         var visible = scalars
         func blank(_ range: Range<Int>) {
@@ -224,9 +243,17 @@ private struct InlineScan {
                 continue
             }
             if Self.hasPrefix(Self.commentOpening, in: scalars, at: index) {
-                commentStart = index
-                endsInComment = true
-                index += 4
+                if let end = Self.find(Self.commentClosing, in: scalars, from: index + 4) {
+                    blank(index..<(end + 3))
+                    index = end + 3
+                } else if midLineOpenerMaySpan || Self.startsLine(scalars, at: index) {
+                    commentStart = index
+                    endsInComment = true
+                    index = scalars.count
+                } else {
+                    unclosedMidLineOpener = true
+                    index += 4
+                }
                 continue
             }
             guard scalars[index] == "`" else {
@@ -259,6 +286,11 @@ private struct InlineScan {
         }
         if endsInComment { blank(commentStart..<scalars.count) }
         return (uncommented, visible)
+    }
+
+    /// Whether only spaces, at most three, come before `index`.
+    private static func startsLine(_ scalars: [Unicode.Scalar], at index: Int) -> Bool {
+        index <= 3 && scalars[..<index].allSatisfy { $0 == " " }
     }
 
     private static let commentOpening: [Unicode.Scalar] = ["<", "!", "-", "-"]
