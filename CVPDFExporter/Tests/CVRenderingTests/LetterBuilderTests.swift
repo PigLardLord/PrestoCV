@@ -180,6 +180,18 @@ struct LetterBuilderTests {
         #expect(try render(bare).textNodes == ["Ada Lovelace", "9 January 2026", "Dear Sir or Madam,", "Yours faithfully,", "Ada Lovelace"])
     }
 
+    @Test("a line break in a paragraph or the closing is printed: the builder's base style keeps the line breaks of those two, and only those")
+    func baseStylePrintsLineBreaks() throws {
+        #expect(LetterHTMLBuilder.baseStyle == "\(DocumentHTMLBuilder.baseStyle).letter-paragraph,.letter-closing{white-space:pre-line}")
+        let html = try render(letterFixture).html
+        #expect(html.contains("<style>\(LetterHTMLBuilder.baseStyle)</style>"))
+        #expect(!LetterHTMLBuilder.baseStyle.contains("<"))
+        // The property is the builder's own: the CSS policy has no white-space, so neither the letter's stylesheet nor a design can set it.
+        #expect(!(try LetterStyle.stylesheet().css.contains("white-space")))
+        #expect(throws: CSSRejection.self) { _ = try ValidatedStylesheet.validating(".letter-paragraph{white-space:pre-line}", against: LetterMarkup.vocabulary) }
+        #expect(designRejects(".cv-summary{white-space:pre-line}") && designRejects(".letter-paragraph{white-space:pre-line}"))
+    }
+
     @Test("a line break inside a paragraph or the closing stays in its text node, as the CV's builder keeps one in its text")
     func lineBreaks() throws {
         var letter = letterFixture
@@ -321,7 +333,7 @@ struct LetterStyleTests {
     func carriesIt() throws {
         let html = try render(letterFixture).html
         #expect(html.contains("<style>\(try LetterStyle.stylesheet().css)</style>") && html.contains("<style>\(LetterStyle.customProperties)</style>"))
-        #expect(html.contains("<style>\(DocumentHTMLBuilder.baseStyle)</style>"))
+        #expect(html.contains("<style>\(LetterHTMLBuilder.baseStyle)</style>"))
         #expect(html.components(separatedBy: "<style>").count == 4)
     }
 }

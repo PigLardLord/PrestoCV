@@ -37,6 +37,15 @@ struct LetterMarkupPageTests {
         for property in colours.filter({ $0.hasPrefix("--") }) { #expect(LetterStyle.customProperties.contains("\(property):")) }
     }
 
+    @Test("the line breaks that the page prints are the builder's base style, not the stylesheet's")
+    func lineBreaks() throws {
+        let rows = try LetterPage.table(after: "### The letter's fixed values")
+        let cell = LetterPage.backticked(try #require(rows["Line breaks"]))
+        #expect(cell.first == "white-space: pre-line" && cell.dropFirst().count == 2)
+        // The page names the two selectors in the order that the style has them.
+        #expect(LetterHTMLBuilder.baseStyle.contains("\(cell.dropFirst().joined(separator: ",")){white-space:pre-line}"))
+    }
+
     @Test("the letter's page is the export's: A4, one page, and the margins every page keeps")
     func page() throws {
         let rows = try LetterPage.table(after: "### The letter's page")

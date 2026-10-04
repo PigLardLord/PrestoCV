@@ -17,6 +17,11 @@ public enum LetterBuildFailure: Error, Equatable, Sendable {
 public struct LetterHTMLBuilder: Sendable {
     public init() {}
 
+    /// The builder's own style, as the CV's builder has one: links wrap, and the line breaks of a paragraph and of the closing are
+    /// printed. `white-space` is not in the property allow-list, so neither the letter's stylesheet nor a design can set it; the
+    /// text is the builder's constant, and it passes through no validation.
+    static let baseStyle = DocumentHTMLBuilder.baseStyle + ".letter-paragraph,.letter-closing{white-space:pre-line}"
+
     /// The letter must pass `LetterDocumentValidator`: a letter that can be rendered is one whose language has conventions,
     /// whose date exists and whose salutation has the name it needs.
     public func render(_ letter: LetterDocument) throws(LetterBuildFailure) -> RenderedDocument {
@@ -56,7 +61,7 @@ public struct LetterHTMLBuilder: Sendable {
             .element(.head, children: [
                 .element(.meta, attributes: [(.charset, "utf-8")]),
                 .element(.title, children: [.text(present(letter.subject) ?? letter.name)]),
-                .trustedStyle(DocumentHTMLBuilder.baseStyle),
+                .trustedStyle(Self.baseStyle),
                 .trustedStyle(LetterStyle.customProperties),
                 .trustedStyle(sheet.css),
             ]),
