@@ -75,6 +75,10 @@ setup; put README.md $'# Project\n\nIn HTML, a comment opens with <!-- and close
 stale "a mid-line <!-- that closes nowhere hides nothing" "^README.md:5: link-target-missing:"
 setup; put README.md $'# Project\n\nA comment hides what is stale: <!-- start\n[gone](gone.md)\nend --> and nothing else.'
 fixed "a mid-line comment that closes in its paragraph hides what it spans"
+setup; put README.md $'# Project\n\n## Alpha <!-- note --> Beta\n\n[ok](#alpha--beta)'
+fixed "a comment in a heading is removed from its anchor"
+put README.md $'# Project\n\n## Alpha <!-- note --> Beta\n\n[stale](#alpha---beta)'
+stale "an anchor that counts the comment as spaces" "^README.md:5: link-anchor-missing:"
 setup; put README.md $'# Project\n\n<a name="top"></a>\n\nBack to [the top](#top).'
 fixed "an explicit HTML anchor is a target"
 put README.md $'# Project\n\n<a name="top"></a>\n\nBack to [the top](#start).'

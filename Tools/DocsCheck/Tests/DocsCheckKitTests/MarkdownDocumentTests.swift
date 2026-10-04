@@ -167,6 +167,13 @@ struct MarkdownDocumentTests {
         #expect(MarkdownDocument(text: "x <!-- one --> <!--\n[a](a.md)").links.map(\.destination) == ["a.md"])
     }
 
+    @Test("a comment is removed from a heading, not replaced by spaces, so it does not widen its anchor")
+    func commentInAHeading() {
+        let document = MarkdownDocument(text: "## Alpha <!-- note --> Beta\n## Gamma<!-- x -->Delta\n## Eps <!-- one --> <!-- two -->")
+        #expect(document.headings.map(\.text) == ["Alpha  Beta", "GammaDelta", "Eps"])
+        #expect(document.anchors == ["alpha--beta", "gammadelta", "eps"])
+    }
+
     @Test("an indented block is read like any other text: reading more can only add findings")
     func indentedCode() {
         #expect(MarkdownDocument(text: "    [a](a.md) `b/c.md`").links.map(\.destination) == ["a.md"])

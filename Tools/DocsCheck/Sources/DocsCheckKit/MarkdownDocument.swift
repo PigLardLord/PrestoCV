@@ -217,13 +217,14 @@ private struct InlineScan {
         explicitAnchors = Self.anchors(inTagsOf: visible)
     }
 
-    /// The line with every HTML comment replaced by spaces, and the same with every code span replaced too. Code
-    /// spans are recorded. Whichever of a code span and a comment starts first wins, as in CommonMark.
+    /// The line without its HTML comments, and the line with every comment and every code span replaced by spaces,
+    /// so that positions stay the same. Code spans are recorded. Whichever of a code span and a comment starts
+    /// first wins, as in CommonMark.
     private mutating func mask(_ scalars: [Unicode.Scalar], midLineOpenerMaySpan: Bool) -> (uncommented: [Unicode.Scalar], visible: [Unicode.Scalar]) {
-        var uncommented = scalars
+        var inComment = [Bool](repeating: false, count: scalars.count)
         var visible = scalars
         func blank(_ range: Range<Int>) {
-            for position in range { uncommented[position] = " "; visible[position] = " " }
+            for position in range { inComment[position] = true; visible[position] = " " }
         }
         var commentStart = 0
         var index = 0
@@ -285,6 +286,7 @@ private struct InlineScan {
             if !closed { index += opening }
         }
         if endsInComment { blank(commentStart..<scalars.count) }
+        let uncommented = scalars.indices.filter { !inComment[$0] }.map { scalars[$0] }
         return (uncommented, visible)
     }
 
