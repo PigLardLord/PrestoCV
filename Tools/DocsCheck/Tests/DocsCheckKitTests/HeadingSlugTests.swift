@@ -74,6 +74,44 @@ struct HeadingSlugTests {
         #expect(HeadingSlugger.baseSlug(ofHeading: heading) == slug)
     }
 
+    @Test("an underscore run is dropped only when it opens or closes emphasis that has its other end", arguments: [
+        ("The _config.yml file", "the-_configyml-file"),
+        ("_emphasis_ and __strong__ words", "emphasis-and-strong-words"),
+        ("snake_case and _real_", "snake_case-and-real"),
+        ("a _b c", "a-_b-c"),
+        ("a b_ c", "a-b_-c"),
+        ("__init__ method", "init-method"),
+        ("_a_b_", "a_b"),
+        ("(_a_) and _a_.", "a-and-a"),
+        ("_ a _", "_-a-_"),
+        ("_a __b_ c__", "a-b-c"),
+        ("a_ b _c", "a_-b-_c"),
+        ("foo_bar_ and _foo_bar", "foo_bar_-and-_foo_bar"),
+        ("__)_.(", "___"),
+        ("_`__)", "___"),
+        ("_a_b_ and __c__ and ___d___", "a_b-and-c-and-d"),
+    ])
+    func underscoreEmphasis(heading: String, slug: String) {
+        #expect(HeadingSlugger.baseSlug(ofHeading: heading) == slug)
+    }
+
+    @Test("character references are decoded: numeric ones in decimal and hexadecimal, and the six named ones", arguments: [
+        ("&#169; sign", "-sign"), ("&#xA9; sign", "-sign"), ("&#XA9; sign", "-sign"), ("caf&#233;", "café"), ("caf&#xE9;", "café"),
+        ("&#x1F600; smile", "-smile"), ("fish &amp; chips", "fish--chips"), ("x &lt; y &gt; z", "x--y--z"), ("&quot;q&quot; &apos;a&apos;", "q-a"),
+        ("a&nbsp;b", "ab"), ("&#0; &#xD800; &#x110000;", "--"), ("&#65;&#x42; &#1234567890; &#x;", "ab-1234567890-x"),
+    ])
+    func characterReferences(heading: String, slug: String) {
+        #expect(HeadingSlugger.baseSlug(ofHeading: heading) == slug)
+    }
+
+    @Test("named references other than the six, and a reference link whose definition is elsewhere, are not rendered as GitHub does")
+    func knownLimits() {
+        // GitHub: "été". The heading alone cannot tell that "&eacute;" is a reference, so it stays text.
+        #expect(HeadingSlugger.baseSlug(ofHeading: "&eacute;t&eacute;") == "eacuteteacute")
+        // GitHub: "ab-text" when [b] is undefined, since then the brackets are text. The label is dropped here.
+        #expect(HeadingSlugger.baseSlug(ofHeading: "[a][b] text") == "a-text")
+    }
+
     @Test("an underscore inside a word is a letter of the word, not emphasis")
     func intrawordUnderscore() {
         #expect(HeadingSlugger.baseSlug(ofHeading: "the foo_bar_baz option") == "the-foo_bar_baz-option")
