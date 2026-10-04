@@ -111,4 +111,55 @@ struct ADRCheckTests {
         #expect(try findings(in: [:], removing: ["\(Self.adr)/README.md"]) == ["\(Self.adr)/README.md:1 adr-index-missing"])
         #expect(try findings(in: [:], removing: ["\(Self.adr)/README.md", "\(Self.adr)/0001-first.md"]) == ["\(Self.adr):1 adr-directory-missing"])
     }
+
+    // MARK: Records are keyed by path, and index rows by their link
+
+    @Test("two ADR files with one number are each a finding, and each is checked on its own")
+    func duplicatedNumber() throws {
+        let result = try findings(in: [
+            "\(Self.adr)/0002-a.md": adrFile("0002", status: "Accepted"),
+            "\(Self.adr)/0002-b.md": adrFile("0002", status: "Draft"),
+            "\(Self.adr)/README.md": index("| [0001](0001-first.md) | First | Accepted |", "| [0002](0002-a.md) | A | Accepted |", "| [0002](0002-b.md) | B | Draft |"),
+        ])
+        #expect(result == [
+            "\(Self.adr)/0002-a.md:1 adr-number-duplicated", "\(Self.adr)/0002-b.md:1 adr-number-duplicated",
+            "\(Self.adr)/0002-b.md:3 adr-status-unknown", "\(Self.adr)/README.md:7 adr-status-unknown",
+        ])
+    }
+
+    @Test("an index row is matched with the file it links to, so two files of one number keep their own statuses")
+    func rowsMatchedByLink() throws {
+        let result = try findings(in: [
+            "\(Self.adr)/0002-a.md": adrFile("0002", status: "Accepted"),
+            "\(Self.adr)/0002-b.md": adrFile("0002", status: "Proposed"),
+            "\(Self.adr)/README.md": index("| [0001](0001-first.md) | First | Accepted |", "| [0002](0002-b.md) | B | Accepted |", "| [0002](0002-a.md) | A | Accepted |"),
+        ])
+        #expect(result == ["\(Self.adr)/0002-a.md:1 adr-number-duplicated", "\(Self.adr)/0002-b.md:1 adr-number-duplicated", "\(Self.adr)/README.md:6 adr-index-status-differs"])
+    }
+
+    @Test("a file the index does not link to is not indexed, even when a row has its number")
+    func numberIsNotTheKey() throws {
+        let result = try findings(in: [
+            "\(Self.adr)/0002-a.md": adrFile("0002", status: "Accepted"),
+            "\(Self.adr)/README.md": index("| [0001](0001-first.md) | First | Accepted |", "| [0002](0002-other.md) | A | Accepted |"),
+        ])
+        #expect(result.contains("\(Self.adr)/0002-a.md:1 adr-not-indexed"))
+        #expect(result.contains("\(Self.adr)/README.md:6 adr-index-unknown"))
+    }
+
+    @Test("a row whose number is not the number of the file it links to is a finding")
+    func rowNumberDiffers() throws {
+        let result = try findings(in: [
+            "\(Self.adr)/0002-a.md": adrFile("0002", status: "Accepted"),
+            "\(Self.adr)/README.md": index("| [0001](0001-first.md) | First | Accepted |", "| [0003](0002-a.md) | A | Accepted |"),
+        ])
+        #expect(result == ["\(Self.adr)/0002-a.md:1 adr-not-indexed", "\(Self.adr)/README.md:6 adr-index-unknown"])
+    }
+
+    @Test("a row without a link into the directory is a finding, and a link may be written in any form that resolves")
+    func rowLinks() throws {
+        let rows = index("| [0001](./0001-first.md) | First | Accepted |", "| 0002 | A | Accepted |", "| [0003](README.md) | R | Accepted |", "| [0002](../adr/0002-a.md) | A | Accepted |")
+        let result = try findings(in: ["\(Self.adr)/0002-a.md": adrFile("0002", status: "Accepted"), "\(Self.adr)/README.md": rows])
+        #expect(result == ["\(Self.adr)/README.md:6 adr-index-unknown", "\(Self.adr)/README.md:7 adr-index-unknown"])
+    }
 }

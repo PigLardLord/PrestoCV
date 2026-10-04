@@ -135,6 +135,13 @@ adr_index '| [0001](0001-first.md) | First | Accepted |' '| [0002](0002-second.m
 stale "an index row with another status than its ADR" "^$ADR/README.md:6: adr-index-status-differs:"
 adr_index '| [0001](0001-first.md) | First | Accepted |' '| [0002](0002-second.md) | Second | Accepted |' '| [0003](0003-third.md) | Third | Accepted |'
 stale "an index row for an ADR that has no file" "^$ADR/README.md:7: adr-index-unknown:"
+setup; put $ADR/0002-a.md $'# 0002. A\n\n- **Status:** Accepted'; put $ADR/0002-b.md $'# 0002. B\n\n- **Status:** Accepted'
+adr_index '| [0001](0001-first.md) | First | Accepted |' '| [0002](0002-a.md) | A | Accepted |' '| [0002](0002-b.md) | B | Accepted |'
+stale "two ADR files with one number" "^$ADR/0002-b.md:1: adr-number-duplicated:"
+put $ADR/0003-b.md $'# 0003. B\n\n- **Status:** Accepted'; rm "$ROOT/$ADR/0002-b.md"
+adr_index '| [0001](0001-first.md) | First | Accepted |' '| [0002](0002-a.md) | A | Accepted |' '| [0003](0003-b.md) | B | Accepted |'; fixed "each ADR has its own number"
+adr_index '| [0001](0001-first.md) | First | Accepted |' '| [0002](0002-a.md) | A | Accepted |' '| 0003 | B | Accepted |'
+stale "an index row without a link to its ADR file" "^$ADR/README.md:7: adr-index-unknown:"
 setup; rm -r "$ROOT/$ADR"
 stale "no ADR directory is an error, not a pass" "^$ADR:1: adr-directory-missing:"
 

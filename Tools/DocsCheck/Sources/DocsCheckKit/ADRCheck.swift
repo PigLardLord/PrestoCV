@@ -22,18 +22,32 @@ struct ADRCheck {
         let adrPaths = Set(byPath.keys.filter { path in
             path.hasPrefix(Self.directory + "/") && ADRStatus.number(ofADRFileNamed: String(path.dropFirst(Self.directory.count + 1))) != nil
         })
-        var findings: [Finding] = []
+        var findings = duplicatedNumbers(among: adrPaths)
         var records: [String: Record] = [:]
         for path in adrPaths.sorted() {
             guard let markdown = byPath[path] else { continue }
             let (record, recordFindings) = statusOfADR(at: path, in: markdown, adrPaths: adrPaths)
             findings += recordFindings
-            records[Self.number(of: path)] = record
+            records[path] = record
         }
         guard let index = byPath[Self.indexPath] else {
             return findings + [Finding(file: Self.indexPath, line: 1, code: .adrIndexMissing, message: "the ADR index does not exist")]
         }
         return findings + indexFindings(index, records: records, adrPaths: adrPaths)
+    }
+
+    /// Two files with one number: each is a finding, because a number names one decision.
+    private func duplicatedNumbers(among adrPaths: Set<String>) -> [Finding] {
+        var byNumber: [String: [String]] = [:]
+        for path in adrPaths.sorted() { byNumber[Self.number(of: path), default: []].append(path) }
+        var findings: [Finding] = []
+        for (number, paths) in byNumber where paths.count > 1 {
+            for path in paths {
+                let others = paths.filter { $0 != path }.map { Finding.quoted(String($0.dropFirst(Self.directory.count + 1))) }.joined(separator: ", ")
+                findings.append(Finding(file: path, line: 1, code: .adrNumberDuplicated, message: "ADR \(number) is also the number of \(others)"))
+            }
+        }
+        return findings
     }
 
     // MARK: Statuses of the ADR files
@@ -73,20 +87,27 @@ struct ADRCheck {
         var listed: Set<String> = []
         for line in index.proseLines {
             guard let row = IndexRow(line: line.text) else { continue }
-            listed.insert(row.number)
             let (status, statusFindings) = validated(row.status, file: Self.indexPath, line: line.number, adrPaths: adrPaths)
             findings += statusFindings
-            guard let record = records[row.number] else {
-                findings.append(Finding(file: Self.indexPath, line: line.number, code: .adrIndexUnknown, message: "the index lists ADR \(row.number), which has no file"))
+            guard let target = row.link.flatMap({ RepositoryPath.resolve($0, from: Self.indexPath) }), adrPaths.contains(target), let record = records[target] else {
+                let message = row.link.map { "the index row \(row.number) links \(Finding.quoted($0)), which is not an ADR of \(Self.directory)" }
+                    ?? "the index row \(row.number) has no link to the file of its ADR"
+                findings.append(Finding(file: Self.indexPath, line: line.number, code: .adrIndexUnknown, message: message))
                 continue
             }
+            guard Self.number(of: target) == row.number else {
+                let message = "the index row says \(row.number), but \(Finding.quoted(String(target.dropFirst(Self.directory.count + 1)))) is ADR \(Self.number(of: target))"
+                findings.append(Finding(file: Self.indexPath, line: line.number, code: .adrIndexUnknown, message: message))
+                continue
+            }
+            listed.insert(target)
             if let status, let fileStatus = record.status, status.summary != fileStatus.summary {
                 let message = "the index says \(status.summary), but \(record.path) says \(fileStatus.summary)"
                 findings.append(Finding(file: Self.indexPath, line: line.number, code: .adrIndexStatusDiffers, message: message))
             }
         }
-        for (number, record) in records where !listed.contains(number) {
-            findings.append(Finding(file: record.path, line: 1, code: .adrNotIndexed, message: "the ADR is not listed in \(Self.indexPath)"))
+        for path in records.keys.sorted() where !listed.contains(path) {
+            findings.append(Finding(file: path, line: 1, code: .adrNotIndexed, message: "the ADR is not listed in \(Self.indexPath)"))
         }
         return findings
     }
@@ -98,6 +119,8 @@ struct ADRCheck {
     /// A row of the index table: `| [0001](0001-title.md) | Decision | Status |`.
     private struct IndexRow {
         let number: String
+        /// The destination of the link in the first cell, if it has one.
+        let link: String?
         let status: String
 
         init?(line: String) {
@@ -107,6 +130,7 @@ struct ADRCheck {
             let digits = first.drop { $0 == "[" }.prefix(4)
             guard digits.count == 4, digits.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
             self.number = String(digits)
+            self.link = MarkdownDocument(text: first).links.first.flatMap { LinkTarget(destination: $0.destination)?.path }
             self.status = status
         }
     }
