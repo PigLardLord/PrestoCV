@@ -11,15 +11,20 @@ public struct DocumentationChecker: Sendable {
     private let files: any RepositoryFiles
     private let root: URL
     private let plannedFile: URL?
+    private let knownTopLevelFiles: [URL]
 
-    public init(root: URL, plannedFile: URL? = nil) {
-        self.init(files: DiskFiles(root: root), rootPath: root.path, plannedFile: plannedFile)
+    /// `knownTopLevelFiles` hold one name per line, such as `git ls-tree --name-only HEAD` prints. A name in them
+    /// counts as a top-level entry of the repository even if it is no longer one, so that a directory that was
+    /// deleted or renamed is found through the documents that still name it.
+    public init(root: URL, plannedFile: URL? = nil, knownTopLevelFiles: [URL] = []) {
+        self.init(files: DiskFiles(root: root), rootPath: root.path, plannedFile: plannedFile, knownTopLevelFiles: knownTopLevelFiles)
     }
 
-    init(files: any RepositoryFiles, rootPath: String, plannedFile: URL?) {
+    init(files: any RepositoryFiles, rootPath: String, plannedFile: URL?, knownTopLevelFiles: [URL] = []) {
         self.files = files
         self.root = URL(fileURLWithPath: rootPath)
         self.plannedFile = plannedFile
+        self.knownTopLevelFiles = knownTopLevelFiles
     }
 
     public func run() throws(DocsCheckError) -> Report {
@@ -32,7 +37,7 @@ public struct DocumentationChecker: Sendable {
         var links = LinkCheck(tree: tree)
         var findings = try links.findings(in: documents)
         findings += unreadHeadings(in: documents)
-        findings += try NamedPathCheck(tree: tree, planned: try plannedPaths(), plannedFileName: plannedFileName).findings(in: documents)
+        findings += try NamedPathCheck(tree: tree, planned: try plannedPaths(), plannedFileName: plannedFileName, knownTopLevel: try knownTopLevel()).findings(in: documents)
         findings += try ADRCheck(tree: tree).findings(in: documents)
         findings += try RuleStatedCheck(tree: tree).findings()
         return Report(findings: findings.sorted(), documentCount: documents.count)
@@ -64,11 +69,31 @@ public struct DocumentationChecker: Sendable {
         }
     }
 
+    private func knownTopLevel() throws(DocsCheckError) -> Set<String> {
+        var names: Set<String> = []
+        for file in knownTopLevelFiles {
+            let text: String
+            do {
+                text = String(decoding: try Data(contentsOf: file), as: UTF8.self)
+            } catch {
+                throw .knownTopLevelUnreadable(path: displayName(of: file))
+            }
+            for line in text.split(whereSeparator: \.isNewline) {
+                let name = line.trimmingCharacters(in: .whitespaces)
+                if !name.isEmpty, !name.contains("/") { names.insert(name) }
+            }
+        }
+        return names
+    }
+
     /// The planned file's path relative to the root, or its name if it is outside the repository.
     private var plannedFileName: String {
-        guard let plannedFile else { return "" }
+        plannedFile.map(displayName(of:)) ?? ""
+    }
+
+    private func displayName(of file: URL) -> String {
         let rootPath = root.standardizedFileURL.path + "/"
-        let path = plannedFile.standardizedFileURL.path
-        return path.hasPrefix(rootPath) ? String(path.dropFirst(rootPath.count)) : plannedFile.lastPathComponent
+        let path = file.standardizedFileURL.path
+        return path.hasPrefix(rootPath) ? String(path.dropFirst(rootPath.count)) : file.lastPathComponent
     }
 }

@@ -7,12 +7,14 @@ struct NamedPathCheck {
     let planned: PlannedPaths
     /// Where the planned file is, relative to the repository root, for findings about it.
     let plannedFileName: String
+    /// Names that count as top-level entries although they may no longer be: see `DocumentationChecker`.
+    var knownTopLevel: Set<String> = []
 
     func findings(in documents: [Document]) throws(DocsCheckError) -> [Finding] {
         var findings = planned.problems.map {
             Finding(file: plannedFileName, line: $0.line, code: .plannedFileInvalid, message: "\(plannedFileName): \($0.message)")
         }
-        let topLevel = try tree.topLevelEntries()
+        let topLevel = try tree.topLevelEntries().union(knownTopLevel)
         var excused: Set<String> = []
         for document in documents {
             for span in document.markdown.codeSpans {

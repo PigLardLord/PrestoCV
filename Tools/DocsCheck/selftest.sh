@@ -182,5 +182,34 @@ setup; put .github/pull_request_template.md $'## Purpose\n\n## Validation'
 stale "a template that does not ask which documents the change updates" "^.github/pull_request_template.md:1: template-does-not-ask:"
 put .github/pull_request_template.md $'## Purpose\n\n### Documents updated\n\nWhich?'; fixed "the template asks"
 
+# --- the names that were at the top before: a deleted or renamed directory is found through the documents that name it
+setup; put known.txt $'Prototypes\nPrestoCVUITests'; put README.md $'# Project\n\nThe UI tests were in `PrestoCVUITests/`, and `Prototypes` moved.'
+stale "a document names directories that are no longer at the top" "^README.md:3: path-missing: .PrestoCVUITests. does not exist" --known-top-level "$ROOT/known.txt"
+put README.md $'# Project\n\nThe UI tests were removed.'; fixed "the document follows" --known-top-level "$ROOT/known.txt"
+setup; put README.md $'# Project\n\nThe UI tests were in `PrestoCVUITests/`.'
+fixed "without the known names, a directory path with no extension is not recognised"
+setup; expect "a file of known names that cannot be read is an error, not a pass" 2 "^error: cannot read known.txt$" --known-top-level "$ROOT/known.txt"
+
+# check.sh adds the top-level names of HEAD when it runs inside a git checkout.
+check_script() {
+  local name="$1" want="$2" pat="$3" got
+  DOCS_CHECK_ROOT="$ROOT" "$HERE/check.sh" > "$OUT" 2>&1; got=$?
+  if [[ "$got" == "$want" ]] && { [[ -z "$pat" ]] || grep -qE -- "$pat" "$OUT"; }; then pass=$((pass+1)); echo "ok   $name"
+  else fail=$((fail+1)); echo "FAIL $name (exit $got, want $want)"; sed 's/^/     /' "$OUT"; fi
+}
+git_setup() {
+  setup; put Tools/DocsCheck/planned.json '[]'; put PrestoCVUITests/Login.swift ''; put Prototypes/Demo/x.txt ''
+  put README.md $'# Project\n\nThe UI tests are in `PrestoCVUITests/`, the demo in `Prototypes/`.'
+  git -C "$ROOT" init -q && git -C "$ROOT" add -A && git -C "$ROOT" -c user.name=test -c user.email=test@example.invalid -c commit.gpgsign=false commit -q -m init
+}
+if command -v git > /dev/null; then
+  git_setup; check_script "check.sh passes on a checkout where every named directory exists" 0 "0 findings"
+  git_setup; rm -rf "$ROOT/PrestoCVUITests"
+  check_script "check.sh: a directory deleted from the working tree, still named by a document" 1 "^README.md:3: path-missing: .PrestoCVUITests. does not exist"
+  put README.md $'# Project\n\nThe demo is in `Prototypes/`.'; check_script "check.sh: the document follows the deletion" 0 "0 findings"
+  git_setup; mv "$ROOT/Prototypes" "$ROOT/Prototype"
+  check_script "check.sh: a directory renamed, still named by a document" 1 "^README.md:3: path-missing: .Prototypes. does not exist"
+fi
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

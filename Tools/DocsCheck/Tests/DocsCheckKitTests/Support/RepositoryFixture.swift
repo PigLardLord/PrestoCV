@@ -28,7 +28,7 @@ func withRepository<Result>(_ files: [String: String], directories: [String] = [
 
 /// The findings of a run over the accepted baseline plus `files` (which replace the baseline's files of the same path),
 /// minus the paths in `removing`, as `file:line code` strings in the order the report prints them.
-func findings(in files: [String: String], removing: [String] = [], directories: [String] = [], planned: String? = nil) throws -> [String] {
+func findings(in files: [String: String], removing: [String] = [], directories: [String] = [], planned: String? = nil, knownTopLevel: [String]? = nil) throws -> [String] {
     var repository = acceptedBaseline.merging(files) { _, test in test }
     for path in removing { repository[path] = nil }
     return try withRepository(repository, directories: directories) { root in
@@ -37,7 +37,12 @@ func findings(in files: [String: String], removing: [String] = [], directories: 
             plannedFile = root.appendingPathComponent("planned.json")
             try Data(planned.utf8).write(to: root.appendingPathComponent("planned.json"))
         }
-        let report = try DocumentationChecker(root: root, plannedFile: plannedFile).run()
+        var knownFiles: [URL] = []
+        if let knownTopLevel {
+            knownFiles = [root.appendingPathComponent("known-top-level.txt")]
+            try Data(knownTopLevel.joined(separator: "\n").utf8).write(to: knownFiles[0])
+        }
+        let report = try DocumentationChecker(root: root, plannedFile: plannedFile, knownTopLevelFiles: knownFiles).run()
         return report.findings.map { "\($0.file):\($0.line) \($0.code.rawValue)" }
     }
 }

@@ -18,6 +18,7 @@ No git hook runs it. Run `check.sh` before committing a change to a document, a 
 
 - **Output.** One finding per line, `file:line: code: message`, sorted by file, line and code, then `checked N documents: K findings`. The exit status is 0 without findings, 1 with findings, 2 when the check cannot run: bad arguments, or a root, a directory, a document or the planned file that cannot be read, printed as `error: cannot read <path>` with the path relative to the root. A check that cannot read never passes.
 - **Environment.** `DOCS_CHECK_ROOT` is the tree to check, `DOCS_CHECK_SCRATCH` the build directory. Both default to this repository and `Tools/DocsCheck/.build`.
+- **Directories that were deleted or renamed.** `--known-top-level <names.txt>` (one name per line, repeatable) adds names that count as top-level entries even if they are no longer there. Inside a git checkout, `check.sh` passes `git ls-tree --name-only HEAD`, so `rm -rf PrestoCVUITests` or `mv Prototypes Prototype` fails while a document still names `PrestoCVUITests/` or `Prototypes/`, until the documents follow. Without the names, a directory path with no file extension whose directory is gone is not recognised as a path.
 - **The working tree is what it reads.** A file that exists only in the working tree, untracked or ignored, satisfies a link locally and fails in CI.
 
 ## 1. Links

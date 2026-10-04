@@ -8,10 +8,12 @@ public enum DocsCheckError: Error, Equatable, Sendable, CustomStringConvertible 
     case unreadableFile(path: String)
     /// The planned-paths file, relative to the root when it is inside it, else by its name.
     case plannedFileUnreadable(path: String)
+    /// A file of known top-level names, relative to the root when it is inside it, else by its name.
+    case knownTopLevelUnreadable(path: String)
 
     public var description: String {
         switch self {
-        case .unreadableRoot(let path), .unreadableDirectory(let path), .unreadableFile(let path), .plannedFileUnreadable(let path):
+        case .unreadableRoot(let path), .unreadableDirectory(let path), .unreadableFile(let path), .plannedFileUnreadable(let path), .knownTopLevelUnreadable(let path):
             return "cannot read \(path)"
         }
     }

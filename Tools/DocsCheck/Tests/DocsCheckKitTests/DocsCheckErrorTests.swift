@@ -52,6 +52,17 @@ struct DocsCheckErrorTests {
         }
     }
 
+    @Test("a file of known top-level names that cannot be read is named relative to the root")
+    func knownTopLevelUnreadable() throws {
+        try withRepository(["README.md": "x"]) { root in
+            let error = thrown { () throws(DocsCheckError) in
+                try DocumentationChecker(root: root, knownTopLevelFiles: [root.appendingPathComponent("known.txt")]).run()
+            }
+            #expect(error == .knownTopLevelUnreadable(path: "known.txt"))
+            #expect(error?.description == "cannot read known.txt")
+        }
+    }
+
     @Test("a planned file outside the root is named by its file name")
     func plannedFileOutsideTheRoot() {
         let error = failure(of: FakeFiles(contents: ["README.md": "x"]), planned: URL(fileURLWithPath: "/nowhere/at/all/planned.json"))

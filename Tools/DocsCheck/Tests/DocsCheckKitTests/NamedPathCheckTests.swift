@@ -140,6 +140,27 @@ struct NamedPathCheckTests {
         #expect(try findings(in: created, planned: entry) == ["planned.json:1 planned-path-unused"])
     }
 
+    // MARK: Known top-level names
+
+    @Test("a name that was a top-level entry counts as one, so a deleted or renamed directory is found")
+    func knownTopLevel() throws {
+        let readme = "The tests are in `PrestoCVUITests/`, see `PrestoCVUITests/Login`, and `Prototypes` moved: `Prototypes/Demo/`."
+        let files = ["README.md": readme, "Prototype/Demo/x.txt": ""]
+        #expect(try findings(in: files) == [])
+        #expect(try findings(in: files, knownTopLevel: ["PrestoCVUITests", "Prototypes", "docs"]) == Array(repeating: "README.md:1 path-missing", count: 4))
+    }
+
+    @Test("the known names are only names: blank lines, spaces and anything with a slash are ignored")
+    func knownNamesAreNames() throws {
+        let files = ["README.md": "`Gone/` `Other/` `a/b`"]
+        #expect(try findings(in: files, knownTopLevel: ["", "  Gone  ", "a/b", "\t"]) == ["README.md:1 path-missing"])
+    }
+
+    @Test("a known name that exists is no different from any other")
+    func knownNameThatExists() throws {
+        #expect(try findings(in: ["README.md": "`Tools/` `Tools/run.sh`", "Tools/run.sh": ""], knownTopLevel: ["Tools"]) == [])
+    }
+
     @Test("a planned file that is not a list of paths with tickets is a finding", arguments: [
         "not json", #"{"path": "Tools/new", "ticket": 1}"#, #"[{"path": "Tools/new"}]"#, #"[{"ticket": 1}]"#, #"[{"path": "Tools/new", "ticket": 0}]"#,
         #"[{"path": "Tools/new", "ticket": "12"}]"#, #"[{"path": "", "ticket": 1}]"#, #"[{"path": "/Tools/new", "ticket": 1}]"#,
