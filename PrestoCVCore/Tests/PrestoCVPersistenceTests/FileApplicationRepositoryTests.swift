@@ -94,6 +94,14 @@ struct FileApplicationRepositoryTests {
         #expect(FileManager.default.fileExists(atPath: dir.appendingPathComponent("Quarantine/\(appFile(appID(2)))").path))
     }
 
+    @Test("a corrupt file is reported with a stable code, never with printed text")
+    func reasonIsACode() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let tooLong = try appJSON().replacingOccurrences(of: #""subject":"Application for iOS Engineer""#, with: #""subject":""# + String(repeating: "s", count: CoverLetter.maxLineBytes + 1) + "\"")
+        try write(tooLong, to: dir.appendingPathComponent(appFile(appID(1))))
+        #expect(try await appRepo(dir).list().issues == [.corrupt(file: appFile(appID(1)), reason: "tooLong.subject")])
+    }
+
     @Test("a file of the wrong kind is corrupt: a CV file under an application's name")
     func wrongKind() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }

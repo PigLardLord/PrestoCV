@@ -1,8 +1,5 @@
 import Foundation
 
-/// A stored file that the strict decoder of its schema refuses, with the reason: the file is corrupt (R12).
-struct FileInvalid: Error, Equatable { let reason: String }
-
 /// The JSON of every stored file: ISO 8601 dates in whole seconds, and sorted keys, so the same value is always written
 /// as the same bytes.
 enum StoredJSON {

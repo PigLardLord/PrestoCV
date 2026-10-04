@@ -133,7 +133,7 @@ struct ApplicationFileV1: Codable, Equatable {
     }
 
     private static func domain<T>(_ make: () throws(ApplicationError) -> T) throws(Invalid) -> T {
-        do { return try make() } catch { throw Invalid(reason: "\(error)") }
+        do throws(ApplicationError) { return try make() } catch { throw Invalid(error) }
     }
 
     private static func scope(_ stored: ScopeV1) throws(Invalid) -> ApplicationProvenance.QuestionScope {

@@ -17,32 +17,32 @@ private func read(_ json: String) throws -> Application { try ApplicationFileV1.
 
 let applicationMutations: [Mutation] = {
     var all: [Mutation] = []
-    all.append(Mutation(name: "revision 0", from: #""revision":3"#, to: #""revision":0"#))
-    all.append(Mutation(name: "a newer schema, read as this one", from: #""schemaVersion":1"#, to: #""schemaVersion":2"#))
-    all.append(Mutation(name: "an advert text with a margin", from: #""company":"Acme S.r.l.","role""#, to: #""company":" Acme S.r.l.","role""#))
-    all.append(Mutation(name: "an empty advert text", from: #""text":"We look for an iOS engineer.\nSwiftUI is a plus.""#, to: #""text":"""#))
+    all.append(Mutation(name: "revision 0", from: #""revision":3"#, to: #""revision":0"#, reason: "revision"))
+    all.append(Mutation(name: "a newer schema, read as this one", from: #""schemaVersion":1"#, to: #""schemaVersion":2"#, reason: "version"))
+    all.append(Mutation(name: "an advert text with a margin", from: #""company":"Acme S.r.l.","role""#, to: #""company":" Acme S.r.l.","role""#, reason: "not canonical"))
+    all.append(Mutation(name: "an empty advert text", from: #""text":"We look for an iOS engineer.\nSwiftUI is a plus.""#, to: #""text":"""#, reason: "empty.advertText"))
     all.append(Mutation(name: "an advert text over its bound", from: #""text":"We look for an iOS engineer.\nSwiftUI is a plus.""#,
-                        to: #""text":""# + String(repeating: "x", count: Advert.maxTextBytes + 1) + "\""))
-    all.append(Mutation(name: "an empty optional that is not absent", from: #""reference":"Ref. 2026-17""#, to: #""reference":"""#))
-    all.append(Mutation(name: "an unknown form of address", from: #""formOfAddress":"ms""#, to: #""formOfAddress":"xx""#))
-    all.append(Mutation(name: "a control character in a paragraph", from: "I ship careful software.", to: #"I ship\u0000 careful software."#))
-    all.append(Mutation(name: "an empty paragraph", from: #""I ship careful software.""#, to: #""""#))
-    all.append(Mutation(name: "an unknown question scope", from: #""scope":{"kind":"skills"}"#, to: #""scope":{"kind":"nothing"}"#))
-    all.append(Mutation(name: "a scope with a key that is not its own", from: #""scope":{"kind":"skills"}"#, to: #""scope":{"experience":2,"kind":"skills"}"#))
-    all.append(Mutation(name: "an unknown letter field", from: #""field":"salaryExpectation""#, to: #""field":"bonus""#))
+                        to: #""text":""# + String(repeating: "x", count: Advert.maxTextBytes + 1) + "\"", reason: "tooLong.advertText"))
+    all.append(Mutation(name: "an empty optional that is not absent", from: #""reference":"Ref. 2026-17""#, to: #""reference":"""#, reason: "not canonical"))
+    all.append(Mutation(name: "an unknown form of address", from: #""formOfAddress":"ms""#, to: #""formOfAddress":"xx""#, reason: "form of address"))
+    all.append(Mutation(name: "a control character in a paragraph", from: "I ship careful software.", to: #"I ship\u0000 careful software."#, reason: "forbiddenCharacters.paragraph"))
+    all.append(Mutation(name: "an empty paragraph", from: #""I ship careful software.""#, to: #""""#, reason: "empty.paragraph"))
+    all.append(Mutation(name: "an unknown question scope", from: #""scope":{"kind":"skills"}"#, to: #""scope":{"kind":"nothing"}"#, reason: "question scope"))
+    all.append(Mutation(name: "a scope with a key that is not its own", from: #""scope":{"kind":"skills"}"#, to: #""scope":{"experience":2,"kind":"skills"}"#, reason: "question scope"))
+    all.append(Mutation(name: "an unknown letter field", from: #""field":"salaryExpectation""#, to: #""field":"bonus""#, reason: "question scope"))
     all.append(Mutation(name: "a question about an experience that is not in the snapshot", from: #""scope":{"experience":0,"kind":"experience"}"#,
-                        to: #""scope":{"experience":7,"kind":"experience"}"#))
-    all.append(Mutation(name: "a statement that is not in the snapshot", from: #"{"experience":1,"line":0}"#, to: #"{"experience":1,"line":5}"#))
-    all.append(Mutation(name: "an answer that is not one", from: #""answers":[0,1]"#, to: #""answers":[0,9]"#))
-    all.append(Mutation(name: "an empty statement", from: #""Shipped the app""#, to: #""""#))
+                        to: #""scope":{"experience":7,"kind":"experience"}"#, reason: "invalidReference.questions"))
+    all.append(Mutation(name: "a statement that is not in the snapshot", from: #"{"experience":1,"line":0}"#, to: #"{"experience":1,"line":5}"#, reason: "invalidReference.statementReference"))
+    all.append(Mutation(name: "an answer that is not one", from: #""answers":[0,1]"#, to: #""answers":[0,9]"#, reason: "invalidReference.answerReference"))
+    all.append(Mutation(name: "an empty statement", from: #""Shipped the app""#, to: #""""#, reason: "empty.statement"))
     all.append(Mutation(name: "an override that the defaults do not say", from: #""letterOverride":{"note":"Part time","salaryExpectation":"60k""#,
-                        to: #""letterOverride":{"note":"Part time","salaryExpectation":"70k""#))
-    all.append(Mutation(name: "a default with a margin", from: #""letterDefaults":{"note":"Part time""#, to: #""letterDefaults":{"note":" Part time""#))
-    all.append(Mutation(name: "a CV without a name", from: #""fullName":"Ada Lovelace""#, to: #""fullName":" ""#))
-    all.append(Mutation(name: "a CV email that is not an address", from: #""email":"ada@example.com""#, to: #""email":"not an address""#))
-    all.append(Mutation(name: "a CV skill level out of range", from: #"{"level":5,"name":"Swift"}"#, to: #"{"level":9,"name":"Swift"}"#))
-    all.append(Mutation(name: "a CV period that ends before it starts", from: #""end":{"month":7,"year":2015}"#, to: #""end":{"month":7,"year":2005}"#))
-    all.append(Mutation(name: "no identity for the CV", from: #""id":"BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB""#, to: #""idx":"BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB""#))
+                        to: #""letterOverride":{"note":"Part time","salaryExpectation":"70k""#, reason: "overrideNotApplied.salaryExpectation"))
+    all.append(Mutation(name: "a default with a margin", from: #""letterDefaults":{"note":"Part time""#, to: #""letterDefaults":{"note":" Part time""#, reason: "not canonical"))
+    all.append(Mutation(name: "a CV without a name", from: #""fullName":"Ada Lovelace""#, to: #""fullName":" ""#, reason: "cvCannotBeSaved"))
+    all.append(Mutation(name: "a CV email that is not an address", from: #""email":"ada@example.com""#, to: #""email":"not an address""#, reason: "email"))
+    all.append(Mutation(name: "a CV skill level out of range", from: #"{"level":5,"name":"Swift"}"#, to: #"{"level":9,"name":"Swift"}"#, reason: "skill level 9"))
+    all.append(Mutation(name: "a CV period that ends before it starts", from: #""end":{"month":7,"year":2015}"#, to: #""end":{"month":7,"year":2005}"#, reason: "education period: endBeforeStart"))
+    all.append(Mutation(name: "no identity for the CV", from: #""id":"BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB""#, to: #""idx":"BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB""#, reason: "not an application file"))
     return all
 }()
 
@@ -95,7 +95,7 @@ struct ApplicationFileTests {
     @Test("every value that is not in its canonical, valid form is corrupt, never normalised or defaulted", arguments: applicationMutations)
     func corrupt(mutation: Mutation) throws {
         let json = try mutation.apply(to: golden)
-        #expect(throws: ApplicationFileV1.Invalid.self) { try read(json) }
+        #expect(throws: ApplicationFileV1.Invalid(reason: mutation.reason)) { try read(json) }
     }
 
     @Test("the job of a stored application is read without reading the rest strictly, so a file that names a job and is otherwise broken still names it")
@@ -111,6 +111,23 @@ struct ApplicationFileTests {
         #expect(throws: ApplicationFileV1.Invalid.self) { try ApplicationFileV1.peekJob(Data("{}".utf8)) }
         #expect(throws: ApplicationFileV1.Invalid.self) { try ApplicationFileV1.peekJob(Data(#"{"provenance":{"jobID":7}}"#.utf8)) }
         #expect(throws: ApplicationFileV1.Invalid.self) { try ApplicationFileV1.peekJob(Data("[".utf8)) }
+    }
+
+    @Test("the reason a file is corrupt is a stable code, the error's case and the field, for every field and every error")
+    func reasonCodes() {
+        var fields: [ApplicationField] = LetterDefaults.Field.allCases.map { .letterDefault($0) }
+        fields += [.recipientCompany, .recipientContactName, .recipientTitle, .recipientSurname, .recipientRole, .recipientAddress]
+        fields += [.reference, .position, .subject, .opening, .paragraph, .closing, .attachment]
+        fields += [.jobID, .promptVersion, .providerAlias, .modelAlias, .snapshot, .statement, .reportArgument, .reportEntry]
+        fields += [.questions, .questionCode, .questionValue, .answer, .lineSources, .statementReference, .answerReference]
+        fields += [.advertCompany, .advertRole, .advertText]
+        let codes = fields.map { FileInvalid(ApplicationError.empty($0)).reason }
+        #expect(Set(codes).count == fields.count)
+        #expect(codes.allSatisfy { $0.range(of: #"^empty\.[A-Za-z]+$"#, options: .regularExpression) != nil }, "\(codes)")
+        let kinds: [ApplicationError] = [.empty(.subject), .tooLong(.subject), .tooMany(.subject), .forbiddenCharacters(.subject), .invalidReference(.subject)]
+        #expect(kinds.map { FileInvalid($0).reason } == ["empty.subject", "tooLong.subject", "tooMany.subject", "forbiddenCharacters.subject", "invalidReference.subject"])
+        #expect(FileInvalid(ApplicationError.overrideNotApplied(.startDate)).reason == "overrideNotApplied.startDate")
+        #expect(FileInvalid(ApplicationError.cvCannotBeSaved).reason == "cvCannotBeSaved" && FileInvalid(ApplicationError.cvIdentityChanged).reason == "cvIdentityChanged")
     }
 
     @Test("{} and a CV file are not applications")

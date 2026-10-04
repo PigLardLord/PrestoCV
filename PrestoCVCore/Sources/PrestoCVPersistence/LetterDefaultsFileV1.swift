@@ -14,9 +14,9 @@ struct LetterDefaultsContentV1: Codable, Equatable {
     /// never normalised on read.
     func toDomain() throws(FileInvalid) -> LetterDefaults {
         let defaults: LetterDefaults
-        do { defaults = try LetterDefaults(salaryExpectation: salaryExpectation, startDate: startDate, note: note) }
-        catch { throw FileInvalid(reason: "letter defaults: \(error)") }
-        guard LetterDefaultsContentV1(defaults) == self else { throw FileInvalid(reason: "letter defaults are not canonical") }
+        do throws(ApplicationError) { defaults = try LetterDefaults(salaryExpectation: salaryExpectation, startDate: startDate, note: note) }
+        catch { throw FileInvalid(error) }
+        guard LetterDefaultsContentV1(defaults) == self else { throw FileInvalid(reason: "not canonical") }
         return defaults
     }
 }

@@ -29,17 +29,17 @@ private let savedAt = Date(timeIntervalSince1970: 1_700_000_000)
 
 private let defaultsMutations: [Mutation] = {
     var all: [Mutation] = []
-    all.append(Mutation(name: "revision 0", from: #""revision":3"#, to: #""revision":0"#))
-    all.append(Mutation(name: "a revision that would overflow", from: #""revision":3"#, to: #""revision":2147483648"#))
-    all.append(Mutation(name: "a newer schema, read as this one", from: #""schemaVersion":1"#, to: #""schemaVersion":2"#))
-    all.append(Mutation(name: "a text with a margin", from: #""salaryExpectation":"55-60k gross""#, to: #""salaryExpectation":" 55-60k gross""#))
+    all.append(Mutation(name: "revision 0", from: #""revision":3"#, to: #""revision":0"#, reason: "revision"))
+    all.append(Mutation(name: "a revision that would overflow", from: #""revision":3"#, to: #""revision":2147483648"#, reason: "revision"))
+    all.append(Mutation(name: "a newer schema, read as this one", from: #""schemaVersion":1"#, to: #""schemaVersion":2"#, reason: "version"))
+    all.append(Mutation(name: "a text with a margin", from: #""salaryExpectation":"55-60k gross""#, to: #""salaryExpectation":" 55-60k gross""#, reason: "not canonical"))
     all.append(Mutation(name: "a text over its bound", from: #""startDate":"From April""#,
-                        to: #""startDate":""# + String(repeating: "x", count: LetterDefaults.maxBytes(of: .startDate) + 1) + "\""))
-    all.append(Mutation(name: "a control character", from: "From April", to: #"From\u0007 April"#))
-    all.append(Mutation(name: "a line break where there must be none", from: "From April", to: #"From\nApril"#))
-    all.append(Mutation(name: "a missing text", from: #""note":"Remote only","#, to: ""))
-    all.append(Mutation(name: "a text that is not text", from: #""note":"Remote only""#, to: #""note":7"#))
-    all.append(Mutation(name: "a missing time", from: #","updatedAt":"2023-11-14T22:13:20Z""#, to: ""))
+                        to: #""startDate":""# + String(repeating: "x", count: LetterDefaults.maxBytes(of: .startDate) + 1) + "\"", reason: "tooLong.startDate"))
+    all.append(Mutation(name: "a control character", from: "From April", to: #"From\u0007 April"#, reason: "forbiddenCharacters.startDate"))
+    all.append(Mutation(name: "a line break where there must be none", from: "From April", to: #"From\nApril"#, reason: "forbiddenCharacters.startDate"))
+    all.append(Mutation(name: "a missing text", from: #""note":"Remote only","#, to: "", reason: "not a letter defaults file"))
+    all.append(Mutation(name: "a text that is not text", from: #""note":"Remote only""#, to: #""note":7"#, reason: "not a letter defaults file"))
+    all.append(Mutation(name: "a missing time", from: #","updatedAt":"2023-11-14T22:13:20Z""#, to: "", reason: "not a letter defaults file"))
     return all
 }()
 
@@ -55,7 +55,7 @@ struct LetterDefaultsFileTests {
     @Test("every value that is not in its canonical, valid form is corrupt, never normalised or defaulted", arguments: defaultsMutations)
     func corrupt(mutation: Mutation) throws {
         let json = try mutation.apply(to: golden)
-        #expect(throws: LetterDefaultsFileV1.Invalid.self) { try LetterDefaultsFileV1.read(Data(json.utf8)) }
+        #expect(throws: LetterDefaultsFileV1.Invalid(reason: mutation.reason)) { try LetterDefaultsFileV1.read(Data(json.utf8)) }
     }
 
     @Test("{} is not a letter defaults file")
@@ -110,6 +110,14 @@ struct FileLetterDefaultsStoreTests {
         // A save does not replace a file it cannot read: it reports it, as every store does.
         await #expect(throws: LetterDefaultsError.corrupt(file: name, reason: "no schemaVersion envelope")) { _ = try await store(dir).save(.empty, expectedRevision: 0) }
         #expect(exists(dir.appendingPathComponent(name)))
+    }
+
+    @Test("a corrupt file is reported with a stable code, never with printed text")
+    func reasonIsACode() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let tooLong = golden.replacingOccurrences(of: #""startDate":"From April""#, with: #""startDate":""# + String(repeating: "x", count: LetterDefaults.maxBytes(of: .startDate) + 1) + "\"")
+        try write(tooLong, to: dir.appendingPathComponent(name))
+        await #expect(throws: LetterDefaultsError.corrupt(file: name, reason: "tooLong.startDate")) { _ = try await store(dir).load() }
     }
 
     @Test("an entry in the quarantine that is not a copy of the defaults is not one: a store with only such entries loads as never saved",
