@@ -17,8 +17,8 @@ public struct JobID: Hashable, Sendable {
 /// edits can move them, so they are only required to be non-negative.
 public struct ApplicationProvenance: Hashable, Sendable {
     public enum Limits {
-        public static let items = 500, lineSources = 5_000, sourcesPerLine = 200, questionValues = 20
-        public static let statementBytes = 40_000, reportBytes = 10_000, answerBytes = 4_000, valueBytes = 1_000, identifierBytes = 64
+        public static let items = 500, lineSources = 40_000, sourcesPerLine = 200, questionValues = 20
+        public static let statementBytes = 40_000, reportBytes = 10_000, answerBytes = 4_000, valueBytes = 10_000, identifierBytes = 64
     }
 
     /// The statements of one experience of the source CV, in order. A statement is one line of the experience's description,

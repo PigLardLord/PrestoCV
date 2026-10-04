@@ -33,6 +33,19 @@ struct ApplicationProvenanceTests {
         #expect(held.report == report && held.lineSources == [sources])
     }
 
+    @Test("a question's value holds a term or a model request of 10,000 bytes, and a tailored CV 200 experiences of 200 lines: 40,000 line sources")
+    func valueAndLineSourceBoundsHoldTailoringsBounds() throws {
+        #expect(P.Limits.valueBytes == 10_000 && P.Limits.lineSources == 40_000)
+        let value = String(repeating: "v", count: 10_000)
+        let question = try P.Question(code: "c", values: [value], scope: .skills, answer: "a")
+        #expect(question.values == [value])
+        expect(.tooLong(.questionValue)) { _ = try P.Question(code: "c", values: [value + "v"], scope: .skills) }
+        let sources = (0..<40_000).map { P.LineSources(experience: $0 / 200, line: $0 % 200) }
+        let held = try provenance(questions: [question], sources: sources)
+        #expect(held.lineSources.count == 40_000 && held.questions == [question])
+        expect(.tooMany(.lineSources)) { _ = try provenance(sources: sources + [P.LineSources(experience: 200, line: 0)]) }
+    }
+
     @Test("the fixture populates every part, so a completeness test over it sees every leaf")
     func fixtureIsComplete() {
         let leaves = FieldLeaves.of(FixtureProvenance.full())
