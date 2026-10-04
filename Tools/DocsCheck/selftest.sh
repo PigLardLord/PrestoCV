@@ -83,6 +83,11 @@ setup; put Shared/root.txt ''; put Tools/Pkg/Shared/y.txt ''; put Tools/Pkg/Tool
 fixed "a path that exists from a directory above its document"
 put Tools/Pkg/Tools/README.md $'# Tools\n\nSee `Shared/z.txt`.'
 stale "a path that exists from none of them" "^Tools/Pkg/Tools/README.md:3: path-missing:"
+setup; put README.md $'# Project\n\nThe server is in `Server/Package.swift`, see `Server/README.md`.'
+stale "files named in a directory that does not exist" "^README.md:3: path-missing: .Server/Package.swift. does not exist"
+put Server/Package.swift ''; put Server/README.md '# Server'; fixed "the directory and its files exist"
+setup; put README.md $'# Project\n\nSee `other-repo:core/Tailor.js`, `example.com/index.html` and `other/image.png`.'
+fixed "a prefixed path, a host name and a file of another kind are not paths"
 setup; put Package/README.md $'[gone](gone.md)'; put Package/.build/checkouts/dep/README.md $'[gone](gone.md)'
 stale "a README in a package" "^Package/README.md:1: link-target-missing:"
 rm "$ROOT/Package/README.md"; fixed "the README in .build is not read"
@@ -95,7 +100,7 @@ put Tools/check.sh '#!/bin/sh'; fixed "the file exists"
 setup; mkdir -p "$ROOT/Tools"; put README.md $'# Project\n\nThe tools are in `Tools/old/`, see `Tools/run.sh:12`.'; put Tools/run.sh ''
 stale "a directory in backticks that does not exist" "^README.md:3: path-missing: .Tools/old. does not exist"
 mkdir -p "$ROOT/Tools/old"; fixed "the directory exists"
-setup; mkdir -p "$ROOT/Tools"; put README.md $'# Project\n\n`Tools/<name>/x.sh` `Tools/*.sh` `Tools/{a,b}.sh` `Tools/...` `~/Tools/x` `/Tools/x` `Other/x.sh` `Tools/.build/y`\n```\nTools/gone.sh\n```'
+setup; mkdir -p "$ROOT/Tools"; put README.md $'# Project\n\n`Tools/<name>/x.sh` `Tools/*.sh` `Tools/{a,b}.sh` `Tools/...` `~/Tools/x` `/Tools/x` `Other/x` `Tools/.build/y`\n```\nTools/gone.sh\n```'
 fixed "placeholders, globs, paths under ~ or /, other names, build products and fenced code are skipped"
 setup; mkdir -p "$ROOT/Tools"; put README.md $'# Project\n\nThe `Tools/future.sh` script will check it.'
 stale "a planned file that is not declared" "^README.md:3: path-missing:"

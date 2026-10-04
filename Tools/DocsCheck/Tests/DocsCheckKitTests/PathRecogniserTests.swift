@@ -59,13 +59,36 @@ struct PathRecogniserTests {
         #expect(paths(span) == [])
     }
 
+    @Test("a word with a slash that ends in a known file extension is a path, whatever its first segment", arguments: [
+        "Sources/Core/File.swift", "a/b.md", "a/b.json", "a/b.mjs", "a/b.js", "a/b.sh", "a/b.yml", "a/b.yaml", "a/b.css", "a/b.html", "a/b.txt", "a/b.csv",
+        "Server/Package.swift", "Sources/X.swift:10", "Sources/X.swift#L3", ".hidden/x.yml", "other/docs/x.md",
+    ])
+    func byExtension(span: String) {
+        let found = PathRecogniser.paths(inCodeSpan: span, topLevel: Self.topLevel)
+        #expect(found.count == 1 && found[0].mustBeDirectory == false)
+        #expect(found.first.map { span.hasPrefix($0.path) } == true)
+    }
+
+    @Test("an extension outside the list, a name without a slash, a host name and a glob are not paths", arguments: [
+        "a/b.png", "a/b.xml", "a/b.SWIFT", "a/b.MD", "a/b.Json", "a/b.md/", "b.swift", "a/.swift", "a/swift", "example.com/index.html", "www.example.org/a/b.md",
+        "Sources/*.swift", "Sources/<name>.swift", "Sources/{a,b}.swift", "Sources/x.swift,", "~/a/b.md", "/a/b.md", "../a/b.md", "a/../b.md", "a/.build/b.json",
+    ])
+    func notByExtension(span: String) {
+        #expect(paths(span) == [])
+    }
+
+    @Test("a command is read word by word, so a file in it is a path and a flag is not")
+    func commandWithFile() {
+        #expect(paths("swift run --package-path Tools/DocsCheck Sources/Gen.swift --out out/x.json") == ["Tools/DocsCheck", "Sources/Gen.swift", "out/x.json"])
+    }
+
     @Test("a path through a build directory names a build product, so it is skipped", arguments: ["Tools/DocsCheck/.build", "Tools/.build/release/DocsCheck", ".build/x"])
     func buildProducts(span: String) {
         #expect(PathRecogniser.paths(inCodeSpan: span, topLevel: Self.topLevel.union([".build"])) == [])
     }
 
     @Test("a path whose first segment is not a top-level entry is skipped", arguments: [
-        "Features/Profile", "App/", "rules.json", "tools/DocsCheck", "TOOLS/x", "other/docs/x.md", "Swift.fatalError", "a/b",
+        "Features/Profile", "App/", "rules.json", "tools/DocsCheck", "TOOLS/x", "other/docs/x", "Swift.fatalError", "a/b",
     ])
     func notTopLevel(span: String) {
         #expect(paths(span) == [])

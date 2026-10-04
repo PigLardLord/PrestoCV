@@ -23,8 +23,8 @@ struct ExactMatchTests {
         let fake = FakeFiles(contents: ["README.md": "[a](docs/A.md) [b](docs/a.md) `docs/A.md` `Docs/a.md` `docs/a.md`", "docs/a.md": ""], caseInsensitive: true)
         let report = try DocumentationChecker(files: fake, rootPath: "/fake", plannedFile: nil).run()
         let codes = report.findings.filter { $0.file == "README.md" }.map { "\($0.line) \($0.code.rawValue)" }
-        // `Docs/a.md` is not taken for a path at all: `Docs` is not a top-level entry.
-        #expect(codes == ["1 link-target-missing", "1 path-missing"])
+        // `Docs/a.md` is a path by its extension, and there is no `Docs` with that case.
+        #expect(codes == ["1 link-target-missing", "1 path-missing", "1 path-missing"])
     }
 
     @Test("a file name is matched scalar by scalar: a decomposed accent is not the precomposed one")

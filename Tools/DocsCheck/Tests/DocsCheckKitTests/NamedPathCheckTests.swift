@@ -54,6 +54,20 @@ struct NamedPathCheckTests {
         #expect(try findings(in: ["Pkg/README.md": "`Shared/`", "Shared": ""]) == ["Pkg/README.md:1 path-missing"])
     }
 
+    @Test("a file named with a first segment that is not top-level is found from the root or beside its document")
+    func fileByExtension() throws {
+        let result = try findings(in: [
+            "Pkg/README.md": "`Sources/Here.swift` `Sources/Gone.swift` `Pkg/Sources/Here.swift` `Server/Package.swift` `Tools/run.sh`",
+            "Pkg/Sources/Here.swift": "", "Tools/run.sh": "",
+        ])
+        #expect(result == ["Pkg/README.md:1 path-missing", "Pkg/README.md:1 path-missing"])
+    }
+
+    @Test("a deleted top-level directory is caught through the files that documents name in it")
+    func deletedDirectory() throws {
+        #expect(try findings(in: ["README.md": "The server is in `Server/Package.swift` and `Server/README.md`."]) == ["README.md:1 path-missing", "README.md:1 path-missing"])
+    }
+
     @Test("a path in a document at the root has only the root to be looked for in")
     func documentAtTheRoot() throws {
         #expect(try findings(in: ["README.md": "`docs/here.md` `docs/gone.md`", "docs/here.md": ""]) == ["README.md:1 path-missing"])
