@@ -18,8 +18,9 @@ public struct DirectorySampleCVSource: SampleCVSource {
         do { names = try FileManager.default.contentsOfDirectory(atPath: directory.path) } catch { throw .storeUnavailable(.cannotList) }
         var samples: [CV] = []
         for name in names.sorted() where name.hasSuffix(".cv.json") {
-            switch StoredCVFile.read(directory.appendingPathComponent(name), maxBytes: maxFileBytes) {
-            case .cv(let cv): samples.append(cv)
+            switch StoredFile<CV>.read(directory.appendingPathComponent(name), maxBytes: maxFileBytes, supportedVersion: CVFileV1.version,
+                                       decode: CVFileV1.read) {
+            case .value(let cv): samples.append(cv)
             case .absent, .unreadable: throw .unreadable(file: name)
             case .newer(let version): throw .upgradeRequired(file: name, version: version)
             case .corrupt: throw .corrupt(file: name)

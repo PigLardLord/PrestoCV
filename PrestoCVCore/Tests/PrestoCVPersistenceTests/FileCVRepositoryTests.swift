@@ -370,7 +370,7 @@ struct FileRepositoryTests {
 
     @Test("every write is atomic and asks for complete data protection")
     func writeOptions() {
-        #expect(FileCVRepository.writeOptions.contains(.atomic) && FileCVRepository.writeOptions.contains(.completeFileProtection))
+        #expect(StoreWriting.options.contains(.atomic) && StoreWriting.options.contains(.completeFileProtection))
     }
 
     #if os(iOS)

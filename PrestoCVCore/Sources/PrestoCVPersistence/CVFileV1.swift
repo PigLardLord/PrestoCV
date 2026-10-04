@@ -41,6 +41,13 @@ struct CVFileV1: Codable, Equatable {
 
     static func decode(_ data: Data) throws -> CVFileV1 { try StoredJSON.decode(CVFileV1.self, from: data) }
 
+    /// The strict read of a stored CV: the file must decode, and every value in it must be valid.
+    static func read(_ data: Data) throws(Invalid) -> CV {
+        let file: CVFileV1
+        do { file = try decode(data) } catch { throw Invalid(reason: "not a CV file") }
+        return try file.toDomain()
+    }
+
     func encoded() throws -> Data { try StoredJSON.encode(self) }
 
     // MARK: From the domain
