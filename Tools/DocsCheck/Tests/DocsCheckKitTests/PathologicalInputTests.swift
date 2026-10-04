@@ -68,6 +68,32 @@ struct PathologicalInputTests {
         #expect(Finding.quoted(String(repeating: "b", count: 161)) == "`" + String(repeating: "b", count: 160) + "…`")
     }
 
+    @Test("a comment opener in the middle of each of 20,000 lines, and 40,000 of them on one line, are read in linear time")
+    func manyMidLineOpeners() {
+        let clock = ContinuousClock()
+        var lines: MarkdownDocument?
+        let manyLines = clock.measure { lines = MarkdownDocument(text: String(repeating: "a <!-- b\n", count: 20_000)) }
+        #expect(lines?.proseLines.count == 20_001)
+        #expect(lines?.proseLines.allSatisfy { $0.text.isEmpty || $0.text == "a <!-- b" } == true)
+        var line: MarkdownDocument?
+        let oneLine = clock.measure { line = MarkdownDocument(text: "x" + String(repeating: "<!--", count: 40_000)) }
+        #expect(line?.proseLines.first?.text.count == 1 + 4 * 40_000)
+        var breaks: MarkdownDocument?
+        let withBreaks = clock.measure { breaks = MarkdownDocument(text: String(repeating: "a <!-- b\n\n", count: 10_000)) }
+        #expect(breaks?.proseLines.count == 20_001)
+        // Linear takes a fraction of a second even unoptimised; looking ahead from every line takes minutes.
+        #expect(manyLines < .seconds(10) && oneLine < .seconds(10) && withBreaks < .seconds(10))
+    }
+
+    @Test("a comment that spans many lines, with many openers inside it, is read in linear time")
+    func manyOpenersInAComment() {
+        let clock = ContinuousClock()
+        var document: MarkdownDocument?
+        let elapsed = clock.measure { document = MarkdownDocument(text: "<!--\n" + String(repeating: "x <!-- y\n", count: 20_000) + "-->\n[a](a.md)") }
+        #expect(document?.links.map(\.destination) == ["a.md"])
+        #expect(elapsed < .seconds(10))
+    }
+
     @Test("long runs of backticks and brackets outside headings are read")
     func longLines() {
         _ = MarkdownDocument(text: String(repeating: "`", count: 200_000))

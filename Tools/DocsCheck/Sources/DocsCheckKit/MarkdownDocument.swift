@@ -55,6 +55,7 @@ struct MarkdownDocument: Sendable {
         var fence: Fence?
         var inComment = false
         let lines = Self.lines(of: text)
+        let lookahead = CommentLookahead(lines: lines)
         for (offset, rawLine) in lines.enumerated() {
             let number = offset + 1
             if let open = fence {
@@ -66,7 +67,7 @@ struct MarkdownDocument: Sendable {
                 continue
             }
             var inline = InlineScan(line: rawLine, startsInComment: inComment, midLineOpenerMaySpan: false)
-            if inline.unclosedMidLineOpener, Self.closes(after: offset, in: lines) {
+            if inline.unclosedMidLineOpener, lookahead.closes(after: offset) {
                 inline = InlineScan(line: rawLine, startsInComment: inComment, midLineOpenerMaySpan: true)
             }
             inComment = inline.endsInComment
@@ -103,19 +104,36 @@ struct MarkdownDocument: Sendable {
         }
     }
 
-    /// Whether a comment opened in the middle of line `offset` is closed by a later line before the paragraph ends,
-    /// as it must be to belong to its paragraph.
-    private static func closes(after offset: Int, in lines: [String]) -> Bool {
-        for line in lines[(offset + 1)...] {
-            if endsParagraph(line) { return false }
-            if line.contains("-->") { return true }
+    /// Whether a comment opened in the middle of a line is closed by a later line before the paragraph ends, as it
+    /// must be to belong to its paragraph. The answer for every line is computed once, in a backward pass, so that
+    /// asking is a lookup and a document of many such lines is read in linear time.
+    private struct CommentLookahead {
+        private var nextParagraphEnd: [Int]
+        private var nextCloser: [Int]
+
+        init(lines: [String]) {
+            nextParagraphEnd = [Int](repeating: Int.max, count: lines.count)
+            nextCloser = nextParagraphEnd
+            var paragraphEnd = Int.max
+            var closer = Int.max
+            for index in lines.indices.reversed() {
+                if MarkdownDocument.endsParagraph(lines[index]) { paragraphEnd = index }
+                if lines[index].contains("-->") { closer = index }
+                nextParagraphEnd[index] = paragraphEnd
+                nextCloser[index] = closer
+            }
         }
-        return false
+
+        /// Whether a line after `offset` holds `-->` before the first line after it that ends the paragraph.
+        func closes(after offset: Int) -> Bool {
+            let next = offset + 1
+            return next < nextCloser.count && nextCloser[next] < nextParagraphEnd[next]
+        }
     }
 
     /// A line that ends the paragraph before it: a blank line, a fence, an ATX heading, or a line that starts a
     /// comment of its own.
-    private static func endsParagraph(_ line: String) -> Bool {
+    fileprivate static func endsParagraph(_ line: String) -> Bool {
         line.allSatisfy { $0 == " " || $0 == "\t" } || Fence(opening: line) != nil || heading(in: line, number: 0) != nil || startsComment(line)
     }
 
@@ -244,6 +262,7 @@ private struct InlineScan {
             for position in range { inComment[position] = true; visible[position] = " " }
         }
         var commentStart = 0
+        var noCloserLeft = false
         var index = 0
         while index < scalars.count {
             if endsInComment {
@@ -261,7 +280,10 @@ private struct InlineScan {
                 continue
             }
             if Self.hasPrefix(Self.commentOpening, in: scalars, at: index) {
-                if let end = Self.find(Self.commentClosing, in: scalars, from: index + 4) {
+                // Once a search finds no `-->`, none from a later position will, so the rest of the line is not searched again.
+                let end = noCloserLeft ? nil : Self.find(Self.commentClosing, in: scalars, from: index + 4)
+                if end == nil { noCloserLeft = true }
+                if let end {
                     blank(index..<(end + 3))
                     index = end + 3
                 } else if midLineOpenerMaySpan || Self.startsLine(scalars, at: index) {
