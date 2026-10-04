@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import DocsCheckKit
 
@@ -105,5 +106,47 @@ struct MarkdownDocumentTests {
         let document = MarkdownDocument(text: "# Title\r\n[a](a.md)\r\n")
         #expect(document.links == [.init(line: 2, destination: "a.md")])
         #expect(document.anchors == ["title"])
+    }
+
+    // MARK: HTML comments
+
+    @Test("an HTML comment hides links and code spans, on one line and over several")
+    func comments() {
+        let text = """
+        before [a](a.md) <!-- [b](b.md) `c/d.md` --> after [e](e.md)
+        <!--
+        [f](f.md)
+        `g/h.md`
+        -->[i](i.md)
+        [j](j.md)
+        """
+        let document = MarkdownDocument(text: text)
+        #expect(document.links.map(\.destination) == ["a.md", "e.md", "i.md", "j.md"])
+        #expect(document.codeSpans.isEmpty)
+    }
+
+    @Test("a comment opened inside a code span or a fence is not a comment, and one opened first hides a code span")
+    func commentsAndCode() {
+        let text = "`<!--` [a](a.md)\n```\n<!--\n```\n[b](b.md)\n<!-- `x` [c](c.md) -->\n\\<!-- [d](d.md)"
+        #expect(MarkdownDocument(text: text).links.map(\.destination) == ["a.md", "b.md", "d.md"])
+    }
+
+    @Test("a fence marker inside a comment opens nothing, and a comment that is never closed hides the rest")
+    func commentsAndFences() {
+        #expect(MarkdownDocument(text: "<!--\n```\n-->\n[a](a.md)").links.map(\.destination) == ["a.md"])
+        #expect(MarkdownDocument(text: "[a](a.md)\n<!--\n[b](b.md)\n").links.map(\.destination) == ["a.md"])
+    }
+
+    @Test("a heading in a comment is not a heading, and a comment at the end of a heading is not part of it")
+    func commentsAndHeadings() {
+        let document = MarkdownDocument(text: "<!--\n## Hidden\n-->\n## Title <!-- note -->\n## Other")
+        #expect(document.headings.map(\.text) == ["Title", "Other"])
+        #expect(document.anchors == ["title", "other"])
+        #expect(MarkdownDocument(text: "<!-- - **Status:** Accepted -->\n- **Status:** Proposed").proseLines.map { $0.text.trimmingCharacters(in: .whitespaces) } == ["", "- **Status:** Proposed"])
+    }
+
+    @Test("an indented block is read like any other text: reading more can only add findings")
+    func indentedCode() {
+        #expect(MarkdownDocument(text: "    [a](a.md) `b/c.md`").links.map(\.destination) == ["a.md"])
     }
 }

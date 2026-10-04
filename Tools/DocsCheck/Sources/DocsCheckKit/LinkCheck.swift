@@ -13,7 +13,7 @@ struct LinkCheck {
     mutating func findings(in documents: [Document]) throws(DocsCheckError) -> [Finding] {
         var findings: [Finding] = []
         for document in documents {
-            anchorsByFile[document.path] = Set(document.markdown.anchors.map(Anchor.init))
+            anchorsByFile[document.path] = Self.anchors(of: document.markdown)
             for link in document.markdown.links {
                 if let finding = try finding(for: link, in: document) { findings.append(finding) }
             }
@@ -47,9 +47,14 @@ struct LinkCheck {
         return nil
     }
 
+    /// The anchors of the headings, which a link may point at.
+    private static func anchors(of markdown: MarkdownDocument) -> Set<Anchor> {
+        Set(markdown.anchors.map(Anchor.init))
+    }
+
     private mutating func anchors(of path: String) throws(DocsCheckError) -> Set<Anchor> {
         if let known = anchorsByFile[path] { return known }
-        let anchors = Set(MarkdownDocument(text: try tree.text(of: path)).anchors.map(Anchor.init))
+        let anchors = Self.anchors(of: MarkdownDocument(text: try tree.text(of: path)))
         anchorsByFile[path] = anchors
         return anchors
     }

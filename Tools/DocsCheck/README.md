@@ -22,7 +22,7 @@ No git hook runs it. Run `check.sh` before committing a change to a document, a 
 
 ## 1. Links
 
-Every relative link in a document resolves to a file or a directory of the repository, and a link with an anchor into a Markdown file resolves to one of its headings. It reads inline links, images and link definitions, outside code spans and fenced code.
+Every relative link in a document resolves to a file or a directory of the repository, and a link with an anchor into a Markdown file resolves to one of its headings. It reads inline links, images and link definitions, outside code spans, fenced code and HTML comments (`<!-- … -->`, on one line or over several). An indented code block is read like any other text: reading more can only add findings.
 
 - **Resolution.** A link is resolved from the directory of the document that holds it; a leading `/` means the repository root. A query string is dropped and percent-encoding is decoded. File names are matched with their exact case and scalar by scalar, as GitHub does, through the listing of each directory, so a link that works on a case-insensitive disk and breaks on GitHub is found. A link that leaves the repository does not resolve. A trailing `/` needs a directory.
 - **Not followed.** Links with a scheme (`https:`, `mailto:` and so on) and links that start with `//` are not fetched.
@@ -34,7 +34,7 @@ Codes: `link-target-missing`, `link-anchor-missing`, `heading-too-long`, `headin
 
 ## 2. Named paths
 
-A path written in a code span whose first segment is a top-level entry of the repository, such as `Tools/…`, `PrestoCVCore/…`, `docs/…` or `.github/…`, exists. Every whitespace-separated word of a code span is tried, so a command that names a path is checked too. Fenced code is not.
+A path written in a code span whose first segment is a top-level entry of the repository, such as `Tools/…`, `PrestoCVCore/…`, `docs/…` or `.github/…`, exists. Every whitespace-separated word of a code span is tried, so a command that names a path is checked too. Fenced code and HTML comments are not read.
 
 - **Skipped.** A word that has a placeholder or a glob (`<n>`, `*`, `?`, `{…}`, `[…]`, `…`, `...`, `$VAR`), any character that a path does not have (so URLs and expressions), a path under `~` or `/`, a path with a `.` or `..` segment, and a path through a `.build` directory, which is a build product. A word whose first segment is not a top-level entry of the repository is not a path for this check.
 - **Suffixes.** `file.swift:10`, `file.swift:10:3`, `file.swift:10-20` and `file.swift#L10` name `file.swift`; an `#anchor` is dropped.

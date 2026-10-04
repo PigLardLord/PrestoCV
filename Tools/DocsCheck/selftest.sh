@@ -69,6 +69,8 @@ setup; put README.md "$(printf '# Project\n\n## %s' "$(head -c 300 /dev/zero | t
 stale "link labels nested 300 deep" "^README.md:3: heading-too-nested:"
 setup; put README.md "$(head -c 200000 /dev/zero | tr '\0' ']' | sed 's/\]/](/g')"
 stale "100,000 link openers on one line are read in linear time, and the finding is one short line" "^README.md:1: link-target-missing: .{1,300}$"
+setup; put README.md $'# Project\n\nA comment hides what is stale: <!-- [gone](gone.md) `Tools/gone.sh` -->\n<!--\n[gone](gone.md)\n-->'; mkdir -p "$ROOT/Tools"
+fixed "a link and a path in an HTML comment are not read"
 setup; put Package/README.md $'[gone](gone.md)'; put Package/.build/checkouts/dep/README.md $'[gone](gone.md)'
 stale "a README in a package" "^Package/README.md:1: link-target-missing:"
 rm "$ROOT/Package/README.md"; fixed "the README in .build is not read"

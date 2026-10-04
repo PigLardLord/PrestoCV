@@ -1,6 +1,6 @@
-/// What the checks need from a Markdown file: its links and code spans with their lines, and its headings. Fenced
-/// code is skipped, and so is the inside of code spans, because neither holds links. It reads CommonMark's inline
-/// links, images and link definitions, and ATX headings.
+/// What the checks need from a Markdown file: its links and code spans with their lines, and its headings. Fenced code, HTML comments and the inside of code spans are skipped, because none of
+/// them holds a link. It reads CommonMark's inline links, images and link definitions, and ATX headings. Indented
+/// code is read like any other text, since reading more can only add findings.
 struct MarkdownDocument: Sendable {
     struct Link: Hashable, Sendable {
         let line: Int
@@ -51,19 +51,22 @@ struct MarkdownDocument: Sendable {
 
     init(text: String) {
         var fence: Fence?
-        for (offset, line) in Self.lines(of: text).enumerated() {
+        var inComment = false
+        for (offset, rawLine) in Self.lines(of: text).enumerated() {
             let number = offset + 1
             if let open = fence {
-                if open.isClosed(by: line) { fence = nil }
+                if open.isClosed(by: rawLine) { fence = nil }
                 continue
             }
-            if let opening = Fence(opening: line) {
+            if !inComment, let opening = Fence(opening: rawLine) {
                 fence = opening
                 continue
             }
+            let inline = InlineScan(line: rawLine, startsInComment: inComment)
+            inComment = inline.endsInComment
+            let line = inline.uncommented
             proseLines.append(Line(number: number, text: line))
             if let heading = Self.heading(in: line, number: number) { headings.append(heading) }
-            let inline = InlineScan(line: line)
             codeSpans += inline.codeSpans.map { CodeSpan(line: number, text: $0) }
             if let destination = Self.definitionDestination(in: line) {
                 links.append(Link(line: number, destination: destination))
@@ -160,14 +163,19 @@ struct MarkdownDocument: Sendable {
     }
 }
 
-/// One line of inline Markdown: the contents of its code spans, and the destinations of its links.
+/// One line of inline Markdown: the contents of its code spans, the destinations of its links, and the line without
+/// its HTML comments. A comment may begin on an earlier line or end on a later one.
 private struct InlineScan {
     private(set) var codeSpans: [String] = []
     private(set) var destinations: [String] = []
+    private(set) var uncommented = ""
+    private(set) var endsInComment = false
 
-    init(line: String) {
+    init(line: String, startsInComment: Bool) {
         let scalars = Array(line.unicodeScalars)
-        let visible = mask(codeSpansOf: scalars)
+        endsInComment = startsInComment
+        let (uncommentedScalars, visible) = mask(scalars)
+        uncommented = Self.string(uncommentedScalars)
         var index = 0
         while index < visible.count {
             if visible[index] == "\\" {
@@ -185,13 +193,35 @@ private struct InlineScan {
         }
     }
 
-    /// The line with every code span, delimiters included, replaced by spaces; the spans are recorded.
-    private mutating func mask(codeSpansOf scalars: [Unicode.Scalar]) -> [Unicode.Scalar] {
+    /// The line with every HTML comment replaced by spaces, and the same with every code span replaced too. Code
+    /// spans are recorded. Whichever of a code span and a comment starts first wins, as in CommonMark.
+    private mutating func mask(_ scalars: [Unicode.Scalar]) -> (uncommented: [Unicode.Scalar], visible: [Unicode.Scalar]) {
+        var uncommented = scalars
         var visible = scalars
+        func blank(_ range: Range<Int>) {
+            for position in range { uncommented[position] = " "; visible[position] = " " }
+        }
+        var commentStart = 0
         var index = 0
         while index < scalars.count {
+            if endsInComment {
+                if let end = Self.find(Self.commentClosing, in: scalars, from: index) {
+                    blank(commentStart..<(end + 3))
+                    index = end + 3
+                    endsInComment = false
+                } else {
+                    index = scalars.count
+                }
+                continue
+            }
             if scalars[index] == "\\" {
                 index += 2
+                continue
+            }
+            if Self.hasPrefix(Self.commentOpening, in: scalars, at: index) {
+                commentStart = index
+                endsInComment = true
+                index += 4
                 continue
             }
             guard scalars[index] == "`" else {
@@ -222,7 +252,24 @@ private struct InlineScan {
             }
             if !closed { index += opening }
         }
-        return visible
+        if endsInComment { blank(commentStart..<scalars.count) }
+        return (uncommented, visible)
+    }
+
+    private static let commentOpening: [Unicode.Scalar] = ["<", "!", "-", "-"]
+    private static let commentClosing: [Unicode.Scalar] = ["-", "-", ">"]
+
+    private static func hasPrefix(_ wanted: [Unicode.Scalar], in scalars: [Unicode.Scalar], at index: Int) -> Bool {
+        index + wanted.count <= scalars.count && scalars[index..<(index + wanted.count)].elementsEqual(wanted)
+    }
+
+    private static func find(_ needle: [Unicode.Scalar], in scalars: [Unicode.Scalar], from start: Int) -> Int? {
+        var index = start
+        while index < scalars.count {
+            if hasPrefix(needle, in: scalars, at: index) { return index }
+            index += 1
+        }
+        return nil
     }
 
     // MARK: Destinations
