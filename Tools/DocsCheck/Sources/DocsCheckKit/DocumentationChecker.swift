@@ -20,7 +20,21 @@ public struct DocumentationChecker: Sendable {
         let tree = RepositoryTree(root: root)
         let documents = try tree.documentPaths().map { Document(path: $0, markdown: MarkdownDocument(text: try tree.text(of: $0))) }
         var links = LinkCheck(tree: tree)
-        let findings = try links.findings(in: documents)
+        var findings = try links.findings(in: documents)
+        findings += NamedPathCheck(tree: tree, planned: try plannedPaths(), plannedFileName: plannedFileName).findings(in: documents)
         return Report(findings: findings.sorted(), documentCount: documents.count)
+    }
+
+    private func plannedPaths() throws -> PlannedPaths {
+        guard let plannedFile else { return .none }
+        return PlannedPaths(json: String(decoding: try Data(contentsOf: plannedFile), as: UTF8.self))
+    }
+
+    /// The planned file's path relative to the root, or its name if it is outside the repository.
+    private var plannedFileName: String {
+        guard let plannedFile else { return "" }
+        let rootPath = root.standardizedFileURL.path + "/"
+        let path = plannedFile.standardizedFileURL.path
+        return path.hasPrefix(rootPath) ? String(path.dropFirst(rootPath.count)) : plannedFile.lastPathComponent
     }
 }

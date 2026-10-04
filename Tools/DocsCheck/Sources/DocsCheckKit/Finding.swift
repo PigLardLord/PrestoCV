@@ -2,6 +2,10 @@
 public enum FindingCode: String, CaseIterable, Sendable {
     case linkTargetMissing = "link-target-missing"
     case linkAnchorMissing = "link-anchor-missing"
+    case pathMissing = "path-missing"
+    case plannedPathExists = "planned-path-exists"
+    case plannedPathUnused = "planned-path-unused"
+    case plannedFileInvalid = "planned-file-invalid"
 }
 
 /// One place where a document and the repository disagree.

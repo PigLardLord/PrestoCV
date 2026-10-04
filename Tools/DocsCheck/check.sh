@@ -7,4 +7,5 @@ TOOL="$(cd "$(dirname "$0")" && pwd)"
 # The build directory can live elsewhere (DOCS_CHECK_SCRATCH), so CI can keep it outside the checkout.
 SCRATCH="${DOCS_CHECK_SCRATCH:-$TOOL/.build}"
 swift build -c release --package-path "$TOOL" --scratch-path "$SCRATCH" >&2
-"$SCRATCH/release/DocsCheck" "$ROOT" "$@"
+# The planned-paths list comes from the tree being checked.
+"$SCRATCH/release/DocsCheck" "$ROOT" --planned "$ROOT/Tools/DocsCheck/planned.json" "$@"

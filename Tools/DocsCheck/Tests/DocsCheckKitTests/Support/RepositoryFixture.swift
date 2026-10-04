@@ -2,6 +2,7 @@ import Foundation
 @testable import DocsCheckKit
 
 /// A repository built from a dictionary of paths and contents in a temporary directory, removed when the body returns.
+@discardableResult
 func withRepository<Result>(_ files: [String: String], directories: [String] = [], _ body: (URL) throws -> Result) throws -> Result {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("docscheck-" + UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }

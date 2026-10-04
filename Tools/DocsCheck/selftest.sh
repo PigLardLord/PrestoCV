@@ -25,8 +25,8 @@ expect() {
   else fail=$((fail+1)); echo "FAIL $name (exit $got, want $want)"; sed 's/^/     /' "$OUT"; fi
 }
 # stale <name> <pattern>: the repository as planted fails with a finding that matches the pattern.
-stale() { expect "stale: $1" 1 "$2"; }
-fixed() { expect "fixed: $1" 0 ""; }
+stale() { local name="$1" pat="$2"; shift 2; expect "stale: $name" 1 "$pat" "$@"; }
+fixed() { local name="$1"; shift; expect "fixed: $name" 0 "" "$@"; }
 
 # --- the repository the cases start from is accepted
 setup; expect "a consistent repository passes" 0 "checked 2 documents: 0 findings"
@@ -50,6 +50,27 @@ setup; put Package/README.md $'[gone](gone.md)'; put Package/.build/checkouts/de
 stale "a README in a package" "^Package/README.md:1: link-target-missing:"
 rm "$ROOT/Package/README.md"; fixed "the README in .build is not read"
 setup; ROOT="$ROOT/missing"; expect "a root that does not exist is an error, not a pass" 2 "^error:"
+
+# --- 2. named paths
+setup; put README.md $'# Project\n\nRun `Tools/check.sh` to check.'; mkdir -p "$ROOT/Tools"; put Tools/run.sh '#!/bin/sh'
+stale "a path in backticks that does not exist" "^README.md:3: path-missing:"
+put Tools/check.sh '#!/bin/sh'; fixed "the file exists"
+setup; mkdir -p "$ROOT/Tools"; put README.md $'# Project\n\nThe tools are in `Tools/old/`, see `Tools/run.sh:12`.'; put Tools/run.sh ''
+stale "a directory in backticks that does not exist" "^README.md:3: path-missing: .Tools/old. does not exist"
+mkdir -p "$ROOT/Tools/old"; fixed "the directory exists"
+setup; mkdir -p "$ROOT/Tools"; put README.md $'# Project\n\n`Tools/<name>/x.sh` `Tools/*.sh` `Tools/{a,b}.sh` `Tools/...` `~/Tools/x` `/Tools/x` `Other/x.sh` `Tools/.build/y`\n```\nTools/gone.sh\n```'
+fixed "placeholders, globs, paths under ~ or /, other names, build products and fenced code are skipped"
+setup; mkdir -p "$ROOT/Tools"; put README.md $'# Project\n\nThe `Tools/future.sh` script will check it.'
+stale "a planned file that is not declared" "^README.md:3: path-missing:"
+put planned.json $'[\n  {"path": "Tools/future.sh", "ticket": 99}\n]'; fixed "the path is declared as planned" --planned "$ROOT/planned.json"
+put Tools/future.sh '#!/bin/sh'
+stale "a declared path that exists" "^planned.json:2: planned-path-exists:" --planned "$ROOT/planned.json"
+put planned.json '[]'; fixed "its entry is removed" --planned "$ROOT/planned.json"
+setup; mkdir -p "$ROOT/Tools"; put planned.json $'[\n  {"path": "Tools/future.sh", "ticket": 99}\n]'
+stale "a declared path that no document names" "^planned.json:2: planned-path-unused:" --planned "$ROOT/planned.json"
+put planned.json $'[{"path": "Tools/future.sh"}]'
+stale "a planned entry without its ticket" "^planned.json:1: planned-file-invalid:" --planned "$ROOT/planned.json"
+setup; expect "a planned file that cannot be read is an error, not a pass" 2 "^error:" --planned "$ROOT/planned.json"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
