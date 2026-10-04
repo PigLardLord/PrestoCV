@@ -187,7 +187,9 @@ struct MarkdownDocumentTests {
         #expect(heading.links.map(\.destination) == ["a.md"])
         #expect(heading.headings.map(\.text) == ["Heading -->"])
         // So does a line that starts a comment of its own, which is read as one.
-        #expect(MarkdownDocument(text: "text <!-- start\n<!-- other -->\n[a](a.md)").links.map(\.destination) == ["a.md"])
+        let comment = MarkdownDocument(text: "text <!-- start\n<!-- other -->\n[a](a.md)")
+        #expect(comment.links.map(\.destination) == ["a.md"])
+        #expect(comment.proseLines.first?.text == "text <!-- start")
         #expect(MarkdownDocument(text: "text <!-- start\n   <!-- other\n[h](h.md)\n-->\n[a](a.md)").links.map(\.destination) == ["a.md"])
     }
 
