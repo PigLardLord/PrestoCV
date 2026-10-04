@@ -63,6 +63,28 @@ struct DocsCheckErrorTests {
         }
     }
 
+    @Test("a document and a directory that the disk will not let the tool read are named, on a real file system", .enabled(if: getuid() != 0, "root can read anything"))
+    func realPermissions() throws {
+        try withRepository(["README.md": "x", "docs/a.md": "x", "docs/sub/b.md": "x"]) { root in
+            let file = root.appendingPathComponent("docs/a.md").path
+            let directory = root.appendingPathComponent("docs/sub").path
+            defer {
+                try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directory)
+                try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file)
+            }
+            try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: file)
+            let unreadable = thrown { () throws(DocsCheckError) in try DocumentationChecker(root: root).run() }
+            #expect(unreadable == .unreadableFile(path: "docs/a.md"))
+            #expect(unreadable?.description == "cannot read docs/a.md")
+
+            try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file)
+            try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: directory)
+            let unlistable = thrown { () throws(DocsCheckError) in try DocumentationChecker(root: root).run() }
+            #expect(unlistable == .unreadableDirectory(path: "docs/sub"))
+            #expect(unlistable?.description == "cannot read docs/sub")
+        }
+    }
+
     @Test("a planned file outside the root is named by its file name")
     func plannedFileOutsideTheRoot() {
         let error = failure(of: FakeFiles(contents: ["README.md": "x"]), planned: URL(fileURLWithPath: "/nowhere/at/all/planned.json"))
