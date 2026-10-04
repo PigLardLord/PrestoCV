@@ -21,6 +21,16 @@ public actor InMemoryDesignStore: DesignStore {
     public func design(id: String) async throws -> ValidatedDesign? { designs[id] }
     public func installedDesigns() async throws -> [DesignManifest] { designs.values.map(\.manifest).sorted { $0.id < $1.id } }
     public func installedOrigins() async throws -> [String: DesignOrigin] { origins }
+    public func adoptAsBundled(_ manifest: DesignManifest) async throws -> Bool {
+        guard designs[manifest.id]?.manifest.version == manifest.version else { return false }
+        switch origins[manifest.id] {
+        case .bundled?: return true
+        case .imported?: return false
+        case nil:
+            origins[manifest.id] = .bundled
+            return true
+        }
+    }
 }
 
 public struct DesignStoreContractFailure: Error, Equatable, CustomStringConvertible {
@@ -52,6 +62,7 @@ public enum DesignStoreContract {
         }
 
         // A conditional save compares and writes in one step, and versions are compared by number.
+        let unknown = try design(id: "unknown")
         let first = try design(id: "fresh", version: "1.0.9"), later = try design(id: "fresh", version: "1.0.10", css: ".cv-entry-title{font-weight:600}")
         let sameVersion = try design(id: "fresh", version: "1.0.10", css: ".cv-skill{font-weight:700}")
         try check(await store.saveIfNewer(first) == .installed, "a conditional save of an identifier no design has installs the design")
@@ -72,6 +83,16 @@ public enum DesignStoreContract {
         try check(await store.saveIfNewer(bundledNewer) == .keptImported, "a conditional save keeps an imported design, even an older one")
         try check(await store.design(id: "mine") == mine, "a kept imported design is not replaced")
         try check(await store.installedOrigins()["mine"] == .imported, "a kept imported design stays imported")
+
+        // Adopting records an installed design as bundled only when its version matches and no import made it.
+        try check(await store.adoptAsBundled(mine.manifest) == false, "an imported design is not adopted")
+        try check(await store.installedOrigins()["mine"] == .imported, "an imported design stays imported")
+        try check(await store.adoptAsBundled(later.manifest) == true, "a design recorded as bundled with the same version counts as adopted")
+        try check(await store.adoptAsBundled(first.manifest) == false, "a design of another version is not adopted")
+        try check(await store.adoptAsBundled(unknown.manifest) == false, "a design that is not installed is not adopted")
+        try check(await store.design(id: "unknown") == nil, "adopting a design that is not installed installs nothing")
+        try check(await store.installedOrigins() == ["bold": .imported, "clean": .imported, "fresh": .bundled, "mine": .imported],
+                  "adopting changes no origin that is recorded")
     }
 
     /// A design as the validator accepts it; `preview` adds a PNG preview, which is stored too.

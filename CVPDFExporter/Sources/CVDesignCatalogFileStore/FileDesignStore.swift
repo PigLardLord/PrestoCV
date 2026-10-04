@@ -104,8 +104,7 @@ public actor FileDesignStore: DesignStore {
             let index = try encode(IndexV2(schemaVersion: Self.indexVersion, designs: listed), for: id)
             guard index.count <= Self.maxIndexBytes else { throw .wouldNotReadBack(id: id) }
             origins[id] = origin
-            let recorded = listed.map(\.manifest.id).compactMap { id in origins[id].map { OriginEntry(id: id, origin: $0) } }
-            let record = try encode(OriginsV1(schemaVersion: Self.originsVersion, designs: recorded), for: id)
+            let record = try encodeOrigins(origins, listing: listed, for: id)
             try write(package, to: file(entry), for: id)
             try write(record, to: originsFile, for: id)
             try write(index, to: indexFile, for: id)
@@ -134,6 +133,27 @@ public actor FileDesignStore: DesignStore {
 
     public func installedDesigns() async throws(FileDesignStoreError) -> [DesignManifest] {
         try withLock(exclusive: false) { () throws(FileDesignStoreError) in try readIndex().map(\.manifest) } ?? []
+    }
+
+    /// Records the installed design with this manifest's identifier and version as bundled, when it has no recorded origin.
+    /// Only the record is written.
+    public func adoptAsBundled(_ manifest: DesignManifest) async throws(FileDesignStoreError) -> Bool {
+        let id = manifest.id
+        let adopted = try withLock(exclusive: true) { () throws(FileDesignStoreError) -> Bool in
+            let entries = try readIndex()
+            var origins = try readOrigins()
+            guard let installed = entries.first(where: { $0.manifest.id == id }), installed.manifest.version == manifest.version else { return false }
+            switch origins[id] {
+            case .bundled?: return true
+            case .imported?: return false
+            case nil:
+                origins[id] = .bundled
+                try write(try encodeOrigins(origins, listing: entries, for: id), to: originsFile, for: id)
+                return true
+            }
+        }
+        guard let adopted else { throw .storeUnavailable }   // an exclusive lock creates the store, so it is never absent
+        return adopted
     }
 
     /// The origins the store has recorded, by identifier, for the designs it lists. A design with no entry has no origin.
@@ -284,6 +304,12 @@ public actor FileDesignStore: DesignStore {
         do throws(DesignPackageRejected) { readBack = try validator.validate(data) } catch { throw .wouldNotReadBack(id: id) }
         guard readBack == design else { throw .wouldNotReadBack(id: id) }
         return data
+    }
+
+    /// The record of the origins of the listed designs, ordered by identifier. A design with no origin has no entry.
+    private func encodeOrigins(_ origins: [String: DesignOrigin], listing entries: [Entry], for id: String) throws(FileDesignStoreError) -> Data {
+        let recorded = entries.map(\.manifest.id).compactMap { id in origins[id].map { OriginEntry(id: id, origin: $0) } }
+        return try encode(OriginsV1(schemaVersion: Self.originsVersion, designs: recorded), for: id)
     }
 
     private func write(_ data: Data, to url: URL, for id: String) throws(FileDesignStoreError) {

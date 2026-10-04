@@ -159,6 +159,7 @@ struct FileDesignStoreTests {
             await #expect(throws: error) { _ = try await store.design(id: "clean") }
             await #expect(throws: error) { try await store.save(DesignStoreContract.design(id: "bold")) }
             await #expect(throws: error) { _ = try await store.saveIfNewer(DesignStoreContract.design(id: "bold")) }
+            await #expect(throws: error) { _ = try await store.adoptAsBundled(DesignStoreContract.design(id: "clean").manifest) }
             #expect(try Data(contentsOf: dir.index) == Data(contents.utf8))
             #expect(!FileManager.default.fileExists(atPath: dir.file("bold").path))
         }
