@@ -78,6 +78,16 @@ struct ApplicationTests {
         #expect(application.provenance == before.provenance && application.revision == 2)
     }
 
+    @Test("the advert's company and role are wide enough for the letter's recipient, which the workflow may fill them from: 10,000 bytes")
+    func advertBoundsHoldTailoringsBounds() throws {
+        #expect(Advert.maxLineBytes == 10_000)
+        let line = String(repeating: "a", count: 10_000)
+        let advert = try Advert(company: line, role: line, text: "t")
+        #expect(advert.company == line && advert.role == line)
+        let recipient = try LetterRecipient(company: line, role: line)
+        #expect(try Advert(company: recipient.company ?? "", role: recipient.role ?? "", text: "t") == advert)
+    }
+
     @Test("the advert may leave the company and the role empty, and the text says something, within its bound")
     func advert() throws {
         let nameless = try Advert(company: " ", role: "", text: " Text \n")

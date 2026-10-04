@@ -3,7 +3,7 @@ import Foundation
 /// The job advert that a tailoring was made for: the company, the role and the text. The company and the role are what a
 /// list shows, and an advert may not name either, so they may be empty. The text is what the tailoring read, and is not.
 public struct Advert: Hashable, Sendable {
-    public static let maxLineBytes = 256, maxTextBytes = 65_536
+    public static let maxLineBytes = 10_000, maxTextBytes = 65_536
     public let company: String, role: String, text: String
 
     public init(company: String, role: String, text: String) throws(ApplicationError) {
