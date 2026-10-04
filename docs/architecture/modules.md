@@ -238,10 +238,11 @@ A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-
 
 ## Tools
 
-Tools are Swift packages under `Tools/` that read the repository and write nothing. They are not part of the app, and not targets of the tables above. `rules.json` maps each of their targets as a `tool`, their tests as `test` and their manifests as `manifest`, so a tool gets the import allow-lists only.
+`Tools/` holds what runs on the repository. None of it is part of the app, and none of it is a target of the tables above. The Swift tools are mapped in `rules.json` (their sources as `tool` targets, a test target as `test`, their manifests as `manifest`), so they get the import allow-lists only.
 
-- **`Tools/ArchitectureCheck`** enforces [the rules](rules.md) and keeps this file and `rules.json` in agreement. It imports Foundation and SwiftSyntax.
-- **`Tools/DocsCheck`** checks that the documentation matches the repository: relative links and their anchors, repository paths written in backticks, ADR statuses and the ADR index, and that `AGENTS.md` and the pull request template state the rule that documentation changes with the code. It imports Foundation only and has no third-party dependency. See [its README](../../Tools/DocsCheck/README.md).
+- **`Tools/ArchitectureCheck`** is a Swift package that enforces [the rules](rules.md) and keeps this file and `rules.json` in agreement. It imports Foundation, SwiftSyntax and SwiftParser. It reads the repository and writes only its baseline, and only when asked (`--write-baseline`). It has no test target: its `selftest.sh` is its test.
+- **`Tools/DocsCheck`** is a Swift package that checks that the documentation matches the repository: relative links and their anchors, repository paths written in backticks, ADR statuses and the ADR index, and that `AGENTS.md` and the pull request template state the rule that documentation changes with the code. It imports Foundation only, has no third-party dependency, and reads the repository without writing anything. It is the only tool with a test target, `DocsCheckKitTests`, next to its `selftest.sh`. See [its README](../../Tools/DocsCheck/README.md).
+- **`Tools/CI`** holds shell scripts that the macOS job calls, such as `Tools/CI/test-simulator.sh`, which prepares the dedicated test simulator. It is not a Swift package.
 
 ---
 
