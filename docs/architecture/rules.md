@@ -141,7 +141,7 @@ Untrusted input is: design packages, AI output, persisted files, imported docume
   - An image's pixel dimensions are read from its header and bounded before the image is decoded.
   - An archive is read in memory. It writes nothing to disk, follows no path inside it and inflates only the files it reads. It counts the bytes it actually inflates, and does not trust the sizes its headers declare.
   - The CSV of an archive is bounded in rows and in the length of a field.
-  - The text that extraction yields enters as an `ExtractedDocument`, validated when it is made: bounded, and with no control character other than the line break. A line break ends a block and is never refused.
+  - The text that extraction yields enters as an `ExtractedDocument`, validated when it is made: bounded, with no control character and no line break in the text of a block. The adapter ends a block at each line break.
   - A model's draft from it is AI output. The check holds it to that text, and the user reviews it before it is saved. A draft is bounded by what a CV holds, and a value over a bound is a typed error that names the field, never a silent truncation.
 - **Persisted files**: see R12.
 
@@ -187,7 +187,7 @@ Domain, application, integration, presentation and workflow-port targets contain
 
 A platform-only target wraps **every file** entirely in its platform condition. Without that, `swift build` of the whole package fails on Linux ([ADR 0003](adr/0003-one-pdf-renderer-per-platform.md#validation)). If shared code needs a platform check, a port is missing.
 
-**Enforced by:** checker (detector `platformCondition`, which visits every `#if` branch, including those inactive on the host), and the Linux CI job.
+**Enforced by:** checker (detector `platformCondition`, which visits every `#if` branch, including those inactive on the host), and the Linux CI job. The detector keeps platform conditions out of the targets that may not have them. It does not see whether every file of an adapter is wrapped, and the Linux job cannot, for an adapter that its manifest declares only on Apple hosts: review holds that wrapping.
 
 ## R12. Persisted data has an explicit, versioned schema
 

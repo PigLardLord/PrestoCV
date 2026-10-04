@@ -22,7 +22,7 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 | **AI Drafting** | supporting | Producing a CV draft from a description, from a PDF or a scan, or from LinkedIn's data archive: extracting the text on the device, structuring it with the on-device model or, when the device cannot, on the server, and mapping the archive's CSV files | `CVGeneratorAI` |
 | **CV Tailoring** | core domain | Tailoring one CV to a job advert and writing its cover letter, and holding both to their sources: advert analysis, content checks, the provenance gate, the tailoring loop | `CVTailoring` |
 | **App** | integration and presentation | Cross-context workflows, the mappers between contexts, view models, views, the composition root | `PrestoCVApp` package + Xcode app target |
-| **Server** | integration and composition | The HTTP API, the jobs, and the adapters that run tailorings and drafts with a model | `PrestoCVServer` package |
+| **Server** | integration and composition | The HTTP API, the jobs, and the adapters that run tailorings, and drafts once #196 exists, with a model | `PrestoCVServer` package |
 
 CV Tailoring is the context [ADR 0005](adr/0005-remove-ai-tailoring-and-json-resume.md) reserved ([ADR 0013](adr/0013-cv-tailoring-context.md)). It runs in the app and on the server; the tailoring loop runs only on the server. JSON Resume is not supported (ADR 0005).
 
@@ -50,9 +50,9 @@ The server is an integration and composition package beside the app, in two role
 - The four domain packages **never import each other**. Each publishes its own model: `CV` in Authoring, `CVDocument` in Rendering, `CVDraft` in Drafting, `SourceCV` and `TailoredCV` in Tailoring.
 - Inside `CVPDFExporter`, Document Rendering is downstream of Design Catalog: it consumes validated stylesheets and palettes. That is the only edge between contexts inside a package, and it goes one way ([R1](rules.md#r1-packages-are-isolated-contexts-depend-only-along-documented-edges)).
 - In the app, all translation between contexts happens in one place: its integration layer (`PrestoCVIntegration`). Each mapper is exhaustive and tested ([ADR 0007](adr/0007-each-package-owns-its-model.md)).
-- On the server, `ServerHTTP` maps the API's generated types to the tailoring and drafting models and back. That is not a translation between contexts, and the generated types never leave it ([ADR 0014](adr/0014-server-modular-monolith.md)). The one translation between two contexts on the server is in `ServerApplication`: a draft and its text, into the import check of `CVTailoring` ([ADR 0020](adr/0020-import.md)).
+- On the server, `ServerHTTP` maps the API's generated types to the tailoring model and, from #196, the drafting model, and back. That is not a translation between contexts, and the generated types never leave it ([ADR 0014](adr/0014-server-modular-monolith.md)). The one translation between two contexts on the server is in `ServerApplication`: a draft and its text, into the import check of `CVTailoring` ([ADR 0020](adr/0020-import.md)).
 - The API between the app and the server is one spec, `openapi.yaml`, in the `PrestoCVAPI` package. The types, the server's protocol and the app's client are generated from it and committed, and CI keeps them current and compatible. The package is not a context. Its generated types are imported only by `ServerHTTP` and, in the app, by the outbound adapter `PrestoCVAPIAdapter`, which is the app's only client of the API, and never leave them ([ADR 0016](adr/0016-api-contract.md)).
-- The server sits beside the app. Today it conforms to CV Tailoring's published model and, for drafts, to AI Drafting's.
+- The server sits beside the app. Today it conforms to CV Tailoring's published model. For drafts, which are planned (#196), it will conform to AI Drafting's too, as the arrow shows.
 - `CVPDFExporter` is reusable outside the app, including on a Linux backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)).
 
 ## Target graph
@@ -85,7 +85,7 @@ PrestoCVAPI package         PrestoCVAPITypes ◀── PrestoCVAPIServer, Presto
 PrestoCVServer package
   PrestoCVServer (executable, composition root) ──▶ every target below, and Tailoring, CVDrafting
   ServerHTTP ──▶ ServerApplication, TailoringModel, CVDrafting, PrestoCVAPITypes, PrestoCVAPIServer
-  ServerApplication ──▶ TailoringModel, Tailoring, CVDrafting, AdvertAnalysis, Provenance
+  ServerApplication ──▶ TailoringModel, Tailoring, CVDrafting, AdvertAnalysis, ContentChecks, Provenance
   ServerInference ──▶ ServerApplication, Tailoring, TailoringModel, CVDrafting
   ServerStorePostgres ──▶ ServerApplication, TailoringModel, CVDrafting
   ServerQueueCloudTasks, ServerLocalProfile ──▶ ServerApplication
