@@ -48,5 +48,6 @@
 ## Commit & Pull Request Guidelines
 - Commits use short, imperative summaries (`Restore delete confirmation...`); keep body text for context or follow-up instructions.
 - Reference issue numbers or Linear tickets in the body when available and list any follow-up tasks.
-- Pull requests include: purpose summary, screenshots for UI-visible changes, validation notes (tests run, simulator device), and mention of localization impacts.
+- Pull requests include: purpose summary, screenshots for UI-visible changes, validation notes (tests run, simulator device), mention of localization impacts, and the documents the change updates.
+- **Documentation changes with the code in the same pull request.** A change that alters a behaviour, a command, a path, a rule or a decision updates every document that describes it, in that pull request. The pull request template (`.github/pull_request_template.md`) asks which documents the change updates, and `Tools/DocsCheck` fails CI when a link, a named path, an ADR status or this rule no longer matches the repository.
 - Run the full test suite before submission and flag any remaining flakiness or simulator prerequisites in the PR description.

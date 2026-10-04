@@ -16,7 +16,12 @@ setup() {
   put docs/guide.md $'# Guide\n\n## Usage\n\nBack to the [readme](../README.md#project).'
   put docs/architecture/adr/README.md $'# ADRs\n\n| # | Decision | Status |\n|---|---|---|\n| [0001](0001-first.md) | First | Accepted |'
   put docs/architecture/adr/0001-first.md $'# 0001. First\n\n- **Status:** Accepted'
+  put AGENTS.md "$AGENTS_RULE"
+  put .github/pull_request_template.md "$TEMPLATE"
 }
+AGENTS_RULE=$'# Guidelines\n\n- **Documentation changes with the code in the same pull request.** The template asks which documents change.'
+TEMPLATE=$'## Purpose\n\n## Documents updated\n\nWhich documents does this change update?'
+
 ADR=docs/architecture/adr
 # adr_index <row>...: the ADR index with the given rows.
 adr_index() { local text=$'# ADRs\n\n| # | Decision | Status |\n|---|---|---|'; for row in "$@"; do text+=$'\n'"$row"; done; put $ADR/README.md "$text"; }
@@ -34,7 +39,7 @@ stale() { local name="$1" pat="$2"; shift 2; expect "stale: $name" 1 "$pat" "$@"
 fixed() { local name="$1"; shift; expect "fixed: $name" 0 "" "$@"; }
 
 # --- the repository the cases start from is accepted
-setup; expect "a consistent repository passes" 0 "checked 4 documents: 0 findings"
+setup; expect "a consistent repository passes" 0 "checked 5 documents: 0 findings"
 
 # --- 1. links
 setup; put README.md $'# Project\n\nSee the [guide](docs/missing.md).'
@@ -100,6 +105,21 @@ adr_index '| [0001](0001-first.md) | First | Accepted |' '| [0002](0002-second.m
 stale "an index row for an ADR that has no file" "^$ADR/README.md:7: adr-index-unknown:"
 setup; rm -r "$ROOT/$ADR"
 stale "no ADR directory is an error, not a pass" "^$ADR:1: adr-directory-missing:"
+
+# --- 4. the rule is stated
+setup; put AGENTS.md $'# Guidelines\n\n- Documentation is welcome.'
+stale "AGENTS.md does not state the rule" "^AGENTS.md:1: rule-not-stated:"
+put AGENTS.md "$AGENTS_RULE"; fixed "AGENTS.md states the rule"
+setup; put AGENTS.md $'# Guidelines\n\nDocumentation changes with the code, in a later pull request.'
+stale "AGENTS.md states a different rule" "^AGENTS.md:1: rule-not-stated:"
+setup; rm "$ROOT/AGENTS.md"
+stale "no AGENTS.md" "^AGENTS.md:1: rule-not-stated:"
+setup; rm "$ROOT/.github/pull_request_template.md"
+stale "no pull request template" "^.github/pull_request_template.md:1: template-missing:"
+put .github/pull_request_template.md "$TEMPLATE"; fixed "the template exists"
+setup; put .github/pull_request_template.md $'## Purpose\n\n## Validation'
+stale "a template that does not ask which documents the change updates" "^.github/pull_request_template.md:1: template-does-not-ask:"
+put .github/pull_request_template.md $'## Purpose\n\n### Documents updated\n\nWhich?'; fixed "the template asks"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

@@ -98,7 +98,7 @@ struct LinkCheckTests {
     func scope() throws {
         let broken = "[x](gone.md)"
         let result = try findings(in: [
-            "AGENTS.md": broken, "README.md": broken, "docs/deep/er/a.md": broken, "Package/README.md": broken,
+            "AGENTS.md": broken + "\n\nDocumentation changes with the code in the same pull request.", "README.md": broken, "docs/deep/er/a.md": broken, "Package/README.md": broken,
             "Notes.md": broken, "Other/ROADMAP.md": broken, "docs/readme.txt": broken,
             "Tools/X/.build/checkouts/dep/README.md": broken, ".git/README.md": broken, "docs/.build/a.md": broken,
         ])

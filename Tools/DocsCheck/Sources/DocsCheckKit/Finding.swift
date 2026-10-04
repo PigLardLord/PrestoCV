@@ -15,6 +15,9 @@ public enum FindingCode: String, CaseIterable, Sendable {
     case adrNotIndexed = "adr-not-indexed"
     case adrIndexUnknown = "adr-index-unknown"
     case adrIndexStatusDiffers = "adr-index-status-differs"
+    case ruleNotStated = "rule-not-stated"
+    case templateMissing = "template-missing"
+    case templateDoesNotAsk = "template-does-not-ask"
 }
 
 /// One place where a document and the repository disagree.

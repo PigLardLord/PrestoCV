@@ -23,6 +23,7 @@ public struct DocumentationChecker: Sendable {
         var findings = try links.findings(in: documents)
         findings += NamedPathCheck(tree: tree, planned: try plannedPaths(), plannedFileName: plannedFileName).findings(in: documents)
         findings += ADRCheck(tree: tree).findings(in: documents)
+        findings += try RuleStatedCheck(tree: tree).findings()
         return Report(findings: findings.sorted(), documentCount: documents.count)
     }
 
