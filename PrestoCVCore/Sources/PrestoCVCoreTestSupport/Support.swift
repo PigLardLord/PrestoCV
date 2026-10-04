@@ -156,3 +156,16 @@ public enum FieldLeaves {
         }
     }
 }
+
+/// A cover letter with every part populated, so completeness tests (mappers, persistence) see every leaf.
+public enum FixtureLetter {
+    public static func full() -> CoverLetter {
+        do {
+            let recipient = try LetterRecipient(company: "Acme S.r.l.", contactName: "Maria Rossi", formOfAddress: .ms, title: "Dott.ssa", surname: "Rossi",
+                                                role: "Head of Engineering", address: ["Via Roma 1", "00100 Roma"])
+            return try CoverLetter(recipient: recipient, reference: "Ref. 2026-17", position: "iOS Engineer", subject: "Application for iOS Engineer",
+                                   opening: "I am writing about the iOS Engineer role.", paragraphs: ["I ship careful software.", "I have led a team of five."],
+                                   closing: "I would be glad to talk.", attachments: ["Curriculum vitae"])
+        } catch { preconditionFailure("the fixture letter is valid: \(error)") }
+    }
+}
