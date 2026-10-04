@@ -41,3 +41,35 @@ public enum ApplicationRepositoryError: Error, Equatable, Sendable {
     /// Refused before writing: the file would exceed the size cap, or would not read back (the previous version is kept).
     case wouldNotReadBack(file: String)
 }
+
+// MARK: - The person's letter defaults (ADR 0019)
+
+/// Where the person's letter defaults are kept: one value, with a revision that a save is conditional on. Defaults never saved
+/// are `StoredLetterDefaults.unsaved`, but a store that cannot be read is an error, never empty defaults (R7). Not cancellable.
+public protocol LetterDefaultsStore: Sendable {
+    func load() async throws(LetterDefaultsError) -> StoredLetterDefaults
+    /// Stores the defaults only if the stored revision equals `expectedRevision`; returns them at revision + 1. The first save
+    /// expects revision 0, that is, no file.
+    func save(_ defaults: LetterDefaults, expectedRevision: Int) async throws(LetterDefaultsError) -> StoredLetterDefaults
+    /// Removes every copy of the defaults: the stored file whatever its schema, and quarantined copies (GDPR erasure).
+    func erase() async throws(LetterDefaultsError)
+}
+
+/// Recovery of the letter defaults from the quarantine, reachable from the UI.
+public protocol LetterDefaultsMaintenance: Sendable {
+    func restore(quarantined name: String) async throws(LetterDefaultsError) -> StoredLetterDefaults
+    /// Deletes quarantined files older than `date`. Returns how many were removed.
+    func purgeQuarantine(olderThan date: Date) async throws(LetterDefaultsError) -> Int
+}
+
+/// No paths or free-form strings: file names only, and coded failures (R7).
+public enum LetterDefaultsError: Error, Equatable, Sendable {
+    case conflict(storedRevision: Int), alreadyExists
+    /// The file is corrupt, and a quarantined copy of it stands, which `restore` accepts by this name. The store reports it on
+    /// every load until the copy is restored or new defaults are saved. `reason` is a code for the person who reads the copy.
+    case corrupt(file: String, reason: String)
+    case unreadable(file: String), upgradeRequired(file: String, version: Int), tooLarge(file: String)
+    case invalidName(String), storeUnavailable(StoreFailure), writeFailed(file: String)
+    /// Refused before writing: the file would exceed the size cap, or would not read back (the previous version is kept).
+    case wouldNotReadBack(file: String)
+}

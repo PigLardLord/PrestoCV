@@ -19,6 +19,16 @@ extension AuthoringError {
         case .alreadyExists, .corrupt, .unreadable, .upgradeRequired, .tooLarge, .invalidName, .storeUnavailable, .writeFailed: self = .unavailable
         }
     }
+
+    init(_ error: LetterDefaultsError) {
+        switch error {
+        case .conflict(let stored): self = .conflict(storedRevision: stored)
+        case .corrupt: self = .corrupt
+        case .upgradeRequired(_, let version): self = .upgradeRequired(version: version)
+        case .wouldNotReadBack: self = .tooLarge
+        case .alreadyExists, .unreadable, .tooLarge, .invalidName, .storeUnavailable, .writeFailed: self = .unavailable
+        }
+    }
 }
 
 // MARK: - Use cases (ADR 0019)
@@ -99,5 +109,25 @@ public struct DeleteApplication: Sendable {
     public init(repository: any ApplicationRepository) { self.repository = repository }
     public func callAsFunction(_ application: Application) async throws(AuthoringError) {
         do { try await repository.delete(application.id, revision: application.revision) } catch { throw AuthoringError(error) }
+    }
+}
+
+/// The person's letter defaults, or none yet. A store that cannot be read is an error, never empty defaults: a corrupt file
+/// reports `corrupt` until the user restores the quarantined copy or saves new defaults.
+public struct LoadLetterDefaults: Sendable {
+    let store: any LetterDefaultsStore
+    public init(store: any LetterDefaultsStore) { self.store = store }
+    public func callAsFunction() async throws(AuthoringError) -> StoredLetterDefaults {
+        do { return try await store.load() } catch { throw AuthoringError(error) }
+    }
+}
+
+/// Saves the person's letter defaults over the ones that the caller loaded: a conditional save, so it never overwrites another
+/// window's changes. An empty text for a field clears it.
+public struct SaveLetterDefaults: Sendable {
+    let store: any LetterDefaultsStore
+    public init(store: any LetterDefaultsStore) { self.store = store }
+    public func callAsFunction(_ defaults: LetterDefaults, over current: StoredLetterDefaults) async throws(AuthoringError) -> StoredLetterDefaults {
+        do { return try await store.save(defaults, expectedRevision: current.revision) } catch { throw AuthoringError(error) }
     }
 }

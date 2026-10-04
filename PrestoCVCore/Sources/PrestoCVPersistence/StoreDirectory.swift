@@ -10,7 +10,7 @@ import PrestoCVApplication
 /// A failure of the store itself, with no identity of a stored value. Each store's own error type maps it (R7).
 enum StoreFault: Equatable {
     case unavailable(StoreFailure), unreadable(file: String), writeFailed(file: String), invalidName(String)
-    case corrupt(file: String), tooLarge(file: String), upgradeRequired(file: String, version: Int), wouldNotReadBack(file: String)
+    case corrupt(file: String, reason: String), tooLarge(file: String), upgradeRequired(file: String, version: Int), wouldNotReadBack(file: String)
 }
 
 protocol StoreFaultConvertible: Error { init(_ fault: StoreFault) }
@@ -22,7 +22,7 @@ extension RepositoryError: StoreFaultConvertible {
         case .unreadable(let file): self = .unreadable(file: file)
         case .writeFailed(let file): self = .writeFailed(file: file)
         case .invalidName(let name): self = .invalidName(name)
-        case .corrupt(let file): self = .corrupt(file: file)
+        case .corrupt(let file, _): self = .corrupt(file: file)
         case .tooLarge(let file): self = .tooLarge(file: file)
         case .upgradeRequired(let file, let version): self = .upgradeRequired(file: file, version: version)
         case .wouldNotReadBack(let file): self = .wouldNotReadBack(file: file)
@@ -37,7 +37,22 @@ extension ApplicationRepositoryError: StoreFaultConvertible {
         case .unreadable(let file): self = .unreadable(file: file)
         case .writeFailed(let file): self = .writeFailed(file: file)
         case .invalidName(let name): self = .invalidName(name)
-        case .corrupt(let file): self = .corrupt(file: file)
+        case .corrupt(let file, _): self = .corrupt(file: file)
+        case .tooLarge(let file): self = .tooLarge(file: file)
+        case .upgradeRequired(let file, let version): self = .upgradeRequired(file: file, version: version)
+        case .wouldNotReadBack(let file): self = .wouldNotReadBack(file: file)
+        }
+    }
+}
+
+extension LetterDefaultsError: StoreFaultConvertible {
+    init(_ fault: StoreFault) {
+        switch fault {
+        case .unavailable(let failure): self = .storeUnavailable(failure)
+        case .unreadable(let file): self = .unreadable(file: file)
+        case .writeFailed(let file): self = .writeFailed(file: file)
+        case .invalidName(let name): self = .invalidName(name)
+        case .corrupt(let file, let reason): self = .corrupt(file: file, reason: reason)
         case .tooLarge(let file): self = .tooLarge(file: file)
         case .upgradeRequired(let file, let version): self = .upgradeRequired(file: file, version: version)
         case .wouldNotReadBack(let file): self = .wouldNotReadBack(file: file)
@@ -147,7 +162,7 @@ struct StoreDirectory<Failure: StoreFaultConvertible>: Sendable {
             return nil
         case .value(let value): return value
         case .newer(let version): throw Failure(.upgradeRequired(file: name, version: version))
-        case .corrupt: throw Failure(.corrupt(file: name))
+        case .corrupt(let reason): throw Failure(.corrupt(file: name, reason: reason))
         case .unreadable: throw Failure(.unreadable(file: name))
         case .tooLarge: throw Failure(.tooLarge(file: name))
         }
@@ -234,7 +249,7 @@ struct StoreDirectory<Failure: StoreFaultConvertible>: Sendable {
             case .tooLarge: throw Failure(.tooLarge(file: name))
             case .unreadable: throw Failure(.unreadable(file: name))
             case .newer(let version): throw Failure(.upgradeRequired(file: name, version: version))
-            case .corrupt: throw Failure(.corrupt(file: name))
+            case .corrupt(let reason): throw Failure(.corrupt(file: name, reason: reason))
             }
             do { try FileManager.default.moveItem(at: source, to: target) } catch { throw Failure(.writeFailed(file: original)) }
             return value

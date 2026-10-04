@@ -69,6 +69,10 @@ func expect(_ error: ApplicationRepositoryError, _ body: () async throws -> Void
     try await expectFailure(error, body, what)
 }
 
+func expect(_ error: LetterDefaultsError, _ body: () async throws -> Void, _ what: String) async throws {
+    try await expectFailure(error, body, what)
+}
+
 public enum CVRepositoryContract {
     public typealias Failure = ContractFailure
 
