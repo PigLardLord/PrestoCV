@@ -31,10 +31,28 @@ public struct DocumentationChecker: Sendable {
         }
         var links = LinkCheck(tree: tree)
         var findings = try links.findings(in: documents)
+        findings += unreadHeadings(in: documents)
         findings += try NamedPathCheck(tree: tree, planned: try plannedPaths(), plannedFileName: plannedFileName).findings(in: documents)
         findings += try ADRCheck(tree: tree).findings(in: documents)
         findings += try RuleStatedCheck(tree: tree).findings()
         return Report(findings: findings.sorted(), documentCount: documents.count)
+    }
+
+    private func unreadHeadings(in documents: [Document]) -> [Finding] {
+        var findings: [Finding] = []
+        for document in documents {
+            for problem in document.markdown.problems {
+                switch problem.reason {
+                case .tooLong:
+                    let message = "the heading is longer than \(MarkdownDocument.maximumHeadingLength) characters, so it is not read and has no anchor"
+                    findings.append(Finding(file: document.path, line: problem.line, code: .headingTooLong, message: message))
+                case .tooNested:
+                    let message = "the heading nests link labels more than \(InlineText.maximumNesting) deep, so it is not read and has no anchor"
+                    findings.append(Finding(file: document.path, line: problem.line, code: .headingTooNested, message: message))
+                }
+            }
+        }
+        return findings
     }
 
     private func plannedPaths() throws(DocsCheckError) -> PlannedPaths {

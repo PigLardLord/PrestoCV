@@ -29,11 +29,25 @@ struct MarkdownDocument: Sendable {
     private(set) var codeSpans: [CodeSpan] = []
     private(set) var headings: [Heading] = []
 
-    /// The anchor of every heading, in document order, as GitHub numbers them.
-    var anchors: [String] {
-        var slugger = HeadingSlugger()
-        return headings.map { slugger.slug(forHeading: $0.text) }
+    /// Headings longer than this many characters are reported, not read.
+    static let maximumHeadingLength = 1_000
+
+    /// A heading that is not read, because reading it could take unbounded time or stack.
+    struct Problem: Hashable, Sendable {
+        enum Reason: Hashable, Sendable {
+            case tooLong
+            case tooNested
+        }
+
+        let line: Int
+        let reason: Reason
     }
+
+    private(set) var problems: [Problem] = []
+
+    /// The anchor of every heading that is read, in document order, as GitHub numbers them. A heading that is not
+    /// read (see `problems`) has none and does not count in the numbering.
+    private(set) var anchors: [String] = []
 
     init(text: String) {
         var fence: Fence?
@@ -55,6 +69,18 @@ struct MarkdownDocument: Sendable {
                 links.append(Link(line: number, destination: destination))
             }
             links += inline.destinations.map { Link(line: number, destination: $0) }
+        }
+        var slugger = HeadingSlugger()
+        for heading in headings {
+            guard heading.text.unicodeScalars.count <= Self.maximumHeadingLength else {
+                problems.append(Problem(line: heading.line, reason: .tooLong))
+                continue
+            }
+            guard let slug = slugger.slug(forHeading: heading.text) else {
+                problems.append(Problem(line: heading.line, reason: .tooNested))
+                continue
+            }
+            anchors.append(slug)
         }
     }
 
@@ -130,7 +156,7 @@ struct MarkdownDocument: Sendable {
         guard index + 1 < scalars.count, scalars[index + 1] == ":" else { return nil }
         index += 2
         while index < scalars.count, scalars[index] == " " || scalars[index] == "\t" { index += 1 }
-        return InlineScan.destination(in: scalars, from: index, terminatedByParenthesis: false)
+        return InlineScan.destination(in: scalars, from: index, terminatedByParenthesis: false)?.text
     }
 }
 
@@ -148,9 +174,11 @@ private struct InlineScan {
                 index += 2
             } else if visible[index] == "]", index + 1 < visible.count, visible[index + 1] == "(" {
                 if let destination = Self.destination(in: visible, from: index + 2, terminatedByParenthesis: true) {
-                    destinations.append(destination)
+                    destinations.append(destination.text)
+                    index = destination.end
+                } else {
+                    index += 2
                 }
-                index += 2
             } else {
                 index += 1
             }
@@ -200,8 +228,9 @@ private struct InlineScan {
     // MARK: Destinations
 
     /// The link destination starting at `start`: `<...>` or a run without whitespace. Inside a link, a `)` that does not
-    /// match an earlier `(` ends it. Returns nil for an empty destination.
-    static func destination(in scalars: [Unicode.Scalar], from start: Int, terminatedByParenthesis: Bool) -> String? {
+    /// match an earlier `(` ends it. Returns nil for an empty destination. `end` is where the destination stops, so a
+    /// scan can continue after it instead of reading it again.
+    static func destination(in scalars: [Unicode.Scalar], from start: Int, terminatedByParenthesis: Bool) -> (text: String, end: Int)? {
         var index = start
         while index < scalars.count, scalars[index] == " " || scalars[index] == "\t" { index += 1 }
         var result: [Unicode.Scalar] = []
@@ -227,7 +256,7 @@ private struct InlineScan {
                 index += 1
             }
         }
-        return result.isEmpty ? nil : string(result)
+        return result.isEmpty ? nil : (string(result), index)
     }
 
     private static func run(of scalar: Unicode.Scalar, in scalars: [Unicode.Scalar], at start: Int) -> Int {

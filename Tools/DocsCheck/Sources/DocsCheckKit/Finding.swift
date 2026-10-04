@@ -2,6 +2,8 @@
 public enum FindingCode: String, CaseIterable, Sendable {
     case linkTargetMissing = "link-target-missing"
     case linkAnchorMissing = "link-anchor-missing"
+    case headingTooLong = "heading-too-long"
+    case headingTooNested = "heading-too-nested"
     case pathMissing = "path-missing"
     case plannedPathExists = "planned-path-exists"
     case plannedPathUnused = "planned-path-unused"
@@ -29,6 +31,12 @@ public struct Finding: Hashable, Comparable, Sendable, CustomStringConvertible {
     public let message: String
 
     public var description: String { "\(file):\(line): \(code.rawValue): \(message)" }
+
+    /// Text of a document, as a code span in a message. A long one is cut, so a finding stays a line.
+    static func quoted(_ text: String) -> String {
+        let limit = 160
+        return text.dropFirst(limit).isEmpty ? "`\(text)`" : "`\(text.prefix(limit))…`"
+    }
 
     public static func < (lhs: Finding, rhs: Finding) -> Bool {
         if lhs.file != rhs.file { return lhs.file < rhs.file }

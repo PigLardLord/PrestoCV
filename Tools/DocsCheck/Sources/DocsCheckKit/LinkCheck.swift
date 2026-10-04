@@ -32,17 +32,17 @@ struct LinkCheck {
             path = document.path
         case let relative?:
             guard let resolved = RepositoryPath.resolve(relative, from: document.path) else {
-                return report(.linkTargetMissing, "`\(link.destination)` leaves the repository")
+                return report(.linkTargetMissing, "\(Finding.quoted(link.destination)) leaves the repository")
             }
             guard let kind = try tree.kind(of: resolved), kind == .directory || !relative.hasSuffix("/") else {
-                return report(.linkTargetMissing, "`\(link.destination)` does not exist")
+                return report(.linkTargetMissing, "\(Finding.quoted(link.destination)) does not exist")
             }
             guard kind == .file, resolved.hasSuffix(".md") else { return nil }
             path = resolved
         }
         guard let anchor = target.anchor, !anchor.isEmpty else { return nil }
         guard try anchors(of: path).contains(Anchor(anchor)) else {
-            return report(.linkAnchorMissing, "`\(path)` has no heading with the anchor `#\(anchor)`")
+            return report(.linkAnchorMissing, "\(Finding.quoted(path)) has no heading with the anchor \(Finding.quoted("#" + anchor))")
         }
         return nil
     }

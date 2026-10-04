@@ -51,7 +51,7 @@ struct ADRCheck {
     /// The status the text says, if it is one, and what is wrong with it.
     private func validated(_ text: String, file: String, line: Int, adrPaths: Set<String>) -> (ADRStatus?, [Finding]) {
         guard let status = ADRStatus(text: text) else {
-            let message = "`\(text.trimmingCharacters(in: .whitespaces))` is not a status: use Proposed, Accepted, Rejected or Superseded by [NNNN](NNNN-title.md)"
+            let message = "\(Finding.quoted(text.trimmingCharacters(in: .whitespaces))) is not a status: use Proposed, Accepted, Rejected or Superseded by [NNNN](NNNN-title.md)"
             return (nil, [Finding(file: file, line: line, code: .adrStatusUnknown, message: message)])
         }
         guard case .supersededBy(let link) = status else { return (status, []) }
@@ -61,7 +61,7 @@ struct ADRCheck {
         }
         let exists = RepositoryPath.resolve(link, from: Self.indexPath).map(adrPaths.contains) ?? false
         guard exists else {
-            return (status, [Finding(file: file, line: line, code: .adrSuccessorMissing, message: "`\(link)` is not an ADR of \(Self.directory)")])
+            return (status, [Finding(file: file, line: line, code: .adrSuccessorMissing, message: "\(Finding.quoted(link)) is not an ADR of \(Self.directory)")])
         }
         return (status, [])
     }

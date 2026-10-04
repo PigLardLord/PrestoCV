@@ -27,7 +27,9 @@ ADR=docs/architecture/adr
 adr_index() { local text=$'# ADRs\n\n| # | Decision | Status |\n|---|---|---|'; for row in "$@"; do text+=$'\n'"$row"; done; put $ADR/README.md "$text"; }
 # put <path> <contents>: writes a file of the repository, replacing it.
 put() { mkdir -p "$ROOT/$(dirname "$1")"; printf '%s\n' "$2" > "$ROOT/$1"; }
-run() { "$CHECK" "$ROOT" "$@" > "$OUT" 2>&1; echo $?; }
+# A run that does not end within a minute fails (exit 124) where the host has timeout(1).
+BOUND=(); if command -v timeout > /dev/null; then BOUND=(timeout 60); fi
+run() { "${BOUND[@]}" "$CHECK" "$ROOT" "$@" > "$OUT" 2>&1; echo $?; }
 expect() {
   local name="$1" want="$2" pat="$3"; shift 3
   local got; got=$(run "$@")
@@ -58,6 +60,15 @@ setup; put README.md $'# Project\n\n[gone](https://example.invalid/gone.md) [mai
 fixed "links to other sites are not followed"
 setup; put README.md $'# Project\n\nA link in a code span, `[gone](gone.md)`, or in a block, is not a link:\n\n```\n[gone](gone.md)\n```'
 fixed "a link in a code span or in a fenced block is not a link"
+setup; put README.md "$(printf '# Project\n\n## %s' "$(head -c 200000 /dev/zero | tr '\0' 'a')")"
+stale "a 200,000-character heading" "^README.md:3: heading-too-long:"
+put README.md $'# Project\n\n## Short'; fixed "a short heading"
+setup; put README.md "$(printf '# Project\n\n## %s' "$(head -c 100000 /dev/zero | tr '\0' '[')")"
+stale "100,000 brackets in a heading" "^README.md:3: heading-too-long:"
+setup; put README.md "$(printf '# Project\n\n## %s' "$(head -c 300 /dev/zero | tr '\0' '[')x$(head -c 300 /dev/zero | tr '\0' ']')")"
+stale "link labels nested 300 deep" "^README.md:3: heading-too-nested:"
+setup; put README.md "$(head -c 200000 /dev/zero | tr '\0' ']' | sed 's/\]/](/g')"
+stale "100,000 link openers on one line are read in linear time, and the finding is one short line" "^README.md:1: link-target-missing: .{1,300}$"
 setup; put Package/README.md $'[gone](gone.md)'; put Package/.build/checkouts/dep/README.md $'[gone](gone.md)'
 stale "a README in a package" "^Package/README.md:1: link-target-missing:"
 rm "$ROOT/Package/README.md"; fixed "the README in .build is not read"

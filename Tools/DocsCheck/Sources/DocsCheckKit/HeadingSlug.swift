@@ -6,9 +6,10 @@ struct HeadingSlugger {
     /// anchors, though Swift's `String` treats them as equal.
     private var occurrences: [Anchor: Int] = [:]
 
-    /// The slug of a heading's inline Markdown, unique among the headings this slugger has seen.
-    mutating func slug(forHeading markdown: String) -> String {
-        let original = Self.baseSlug(ofHeading: markdown)
+    /// The slug of a heading's inline Markdown, unique among the headings this slugger has seen. Nil if the heading
+    /// nests link labels too deeply to be read.
+    mutating func slug(forHeading markdown: String) -> String? {
+        guard let original = Self.baseSlug(ofHeading: markdown) else { return nil }
         var slug = original
         while occurrences[Anchor(slug)] != nil {
             occurrences[Anchor(original), default: 0] += 1
@@ -19,9 +20,11 @@ struct HeadingSlugger {
     }
 
     /// The slug of a heading on its own, before any numbering for repeats.
-    static func baseSlug(ofHeading markdown: String) -> String {
+    /// Nil if the heading nests link labels deeper than `InlineText.maximumNesting`.
+    static func baseSlug(ofHeading markdown: String) -> String? {
+        guard let text = InlineText.plain(markdown) else { return nil }
         var slug = ""
-        for scalar in InlineText.plain(markdown).lowercased().unicodeScalars where keeps(scalar) {
+        for scalar in text.lowercased().unicodeScalars where keeps(scalar) {
             slug.unicodeScalars.append(scalar == " " ? "-" : scalar)
         }
         return slug

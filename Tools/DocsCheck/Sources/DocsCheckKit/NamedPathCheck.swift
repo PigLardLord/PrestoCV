@@ -21,17 +21,17 @@ struct NamedPathCheck {
                     if let kind, kind == .directory || !path.mustBeDirectory { continue }
                     if planned.declares(path.path) { continue }
                     let problem = kind == nil ? "does not exist" : "is a file, not a directory"
-                    findings.append(Finding(file: document.path, line: span.line, code: .pathMissing, message: "`\(path.path)` \(problem)"))
+                    findings.append(Finding(file: document.path, line: span.line, code: .pathMissing, message: "\(Finding.quoted(path.path)) \(problem)"))
                 }
             }
         }
         for entry in planned.entries {
             if try tree.kind(of: entry.path) != nil {
                 findings.append(Finding(file: plannedFileName, line: entry.line, code: .plannedPathExists,
-                                        message: "`\(entry.path)` exists now, so it is no longer planned (ticket #\(entry.ticket)): remove its entry"))
+                                        message: "\(Finding.quoted(entry.path)) exists now, so it is no longer planned (ticket #\(entry.ticket)): remove its entry"))
             } else if !named.contains(entry.path) {
                 findings.append(Finding(file: plannedFileName, line: entry.line, code: .plannedPathUnused,
-                                        message: "no document names `\(entry.path)` (ticket #\(entry.ticket)): remove its entry"))
+                                        message: "no document names \(Finding.quoted(entry.path)) (ticket #\(entry.ticket)): remove its entry"))
             }
         }
         return findings

@@ -38,7 +38,7 @@ struct PlannedPaths {
         for entry in raw {
             let line = (lines.firstIndex { $0.contains("\"\(entry.path)\"") } ?? 0) + 1
             if let reason = Self.reasonInvalid(entry) {
-                problems.append(Problem(line: line, message: "the entry for `\(entry.path)` \(reason)"))
+                problems.append(Problem(line: line, message: "the entry for \(Finding.quoted(entry.path)) \(reason)"))
             } else {
                 entries.append(Entry(path: Self.normalised(entry.path), ticket: entry.ticket, line: line))
             }

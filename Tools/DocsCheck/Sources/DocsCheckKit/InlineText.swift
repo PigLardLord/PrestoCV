@@ -2,9 +2,15 @@
 /// text, images and HTML tags disappear, and emphasis markers are dropped. It covers the inline syntax headings use,
 /// not the whole of CommonMark.
 enum InlineText {
-    static func plain(_ markdown: String) -> String {
+    /// How deep link labels may nest in a heading. A deeper heading is reported, not read, so that no input can
+    /// recurse without bound.
+    static let maximumNesting = 32
+
+    /// The text of the inline Markdown, or nil if its link labels nest deeper than `maximumNesting`.
+    static func plain(_ markdown: String) -> String? {
         var renderer = Renderer(characters: Array(markdown))
-        return Emphasis.text(of: renderer.render(0..<renderer.characters.count))
+        let pieces = renderer.render(0..<renderer.characters.count)
+        return renderer.exceededNesting ? nil : Emphasis.text(of: pieces)
     }
 
     /// Rendered text, with each run of underscores kept apart: whether it is emphasis depends on its other end.
@@ -60,6 +66,12 @@ enum InlineText {
 
     private struct Renderer {
         let characters: [Character]
+        private var depth = 0
+        private(set) var exceededNesting = false
+
+        init(characters: [Character]) {
+            self.characters = characters
+        }
 
         mutating func render(_ range: Range<Int>) -> [Piece] {
             var pieces: [Piece] = []
@@ -89,7 +101,7 @@ enum InlineText {
                     }
                 case "[":
                     if let link = link(at: index, in: range) {
-                        for piece in render(link.label) {
+                        for piece in renderLabel(link.label) {
                             if case .text(let string) = piece { append(string) } else { pieces.append(piece) }
                         }
                         index = link.end
@@ -115,6 +127,17 @@ enum InlineText {
                 }
             }
             return pieces
+        }
+
+        /// The label of a link, one level deeper. Past `maximumNesting` it is not rendered.
+        private mutating func renderLabel(_ range: Range<Int>) -> [Piece] {
+            depth += 1
+            defer { depth -= 1 }
+            guard depth <= InlineText.maximumNesting else {
+                exceededNesting = true
+                return []
+            }
+            return render(range)
         }
 
         // MARK: Code spans
