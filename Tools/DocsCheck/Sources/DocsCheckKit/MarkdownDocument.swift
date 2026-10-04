@@ -103,14 +103,26 @@ struct MarkdownDocument: Sendable {
         }
     }
 
-    /// Whether a comment opened in the middle of line `offset` is closed by a later line before the next blank line,
+    /// Whether a comment opened in the middle of line `offset` is closed by a later line before the paragraph ends,
     /// as it must be to belong to its paragraph.
     private static func closes(after offset: Int, in lines: [String]) -> Bool {
         for line in lines[(offset + 1)...] {
-            if line.allSatisfy({ $0 == " " || $0 == "\t" }) { return false }
+            if endsParagraph(line) { return false }
             if line.contains("-->") { return true }
         }
         return false
+    }
+
+    /// A line that ends the paragraph before it: a blank line, a fence, an ATX heading, or a line that starts a
+    /// comment of its own.
+    private static func endsParagraph(_ line: String) -> Bool {
+        line.allSatisfy { $0 == " " || $0 == "\t" } || Fence(opening: line) != nil || heading(in: line, number: 0) != nil || startsComment(line)
+    }
+
+    /// Whether a line starts, after at most three spaces, with `<!--`.
+    private static func startsComment(_ line: String) -> Bool {
+        let indentation = line.prefix { $0 == " " }.count
+        return indentation <= 3 && line.dropFirst(indentation).hasPrefix("<!--")
     }
 
     // MARK: Fences

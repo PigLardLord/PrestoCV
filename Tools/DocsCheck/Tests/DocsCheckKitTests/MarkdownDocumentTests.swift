@@ -175,6 +175,29 @@ struct MarkdownDocumentTests {
         #expect(MarkdownDocument(text: "text <!-- start\n\n[a](a.md)\nlater -->\n[b](b.md)").links.map(\.destination) == ["a.md", "b.md"])
     }
 
+    @Test("a block that ends the paragraph ends the search for the comment's closer: a fence, a heading or a comment of its own")
+    func midLineOpenerAndParagraphEnds() {
+        // The `-->` inside the fence does not close the comment; the fence is a fence and the line after it is read.
+        let fence = "text <!-- start\n```html\n<p>-->\n```\n[gone](gone.md)"
+        #expect(MarkdownDocument(text: fence).links.map(\.destination) == ["gone.md"])
+        #expect(MarkdownDocument(text: fence).proseLines.first?.text == "text <!-- start")
+        #expect(MarkdownDocument(text: "text <!-- start\n~~~\nend -->\n~~~\n[gone](gone.md)").links.map(\.destination) == ["gone.md"])
+        // A heading ends the paragraph too, and its `-->` closes nothing.
+        let heading = MarkdownDocument(text: "text <!-- start\n## Heading -->\n[a](a.md)")
+        #expect(heading.links.map(\.destination) == ["a.md"])
+        #expect(heading.headings.map(\.text) == ["Heading -->"])
+        // So does a line that starts a comment of its own, which is read as one.
+        #expect(MarkdownDocument(text: "text <!-- start\n<!-- other -->\n[a](a.md)").links.map(\.destination) == ["a.md"])
+        #expect(MarkdownDocument(text: "text <!-- start\n   <!-- other\n[h](h.md)\n-->\n[a](a.md)").links.map(\.destination) == ["a.md"])
+    }
+
+    @Test("a mid-line comment that closes before any of those still spans its lines")
+    func midLineCommentBeforeAFence() {
+        let text = "text <!-- start\n[h](h.md)\nend -->\n```\n```\n[a](a.md)"
+        #expect(MarkdownDocument(text: text).links.map(\.destination) == ["a.md"])
+        #expect(MarkdownDocument(text: "text <!-- start\n#hashtag [h](h.md)\n####### seven\nend -->\n[a](a.md)").links.map(\.destination) == ["a.md"])
+    }
+
     @Test("a comment that starts its line, after at most three spaces, runs to its end whatever lies between")
     func lineStartComment() {
         #expect(MarkdownDocument(text: "   <!--\n[h](h.md)\n\n[i](i.md)\n-->\n[c](c.md)").links.map(\.destination) == ["c.md"])

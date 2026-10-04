@@ -87,6 +87,8 @@ setup; put README.md $'# Project\n\nA comment hides what is stale: <!-- [gone](g
 fixed "a link and a path in an HTML comment are not read"
 setup; put README.md $'# Project\n\nIn HTML, a comment opens with <!-- and closes later.\n\n[gone](gone.md)'
 stale "a mid-line <!-- that closes nowhere hides nothing" "^README.md:5: link-target-missing:"
+setup; put README.md $'# Project\n\ntext <!-- start\n```html\n<p>-->\n```\n[gone](gone.md)'
+stale "a mid-line <!-- before a fence is not closed by the --> inside it" "^README.md:7: link-target-missing:"
 setup; put README.md $'# Project\n\nA comment hides what is stale: <!-- start\n[gone](gone.md)\nend --> and nothing else.'
 fixed "a mid-line comment that closes in its paragraph hides what it spans"
 setup; put README.md $'# Project\n\n## Alpha <!-- note --> Beta\n\n[ok](#alpha--beta)'
