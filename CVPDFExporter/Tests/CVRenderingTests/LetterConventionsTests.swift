@@ -229,7 +229,7 @@ struct LetterConventionsReaderTests {
         #expect(with != without)
     }
 
-    @Test("a first day over the bound, or with a hidden character, is incomplete", arguments: [String(repeating: "x", count: 201), "1\u{200B}er", "1\ner", "\u{202E}1er"])
+    @Test("a first day over the bound, or with a control character or an override, is incomplete", arguments: [String(repeating: "x", count: 201), "1\u{0007}er", "1\ner", "\u{202E}1er"])
     func badFirstDay(text: String) throws {
         #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "date.firstDay")) { _ = try parse(try setting("date", "firstDay", to: text)) }
     }
@@ -309,7 +309,7 @@ struct LetterConventionsReaderTests {
         #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "labels.reference")) { _ = try parse(try setting("labels", "reference", to: wide)) }
     }
 
-    @Test("control, bidirectional and invisible characters are refused in a value", arguments: ["a\u{0007}b", "a\nb", "\u{202E}x", "x\u{200B}", "x\u{2066}y", "x\u{FEFF}y", "x\u{2028}y"])
+    @Test("control characters, line breaks and bidirectional overrides are refused in a value, by the rule that documents follow", arguments: ["a\u{0007}b", "a\nb", "a\tb", "\u{202E}x", "x\u{2066}y", "x\u{0085}y"])
     func hiddenCharacters(text: String) throws {
         #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "valedictions.neutral")) { _ = try parse(try setting("valedictions", "neutral", to: text)) }
         #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "date.months")) {

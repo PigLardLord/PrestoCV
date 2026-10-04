@@ -161,10 +161,10 @@ struct LetterConventions: Sendable, Equatable {
             attachmentsLabel: try plain(try string(labels, "attachments", path: "labels.attachments"), "labels.attachments"))
     }
 
-    /// Filled, within the bound in bytes, and with no control, bidirectional or invisible character.
+    /// Filled, within the bound in bytes, and with no control character or bidirectional override, by the rule of the documents.
     private static func isFit(_ s: String) -> Bool {
         !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && s.utf8.count <= maxValueBytes
-            && !s.unicodeScalars.contains(where: LetterDocumentValidator.hidesOrReorders)
+            && !s.unicodeScalars.contains(where: { DocumentText.refuses($0, allowingLineBreak: false) })
     }
 }
 

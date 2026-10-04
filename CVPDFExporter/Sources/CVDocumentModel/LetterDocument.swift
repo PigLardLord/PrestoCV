@@ -99,7 +99,7 @@ public enum LetterDocumentValidator {
     /// 1,890,000 bytes, and the keys and punctuation take under 10,000 more.
     public static let maxJSONBytes = 2_000_000
 
-    static let textReason = "a field is too long, or it has control or hidden characters"
+    static let textReason = "a field is too long, or it has control characters or bidirectional overrides"
 
     /// The entry point for a letter that arrives as JSON: the size is checked before decoding, and the decoded letter is validated.
     public static func decode(json: Data) throws(Invalid) -> LetterDocument {
@@ -111,17 +111,6 @@ public enum LetterDocumentValidator {
         } catch { throw Invalid(reason: "not a letter document") }
         try validate(letter)
         return letter
-    }
-
-    /// A character that is not shown, or that changes what is shown: controls (a line break among them), the line and
-    /// paragraph separators, and every format character, which takes in the bidirectional overrides and isolates that
-    /// reorder what is printed, the zero-width characters and the tag characters. None belongs to a letter in the six languages,
-    /// nor to the page's own words, which are held to the same rule.
-    public static func hidesOrReorders(_ s: Unicode.Scalar) -> Bool {
-        switch s.properties.generalCategory {
-        case .control, .format, .lineSeparator, .paragraphSeparator: true
-        default: false
-        }
     }
 
     /// The primary language subtag of a BCP 47-shaped tag is one of the supported languages.
@@ -153,11 +142,11 @@ public enum LetterDocumentValidator {
         guard d.recipient.address.count <= maxAddressLines else { throw Invalid(reason: "too many address lines") }
         guard d.attachments.count <= maxAttachments else { throw Invalid(reason: "too many attachments") }
 
-        /// A field of one line refuses every control character, a line break among them. A paragraph and the closing may hold
-        /// line breaks, which the page keeps as the CV's builder keeps them in its text.
+        /// A field of one line refuses every control character, a line break among them, by the rule that CV text follows. A
+        /// paragraph and the closing may hold line breaks.
         func text(_ s: String?, multiline: Bool = false) throws(Invalid) {
             guard let s else { return }
-            guard s.utf8.count <= maxTextBytes, !s.unicodeScalars.contains(where: { hidesOrReorders($0) && !(multiline && $0 == "\n") }) else {
+            guard s.utf8.count <= maxTextBytes, !s.unicodeScalars.contains(where: { DocumentText.refuses($0, allowingLineBreak: multiline) }) else {
                 throw Invalid(reason: textReason)
             }
         }

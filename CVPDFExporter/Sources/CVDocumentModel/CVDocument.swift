@@ -173,16 +173,13 @@ public enum CVDocumentValidator {
         return document
     }
 
-    /// Explicit bidirectional embeddings, overrides and isolates reorder what is printed, so they are refused.
-    static func reordersText(_ s: Unicode.Scalar) -> Bool { (0x202A...0x202E).contains(s.value) || (0x2066...0x2069).contains(s.value) }
-
     public static func validate(_ d: CVDocument) throws(Invalid) {
         var total = 0
         func text(_ s: String?, _ what: String) throws(Invalid) {
             guard let s else { return }
             total += s.utf8.count
             guard s.utf8.count <= maxTextBytes, total <= maxDocumentTextBytes,
-                  !s.unicodeScalars.contains(where: { ($0.properties.generalCategory == .control && $0 != "\n") || reordersText($0) }) else {
+                  !s.unicodeScalars.contains(where: { DocumentText.refuses($0, allowingLineBreak: true) }) else {
                 throw Invalid(reason: "\(what) is too long, the document is too large, or it has control characters")
             }
         }

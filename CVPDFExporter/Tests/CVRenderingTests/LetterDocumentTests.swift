@@ -70,13 +70,18 @@ func invalid(_ document: LetterDocument) -> String? {
     do { try LetterDocumentValidator.validate(document); return nil } catch { return error.reason }
 }
 
-/// Control characters, bidirectional controls that reorder what is printed, line and paragraph separators, and invisible
-/// characters that hide text or tell nothing: refused in every field.
+/// Refused in every field, as in a CV's text: control characters, and the bidirectional embeddings, overrides and isolates that
+/// reorder what is printed.
 let hostileLetterText: [String] = [
     "\u{0007}", "a\u{0000}b", "tab\there", "carriage\rreturn", "a\r\nb", "a\u{000B}b", "a\u{000C}b", "\u{001B}[31m", "\u{007F}", "x\u{0085}y",
     "\u{202E}evil", "a\u{2066}b", "x\u{202A}y", "x\u{202B}y", "x\u{202C}y", "x\u{202D}y", "x\u{2067}y", "x\u{2068}y", "x\u{2069}y",
-    "x\u{200E}y", "x\u{200F}y", "x\u{061C}y",
-    "x\u{200B}y", "x\u{200C}y", "x\u{200D}y", "x\u{2060}y", "\u{FEFF}x", "x\u{00AD}y", "x\u{E0041}y", "x\u{2028}y", "x\u{2029}y",
+]
+
+/// Accepted in every field, as in a CV's text, because Authoring keeps them: the joiners of emoji sequences and of scripts, the
+/// soft hyphen, the zero-width and direction marks, tag sequences (the flag of England), and the line and paragraph separators.
+let keptLetterText: [String] = [
+    "x\u{200B}y", "x\u{200C}y", "x\u{200D}y", "👩\u{200D}💻 and 👨\u{200D}👩\u{200D}👧", "x\u{2060}y", "x\u{FEFF}y", "co\u{00AD}operate",
+    "x\u{E0041}y", "🏴\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}", "x\u{2028}y", "x\u{2029}y", "x\u{200E}y", "x\u{200F}y", "x\u{061C}y",
 ]
 
 /// A line break: accepted in a paragraph and in the closing, refused in a field that holds one line.
@@ -229,11 +234,46 @@ struct LetterDocumentContractTests {
         #expect(invalid(letter) == nil)
     }
 
-    @Test("control, bidirectional and invisible characters are refused in every field", arguments: LetterTextField.all, hostileLetterText)
+    @Test("control characters and bidirectional overrides are refused in every field", arguments: LetterTextField.all, hostileLetterText)
     func hostileCharacters(field: LetterTextField, text: String) {
         var letter = letterFixture
         field.set(&letter, text)
         #expect(invalid(letter) == LetterDocumentValidator.textReason, "\(field.name) accepted \(text.unicodeScalars.map(\.value))")
+    }
+
+    @Test("what Authoring keeps is accepted in every field: emoji sequences, soft hyphens, zero-width and direction marks, tag sequences, separators",
+          arguments: LetterTextField.all, keptLetterText)
+    func keptCharacters(field: LetterTextField, text: String) throws {
+        var letter = letterFixture
+        field.set(&letter, text)
+        #expect(invalid(letter) == nil, "\(field.name) refused \(text.unicodeScalars.map(\.value))")
+        #expect(try LetterDocumentValidator.decode(json: try JSONEncoder().encode(letter)) == letter)
+    }
+
+    /// Scalars from the ranges where controls, separators, joiners, marks and tags are, and from the planes around them.
+    static let sweep: [Unicode.Scalar] = {
+        var scalars: [Unicode.Scalar] = []
+        for range in [0...0x2FFF, 0xE000...0xFFFF, 0xE0000...0xE0FFF, 0x1F000...0x1F2FF] {
+            for value in range { if let scalar = Unicode.Scalar(UInt32(value)) { scalars.append(scalar) } }
+        }
+        return scalars
+    }()
+
+    @Test("one rule: the letter's paragraphs refuse exactly the characters that a CV's text refuses, and its lines the same but the line break")
+    func theRuleIsTheCVs() {
+        var disagreements: [UInt32] = []
+        for scalar in Self.sweep {
+            let text = "a\(scalar)b"
+            let cv = (try? CVDocumentValidator.validate(CVDocument(language: "en", person: Person(name: text), sections: []))) != nil
+            var letter = letterFixture
+            letter.body[0] = text
+            var line = letterFixture
+            line.recipient.name = text
+            if cv != (invalid(letter) == nil) { disagreements.append(scalar.value) }
+            if scalar != "\n" && cv != (invalid(line) == nil) { disagreements.append(scalar.value) }
+        }
+        #expect(disagreements.isEmpty, "\(disagreements.prefix(8))")
+        #expect(Self.sweep.count > 20_000)
     }
 
     @Test("ordinary text in the six languages is accepted: accents, apostrophes, quotes, the euro sign, emoji and CJK names",
