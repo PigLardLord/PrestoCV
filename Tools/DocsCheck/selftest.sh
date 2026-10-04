@@ -79,6 +79,10 @@ setup; mkdir -p "$ROOT/Tools/Pkg/docs"; put Tools/Pkg/README.md $'# Pkg\n\nSee `
 fixed "a path that exists beside its document, not at the root"
 rm "$ROOT/Tools/Pkg/docs/beside.md"
 stale "a path that exists neither at the root nor beside its document" "^Tools/Pkg/README.md:3: path-missing:"
+setup; put Shared/root.txt ''; put Tools/Pkg/Shared/y.txt ''; put Tools/Pkg/Tools/README.md $'# Tools\n\nSee `Shared/y.txt`.'
+fixed "a path that exists from a directory above its document"
+put Tools/Pkg/Tools/README.md $'# Tools\n\nSee `Shared/z.txt`.'
+stale "a path that exists from none of them" "^Tools/Pkg/Tools/README.md:3: path-missing:"
 setup; put Package/README.md $'[gone](gone.md)'; put Package/.build/checkouts/dep/README.md $'[gone](gone.md)'
 stale "a README in a package" "^Package/README.md:1: link-target-missing:"
 rm "$ROOT/Package/README.md"; fixed "the README in .build is not read"

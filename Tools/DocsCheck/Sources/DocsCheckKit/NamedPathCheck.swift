@@ -1,5 +1,5 @@
 /// Check 2. A path a document names in a code span, when its first segment is a top-level entry of the repository,
-/// must exist, from the repository root or from the directory of the document. A path that is planned is declared
+/// must exist, from the repository root or from the directory of the document or one above it. A path that is planned is declared
 /// in the planned file, and a declaration that is no longer needed is reported, so the list cannot go stale.
 struct NamedPathCheck {
     let tree: RepositoryTree
@@ -29,7 +29,7 @@ struct NamedPathCheck {
                     }
                     if found || places.contains(where: planned.declares) { continue }
                     let problem = existsAsFile ? "is a file, not a directory"
-                        : places.count > 1 ? "exists neither from the repository root nor from \(Finding.quoted(Self.directory(of: document.path)))"
+                        : places.count > 1 ? "does not exist from the repository root, nor from the directory of its document or those above it"
                         : "does not exist"
                     findings.append(Finding(file: document.path, line: span.line, code: .pathMissing, message: "\(Finding.quoted(path.path)) \(problem)"))
                 }
@@ -47,14 +47,15 @@ struct NamedPathCheck {
         return findings
     }
 
-    /// The paths a name can mean: as written, from the root, and from the directory of the document, when that differs.
+    /// The paths a name can mean: as written, from the root, and from the directory of the document and each directory
+    /// above it, so that a package's README can name `Sources/X.swift` from the package root.
     private static func places(of path: String, in document: String) -> [String] {
         var places = [path]
-        if let beside = RepositoryPath.resolve(path, from: document), beside != path { places.append(beside) }
+        var directory = document.split(separator: "/").dropLast().map(String.init)
+        while !directory.isEmpty {
+            if let beside = RepositoryPath.resolve(path, from: directory.joined(separator: "/") + "/x"), beside != path { places.append(beside) }
+            directory.removeLast()
+        }
         return places
-    }
-
-    private static func directory(of document: String) -> String {
-        document.split(separator: "/").dropLast().joined(separator: "/")
     }
 }

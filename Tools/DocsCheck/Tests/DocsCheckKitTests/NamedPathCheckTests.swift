@@ -38,7 +38,16 @@ struct NamedPathCheckTests {
         #expect(result == ["Tools/Pkg/README.md:1 path-missing"])
     }
 
-    @Test("a directory path needs a directory from one of the two places")
+    @Test("a path is also looked for from each directory above its document, so a package's README can name Sources/X.swift")
+    func directoriesAbove() throws {
+        let result = try findings(in: [
+            "Pkg/Tools/Gen/README.md": "`Sources/Here.swift` `Sources/Gone.swift` `Sources/Root.swift`",
+            "Pkg/Sources/Here.swift": "", "Sources/Root.swift": "",
+        ])
+        #expect(result == ["Pkg/Tools/Gen/README.md:1 path-missing"])
+    }
+
+    @Test("a directory path needs a directory from one of the places")
     func directoryFromEitherPlace() throws {
         // `Shared` is a file at the root and a directory beside the document, so `Shared/` is satisfied beside it only.
         #expect(try findings(in: ["Pkg/README.md": "`Shared/`", "Pkg/Shared/here.md": "", "Shared": ""]) == [])
