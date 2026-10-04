@@ -635,6 +635,36 @@
    "rules": []
   },
   {
+   "name": "DocsCheckKit",
+   "path": "Tools/DocsCheck/Sources/DocsCheckKit",
+   "kind": "tool",
+   "allowedImports": [
+    "Foundation"
+   ],
+   "rules": []
+  },
+  {
+   "name": "DocsCheck",
+   "path": "Tools/DocsCheck/Sources/DocsCheck",
+   "kind": "tool",
+   "allowedImports": [
+    "Foundation",
+    "DocsCheckKit"
+   ],
+   "rules": []
+  },
+  {
+   "name": "DocsCheckKitTests",
+   "path": "Tools/DocsCheck/Tests/DocsCheckKitTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "DocsCheckKit"
+   ],
+   "rules": []
+  },
+  {
    "name": "ADRValidationPrototype",
    "path": "Prototypes/ADRValidation",
    "kind": "excluded",
@@ -688,6 +718,17 @@
   {
    "name": "ArchitectureCheckManifest",
    "path": "Tools/ArchitectureCheck/Package.swift",
+   "kind": "manifest",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m"
+   ]
+  },
+  {
+   "name": "DocsCheckManifest",
+   "path": "Tools/DocsCheck/Package.swift",
    "kind": "manifest",
    "allowedImports": [
     "PackageDescription"
