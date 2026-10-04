@@ -6,6 +6,9 @@ public enum ApplicationField: Hashable, Sendable {
     case letterDefault(LetterDefaults.Field)
     case recipientCompany, recipientContactName, recipientTitle, recipientSurname, recipientRole, recipientAddress
     case reference, position, subject, opening, paragraph, closing, attachment
+    case jobID, promptVersion, providerAlias, modelAlias
+    case snapshot, statement, reportArgument, reportEntry, questions, questionCode, questionValue, answer
+    case lineSources, statementReference, answerReference
 }
 
 /// Why a value of an application, of its cover letter or of the letter defaults is refused (R6). A code, never a text:
@@ -15,6 +18,10 @@ public enum ApplicationError: Error, Equatable, Sendable {
     case tooLong(ApplicationField)
     case tooMany(ApplicationField)
     case forbiddenCharacters(ApplicationField)
+    /// A position that points outside what it points into: a statement of the snapshot, a question, a question's answer.
+    case invalidReference(ApplicationField)
+    /// The letter defaults as the snapshot held them do not say what the override set for this field.
+    case overrideNotApplied(LetterDefaults.Field)
 }
 
 /// The one rule for a text that a person or a tailoring wrote and that is stored and printed (R6): trimmed, bounded in

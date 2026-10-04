@@ -169,3 +169,26 @@ public enum FixtureLetter {
         } catch { preconditionFailure("the fixture letter is valid: \(error)") }
     }
 }
+
+/// Where an application came from, with every part populated, so completeness tests see every leaf.
+public enum FixtureProvenance {
+    public static let sourceCV = CVID(UUID(uuidString: "99999999-9999-9999-9999-999999999999")!)
+
+    public static func full(jobID: String = "job-0001", sourceCV: CVID = FixtureProvenance.sourceCV) -> ApplicationProvenance {
+        do {
+            typealias P = ApplicationProvenance
+            let snapshot = [try P.SourceExperience(statements: ["Led a team of five", "Shipped the app"]),
+                            try P.SourceExperience(statements: ["Wrote the build scripts"])]
+            let report = try P.Report(argument: "A careful engineer who ships", cut: ["Old jobs"], moved: ["Skills up"], reworded: ["Led a team"])
+            var questions: [P.Question] = []
+            questions.append(try P.Question(code: "evidence.missing", values: ["SwiftUI"], scope: .experience(0), answer: "Used it daily"))
+            questions.append(try P.Question(code: "letter.field", values: ["salary"], scope: .letterField(.salaryExpectation), answer: "60k"))
+            questions.append(try P.Question(code: "evidence.missing", values: ["Kotlin"], scope: .skills, answer: "Two years"))
+            questions.append(try P.Question(code: "summary.claim", values: ["leadership"], scope: .summary, answer: "Five reports"))
+            let override = try LetterDefaults(salaryExpectation: "60k", startDate: "May", note: "Part time")
+            let sources = [P.LineSources(experience: 0, line: 1, statements: [P.StatementPosition(experience: 0, line: 0), P.StatementPosition(experience: 1, line: 0)], answers: [0, 1])]
+            return try P(jobID: JobID(jobID), sourceCV: sourceCV, snapshot: snapshot, report: report, questions: questions, letterOverride: override,
+                         letterDefaults: override, promptVersion: "tailor-3", providerAlias: "provider-a", modelAlias: "model-small", lineSources: sources)
+        } catch { preconditionFailure("the fixture provenance is valid: \(error)") }
+    }
+}
