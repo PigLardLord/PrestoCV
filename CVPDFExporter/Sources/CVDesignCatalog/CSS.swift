@@ -274,6 +274,8 @@ let allowedProperties: [String: CSSValue.Check] = [
 
 struct CSSParser {
     var t: [CSSToken]
+    /// The selectors the stylesheet may name: the markup contract's for a design, the letter's own for the letter's.
+    let vocabulary: SelectorVocabulary
     var i = 0
 
     mutating func skipWS() { while i < t.count, t[i] == .whitespace { i += 1 } }
@@ -320,10 +322,10 @@ struct CSSParser {
         }
         guard i < t.count else { throw CSSRejection(reason: "unterminated rule") }
         i += 1
-        return "\(try Self.selectorList(prelude)){\(try Self.declarations(body))}"
+        return "\(try selectorList(prelude)){\(try Self.declarations(body))}"
     }
 
-    static func selectorList(_ tokens: [CSSToken]) throws(CSSRejection) -> String {
+    func selectorList(_ tokens: [CSSToken]) throws(CSSRejection) -> String {
         var parts: [[CSSToken]] = [[]]
         for token in tokens { if token == .comma { parts.append([]) } else { parts[parts.count - 1].append(token) } }
         var out: [String] = []
@@ -331,9 +333,9 @@ struct CSSParser {
         return out.joined(separator: ",")
     }
 
-    /// Compound selectors of contract elements, classes, [data-section=…], [data-rating=…] and a few
+    /// Compound selectors of the vocabulary's elements, classes, [data-section=…], [data-rating=…] and a few
     /// structural pseudo-classes, joined by descendant, >, + or ~. No ids, no pseudo-elements, no functions.
-    static func selector(_ raw: [CSSToken]) throws(CSSRejection) -> String {
+    func selector(_ raw: [CSSToken]) throws(CSSRejection) -> String {
         var tokens = raw
         while tokens.first == .whitespace { tokens.removeFirst() }
         while tokens.last == .whitespace { tokens.removeLast() }
@@ -354,13 +356,13 @@ struct CSSParser {
                 out += combinator == " " ? " " : combinator
                 needsCompound = true
             case .ident(let e):
-                guard MarkupContract.elements.contains(e.lowercased()) else { throw CSSRejection(reason: "element \(e) is not in the markup contract") }
+                guard vocabulary.elements.contains(e.lowercased()) else { throw CSSRejection(reason: "element \(e) is not in the markup contract") }
                 out += e.lowercased(); i += 1; needsCompound = false
             case .delim("*"):
                 // Not in the markup contract: it also selects the document root, which sets what rem means.
                 throw CSSRejection(reason: "the universal selector is not allowed")
             case .delim("."):
-                guard i + 1 < tokens.count, case .ident(let c) = tokens[i + 1], MarkupContract.classes.contains(c) else {
+                guard i + 1 < tokens.count, case .ident(let c) = tokens[i + 1], vocabulary.classes.contains(c) else {
                     throw CSSRejection(reason: "class is not in the markup contract")
                 }
                 out += ".\(c)"; i += 2; needsCompound = false
@@ -374,11 +376,11 @@ struct CSSParser {
                 case .number(let n): value = fmt(n)
                 default: throw CSSRejection(reason: "attribute value not allowed")
                 }
-                let ok = (a == "data-section" && MarkupContract.sectionKinds.contains(value)) || (a == "data-rating" && MarkupContract.ratings.contains(value))
+                let ok = (a == "data-section" && vocabulary.sectionKinds.contains(value)) || (a == "data-rating" && vocabulary.ratings.contains(value))
                 guard ok else { throw CSSRejection(reason: "attribute selector not in the markup contract") }
                 out += "[\(a)=\"\(value)\"]"; i += 5; needsCompound = false
             case .colon:
-                guard i + 1 < tokens.count, case .ident(let p) = tokens[i + 1], MarkupContract.pseudoClasses.contains(p.lowercased()) else {
+                guard i + 1 < tokens.count, case .ident(let p) = tokens[i + 1], vocabulary.pseudoClasses.contains(p.lowercased()) else {
                     throw CSSRejection(reason: "pseudo-class or pseudo-element not allowed")
                 }
                 out += ":\(p.lowercased())"; i += 2; needsCompound = false
@@ -414,9 +416,10 @@ struct CSSParser {
 }
 
 enum CSSPolicy {
-    /// Returns the canonical re-serialisation of an allowed stylesheet, or the first reason to reject it.
-    static func canonical(_ css: String) throws(CSSRejection) -> String {
-        var parser = CSSParser(t: try CSSTokenizer.tokenize(css))
+    /// Returns the canonical re-serialisation of an allowed stylesheet, or the first reason to reject it. A design's
+    /// stylesheet is checked against the markup contract's selectors, which is the default.
+    static func canonical(_ css: String, vocabulary: SelectorVocabulary = .cv) throws(CSSRejection) -> String {
+        var parser = CSSParser(t: try CSSTokenizer.tokenize(css), vocabulary: vocabulary)
         return try parser.stylesheet()
     }
 }

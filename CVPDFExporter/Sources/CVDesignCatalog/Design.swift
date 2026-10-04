@@ -64,7 +64,7 @@ public struct DesignPackageValidator: Sendable {
         if !DesignManifest.isValidID(manifest.id) { violations.append(.invalidID(manifest.id)) }
         if manifest.markupContract != MarkupContract.version { violations.append(.unsupportedContract(manifest.markupContract)) }
         var stylesheet: ValidatedStylesheet?
-        do throws(CSSRejection) { stylesheet = ValidatedStylesheet(css: try CSSPolicy.canonical(css)) } catch { violations.append(.css(error.reason)) }
+        do throws(CSSRejection) { stylesheet = ValidatedStylesheet(css: try CSSPolicy.canonical(css, vocabulary: .cv)) } catch { violations.append(.css(error.reason)) }
         var preview: Data?
         if let base64 = object["previewImageBase64"] {
             if let b = base64 as? String, let png = Data(base64Encoded: b), png.count <= maxPreviewBytes,
