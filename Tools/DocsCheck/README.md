@@ -14,7 +14,7 @@ swift test --package-path Tools/DocsCheck # the unit tests
 Tools/DocsCheck/selftest.sh               # a planted stale document per check; needs the build that check.sh makes
 ```
 
-No git hook runs it. Run `check.sh` before committing a change to a document, a path or an ADR; CI runs it, then its self-test and its unit tests, on every pull request (the `linux` job of `.github/workflows/ci.yml`; the macOS job does not run it, because the documents are the same on both hosts).
+No git hook runs it. Run `check.sh` before committing a change to a document, a path or an ADR; CI runs it, then its self-test and its unit tests, on every pull request, in its own Linux job ("Linux · documentation check" in `.github/workflows/ci.yml`), so that a stale link does not hide the package build and tests. The macOS job does not run it, because the documents are the same on both hosts.
 
 - **Output.** One finding per line, `file:line: code: message`, sorted by file, line and code, then `checked N documents: K findings`. The exit status is 0 without findings, 1 with findings, 2 when the check cannot run: bad arguments, or a root, a directory, a document or the planned file that cannot be read, printed as `error: cannot read <path>` with the path relative to the root. A check that cannot read never passes.
 - **Environment.** `DOCS_CHECK_ROOT` is the tree to check, `DOCS_CHECK_SCRATCH` the build directory. Both default to this repository and `Tools/DocsCheck/.build`.

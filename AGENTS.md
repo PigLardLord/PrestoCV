@@ -19,7 +19,7 @@
 - `Tools/ArchitectureCheck/check.sh` runs the architecture checker on the whole repository (see `Tools/ArchitectureCheck/README.md`).
 - `Tools/DocsCheck/check.sh` runs the documentation checker on the whole repository: links, named paths, ADR statuses and the documentation rule (see `Tools/DocsCheck/README.md`).
 - CI (`.github/workflows/ci.yml`) runs on every pull request:
-  - on Linux, the architecture check (with the baseline compared to the base branch) and its self-test, then the documentation check with its self-test and its tests;
+  - on Linux, in two parallel jobs, so that a stale link does not hide a failing build and the reverse: the architecture check (with the baseline compared to the base branch), its self-test, and the build and tests of the new targets; and the documentation check, its self-test and its tests;
   - on macOS, on a self-hosted runner on the owner's Mac, the architecture check and its self-test, the package tests and the app tests on the iOS simulator.
 - `open PrestoCV.xcodeproj` launches Xcode with the configured schemes; prefer running previews via the `PrestoCV` scheme.
 

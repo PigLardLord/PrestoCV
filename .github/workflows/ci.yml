@@ -41,6 +41,23 @@ jobs:
           fi
       - name: Checker self-test
         run: Tools/ArchitectureCheck/selftest.sh
+      - name: Build and test the new targets
+        # On Linux only the new targets exist; the legacy ones are declared for Apple hosts only (ADR 0012).
+        run: |
+          for package in CVGeneratorAI PrestoCVApp; do
+            swift build --package-path "$package"
+          done
+          swift test --package-path PrestoCVCore
+          swift test --package-path CVPDFExporter
+
+  docs:
+    # Apart from the architecture job, so that a stale link does not hide the package build and tests, nor the reverse.
+    name: Linux · documentation check
+    runs-on: ubuntu-latest
+    container: swift:6.3
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
       - name: Cache the documentation checker build
         uses: actions/cache@v4
         with:
@@ -53,14 +70,6 @@ jobs:
         run: Tools/DocsCheck/selftest.sh
       - name: Documentation checker tests
         run: swift test --package-path Tools/DocsCheck
-      - name: Build and test the new targets
-        # On Linux only the new targets exist; the legacy ones are declared for Apple hosts only (ADR 0012).
-        run: |
-          for package in CVGeneratorAI PrestoCVApp; do
-            swift build --package-path "$package"
-          done
-          swift test --package-path PrestoCVCore
-          swift test --package-path CVPDFExporter
 
   macos:
     name: macOS · checks, packages and app
