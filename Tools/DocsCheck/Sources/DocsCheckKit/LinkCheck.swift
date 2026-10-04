@@ -4,7 +4,7 @@ import Foundation
 /// file is one of its headings. Links to other sites are not followed.
 struct LinkCheck {
     let tree: RepositoryTree
-    private var anchorsByFile: [String: Set<String>] = [:]
+    private var anchorsByFile: [String: Set<Anchor>] = [:]
 
     init(tree: RepositoryTree) {
         self.tree = tree
@@ -13,7 +13,7 @@ struct LinkCheck {
     mutating func findings(in documents: [Document]) throws(DocsCheckError) -> [Finding] {
         var findings: [Finding] = []
         for document in documents {
-            anchorsByFile[document.path] = Set(document.markdown.anchors)
+            anchorsByFile[document.path] = Set(document.markdown.anchors.map(Anchor.init))
             for link in document.markdown.links {
                 if let finding = try finding(for: link, in: document) { findings.append(finding) }
             }
@@ -41,15 +41,15 @@ struct LinkCheck {
             path = resolved
         }
         guard let anchor = target.anchor, !anchor.isEmpty else { return nil }
-        guard try anchors(of: path).contains(anchor) else {
+        guard try anchors(of: path).contains(Anchor(anchor)) else {
             return report(.linkAnchorMissing, "`\(path)` has no heading with the anchor `#\(anchor)`")
         }
         return nil
     }
 
-    private mutating func anchors(of path: String) throws(DocsCheckError) -> Set<String> {
+    private mutating func anchors(of path: String) throws(DocsCheckError) -> Set<Anchor> {
         if let known = anchorsByFile[path] { return known }
-        let anchors = Set(MarkdownDocument(text: try tree.text(of: path)).anchors)
+        let anchors = Set(MarkdownDocument(text: try tree.text(of: path)).anchors.map(Anchor.init))
         anchorsByFile[path] = anchors
         return anchors
     }

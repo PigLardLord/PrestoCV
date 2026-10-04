@@ -2,17 +2,19 @@
 /// decimal digits, underscores and hyphens, with each space becoming a hyphen. A heading that repeats an earlier slug gets
 /// `-1`, `-2` and so on, in document order, as GitHub does.
 struct HeadingSlugger {
-    private var occurrences: [String: Int] = [:]
+    /// Keyed by scalars, because GitHub's ids are strings of code points: `é` in one scalar and in two are different
+    /// anchors, though Swift's `String` treats them as equal.
+    private var occurrences: [Anchor: Int] = [:]
 
     /// The slug of a heading's inline Markdown, unique among the headings this slugger has seen.
     mutating func slug(forHeading markdown: String) -> String {
         let original = Self.baseSlug(ofHeading: markdown)
         var slug = original
-        while occurrences[slug] != nil {
-            occurrences[original, default: 0] += 1
-            slug = original + "-" + String(occurrences[original, default: 0])
+        while occurrences[Anchor(slug)] != nil {
+            occurrences[Anchor(original), default: 0] += 1
+            slug = original + "-" + String(occurrences[Anchor(original), default: 0])
         }
-        occurrences[slug] = 0
+        occurrences[Anchor(slug)] = 0
         return slug
     }
 
@@ -36,5 +38,14 @@ struct HeadingSlugger {
         default:
             return false
         }
+    }
+}
+
+/// An anchor compared scalar by scalar, as GitHub compares ids.
+struct Anchor: Hashable {
+    private let scalars: [Unicode.Scalar]
+
+    init(_ name: String) {
+        scalars = Array(name.unicodeScalars)
     }
 }
