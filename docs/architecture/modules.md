@@ -124,8 +124,16 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - it checks the name, counts, dates and ratings;
   - it bounds text in UTF-8 bytes, per field and for the whole document, and refuses control characters and bidirectional overrides;
   - JSON arrives through `decode(json:)`, which checks the size before decoding.
-- Pending: a committed JSON Schema.
-- **`LetterDocument`** (planned, #187, [ADR 0019](adr/0019-applications.md)), a second published document type, beside `CVDocument`: the sender, the recipient and their form of address, the place and date, the reference and subject, the body, the closing, the name, the attachments and the `language`. The salutation and the valediction are the page's, not the document's (below). Plain values, no PrestoCV type. It carries a `schemaVersion`, and a letter that arrives as JSON passes a validator of its own, beside `CVDocumentValidator` (R8).
+- **`LetterDocument`**, a second published document type, beside `CVDocument` ([ADR 0019](adr/0019-applications.md)): a cover letter, as plain values with no PrestoCV type.
+  - It carries a `schemaVersion` (other versions are rejected) and a `language`, one of `en`, `it`, `de`, `es`, `fr`, `pt` by its primary subtag.
+  - It carries the sender (`Person`, the personal details), the recipient (`LetterRecipient`: a `FormOfAddress` of `masculine`, `feminine` or `neutral`, the name as printed, the family name the salutation uses, the company and the address lines), the place, the date (`LetterDate`: year, month and day, never a display string), the reference, the subject, the body paragraphs, the closing, the name that signs and the attachments.
+  - The salutation, the valediction and the words of the date are not fields: the page writes them from the language's conventions (below), so the body is salutation-free. A field holds one line of text, and no field carries a line break.
+- **`LetterDocumentValidator`**, beside `CVDocumentValidator`, is the anti-corruption layer for a letter that arrives as JSON (R8):
+  - it checks the language, the name, the sender's name, that there is a paragraph, that a family name is there unless the form of address is neutral, and that the date exists on the calendar;
+  - it bounds each field in UTF-8 bytes, the whole letter, and the number of paragraphs, address lines and attachments;
+  - it refuses control characters, line and paragraph separators and every format character, which takes in the bidirectional controls and the zero-width characters;
+  - JSON arrives through `decode(json:)`, which checks the size before decoding and says when the schema version is unsupported.
+- Pending: a committed JSON Schema for each of the two documents.
 
 **`CVDesignCatalog`**
 - **`MarkupContract`**, version 1: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](markup-contract.md).
