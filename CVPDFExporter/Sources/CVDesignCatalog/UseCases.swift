@@ -69,20 +69,28 @@ public struct SyncReport: Equatable, Sendable {
     public internal(set) var notRendered: [String] = []
     /// Not saved: the design is valid and rendered, but the store failed to save it.
     public internal(set) var failed: [String] = []
-    /// Not saved: the store holds a design with this identifier that the sync did not install, so it is left alone.
+    /// Not saved: the store holds a design with this identifier that the sync did not install, so it is left alone,
+    /// whatever the versions. That is an import, or a design with no recorded origin that is not the bundled one (the
+    /// same identifier and version). It is not rendered, unless it appeared while this design rendered: then the store
+    /// kept it (`ConditionalSave.keptImported`).
     public internal(set) var conflicts: [String] = []
 }
 
 /// Brings the designs that ship with the app into the store, at every launch. Each bundled package is validated, then
 /// rendered through the gate, then saved, as `InstallDesign` does (R8).
 /// - A package whose identifier no installed design has is installed. One newer than the installed design replaces it
-///   (upgraded). One of the same or an older version is left alone and not rendered, so a design installed by other
-///   means is never downgraded and the steady state does no rendering and no writing.
+///   (upgraded). One of the same or an older version is left alone and not rendered, so a bundled design is never
+///   downgraded and the steady state does no rendering and no writing.
+/// - The sync replaces only designs it installed itself. The store records each design's origin, and an installed design
+///   that an import saved holds its identifier: it is left alone and not rendered, whatever the versions, and the
+///   identifier is a `conflict`. A design with no recorded origin, one installed before origins were recorded, counts as
+///   bundled only if its version is the bundled design's version exactly (then it is `unchanged`); otherwise it counts
+///   as an import.
 /// - Rendering takes long, and another caller may save the design meanwhile. So the save is `DesignStore.saveIfNewer`,
 ///   which compares again under the store's lock, and the report states what the store did: a design the store kept
 ///   because it became the same or a newer version is `unchanged`, and is never overwritten by the older one. A design
 ///   that an import saved meanwhile is kept as well, and is a `conflict`: the sync replaces only what it installed.
-/// - The installed designs are listed once, and only their manifests are compared. An installed design is never read, so
+/// - The installed designs and their recorded origins are listed once, and only their manifests are compared. An installed design is never read, so
 ///   one whose file is damaged does not stop the sync while the bundled design is unchanged.
 /// - A package fails on its own: the validator refuses it (`rejected`), the gate refuses it or fails (`notRendered`), or
 ///   the store fails to save it (`failed`). The other packages still sync.
@@ -99,7 +107,7 @@ public struct SyncBundledDesigns: Sendable {
     public func callAsFunction() async throws -> SyncReport {
         let packages: [(name: String, data: Data)]
         do { packages = try await source.bundledPackages() } catch { throw DesignCatalogError.bundledDesignsUnavailable }
-        var versions = try await installedVersions()
+        var (versions, origins) = try await listInstalled()
         var report = SyncReport()
         for (name, data) in packages {
             let design: ValidatedDesign
@@ -108,9 +116,20 @@ public struct SyncBundledDesigns: Sendable {
                 continue
             }
             let id = design.manifest.id, version = design.manifest.version
-            if let installed = versions[id], version <= installed {
-                report.unchanged.append(id)
-                continue
+            if let installed = versions[id] {
+                switch origins[id] {
+                case .bundled?:
+                    if version <= installed {
+                        report.unchanged.append(id)
+                        continue
+                    }
+                case nil where version == installed:
+                    report.unchanged.append(id)
+                    continue
+                case .imported?, nil:
+                    report.conflicts.append(id)
+                    continue
+                }
             }
             do { try await gate.verify(design) } catch let cancellation as CancellationError { throw cancellation } catch {
                 report.notRendered.append(id)
@@ -127,15 +146,17 @@ public struct SyncBundledDesigns: Sendable {
             case .keptInstalled: report.unchanged.append(id)
             case .keptImported: report.conflicts.append(id)
             }
+            origins[id] = outcome == .keptImported ? .imported : .bundled
             versions[id] = max(version, versions[id] ?? version)
         }
         return report
     }
 
-    private func installedVersions() async throws(DesignCatalogError) -> [String: DesignVersion] {
-        let manifests: [DesignManifest]
-        do { manifests = try await store.installedDesigns() } catch { throw .storeUnavailable }
-        return Dictionary(manifests.map { ($0.id, $0.version) }, uniquingKeysWith: max)
+    /// The installed versions and the recorded origins, by identifier.
+    private func listInstalled() async throws(DesignCatalogError) -> (versions: [String: DesignVersion], origins: [String: DesignOrigin]) {
+        let manifests: [DesignManifest], origins: [String: DesignOrigin]
+        do { manifests = try await store.installedDesigns(); origins = try await store.installedOrigins() } catch { throw .storeUnavailable }
+        return (Dictionary(manifests.map { ($0.id, $0.version) }, uniquingKeysWith: max), origins)
     }
 }
 

@@ -142,6 +142,28 @@ struct FileDesignStoreOriginTests {
         }
     }
 
+    @Test("the sync through the file store never replaces an imported design, and still upgrades the bundled ones it installed")
+    func syncThroughTheFileStore() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir), gate = FakeRenderingGate()
+            let mine = try DesignStoreContract.design(id: "clean", version: "0.0.1", css: ".cv-skill{font-weight:700}")
+            try await store.save(mine)
+            func sync(_ packages: [(name: String, data: Data)]) async throws -> SyncReport {
+                try await SyncBundledDesigns(source: FixedBundledSource(packages: packages), gate: gate, store: store)()
+            }
+            let first = try await sync([("clean", DesignStoreContract.package(id: "clean")), ("bold", DesignStoreContract.package(id: "bold"))])
+            #expect(first.conflicts == ["clean"] && first.installed == ["bold"])
+            #expect(try await store.design(id: "clean") == mine)
+            #expect(try await store.installedOrigins() == ["clean": .imported, "bold": .bundled])
+            let second = try await sync([("clean", DesignStoreContract.package(id: "clean")), ("bold", DesignStoreContract.package(id: "bold"))])
+            #expect(second.conflicts == ["clean"] && second.unchanged == ["bold"] && second.installed.isEmpty)
+            let third = try await sync([("bold", DesignStoreContract.package(id: "bold", version: "1.1.0"))])
+            #expect(third.upgraded == ["bold"] && third.conflicts.isEmpty)
+            #expect(try await FileDesignStore(directory: dir).installedOrigins() == ["clean": .imported, "bold": .bundled])
+            #expect(await gate.verified == ["bold", "bold"])
+        }
+    }
+
     @Test("the record's version follows the origins it holds: bump it when an origin is added")
     func recordVersionFollowsOrigins() {
         let message: Comment = "a record written with a new origin cannot be read by an older app: bump the record version when an origin is added"
