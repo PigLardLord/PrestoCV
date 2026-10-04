@@ -1,6 +1,14 @@
 import Foundation
 @testable import DocsCheckKit
 
+/// The documents every check needs, in a state the checker accepts. A test replaces or removes the ones it is about.
+let acceptedBaseline: [String: String] = [
+    "AGENTS.md": "# Guidelines\n\n- **Documentation is code.** Documentation changes with the code in the same pull request.",
+    ".github/pull_request_template.md": "## Purpose\n\n## Documents updated\n\nWhich documents does this change update?",
+    "docs/architecture/adr/README.md": "# ADRs\n\n| # | Decision | Status |\n|---|---|---|\n| [0001](0001-first.md) | First | Accepted |",
+    "docs/architecture/adr/0001-first.md": "# 0001. First\n\n- **Status:** Accepted\n",
+]
+
 /// A repository built from a dictionary of paths and contents in a temporary directory, removed when the body returns.
 @discardableResult
 func withRepository<Result>(_ files: [String: String], directories: [String] = [], _ body: (URL) throws -> Result) throws -> Result {
@@ -18,9 +26,12 @@ func withRepository<Result>(_ files: [String: String], directories: [String] = [
     return try body(root)
 }
 
-/// The findings of a run, as `file:line code` strings, in the order the report prints them.
-func findings(in files: [String: String], directories: [String] = [], planned: String? = nil) throws -> [String] {
-    try withRepository(files, directories: directories) { root in
+/// The findings of a run over the accepted baseline plus `files` (which replace the baseline's files of the same path),
+/// minus the paths in `removing`, as `file:line code` strings in the order the report prints them.
+func findings(in files: [String: String], removing: [String] = [], directories: [String] = [], planned: String? = nil) throws -> [String] {
+    var repository = acceptedBaseline.merging(files) { _, test in test }
+    for path in removing { repository[path] = nil }
+    return try withRepository(repository, directories: directories) { root in
         var plannedFile: URL?
         if let planned {
             plannedFile = root.appendingPathComponent("planned.json")

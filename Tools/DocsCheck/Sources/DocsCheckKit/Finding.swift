@@ -6,6 +6,15 @@ public enum FindingCode: String, CaseIterable, Sendable {
     case plannedPathExists = "planned-path-exists"
     case plannedPathUnused = "planned-path-unused"
     case plannedFileInvalid = "planned-file-invalid"
+    case adrDirectoryMissing = "adr-directory-missing"
+    case adrStatusMissing = "adr-status-missing"
+    case adrStatusUnknown = "adr-status-unknown"
+    case adrSupersededWithoutLink = "adr-superseded-without-link"
+    case adrSuccessorMissing = "adr-successor-missing"
+    case adrIndexMissing = "adr-index-missing"
+    case adrNotIndexed = "adr-not-indexed"
+    case adrIndexUnknown = "adr-index-unknown"
+    case adrIndexStatusDiffers = "adr-index-status-differs"
 }
 
 /// One place where a document and the repository disagree.

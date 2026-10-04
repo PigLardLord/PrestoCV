@@ -14,7 +14,12 @@ setup() {
   ROOT="$(mktemp -d)"; ROOTS+=("$ROOT")
   put README.md $'# Project\n\nSee the [guide](docs/guide.md).'
   put docs/guide.md $'# Guide\n\n## Usage\n\nBack to the [readme](../README.md#project).'
+  put docs/architecture/adr/README.md $'# ADRs\n\n| # | Decision | Status |\n|---|---|---|\n| [0001](0001-first.md) | First | Accepted |'
+  put docs/architecture/adr/0001-first.md $'# 0001. First\n\n- **Status:** Accepted'
 }
+ADR=docs/architecture/adr
+# adr_index <row>...: the ADR index with the given rows.
+adr_index() { local text=$'# ADRs\n\n| # | Decision | Status |\n|---|---|---|'; for row in "$@"; do text+=$'\n'"$row"; done; put $ADR/README.md "$text"; }
 # put <path> <contents>: writes a file of the repository, replacing it.
 put() { mkdir -p "$ROOT/$(dirname "$1")"; printf '%s\n' "$2" > "$ROOT/$1"; }
 run() { "$CHECK" "$ROOT" "$@" > "$OUT" 2>&1; echo $?; }
@@ -29,7 +34,7 @@ stale() { local name="$1" pat="$2"; shift 2; expect "stale: $name" 1 "$pat" "$@"
 fixed() { local name="$1"; shift; expect "fixed: $name" 0 "" "$@"; }
 
 # --- the repository the cases start from is accepted
-setup; expect "a consistent repository passes" 0 "checked 2 documents: 0 findings"
+setup; expect "a consistent repository passes" 0 "checked 4 documents: 0 findings"
 
 # --- 1. links
 setup; put README.md $'# Project\n\nSee the [guide](docs/missing.md).'
@@ -71,6 +76,30 @@ stale "a declared path that no document names" "^planned.json:2: planned-path-un
 put planned.json $'[{"path": "Tools/future.sh"}]'
 stale "a planned entry without its ticket" "^planned.json:1: planned-file-invalid:" --planned "$ROOT/planned.json"
 setup; expect "a planned file that cannot be read is an error, not a pass" 2 "^error:" --planned "$ROOT/planned.json"
+
+# --- 3. ADR status and index
+setup; put $ADR/0001-first.md $'# 0001. First\n\n- **Date:** 2026-01-01'
+stale "an ADR without a status" "^$ADR/0001-first.md:1: adr-status-missing:"
+put $ADR/0001-first.md $'# 0001. First\n\n- **Status:** Accepted\n- **Date:** 2026-01-01'; fixed "the ADR has a status"
+setup; put $ADR/0001-first.md $'# 0001. First\n\n- **Status:** Draft'; adr_index '| [0001](0001-first.md) | First | Draft |'
+stale "a status the ADR README does not define" "^$ADR/0001-first.md:3: adr-status-unknown:"
+put $ADR/0001-first.md $'# 0001. First\n\n- **Status:** Proposed'; adr_index '| [0001](0001-first.md) | First | Proposed |'; fixed "a defined status"
+setup; put $ADR/0001-first.md $'# 0001. First\n\n- **Status:** Superseded by 0002'; adr_index '| [0001](0001-first.md) | First | Superseded by 0002 |'
+put $ADR/0002-second.md $'# 0002. Second\n\n- **Status:** Accepted'
+stale "a superseded ADR that names its replacement without a link" "^$ADR/0001-first.md:3: adr-superseded-without-link:"
+put $ADR/0001-first.md $'# 0001. First\n\n- **Status:** Superseded by [0002](0002-second.md)'
+adr_index '| [0001](0001-first.md) | First | Superseded by [0002](0002-second.md) |' '| [0002](0002-second.md) | Second | Accepted |'; fixed "the replacement is linked"
+rm "$ROOT/$ADR/0002-second.md"; adr_index '| [0001](0001-first.md) | First | Superseded by [0002](0002-second.md) |'
+stale "a superseded ADR whose replacement does not exist" "^$ADR/0001-first.md:3: adr-successor-missing:"
+setup; put $ADR/0002-second.md $'# 0002. Second\n\n- **Status:** Accepted'
+stale "an ADR that the index does not list" "^$ADR/0002-second.md:1: adr-not-indexed:"
+adr_index '| [0001](0001-first.md) | First | Accepted |' '| [0002](0002-second.md) | Second | Accepted |'; fixed "the index lists it"
+adr_index '| [0001](0001-first.md) | First | Accepted |' '| [0002](0002-second.md) | Second | Proposed |'
+stale "an index row with another status than its ADR" "^$ADR/README.md:6: adr-index-status-differs:"
+adr_index '| [0001](0001-first.md) | First | Accepted |' '| [0002](0002-second.md) | Second | Accepted |' '| [0003](0003-third.md) | Third | Accepted |'
+stale "an index row for an ADR that has no file" "^$ADR/README.md:7: adr-index-unknown:"
+setup; rm -r "$ROOT/$ADR"
+stale "no ADR directory is an error, not a pass" "^$ADR:1: adr-directory-missing:"
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

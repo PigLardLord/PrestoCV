@@ -6,7 +6,7 @@ An ADR records one decision: the context that forced it, what was decided, and w
 - **Once the branch is merged, an ADR is immutable.** A changed decision gets a new ADR that supersedes the old one, and the old one's status says so.
 - **An ADR is binding only once it is Accepted and merged.** Proposed ADRs describe the intended target and guide the prototype, but they are not rules yet.
 
-Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected**.
+Status is one of **Proposed**, **Accepted**, **Rejected** or **Superseded by NNNN**, where a superseded ADR links to the one that replaces it: `Superseded by [0013](0013-title.md)`. It is written exactly so in the `- **Status:**` line of the ADR and in the index below. `Tools/DocsCheck` fails if an ADR has no status, if a superseded one does not link to an ADR that exists, or if the index lacks an ADR or gives it another status.
 
 | # | Decision | Status |
 |---|---|---|

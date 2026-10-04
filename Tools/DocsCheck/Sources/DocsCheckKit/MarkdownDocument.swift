@@ -18,6 +18,13 @@ struct MarkdownDocument: Sendable {
         let text: String
     }
 
+    struct Line: Hashable, Sendable {
+        let number: Int
+        let text: String
+    }
+
+    /// The lines that are not inside a fenced code block, fences themselves excluded.
+    private(set) var proseLines: [Line] = []
     private(set) var links: [Link] = []
     private(set) var codeSpans: [CodeSpan] = []
     private(set) var headings: [Heading] = []
@@ -40,6 +47,7 @@ struct MarkdownDocument: Sendable {
                 fence = opening
                 continue
             }
+            proseLines.append(Line(number: number, text: line))
             if let heading = Self.heading(in: line, number: number) { headings.append(heading) }
             let inline = InlineScan(line: line)
             codeSpans += inline.codeSpans.map { CodeSpan(line: number, text: $0) }
