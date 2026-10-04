@@ -21,5 +21,5 @@ enum LetterMarkup {
     static let elements: Set<String> = ["main", "header", "section", "h1", "h2", "p", "span", "a"]
     static let classes = Set(LetterClass.allCases.map(\.rawValue))
     /// No attribute selectors and no pseudo-classes: the letter's stylesheet styles by element and class alone.
-    static let vocabulary = SelectorVocabulary(elements: elements, classes: classes, sectionKinds: [], ratings: [], pseudoClasses: [])
+    static let vocabulary = SelectorVocabulary(name: "the cover letter's structure", elements: elements, classes: classes, sectionKinds: [], ratings: [], pseudoClasses: [])
 }

@@ -356,14 +356,14 @@ struct CSSParser {
                 out += combinator == " " ? " " : combinator
                 needsCompound = true
             case .ident(let e):
-                guard vocabulary.elements.contains(e.lowercased()) else { throw CSSRejection(reason: "element \(e) is not in the markup contract") }
+                guard vocabulary.elements.contains(e.lowercased()) else { throw CSSRejection(reason: "element \(e) is not in \(vocabulary.name)") }
                 out += e.lowercased(); i += 1; needsCompound = false
             case .delim("*"):
                 // Not in the markup contract: it also selects the document root, which sets what rem means.
                 throw CSSRejection(reason: "the universal selector is not allowed")
             case .delim("."):
                 guard i + 1 < tokens.count, case .ident(let c) = tokens[i + 1], vocabulary.classes.contains(c) else {
-                    throw CSSRejection(reason: "class is not in the markup contract")
+                    throw CSSRejection(reason: "class is not in \(vocabulary.name)")
                 }
                 out += ".\(c)"; i += 2; needsCompound = false
             case .lbracket:
@@ -377,11 +377,11 @@ struct CSSParser {
                 default: throw CSSRejection(reason: "attribute value not allowed")
                 }
                 let ok = (a == "data-section" && vocabulary.sectionKinds.contains(value)) || (a == "data-rating" && vocabulary.ratings.contains(value))
-                guard ok else { throw CSSRejection(reason: "attribute selector not in the markup contract") }
+                guard ok else { throw CSSRejection(reason: "attribute selector is not in \(vocabulary.name)") }
                 out += "[\(a)=\"\(value)\"]"; i += 5; needsCompound = false
             case .colon:
                 guard i + 1 < tokens.count, case .ident(let p) = tokens[i + 1], vocabulary.pseudoClasses.contains(p.lowercased()) else {
-                    throw CSSRejection(reason: "pseudo-class or pseudo-element not allowed")
+                    throw CSSRejection(reason: "pseudo-class is not in \(vocabulary.name), or it is a pseudo-element")
                 }
                 out += ":\(p.lowercased())"; i += 2; needsCompound = false
             default:

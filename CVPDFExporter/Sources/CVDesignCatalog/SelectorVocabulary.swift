@@ -2,17 +2,19 @@
 /// A design's stylesheet is checked against the CV's, which are the markup contract's. The cover letter's built-in
 /// stylesheet is checked against the letter structure's own. The property allow-list is the same for both.
 package struct SelectorVocabulary: Sendable, Equatable {
+    /// How a rejection names the vocabulary: "the markup contract", "the cover letter's structure".
+    package let name: String
     package let elements: Set<String>, classes: Set<String>
     /// The values of `[data-section=…]` and of `[data-rating=…]`. A vocabulary with none has no attribute selectors.
     package let sectionKinds: Set<String>, ratings: Set<String>
     package let pseudoClasses: Set<String>
 
-    package init(elements: Set<String>, classes: Set<String>, sectionKinds: Set<String>, ratings: Set<String>, pseudoClasses: Set<String>) {
-        self.elements = elements; self.classes = classes; self.sectionKinds = sectionKinds; self.ratings = ratings; self.pseudoClasses = pseudoClasses
+    package init(name: String, elements: Set<String>, classes: Set<String>, sectionKinds: Set<String>, ratings: Set<String>, pseudoClasses: Set<String>) {
+        self.name = name; self.elements = elements; self.classes = classes; self.sectionKinds = sectionKinds; self.ratings = ratings; self.pseudoClasses = pseudoClasses
     }
 
     /// What a design may select: the markup contract.
-    package static let cv = SelectorVocabulary(elements: MarkupContract.elements, classes: MarkupContract.classes, sectionKinds: MarkupContract.sectionKinds,
+    package static let cv = SelectorVocabulary(name: "the markup contract", elements: MarkupContract.elements, classes: MarkupContract.classes, sectionKinds: MarkupContract.sectionKinds,
                                               ratings: MarkupContract.ratings, pseudoClasses: MarkupContract.pseudoClasses)
 }
 

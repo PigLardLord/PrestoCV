@@ -310,6 +310,16 @@ struct LetterStyleTests {
         #expect(designRejects(LetterStyle.source))
     }
 
+    @Test("a letter rule that names a CV class, or any selector outside the letter's, is refused in the words of the letter's structure")
+    func letterRejectionsNameTheLetter() {
+        for css in [".cv-name{color:var(--color-text)}", "h3{color:var(--color-text)}", ".letter:first-child{color:var(--color-text)}", #".letter[data-schema="1"]{color:var(--color-text)}"#] {
+            do {
+                _ = try ValidatedStylesheet.validating(css, against: LetterMarkup.vocabulary)
+                Issue.record("\(css) was accepted")
+            } catch { #expect(error.reason.contains("the cover letter's structure") && !error.reason.contains("markup contract"), "\(css): \(error.reason)") }
+        }
+    }
+
     @Test("a design stylesheet that names a letter class, or any letter selector, is rejected", arguments: LetterMarkup.classes.sorted())
     func designsCannotSelectTheLetter(cls: String) {
         #expect(designRejects(".\(cls){color:var(--color-text)}"))

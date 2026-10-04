@@ -7,7 +7,7 @@ import Foundation
 @Suite("ADR 0019 · the CSS policy takes a selector vocabulary")
 struct SelectorVocabularyTests {
     /// What a second structure could be: two classes, one element, no attribute selectors, no pseudo-classes.
-    static let note = SelectorVocabulary(elements: ["p", "span"], classes: ["note", "note-title"], sectionKinds: [], ratings: [], pseudoClasses: [])
+    static let note = SelectorVocabulary(name: "the note structure", elements: ["p", "span"], classes: ["note", "note-title"], sectionKinds: [], ratings: [], pseudoClasses: [])
 
     @Test("the CV's vocabulary is the markup contract, in every kind of selector")
     func cvIsTheMarkupContract() {
@@ -36,6 +36,35 @@ struct SelectorVocabularyTests {
         _ = try DesignPackageValidator().validate(designData(".cv-name{color:var(--color-text)}"))
     }
 
+    /// The reason of a rejection.
+    func reason(_ css: String, against vocabulary: SelectorVocabulary) -> String? {
+        do { _ = try ValidatedStylesheet.validating(css, against: vocabulary); return nil } catch { return error.reason }
+    }
+
+    @Test("a rejected selector names the vocabulary that refused it, whichever kind of selector it is", arguments: [
+        "h5{color:var(--color-text)}", ".other{color:var(--color-text)}", #"[data-section="x"]{color:var(--color-text)}"#, ".note[data-rating=\"3\"]{color:var(--color-text)}",
+        ".note:first-child{color:var(--color-text)}", "p.cv-name{color:var(--color-text)}",
+    ])
+    func rejectionsNameTheVocabulary(css: String) {
+        let refusal = reason(css, against: Self.note)
+        #expect(refusal?.contains("the note structure") == true, "\(css): \(refusal ?? "accepted")")
+        #expect(refusal?.contains("markup contract") == false)
+    }
+
+    @Test("a design is refused in the words of the markup contract")
+    func designsSayMarkupContract() {
+        #expect(reason(".note{color:var(--color-text)}", against: .cv) == "class is not in the markup contract")
+        #expect(reason("h5{color:var(--color-text)}", against: .cv) == "element h5 is not in the markup contract")
+        #expect(reason(#"[data-section="x"]{color:var(--color-text)}"#, against: .cv) == "attribute selector is not in the markup contract")
+        #expect(reason(".cv:hover{color:var(--color-text)}", against: .cv) == "pseudo-class is not in the markup contract, or it is a pseudo-element")
+        do {
+            _ = try DesignPackageValidator().validate(designData(".note{color:var(--color-text)}"))
+            Issue.record("a design with a class outside the contract was accepted")
+        } catch let rejected as DesignPackageRejected {
+            #expect(rejected.violations == [.css("class is not in the markup contract")])
+        } catch { Issue.record("\(error)") }
+    }
+
     @Test("the property allow-list is the same whatever the vocabulary: nothing that loads, hides, moves or injects", arguments: [
         ".note{position:absolute}", ".note{color:red}", ".note{color:#000}", ".note{background:url(https://evil.example/a)}", ".note{display:none}",
         ".note{opacity:0}", ".note{font-size:0}", ".note{font-family:Arial}", ".note{color:var(--color-text) !important}", ".note{content:\"x\"}",
@@ -48,7 +77,7 @@ struct SelectorVocabularyTests {
 
     @Test("a vocabulary with no attribute kinds refuses every attribute selector, and an empty one refuses every selector")
     func emptyKinds() {
-        let none = SelectorVocabulary(elements: [], classes: [], sectionKinds: [], ratings: [], pseudoClasses: [])
+        let none = SelectorVocabulary(name: "nothing", elements: [], classes: [], sectionKinds: [], ratings: [], pseudoClasses: [])
         for css in ["p{color:var(--color-text)}", ".cv{color:var(--color-text)}", ".note{color:var(--color-text)}"] {
             #expect(throws: CSSRejection.self) { _ = try ValidatedStylesheet.validating(css, against: none) }
         }
