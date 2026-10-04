@@ -18,6 +18,7 @@ The current app and packages are the legacy code the migration replaces, one con
 | `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). |
 | `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The current packages (legacy, being replaced). |
 | `Tools/ArchitectureCheck/` | The checker that enforces the rules, and its pre-commit hook. |
+| `Tools/DocsCheck/` | The checker that keeps the documentation in step with the repository: links, named paths, ADR statuses and the documentation rule. |
 | `Prototypes/ADRValidation/` | The throwaway prototype that validated the ADRs. It is outside the app's build; its README says how to run it. |
 
 ## Building and testing
@@ -29,9 +30,10 @@ xcodebuild -project PrestoCV.xcodeproj -scheme PrestoCV -configuration Debug bui
 xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
 swift test --package-path PrestoCVCore
 Tools/ArchitectureCheck/check.sh
+Tools/DocsCheck/check.sh
 ```
 
-On Linux, the packages contain only the new targets. They build today and stay empty until the migration fills them; the architecture checker and the prototype also build and test there. The legacy targets are declared only on Apple hosts (ADR 0012).
+On Linux, the packages contain only the new targets. They build today and stay empty until the migration fills them; the architecture checker, the documentation checker and the prototype also build and test there. The legacy targets are declared only on Apple hosts (ADR 0012).
 
 ## Development data
 

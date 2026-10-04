@@ -17,6 +17,7 @@
 - `xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'` runs app unit + UI tests.
 - `swift test --package-path PrestoCVCore` validates the core package in isolation.
 - `Tools/ArchitectureCheck/check.sh` runs the architecture checker on the whole repository (see `Tools/ArchitectureCheck/README.md`).
+- `Tools/DocsCheck/check.sh` runs the documentation checker on the whole repository: links, named paths, ADR statuses and the documentation rule (see `Tools/DocsCheck/README.md`).
 - CI (`.github/workflows/ci.yml`) runs on every pull request:
   - on Linux, the architecture check (with the baseline compared to the base branch) and its self-test, then the documentation check with its self-test and its tests;
   - on macOS, on a self-hosted runner on the owner's Mac, the architecture check and its self-test, the package tests and the app tests on the iOS simulator.

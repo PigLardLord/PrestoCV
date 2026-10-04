@@ -236,6 +236,15 @@ A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-
 
 ---
 
+## Tools
+
+Tools are Swift packages under `Tools/` that read the repository and write nothing. They are not part of the app, and not targets of the tables above. `rules.json` maps each of their targets as a `tool`, their tests as `test` and their manifests as `manifest`, so a tool gets the import allow-lists only.
+
+- **`Tools/ArchitectureCheck`** enforces [the rules](rules.md) and keeps this file and `rules.json` in agreement. It imports Foundation and SwiftSyntax.
+- **`Tools/DocsCheck`** checks that the documentation matches the repository: relative links and their anchors, repository paths written in backticks, ADR statuses and the ADR index, and that `AGENTS.md` and the pull request template state the rule that documentation changes with the code. It imports Foundation only and has no third-party dependency. See [its README](../../Tools/DocsCheck/README.md).
+
+---
+
 ## Dependency graph (summary)
 
 ```
