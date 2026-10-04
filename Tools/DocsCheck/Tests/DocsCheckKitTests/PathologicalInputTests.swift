@@ -75,4 +75,13 @@ struct PathologicalInputTests {
         _ = MarkdownDocument(text: String(repeating: "[", count: 200_000))
         _ = MarkdownDocument(text: (1...600).map { String(repeating: "`", count: $0) }.joined(separator: "a"))
     }
+
+    @Test("tags that never end take time in proportion to the line: a tag is read for at most 1,000 scalars, and the first one that does not end stops the line's scan")
+    func endlessTags() {
+        _ = MarkdownDocument(text: String(repeating: "<a x=\"", count: 100_000))
+        _ = MarkdownDocument(text: String(repeating: "<a ", count: 16_000))
+        #expect(MarkdownDocument(text: "<a " + String(repeating: "x ", count: 400) + "id=\"late\">").explicitAnchors == ["late"])
+        #expect(MarkdownDocument(text: "<a " + String(repeating: "x ", count: 600) + "id=\"late\">").explicitAnchors.isEmpty)
+        #expect(MarkdownDocument(text: "<a name=\"first\"> <b " + String(repeating: "x ", count: 600) + "> <a name=\"after\">").explicitAnchors == ["first"])
+    }
 }

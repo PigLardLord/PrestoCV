@@ -314,7 +314,8 @@ private struct InlineScan {
     // MARK: Explicit anchors
 
     /// The `id` and `name` attributes of the HTML tags that start and end on this line. Attribute names are matched
-    /// whole and without regard to case; values are taken as written.
+    /// whole and without regard to case; values are taken as written. The first tag that does not end within
+    /// `maximumTagLength` scalars ends the scan of the line, so that a line of tags that never end is read once.
     private static func anchors(inTagsOf scalars: [Unicode.Scalar]) -> [String] {
         var anchors: [String] = []
         var index = 0
@@ -323,43 +324,45 @@ private struct InlineScan {
                 index += 1
                 continue
             }
-            if let (found, end) = attributes(ofTagAt: index, in: scalars) {
-                anchors += found
-                index = end
-            } else {
-                index += 1
-            }
+            guard let (found, end) = attributes(ofTagAt: index, in: scalars) else { break }
+            anchors += found
+            index = end
         }
         return anchors
     }
 
-    /// The anchors of the tag that starts at `start` and the index after its `>`, or nil if the tag does not end on the line.
+    /// A tag is read for at most this many scalars.
+    static let maximumTagLength = 1_000
+
+    /// The anchors of the tag that starts at `start` and the index after its `>`, or nil if the tag does not end on
+    /// the line within `maximumTagLength` scalars.
     private static func attributes(ofTagAt start: Int, in scalars: [Unicode.Scalar]) -> ([String], Int)? {
+        let limit = min(scalars.count, start + maximumTagLength)
         var index = start + 1
-        while index < scalars.count, isNameScalar(scalars[index]) { index += 1 }
+        while index < limit, isNameScalar(scalars[index]) { index += 1 }
         var anchors: [String] = []
-        while index < scalars.count {
-            while index < scalars.count, isSpace(scalars[index]) || scalars[index] == "/" { index += 1 }
-            guard index < scalars.count else { return nil }
+        while index < limit {
+            while index < limit, isSpace(scalars[index]) || scalars[index] == "/" { index += 1 }
+            guard index < limit else { return nil }
             if scalars[index] == ">" { return (anchors, index + 1) }
             let nameStart = index
-            while index < scalars.count, !isSpace(scalars[index]), !"=>/".unicodeScalars.contains(scalars[index]) { index += 1 }
+            while index < limit, !isSpace(scalars[index]), !"=>/".unicodeScalars.contains(scalars[index]) { index += 1 }
             guard index > nameStart else { return nil }
             let name = string(Array(scalars[nameStart..<index])).lowercased()
-            while index < scalars.count, isSpace(scalars[index]) { index += 1 }
-            guard index < scalars.count, scalars[index] == "=" else { continue }
+            while index < limit, isSpace(scalars[index]) { index += 1 }
+            guard index < limit, scalars[index] == "=" else { continue }
             index += 1
-            while index < scalars.count, isSpace(scalars[index]) { index += 1 }
-            guard index < scalars.count else { return nil }
+            while index < limit, isSpace(scalars[index]) { index += 1 }
+            guard index < limit else { return nil }
             var value: [Unicode.Scalar] = []
             if scalars[index] == "\"" || scalars[index] == "'" {
                 let quote = scalars[index]
                 index += 1
-                while index < scalars.count, scalars[index] != quote { value.append(scalars[index]); index += 1 }
-                guard index < scalars.count else { return nil }
+                while index < limit, scalars[index] != quote { value.append(scalars[index]); index += 1 }
+                guard index < limit else { return nil }
                 index += 1
             } else {
-                while index < scalars.count, !isSpace(scalars[index]), scalars[index] != ">" { value.append(scalars[index]); index += 1 }
+                while index < limit, !isSpace(scalars[index]), scalars[index] != ">" { value.append(scalars[index]); index += 1 }
             }
             if (name == "id" || name == "name"), !value.isEmpty { anchors.append(string(value)) }
         }
