@@ -69,6 +69,8 @@ struct LetterConventions: Sendable, Equatable {
     /// reads its language's table, so every reader of a language gets the one variant that its table names.
     let variant: String
     private let dateFormat: LetterTemplate, months: [String], withPlace: LetterTemplate, withoutPlace: LetterTemplate
+    /// How the language writes day 1 where it is not the number ("1er"); nil where it is.
+    private let firstDay: String?
     private let salutations: ByForm<LetterTemplate>, valedictions: ByForm<String>
     let referenceLabel: String, attachmentsLabel: String
 
@@ -77,7 +79,8 @@ struct LetterConventions: Sendable, Equatable {
     /// The date in the language's format; nil when the month does not exist.
     func dateText(_ date: LetterDate) -> String? {
         guard let month = monthName(date.month) else { return nil }
-        return dateFormat.fill([.day: String(date.day), .month: month, .year: String(date.year)])
+        let day = date.day == 1 ? firstDay ?? "1" : String(date.day)
+        return dateFormat.fill([.day: day, .month: month, .year: String(date.year)])
     }
 
     /// The place and the date as the language writes them, or the date alone when there is no place.
@@ -131,7 +134,7 @@ struct LetterConventions: Sendable, Equatable {
         guard Set(root.keys).isSubset(of: ["variant", "date", "salutations", "valedictions", "labels"]) else { throw Failure.corruptTable(language) }
         let variant = try string(root, "variant", path: "variant")
         guard variant.hasPrefix(language + "-"), String(variant.dropFirst(language.count + 1)).fullyMatches("[A-Z]{2}") else { throw Failure.incomplete(language: language, key: "variant") }
-        let date = try object(root, "date", keys: ["format", "months", "withPlace", "withoutPlace"], path: "date")
+        let date = try object(root, "date", keys: ["format", "months", "withPlace", "withoutPlace", "firstDay"], path: "date")
         let salutations = try object(root, "salutations", keys: ["masculine", "feminine", "neutral"], path: "salutations")
         let valedictions = try object(root, "valedictions", keys: ["masculine", "feminine", "neutral"], path: "valedictions")
         let labels = try object(root, "labels", keys: ["reference", "attachments"], path: "labels")
@@ -141,11 +144,13 @@ struct LetterConventions: Sendable, Equatable {
         guard monthTexts.count == 12 else { throw Failure.incomplete(language: language, key: "date.months") }
         var months: [String] = []
         for text in monthTexts { months.append(try plain(text, "date.months")) }
+        var firstDay: String?
+        if date["firstDay"] != nil { firstDay = try plain(try string(date, "firstDay", path: "date.firstDay"), "date.firstDay") }
 
         return LetterConventions(
             variant: variant, dateFormat: try template(date, "format", path: "date.format", holes: [.day, .month, .year]), months: months,
             withPlace: try template(date, "withPlace", path: "date.withPlace", holes: [.place, .date]),
-            withoutPlace: try template(date, "withoutPlace", path: "date.withoutPlace", holes: [.date]),
+            withoutPlace: try template(date, "withoutPlace", path: "date.withoutPlace", holes: [.date]), firstDay: firstDay,
             salutations: ByForm(masculine: try template(salutations, "masculine", path: "salutations.masculine", holes: [.name]),
                                 feminine: try template(salutations, "feminine", path: "salutations.feminine", holes: [.name]),
                                 neutral: try template(salutations, "neutral", path: "salutations.neutral", holes: [])),

@@ -4,7 +4,8 @@
     "format": "{day} {month} {year}",
     "months": ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"],
     "withPlace": "{place}, le {date}",
-    "withoutPlace": "{date}"
+    "withoutPlace": "{date}",
+    "firstDay": "1er"
   },
   "salutations": {
     "masculine": "Monsieur {name},",

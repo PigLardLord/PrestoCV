@@ -114,6 +114,17 @@ struct LetterBuilderTests {
         }
     }
 
+    @Test("the first of the month is written as the language writes it: 1er in French", arguments: LetterConventionsTests.expected)
+    func firstOfTheMonth(expected: LetterConventionsTests.Expected) throws {
+        var letter = letterFixture
+        letter.language = expected.language
+        letter.place = "Roma"
+        letter.date = LetterConventionsTests.firstDay
+        let rendered = try render(letter)
+        #expect(letterText(rendered.html, "letter-dateline") == expected.firstDateLine)
+        #expect(rendered.textNodes.contains(expected.firstDateLine))
+    }
+
     @Test("the layout holds no word: with the conventions' words replaced, nothing of the old ones is left")
     func layoutHoldsNoWords() throws {
         var table = try LetterData.raw("en")

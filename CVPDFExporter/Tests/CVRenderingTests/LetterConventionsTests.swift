@@ -24,39 +24,41 @@ struct LetterConventionsTests {
     static let languages = ["en", "it", "de", "es", "fr", "pt"]
 
     /// What the files must say. Changing a row is changing the letter's wording, and is reviewed like code.
-    /// (language, the variant it is written in, the date of 4 October 2026 with the place "Roma", the date alone, masculine, feminine and
-    ///  neutral salutations to "Rossi", masculine, feminine and neutral valedictions, the reference and attachments labels)
+    /// (language, the variant it is written in, the date of 4 October 2026 with the place "Roma", the date alone, the date of 1 October 2026
+    ///  with the place, masculine, feminine and neutral salutations to "Rossi", masculine, feminine and neutral valedictions, the
+    ///  reference and attachments labels)
     struct Expected: Sendable, CustomTestStringConvertible {
-        let language: String, variant: String, dateLine: String, date: String
+        let language: String, variant: String, dateLine: String, date: String, firstDateLine: String
         let salutations: [String], valedictions: [String], labels: [String]
         var testDescription: String { language }
     }
     static let expected: [Expected] = [
-        Expected(language: "en", variant: "en-GB", dateLine: "Roma, 4 October 2026", date: "4 October 2026",
+        Expected(language: "en", variant: "en-GB", dateLine: "Roma, 4 October 2026", date: "4 October 2026", firstDateLine: "Roma, 1 October 2026",
                  salutations: ["Dear Mr Rossi,", "Dear Ms Rossi,", "Dear Sir or Madam,"],
                  valedictions: ["Yours sincerely,", "Yours sincerely,", "Yours faithfully,"], labels: ["Reference", "Enclosures"]),
-        Expected(language: "it", variant: "it-IT", dateLine: "Roma, 4 ottobre 2026", date: "4 ottobre 2026",
+        Expected(language: "it", variant: "it-IT", dateLine: "Roma, 4 ottobre 2026", date: "4 ottobre 2026", firstDateLine: "Roma, 1 ottobre 2026",
                  salutations: ["Gentile Sig. Rossi,", "Gentile Sig.ra Rossi,", "Gentili Signore e Signori,"],
                  valedictions: ["Distinti saluti,", "Distinti saluti,", "Distinti saluti,"], labels: ["Riferimento", "Allegati"]),
-        Expected(language: "de", variant: "de-DE", dateLine: "Roma, 4. Oktober 2026", date: "4. Oktober 2026",
+        Expected(language: "de", variant: "de-DE", dateLine: "Roma, 4. Oktober 2026", date: "4. Oktober 2026", firstDateLine: "Roma, 1. Oktober 2026",
                  salutations: ["Sehr geehrter Herr Rossi,", "Sehr geehrte Frau Rossi,", "Sehr geehrte Damen und Herren,"],
                  valedictions: ["Mit freundlichen Grüßen", "Mit freundlichen Grüßen", "Mit freundlichen Grüßen"], labels: ["Bezug", "Anlagen"]),
-        Expected(language: "es", variant: "es-ES", dateLine: "Roma, 4 de octubre de 2026", date: "4 de octubre de 2026",
+        Expected(language: "es", variant: "es-ES", dateLine: "Roma, 4 de octubre de 2026", date: "4 de octubre de 2026", firstDateLine: "Roma, 1 de octubre de 2026",
                  salutations: ["Estimado Sr. Rossi:", "Estimada Sra. Rossi:", "Estimados señores y señoras:"],
                  valedictions: ["Atentamente,", "Atentamente,", "Atentamente,"], labels: ["Referencia", "Anexos"]),
-        Expected(language: "fr", variant: "fr-FR", dateLine: "Roma, le 4 octobre 2026", date: "4 octobre 2026",
+        Expected(language: "fr", variant: "fr-FR", dateLine: "Roma, le 4 octobre 2026", date: "4 octobre 2026", firstDateLine: "Roma, le 1er octobre 2026",
                  salutations: ["Monsieur Rossi,", "Madame Rossi,", "Madame, Monsieur,"],
                  valedictions: ["Je vous prie d’agréer, Monsieur, l’expression de mes salutations distinguées.",
                                 "Je vous prie d’agréer, Madame, l’expression de mes salutations distinguées.",
                                 "Je vous prie d’agréer, Madame, Monsieur, l’expression de mes salutations distinguées."],
                  labels: ["Référence", "Pièces jointes"]),
-        Expected(language: "pt", variant: "pt-PT", dateLine: "Roma, 4 de outubro de 2026", date: "4 de outubro de 2026",
+        Expected(language: "pt", variant: "pt-PT", dateLine: "Roma, 4 de outubro de 2026", date: "4 de outubro de 2026", firstDateLine: "Roma, 1 de outubro de 2026",
                  salutations: ["Exmo. Senhor Rossi,", "Exma. Senhora Rossi,", "Exmos. Senhores,"],
                  valedictions: ["Com os melhores cumprimentos,", "Com os melhores cumprimentos,", "Com os melhores cumprimentos,"],
                  labels: ["Referência", "Anexos"]),
     ]
     static let forms = FormOfAddress.allCases
     static let day = LetterDate(year: 2026, month: 10, day: 4)
+    static let firstDay = LetterDate(year: 2026, month: 10, day: 1)
 
     @Test("the index lists the six languages, which are the ones the document model accepts")
     func index() throws {
@@ -78,7 +80,8 @@ struct LetterConventionsTests {
         let variant = try #require(object["variant"] as? String)
         #expect(variant.fullyMatches("\(language)-[A-Z]{2}"), "\(language) is written in \(variant)")
         let date = try #require(object["date"] as? [String: Any])
-        #expect(Set(date.keys) == ["format", "months", "withPlace", "withoutPlace"], "\(language) date")
+        // Only a language that writes the first of the month differently has the optional key.
+        #expect(Set(date.keys) == (language == "fr" ? ["format", "months", "withPlace", "withoutPlace", "firstDay"] : ["format", "months", "withPlace", "withoutPlace"]), "\(language) date")
         #expect(Set(try #require(object["salutations"] as? [String: Any]).keys) == ["masculine", "feminine", "neutral"], "\(language) salutations")
         #expect(Set(try #require(object["valedictions"] as? [String: Any]).keys) == ["masculine", "feminine", "neutral"], "\(language) valedictions")
         #expect(Set(try #require(object["labels"] as? [String: Any]).keys) == ["reference", "attachments"], "\(language) labels")
@@ -93,6 +96,7 @@ struct LetterConventionsTests {
         #expect(conventions.variant == expected.variant)
         #expect(conventions.dateText(Self.day) == expected.date)
         #expect(conventions.dateLine(place: "Roma", date: Self.day) == expected.dateLine)
+        #expect(conventions.dateLine(place: "Roma", date: Self.firstDay) == expected.firstDateLine)
         #expect(conventions.dateLine(place: nil, date: Self.day) == expected.date)
         #expect(conventions.dateLine(place: "", date: Self.day) == expected.date)
         for (index, form) in Self.forms.enumerated() {
@@ -109,6 +113,16 @@ struct LetterConventionsTests {
         #expect(names.count == 12 && Set(names).count == 12)
         #expect(conventions.monthName(0) == nil && conventions.monthName(13) == nil && conventions.monthName(-1) == nil)
         #expect(conventions.dateText(LetterDate(year: 2026, month: 13, day: 1)) == nil)
+    }
+
+    @Test("French writes the first of the month as 1er, and no other day as an ordinal")
+    func frenchFirst() throws {
+        let fr = try LetterConventionsCatalog.conventions(for: "fr")
+        #expect(fr.dateText(LetterDate(year: 2026, month: 10, day: 1)) == "1er octobre 2026")
+        #expect(fr.dateText(LetterDate(year: 2026, month: 1, day: 1)) == "1er janvier 2026")
+        #expect(fr.dateLine(place: "Paris", date: LetterDate(year: 2027, month: 3, day: 1)) == "Paris, le 1er mars 2027")
+        for day in [2, 10, 11, 21, 31] { #expect(fr.dateText(LetterDate(year: 2026, month: 10, day: day)) == "\(day) octobre 2026", "day \(day)") }
+        #expect(try LetterConventionsCatalog.conventions(for: "en").dateText(LetterDate(year: 2026, month: 10, day: 1)) == "1 October 2026")
     }
 
     static let regionalCases: [(String, String)] = [("pt-BR", "pt"), ("pt-PT", "pt"), ("de-CH", "de"), ("en-GB", "en"), ("EN-us", "en"), ("fr-CA", "fr"), ("es-419", "es"), ("it-IT", "it")]
@@ -205,6 +219,21 @@ struct LetterConventionsReaderTests {
         #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "de", key: "variant")) { _ = try LetterConventions.parse(data, language: "de") }
     }
 
+    @Test("the first day of the month is optional, and is written where the table gives it")
+    func firstDay() throws {
+        let without = try parse(try base())
+        #expect(without.dateText(LetterDate(year: 2026, month: 10, day: 1)) == "1 October 2026")
+        let with = try parse(try setting("date", "firstDay", to: "1st"))
+        #expect(with.dateText(LetterDate(year: 2026, month: 10, day: 1)) == "1st October 2026")
+        #expect(with.dateText(LetterDate(year: 2026, month: 10, day: 2)) == "2 October 2026")
+        #expect(with != without)
+    }
+
+    @Test("a first day over the bound, or with a hidden character, is incomplete", arguments: [String(repeating: "x", count: 201), "1\u{200B}er", "1\ner", "\u{202E}1er"])
+    func badFirstDay(text: String) throws {
+        #expect(throws: LetterConventionsCatalog.Failure.incomplete(language: "en", key: "date.firstDay")) { _ = try parse(try setting("date", "firstDay", to: text)) }
+    }
+
     @Test("a missing section names itself", arguments: ["date", "salutations", "valedictions", "labels"])
     func missingSection(path: String) throws {
         let object = try edited { $0[path] = nil }
@@ -212,6 +241,7 @@ struct LetterConventionsReaderTests {
     }
 
     static let emptyValues: [(String, String, String)] = [
+        ("date", "firstDay", ""), ("date", "firstDay", " "),
         ("date", "format", ""), ("salutations", "neutral", ""), ("salutations", "masculine", " \t "), ("valedictions", "feminine", ""), ("labels", "reference", " "),
         ("labels", "attachments", ""), ("date", "withoutPlace", ""),
     ]
@@ -245,7 +275,7 @@ struct LetterConventionsReaderTests {
     }
 
     static let wrongTypes: [(String, String, Wrong)] = [
-        ("date", "format", Wrong.number), ("date", "months", .string), ("salutations", "neutral", .strings), ("labels", "reference", .bool), ("date", "months", .numbers),
+        ("date", "format", Wrong.number), ("date", "firstDay", .number), ("date", "firstDay", .strings), ("date", "months", .string), ("salutations", "neutral", .strings), ("labels", "reference", .bool), ("date", "months", .numbers),
     ]
 
     @Test("a value of the wrong type is a corrupt table", arguments: wrongTypes)
@@ -288,6 +318,7 @@ struct LetterConventionsReaderTests {
     }
 
     static let badTemplates: [(String, String, String)] = [
+        ("date", "firstDay", "{day}"), ("date", "firstDay", "1{year}"),
         ("date", "format", "{day} {month}"), ("date", "format", "{day} {month} {year} {year}"), ("date", "format", "{day} {month} {year} {name}"),
         ("date", "format", "{day} {month} {yeer}"), ("date", "format", "{day {month} {year}"), ("date", "format", "{day} {month} {year}}"), ("date", "format", "{}{day}{month}{year}"),
         ("date", "withPlace", "{place}"), ("date", "withPlace", "{date}"), ("date", "withPlace", "{place}, {date} {date}"), ("date", "withoutPlace", "{place}"),
