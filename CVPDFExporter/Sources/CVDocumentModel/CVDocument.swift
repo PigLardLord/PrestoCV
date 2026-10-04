@@ -195,9 +195,12 @@ public enum CVDocumentValidator {
                 if e.year < p.start.year || (e.year == p.start.year && (e.month ?? 12) < (p.start.month ?? 1)) { throw Invalid(reason: "end before start") }
             }
         }
-        guard !d.person.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw Invalid(reason: "name is required") }
-        try text(d.language, "language"); try text(d.person.name, "name"); try text(d.person.professionalTitle, "title"); try text(d.person.email, "email")
-        try text(d.person.phone, "phone"); try text(d.person.location, "location"); try text(d.person.website, "website")
+        try text(d.language, "language")
+        switch PersonRule.violation(in: d.person, maxTextBytes: maxTextBytes, total: &total, maxTotal: maxDocumentTextBytes) {
+        case .nameRequired?: throw Invalid(reason: "name is required")
+        case .text(let field)?: throw Invalid(reason: "\(field.label) is too long, the document is too large, or it has control characters")
+        case nil: break
+        }
         try count(d.sections.count, "sections")
         for s in d.sections {
             switch s {

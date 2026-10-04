@@ -21,25 +21,31 @@ let letterFixture = LetterDocument(
 /// Every text field of a `LetterDocument`, one entry per value, so that a test can put something hostile into each of them.
 /// `fieldsAreComplete` fails when the model gains a field that is not listed here.
 struct LetterTextField: Sendable, CustomTestStringConvertible {
+    /// What kind of rule a field follows. The letter's own lines are one line and trimmed; a paragraph and the closing may hold
+    /// line breaks; the sender is a `Person`, held to the rule that `CVDocumentValidator` applies to one: line breaks allowed, no
+    /// trimming, and the CV's bound.
+    enum Kind: Sendable { case line, paragraph, person }
     let name: String
     /// What the validator calls the field in its reasons.
     let what: String
-    /// A paragraph and the closing may hold line breaks; every other field holds one line.
-    let multiline: Bool
+    let kind: Kind
     let set: @Sendable (inout LetterDocument, String) -> Void
     var testDescription: String { name }
+    var multiline: Bool { kind != .line }
+    var trimmed: Bool { kind == .line }
+    var maxBytes: Int { kind == .person ? CVDocumentValidator.maxTextBytes : LetterDocumentValidator.maxTextBytes }
 
     static let all: [LetterTextField] = {
         var all: [LetterTextField] = []
-        func add(_ name: String, _ what: String, multiline: Bool = false, _ set: @escaping @Sendable (inout LetterDocument, String) -> Void) {
-            all.append(LetterTextField(name: name, what: what, multiline: multiline, set: set))
+        func add(_ name: String, _ what: String, _ kind: Kind = .line, _ set: @escaping @Sendable (inout LetterDocument, String) -> Void) {
+            all.append(LetterTextField(name: name, what: what, kind: kind, set: set))
         }
-        add("sender.name", "the sender's name") { $0.sender.name = $1 }
-        add("sender.professionalTitle", "the sender's title") { $0.sender.professionalTitle = $1 }
-        add("sender.email", "the sender's email") { $0.sender.email = $1 }
-        add("sender.phone", "the sender's phone") { $0.sender.phone = $1 }
-        add("sender.location", "the sender's location") { $0.sender.location = $1 }
-        add("sender.website", "the sender's website") { $0.sender.website = $1 }
+        add("sender.name", "the sender's name", .person) { $0.sender.name = $1 }
+        add("sender.professionalTitle", "the sender's title", .person) { $0.sender.professionalTitle = $1 }
+        add("sender.email", "the sender's email", .person) { $0.sender.email = $1 }
+        add("sender.phone", "the sender's phone", .person) { $0.sender.phone = $1 }
+        add("sender.location", "the sender's location", .person) { $0.sender.location = $1 }
+        add("sender.website", "the sender's website", .person) { $0.sender.website = $1 }
         add("recipient.name", "the recipient's name") { $0.recipient.name = $1 }
         add("recipient.familyName", "the recipient's family name") { $0.recipient.familyName = $1 }
         add("recipient.company", "the recipient's company") { $0.recipient.company = $1 }
@@ -48,9 +54,9 @@ struct LetterTextField: Sendable, CustomTestStringConvertible {
         add("place", "the place") { $0.place = $1 }
         add("reference", "the reference") { $0.reference = $1 }
         add("subject", "the subject") { $0.subject = $1 }
-        add("body[0]", "a paragraph", multiline: true) { $0.body[0] = $1 }
-        add("body[1]", "a paragraph", multiline: true) { $0.body[1] = $1 }
-        add("closing", "the closing", multiline: true) { $0.closing = $1 }
+        add("body[0]", "a paragraph", .paragraph) { $0.body[0] = $1 }
+        add("body[1]", "a paragraph", .paragraph) { $0.body[1] = $1 }
+        add("closing", "the closing", .paragraph) { $0.closing = $1 }
         add("name", "the name") { $0.name = $1 }
         add("attachments[0]", "an attachment") { $0.attachments[0] = $1 }
         add("attachments[1]", "an attachment") { $0.attachments[1] = $1 }
@@ -124,9 +130,9 @@ struct LetterDocumentContractTests {
     @Test("a field that is too long is refused, whichever field it is", arguments: LetterTextField.all)
     func oversizedField(field: LetterTextField) {
         var letter = letterFixture
-        field.set(&letter, String(repeating: "x", count: LetterDocumentValidator.maxTextBytes + 1))
+        field.set(&letter, String(repeating: "x", count: field.maxBytes + 1))
         #expect(invalid(letter) == LetterDocumentValidator.textReason(field.what))
-        field.set(&letter, String(repeating: "x", count: LetterDocumentValidator.maxTextBytes))
+        field.set(&letter, String(repeating: "x", count: field.maxBytes))
         #expect(invalid(letter) == nil)
     }
 
@@ -139,15 +145,18 @@ struct LetterDocumentContractTests {
         #expect(invalid(letter) != nil)
     }
 
-    /// A letter with every field at its bound: `filler` is a text of exactly the per-field bound, in bytes.
-    static func letterAtEveryBound(_ filler: String) -> LetterDocument {
+    /// A letter with every field at its bound: each field is `unit` repeated to exactly the field's bound in bytes, which is the CV's
+    /// for the sender's six fields and the letter's own for the rest.
+    static func letterAtEveryBound(_ unit: String) -> LetterDocument {
+        func fill(_ bytes: Int) -> String { String(repeating: unit, count: bytes / unit.utf8.count) }
+        let line = fill(LetterDocumentValidator.maxTextBytes), personal = fill(CVDocumentValidator.maxTextBytes)
         var letter = letterFixture
-        letter.sender = Person(name: filler, professionalTitle: filler, email: filler, phone: filler, location: filler, website: filler)
-        letter.recipient = LetterRecipient(formOfAddress: .masculine, name: filler, familyName: filler, company: filler,
-                                           address: Array(repeating: filler, count: LetterDocumentValidator.maxAddressLines))
-        letter.place = filler; letter.reference = filler; letter.subject = filler; letter.closing = filler; letter.name = filler
-        letter.body = Array(repeating: filler, count: LetterDocumentValidator.maxParagraphs)
-        letter.attachments = Array(repeating: filler, count: LetterDocumentValidator.maxAttachments)
+        letter.sender = Person(name: personal, professionalTitle: personal, email: personal, phone: personal, location: personal, website: personal)
+        letter.recipient = LetterRecipient(formOfAddress: .masculine, name: line, familyName: line, company: line,
+                                           address: Array(repeating: line, count: LetterDocumentValidator.maxAddressLines))
+        letter.place = line; letter.reference = line; letter.subject = line; letter.closing = line; letter.name = line
+        letter.body = Array(repeating: line, count: LetterDocumentValidator.maxParagraphs)
+        letter.attachments = Array(repeating: line, count: LetterDocumentValidator.maxAttachments)
         return letter
     }
 
@@ -164,13 +173,16 @@ struct LetterDocumentContractTests {
 
     @Test("a letter with every field at its bound is accepted, however its JSON is written, and the bounds say how large that is")
     func everyFieldAtItsBound() throws {
-        let bound = LetterDocumentValidator.maxTextBytes
-        // One-line fields: 6 of the sender, the signature, 3 of the recipient, its address lines, the place, the reference and
-        // the subject, and the attachments. Multi-line fields: the paragraphs and the closing.
-        let fields = 6 + 1 + 3 + LetterDocumentValidator.maxAddressLines + 3 + LetterDocumentValidator.maxAttachments + LetterDocumentValidator.maxParagraphs + 1
-        #expect(fields == 63 && LetterDocumentValidator.maxLetterTextBytes == fields * bound && LetterDocumentValidator.maxLetterTextBytes == 630_000)
-        for filler in [String(repeating: "x", count: bound), String(repeating: "🙂", count: bound / 4)] {
-            let letter = Self.letterAtEveryBound(filler)
+        let line = LetterDocumentValidator.maxTextBytes, personal = CVDocumentValidator.maxTextBytes
+        #expect(line == 10_000 && personal == 16_384)
+        // The letter's own fields of one line: the signature, 3 of the recipient, its address lines, the place, the reference and the
+        // subject, and the attachments. Its fields of several: the paragraphs and the closing. The sender's 6, as a CV's person has them.
+        let lines = 1 + 3 + LetterDocumentValidator.maxAddressLines + 3 + LetterDocumentValidator.maxAttachments
+        let several = LetterDocumentValidator.maxParagraphs + 1
+        #expect(lines == 35 && several == 22)
+        #expect(LetterDocumentValidator.maxLetterTextBytes == (lines + several) * line + 6 * personal && LetterDocumentValidator.maxLetterTextBytes == 668_304)
+        for unit in ["x", "🙂"] {
+            let letter = Self.letterAtEveryBound(unit)
             #expect(stringLeaves(of: letter).filter { $0 != letter.language }.reduce(0) { $0 + $1.utf8.count } == LetterDocumentValidator.maxLetterTextBytes)
             try LetterDocumentValidator.validate(letter)
             let plain = try JSONEncoder().encode(letter)
@@ -181,7 +193,7 @@ struct LetterDocumentContractTests {
             #expect(try LetterDocumentValidator.decode(json: escaped) == letter)
         }
         // The largest letter in JSON is the one of emoji: three times its text, and still within the bound.
-        let widest = Data(Self.escapingEveryNonASCII(String(decoding: try JSONEncoder().encode(Self.letterAtEveryBound(String(repeating: "🙂", count: bound / 4))), as: UTF8.self)).utf8)
+        let widest = Data(Self.escapingEveryNonASCII(String(decoding: try JSONEncoder().encode(Self.letterAtEveryBound("🙂")), as: UTF8.self)).utf8)
         #expect(widest.count > 3 * LetterDocumentValidator.maxLetterTextBytes - 1_000 && widest.count <= LetterDocumentValidator.maxJSONBytes)
     }
 
@@ -251,9 +263,42 @@ struct LetterDocumentContractTests {
         #expect(invalid(letter)?.hasPrefix(field.what) == true)
     }
 
+    /// The personal details as Authoring keeps them (the shapes are those of `PersonalDetails` and its fixtures, which this package
+    /// cannot import): values are not trimmed, and a location may hold several lines.
+    static let savedSenders: [Person] = [
+        Person(name: "Ada Lovelace", professionalTitle: "iOS Engineer", email: "ada@example.com", phone: "+39 06 1234567", location: "Roma", website: "https://ada.example"),
+        Person(name: "Ada Lovelace", professionalTitle: "iOS Engineer", email: "ada@example.com", phone: "+39 06 1234567", location: "Via Roma 1\n00100 Roma", website: "https://ada.example"),
+        Person(name: " Ada Lovelace ", professionalTitle: "iOS Engineer", location: "Via Roma 1\n00100 Roma\nItalia"),
+        Person(name: "Ada Lovelace\n", professionalTitle: "  iOS Engineer", email: " ada@example.com", phone: "+39 06 1234567 ", location: "\nRoma\n\n", website: " https://ada.example"),
+        Person(name: "A", professionalTitle: "", email: "", phone: "", location: "", website: ""),
+    ]
+
+    @Test("a sender that a CV keeps is accepted by the letter validator, in the six fields: the rule is the CV's", arguments: savedSenders)
+    func savedSender(person: Person) throws {
+        try CVDocumentValidator.validate(CVDocument(language: "en", person: person, sections: []))
+        var letter = letterFixture
+        letter.sender = person
+        try LetterDocumentValidator.validate(letter)
+        #expect(try LetterDocumentValidator.decode(json: try JSONEncoder().encode(letter)) == letter)
+    }
+
+    @Test("the sender is refused as a CV's person is: a name that says nothing, a text over the CV's bound, a control character")
+    func senderIsRefusedAsACVPersonIs() throws {
+        for person in [Person(name: " \n "), Person(name: "A", location: String(repeating: "x", count: CVDocumentValidator.maxTextBytes + 1)),
+                       Person(name: "A", email: "a\u{0007}b"), Person(name: "A", location: "a\u{202E}b"), Person(name: "A\tB")] {
+            #expect(throws: CVDocumentValidator.Invalid.self) { try CVDocumentValidator.validate(CVDocument(language: "en", person: person, sections: [])) }
+            var letter = letterFixture
+            letter.sender = person
+            #expect(invalid(letter) != nil)
+        }
+        var letter = letterFixture
+        letter.sender = Person(name: "\n ")
+        #expect(invalid(letter) == "the sender's name is required")
+    }
+
     /// A field of one line that is not trimmed: Authoring trims, so only a JSON client sends one.
     static let untrimmed: [String] = [" x", "x ", "  x  ", "\u{00A0}x", "x\u{3000}", "x\u{2028}", "\u{2029}x"]
-    static let oneLineFields: [LetterTextField] = LetterTextField.all.filter { !$0.multiline }
+    static let oneLineFields: [LetterTextField] = LetterTextField.all.filter(\.trimmed)
 
     @Test("a field of one line that starts or ends with white space is refused, and says so", arguments: oneLineFields, untrimmed)
     func untrimmedLines(field: LetterTextField, text: String) {
@@ -302,7 +347,10 @@ struct LetterDocumentContractTests {
             letter.body[0] = text
             var line = letterFixture
             line.recipient.name = text
+            var sender = letterFixture
+            sender.sender.location = text
             if cv != (invalid(letter) == nil) { disagreements.append(scalar.value) }
+            if cv != (invalid(sender) == nil) { disagreements.append(scalar.value) }          // the sender follows the CV's rule, line breaks included
             if scalar != "\n" && cv != (invalid(line) == nil) { disagreements.append(scalar.value) }
         }
         #expect(disagreements.isEmpty, "\(disagreements.prefix(8))")
