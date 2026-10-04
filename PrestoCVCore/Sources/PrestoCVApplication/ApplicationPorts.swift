@@ -8,7 +8,9 @@ public protocol ApplicationRepository: Sendable {
     /// Stores a never-saved application (revision 0) as revision 1, with its CV at the same revision. For a job that the
     /// store already holds an application for, it returns that application and stores nothing: the repository checks the job's
     /// identifier under its lock, so two creates for one job leave one application. Fails with `alreadyExists` when the
-    /// identifier is taken by an application of another job.
+    /// identifier is taken by an application of another job. The check is fail-open: a file that cannot be read, or that fails the
+    /// strict read, does not hold its job, so keeping a result is never refused because of another file. So per-job uniqueness
+    /// holds for create only: restoring a repaired file can bring back a second application for a job.
     func create(_ application: Application) async throws(ApplicationRepositoryError) -> Application
     /// Replaces the stored application only if its revision equals `application.revision`; returns it at revision + 1. The
     /// CV and the letter share that revision.
@@ -21,6 +23,8 @@ public protocol ApplicationRepository: Sendable {
 
 /// Recovery and erasure of applications, reachable from the UI (quarantine review, "delete everything about this application").
 public protocol ApplicationStoreMaintenance: Sendable {
+    /// Brings a quarantined application back through the read checks. It can bring back a second application for a job that create
+    /// already kept another for, since create does not read what it cannot read: per-job uniqueness holds for create only.
     func restore(quarantined name: String) async throws(ApplicationRepositoryError) -> Application
     /// Removes every copy of an application: the stored file whatever its schema, and quarantined copies (GDPR erasure).
     func erase(_ id: ApplicationID) async throws(ApplicationRepositoryError)
@@ -49,7 +53,8 @@ public enum ApplicationRepositoryError: Error, Equatable, Sendable {
 public protocol LetterDefaultsStore: Sendable {
     func load() async throws(LetterDefaultsError) -> StoredLetterDefaults
     /// Stores the defaults only if the stored revision equals `expectedRevision`; returns them at revision + 1. The first save
-    /// expects revision 0, that is, no file.
+    /// expects revision 0, that is, no file. The revision restarts after a quarantine or an erase, since the file is gone: a window
+    /// that still holds an old revision N can overwrite once the counter reaches N again. That is rare, and a known limitation.
     func save(_ defaults: LetterDefaults, expectedRevision: Int) async throws(LetterDefaultsError) -> StoredLetterDefaults
     /// Removes every copy of the defaults: the stored file whatever its schema, and quarantined copies (GDPR erasure). It removes
     /// what it can, the stored file first, even when the quarantine cannot be used, and fails with the first copy that it could
@@ -69,7 +74,7 @@ public enum LetterDefaultsError: Error, Equatable, Sendable {
     case conflict(storedRevision: Int), alreadyExists
     /// The file is corrupt. While it is still stored, `file` is its name and a save is refused. Once a quarantined copy of it
     /// stands, `file` is the copy's name, which `restore` accepts, and the store reports it on every load until the copy is
-    /// restored or new defaults are saved. `reason` is a stable code.
+    /// restored or purged or erased, or new defaults are saved. `reason` is a stable code.
     case corrupt(file: String, reason: String)
     /// The file is corrupt and could not be moved aside: it stays where it is, and no copy stands to restore (R12).
     case quarantineFailed(file: String)

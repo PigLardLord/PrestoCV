@@ -6,10 +6,12 @@ import PrestoCVApplication
 /// gives a CV: one file per application, named from its identifier, in schema 1, in a directory of its own with its own lock
 /// and its own `Quarantine/`; every outcome of R12; atomic writes that must read back; and every mutation under an exclusive
 /// `flock`, so revision checks hold across repository instances and processes. The composition root keeps one instance per
-/// process (ADR 0008).
+/// process (ADR 0008). Waiting for the lock blocks a thread of the cooperative pool: #111.
 ///
 /// The CV inside an application is part of its file, so the application's revision and times are the CV's, and erasing an
-/// application erases the CV with it. Erasing a CV does not erase the applications made from it.
+/// application erases the CV with it. Erasing a CV does not erase the applications made from it. Create is fail-open: it reads the
+/// job of each file it can, so restoring a repaired file can bring back a second application for a job, and per-job uniqueness
+/// holds for create only.
 public actor FileApplicationRepository: ApplicationRepository, ApplicationStoreMaintenance {
     private let store: StoreDirectory<ApplicationRepositoryError>
 

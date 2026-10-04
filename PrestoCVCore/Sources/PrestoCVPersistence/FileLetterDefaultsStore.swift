@@ -9,7 +9,10 @@ import PrestoCVApplication
 /// A missing file is empty defaults, and nothing else is: a file that is newer, unreadable, oversized or corrupt is reported
 /// by its own outcome, never read as empty (R7). A corrupt file is moved to the quarantine, and the store remembers it by the
 /// copy that stands there: while a copy stands and no file replaces it, every load reports `corrupt`, until the user restores
-/// the copy or saves new defaults. The composition root keeps one instance per process (ADR 0008).
+/// the copy or saves new defaults, or the copy is purged or erased. The revision restarts after a quarantine or an erase, since
+/// the file is gone, so a window that still holds an old revision N can overwrite once the counter reaches N again: rare, and a
+/// known limitation. The composition root keeps one instance per process (ADR 0008). Waiting for the lock blocks a thread of
+/// the cooperative pool: #111.
 public actor FileLetterDefaultsStore: LetterDefaultsStore, LetterDefaultsMaintenance {
     private let store: StoreDirectory<LetterDefaultsError>
 

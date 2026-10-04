@@ -113,7 +113,7 @@ public struct DeleteApplication: Sendable {
 }
 
 /// The person's letter defaults, or none yet. A store that cannot be read is an error, never empty defaults: a corrupt file
-/// reports `corrupt` until the user restores the quarantined copy or saves new defaults.
+/// reports `corrupt` until the user restores the quarantined copy or saves new defaults, or the copy is purged or erased.
 public struct LoadLetterDefaults: Sendable {
     let store: any LetterDefaultsStore
     public init(store: any LetterDefaultsStore) { self.store = store }
