@@ -9,6 +9,7 @@ public enum ApplicationField: Hashable, Sendable {
     case jobID, promptVersion, providerAlias, modelAlias
     case snapshot, statement, reportArgument, reportEntry, questions, questionCode, questionValue, answer
     case lineSources, statementReference, answerReference
+    case advertCompany, advertRole, advertText
 }
 
 /// Why a value of an application, of its cover letter or of the letter defaults is refused (R6). A code, never a text:
@@ -22,6 +23,10 @@ public enum ApplicationError: Error, Equatable, Sendable {
     case invalidReference(ApplicationField)
     /// The letter defaults as the snapshot held them do not say what the override set for this field.
     case overrideNotApplied(LetterDefaults.Field)
+    /// The tailored CV does not meet `CV.canBeSaved`, on create or on an update.
+    case cvCannotBeSaved
+    /// No change replaces the identity that the application's CV was given when the application was created.
+    case cvIdentityChanged
 }
 
 /// The one rule for a text that a person or a tailoring wrote and that is stored and printed (R6): trimmed, bounded in

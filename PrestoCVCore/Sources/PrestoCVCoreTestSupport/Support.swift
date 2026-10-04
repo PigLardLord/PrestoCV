@@ -192,3 +192,17 @@ public enum FixtureProvenance {
         } catch { preconditionFailure("the fixture provenance is valid: \(error)") }
     }
 }
+
+/// An application with every field populated, never saved, so completeness tests (mappers, persistence) see every leaf.
+public enum FixtureApplication {
+    public static let id = ApplicationID(UUID(uuidString: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")!)
+    public static let cvID = CVID(UUID(uuidString: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")!)
+
+    public static func full(id: ApplicationID = FixtureApplication.id, cvID: CVID = FixtureApplication.cvID, jobID: String = "job-0001") -> Application {
+        do {
+            return try Application(id: id, cv: FixtureCV.full(id: cvID), letter: FixtureLetter.full(),
+                                   advert: Advert(company: "Acme S.r.l.", role: "iOS Engineer", text: "We look for an iOS engineer.\nSwiftUI is a plus."),
+                                   provenance: FixtureProvenance.full(jobID: jobID))
+        } catch { preconditionFailure("the fixture application is valid: \(error)") }
+    }
+}

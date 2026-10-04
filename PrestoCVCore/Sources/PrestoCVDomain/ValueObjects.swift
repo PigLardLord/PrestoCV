@@ -7,6 +7,11 @@ public struct CVID: Hashable, Sendable, Codable {
     public init(_ raw: UUID) { self.raw = raw }
 }
 
+public struct ApplicationID: Hashable, Sendable, Codable {
+    public let raw: UUID
+    public init(_ raw: UUID) { self.raw = raw }
+}
+
 // MARK: - Dates and periods
 
 /// Year, or year and month. Only a partial order exists between dates of different precision.
