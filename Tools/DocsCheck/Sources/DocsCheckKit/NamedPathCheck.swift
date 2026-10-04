@@ -47,7 +47,7 @@ struct NamedPathCheck {
                                         message: "\(Finding.quoted(entry.path)) exists now, so it is no longer planned (ticket #\(entry.ticket)): remove its entry"))
             } else if !excused.contains(entry.path) {
                 findings.append(Finding(file: plannedFileName, line: entry.line, code: .plannedPathUnused,
-                                        message: "no document names \(Finding.quoted(entry.path)) (ticket #\(entry.ticket)): remove its entry"))
+                                        message: "the entry for \(Finding.quoted(entry.path)) excuses no missing name: no document names it, or the name is found elsewhere (ticket #\(entry.ticket)): remove it"))
             }
         }
         return findings

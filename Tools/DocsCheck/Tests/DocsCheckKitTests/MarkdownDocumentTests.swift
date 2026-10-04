@@ -52,6 +52,11 @@ struct MarkdownDocumentTests {
         #expect(destinations(text) == ["a.md", "b.md", "c.md", "d e.md", "e.md", "f.md"])
     }
 
+    @Test("a footnote definition is not a link definition, even when it ends right after a path")
+    func footnoteDefinition() {
+        #expect(destinations("[^note]: gone.md\n[^1]: other.md \"title\"\n[note]: kept.md") == ["kept.md"])
+    }
+
     @Test("code spans and fenced blocks hide what looks like a link")
     func codeHidesLinks() {
         let text = """

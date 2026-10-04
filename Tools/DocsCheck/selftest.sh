@@ -62,6 +62,8 @@ setup; put README.md $'# Project\n\n[Note]: the next paragraph says more, see `d
 fixed "a line that starts like a definition but goes on in words is prose"
 put README.md $'# Project\n\n[Note]: gone.md "Title"'
 stale "a definition with a title" "^README.md:3: link-target-missing:"
+setup; put README.md $'# Project\n\n[^note]: gone.md'
+fixed "a footnote definition is not a link definition"
 setup; put README.md $'# Project\n\nSee [line 10](docs/guide.md?plain=1#L10).'
 fixed "a fragment of a plain=1 link is a line, not a heading"
 put README.md $'# Project\n\nSee [line 10](docs/guide.md#L10).'
@@ -219,7 +221,7 @@ check_script() {
 git_setup() {
   setup; put Tools/DocsCheck/planned.json '[]'; put PrestoCVUITests/Login.swift ''; put Prototypes/Demo/x.txt ''
   put README.md $'# Project\n\nThe UI tests are in `PrestoCVUITests/`, the demo in `Prototypes/`.'
-  git -C "$ROOT" init -q && git -C "$ROOT" add -A && git -C "$ROOT" -c user.name=test -c user.email=test@example.invalid -c commit.gpgsign=false commit -q -m init
+  git -C "$ROOT" init -q && git -C "$ROOT" add -A && git -C "$ROOT" -c user.name=test -c user.email=test@example.invalid -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q -m init
 }
 if command -v git > /dev/null; then
   git_setup; check_script "check.sh passes on a checkout where every named directory exists" 0 "0 findings"
