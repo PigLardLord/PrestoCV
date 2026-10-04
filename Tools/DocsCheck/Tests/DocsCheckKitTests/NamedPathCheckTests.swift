@@ -78,13 +78,4 @@ struct NamedPathCheckTests {
         let result = try findings(in: ["README.md": "Nothing.", "Tools/run.sh": ""], planned: planned)
         #expect(result.contains { $0.hasSuffix(" planned-file-invalid") })
     }
-
-    @Test("a planned file that cannot be read is an error, never a pass")
-    func missingPlannedFile() throws {
-        try withRepository(["README.md": "x"]) { root in
-            #expect(throws: (any Error).self) {
-                try DocumentationChecker(root: root, plannedFile: root.appendingPathComponent("missing.json")).run()
-            }
-        }
-    }
 }

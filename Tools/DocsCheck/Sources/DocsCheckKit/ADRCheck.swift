@@ -14,8 +14,8 @@ struct ADRCheck {
         let status: ADRStatus?
     }
 
-    func findings(in documents: [Document]) -> [Finding] {
-        guard tree.kind(of: Self.directory) == .directory else {
+    func findings(in documents: [Document]) throws(DocsCheckError) -> [Finding] {
+        guard try tree.kind(of: Self.directory) == .directory else {
             return [Finding(file: Self.directory, line: 1, code: .adrDirectoryMissing, message: "the ADR directory does not exist, so there is no ADR to check")]
         }
         let byPath = Dictionary(documents.map { ($0.path, $0.markdown) }, uniquingKeysWith: { first, _ in first })

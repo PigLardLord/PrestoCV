@@ -12,9 +12,9 @@ struct RuleStatedCheck {
 
     let tree: RepositoryTree
 
-    func findings() throws -> [Finding] {
+    func findings() throws(DocsCheckError) -> [Finding] {
         var findings: [Finding] = []
-        if tree.kind(of: Self.agentsPath) == .file {
+        if try tree.kind(of: Self.agentsPath) == .file {
             if !Self.contains(phrase: Self.ruleMarker, in: try tree.text(of: Self.agentsPath)) {
                 findings.append(Finding(file: Self.agentsPath, line: 1, code: .ruleNotStated,
                                         message: "it does not state that \(Self.ruleMarker)"))
@@ -22,7 +22,7 @@ struct RuleStatedCheck {
         } else {
             findings.append(Finding(file: Self.agentsPath, line: 1, code: .ruleNotStated, message: "the file does not exist, so the rule is not stated"))
         }
-        if tree.kind(of: Self.templatePath) == .file {
+        if try tree.kind(of: Self.templatePath) == .file {
             let headings = MarkdownDocument(text: try tree.text(of: Self.templatePath)).headings
             if !headings.contains(where: { Self.words(in: $0.text) == Self.words(in: Self.templateHeadingMarker) }) {
                 findings.append(Finding(file: Self.templatePath, line: 1, code: .templateDoesNotAsk,

@@ -27,5 +27,5 @@ do {
     print("checked \(report.documentCount) documents: \(report.findings.count) findings")
     exit(report.findings.isEmpty ? 0 : 1)
 } catch {
-    fail("\(error)")
+    fail(error.description)
 }

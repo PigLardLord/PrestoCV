@@ -61,7 +61,7 @@ fixed "a link in a code span or in a fenced block is not a link"
 setup; put Package/README.md $'[gone](gone.md)'; put Package/.build/checkouts/dep/README.md $'[gone](gone.md)'
 stale "a README in a package" "^Package/README.md:1: link-target-missing:"
 rm "$ROOT/Package/README.md"; fixed "the README in .build is not read"
-setup; ROOT="$ROOT/missing"; expect "a root that does not exist is an error, not a pass" 2 "^error:"
+setup; ROOT="$ROOT/missing"; expect "a root that does not exist is an error, not a pass" 2 "^error: cannot read .*/missing$"
 
 # --- 2. named paths
 setup; put README.md $'# Project\n\nRun `Tools/check.sh` to check.'; mkdir -p "$ROOT/Tools"; put Tools/run.sh '#!/bin/sh'
@@ -82,7 +82,7 @@ setup; mkdir -p "$ROOT/Tools"; put planned.json $'[\n  {"path": "Tools/future.sh
 stale "a declared path that no document names" "^planned.json:2: planned-path-unused:" --planned "$ROOT/planned.json"
 put planned.json $'[{"path": "Tools/future.sh"}]'
 stale "a planned entry without its ticket" "^planned.json:1: planned-file-invalid:" --planned "$ROOT/planned.json"
-setup; expect "a planned file that cannot be read is an error, not a pass" 2 "^error:" --planned "$ROOT/planned.json"
+setup; expect "a planned file that cannot be read is an error, not a pass" 2 "^error: cannot read planned.json$" --planned "$ROOT/planned.json"
 
 # --- 3. ADR status and index
 setup; put $ADR/0001-first.md $'# 0001. First\n\n- **Date:** 2026-01-01'

@@ -10,7 +10,7 @@ struct LinkCheck {
         self.tree = tree
     }
 
-    mutating func findings(in documents: [Document]) throws -> [Finding] {
+    mutating func findings(in documents: [Document]) throws(DocsCheckError) -> [Finding] {
         var findings: [Finding] = []
         for document in documents {
             anchorsByFile[document.path] = Set(document.markdown.anchors)
@@ -21,7 +21,7 @@ struct LinkCheck {
         return findings
     }
 
-    private mutating func finding(for link: MarkdownDocument.Link, in document: Document) throws -> Finding? {
+    private mutating func finding(for link: MarkdownDocument.Link, in document: Document) throws(DocsCheckError) -> Finding? {
         guard let target = LinkTarget(destination: link.destination) else { return nil }
         func report(_ code: FindingCode, _ message: String) -> Finding {
             Finding(file: document.path, line: link.line, code: code, message: message)
@@ -34,7 +34,7 @@ struct LinkCheck {
             guard let resolved = RepositoryPath.resolve(relative, from: document.path) else {
                 return report(.linkTargetMissing, "`\(link.destination)` leaves the repository")
             }
-            guard let kind = tree.kind(of: resolved), kind == .directory || !relative.hasSuffix("/") else {
+            guard let kind = try tree.kind(of: resolved), kind == .directory || !relative.hasSuffix("/") else {
                 return report(.linkTargetMissing, "`\(link.destination)` does not exist")
             }
             guard kind == .file, resolved.hasSuffix(".md") else { return nil }
@@ -47,7 +47,7 @@ struct LinkCheck {
         return nil
     }
 
-    private mutating func anchors(of path: String) throws -> Set<String> {
+    private mutating func anchors(of path: String) throws(DocsCheckError) -> Set<String> {
         if let known = anchorsByFile[path] { return known }
         let anchors = Set(MarkdownDocument(text: try tree.text(of: path)).anchors)
         anchorsByFile[path] = anchors
