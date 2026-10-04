@@ -138,14 +138,16 @@ Untrusted input is: design packages, AI output, persisted files, imported docume
 - **Native evidence.** The native renderers must also pass a geometric check: each field inside the page, and legible. It is pending until they exist ([ADR 0003](adr/0003-one-pdf-renderer-per-platform.md)).
 - **Documents** arriving as JSON (backend) pass `CVDocumentValidator`: supported version, required name, bounded text and counts, valid dates and ratings.
 - **Imported documents** ([ADR 0020](adr/0020-import.md)): a PDF, an image or a LinkedIn archive is bounded in bytes before it is read, and then in pages, in entries and in the text it yields.
-  - An archive is read in memory. It writes nothing to disk, follows no path inside it and inflates only the files it reads.
-  - The text that extraction yields enters as an `ExtractedDocument`, validated when it is made: bounded, with no control characters.
-  - A model's draft from it is AI output. The check holds it to that text, and the user reviews it before it is saved.
+  - An image's pixel dimensions are read from its header and bounded before the image is decoded.
+  - An archive is read in memory. It writes nothing to disk, follows no path inside it and inflates only the files it reads. It counts the bytes it actually inflates, and does not trust the sizes its headers declare.
+  - The CSV of an archive is bounded in rows and in the length of a field.
+  - The text that extraction yields enters as an `ExtractedDocument`, validated when it is made: bounded, and with no control character other than the line break. A line break ends a block and is never refused.
+  - A model's draft from it is AI output. The check holds it to that text, and the user reviews it before it is saved. A draft is bounded by what a CV holds, and a value over a bound is a typed error that names the field, never a silent truncation.
 - **Persisted files**: see R12.
 
 **Why.** See issue #9 and the security review of 2026-09-27: a regex deny-list let 34 of 34 content-hiding constructs through, and could be bypassed with CSS comments and strings. On a backend, a `<style>` breakout would be server-side request forgery.
 
-**Enforced by:** test (one per attack, listed in the Design Catalog and Rendering tests, and in the import tests of #193 and #194) and the type system (`ValidatedStylesheet` can only be created by the validator).
+**Enforced by:** test (one per attack, listed in the Design Catalog and Rendering tests, in the import tests of #193 and #194, and in #196's test that the spec's bounds equal the bounds of `ExtractedDocument`) and the type system (`ValidatedStylesheet` can only be created by the validator).
 
 ## R9. Swift 6, complete concurrency checking, no escape hatches
 

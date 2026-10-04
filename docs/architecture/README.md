@@ -22,11 +22,11 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 | **AI Drafting** | supporting | Producing a CV draft from a description, from a PDF or a scan, or from LinkedIn's data archive: extracting the text on the device, structuring it with the on-device model or, when the device cannot, on the server, and mapping the archive's CSV files | `CVGeneratorAI` |
 | **CV Tailoring** | core domain | Tailoring one CV to a job advert and writing its cover letter, and holding both to their sources: advert analysis, content checks, the provenance gate, the tailoring loop | `CVTailoring` |
 | **App** | integration and presentation | Cross-context workflows, the mappers between contexts, view models, views, the composition root | `PrestoCVApp` package + Xcode app target |
-| **Server** | integration and composition | The HTTP API, the jobs, and the adapters that run tailorings with a model | `PrestoCVServer` package |
+| **Server** | integration and composition | The HTTP API, the jobs, and the adapters that run tailorings and drafts with a model | `PrestoCVServer` package |
 
 CV Tailoring is the context [ADR 0005](adr/0005-remove-ai-tailoring-and-json-resume.md) reserved ([ADR 0013](adr/0013-cv-tailoring-context.md)). It runs in the app and on the server; the tailoring loop runs only on the server. JSON Resume is not supported (ADR 0005).
 
-Every source of a draft, a description, a PDF, a scan or LinkedIn's data archive, produces a `CVDraft` that the user reviews before it becomes a CV. A draft that comes from a document is held to that document's text by `CVTailoring`'s content checks, which `PrestoCVIntegration` runs because the contexts never import one another. Images and PDFs never leave the device; only extracted text can go to the server, and only when the device cannot structure it ([ADR 0020](adr/0020-import.md)).
+Every source of a draft, a description, a PDF, a scan or LinkedIn's data archive, produces a `CVDraft` that the user reviews before it becomes a CV. A draft that comes from a document is held to that document's text by one entry point of `CVTailoring`, which both integration layers call because the contexts never import one another. Images and PDFs never leave the device; only extracted text can go to the server, and only when the device cannot structure it ([ADR 0020](adr/0020-import.md)).
 
 The server is an integration and composition package beside the app, in two roles, `serve` and `work` ([ADR 0014](adr/0014-server-modular-monolith.md)). Like the app, it has a composition root of its own ([R4](rules.md#r4-one-composition-root-per-executable)). It reaches models through the providers its deployment configures, each held to the deployment's data policy ([ADR 0015](adr/0015-inference-providers-and-data-policy.md)). Hosted, it runs on Cloud Run in the EU, erases a job once the app has its result (24 hours after it ends at the latest), and limits what it spends ([ADR 0017](adr/0017-hosting-storage-and-cost.md)).
 
@@ -41,17 +41,18 @@ The server is an integration and composition package beside the app, in two role
                           ┌───────────────┐  ┌──────────────────────────┐  ┌──────────────┐  ┌───────────────┐                     │
                           │ CV Authoring  │  │ Design Catalog           │  │ AI Drafting  │  │ CV Tailoring  │                     │
                           │ (PrestoCVCore)    │  │ Document Rendering       │  │ (CVGenerator │  │ (CVTailoring) │                     │
-                          │               │  │ (CVPDFExporter)          │  │  AI)         │  │               │◀────────────────────┘
-                          └───────────────┘  └──────────────────────────┘  └──────────────┘  └───────────────┘
-                              no arrows between the four packages
+                          │               │  │ (CVPDFExporter)          │  │  AI)         │  │               │◀────────────────────┤
+                          └───────────────┘  └──────────────────────────┘  └──────────────┘  └───────────────┘                     │
+                              no arrows between the four packages                 ▲                                                │
+                                                                                  └────────────────────────────────────────────────┘
 ```
 
 - The four domain packages **never import each other**. Each publishes its own model: `CV` in Authoring, `CVDocument` in Rendering, `CVDraft` in Drafting, `SourceCV` and `TailoredCV` in Tailoring.
 - Inside `CVPDFExporter`, Document Rendering is downstream of Design Catalog: it consumes validated stylesheets and palettes. That is the only edge between contexts inside a package, and it goes one way ([R1](rules.md#r1-packages-are-isolated-contexts-depend-only-along-documented-edges)).
-- All translation between contexts happens today in one place: the app's integration layer (`PrestoCVIntegration`). Each mapper is exhaustive and tested ([ADR 0007](adr/0007-each-package-owns-its-model.md)).
-- On the server, `ServerHTTP` maps the API's generated types to the tailoring and drafting models and back. That is not a translation between contexts, and the generated types never leave it ([ADR 0014](adr/0014-server-modular-monolith.md)). The one translation between two contexts on the server is in `ServerApplication`: a draft and its text, into the content checks ([ADR 0020](adr/0020-import.md)).
+- In the app, all translation between contexts happens in one place: its integration layer (`PrestoCVIntegration`). Each mapper is exhaustive and tested ([ADR 0007](adr/0007-each-package-owns-its-model.md)).
+- On the server, `ServerHTTP` maps the API's generated types to the tailoring and drafting models and back. That is not a translation between contexts, and the generated types never leave it ([ADR 0014](adr/0014-server-modular-monolith.md)). The one translation between two contexts on the server is in `ServerApplication`: a draft and its text, into the import check of `CVTailoring` ([ADR 0020](adr/0020-import.md)).
 - The API between the app and the server is one spec, `openapi.yaml`, in the `PrestoCVAPI` package. The types, the server's protocol and the app's client are generated from it and committed, and CI keeps them current and compatible. The package is not a context. Its generated types are imported only by `ServerHTTP` and, in the app, by the outbound adapter `PrestoCVAPIAdapter`, which is the app's only client of the API, and never leave them ([ADR 0016](adr/0016-api-contract.md)).
-- The server sits beside the app. Today it conforms only to CV Tailoring's published model.
+- The server sits beside the app. Today it conforms to CV Tailoring's published model and, for drafts, to AI Drafting's.
 - `CVPDFExporter` is reusable outside the app, including on a Linux backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)).
 
 ## Target graph
@@ -84,7 +85,7 @@ PrestoCVAPI package         PrestoCVAPITypes ◀── PrestoCVAPIServer, Presto
 PrestoCVServer package
   PrestoCVServer (executable, composition root) ──▶ every target below, and Tailoring, CVDrafting
   ServerHTTP ──▶ ServerApplication, TailoringModel, CVDrafting, PrestoCVAPITypes, PrestoCVAPIServer
-  ServerApplication ──▶ TailoringModel, Tailoring, CVDrafting, ContentChecks, Provenance
+  ServerApplication ──▶ TailoringModel, Tailoring, CVDrafting, AdvertAnalysis, Provenance
   ServerInference ──▶ ServerApplication, Tailoring, TailoringModel, CVDrafting
   ServerStorePostgres ──▶ ServerApplication, TailoringModel, CVDrafting
   ServerQueueCloudTasks, ServerLocalProfile ──▶ ServerApplication
