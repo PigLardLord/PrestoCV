@@ -16,6 +16,8 @@ One word, one meaning, in code, UI copy, tickets and translations. Today "templa
 | **Design package** | The `.mcvt` file that carries a design: manifest, CSS, preview image. | — | Design Catalog |
 | **Bundled design** | A design package shipped inside `CVBundledDesigns`. | Installed design | Design Catalog |
 | **Installed design** | A design package in the design store, bundled or imported. | — | Design Catalog |
+| **Imported design** | An installed design that came from a package someone supplied. It never takes the identifier of a bundled design. | Bundled design | Design Catalog |
+| **Design origin** | `bundled` (installed by the sync) or `imported` (installed by an import). The store records it, outside the package, because a package is untrusted. | — | Design Catalog |
 | **Palette** / **Font scheme** | Customisations of a design. They get their own names in the UI (colour names, typeface names), never a design's name. | Design | Design Catalog |
 | **Design choice** | The design, palette and font a CV uses, stored on the CV. | — | Authoring (as opaque identifiers) |
 | **Document** | `CVDocument`: the input of rendering, the published language of `CVPDFExporter`. | CV | Rendering |

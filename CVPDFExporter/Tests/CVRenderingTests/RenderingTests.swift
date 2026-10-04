@@ -430,6 +430,7 @@ func startTags(in html: String) -> [(name: String, attributes: [String: String])
 
 @Suite("ADR 0011 · installing a design goes through the rendering gate (review round 2)")
 struct InstallTests {
+    let noBundledDesigns = FixedBundledSource(packages: [])
     func gate(_ renderer: any PDFRendering) throws -> FixtureRenderingGate {
         FixtureRenderingGate(renderer: renderer, inspector: MinimalPDFInspector(), fixture: fixture,
                              headings: try HeadingsCatalog.headings(for: "it"))
@@ -437,7 +438,7 @@ struct InstallTests {
     @Test("a valid design that renders completely is stored")
     func installs() async throws {
         let store = InMemoryDesignStore()
-        _ = try await InstallDesign(gate: try gate(FakePDFRenderer()), store: store)(designData(cleanCSS, id: "clean"))
+        _ = try await InstallDesign(source: noBundledDesigns, gate: try gate(FakePDFRenderer()), store: store)(designData(cleanCSS, id: "clean"))
         #expect(try await store.design(id: "clean") != nil)
     }
     @Test("a design whose rendering loses content is not stored")
@@ -448,14 +449,14 @@ struct InstallTests {
             }
         }
         let store = InMemoryDesignStore()
-        await #expect(throws: FixtureRenderingGate.Rejection.self) { _ = try await InstallDesign(gate: try gate(Dropping()), store: store)(designData(cleanCSS, id: "clean")) }
+        await #expect(throws: FixtureRenderingGate.Rejection.self) { _ = try await InstallDesign(source: noBundledDesigns, gate: try gate(Dropping()), store: store)(designData(cleanCSS, id: "clean")) }
         #expect(try await store.design(id: "clean") == nil)
     }
     @Test("an invalid package is not stored and never rendered")
     func invalid() async throws {
         struct Unreachable: PDFRendering { func render(html: String, page: PageSetup) async throws -> RenderedPDF { Issue.record("rendered"); throw CancellationError() } }
         let store = InMemoryDesignStore()
-        await #expect(throws: DesignPackageRejected.self) { _ = try await InstallDesign(gate: try gate(Unreachable()), store: store)(designData(".cv{display:none}", id: "bad")) }
+        await #expect(throws: DesignPackageRejected.self) { _ = try await InstallDesign(source: noBundledDesigns, gate: try gate(Unreachable()), store: store)(designData(".cv{display:none}", id: "bad")) }
         #expect(try await store.design(id: "bad") == nil)
     }
 }

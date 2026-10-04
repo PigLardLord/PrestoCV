@@ -164,6 +164,25 @@ struct FileDesignStoreOriginTests {
         }
     }
 
+    @Test("an import shadowing a bundled design through the file store is refused, and the bundled design still upgrades")
+    func importShadowingThroughTheFileStore() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir), gate = FakeRenderingGate()
+            let source = FixedBundledSource(packages: [("modern", try DesignStoreContract.package(id: "modern"))])
+            _ = try await SyncBundledDesigns(source: source, gate: gate, store: store)()
+            let bundledModern = try await store.design(id: "modern")
+            let shadow = try DesignStoreContract.package(id: "modern", version: "999999999.0.0", css: ".cv-skill{font-weight:700}")
+            await #expect(throws: DesignCatalogError.bundledIdentifier("modern")) {
+                _ = try await InstallDesign(source: source, gate: gate, store: store)(shadow)
+            }
+            #expect(try await store.design(id: "modern") == bundledModern)
+            let fixed = FixedBundledSource(packages: [("modern", try DesignStoreContract.package(id: "modern", version: "1.0.1"))])
+            let report = try await SyncBundledDesigns(source: fixed, gate: gate, store: store)()
+            #expect(report.upgraded == ["modern"] && report.conflicts.isEmpty)
+            #expect(try await store.installedOrigins() == ["modern": .bundled])
+        }
+    }
+
     @Test("the record's version follows the origins it holds: bump it when an origin is added")
     func recordVersionFollowsOrigins() {
         let message: Comment = "a record written with a new origin cannot be read by an older app: bump the record version when an origin is added"

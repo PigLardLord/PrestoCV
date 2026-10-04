@@ -348,3 +348,64 @@ struct SyncBundledDesignsTests {
         #expect(await gate.verified.isEmpty)
     }
 }
+
+@Suite("importing a design (#127)")
+struct InstallDesignTests {
+    @Test("an import that takes the identifier of a bundled design is refused, whatever its version: the bundled design stays",
+          arguments: ["0.0.1", "1.0.0", "999999999.0.0"])
+    func refusedOverBundled(version: String) async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let source = FixedBundledSource(packages: [try bundled("modern")])
+        _ = try await SyncBundledDesigns(source: source, gate: gate, store: store)()
+        let bundledModern = try await GetDesign(store: store)(id: "modern")
+        let importGate = FakeRenderingGate()
+        let install = InstallDesign(source: source, gate: importGate, store: store)
+        await #expect(throws: DesignCatalogError.bundledIdentifier("modern")) { _ = try await install(DesignStoreContract.package(id: "modern", version: version, css: otherCSS)) }
+        #expect(try await GetDesign(store: store)(id: "modern") == bundledModern)
+        #expect(try await store.installedOrigins() == ["modern": .bundled])
+        #expect(await importGate.verified.isEmpty)
+    }
+
+    @Test("a bundled identifier is refused before the sync has installed the design, and nothing is stored")
+    func refusedBeforeTheSync() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let install = InstallDesign(source: FixedBundledSource(packages: [try bundled("modern"), try bundled("clean")]), gate: gate, store: store)
+        await #expect(throws: DesignCatalogError.bundledIdentifier("clean")) { _ = try await install(DesignStoreContract.package(id: "clean", version: "999999999.0.0")) }
+        #expect(try await store.installedDesigns().isEmpty)
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("an import with an identifier of its own is rendered, stored and recorded as imported")
+    func installsImport() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let install = InstallDesign(source: FixedBundledSource(packages: [try bundled("modern")]), gate: gate, store: store)
+        let design = try await install(DesignStoreContract.package(id: "mine", css: otherCSS))
+        #expect(try await GetDesign(store: store)(id: "mine") == design)
+        #expect(try await store.installedOrigins() == ["mine": .imported])
+        #expect(await gate.verified == ["mine"])
+    }
+
+    @Test("a bundled package the validator refuses names no identifier, so an import may take it")
+    func refusedBundledPackageReservesNothing() async throws {
+        let store = InMemoryDesignStore()
+        let broken = (name: "modern", data: designData(".cv{}", id: "modern", manifestExtra: ["version": "1"]))
+        let install = InstallDesign(source: FixedBundledSource(packages: [broken]), gate: FakeRenderingGate(), store: store)
+        _ = try await install(DesignStoreContract.package(id: "modern"))
+        #expect(try await store.installedOrigins() == ["modern": .imported])
+    }
+
+    @Test("a bundled source that cannot be read stops the import: nothing is rendered or stored")
+    func sourceUnavailable() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let install = InstallDesign(source: FixedBundledSource(packages: nil), gate: gate, store: store)
+        await #expect(throws: DesignCatalogError.bundledDesignsUnavailable) { _ = try await install(DesignStoreContract.package(id: "mine")) }
+        #expect(try await store.installedDesigns().isEmpty)
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("an invalid package is refused as invalid, before the bundled designs are read")
+    func invalidPackage() async throws {
+        let install = InstallDesign(source: FixedBundledSource(packages: nil), gate: FakeRenderingGate(), store: InMemoryDesignStore())
+        await #expect(throws: DesignPackageRejected.self) { _ = try await install(designData(".cv{display:none}", id: "bad")) }
+    }
+}

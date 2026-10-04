@@ -1,7 +1,7 @@
 import Foundation
 
-/// Why `ListDesigns`, `GetDesign`, `SyncBundledDesigns` and `ResolveDesign` fail (R7): a failure of the store or of the
-/// bundled source is reported as such, never passed through raw.
+/// Why `ListDesigns`, `GetDesign`, `SyncBundledDesigns`, `ResolveDesign` and `InstallDesign` fail (R7): a failure of the
+/// store or of the bundled source is reported as such, never passed through raw.
 public enum DesignCatalogError: Error, Equatable, Sendable {
     /// No installed design has this identifier.
     case unknownDesign(String)
@@ -9,20 +9,47 @@ public enum DesignCatalogError: Error, Equatable, Sendable {
     case storeUnavailable
     /// The bundled designs cannot be read from the app.
     case bundledDesignsUnavailable
+    /// An import named the identifier of a bundled design. The design is refused, whatever its version: a CV's design
+    /// choice names the identifier, and bundled fixes must reach it.
+    case bundledIdentifier(String)
 }
 
-/// Installing a design from untrusted bytes: validate, then prove it renders completely, then store.
-/// Nothing is stored unless both checks pass.
+/// Installing a design from untrusted bytes: validate, then refuse the identifier of a bundled design, then prove it
+/// renders completely, then store it as an import. Nothing is stored unless every check passes.
+/// - An import that names the identifier of a bundled design is refused (`DesignCatalogError.bundledIdentifier`),
+///   whatever its version: it would shadow the bundled design, and later fixes would never reach a CV that names it.
+///   Storing it under another identifier would change what the CV's design choice names. A bundled design is one the
+///   source lists and the validator accepts, installed or not.
+/// - The source is read after the package is validated, so an invalid package is reported as invalid. A source that cannot
+///   be read stops the import (`DesignCatalogError.bundledDesignsUnavailable`), since the identifier cannot be judged.
 public struct InstallDesign: Sendable {
-    let validator: DesignPackageValidator, gate: any DesignRenderingGate, store: any DesignStore
-    public init(validator: DesignPackageValidator = DesignPackageValidator(), gate: any DesignRenderingGate, store: any DesignStore) {
-        self.validator = validator; self.gate = gate; self.store = store
+    let source: any BundledDesignSource, validator: DesignPackageValidator, gate: any DesignRenderingGate, store: any DesignStore
+    public init(source: any BundledDesignSource, validator: DesignPackageValidator = DesignPackageValidator(),
+                gate: any DesignRenderingGate, store: any DesignStore) {
+        self.source = source; self.validator = validator; self.gate = gate; self.store = store
     }
     public func callAsFunction(_ data: Data) async throws -> ValidatedDesign {
         let design = try validator.validate(data)
+        let id = design.manifest.id
+        guard try await !bundledIdentifiers().contains(id) else { throw DesignCatalogError.bundledIdentifier(id) }
         try await gate.verify(design)
         try await store.save(design)
         return design
+    }
+
+    /// The identifiers of the bundled packages that pass the validator. A package it refuses names nothing.
+    private func bundledIdentifiers() async throws -> Set<String> {
+        let packages: [(name: String, data: Data)]
+        do { packages = try await source.bundledPackages() } catch let cancellation as CancellationError { throw cancellation } catch {
+            throw DesignCatalogError.bundledDesignsUnavailable
+        }
+        var identifiers: Set<String> = []
+        for package in packages {
+            let design: ValidatedDesign
+            do throws(DesignPackageRejected) { design = try validator.validate(package.data) } catch { continue }
+            identifiers.insert(design.manifest.id)
+        }
+        return identifiers
     }
 }
 
