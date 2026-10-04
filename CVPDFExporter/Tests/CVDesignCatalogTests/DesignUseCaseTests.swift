@@ -375,6 +375,39 @@ struct InstallDesignTests {
         #expect(await gate.verified.isEmpty)
     }
 
+    @Test("an import is refused when the store records the identifier as bundled, even if the design has left the bundle")
+    func refusedOverRecordedBundled() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let former = try DesignStoreContract.design(id: "former")
+        try await installedBySync(former, in: store)
+        let install = InstallDesign(source: FixedBundledSource(packages: [try bundled("modern")]), gate: gate, store: store)
+        await #expect(throws: DesignCatalogError.bundledIdentifier("former")) { _ = try await install(DesignStoreContract.package(id: "former", version: "9.0.0", css: otherCSS)) }
+        #expect(try await GetDesign(store: store)(id: "former") == former)
+        #expect(try await store.installedOrigins() == ["former": .bundled])
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("an import may replace a design recorded as imported, or one with no recorded origin")
+    func replacesImportsAndUnrecorded() async throws {
+        let store = SpyDesignStore(installed: [try DesignStoreContract.design(id: "old")], origins: ["mine": .imported])
+        try await store.save(DesignStoreContract.design(id: "mine"))
+        let install = InstallDesign(source: FixedBundledSource(packages: [try bundled("modern")]), gate: FakeRenderingGate(), store: store)
+        for id in ["old", "mine"] {
+            let design = try await install(DesignStoreContract.package(id: id, version: "2.0.0", css: otherCSS))
+            #expect(try await GetDesign(store: store)(id: id) == design)
+        }
+        #expect(try await store.installedOrigins() == ["old": .imported, "mine": .imported])
+    }
+
+    @Test("a store whose origins cannot be listed stops the import: nothing is rendered or stored")
+    func originsUnavailable() async throws {
+        let gate = FakeRenderingGate(), store = SpyDesignStore(listingFails: true)
+        let install = InstallDesign(source: FixedBundledSource(packages: []), gate: gate, store: store)
+        await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await install(DesignStoreContract.package(id: "mine")) }
+        #expect(await store.savedIDs.isEmpty)
+        #expect(await gate.verified.isEmpty)
+    }
+
     @Test("an import with an identifier of its own is rendered, stored and recorded as imported")
     func installsImport() async throws {
         let store = InMemoryDesignStore(), gate = FakeRenderingGate()

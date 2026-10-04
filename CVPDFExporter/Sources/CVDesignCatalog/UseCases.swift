@@ -19,9 +19,11 @@ public enum DesignCatalogError: Error, Equatable, Sendable {
 /// - An import that names the identifier of a bundled design is refused (`DesignCatalogError.bundledIdentifier`),
 ///   whatever its version: it would shadow the bundled design, and later fixes would never reach a CV that names it.
 ///   Storing it under another identifier would change what the CV's design choice names. A bundled design is one the
-///   source lists and the validator accepts, installed or not.
+///   source lists and the validator accepts, installed or not, and one the store records as bundled, even if it has left
+///   the bundle.
 /// - The source is read after the package is validated, so an invalid package is reported as invalid. A source that cannot
-///   be read stops the import (`DesignCatalogError.bundledDesignsUnavailable`), since the identifier cannot be judged.
+///   be read stops the import (`DesignCatalogError.bundledDesignsUnavailable`), and so does a store that cannot list its
+///   origins (`DesignCatalogError.storeUnavailable`), since the identifier cannot be judged.
 public struct InstallDesign: Sendable {
     let source: any BundledDesignSource, validator: DesignPackageValidator, gate: any DesignRenderingGate, store: any DesignStore
     public init(source: any BundledDesignSource, validator: DesignPackageValidator = DesignPackageValidator(),
@@ -31,10 +33,18 @@ public struct InstallDesign: Sendable {
     public func callAsFunction(_ data: Data) async throws -> ValidatedDesign {
         let design = try validator.validate(data)
         let id = design.manifest.id
-        guard try await !bundledIdentifiers().contains(id) else { throw DesignCatalogError.bundledIdentifier(id) }
+        guard try await !holdsBundledIdentifier(id) else { throw DesignCatalogError.bundledIdentifier(id) }
         try await gate.verify(design)
         try await store.save(design)
         return design
+    }
+
+    /// Whether a bundled design has this identifier: one the source lists, or one the store records as bundled.
+    private func holdsBundledIdentifier(_ id: String) async throws -> Bool {
+        if try await bundledIdentifiers().contains(id) { return true }
+        do { return try await store.installedOrigins()[id] == .bundled } catch let cancellation as CancellationError { throw cancellation } catch {
+            throw DesignCatalogError.storeUnavailable
+        }
     }
 
     /// The identifiers of the bundled packages that pass the validator. A package it refuses names nothing.
