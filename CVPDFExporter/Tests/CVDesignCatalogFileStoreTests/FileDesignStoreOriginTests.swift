@@ -1,0 +1,151 @@
+import Testing
+import Foundation
+#if canImport(Glibc)
+import Glibc
+#elseif canImport(Darwin)
+import Darwin
+#endif
+import CVDesignCatalog
+@testable import CVDesignCatalogFileStore
+import CVRenderingTestSupport
+
+extension URL {
+    var origins: URL { appendingPathComponent("origins.json") }
+}
+
+private func record(_ designs: String = "[]", schemaVersion: Int = 1) -> String { #"{"designs":\#(designs),"schemaVersion":\#(schemaVersion)}"# }
+private func entry(_ id: String, _ origin: String = "imported") -> String { #"{"id":"\#(id)","origin":"\#(origin)"}"# }
+
+/// Origin records the store refuses, with the error it reports. Built step by step: a long literal array is slow to type-check.
+private let badRecords: [(String, FileDesignStoreError)] = {
+    var cases: [(String, FileDesignStoreError)] = []
+    cases.append((#"{"schemaVersion":2,"designs":[],"themes":[]}"#, .originsFromNewerVersion(2)))
+    cases.append(("not JSON", .originsCorrupt("no schema version")))
+    cases.append((record(schemaVersion: 0), .originsCorrupt("schema version 0")))
+    cases.append((#"{"schemaVersion":1}"#, .originsCorrupt("not an origin record")))
+    cases.append((record("[\(entry("clean", "purchased"))]"), .originsCorrupt("not an origin record")))
+    cases.append((record("[\(entry("clean", "Bundled"))]"), .originsCorrupt("not an origin record")))
+    cases.append((record("[{\"id\":\"clean\"}]"), .originsCorrupt("not an origin record")))
+    cases.append((record("[\(entry("../clean"))]"), .originsCorrupt("entries")))
+    cases.append((record("[\(entry("Clean"))]"), .originsCorrupt("entries")))
+    cases.append((record("[\(entry("clean")),\(entry("bold"))]"), .originsCorrupt("entries")))
+    cases.append((record("[\(entry("clean")),\(entry("clean", "bundled"))]"), .originsCorrupt("entries")))
+    return cases
+}()
+
+@Suite("FileDesignStore records each design's origin (#127)")
+struct FileDesignStoreOriginTests {
+    @Test("a save is recorded as imported, a conditional save as bundled, and an upgrade keeps the origin")
+    func recordsOrigins() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            try await store.save(DesignStoreContract.design(id: "clean"))
+            #expect(try await store.saveIfNewer(DesignStoreContract.design(id: "bold")) == .installed)
+            #expect(try await store.installedOrigins() == ["clean": .imported, "bold": .bundled])
+            #expect(try await store.saveIfNewer(DesignStoreContract.design(id: "bold", version: "1.1.0")) == .upgraded)
+            try await store.save(DesignStoreContract.design(id: "clean", version: "2.0.0"))
+            #expect(try await store.installedOrigins() == ["clean": .imported, "bold": .bundled])
+        }
+    }
+
+    @Test("the record is a versioned file of its own, listing each design's origin by identifier")
+    func recordFormat() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            try await store.save(DesignStoreContract.design(id: "clean"))
+            _ = try await store.saveIfNewer(DesignStoreContract.design(id: "bold"))
+            let expected = record("[\(entry("bold", "bundled")),\(entry("clean", "imported"))]")
+            #expect(try String(decoding: Data(contentsOf: dir.origins), as: UTF8.self) == expected)
+            #expect(try await FileDesignStore(directory: dir).installedOrigins() == ["clean": .imported, "bold": .bundled])
+        }
+    }
+
+    @Test("a store that does not exist yet has no origins, and asking creates nothing")
+    func missingDirectory() async throws {
+        try await inTemporaryStore { dir async throws in
+            #expect(try await FileDesignStore(directory: dir).installedOrigins().isEmpty)
+            #expect(!FileManager.default.fileExists(atPath: dir.path))
+        }
+    }
+
+    @Test("a design that has no recorded origin is installed and readable, and has no origin")
+    func unrecorded() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            let clean = try DesignStoreContract.design(id: "clean")
+            try await store.save(clean)
+            try FileManager.default.removeItem(at: dir.origins)
+            #expect(try await store.installedOrigins().isEmpty)
+            #expect(try await store.installedDesigns() == [clean.manifest])
+            #expect(try await store.design(id: "clean") == clean)
+            try await store.save(DesignStoreContract.design(id: "bold"))
+            #expect(try await store.installedOrigins() == ["bold": .imported])
+        }
+    }
+
+    @Test("an entry for a design the index does not list is not reported, and the next save drops it")
+    func orphanEntry() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            try await store.save(DesignStoreContract.design(id: "clean"))
+            try Data(record("[\(entry("clean", "bundled")),\(entry("ghost", "bundled"))]").utf8).write(to: dir.origins)
+            #expect(try await store.installedOrigins() == ["clean": .bundled])
+            try await store.save(DesignStoreContract.design(id: "bold"))
+            #expect(try String(decoding: Data(contentsOf: dir.origins), as: UTF8.self) == record("[\(entry("bold")),\(entry("clean", "bundled"))]"))
+        }
+    }
+
+    @Test("a record from a newer version or a corrupt one is reported and left untouched, even by a save; the designs stay readable",
+          arguments: badRecords)
+    func badRecord(contents: String, error: FileDesignStoreError) async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            let clean = try DesignStoreContract.design(id: "clean")
+            try await store.save(clean)
+            try Data(contents.utf8).write(to: dir.origins)
+            await #expect(throws: error) { _ = try await store.installedOrigins() }
+            await #expect(throws: error) { try await store.save(DesignStoreContract.design(id: "bold")) }
+            await #expect(throws: error) { _ = try await store.saveIfNewer(DesignStoreContract.design(id: "bold")) }
+            #expect(try Data(contentsOf: dir.origins) == Data(contents.utf8))
+            #expect(!FileManager.default.fileExists(atPath: dir.file("bold").path))
+            #expect(try await store.installedDesigns() == [clean.manifest])
+            #expect(try await store.design(id: "clean") == clean)
+        }
+    }
+
+    @Test("a record larger than the cap is reported without being read, and left untouched")
+    func oversizedRecord() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            try await store.save(DesignStoreContract.design(id: "clean"))
+            let oversized = Data(repeating: 0x20, count: FileDesignStore.maxOriginsBytes + 1)
+            try oversized.write(to: dir.origins)
+            await #expect(throws: FileDesignStoreError.originsCorrupt("too large")) { _ = try await store.installedOrigins() }
+            await #expect(throws: FileDesignStoreError.originsCorrupt("too large")) { try await store.save(DesignStoreContract.design(id: "bold")) }
+            #expect(try Data(contentsOf: dir.origins) == oversized)
+        }
+    }
+
+    @Test("a record that is a symbolic link or a named pipe is unreadable, and never followed or waited on", .timeLimit(.minutes(1)))
+    func unreadableRecord() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            try await store.save(DesignStoreContract.design(id: "clean"))
+            let elsewhere = dir.appendingPathComponent("elsewhere.json")
+            try FileManager.default.moveItem(at: dir.origins, to: elsewhere)
+            try FileManager.default.createSymbolicLink(at: dir.origins, withDestinationURL: elsewhere)
+            await #expect(throws: FileDesignStoreError.originsUnreadable) { _ = try await store.installedOrigins() }
+            await #expect(throws: FileDesignStoreError.originsUnreadable) { try await store.save(DesignStoreContract.design(id: "bold")) }
+            try FileManager.default.removeItem(at: dir.origins)
+            #expect(mkfifo(dir.origins.path, 0o600) == 0)
+            await #expect(throws: FileDesignStoreError.originsUnreadable) { _ = try await store.installedOrigins() }
+        }
+    }
+
+    @Test("the record's version follows the origins it holds: bump it when an origin is added")
+    func recordVersionFollowsOrigins() {
+        let message: Comment = "a record written with a new origin cannot be read by an older app: bump the record version when an origin is added"
+        #expect(FileDesignStore.originsVersion == 1, message)
+        #expect(DesignOrigin.allCases.map(\.rawValue) == ["bundled", "imported"], message)
+    }
+}

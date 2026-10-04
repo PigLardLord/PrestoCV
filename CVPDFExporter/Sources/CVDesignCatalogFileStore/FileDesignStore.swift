@@ -14,6 +14,9 @@ public enum FileDesignStoreError: Error, Equatable, Sendable {
     /// The index cannot be read (an I/O failure, or not a regular file), is corrupt, or was written by a newer
     /// version. It is left untouched, and nothing is saved over it.
     case indexUnreadable, indexCorrupt(String), indexFromNewerVersion(Int)
+    /// The origin record cannot be read (an I/O failure, or not a regular file), is corrupt, or was written by a newer
+    /// version. Like the index, it is left untouched, and nothing is saved over it.
+    case originsUnreadable, originsCorrupt(String), originsFromNewerVersion(Int)
     /// A listed design cannot be read, is larger than the validator accepts, or no longer passes validation.
     case designUnreadable(id: String), designTooLarge(id: String, bytes: Int), designRejected(id: String, [DesignPackageViolation])
     /// The design, once encoded, would not validate back to itself, so nothing was written.
@@ -27,6 +30,11 @@ public enum FileDesignStoreError: Error, Equatable, Sendable {
 /// - Every save of a design writes a new generation of its package file under `Designs/`, then `index.json`, which
 ///   lists each design with its current generation. Both writes are atomic. A save that fails before the index is
 ///   written leaves the listed version untouched; superseded and unlisted files are removed at the next save.
+/// - `origins.json`, next to the index, records for each design whether the catalog's sync installed it (`bundled`) or
+///   an import did (`imported`). It is the store's own record: a package is untrusted, so it cannot say what it is.
+///   A save writes it between the package file and the index, so a save that stops early leaves, at worst, an entry
+///   for a design the index does not list. Such an entry is never reported and the next save drops it. A design that
+///   has no entry (installed before origins were recorded) has no origin: the caller decides what that means.
 /// - A save holds an exclusive `flock` on the store and a read a shared one, so a second instance or another
 ///   process loses no index update.
 /// - Files on disk are untrusted input (R8): every read goes through the validator again and must match the index,
@@ -42,9 +50,15 @@ public actor FileDesignStore: DesignStore {
     /// The index's schema version. An index written with a new palette or font scheme cannot be read by an older app:
     /// bump the index version when these change.
     static let indexVersion = 2
+    /// The origin record's schema version. A record written with a new origin cannot be read by an older app: bump it
+    /// when an origin is added.
+    static let originsVersion = 1
     static let maxIndexBytes = 1024 * 1024, maxGeneration = Int(Int32.max)
+    /// An origin entry is shorter than an index entry, so the record of designs that fit the index fits this cap.
+    static let maxOriginsBytes = maxIndexBytes
     private var designsDirectory: URL { directory.appendingPathComponent("Designs", isDirectory: true) }
     private var indexFile: URL { directory.appendingPathComponent("index.json") }
+    private var originsFile: URL { directory.appendingPathComponent("origins.json") }
     private static func fileName(_ id: String, _ generation: Int) -> String { "\(id).\(generation).mcvt" }
     private func file(_ entry: Entry) -> URL { designsDirectory.appendingPathComponent(Self.fileName(entry.manifest.id, entry.generation)) }
 
@@ -53,24 +67,29 @@ public actor FileDesignStore: DesignStore {
     /// Index schema 2: each stored design's manifest and the generation of its file.
     private struct IndexV2: Codable { let schemaVersion: Int; let designs: [Entry] }
     private struct Entry: Codable { let manifest: DesignManifest; let generation: Int }
+    /// Origin record schema 1: the origin of each design that has one, ordered by identifier.
+    private struct OriginsV1: Codable { let schemaVersion: Int; let designs: [OriginEntry] }
+    private struct OriginEntry: Codable { let id: String; let origin: DesignOrigin }
+    private struct Envelope: Decodable { let schemaVersion: Int }
 
     // MARK: DesignStore
 
     public func save(_ design: ValidatedDesign) async throws(FileDesignStoreError) {
-        _ = try saveEntry(design, onlyIfNewer: false)
+        _ = try saveEntry(design, as: .imported, onlyIfNewer: false)
     }
 
     public func saveIfNewer(_ design: ValidatedDesign) async throws(FileDesignStoreError) -> ConditionalSave {
-        try saveEntry(design, onlyIfNewer: true)
+        try saveEntry(design, as: .bundled, onlyIfNewer: true)
     }
 
     /// The one write path. With `onlyIfNewer`, the installed version is compared inside the exclusive lock that the
     /// write holds, and an installed design of the same or a newer version leaves the store untouched.
-    private func saveEntry(_ design: ValidatedDesign, onlyIfNewer: Bool) throws(FileDesignStoreError) -> ConditionalSave {
+    private func saveEntry(_ design: ValidatedDesign, as origin: DesignOrigin, onlyIfNewer: Bool) throws(FileDesignStoreError) -> ConditionalSave {
         let id = design.manifest.id
         let package = try encodeReadingBack(design)
         let outcome = try withLock(exclusive: true) { () throws(FileDesignStoreError) -> ConditionalSave in
             let entries = try readIndex()
+            var origins = try readOrigins()
             let installed = entries.first { $0.manifest.id == id }
             if onlyIfNewer, let installed, design.manifest.version <= installed.manifest.version { return .keptInstalled }
             try removeUnlistedFiles(keeping: entries, for: id)
@@ -80,7 +99,11 @@ public actor FileDesignStore: DesignStore {
             let listed = (entries.filter { $0.manifest.id != id } + [entry]).sorted { $0.manifest.id < $1.manifest.id }
             let index = try encode(IndexV2(schemaVersion: Self.indexVersion, designs: listed), for: id)
             guard index.count <= Self.maxIndexBytes else { throw .wouldNotReadBack(id: id) }
+            origins[id] = origin
+            let recorded = listed.map(\.manifest.id).compactMap { id in origins[id].map { OriginEntry(id: id, origin: $0) } }
+            let record = try encode(OriginsV1(schemaVersion: Self.originsVersion, designs: recorded), for: id)
             try write(package, to: file(entry), for: id)
+            try write(record, to: originsFile, for: id)
             try write(index, to: indexFile, for: id)
             return installed == nil ? .installed : .upgraded
         }
@@ -107,6 +130,14 @@ public actor FileDesignStore: DesignStore {
 
     public func installedDesigns() async throws(FileDesignStoreError) -> [DesignManifest] {
         try withLock(exclusive: false) { () throws(FileDesignStoreError) in try readIndex().map(\.manifest) } ?? []
+    }
+
+    /// The origins the store has recorded, by identifier, for the designs it lists. A design with no entry has no origin.
+    public func installedOrigins() async throws(FileDesignStoreError) -> [String: DesignOrigin] {
+        try withLock(exclusive: false) { () throws(FileDesignStoreError) -> [String: DesignOrigin] in
+            let listed = Set(try readIndex().map(\.manifest.id))
+            return try readOrigins().filter { listed.contains($0.key) }
+        } ?? [:]
     }
 
     // MARK: Locking
@@ -190,7 +221,6 @@ public actor FileDesignStore: DesignStore {
         case .unreadable: throw .indexUnreadable
         case .tooLarge: throw .indexCorrupt("too large")
         }
-        struct Envelope: Decodable { let schemaVersion: Int }
         let version: Int
         do { version = try JSONDecoder().decode(Envelope.self, from: data).schemaVersion } catch { throw .indexCorrupt("no schema version") }
         guard version <= Self.indexVersion else { throw .indexFromNewerVersion(version) }
@@ -203,6 +233,26 @@ public actor FileDesignStore: DesignStore {
             throw .indexCorrupt("entries")
         }
         return index.designs
+    }
+
+    /// The recorded origins. A missing record is an empty one; any other failure leaves it untouched.
+    private func readOrigins() throws(FileDesignStoreError) -> [String: DesignOrigin] {
+        let data: Data
+        switch readRegularFile(originsFile, cap: Self.maxOriginsBytes) {
+        case .absent: return [:]
+        case .data(let bytes): data = bytes
+        case .unreadable: throw .originsUnreadable
+        case .tooLarge: throw .originsCorrupt("too large")
+        }
+        let version: Int
+        do { version = try JSONDecoder().decode(Envelope.self, from: data).schemaVersion } catch { throw .originsCorrupt("no schema version") }
+        guard version <= Self.originsVersion else { throw .originsFromNewerVersion(version) }
+        guard version == Self.originsVersion else { throw .originsCorrupt("schema version \(version)") }
+        let record: OriginsV1
+        do { record = try JSONDecoder().decode(OriginsV1.self, from: data) } catch { throw .originsCorrupt("not an origin record") }
+        let ids = record.designs.map(\.id)
+        guard ids.allSatisfy(DesignManifest.isValidID), ids == ids.sorted(), Set(ids).count == ids.count else { throw .originsCorrupt("entries") }
+        return Dictionary(uniqueKeysWithValues: record.designs.map { ($0.id, $0.origin) })
     }
 
     /// The fields an index holds are checked as the validator checks them in a package (the identifier is checked

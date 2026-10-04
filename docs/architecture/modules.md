@@ -126,6 +126,12 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 **`CVDesignCatalogFileStore`** holds `FileDesignStore`: the directory is injected, the index is written atomically under a lock (`flock`), and one instance serves the process. A conditional save compares versions inside the same exclusive lock as the write. Every read validates the file again, so only validated designs leave the store. The index is schema version 2, and each entry's manifest is validated when the index is read; an index of another schema, or with an entry the validator would refuse, is reported and left untouched.
 
+The store also records each design's origin, `bundled` (installed by the catalog's sync) or `imported` (installed by an import), in `origins.json` next to the index. A package is untrusted, so it cannot say what it is: the store records it, outside the package.
+- The record is schema version 1: `{"schemaVersion":1,"designs":[{"id":…,"origin":…}]}`, ordered by identifier. It is read as strictly as the index: a valid identifier on every entry, each identifier once, an origin the catalog knows, at most 1 MiB, and never a symbolic link or a pipe. An origin added later bumps the version.
+- Every save holds the exclusive lock and writes the package file, then the record, then the index, each atomically. A save that stops early can leave an entry for a design the index does not list: it is never reported, and the next save drops it.
+- A record from a newer version, one that cannot be read and a corrupt one are each reported (`originsFromNewerVersion`, `originsUnreadable`, `originsCorrupt`), left untouched, and nothing is saved over it, as for the index. Listing and reading designs do not use the record, so they still work.
+- A design that has no entry (installed before origins were recorded) has no origin. A missing record is an empty one.
+
 **`CVBundledDesigns`** holds the bundled `.mcvt` files as resources, served as raw bytes through `Bundle.module`.
 
 **`CVRendering`**
