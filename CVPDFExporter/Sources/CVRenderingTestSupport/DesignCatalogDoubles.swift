@@ -9,6 +9,7 @@ public struct UnavailableStore: DesignStore {
     public func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave { throw Failure() }
     public func design(id: String) async throws -> ValidatedDesign? { throw Failure() }
     public func installedDesigns() async throws -> [DesignManifest] { throw Failure() }
+    public func installedOrigins() async throws -> [String: DesignOrigin] { throw Failure() }
 }
 
 /// A bundled source with a fixed list of packages; `nil` is a source that cannot be read.
@@ -23,15 +24,19 @@ public struct FixedBundledSource: BundledDesignSource {
 }
 
 /// An in-memory design store for the sync tests: it records the identifiers it saved, and can be told which calls fail.
+/// A design it starts with has the origin the test gives it, or none, as one installed before origins were recorded.
 public actor SpyDesignStore: DesignStore {
     public struct Failure: Error {}
     private var designs: [String: ValidatedDesign]
+    private var origins: [String: DesignOrigin]
     private let savesFailFor: Set<String>, unreadable: Set<String>, listingFails: Bool
     /// The identifiers saved, in order; a save that failed is not recorded.
     public private(set) var savedIDs: [String] = []
 
-    public init(installed: [ValidatedDesign] = [], savesFailFor: Set<String> = [], unreadable: Set<String> = [], listingFails: Bool = false) {
+    public init(installed: [ValidatedDesign] = [], origins: [String: DesignOrigin] = [:], savesFailFor: Set<String> = [],
+                unreadable: Set<String> = [], listingFails: Bool = false) {
         self.designs = Dictionary(installed.map { ($0.manifest.id, $0) }, uniquingKeysWith: { $1 })
+        self.origins = origins
         self.savesFailFor = savesFailFor; self.unreadable = unreadable; self.listingFails = listingFails
     }
 
@@ -39,6 +44,7 @@ public actor SpyDesignStore: DesignStore {
         let id = design.manifest.id
         if savesFailFor.contains(id) { throw Failure() }
         designs[id] = design
+        origins[id] = .imported
         savedIDs.append(id)
     }
     public func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave {
@@ -48,6 +54,7 @@ public actor SpyDesignStore: DesignStore {
         if let installed = designs[id] { outcome = design.manifest.version > installed.manifest.version ? .upgraded : .keptInstalled } else { outcome = .installed }
         if outcome != .keptInstalled {
             designs[id] = design
+            origins[id] = .bundled
             savedIDs.append(id)
         }
         return outcome
@@ -59,6 +66,10 @@ public actor SpyDesignStore: DesignStore {
     public func installedDesigns() async throws -> [DesignManifest] {
         if listingFails { throw Failure() }
         return designs.values.map(\.manifest).sorted { $0.id < $1.id }
+    }
+    public func installedOrigins() async throws -> [String: DesignOrigin] {
+        if listingFails { throw Failure() }
+        return origins
     }
 }
 

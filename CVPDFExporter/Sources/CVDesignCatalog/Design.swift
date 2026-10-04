@@ -157,11 +157,13 @@ public enum ConditionalSave: Equatable, Sendable {
     case keptInstalled
 }
 
-/// Stores validated designs. Owned by the catalog (R3); adapters live in CVDesignCatalogFileStore and test support,
-/// and pass `DesignStoreContract`. Saving an identifier again replaces its design.
+/// Stores validated designs, and records where each came from. Owned by the catalog (R3); adapters live in
+/// CVDesignCatalogFileStore and test support, and pass `DesignStoreContract`. Saving an identifier again replaces its design.
 public protocol DesignStore: Sendable {
+    /// Saves a design that an import installs, and records its origin as `imported`.
     func save(_ design: ValidatedDesign) async throws
-    /// Saves the design only if no design has its identifier or the installed one has an older version, and says which.
+    /// Saves a design that the sync installs, and records its origin as `bundled`. It saves only if no design has its
+    /// identifier or the installed one has an older version, and says which.
     /// The comparison and the write are one step under the store's lock, so a design saved meanwhile by another caller
     /// is never replaced by an older one. When the installed design is kept, nothing is written.
     func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave
@@ -169,6 +171,9 @@ public protocol DesignStore: Sendable {
     func design(id: String) async throws -> ValidatedDesign?
     /// The stored designs' manifests, ordered by identifier.
     func installedDesigns() async throws -> [DesignManifest]
+    /// The origins the store has recorded, by identifier, for the designs it lists. A design with no recorded origin
+    /// (one installed before origins were recorded) is absent.
+    func installedOrigins() async throws -> [String: DesignOrigin]
 }
 
 /// Proves that a design renders a fixture document without losing content (ADR 0011). Owned by the

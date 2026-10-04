@@ -4,17 +4,22 @@ import CVDesignCatalog
 /// In-memory `DesignStore` for tests.
 public actor InMemoryDesignStore: DesignStore {
     var designs: [String: ValidatedDesign] = [:]
+    var origins: [String: DesignOrigin] = [:]
     public init() {}
-    public func save(_ design: ValidatedDesign) async throws { designs[design.manifest.id] = design }
+    public func save(_ design: ValidatedDesign) async throws {
+        designs[design.manifest.id] = design
+        origins[design.manifest.id] = .imported
+    }
     public func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave {
         let id = design.manifest.id
-        guard let installed = designs[id] else { designs[id] = design; return .installed }
+        guard let installed = designs[id] else { designs[id] = design; origins[id] = .bundled; return .installed }
         guard design.manifest.version > installed.manifest.version else { return .keptInstalled }
         designs[id] = design
         return .upgraded
     }
     public func design(id: String) async throws -> ValidatedDesign? { designs[id] }
     public func installedDesigns() async throws -> [DesignManifest] { designs.values.map(\.manifest).sorted { $0.id < $1.id } }
+    public func installedOrigins() async throws -> [String: DesignOrigin] { origins }
 }
 
 public struct DesignStoreContractFailure: Error, Equatable, CustomStringConvertible {
@@ -32,8 +37,10 @@ public enum DesignStoreContract {
 
         try check(await store.installedDesigns().isEmpty, "an empty store lists no designs")
         try check(await store.design(id: "clean") == nil, "an empty store has no design")
+        try check(await store.installedOrigins().isEmpty, "an empty store has no origins")
         try await store.save(clean)
         try check(await store.design(id: "clean") == clean, "a saved design comes back unchanged, preview included")
+        try check(await store.installedOrigins() == ["clean": .imported], "a saved design is recorded as imported")
         try await store.save(bold)
         try check(await store.installedDesigns() == [bold.manifest, clean.manifest], "designs are listed by id")
         try await store.save(cleanV2)
@@ -55,6 +62,8 @@ public enum DesignStoreContract {
         try check(await store.saveIfNewer(first) == .keptInstalled, "a conditional save of an older version keeps the installed design")
         try check(await store.design(id: "fresh") == later, "a design is never replaced by an older one")
         try check(await store.installedDesigns() == [bold.manifest, cleanV2.manifest, later.manifest], "a conditional save lists a design once")
+        try check(await store.installedOrigins() == ["bold": .imported, "clean": .imported, "fresh": .bundled],
+                  "a conditional save records the design as bundled, and an upgrade keeps the origin")
     }
 
     /// A design as the validator accepts it; `preview` adds a PNG preview, which is stored too.

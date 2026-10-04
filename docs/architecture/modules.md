@@ -121,7 +121,8 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
     - A package fails on its own, and the others still sync: the validator rejects it (`rejected`, with its name and violations), the gate refuses it or fails (`notRendered`), or the store fails to save it (`failed`).
     - What stops the sync: a store that cannot list its designs (`storeUnavailable`), a source that cannot be read (`bundledDesignsUnavailable`), and cancellation. The `SyncReport` lists `installed`, `upgraded`, `unchanged`, `rejected`, `notRendered` and `failed`.
 - **Ports:** `DesignStore`, `BundledDesignSource` (raw bytes), and **`DesignRenderingGate`**.
-  - `DesignStore` saves, reads one design and lists the manifests. `saveIfNewer` saves only when no design has the identifier (`installed`) or the installed one is older (`upgraded`), and otherwise writes nothing (`keptInstalled`). The comparison and the write are one step under the store's lock.
+  - `DesignStore` saves, reads one design and lists the manifests, and records each design's origin (`DesignOrigin`: `bundled` or `imported`). `save` is the import's: it records `imported`. `saveIfNewer` is the sync's: it records `bundled`, and saves only when no design has the identifier (`installed`) or the installed one is older (`upgraded`), and otherwise writes nothing (`keptInstalled`). The comparison and the write are one step under the store's lock.
+  - `installedOrigins()` returns the recorded origins by identifier. A design with no recorded origin, one installed before origins were recorded, is absent from it.
   - The catalog owns the gate; `CVRendering` implements it, along the allowed Rendering → Catalog edge.
 
 **`CVDesignCatalogFileStore`** holds `FileDesignStore`: the directory is injected, the index is written atomically under a lock (`flock`), and one instance serves the process. A conditional save compares versions inside the same exclusive lock as the write. Every read validates the file again, so only validated designs leave the store. The index is schema version 2, and each entry's manifest is validated when the index is read; an index of another schema, or with an entry the validator would refuse, is reported and left untouched.
@@ -166,7 +167,7 @@ The store also records each design's origin, `bundled` (installed by the catalog
 
 **Test support and tests.**
 - **`CVRenderingTestSupport`** may import `CVRendering`, `CVDocumentModel`, `CVDesignCatalog`, Foundation. It holds `InMemoryDesignStore`, the **`DesignStore` contract suite** that it and `FileDesignStore` pass, the design package builders, and:
-  - the catalog doubles: `UnavailableStore` (every call fails), `SpyDesignStore` (records its saves; listing, reading and saving can be made to fail), `FixedBundledSource` (a fixed list of packages, or none readable) and `FakeRenderingGate` (refuses or cancels on chosen identifiers, and records what it verified) and `SuspendingRenderingGate` (holds one design's render until the test releases it);
+  - the catalog doubles: `UnavailableStore` (every call fails), `SpyDesignStore` (records its saves; listing, reading and saving can be made to fail; a design it starts with has the origin the test gives it, or none), `FixedBundledSource` (a fixed list of packages, or none readable) and `FakeRenderingGate` (refuses or cancels on chosen identifiers, and records what it verified) and `SuspendingRenderingGate` (holds one design's render until the test releases it);
   - the **`PDFRendering` contract suite**:
     - the fixture must fit and contain every field;
     - page count per the inspector;
