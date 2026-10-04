@@ -121,6 +121,25 @@ struct NamedPathCheckTests {
         #expect(unused == ["planned.json:1 planned-path-unused"])
     }
 
+    @Test("an entry is a path from the repository root: it excuses a name read from the document's directory, and goes stale when that file exists")
+    func plannedEntriesAreRootRelative() throws {
+        let document = ["Tools/Pkg/README.md": "`Sources/New.swift`", "docs/a.md": ""]
+        let entry = #"[{"path": "Tools/Pkg/Sources/New.swift", "ticket": 12}]"#
+        #expect(try findings(in: document, planned: entry) == [])
+        #expect(try findings(in: document.merging(["Tools/Pkg/Sources/New.swift": ""]) { a, _ in a }, planned: entry) == ["planned.json:1 planned-path-exists"])
+    }
+
+    @Test("an entry written as the document writes it, from the document's directory, is reported once the file exists there")
+    func plannedEntryFromTheDocumentDirectory() throws {
+        let document = ["Tools/Pkg/README.md": "`Sources/New.swift`", "docs/a.md": ""]
+        let entry = #"[{"path": "Sources/New.swift", "ticket": 12}]"#
+        let created = document.merging(["Tools/Pkg/Sources/New.swift": ""]) { a, _ in a }
+        // Before the file exists, the entry reads as a path from the root and excuses the name.
+        #expect(try findings(in: document, planned: entry) == [])
+        // After, the name is found beside its document and the entry excuses nothing: it cannot go stale unseen.
+        #expect(try findings(in: created, planned: entry) == ["planned.json:1 planned-path-unused"])
+    }
+
     @Test("a planned file that is not a list of paths with tickets is a finding", arguments: [
         "not json", #"{"path": "Tools/new", "ticket": 1}"#, #"[{"path": "Tools/new"}]"#, #"[{"ticket": 1}]"#, #"[{"path": "Tools/new", "ticket": 0}]"#,
         #"[{"path": "Tools/new", "ticket": "12"}]"#, #"[{"path": "", "ticket": 1}]"#, #"[{"path": "/Tools/new", "ticket": 1}]"#,

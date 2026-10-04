@@ -48,7 +48,7 @@ A path written in a code span exists. A word is a path when its first segment is
   ]
   ```
 
-  A declared path that exists is a finding, so is one that no document names, and so is an entry that is not a relative path with a ticket number. The list therefore cannot go stale: the change that creates the file removes its entry. An entry excuses a path in a code span, not a link: a link to a file that does not exist is always a finding. A path is declared as the document writes it, or as it resolves from the document's directory or one above it. A directory path whose first segment is not a top-level entry, such as a new top-level directory with no file extension, is not recognised, so it needs no declaration until that directory exists.
+  An entry is a path from the repository root: the path the file will have. This README names `Sources/DocsCheckKit/Finding.swift` and means `Tools/DocsCheck/Sources/DocsCheckKit/Finding.swift`: were that file planned, its entry would be the second form. An entry is a finding when its file exists, when it is not a relative path with a ticket number, and when it excuses no name now, which includes a name that has since been found beside its document. The list therefore cannot go stale: the change that creates the file removes its entry. An entry excuses a path in a code span, not a link: a link to a file that does not exist is always a finding. A directory path whose first segment is not a top-level entry, such as a new top-level directory with no file extension, is not recognised, so it needs no declaration until that directory exists.
 
 Codes: `path-missing`, `planned-path-exists`, `planned-path-unused`, `planned-file-invalid`.
 

@@ -120,6 +120,12 @@ put planned.json $'[\n  {"path": "Tools/future.sh", "ticket": 99}\n]'; fixed "th
 put Tools/future.sh '#!/bin/sh'
 stale "a declared path that exists" "^planned.json:2: planned-path-exists:" --planned "$ROOT/planned.json"
 put planned.json '[]'; fixed "its entry is removed" --planned "$ROOT/planned.json"
+setup; put Tools/Pkg/README.md $'# Pkg\n\nA future file: `Sources/New.swift`.'; put planned.json $'[\n  {"path": "Tools/Pkg/Sources/New.swift", "ticket": 99}\n]'
+fixed "an entry that is a path from the root excuses a name read beside its document" --planned "$ROOT/planned.json"
+put Tools/Pkg/Sources/New.swift ''
+stale "that entry, once the file exists" "^planned.json:2: planned-path-exists:" --planned "$ROOT/planned.json"
+put planned.json $'[\n  {"path": "Sources/New.swift", "ticket": 99}\n]'
+stale "an entry written from the document's directory, once the file exists there" "^planned.json:2: planned-path-unused:" --planned "$ROOT/planned.json"
 setup; mkdir -p "$ROOT/Tools"; put planned.json $'[\n  {"path": "Tools/future.sh", "ticket": 99}\n]'
 stale "a declared path that no document names" "^planned.json:2: planned-path-unused:" --planned "$ROOT/planned.json"
 put planned.json $'[{"path": "Tools/future.sh"}]'
