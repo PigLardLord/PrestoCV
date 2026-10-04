@@ -195,6 +195,19 @@ struct FileLetterDefaultsStoreTests {
         #expect(try await store(dir).save(big, expectedRevision: 1).revision == 2)
     }
 
+    @Test("a save that the strict read refuses is refused, though it is within the size cap: a revision past the bound")
+    func wouldNotReadBackThroughTheDecoder() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let atTheBound = golden.replacingOccurrences(of: #""revision":3"#, with: #""revision":2147483647"#)
+        try write(atTheBound, to: dir.appendingPathComponent(name))
+        let s = store(dir)
+        let stored = try await s.load()
+        #expect(stored.revision == Int(Int32.max))
+        await #expect(throws: LetterDefaultsError.wouldNotReadBack(file: name)) { _ = try await s.save(try defaults(note: "x"), expectedRevision: Int(Int32.max)) }
+        #expect(try String(contentsOf: dir.appendingPathComponent(name), encoding: .utf8) == atTheBound)
+        #expect(try await s.load() == stored)
+    }
+
     @Test("a clock with fractional seconds still round-trips: the time is stored to the second")
     func fractionalClock() async throws {
         struct Fractional: TimeSource { func now() -> Date { Date(timeIntervalSince1970: 1_700_000_000.7654) } }

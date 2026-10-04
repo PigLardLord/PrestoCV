@@ -146,6 +146,36 @@ struct FileApplicationRepositoryTests {
         #expect(try await roomy.update(heavy).letter == big)
     }
 
+    @Test("a save that the strict read refuses is refused, though it is within the size cap: a revision past the bound, and a CV text over the DTO's cap")
+    func wouldNotReadBackThroughTheDecoder() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let top = dir.appendingPathComponent(appFile(appID(1)))
+        let atTheBound = try appJSON().replacingOccurrences(of: #""revision":1"#, with: #""revision":2147483647"#)
+        try write(atTheBound, to: top)
+        let r = appRepo(dir)
+        let stored = try await r.load(appID(1))
+        #expect(stored.revision == Int(Int32.max))
+        var edited = stored
+        edited.setLetter(try CoverLetter(recipient: LetterRecipient(), paragraphs: ["x"]))
+        await #expect(throws: ApplicationRepositoryError.wouldNotReadBack(file: appFile(appID(1)))) { _ = try await r.update(edited) }
+        #expect(try String(contentsOf: top, encoding: .utf8) == atTheBound)
+
+        let ok = try await r.create(application(2))
+        var longCV = ok.cv, details = ok.cv.personal
+        details.summary = String(repeating: "x", count: CVContentV1.maxText + 1)
+        longCV.setPersonalDetails(details)
+        let before = try String(contentsOf: dir.appendingPathComponent(appFile(appID(2))), encoding: .utf8)
+        var longer = ok
+        try longer.setCV(longCV)
+        await #expect(throws: ApplicationRepositoryError.wouldNotReadBack(file: appFile(appID(2)))) { _ = try await r.update(longer) }
+        #expect(try String(contentsOf: dir.appendingPathComponent(appFile(appID(2))), encoding: .utf8) == before)
+        #expect(try await r.load(appID(2)) == ok)
+        var fresh = application(3)
+        try fresh.setCV(longCV.duplicated(as: fresh.cv.id, title: "t"))
+        await #expect(throws: ApplicationRepositoryError.wouldNotReadBack(file: appFile(appID(3)))) { _ = try await r.create(fresh) }
+        #expect(!exists(dir.appendingPathComponent(appFile(appID(3)))))
+    }
+
     @Test("a clock with fractional seconds still round-trips: timestamps are stored to the second")
     func fractionalClock() async throws {
         struct Fractional: TimeSource { func now() -> Date { Date(timeIntervalSince1970: 1_700_000_000.7654) } }
