@@ -343,6 +343,16 @@ struct FileRepositoryTests {
         #expect(FileManager.default.fileExists(atPath: q.appendingPathComponent(fileName(id1)).path))
     }
 
+    @Test("erase removes the stored file even when the quarantine cannot be used, and reports the quarantine")
+    func eraseWithUnusableQuarantine() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let r = repo(dir)
+        _ = try await r.create(named("Ada"))
+        try Data("x".utf8).write(to: dir.appendingPathComponent("Quarantine"))          // a file where the folder should be
+        await #expect(throws: RepositoryError.storeUnavailable(.notADirectory)) { try await r.erase(id1) }
+        #expect(!FileManager.default.fileExists(atPath: dir.appendingPathComponent(fileName(id1)).path))
+    }
+
     @Test("loading a CV from a store that has disappeared reports the store, not the CV deleted")
     func vanishedStore() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }

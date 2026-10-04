@@ -38,7 +38,7 @@ struct LetterDefaultsUseCaseTests {
             (.conflict(storedRevision: 4), .conflict(storedRevision: 4)), (.corrupt(file: "f", reason: "r"), .corrupt),
             (.upgradeRequired(file: "f", version: 2), .upgradeRequired(version: 2)), (.wouldNotReadBack(file: "f"), .tooLarge),
             (.unreadable(file: "f"), .unavailable), (.tooLarge(file: "f"), .unavailable), (.storeUnavailable(.cannotList), .unavailable),
-            (.writeFailed(file: "f"), .unavailable),
+            (.writeFailed(file: "f"), .unavailable), (.quarantineFailed(file: "f"), .unavailable), (.alreadyExists, .unavailable),
         ]
         for (failure, expected) in cases {
             let store = FailingLetterDefaultsStore(failure)

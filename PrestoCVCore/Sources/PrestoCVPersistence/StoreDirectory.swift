@@ -257,15 +257,21 @@ struct StoreDirectory<Failure: StoreFaultConvertible>: Sendable {
         }
     }
 
-    /// Removes every copy of the file called `name`: the stored file whatever its schema, and its quarantined copies.
-    /// It fails when a copy cannot be inspected, rather than report every copy gone. Call it under the lock.
+    /// Removes every copy of the file called `name`: the stored file whatever its schema, and its quarantined copies. The stored
+    /// file goes first, and every copy that can be removed goes even when another cannot, or when the quarantine cannot be used.
+    /// It fails with the first copy that it could not inspect or remove, rather than report every copy gone. Call it under the lock.
     func eraseCopies(of name: String) throws(Failure) {
+        var failure: Failure?
         var victims = [directory.appendingPathComponent(name)]
-        victims += try quarantineNames().filter { $0 == name || $0.hasSuffix("~" + name) }.map { quarantine.appendingPathComponent($0) }
+        do throws(Failure) { victims += try quarantineNames().filter { $0 == name || $0.hasSuffix("~" + name) }.map { quarantine.appendingPathComponent($0) } }
+        catch { failure = error }
         for victim in victims {
-            guard try exists(victim) else { continue }
-            do { try FileManager.default.removeItem(at: victim) } catch { throw Failure(.writeFailed(file: victim.lastPathComponent)) }
+            do throws(Failure) {
+                guard try exists(victim) else { continue }
+                do { try FileManager.default.removeItem(at: victim) } catch { throw Failure(.writeFailed(file: victim.lastPathComponent)) }
+            } catch { failure = failure ?? error }
         }
+        if let failure { throw failure }
     }
 
     /// A file's age in the quarantine counts from when it entered it: quarantining stamps it with the clock.

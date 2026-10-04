@@ -99,14 +99,53 @@ struct FileLetterDefaultsStoreTests {
         #expect(try await store(dir).load() == saved && exists(dir.appendingPathComponent("Quarantine/\(name)")))
     }
 
-    @Test("a corrupt file that stays in place for lack of a quarantine is reported by its own name and left alone")
+    @Test("a corrupt file that cannot be moved aside is reported as a failed quarantine and left where it is")
     func quarantineFails() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
         try write("{", to: dir.appendingPathComponent(name))
         try Data("x".utf8).write(to: dir.appendingPathComponent("Quarantine"))          // a file where the folder should be
-        await #expect(throws: LetterDefaultsError.corrupt(file: name, reason: "no schemaVersion envelope")) { _ = try await store(dir).load() }
+        await #expect(throws: LetterDefaultsError.quarantineFailed(file: name)) { _ = try await store(dir).load() }
+        await #expect(throws: LetterDefaultsError.quarantineFailed(file: name)) { _ = try await store(dir).load() }
         #expect(exists(dir.appendingPathComponent(name)))
+        // A save does not replace a file it cannot read: it reports it, as every store does.
         await #expect(throws: LetterDefaultsError.corrupt(file: name, reason: "no schemaVersion envelope")) { _ = try await store(dir).save(.empty, expectedRevision: 0) }
+        #expect(exists(dir.appendingPathComponent(name)))
+    }
+
+    @Test("an entry in the quarantine that is not a copy of the defaults is not one: a store with only such entries loads as never saved",
+          arguments: [".DS_Store", "notes.txt", "letter-defaults.json.bak", "x~letter-defaults.json", "1~2~letter-defaults.json", "letter-defaults.json\n"])
+    func unrelatedQuarantineEntry(entry: String) async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        try write("x", to: dir.appendingPathComponent("Quarantine/\(entry)"))
+        #expect(try await store(dir).load() == .unsaved)
+        let saved = try await store(dir).save(try defaults(note: "x"), expectedRevision: 0)
+        #expect(try await store(dir).load() == saved && exists(dir.appendingPathComponent("Quarantine/\(entry)")))
+    }
+
+    @Test("erase removes the stored file even when the quarantine cannot be used, and reports the quarantine")
+    func eraseWithUnusableQuarantine() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let s = store(dir)
+        _ = try await s.save(try defaults(note: "x"), expectedRevision: 0)
+        try Data("x".utf8).write(to: dir.appendingPathComponent("Quarantine"))          // a file where the folder should be
+        await #expect(throws: LetterDefaultsError.storeUnavailable(.notADirectory)) { try await s.erase() }
+        #expect(!exists(dir.appendingPathComponent(name)))
+    }
+
+    @Test("erase removes every copy it can, and reports the first it could not remove", .enabled(if: !isRoot))
+    func erasePartly() async throws {
+        let dir = tempDir()
+        let q = dir.appendingPathComponent("Quarantine")
+        defer { chmod(q.path, 0o755); try? FileManager.default.removeItem(at: dir) }
+        let s = store(dir)
+        _ = try await s.save(try defaults(note: "x"), expectedRevision: 0)
+        try write("{", to: q.appendingPathComponent("1~\(name)"))
+        chmod(q.path, 0o500)                                     // entries can be inspected, none can be removed
+        await #expect(throws: LetterDefaultsError.writeFailed(file: "1~\(name)")) { try await s.erase() }
+        #expect(!exists(dir.appendingPathComponent(name)) && exists(q.appendingPathComponent("1~\(name)")))
+        chmod(q.path, 0o755)
+        try await s.erase()
+        #expect(!exists(q.appendingPathComponent("1~\(name)")))
     }
 
     @Test("a restore brings the quarantined copy back, and the defaults load again")

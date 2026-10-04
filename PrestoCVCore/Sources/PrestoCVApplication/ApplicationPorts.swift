@@ -51,7 +51,9 @@ public protocol LetterDefaultsStore: Sendable {
     /// Stores the defaults only if the stored revision equals `expectedRevision`; returns them at revision + 1. The first save
     /// expects revision 0, that is, no file.
     func save(_ defaults: LetterDefaults, expectedRevision: Int) async throws(LetterDefaultsError) -> StoredLetterDefaults
-    /// Removes every copy of the defaults: the stored file whatever its schema, and quarantined copies (GDPR erasure).
+    /// Removes every copy of the defaults: the stored file whatever its schema, and quarantined copies (GDPR erasure). It removes
+    /// what it can, the stored file first, even when the quarantine cannot be used, and fails with the first copy that it could
+    /// not remove or inspect.
     func erase() async throws(LetterDefaultsError)
 }
 
@@ -65,9 +67,12 @@ public protocol LetterDefaultsMaintenance: Sendable {
 /// No paths or free-form strings: file names only, and coded failures (R7).
 public enum LetterDefaultsError: Error, Equatable, Sendable {
     case conflict(storedRevision: Int), alreadyExists
-    /// The file is corrupt, and a quarantined copy of it stands, which `restore` accepts by this name. The store reports it on
-    /// every load until the copy is restored or new defaults are saved. `reason` is a code for the person who reads the copy.
+    /// The file is corrupt. While it is still stored, `file` is its name and a save is refused. Once a quarantined copy of it
+    /// stands, `file` is the copy's name, which `restore` accepts, and the store reports it on every load until the copy is
+    /// restored or new defaults are saved. `reason` is a stable code.
     case corrupt(file: String, reason: String)
+    /// The file is corrupt and could not be moved aside: it stays where it is, and no copy stands to restore (R12).
+    case quarantineFailed(file: String)
     case unreadable(file: String), upgradeRequired(file: String, version: Int), tooLarge(file: String)
     case invalidName(String), storeUnavailable(StoreFailure), writeFailed(file: String)
     /// Refused before writing: the file would exceed the size cap, or would not read back (the previous version is kept).

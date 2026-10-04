@@ -241,6 +241,30 @@ struct FileApplicationRepositoryTests {
         #expect(try await r.list().applications.map(\.id) == [appID(2)])
     }
 
+    @Test("erase removes the stored file even when the quarantine cannot be used, and reports the quarantine")
+    func eraseWithUnusableQuarantine() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let r = appRepo(dir)
+        _ = try await r.create(application(1))
+        _ = try await r.create(application(2))
+        try Data("x".utf8).write(to: dir.appendingPathComponent("Quarantine"))          // a file where the folder should be
+        await #expect(throws: ApplicationRepositoryError.storeUnavailable(.notADirectory)) { try await r.erase(appID(1)) }
+        #expect(!exists(dir.appendingPathComponent(appFile(appID(1)))) && exists(dir.appendingPathComponent(appFile(appID(2)))))
+    }
+
+    @Test("erase removes every copy it can, and reports the first it could not remove", .enabled(if: !isRoot))
+    func erasePartly() async throws {
+        let dir = tempDir()
+        let q = dir.appendingPathComponent("Quarantine")
+        defer { chmod(q.path, 0o755); try? FileManager.default.removeItem(at: dir) }
+        let r = appRepo(dir)
+        _ = try await r.create(application(1))
+        try write("{", to: q.appendingPathComponent("1~\(appFile(appID(1)))"))
+        chmod(q.path, 0o500)                                     // entries can be inspected, none can be removed
+        await #expect(throws: ApplicationRepositoryError.writeFailed(file: "1~\(appFile(appID(1)))")) { try await r.erase(appID(1)) }
+        #expect(!exists(dir.appendingPathComponent(appFile(appID(1)))) && exists(q.appendingPathComponent("1~\(appFile(appID(1)))")))
+    }
+
     @Test("the quarantine purge removes only old entries")
     func purge() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }

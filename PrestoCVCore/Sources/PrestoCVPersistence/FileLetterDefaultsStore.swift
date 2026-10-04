@@ -61,7 +61,8 @@ public actor FileLetterDefaultsStore: LetterDefaultsStore, LetterDefaultsMainten
             case .unreadable: throw .unreadable(file: Self.fileName)
             case .tooLarge: throw .tooLarge(file: Self.fileName)
             case .corrupt(let reason):
-                throw .corrupt(file: store.moveToQuarantine(file)?.lastPathComponent ?? Self.fileName, reason: reason)
+                guard let moved = store.moveToQuarantine(file) else { throw .quarantineFailed(file: Self.fileName) }
+                throw .corrupt(file: moved.lastPathComponent, reason: reason)
             }
         }
     }

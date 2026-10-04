@@ -26,7 +26,7 @@ extension AuthoringError {
         case .corrupt: self = .corrupt
         case .upgradeRequired(_, let version): self = .upgradeRequired(version: version)
         case .wouldNotReadBack: self = .tooLarge
-        case .alreadyExists, .unreadable, .tooLarge, .invalidName, .storeUnavailable, .writeFailed: self = .unavailable
+        case .alreadyExists, .unreadable, .tooLarge, .invalidName, .storeUnavailable, .writeFailed, .quarantineFailed: self = .unavailable
         }
     }
 }
