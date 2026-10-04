@@ -56,6 +56,10 @@ put docs/guide.md $'# Guide\n\n## Installation\n\nSee [usage](#installation).'; 
 setup; put README.md $'# Project\n\nSee the [guide](docs/guide.md#set-up).'
 stale "an anchor into another file that is not one of its headings" "^README.md:3: link-anchor-missing:"
 put docs/guide.md $'# Guide\n\n## Set `up`!\n\n## Set up'; put README.md $'# Project\n\n[a](docs/guide.md#set-up) [b](docs/guide.md#set-up-1)'; fixed "headings with punctuation and a repeat"
+setup; put README.md $'# Project\n\n[Note]: the next paragraph says more, see `docs/guide.md` and not gone.md.'
+fixed "a line that starts like a definition but goes on in words is prose"
+put README.md $'# Project\n\n[Note]: gone.md "Title"'
+stale "a definition with a title" "^README.md:3: link-target-missing:"
 setup; put README.md $'# Project\n\nSee [line 10](docs/guide.md?plain=1#L10).'
 fixed "a fragment of a plain=1 link is a line, not a heading"
 put README.md $'# Project\n\nSee [line 10](docs/guide.md#L10).'

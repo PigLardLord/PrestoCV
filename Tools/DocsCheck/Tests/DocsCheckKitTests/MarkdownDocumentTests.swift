@@ -36,6 +36,22 @@ struct MarkdownDocumentTests {
         #expect(destinations(text) == ["one.md", "two.md"])
     }
 
+    @Test("a definition needs a title or the end of the line after its destination, or it is prose")
+    func definitionOrProse() {
+        let text = """
+        [a]: a.md "Title"
+        [b]: b.md 'Title'
+        [c]: c.md (Title)
+        [d]: <d e.md>
+        [e]: e.md
+        [f]: f.md   
+        [Note]: the next paragraph says more
+        [g]: g.md and some words
+        [h]: h.md"title without a space"
+        """
+        #expect(destinations(text) == ["a.md", "b.md", "c.md", "d e.md", "e.md", "f.md"])
+    }
+
     @Test("code spans and fenced blocks hide what looks like a link")
     func codeHidesLinks() {
         let text = """

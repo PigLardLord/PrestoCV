@@ -176,7 +176,12 @@ struct MarkdownDocument: Sendable {
         guard index + 1 < scalars.count, scalars[index + 1] == ":" else { return nil }
         index += 2
         while index < scalars.count, scalars[index] == " " || scalars[index] == "\t" { index += 1 }
-        return InlineScan.destination(in: scalars, from: index, terminatedByParenthesis: false)?.text
+        guard let destination = InlineScan.destination(in: scalars, from: index, terminatedByParenthesis: false) else { return nil }
+        // After the destination comes the end of the line or a title; anything else makes the line prose.
+        var after = destination.end
+        while after < scalars.count, scalars[after] == " " || scalars[after] == "\t" { after += 1 }
+        guard after == scalars.count || (after > destination.end && ["\"", "'", "("].contains(scalars[after])) else { return nil }
+        return destination.text
     }
 }
 
@@ -393,6 +398,7 @@ private struct InlineScan {
         if index < scalars.count, scalars[index] == "<" {
             index += 1
             while index < scalars.count, scalars[index] != ">" { result.append(scalars[index]); index += 1 }
+            if index < scalars.count { index += 1 }
         } else {
             var depth = 0
             while index < scalars.count {
