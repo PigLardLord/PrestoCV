@@ -102,7 +102,7 @@ struct LetterConventions: Sendable, Equatable {
     // MARK: Reading
 
     /// Strict, bounded and typed: the file's size is checked first; an unknown key, a value of the wrong type or something
-    /// that is not an object is a corrupt table; a missing key, an empty or over-long value, a hidden character, a month
+    /// that is not an object is a corrupt table; a missing key, an empty or over-long value, a control character or a bidirectional override, a month
     /// count other than twelve or a template with the wrong holes is incomplete, and names its key.
     static func parse(_ data: Data, language: String) throws(LetterConventionsCatalog.Failure) -> LetterConventions {
         typealias Failure = LetterConventionsCatalog.Failure
@@ -116,7 +116,7 @@ struct LetterConventions: Sendable, Equatable {
             guard let inner = value as? [String: Any], Set(inner.keys).isSubset(of: keys) else { throw Failure.corruptTable(language) }
             return inner
         }
-        /// Plain text, as the data may hold it: filled, bounded, with no hidden character and no hole.
+        /// Plain text, as the data may hold it: filled, bounded, with no control character or bidirectional override and no hole.
         func plain(_ s: String, _ path: String) throws(Failure) -> String {
             guard LetterTemplate(s, holes: []) != nil, isFit(s) else { throw Failure.incomplete(language: language, key: path) }
             return s
