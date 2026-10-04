@@ -31,6 +31,8 @@ private func appJSON(_ application: Application = application(), version: Int = 
     return String(decoding: json, as: UTF8.self).replacingOccurrences(of: #""schemaVersion":1"#, with: #""schemaVersion":\#(version)"#)
 }
 
+private func exists(_ url: URL) -> Bool { FileManager.default.fileExists(atPath: url.path) }
+
 private func write(_ text: String, to url: URL) throws {
     try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
     try Data(text.utf8).write(to: url)
@@ -376,6 +378,23 @@ struct FileApplicationRepositoryTests {
         #expect(try await r.create(application(1)).id == appID(1))
         #expect(FileManager.default.fileExists(atPath: dir.appendingPathComponent(appFile(appID(2))).path))
         #expect(!FileManager.default.fileExists(atPath: dir.appendingPathComponent("Quarantine").path))
+    }
+
+    @Test("a file that names the job but does not read strictly does not hold it: another application is kept, and the file is left alone")
+    func createBesideFileThatNamesTheJob() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let broken = try appJSON(application(2, job: "one job")).replacingOccurrences(of: #""fullName":"Ada""#, with: #""fullName":" ""#)
+        #expect(broken.contains(#""jobID":"one job""#) && broken.contains(#""fullName":" ""#))
+        try write(broken, to: dir.appendingPathComponent(appFile(appID(2))))
+        let mismatched = try appJSON(application(4, job: "one job"))                         // named for application 3, holding application 4
+        try write(mismatched, to: dir.appendingPathComponent(appFile(appID(3))))
+        let r = appRepo(dir)
+        let kept = try await r.create(application(1, job: "one job"))
+        #expect(kept.id == appID(1) && kept.provenance.jobID.raw == "one job")
+        #expect(try String(contentsOf: dir.appendingPathComponent(appFile(appID(2))), encoding: .utf8) == broken)
+        #expect(try String(contentsOf: dir.appendingPathComponent(appFile(appID(3))), encoding: .utf8) == mismatched)
+        #expect(!exists(dir.appendingPathComponent("Quarantine")))
+        #expect(try await r.create(application(5, job: "one job")) == kept)
     }
 
     @Test("every write is atomic and asks for complete data protection")

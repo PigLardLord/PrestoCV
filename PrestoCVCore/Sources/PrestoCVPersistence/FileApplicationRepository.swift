@@ -32,11 +32,15 @@ public actor FileApplicationRepository: ApplicationRepository, ApplicationStoreM
 
     private func current(_ id: ApplicationID) throws(ApplicationRepositoryError) -> Application? { try store.current(url(id), read: { read($0) }) }
 
-    /// The application kept for a job, if the store holds one that it can read. A file that cannot be read says nothing about
-    /// its job: it is reported by the listing, and keeping a result is never refused because of another file. Call it under the
-    /// lock; it moves nothing.
+    /// The application kept for a job, if the store holds one that it can read. Each file is peeked for its job alone, and only
+    /// a file that names the job is read strictly, so keeping a result costs a pass over the store, not a strict read of every
+    /// application. A file that cannot be read, or that names the job and fails the strict read, says nothing about its job:
+    /// it is reported by the listing, and keeping a result is never refused because of another file. Call it under the lock;
+    /// it moves nothing.
     private func kept(for job: JobID) throws(ApplicationRepositoryError) -> Application? {
         for file in try store.entries(suffix: Self.suffix) {
+            let peeked = StoredFile<String>.read(file, maxBytes: store.maxFileBytes, supportedVersion: ApplicationFileV1.version, decode: ApplicationFileV1.peekJob)
+            guard case .value(let named) = peeked, named == job.raw else { continue }
             if case .value(let application) = read(file), application.provenance.jobID == job { return application }
         }
         return nil

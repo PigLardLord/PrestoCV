@@ -60,6 +60,17 @@ struct ApplicationFileV1: Codable, Equatable {
         return try file.toDomain()
     }
 
+    /// The job that a stored application was kept for, read without the strict read of the rest: all that create needs to find
+    /// the application of a job. A match is then read strictly, so a file that names the job and is otherwise broken does not
+    /// hold it.
+    static func peekJob(_ data: Data) throws(Invalid) -> String {
+        struct Peek: Decodable {
+            struct Provenance: Decodable { let jobID: String }
+            let provenance: Provenance
+        }
+        do { return try StoredJSON.decode(Peek.self, from: data).provenance.jobID } catch { throw Invalid(reason: "no job") }
+    }
+
     // MARK: From the domain
 
     init(_ application: Application, createdAt: Date, updatedAt: Date) {

@@ -98,6 +98,21 @@ struct ApplicationFileTests {
         #expect(throws: ApplicationFileV1.Invalid.self) { try read(json) }
     }
 
+    @Test("the job of a stored application is read without reading the rest strictly, so a file that names a job and is otherwise broken still names it")
+    func peekJob() throws {
+        #expect(try ApplicationFileV1.peekJob(Data(golden.utf8)) == "job-0001")
+        let broken = golden.replacingOccurrences(of: #""fullName":"Ada Lovelace""#, with: #""fullName":" ""#)
+        #expect(throws: ApplicationFileV1.Invalid.self) { try read(broken) }
+        #expect(try ApplicationFileV1.peekJob(Data(broken.utf8)) == "job-0001")
+    }
+
+    @Test("a file with no job names none")
+    func peekWithoutJob() throws {
+        #expect(throws: ApplicationFileV1.Invalid.self) { try ApplicationFileV1.peekJob(Data("{}".utf8)) }
+        #expect(throws: ApplicationFileV1.Invalid.self) { try ApplicationFileV1.peekJob(Data(#"{"provenance":{"jobID":7}}"#.utf8)) }
+        #expect(throws: ApplicationFileV1.Invalid.self) { try ApplicationFileV1.peekJob(Data("[".utf8)) }
+    }
+
     @Test("{} and a CV file are not applications")
     func notAnApplication() throws {
         #expect(throws: ApplicationFileV1.Invalid.self) { try read("{}") }
