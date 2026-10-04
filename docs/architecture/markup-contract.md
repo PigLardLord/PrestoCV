@@ -128,14 +128,75 @@ Units and bounds:
 
 Anything that could load a resource, or hide, move, reorder or inject content, is absent from this table by design. That includes `position`, `transform`, `zoom`, `filter`, `mask`, `clip`, `overflow`, `visibility`, `opacity`, `height`, `content`, `list-style`, `quotes`, counters, `direction`, `unicode-bidi`, `order` and grid placement. The palette itself only exists with readable contrast ([R8](rules.md#r8-untrusted-input-enters-through-one-validating-boundary)).
 
-## The cover letter's structure (planned, #187)
+## The cover letter's structure
 
 A `LetterDocument` is rendered as a structure of its own, beside the CV's. One built-in stylesheet styles it, for every design ([ADR 0019](adr/0019-applications.md)).
 
 - **Its elements and classes are its own.** None of its classes is in the table of what a design may select, so a design's CSS cannot select them: the design validator rejects any class outside that table.
-- **Its stylesheet is not a design.** It passes the same tokenizer and property allow-list as a design's, checked against the letter structure's selectors. Its colours and fonts are fixed values of the stylesheet.
-- **The structure is pinned by a golden HTML file** (R10), and a test reads this section and holds the code to it, as `MarkupContractPageTests` does for the CV's structure.
-- **The structure itself is written here when #187 lands:** the tree, the classes and the page rules. Its headings differ from the CV's `### Structure` and `### Selectable by a design`, which `MarkupContractPageTests` finds by name. Until then this section only states that the letter is separate from the CV's contract.
+- **Its stylesheet is not a design.** It is not in the catalog, nobody installs it, and the builder takes no design. It passes the same tokenizer and property allow-list as a design's, checked against the letter structure's selectors (below). Its colours and fonts are fixed values of the stylesheet.
+- **The structure is pinned by golden HTML files** (R10): `letter-it.html`, a letter with every field, and `letter-en-minimal.html`, one with only what is required.
+
+The source of truth is code in `CVRendering`: `LetterClass` and `LetterMarkup` for the structure, `LetterStyle` for the stylesheet, and `LetterHTMLBuilder` for the markup. `LetterMarkupPageTests`, in `CVPDFExporter/Tests/CVRenderingTests/`, reads this section and fails when it and the code disagree. Its headings differ from the two that `MarkupContractPageTests` finds by name in the CV's part of this page, so that suite keeps reading the CV's tables.
+
+### The letter's tree
+
+```
+html[lang]
+└── body
+    └── main.letter[data-schema]
+        ├── header.letter-sender
+        │   ├── p.letter-sender-name
+        │   ├── p.letter-sender-title        (if present)
+        │   ├── p.letter-sender-email        (if present)
+        │   ├── p.letter-sender-phone        (if present)
+        │   ├── p.letter-sender-location     (if present)
+        │   └── a.letter-sender-website[href]  (if present and a valid WebLink; its text is the href)
+        ├── section.letter-recipient         (if the recipient has a name, a company or an address line)
+        │   ├── p.letter-recipient-name      (if present)
+        │   ├── p.letter-recipient-company   (if present)
+        │   └── p.letter-recipient-address   one per address line
+        ├── p.letter-dateline                the place and the date, in the language's format
+        ├── p.letter-reference               (if present)
+        │   ├── span.letter-reference-label  the language's label
+        │   └── span.letter-reference-value
+        ├── h1.letter-subject                (if present)
+        ├── p.letter-salutation              the language's salutation for the form of address
+        ├── p.letter-paragraph               one per body paragraph
+        ├── p.letter-closing                 (if present)
+        ├── p.letter-valediction             the language's valediction for the form of address
+        ├── p.letter-signature               the name
+        └── section.letter-attachments       (if there are any)
+            ├── h2.letter-attachments-title  the language's label
+            └── p.letter-attachment          one per attachment
+```
+
+**The page writes five kinds of text, and nothing else.** The date line, the salutation, the valediction, the reference label and the attachments label come from the language's conventions (R13). Every other text node is a field of the document, and a test compares the text nodes of each language with the fields and the conventions, so the layout holds no word of its own.
+
+**A blank value is absent.** A missing, empty or whitespace-only optional field, paragraph, address line or attachment produces no element, so the page has no empty line.
+
+**The sender's website prints its destination,** exactly as its `href`, as a CV link does (above). The builder's base style lets it wrap.
+
+**The recipient's form of address** picks the salutation and the valediction. A `masculine` or `feminine` salutation holds the recipient's family name, escaped like any other text and never read as a template; a `neutral` one names nobody.
+
+### Selectable by the letter's stylesheet
+
+| Kind | Values |
+|---|---|
+| Elements | `main`, `header`, `section`, `h1`, `h2`, `p`, `span`, `a` |
+| Classes | `letter`, `letter-sender`, `letter-sender-name`, `letter-sender-title`, `letter-sender-email`, `letter-sender-phone`, `letter-sender-location`, `letter-sender-website`, `letter-recipient`, `letter-recipient-name`, `letter-recipient-company`, `letter-recipient-address`, `letter-dateline`, `letter-reference`, `letter-reference-label`, `letter-reference-value`, `letter-subject`, `letter-salutation`, `letter-paragraph`, `letter-closing`, `letter-valediction`, `letter-signature`, `letter-attachments`, `letter-attachments-title`, `letter-attachment` |
+| Attribute selectors | none |
+| Pseudo-classes | none |
+
+The grammar and the property table are the design CSS's, above, unchanged: a letter rule is checked by the same tokenizer and the same allow-list, so it cannot load a resource, or hide, move, reorder or inject content. Only the selectors differ.
+
+### The letter's fixed values
+
+| Value | Setting |
+|---|---|
+| Colours | text `#111111`, primary `#1F3A5F`, background `#FFFFFF`, set as the custom properties `--color-text`, `--color-primary` and `--color-background` |
+| Fonts | `Helvetica,Arial,sans-serif`, set as `--font-body` and `--font-heading`. The stack has one set of metrics on every platform, so a letter takes the same room wherever it is rendered |
+
+The colours pass the palette rules of a design's: text at least 4.5:1 and primary at least 3:1 against the background. They come from no design and no palette.
 
 ## Changelog
 
