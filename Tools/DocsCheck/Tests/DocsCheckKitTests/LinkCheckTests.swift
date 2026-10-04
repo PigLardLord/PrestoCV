@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import DocsCheckKit
 
@@ -103,6 +104,15 @@ struct LinkCheckTests {
             "Tools/X/.build/checkouts/dep/README.md": broken, ".git/README.md": broken, "docs/.build/a.md": broken,
         ])
         #expect(result == ["AGENTS.md:1 link-target-missing", "Package/README.md:1 link-target-missing", "README.md:1 link-target-missing", "docs/deep/er/a.md:1 link-target-missing"])
+    }
+
+    @Test("a symbolic link to a directory is not followed, so a cycle cannot hang the walk")
+    func symbolicLinks() throws {
+        try withRepository(acceptedBaseline.merging(["README.md": "[a](docs/a.md)", "docs/a.md": "[x](gone.md)"]) { _, test in test }) { root in
+            try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("docs/loop"), withDestinationURL: root)
+            let report = try DocumentationChecker(root: root).run()
+            #expect(report.findings.filter { $0.code == .linkTargetMissing }.map(\.file) == ["docs/a.md"])
+        }
     }
 
     @Test("findings are sorted by file, then line")

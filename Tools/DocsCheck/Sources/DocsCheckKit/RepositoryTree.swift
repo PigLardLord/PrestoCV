@@ -26,7 +26,7 @@ struct RepositoryTree {
         for name in try FileManager.default.contentsOfDirectory(atPath: absolutePath(directory)).sorted() {
             let path = directory.isEmpty ? name : directory + "/" + name
             switch kind(atExactPath: path) {
-            case .directory where !Self.skippedDirectories.contains(name):
+            case .directory where !Self.skippedDirectories.contains(name) && !isSymbolicLink(path):
                 paths += try markdownFiles(in: path)
             case .file where name.hasSuffix(".md"):
                 paths.append(path)
@@ -62,6 +62,10 @@ struct RepositoryTree {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: absolutePath(path), isDirectory: &isDirectory) else { return nil }
         return isDirectory.boolValue ? .directory : .file
+    }
+
+    private func isSymbolicLink(_ path: String) -> Bool {
+        (try? FileManager.default.attributesOfItem(atPath: absolutePath(path))[.type] as? FileAttributeType) == .typeSymbolicLink
     }
 
     private func absolutePath(_ path: String) -> String {

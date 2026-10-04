@@ -56,6 +56,8 @@ stale "an anchor into another file that is not one of its headings" "^README.md:
 put docs/guide.md $'# Guide\n\n## Set `up`!\n\n## Set up'; put README.md $'# Project\n\n[a](docs/guide.md#set-up) [b](docs/guide.md#set-up-1)'; fixed "headings with punctuation and a repeat"
 setup; put README.md $'# Project\n\n[gone](https://example.invalid/gone.md) [mail](mailto:nobody@example.invalid)'
 fixed "links to other sites are not followed"
+setup; put README.md $'# Project\n\nA link in a code span, `[gone](gone.md)`, or in a block, is not a link:\n\n```\n[gone](gone.md)\n```'
+fixed "a link in a code span or in a fenced block is not a link"
 setup; put Package/README.md $'[gone](gone.md)'; put Package/.build/checkouts/dep/README.md $'[gone](gone.md)'
 stale "a README in a package" "^Package/README.md:1: link-target-missing:"
 rm "$ROOT/Package/README.md"; fixed "the README in .build is not read"

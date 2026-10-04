@@ -89,6 +89,11 @@ struct MarkdownDocumentTests {
         ])
     }
 
+    @Test("a closing sequence of hashes needs a space before it, so a heading may end in a hash")
+    func headingEndingInHash() {
+        #expect(MarkdownDocument(text: "# C#\n## F# #\n### #").headings.map(\.text) == ["C#", "F#", ""])
+    }
+
     @Test("anchors are the slugs of the headings, numbered when they repeat")
     func anchors() {
         let text = "# Usage\n## Install\ntext\n## Install\n```\n## Install\n```\n## Città e `code`\n## Install"
