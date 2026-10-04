@@ -188,14 +188,29 @@ struct FileLetterDefaultsStoreTests {
         await #expect(throws: LetterDefaultsError.corrupt(file: "1~\(name)", reason: "revision")) { _ = try await store(other).load() }
     }
 
-    @Test("copies that entered the quarantine in the same second are ordered by their number, as they were numbered: 10~ is newer than 2~, and a plain name is the oldest")
-    func newestCopyByNumber() async throws {
+    @Test("copies that entered the quarantine in the same second are ordered by their number, as they were numbered: 10~ is newer than 2~, and a plain name is the oldest; whichever was created first on disk",
+          arguments: [true, false])
+    func newestCopyByNumber(newestCreatedFirst: Bool) async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
-        try standing([("", 100, "{"), ("1~", 100, "{"), ("2~", 100, "{"), ("10~", 100, badRevision)], in: dir)
+        var copies: [(prefix: String, at: Double, content: String)] = [("", 100, "{"), ("1~", 100, "{"), ("2~", 100, "{")]
+        if newestCreatedFirst { copies.insert(("10~", 100, badRevision), at: 0) } else { copies.append(("10~", 100, badRevision)) }
+        try standing(copies, in: dir)
         await #expect(throws: LetterDefaultsError.corrupt(file: "10~\(name)", reason: "revision")) { _ = try await store(dir).load() }
-        let other = tempDir(); defer { try? FileManager.default.removeItem(at: other) }
-        try standing([("", 100, badRevision), ("2~", 99, "{")], in: other)
-        await #expect(throws: LetterDefaultsError.corrupt(file: name, reason: "revision")) { _ = try await store(other).load() }
+    }
+
+    @Test("a plain name is the oldest of copies of one second, and a copy with a later stamp is newer whatever its number, whichever was created first on disk",
+          arguments: [true, false])
+    func plainNameAgainstNumbered(plainCreatedFirst: Bool) async throws {
+        let sameSecond = tempDir(); defer { try? FileManager.default.removeItem(at: sameSecond) }
+        var pair: [(prefix: String, at: Double, content: String)] = [("", 100, "{"), ("1~", 100, badRevision)]
+        if !plainCreatedFirst { pair.reverse() }
+        try standing(pair, in: sameSecond)
+        await #expect(throws: LetterDefaultsError.corrupt(file: "1~\(name)", reason: "revision")) { _ = try await store(sameSecond).load() }
+        let later = tempDir(); defer { try? FileManager.default.removeItem(at: later) }
+        var stamped: [(prefix: String, at: Double, content: String)] = [("", 100, badRevision), ("2~", 99, "{")]
+        if !plainCreatedFirst { stamped.reverse() }
+        try standing(stamped, in: later)
+        await #expect(throws: LetterDefaultsError.corrupt(file: name, reason: "revision")) { _ = try await store(later).load() }
     }
 
     @Test("a restore brings the quarantined copy back, and the defaults load again")

@@ -37,8 +37,10 @@ public actor FileLetterDefaultsStore: LetterDefaultsStore, LetterDefaultsMainten
     }
 
     /// The corrupt copy that stands in the quarantine, if one does, as the error that reports it: the newest, by the time it entered
-    /// the quarantine and, within the same second, by its number, which a later copy of the same name gets higher (`10~` is newer
-    /// than `2~`, and a name with no number is the oldest). Call it under the lock.
+    /// the quarantine. Within the same second the stamp cannot tell copies apart, so the number that a copy was given when it was
+    /// quarantined decides, which is the lowest number that was free: a higher number is the later copy, unless a purge freed a
+    /// lower one in between, and a name with no number is the oldest. Whenever the stamps differ, the stamp decides, so `10~` can
+    /// be older than `2~`. Call it under the lock.
     private func standingCopy() throws(LetterDefaultsError) -> LetterDefaultsError? {
         var newest: (name: String, stamp: Date, number: Int)?
         for name in try store.quarantineNames() where name.range(of: "^(\\d+~)?" + Self.namePattern + "\\z", options: .regularExpression) != nil {
