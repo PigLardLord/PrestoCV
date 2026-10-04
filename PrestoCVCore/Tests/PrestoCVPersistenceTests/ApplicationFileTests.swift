@@ -113,6 +113,24 @@ struct ApplicationFileTests {
         #expect(throws: ApplicationFileV1.Invalid.self) { try ApplicationFileV1.peekJob(Data("[".utf8)) }
     }
 
+    @Test("the override and the defaults as held are stored under their own keys, and not the one for the other")
+    func overrideAndDefaultsKeys() throws {
+        let override = try LetterDefaults(salaryExpectation: "60k")
+        let held = try LetterDefaults(salaryExpectation: "60k", startDate: "May", note: "Part time")
+        let full = FixtureProvenance.full()
+        let provenance = try ApplicationProvenance(
+            jobID: full.jobID, sourceCV: full.sourceCV, snapshot: full.snapshot, report: full.report, questions: full.questions, letterOverride: override,
+            letterDefaults: held, promptVersion: full.promptVersion, providerAlias: full.providerAlias, modelAlias: full.modelAlias, lineSources: full.lineSources)
+        let source = FixtureApplication.full()
+        let application = try Application(id: source.id, cv: source.cv, letter: source.letter, advert: source.advert, provenance: provenance)
+            .stamped(revision: 3, createdAt: created, updatedAt: updated)
+        let json = String(decoding: try ApplicationFileV1(application, createdAt: created, updatedAt: updated).encoded(), as: UTF8.self)
+        #expect(json.contains(#""letterOverride":{"note":"","salaryExpectation":"60k","startDate":""}"#))
+        #expect(json.contains(#""letterDefaults":{"note":"Part time","salaryExpectation":"60k","startDate":"May"}"#))
+        let read = try ApplicationFileV1.read(Data(json.utf8))
+        #expect(read == application && read.provenance.letterOverride == override && read.provenance.letterDefaults == held)
+    }
+
     @Test("the reason a file is corrupt is a stable code, the error's case and the field, for every field and every error")
     func reasonCodes() {
         var fields: [ApplicationField] = LetterDefaults.Field.allCases.map { .letterDefault($0) }
