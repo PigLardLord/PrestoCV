@@ -198,6 +198,16 @@ The grammar and the property table are the design CSS's, above, unchanged: a let
 
 The colours pass the palette rules of a design's: text at least 4.5:1 and primary at least 3:1 against the background. They come from no design and no palette.
 
+### The letter's page
+
+| Setting | Value |
+|---|---|
+| Paper | A4, `595` × `842` pt |
+| Pages | `1` |
+| Free at the top and at the bottom of the page | `36` pt |
+
+The letter is one page. `LetterPDFExport` prints it on that page, reads the PDF back, and refuses it unless the PDF has one page and holds every text node the builder produced. A letter that needs a second page is a typed `doesNotFitOnOnePage` error, never a page that is cut off. The left and right margins are the stylesheet's own: 48 pt of padding on `.letter`. Whether a real letter fits in the real fonts is checked on the native renderers.
+
 ## Changelog
 
 | Version | Change | Compatible with |

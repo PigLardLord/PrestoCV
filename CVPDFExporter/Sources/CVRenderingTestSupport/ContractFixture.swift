@@ -23,6 +23,28 @@ public enum ContractFixture {
         .interests(["Poetry"]),
     ])
 
+    /// A letter that populates every field, in the language given: what the native renderers' letter contract prints.
+    public static func letter(language: String) -> LetterDocument {
+        LetterDocument(
+            language: language,
+            sender: Person(name: "Ada Lovelace", professionalTitle: "Analyst", email: "ada@example.com", phone: "+39 06 1234567",
+                           location: "Via Roma 1, 00100 Roma", website: "https://ada.example"),
+            recipient: LetterRecipient(formOfAddress: .feminine, name: "Maria Rossi", familyName: "Rossi", company: "Babbage & Co",
+                                       address: ["Via Milano 2", "20100 Milano"]),
+            place: "Roma", date: LetterDate(year: 2026, month: 10, day: 4), reference: "REF-2026-14", subject: "Application for the position of Analyst",
+            body: ["I am writing to apply for the position of Analyst at Babbage & Co.", "My CV is attached, and it tells {{title}} <b>literally</b>."],
+            closing: "I am available for an interview.", name: "Ada Lovelace", attachments: ["Curriculum vitae", "Degree certificate"])
+    }
+
+    /// The same letter with as many paragraphs as a letter may have, of two lines each: more than any page holds.
+    public static func overlongLetter(language: String) -> LetterDocument {
+        var letter = letter(language: language)
+        letter.body = (1...40).map {
+            "Paragraph \($0) says something about the role and about the person who applies for it, and it goes on for a second line of text."
+        }
+        return letter
+    }
+
     public static let palette = Palette(primary: HexColor("#1F3A5F")!, text: HexColor("#111111")!, background: HexColor("#FFFFFF")!)!
 
     /// A plain design that passes the CSS policy.

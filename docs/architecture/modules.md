@@ -174,6 +174,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
     - the labels of the reference line and of the attachments.
 
     The reader is strict and bounded: the file's size is checked first, an unknown key is a corrupt table, a missing key or an empty, over-long or hidden-character value is incomplete and names its key, and a template with a hole it does not need, or without one it needs, is incomplete. A hole is filled in one pass, so a family name that looks like a hole is text. Tests hold the six files to the schema, to the index and to `LetterDocument.supportedLanguages`, pin each language's wording, and compare the text nodes of each language with the document's fields and the conventions, so the layout holds no word of its own.
+  - **`LetterPDFExport`** exports a letter as one A4 page. It builds the markup, prints it through `PDFRendering` on `LetterPDFExport.page` (A4, at most one page), and reads the PDF back through `PDFInspecting`. It refuses a PDF that cannot be read (`unreadablePDF`), one that is not a single page, whether the renderer says so or the PDF shows it (`doesNotFitOnOnePage`, with the pages it needed), and one that lacks a text node the builder produced (`missing`, naming them), as the CV's check does. A letter that does not fit is an error, never a truncated page. A letter that cannot be rendered never reaches the renderer, and a cancellation ends in `CancellationError`.
 
 **`CVRenderingWebKitSupport`**
 - `SecureWebViewConfiguration.compileRules()` is called once by the composition root: a block rule per network scheme, plus a block on every subresource type. `make(rules:)` then builds each configuration: JavaScript off for content, non-persistent store, media only on user action.
@@ -199,9 +200,11 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
     - truncation reported;
     - `requiredPages` checked against an unlimited render;
     - deterministic pre-start cancellation;
+  - the **letter export contract**, `LetterExportContract`, which every renderer also passes, on its real platform: in each of the six languages a letter that fits is exported as one page that holds every text node, and a letter that cannot fit is a typed error. `ContractFixture.letter(language:)` and `overlongLetter(language:)` are its documents;
   - `FakePDFRenderer`, which writes real uncompressed PDFs;
   - `MinimalPDFInspector`.
 - **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test, in-flight cancellation and the content-completeness test for every bundled design.
+  - Pending (#187): both also run `LetterExportContract` with PDFKit's inspector, and a test that a realistic letter, with a full sender block, a four-line address and three attachments, fits one page in the real fonts.
 
 **Separate package `CVPDFExporterExamples`** holds the demos and the template viewer. The library package contains no executables (R14).
 

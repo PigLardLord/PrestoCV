@@ -37,6 +37,16 @@ struct LetterMarkupPageTests {
         for property in colours.filter({ $0.hasPrefix("--") }) { #expect(LetterStyle.customProperties.contains("\(property):")) }
     }
 
+    @Test("the letter's page is the export's: A4, one page, and the margins every page keeps")
+    func page() throws {
+        let rows = try LetterPage.table(after: "### The letter's page")
+        let paper = LetterPage.backticked(try #require(rows["Paper"])).compactMap(Double.init)
+        #expect(paper == [LetterPDFExport.page.widthPoints, LetterPDFExport.page.heightPoints])
+        #expect(LetterPage.backticked(try #require(rows["Pages"])).compactMap(Int.init) == [LetterPDFExport.page.maxPages])
+        #expect(LetterPage.backticked(try #require(rows["Free at the top and at the bottom of the page"])).compactMap(Double.init) == [LetterPDFExport.page.verticalMarginPoints])
+        #expect(Set(rows.keys) == ["Paper", "Pages", "Free at the top and at the bottom of the page"])
+    }
+
     @Test("the golden files that the page names exist, and the page names every golden file of the letter")
     func goldenFiles() throws {
         let section = try LetterPage.section(from: "## The cover letter's structure", to: "### The letter's tree")
