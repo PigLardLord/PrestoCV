@@ -51,7 +51,7 @@ public struct LetterDefaults: Hashable, Sendable {
     }
 
     private static func text(_ raw: String, _ field: Field) throws(ApplicationError) -> String {
-        try TextRule.trimmed(raw, .letterDefault(field), maxBytes: maxBytes(of: field), multiline: field == .note)
+        try ApplicationTextRule.trimmed(raw, .letterDefault(field), maxBytes: maxBytes(of: field), multiline: field == .note)
     }
 }
 

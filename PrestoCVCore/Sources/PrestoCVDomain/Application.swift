@@ -7,9 +7,9 @@ public struct Advert: Hashable, Sendable {
     public let company: String, role: String, text: String
 
     public init(company: String, role: String, text: String) throws(ApplicationError) {
-        self.company = try TextRule.trimmed(company, .advertCompany, maxBytes: Self.maxLineBytes)
-        self.role = try TextRule.trimmed(role, .advertRole, maxBytes: Self.maxLineBytes)
-        self.text = try TextRule.required(text, .advertText, maxBytes: Self.maxTextBytes, multiline: true)
+        self.company = try ApplicationTextRule.trimmed(company, .advertCompany, maxBytes: Self.maxLineBytes)
+        self.role = try ApplicationTextRule.trimmed(role, .advertRole, maxBytes: Self.maxLineBytes)
+        self.text = try ApplicationTextRule.required(text, .advertText, maxBytes: Self.maxTextBytes, multiline: true)
     }
 }
 

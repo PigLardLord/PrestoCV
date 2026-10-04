@@ -5,7 +5,7 @@ import Foundation
 public struct JobID: Hashable, Sendable {
     public static let maxBytes = 256
     public let raw: String
-    public init(_ raw: String) throws(ApplicationError) { self.raw = try TextRule.required(raw, .jobID, maxBytes: Self.maxBytes) }
+    public init(_ raw: String) throws(ApplicationError) { self.raw = try ApplicationTextRule.required(raw, .jobID, maxBytes: Self.maxBytes) }
 }
 
 /// Where an application came from, as plain values that Authoring stores, bounds and gives back, and does not interpret
@@ -26,7 +26,7 @@ public struct ApplicationProvenance: Hashable, Sendable {
     public struct SourceExperience: Hashable, Sendable {
         public let statements: [String]
         public init(statements: [String]) throws(ApplicationError) {
-            self.statements = try TextRule.list(statements, .statement, maxCount: Limits.items, maxBytes: Limits.statementBytes)
+            self.statements = try ApplicationTextRule.list(statements, .statement, maxCount: Limits.items, maxBytes: Limits.statementBytes)
         }
     }
 
@@ -41,9 +41,9 @@ public struct ApplicationProvenance: Hashable, Sendable {
         public let argument: String
         public let cut: [String], moved: [String], reworded: [String]
         public init(argument: String, cut: [String] = [], moved: [String] = [], reworded: [String] = []) throws(ApplicationError) {
-            self.argument = try TextRule.trimmed(argument, .reportArgument, maxBytes: Limits.reportBytes, multiline: true)
+            self.argument = try ApplicationTextRule.trimmed(argument, .reportArgument, maxBytes: Limits.reportBytes, multiline: true)
             func entries(_ texts: [String]) throws(ApplicationError) -> [String] {
-                try TextRule.list(texts, .reportEntry, maxCount: Limits.items, maxBytes: Limits.reportBytes, multiline: true)
+                try ApplicationTextRule.list(texts, .reportEntry, maxCount: Limits.items, maxBytes: Limits.reportBytes, multiline: true)
             }
             self.cut = try entries(cut); self.moved = try entries(moved); self.reworded = try entries(reworded)
         }
@@ -60,10 +60,10 @@ public struct ApplicationProvenance: Hashable, Sendable {
         public let scope: QuestionScope
         public let answer: String?
         public init(code: String, values: [String] = [], scope: QuestionScope, answer: String? = nil) throws(ApplicationError) {
-            self.code = try TextRule.required(code, .questionCode, maxBytes: Limits.identifierBytes)
-            self.values = try TextRule.list(values, .questionValue, maxCount: Limits.questionValues, maxBytes: Limits.valueBytes)
+            self.code = try ApplicationTextRule.required(code, .questionCode, maxBytes: Limits.identifierBytes)
+            self.values = try ApplicationTextRule.list(values, .questionValue, maxCount: Limits.questionValues, maxBytes: Limits.valueBytes)
             self.scope = scope
-            self.answer = try TextRule.optional(answer, .answer, maxBytes: Limits.answerBytes, multiline: true)
+            self.answer = try ApplicationTextRule.optional(answer, .answer, maxBytes: Limits.answerBytes, multiline: true)
         }
     }
 
@@ -116,9 +116,9 @@ public struct ApplicationProvenance: Hashable, Sendable {
         }
         self.jobID = jobID; self.sourceCV = sourceCV; self.snapshot = snapshot; self.report = report; self.questions = questions
         self.letterOverride = letterOverride; self.letterDefaults = letterDefaults
-        self.promptVersion = try TextRule.required(promptVersion, .promptVersion, maxBytes: Limits.identifierBytes)
-        self.providerAlias = try TextRule.required(providerAlias, .providerAlias, maxBytes: Limits.identifierBytes)
-        self.modelAlias = try TextRule.required(modelAlias, .modelAlias, maxBytes: Limits.identifierBytes)
+        self.promptVersion = try ApplicationTextRule.required(promptVersion, .promptVersion, maxBytes: Limits.identifierBytes)
+        self.providerAlias = try ApplicationTextRule.required(providerAlias, .providerAlias, maxBytes: Limits.identifierBytes)
+        self.modelAlias = try ApplicationTextRule.required(modelAlias, .modelAlias, maxBytes: Limits.identifierBytes)
         self.lineSources = lineSources
     }
 }

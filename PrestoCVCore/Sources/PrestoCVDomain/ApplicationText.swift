@@ -33,7 +33,7 @@ public enum ApplicationError: Error, Equatable, Sendable {
 /// UTF-8 bytes (a letter followed by any number of combining marks is one character), and free of what could hide or
 /// reorder it. It is as strict as `CVDocumentValidator`, so what Authoring keeps is never refused by the letter's
 /// validator for its characters.
-enum TextRule {
+enum ApplicationTextRule {
     static func trimmed(_ raw: String, _ field: ApplicationField, maxBytes: Int, multiline: Bool = false) throws(ApplicationError) -> String {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard text.utf8.count <= maxBytes else { throw .tooLong(field) }
