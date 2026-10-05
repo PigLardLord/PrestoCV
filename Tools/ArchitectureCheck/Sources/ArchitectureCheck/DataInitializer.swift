@@ -25,18 +25,33 @@ struct DataInitializer {
     }
 
     private static func delegates(_ statements: CodeBlockItemListSyntax, _ names: [String], _ values: ConstantValue) -> Bool {
-        guard statements.count == 1, let call = statements.first?.item.as(FunctionCallExprSyntax.self),
-              call.trailingClosure == nil, call.additionalTrailingClosures.isEmpty,
-              let callee = call.calledExpression.as(MemberAccessExprSyntax.self), callee.declName.baseName.text == "init",
-              callee.base?.as(DeclReferenceExprSyntax.self)?.baseName.text == "self" else { return false }
-        var passed: [String] = []
-        for argument in call.arguments {
-            if let name = values.parameter(argument.expression) { passed.append(name) }
-            else if !values.accepts(argument.expression) { return false }
-        }
+        guard statements.count == 1, let call = statements.first?.item.as(FunctionCallExprSyntax.self), isSelfInit(call),
+              let passed = passedParameters(of: call, values) else { return false }
         return passed.sorted() == names.sorted()
     }
+
+    /// `self.init(...)`, without a trailing closure.
+    private static func isSelfInit(_ call: FunctionCallExprSyntax) -> Bool {
+        guard call.trailingClosure == nil, call.additionalTrailingClosures.isEmpty,
+              let callee = call.calledExpression.as(MemberAccessExprSyntax.self) else { return false }
+        return callee.declName.baseName.text == "init" && isSelf(callee.base)
+    }
+
+    /// The parameters that the arguments pass unchanged; nil when an argument is neither a parameter nor a constant.
+    private static func passedParameters(of call: FunctionCallExprSyntax, _ values: ConstantValue) -> [String]? {
+        var passed: [String] = []
+        for argument in call.arguments {
+            if let name = values.parameter(argument.expression) {
+                passed.append(name)
+            } else if !values.accepts(argument.expression) {
+                return nil
+            }
+        }
+        return passed
+    }
 }
+
+private func isSelf(_ expr: ExprSyntax?) -> Bool { expr?.as(DeclReferenceExprSyntax.self)?.baseName.text == "self" }
 
 /// `self.name = value`, or `name = value`, as a statement.
 private struct Assignment {
@@ -46,12 +61,8 @@ private struct Assignment {
     init?(_ item: CodeBlockItemSyntax.Item) {
         guard let sequence = item.as(SequenceExprSyntax.self), sequence.elements.count == 3 else { return nil }
         let parts = Array(sequence.elements)
-        guard parts[1].is(AssignmentExprSyntax.self) else { return nil }
-        if let member = parts[0].as(MemberAccessExprSyntax.self), member.base?.as(DeclReferenceExprSyntax.self)?.baseName.text == "self" {
-            target = member.declName.baseName.text
-        } else if let name = parts[0].as(DeclReferenceExprSyntax.self) {
-            target = name.baseName.text
-        } else { return nil }
+        guard parts[1].is(AssignmentExprSyntax.self), let target = Self.targetName(of: parts[0]) else { return nil }
+        self.target = target
         value = parts[2]
     }
 
@@ -59,4 +70,10 @@ private struct Assignment {
     func storesParameter(of values: ConstantValue) -> Bool { values.parameter(value) == target }
 
     func givesConstant(of values: ConstantValue) -> Bool { values.accepts(value) }
+
+    /// The property that `self.name` or `name` names.
+    private static func targetName(of expr: ExprSyntax) -> String? {
+        if let member = expr.as(MemberAccessExprSyntax.self) { return isSelf(member.base) ? member.declName.baseName.text : nil }
+        return expr.as(DeclReferenceExprSyntax.self)?.baseName.text
+    }
 }
