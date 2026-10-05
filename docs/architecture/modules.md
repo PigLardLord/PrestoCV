@@ -30,7 +30,8 @@ Test targets and test-support targets are described below each package. The chec
   - `revision`, `createdAt` and `updatedAt`, settable only inside the package;
   - a private title, `PersonalDetails`, and ordered sections of entries;
   - the "has enough content to be saved" rule;
-  - duplication with a title composed by the caller.
+  - duplication with a title composed by the caller;
+  - the order of every listing, most recently changed first (`mostRecentlyChangedFirst()`).
 - **Value objects:**
   - `PartialDate` (year or month precision, partial order);
   - `Period`, whose end is a date, "current" or "ended, date unknown" (`PeriodEnd.unknown`);
@@ -48,6 +49,7 @@ Test targets and test-support targets are described below each package. The chec
 - **Use cases:**
   - `NewCV`, `SaveCV` (create or conditional update, errors translated to `AuthoringError`, including `tooLarge`), `LoadCV`;
   - list (by last change), rename, duplicate, delete, start from a sample, determine onboarding.
+- **Errors:** every use case translates a `RepositoryError` through one exhaustive mapping, `AuthoringError(_:)`.
 - **Listing** returns the healthy CVs plus `StoreIssue`s: `corrupt`, `upgradeRequired`, `unreadable`, `tooLarge`, `quarantineFailed`.
 
 **`PrestoCVPersistence`**
@@ -58,6 +60,13 @@ Test targets and test-support targets are described below each package. The chec
   - reads classified as described in `PersistedSchema`;
   - `Quarantine/` with validated restore, erase and purge.
 - `DirectorySampleCVSource`: sample CVs from an injected directory, in the same v1 format and through the store's own reader. The app ships them in `PrestoCV/Resources/Samples/`.
+- **Internal types**, one concern each:
+  - `CVFileV1`: the schema, with the conversion of each stored entry to and from the domain and the size caps;
+  - `StoredCVFile`: the one reader of a stored file (open once, size cap, strict decode, one outcome per failure);
+  - `StoreLock`: the exclusive `flock` on the store;
+  - `StoreState`: whether the store directory is present, absent or unavailable;
+  - `Quarantine` and `QuarantinedName`: the `Quarantine/` folder and the validated names in it;
+  - `StoredFileName` and `StoreFiles`: how files are named, and removed with coded failures.
 
 **Test support and tests.**
 - `PrestoCVCoreTestSupport` may import `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Synchronization. It holds:
