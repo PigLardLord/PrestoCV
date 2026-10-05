@@ -19,6 +19,11 @@ public struct DocumentHTMLBuilder: Sendable {
     static let baseStyle = "a{overflow-wrap:anywhere}"
 
     /// The document as an HTML page.
+    ///
+    /// - Parameters:
+    ///   - document: the document to print; it is not validated here.
+    ///   - style: the design's stylesheet, with the palette and fonts chosen for it.
+    ///   - headings: the section titles in the document's language.
     public func build(_ document: CVDocument, style: DocumentStyle, headings: Headings) -> String {
         render(document, style: style, headings: headings).html
     }

@@ -6,7 +6,10 @@ import WebKit
 /// no network, no JavaScript from the content, no persistent data, and media only on user action.
 @MainActor
 public enum SecureWebViewConfiguration {
-    public enum Failure: Error, Equatable, Sendable { case contentRulesUnavailable }
+    public enum Failure: Error, Equatable, Sendable {
+        /// The rule list cannot be compiled or the rule list store is unavailable. There is no configuration without it.
+        case contentRulesUnavailable
+    }
 
     /// The schemes a document could reach the network or local data through. Content-blocker patterns have no
     /// alternation, so each gets a block rule of its own. Content blockers do not see data: URLs on Apple platforms
@@ -55,7 +58,18 @@ public enum SecureWebViewConfiguration {
 /// object alive for as long as the web view.
 @MainActor
 public final class SingleLoadNavigationDelegate: NSObject, WKNavigationDelegate {
-    public enum Failure: Error, Equatable, Sendable { case alreadyUsed, loadFailed, contentProcessTerminated, timedOut, cancelled }
+    public enum Failure: Error, Equatable, Sendable {
+        /// The delegate loads one document only, and this one has loaded.
+        case alreadyUsed
+        /// The web view could not start the load or reported that it failed.
+        case loadFailed
+        /// The web content process ended before the load finished.
+        case contentProcessTerminated
+        /// The load had not finished when the timeout passed.
+        case timedOut
+        /// The task was cancelled while the load was in progress.
+        case cancelled
+    }
 
     private var initialNavigation: WKNavigation?
     private var loadStarted = false, initialLoadAllowed = false, initialResponseAllowed = false
@@ -151,7 +165,16 @@ public final class SingleLoadNavigationDelegate: NSObject, WKNavigationDelegate 
 /// world of its own, so the page can neither see nor change it, and the wait gives up after a timeout.
 @MainActor
 public enum DocumentReadiness {
-    public enum Failure: Error, Equatable, Sendable { case timedOut, scriptFailed, notReady, cancelled }
+    public enum Failure: Error, Equatable, Sendable {
+        /// The page had not answered when the timeout passed.
+        case timedOut
+        /// The readiness script could not run or threw.
+        case scriptFailed
+        /// The page answered that it is not ready.
+        case notReady
+        /// The task was cancelled while the page was being checked.
+        case cancelled
+    }
 
     public static let world = WKContentWorld.world(name: "cv.readiness")
     static let script = "await document.fonts.ready; return document.readyState === 'complete';"

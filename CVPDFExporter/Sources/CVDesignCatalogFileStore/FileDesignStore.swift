@@ -18,6 +18,8 @@ public enum FileDesignStoreError: Error, Equatable, Sendable {
     case designUnreadable(id: String), designTooLarge(id: String, bytes: Int), designRejected(id: String, [DesignPackageViolation])
     /// The design, once encoded, would not validate back to itself, so nothing was written.
     case wouldNotReadBack(id: String)
+    /// A file or the index could not be encoded or written, or a superseded or unlisted file could not be removed. The
+    /// index still lists the version it listed before.
     case writeFailed(id: String)
 }
 
@@ -37,6 +39,11 @@ public actor FileDesignStore: DesignStore {
 
     private let directory: StoreDirectory, validator: DesignPackageValidator
 
+    /// - Parameters:
+    ///   - directory: where the store lives. It is created by the first save, and a read of one that does not exist
+    ///     creates nothing.
+    ///   - validator: checks every file read and every file about to be written; its `maxBytes` also bounds the size of
+    ///     a design file the store reads.
     public init(directory: URL, validator: DesignPackageValidator = DesignPackageValidator()) {
         self.directory = StoreDirectory(url: directory)
         self.validator = validator
@@ -49,6 +56,12 @@ public actor FileDesignStore: DesignStore {
 
     // MARK: DesignStore
 
+    /// Stores `design` as a new generation, replacing the one with the same identifier.
+    ///
+    /// - Throws: `wouldNotReadBack` when the encoded design would not validate back to itself or the index would pass its
+    ///   size or generation cap, `writeFailed` when a write fails, `storeUnavailable` when the store cannot be reached or
+    ///   locked, and the index errors (`indexUnreadable`, `indexCorrupt`, `indexFromNewerVersion`) when the index cannot be
+    ///   used, in which case nothing is written.
     public func save(_ design: ValidatedDesign) async throws(FileDesignStoreError) {
         let id = design.manifest.id
         let package = try encodeReadingBack(design)
@@ -64,6 +77,11 @@ public actor FileDesignStore: DesignStore {
         }
     }
 
+    /// The stored design with this identifier, validated again as it is read.
+    ///
+    /// - Returns: nil when no design has the identifier, or when `id` is not a valid identifier.
+    /// - Throws: `designUnreadable`, `designTooLarge` or `designRejected` for a listed design whose file cannot be used,
+    ///   and `storeUnavailable` or the index errors when the store or its index cannot be read.
     public func design(id: String) async throws(FileDesignStoreError) -> ValidatedDesign? {
         guard DesignManifest.isValidID(id) else { return nil }   // never a path, such as "../x", or "Clean" on a case-insensitive volume
         return try directory.withSharedLock { () throws(FileDesignStoreError) -> ValidatedDesign? in
@@ -72,6 +90,9 @@ public actor FileDesignStore: DesignStore {
         } ?? nil
     }
 
+    /// The manifests of the stored designs, ordered by identifier; empty when nothing has been saved yet.
+    ///
+    /// - Throws: `storeUnavailable` or an index error when the store or its index cannot be read.
     public func installedDesigns() async throws(FileDesignStoreError) -> [DesignManifest] {
         try directory.withSharedLock { () throws(FileDesignStoreError) in try readIndex().map(\.manifest) } ?? []
     }
