@@ -10,7 +10,8 @@ import SwiftSyntax
 //
 // 1. Inventory: every .swift file under <root> (except .build/.git) belongs to exactly one target;
 //    symbolic links in the source tree are refused (SwiftPM follows them, a scanner might not).
-// 2. Each file is parsed with SwiftSyntax. Detectors report constructs; rules map to detectors.
+// 2. Each file is parsed with SwiftSyntax. Detectors report constructs; the rules of docs/architecture/rules.md
+//    (cited by name, never by number) map to detectors.
 // 3. Findings are occurrences: file | rule | detector | fingerprint#ordinal, fingerprint = hash of the
 //    construct's text without trivia. The baseline must match exactly; --against forbids growth.
 // 4. Exceptions are permanent, justified by an existing ADR; baseline entries are temporary.
@@ -23,14 +24,14 @@ struct Config: Decodable {
         let kind: String?                 // production (default), test, tool, manifest, legacy, excluded
         let docName: String?              // row name in modules.md, when it differs (app folders)
         let allowedImports: [String]
-        let rules: [String]
-        /// module → "internal": the import must be `internal`, `fileprivate` or `private` (R5: no domain
+        let rules: [String]               // the rules whose detectors run on this target
+        /// module → "internal": the import must be `internal`, `fileprivate` or `private` (HumbleViews: no domain
         /// type in a public API). A plain `import` is public in the Swift 6 language mode, so it fails too.
         let requiredImportAccess: [String: String]?
     }
     struct Exception: Decodable { let path: String; let detector: String; let adr: String; let reason: String }
     let targets: [Target]
-    let rules: [String: [String]]         // rule → detectors
+    let rules: [String: [String]]         // rule name → detectors
     let infrastructureTypes: [String]
     let exceptions: [Exception]?
     let notYetImplemented: [String]?
@@ -108,6 +109,12 @@ func fingerprint(_ text: String) -> String {
     return String(h, radix: 16)
 }
 
+for target in config.targets {
+    for rule in target.rules where config.rules[rule] == nil {
+        problems.append("target \(target.name) lists the rule \(rule), which rules.json does not define")
+    }
+}
+
 let detectorToRules: (Config.Target) -> [String: [String]] = { target in
     var map: [String: [String]] = [:]
     for rule in target.rules { for d in config.rules[rule] ?? [] { map[d, default: []].append(rule) } }
@@ -141,15 +148,15 @@ for (file, target) in assignment where target.kind != "legacy" {
         if exceptionsValid.contains(where: { file.hasPrefix($0.path) && $0.detector == detector }) { return }
         let base = "\(file)|\(rule)|\(detector)|\(fingerprint(node))"
         let n = ordinals[base, default: 0]; ordinals[base] = n + 1
-        findings.append(Finding(key: "\(base)#\(n)", message: "\(file):\(line): \(rule) \(detector): \(detail)"))
+        findings.append(Finding(key: "\(base)#\(n)", message: "\(file):\(line): \(rule): \(detector): \(detail)"))
     }
     let allowed = Set(target.allowedImports + ["Swift"])
     for imp in scanner.imports where !allowed.contains(imp.module) {
-        record(rule: "R1", detector: "import", detail: imp.node, node: imp.node, line: imp.line)
+        record(rule: "DependencyRule", detector: "import", detail: imp.node, node: imp.node, line: imp.line)
     }
     for imp in scanner.imports where target.requiredImportAccess?[imp.module] == "internal" {
         if !["internal", "fileprivate", "private"].contains(imp.access ?? "public") {
-            record(rule: "R5", detector: "importAccess", detail: "\(imp.access ?? "(default public)") import \(imp.module) must be internal",
+            record(rule: "HumbleViews", detector: "importAccess", detail: "\(imp.access ?? "(default public)") import \(imp.module) must be internal",
                    node: (imp.access ?? "") + " " + imp.node, line: imp.line)
         }
     }
@@ -158,6 +165,8 @@ for (file, target) in assignment where target.kind != "legacy" {
         // Inside a manifest, the declaration of a legacy target is exempt like its sources (ADR 0012); anything
         // else in the manifest, including package-level settings and new targets, is checked.
         if target.kind == "manifest", let owner = hit.packageTarget, isLegacyDeclaration(owner, inManifest: file) { continue }
+        // A manifest runs the manifest detectors only, and a source file never does.
+        guard Scanner.manifestDetectors.contains(hit.detector) == (target.kind == "manifest") else { continue }
         for rule in rulesFor[hit.detector] ?? [] { record(rule: rule, detector: hit.detector, detail: hit.detail, node: hit.node, line: hit.line) }
     }
     // A tools version below 6 builds every target without an explicit mode in Swift 5 mode. Only a manifest
@@ -219,7 +228,7 @@ if let packages = value(after: "--packages") {
         guard p.terminationStatus == 0, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let targets = json["targets"] as? [[String: Any]] else { problems.append("cannot read the manifest of \(dir)"); continue }
         // The effective language mode, as SwiftPM evaluated it: the target's setting, else the package's list, else the
-        // tools version. Every target that is not a legacy target of this package must build in Swift 6 mode (R9).
+        // tools version. Every target that is not a legacy target of this package must build in Swift 6 mode (StrictConcurrency).
         let manifestPath = dir == "." ? "Package.swift" : dir + "/Package.swift"
         let toolsMajor = ((json["toolsVersion"] as? [String: Any])?["_version"] as? String).flatMap { Int($0.prefix { $0.isNumber }) } ?? 6
         let packageModes = (json["swiftLanguageVersions"] as? [String]) ?? (json["swiftLanguageModes"] as? [String]) ?? []
@@ -234,7 +243,7 @@ if let packages = value(after: "--packages") {
             }
             let effective = targetModes.map(major).min() ?? (packageModes.isEmpty ? (toolsMajor >= 6 ? 6 : 5) : packageModes.map(major).max() ?? 6)
             if !isLegacyHere, effective < 6 {
-                problems.append("package \(dir): target \(name) builds in Swift \(effective) mode, not Swift 6 (R9)")
+                problems.append("package \(dir): target \(name) builds in Swift \(effective) mode, not Swift 6 (StrictConcurrency)")
             }
             let deps = (t["dependencies"] as? [[String: Any]] ?? []).compactMap { dep -> String? in
                 for k in ["byName", "target", "product"] { if let a = dep[k] as? [Any], let n = a.first as? String { return n } }

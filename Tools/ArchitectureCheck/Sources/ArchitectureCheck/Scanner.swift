@@ -30,6 +30,8 @@ final class Scanner: SyntaxVisitor {
     static let infrastructureMembers: [String: String] = ["FileManager": "default", "Bundle": "main", "UserDefaults": "standard"]
     static let escapeCalls: Set<String> = ["fatalError", "precondition", "preconditionFailure", "unsafeBitCast"]
     static let printCalls: Set<String> = ["print", "debugPrint", "NSLog", "dump"]
+    /// Detectors that read a package manifest. They run on manifests only, and the others on sources only.
+    static let manifestDetectors: Set<String> = ["swift5Mode", "unsafeFlags"]
 
     init(tree: SourceFileSyntax, file: String, infrastructureTypes: Set<String>) {
         converter = SourceLocationConverter(fileName: file, tree: tree)
@@ -204,7 +206,7 @@ final class Scanner: SyntaxVisitor {
 
     override func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
         let n = Self.name(node.baseName)
-        // `Bundle.module` reads the package's own resources, which R13 requires; every other Bundle use is ambient.
+        // `Bundle.module` reads the package's own resources, which LocalisationAtEdges requires; every other Bundle use is ambient.
         let ownResources = n == "Bundle" && node.parent?.as(MemberAccessExprSyntax.self).map { Self.name($0.declName.baseName) == "module" } == true
         if Self.ambientTypes.contains(n), !ownResources { hit("ambientEnvironment", n, node) }
         if n == "LocalizedStringResource" || n == "LocalizedStringKey" { hit("localization", n, node) }

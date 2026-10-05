@@ -1,39 +1,37 @@
 {
- "_comment": "Architecture rules of the repository (ADR 0006). Every Swift file belongs to exactly one target. Legacy targets are exempt until deleted (ADR 0012); targets listed in modules.md but not built yet are in notYetImplemented.",
+ "_comment": "Architecture rules of the repository (ADR 0006, ADR 0021). Rules are named as in docs/architecture/rules.md. The rules map lists the detectors of each rule, and a target's rules list names the rules whose detectors run on it. Every Swift file belongs to exactly one target. Legacy targets are exempt until deleted (ADR 0012); targets listed in modules.md but not built yet are in notYetImplemented.",
  "rules": {
-  "R1": [
+  "DependencyRule": [
    "exportedImport"
   ],
-  "R2": [
+  "PureCore": [
    "wallClock",
    "randomIdentity",
    "ambientEnvironment",
    "localization",
    "printing"
   ],
-  "R4": [
+  "DIP": [
    "singleton",
    "infrastructureConstruction"
   ],
-  "R7": [
+  "CleanErrors": [
    "swallowedError"
   ],
-  "R9": [
-   "escapeHatch"
-  ],
-  "R11": [
-   "platformCondition"
-  ],
-  "R13": [
-   "localization"
-  ],
-  "R14": [
-   "printing",
-   "testDouble"
-  ],
-  "R9m": [
+  "StrictConcurrency": [
+   "escapeHatch",
    "swift5Mode",
    "unsafeFlags"
+  ],
+  "PlatformAdapters": [
+   "platformCondition"
+  ],
+  "LocalisationAtEdges": [
+   "localization"
+  ],
+  "NoDeadCode": [
+   "printing",
+   "testDouble"
   ]
  },
  "infrastructureTypes": [
@@ -60,14 +58,14 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R2",
-    "R4",
-    "R7",
-    "R9",
-    "R11",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "PureCore",
+    "DIP",
+    "CleanErrors",
+    "StrictConcurrency",
+    "PlatformAdapters",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -78,14 +76,14 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R2",
-    "R4",
-    "R7",
-    "R9",
-    "R11",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "PureCore",
+    "DIP",
+    "CleanErrors",
+    "StrictConcurrency",
+    "PlatformAdapters",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -99,11 +97,11 @@
     "Darwin"
    ],
    "rules": [
-    "R1",
-    "R7",
-    "R9",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "CleanErrors",
+    "StrictConcurrency",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -154,14 +152,14 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R2",
-    "R4",
-    "R7",
-    "R9",
-    "R11",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "PureCore",
+    "DIP",
+    "CleanErrors",
+    "StrictConcurrency",
+    "PlatformAdapters",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -171,14 +169,14 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R2",
-    "R4",
-    "R7",
-    "R9",
-    "R11",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "PureCore",
+    "DIP",
+    "CleanErrors",
+    "StrictConcurrency",
+    "PlatformAdapters",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -191,11 +189,11 @@
     "Darwin"
    ],
    "rules": [
-    "R1",
-    "R7",
-    "R9",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "CleanErrors",
+    "StrictConcurrency",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -206,11 +204,11 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R7",
-    "R9",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "CleanErrors",
+    "StrictConcurrency",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -222,14 +220,14 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R2",
-    "R4",
-    "R7",
-    "R9",
-    "R11",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "PureCore",
+    "DIP",
+    "CleanErrors",
+    "StrictConcurrency",
+    "PlatformAdapters",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -241,11 +239,11 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R7",
-    "R9",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "CleanErrors",
+    "StrictConcurrency",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -259,11 +257,11 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R7",
-    "R9",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "CleanErrors",
+    "StrictConcurrency",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -277,11 +275,11 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R7",
-    "R9",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "CleanErrors",
+    "StrictConcurrency",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -293,11 +291,11 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R7",
-    "R9",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "CleanErrors",
+    "StrictConcurrency",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -391,14 +389,14 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R2",
-    "R4",
-    "R7",
-    "R9",
-    "R11",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "PureCore",
+    "DIP",
+    "CleanErrors",
+    "StrictConcurrency",
+    "PlatformAdapters",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -410,11 +408,11 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R7",
-    "R9",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "CleanErrors",
+    "StrictConcurrency",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -426,14 +424,14 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R2",
-    "R4",
-    "R7",
-    "R9",
-    "R11",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "PureCore",
+    "DIP",
+    "CleanErrors",
+    "StrictConcurrency",
+    "PlatformAdapters",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -450,14 +448,14 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R2",
-    "R4",
-    "R7",
-    "R9",
-    "R11",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "PureCore",
+    "DIP",
+    "CleanErrors",
+    "StrictConcurrency",
+    "PlatformAdapters",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -471,14 +469,14 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R2",
-    "R4",
-    "R7",
-    "R9",
-    "R11",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "PureCore",
+    "DIP",
+    "CleanErrors",
+    "StrictConcurrency",
+    "PlatformAdapters",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ],
    "requiredImportAccess": {
     "PrestoCVDomain": "internal",
@@ -509,11 +507,11 @@
     "Foundation"
    ],
    "rules": [
-    "R1",
-    "R7",
-    "R9",
-    "R13",
-    "R14"
+    "DependencyRule",
+    "CleanErrors",
+    "StrictConcurrency",
+    "LocalisationAtEdges",
+    "NoDeadCode"
    ]
   },
   {
@@ -649,7 +647,7 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "StrictConcurrency"
    ]
   },
   {
@@ -660,7 +658,7 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "StrictConcurrency"
    ]
   },
   {
@@ -671,7 +669,7 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "StrictConcurrency"
    ]
   },
   {
@@ -682,7 +680,7 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "StrictConcurrency"
    ]
   },
   {
@@ -693,7 +691,7 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "StrictConcurrency"
    ]
   },
   {
@@ -704,7 +702,7 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "StrictConcurrency"
    ]
   }
  ]

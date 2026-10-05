@@ -17,13 +17,14 @@ import PackageDescription
 let package = Package(name: "F", targets: [.target(name: "Other"), .target(name: "Pure")])
 P
   cat > "$ROOT/rules.json" <<'J'
-{"rules":{"R1":["exportedImport"],"R2":["wallClock","randomIdentity","ambientEnvironment","localization","printing"],
-  "R4":["singleton","infrastructureConstruction"],"R7":["swallowedError"],"R9":["escapeHatch"],"R11":["platformCondition"],
-  "R14":["testDouble"],"R9m":["swift5Mode","unsafeFlags"]},
+{"rules":{"DependencyRule":["exportedImport"],"PureCore":["wallClock","randomIdentity","ambientEnvironment","localization","printing"],
+  "DIP":["singleton","infrastructureConstruction"],"CleanErrors":["swallowedError"],
+  "StrictConcurrency":["escapeHatch","swift5Mode","unsafeFlags"],"PlatformAdapters":["platformCondition"],
+  "LocalisationAtEdges":["localization"],"NoDeadCode":["printing","testDouble"]},
  "infrastructureTypes":["FileStore"],
- "targets":[{"name":"Pure","path":"Sources/Pure","allowedImports":["Foundation"],"rules":["R1","R2","R4","R7","R9","R11","R14"]},
+ "targets":[{"name":"Pure","path":"Sources/Pure","allowedImports":["Foundation"],"rules":["DependencyRule","PureCore","DIP","CleanErrors","StrictConcurrency","PlatformAdapters","LocalisationAtEdges","NoDeadCode"]},
             {"name":"Other","path":"Sources/Other","allowedImports":["Foundation"],"rules":[]},
-            {"name":"Manifest","path":"Package.swift","kind":"manifest","allowedImports":["PackageDescription"],"rules":["R9m"]}]}
+            {"name":"Manifest","path":"Package.swift","kind":"manifest","allowedImports":["PackageDescription"],"rules":["StrictConcurrency"]}]}
 J
   echo '[]' > "$ROOT/baseline.json"
 }
@@ -42,7 +43,7 @@ clean() { setup; src "$2"; expect "$1" 0 ""; }
 for form in 'public import Other' '/* c */ import Other' $'import\n    Other' 'import Foundation; import Other' \
             '@preconcurrency import Other' 'package import struct Other.O' $'#if canImport(Other)\nimport Other\n#endif' \
             'import `Other`' '@_spi(X)import Other' 'internal import Other'; do
-  flag "import form: ${form//$'\n'/⏎}" "$form" "R1 import"
+  flag "import form: ${form//$'\n'/⏎}" "$form" "DependencyRule: import"
 done
 flag "@_exported import is banned even when allowed" $'@_exported import Foundation' "exportedImport"
 # --- a module qualifier hides nothing (final gate of #66)
@@ -65,48 +66,76 @@ for form in '// import Other' '/* import Other */' '/* /* nested */ import Other
   clean "not code: ${form//$'\n'/⏎}" "$form"
 done
 flag "regex literal with a quote does not hide what follows" $'let r = /"/\nlet d = Date()' "wallClock"
-flag "extended regex literal with */ does not hide an import" $'let r = #/x/*/#\nimport Other' "R1 import"
+flag "extended regex literal with */ does not hide an import" $'let r = #/x/*/#\nimport Other' "DependencyRule: import"
 flag "regex literal with // does not hide the rest of the line" 'let r = #/a//b/#; let d = Date()' "wallClock"
 flag "Date() after a string containing //" 'let s = " // harmless"; let d = Date()' "wallClock"
 flag "Date() inside an interpolation" 'let s = "now: \(Date())"' "wallClock"
 flag "Date() inside a raw interpolation" 'let s = #"raw \#(Date()) raw"#' "wallClock"
 flag "nested interpolation" 'let s = "a \("nested \(Bundle.main)") b"' "ambientEnvironment"
-# --- R2 variants
+# --- PureCore variants
 for form in 'let d = Date.now' 'func f() -> Date { .now }' 'let u = UUID.init()' 'let u = UUID()' 'let p = ProcessInfo.processInfo' \
             'let z = TimeZone.current' 'let n = NotificationCenter.default' 'let l = Locale.autoupdatingCurrent' 'let b = Bundle(path: "/")' \
             'let s = String(localized: "k")' 'let r: LocalizedStringResource = "k"' 'print("x")'; do
-  flag "R2: $form" "$form" "R2"
+  flag "PureCore: $form" "$form" "PureCore"
 done
 clean "Bundle.module reads the package's own resources" 'import Foundation
 let u = Bundle.module.url(forResource: "x", withExtension: "json")'
-# --- R9 escape hatches, R7 swallowed errors, R4, R11, R14
+# --- StrictConcurrency escape hatches, CleanErrors, DIP, PlatformAdapters, NoDeadCode
 for form in 'final class A: @unchecked Swift.Sendable {}' 'final class A: @unchecked  Sendable {}' 'func f() { fatalError ("x") }' \
             'let x: Int? = 1; let y = x!' 'func f() { precondition(true) }' 'func f() { preconditionFailure() }' 'let x = try! g()' \
             'let x = 1 as! Int' 'nonisolated(unsafe) var g = 0' 'func f() { MainActor.assumeIsolated { } }' 'let s = DispatchSemaphore(value: 0)'; do
-  flag "R9: $form" "$form" "R9 escapeHatch"
+  flag "StrictConcurrency: $form" "$form" "StrictConcurrency: escapeHatch"
 done
-flag "R7: try?" 'let x = try? g()' "R7 swallowedError"
-flag "R7: empty catch" 'func f() { do { try g() } catch {} }' "R7 swallowedError"
-flag "R4: singleton" 'final class S { static let shared = S() }' "R4 singleton"
-flag "R4: infrastructure built outside composition" 'let s = FileStore()' "R4 infrastructureConstruction"
+flag "CleanErrors: try?" 'let x = try? g()' "CleanErrors: swallowedError"
+flag "CleanErrors: empty catch" 'func f() { do { try g() } catch {} }' "CleanErrors: swallowedError"
+flag "DIP: singleton" 'final class S { static let shared = S() }' "DIP: singleton"
+flag "DIP: infrastructure built outside composition" 'let s = FileStore()' "DIP: infrastructureConstruction"
 for form in $'#if !os(Linux)\nlet a = 1\n#endif' $'#if true\nlet a = 1\n#elseif os(iOS)\nlet a = 2\n#endif' \
             $'#if targetEnvironment(simulator)\nlet a = 1\n#endif' 'func f() { if #available(iOS 26, *) { } }' '@available(iOS 26, *) func f() {}'; do
-  flag "R11: ${form//$'\n'/⏎}" "$form" "R11 platformCondition"
+  flag "PlatformAdapters: ${form//$'\n'/⏎}" "$form" "PlatformAdapters: platformCondition"
 done
-flag "R14: test double declared in production" 'struct MockExportRepository {}' "R14 testDouble"
-flag "R14: test double referenced in production" 'let r = TestPDFRenderer.self' "R14 testDouble"
-# --- R5: import access (the domain must not leak through a public API)
+flag "NoDeadCode: test double declared in production" 'struct MockExportRepository {}' "NoDeadCode: testDouble"
+flag "NoDeadCode: test double referenced in production" 'let r = TestPDFRenderer.self' "NoDeadCode: testDouble"
+# A detector listed under two rules reports under both.
+flag "a detector under two rules: localization is PureCore" 'let k = NSLocalizedString("k", comment: "")' "PureCore: localization"
+flag "a detector under two rules: localization is LocalisationAtEdges" 'let k = NSLocalizedString("k", comment: "")' "LocalisationAtEdges: localization"
+flag "a detector under two rules: printing is PureCore" 'func f() { print("x") }' "PureCore: printing"
+flag "a detector under two rules: printing is NoDeadCode" 'func f() { print("x") }' "NoDeadCode: printing"
+# An adapter target runs the detectors of its own rules only: it may read the clock and the platform, but not print.
+adapter() {   # $1 = name, $2 = expected exit, $3 = pattern, $4 = the adapter's source
+  setup; src 'let x = 1'
+  python3 - "$ROOT/rules.json" <<'PYJ'
+import json, sys
+p = sys.argv[1]; r = json.load(open(p))
+r["targets"][1]["rules"] = ["DependencyRule", "CleanErrors", "StrictConcurrency", "LocalisationAtEdges", "NoDeadCode"]
+json.dump(r, open(p, "w"))
+PYJ
+  printf '%s\n' "$4" > "$ROOT/Sources/Other/O.swift"; expect "$1" "$2" "$3"
+}
+adapter "an adapter may read the clock" 0 "" 'let d = Date()'
+adapter "an adapter may hold a platform condition" 0 "" $'#if os(iOS)\nlet a = 1\n#endif'
+adapter "an adapter may not print" 1 "NoDeadCode: printing" 'func f() { print("x") }'
+adapter "an adapter may not swallow an error" 1 "CleanErrors: swallowedError" 'let x = try? g()'
+# A rule name that rules.json does not define would silently disable its detectors.
+setup; src 'let x = 1'
+python3 - "$ROOT/rules.json" <<'PY'
+import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"][0]["rules"].append("NoSuchRule"); json.dump(r,open(p,"w"))
+PY
+expect "a target listing an undefined rule is a problem" 1 "lists the rule NoSuchRule, which rules.json does not define"
+# Manifest detectors read manifests only, and the source detectors read sources only.
+clean "a language-mode spelling in a source is not a manifest setting" $'enum IPVersion { case v4, v5 }\nlet v = IPVersion.v5'
+# --- HumbleViews: import access (the domain must not leak through a public API)
 for form in 'import Foundation' 'public import Foundation' 'package import Foundation' '@preconcurrency public import Foundation'; do
   setup; python3 - "$ROOT/rules.json" <<'PY'
 import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"][0]["requiredImportAccess"]={"Foundation":"internal"}; json.dump(r,open(p,"w"))
 PY
-  src "$form"; expect "R5: '$form' is refused where internal access is required" 1 "importAccess"
+  src "$form"; expect "HumbleViews: '$form' is refused where internal access is required" 1 "HumbleViews: importAccess"
 done
 for form in 'internal import Foundation' 'private import Foundation' 'fileprivate import Foundation'; do
   setup; python3 - "$ROOT/rules.json" <<'PY'
 import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"][0]["requiredImportAccess"]={"Foundation":"internal"}; json.dump(r,open(p,"w"))
 PY
-  src "$form"; expect "R5: '$form' is accepted" 0 ""
+  src "$form"; expect "HumbleViews: '$form' is accepted" 0 ""
 done
 # --- inputs that cannot be read are problems, never a silent pass (#67)
 setup; src 'let x = 1'; expect "a missing modules file fails" 1 "cannot read" --modules "$ROOT/missing.md"
@@ -132,7 +161,7 @@ legacy_setup; printf '%s\n' '// swift-tools-version: 6.0' 'import PackageDescrip
 expect "manifest: Swift 5 mode on a legacy target is exempt" 0 ""
 legacy_setup; printf '%s\n' '// swift-tools-version: 6.0' 'import PackageDescription' \
   'let package = Package(name: "F", targets: [.target(name: "Old", swiftSettings: [.swiftLanguageMode(.v5)]), .target(name: "Pure", swiftSettings: [.swiftLanguageMode(.v5)]), .target(name: "Other")])' > "$ROOT/Package.swift"
-expect "manifest: Swift 5 mode on a new target next to a legacy one fails" 1 "Package.swift:3: R9m swift5Mode"
+expect "manifest: Swift 5 mode on a new target next to a legacy one fails" 1 "Package.swift:3: StrictConcurrency: swift5Mode"
 legacy_setup; printf '%s\n' '// swift-tools-version: 6.0' 'import PackageDescription' \
   'let package = Package(name: "F", targets: [.target(name: "Old"), .target(name: "Pure"), .target(name: "Other")], swiftLanguageModes: [.v5])' > "$ROOT/Package.swift"
 expect "manifest: a package-wide Swift 5 mode fails even with legacy targets" 1 "swift5Mode"
@@ -151,12 +180,12 @@ p, bname = sys.argv[1], sys.argv[2]; r = json.load(open(p))
 r["targets"] = [t for t in r["targets"] if t["name"] != "Manifest"] + [
   {"name": "Old", "path": "A/Sources/Old", "kind": "legacy", "allowedImports": [], "rules": []},
   {"name": bname, "path": "B/Sources/Old", "allowedImports": [], "rules": []},
-  {"name": "AManifest", "path": "A/Package.swift", "kind": "manifest", "allowedImports": ["PackageDescription"], "rules": ["R9m"]},
-  {"name": "BManifest", "path": "B/Package.swift", "kind": "manifest", "allowedImports": ["PackageDescription"], "rules": ["R9m"]}]
+  {"name": "AManifest", "path": "A/Package.swift", "kind": "manifest", "allowedImports": ["PackageDescription"], "rules": ["StrictConcurrency"]},
+  {"name": "BManifest", "path": "B/Package.swift", "kind": "manifest", "allowedImports": ["PackageDescription"], "rules": ["StrictConcurrency"]}]
 json.dump(r, open(p, "w"))
 PYJ
 }
-two_packages "BOld"; expect "manifest: a legacy name does not exempt the same name in another package" 1 "B/Package.swift:3: R9m swift5Mode"
+two_packages "BOld"; expect "manifest: a legacy name does not exempt the same name in another package" 1 "B/Package.swift:3: StrictConcurrency: swift5Mode"
 two_packages "Old"; expect "rules: a target name used twice is a problem" 1 "target name Old appears 2 times"
 # A root manifest does not own the legacy targets of a nested package (review round 6).
 setup; src 'let x = 1'; mkdir -p "$ROOT/N/Sources/Old" "$ROOT/Sources/Old"
@@ -170,10 +199,10 @@ import json, sys
 p = sys.argv[1]; r = json.load(open(p))
 r["targets"] += [{"name": "Old", "path": "N/Sources/Old", "kind": "legacy", "allowedImports": [], "rules": []},
   {"name": "RootOld", "path": "Sources/Old", "allowedImports": [], "rules": []},
-  {"name": "NManifest", "path": "N/Package.swift", "kind": "manifest", "allowedImports": ["PackageDescription"], "rules": ["R9m"]}]
+  {"name": "NManifest", "path": "N/Package.swift", "kind": "manifest", "allowedImports": ["PackageDescription"], "rules": ["StrictConcurrency"]}]
 json.dump(r, open(p, "w"))
 PYJ
-expect "manifest: a root manifest cannot exempt a nested package's legacy name" 1 "error: new violation Package.swift:3: R9m swift5Mode"
+expect "manifest: a root manifest cannot exempt a nested package's legacy name" 1 "error: new violation Package.swift:3: StrictConcurrency: swift5Mode"
 if grep -q "N/Package.swift" "$ROOT/out.txt"; then fail=$((fail+1)); echo "FAIL nested package's own legacy declaration was flagged"; else pass=$((pass+1)); echo "ok   the nested package's own legacy declaration stays exempt"; fi
 setup; src 'let x = 1'; printf '%s\n' '// swift-tools-version: 6.0' 'import PackageDescription' \
   'let package = Package(name: "F", targets: [.target(name: "Pure", swiftSettings: [.unsafeFlags(["-Onone"])]), .target(name: "Other")])' > "$ROOT/Package.swift"
@@ -193,6 +222,8 @@ manifest_case "manifest: .version(\"6\") is fine" 0 "" '// swift-tools-version: 
   'let package = Package(name: "F", targets: [.target(name: "Pure", swiftSettings: [.swiftLanguageMode(.version("6"))]), .target(name: "Other")])'
 manifest_case "manifest: tools version 5.10 with new targets fails" 1 "swift-tools-version 5 builds" '// swift-tools-version: 5.10' 'import PackageDescription' \
   'let package = Package(name: "F", targets: [.target(name: "Pure"), .target(name: "Other")])'
+manifest_case "manifest: the source detectors do not run on a manifest" 0 "" '// swift-tools-version: 6.0' 'import PackageDescription' \
+  'let x = try! g()' 'let package = Package(name: "F", targets: [.target(name: "Pure"), .target(name: "Other")])'
 legacy_only() {
   setup; src 'let x = 1'; mkdir -p "$ROOT/Sources/Old"; echo 'let old = 1' > "$ROOT/Sources/Old/Old.swift"
   python3 - "$ROOT/rules.json" <<'PYJ'
