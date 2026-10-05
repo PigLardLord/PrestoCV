@@ -41,6 +41,19 @@ struct Body {
         self.init(isClosure: true, id: node.id, name: "closure", line: lines.line(of: node.leftBrace), statements: node.statements)
     }
 
+    /// The body that a node holds, if it is one of the nodes that hold one.
+    static func of(_ node: Syntax, _ lines: CodeLines) -> Body? {
+        switch node.kind {
+        case .functionDecl: Body(node.cast(FunctionDeclSyntax.self), lines)
+        case .initializerDecl: Body(node.cast(InitializerDeclSyntax.self), lines)
+        case .deinitializerDecl: Body(node.cast(DeinitializerDeclSyntax.self), lines)
+        case .accessorDecl: Body(node.cast(AccessorDeclSyntax.self), lines)
+        case .accessorBlock: Body(node.cast(AccessorBlockSyntax.self), lines)
+        case .closureExpr: Body(node.cast(ClosureExprSyntax.self), lines)
+        default: nil
+        }
+    }
+
     private init(isClosure: Bool, id: SyntaxIdentifier, name: String, line: Int, statements: CodeBlockItemListSyntax) {
         self.isClosure = isClosure
         self.id = id
@@ -53,39 +66,4 @@ struct Body {
         if let binding = block.parent?.as(PatternBindingSyntax.self) { return binding.pattern.trimmedDescription }
         return block.parent?.is(SubscriptDeclSyntax.self) == true ? "subscript" : "a property"
     }
-}
-
-/// Calls `enter` and `leave` around every body of a file, in every `#if` branch.
-class BodyVisitor: SyntaxVisitor {
-    let lines: CodeLines
-
-    init(lines: CodeLines) {
-        self.lines = lines
-        super.init(viewMode: .sourceAccurate)
-    }
-
-    func enter(_ body: Body) {}
-    func leave(_ body: Body) {}
-
-    private func entering(_ body: Body?) -> SyntaxVisitorContinueKind {
-        if let body { enter(body) }
-        return .visitChildren
-    }
-
-    private func leaving(_ body: Body?) {
-        if let body { leave(body) }
-    }
-
-    override final func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind { entering(Body(node, lines)) }
-    override final func visitPost(_ node: FunctionDeclSyntax) { leaving(Body(node, lines)) }
-    override final func visit(_ node: InitializerDeclSyntax) -> SyntaxVisitorContinueKind { entering(Body(node, lines)) }
-    override final func visitPost(_ node: InitializerDeclSyntax) { leaving(Body(node, lines)) }
-    override final func visit(_ node: DeinitializerDeclSyntax) -> SyntaxVisitorContinueKind { entering(Body(node, lines)) }
-    override final func visitPost(_ node: DeinitializerDeclSyntax) { leaving(Body(node, lines)) }
-    override final func visit(_ node: AccessorDeclSyntax) -> SyntaxVisitorContinueKind { entering(Body(node, lines)) }
-    override final func visitPost(_ node: AccessorDeclSyntax) { leaving(Body(node, lines)) }
-    override final func visit(_ node: AccessorBlockSyntax) -> SyntaxVisitorContinueKind { entering(Body(node, lines)) }
-    override final func visitPost(_ node: AccessorBlockSyntax) { leaving(Body(node, lines)) }
-    override final func visit(_ node: ClosureExprSyntax) -> SyntaxVisitorContinueKind { entering(Body(node, lines)) }
-    override final func visitPost(_ node: ClosureExprSyntax) { leaving(Body(node, lines)) }
 }
