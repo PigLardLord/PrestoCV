@@ -101,7 +101,7 @@ struct CSSParser {
                 let value: String
                 switch tokens[i + 3] {
                 case .string(let v), .ident(let v): value = v
-                case .number(let n): value = fmt(n)
+                case .number(let n): value = canonicalNumber(n)
                 default: throw CSSRejection(reason: "attribute value not allowed")
                 }
                 let ok = (a == "data-section" && MarkupContract.sectionKinds.contains(value)) || (a == "data-rating" && MarkupContract.ratings.contains(value))
