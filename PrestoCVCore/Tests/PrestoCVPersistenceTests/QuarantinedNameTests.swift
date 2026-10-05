@@ -13,7 +13,7 @@ struct QuarantinedNameTests {
     }
 
     @Test("anything that is not a stored file name with an optional numeric prefix is refused",
-          arguments: ["", "x.cv.json", "../" + fileName(id1), "a~" + fileName(id1), "1~2~" + fileName(id1), "~" + fileName(id1),
+          arguments: ["", "x.cv.json", "x" + fileName(id1), "../" + fileName(id1), "a~" + fileName(id1), "1~2~" + fileName(id1), "~" + fileName(id1),
                       fileName(id1) + "\n", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.cv.json", "1~" + fileName(id1) + ".bak", "\(id1.raw.uuidString).json"])
     func refusesOtherNames(name: String) {
         #expect(QuarantinedName(name) == nil)
@@ -24,5 +24,6 @@ struct QuarantinedNameTests {
         let name = fileName(id1)
         #expect(QuarantinedName.isCopy(name, of: name) && QuarantinedName.isCopy("3~" + name, of: name))
         #expect(!QuarantinedName.isCopy(fileName(id2), of: name) && !QuarantinedName.isCopy("3~" + fileName(id2), of: name))
+        #expect(!QuarantinedName.isCopy("x" + name, of: name), "a prefix without its tilde is not a copy")
     }
 }
