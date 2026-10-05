@@ -1,7 +1,8 @@
 # Repository Guidelines
 
 ## Architecture (target)
-- The target architecture and its rules are in `docs/architecture/`: start from `docs/architecture/README.md`, then `rules.md` (R1–R14) and `modules.md` (targets and allowed imports). Decisions are recorded as ADRs in `docs/architecture/adr/`.
+- The target architecture and its rules are in `docs/architecture/`: start from `docs/architecture/README.md`, then `rules.md` (the rules, and the review checklist) and `modules.md` (targets and allowed imports). Decisions are recorded as ADRs in `docs/architecture/adr/`.
+- The rules are SOLID, Clean Architecture, Clean Code and the project's own, named by topic ([ADR 0021](docs/architecture/adr/0021-solid-and-clean-rules.md)). A rule is cited by its name, such as `SRP` or `ValidatingBoundary`, never by a number.
 - New code follows the target architecture, not the current structure described below. The migration is in progress (see the migration strategy in `docs/architecture/README.md`); where this file and `docs/architecture/` disagree, `docs/architecture/` wins.
 - A change that needs a new target or a new dependency between targets updates `modules.md` in the same pull request. A permanent exception to a rule is an entry in the checker's `rules.json` that cites an ADR; a temporary one is a baseline entry, and the baseline may only shrink.
 - Proposed ADRs describe the target and guide new code; a rule becomes binding when its ADR is Accepted and merged.
@@ -23,7 +24,7 @@
 - `open PrestoCV.xcodeproj` launches Xcode with the configured schemes; prefer running previews via the `PrestoCV` scheme.
 
 ## Coding Style & Naming Conventions
-- Swift 6 language mode with complete concurrency checking (R9); four-space indentation, `UpperCamelCase` for types, `lowerCamelCase` for methods, properties, and test doubles.
+- Swift 6 language mode with complete concurrency checking (`StrictConcurrency`); four-space indentation, `UpperCamelCase` for types, `lowerCamelCase` for methods, properties, and test doubles.
 - Group related declarations with `// MARK:` sections and colocate previews with their views under `#if DEBUG`.
 - Use value types (`struct`, `enum`) for feature models and mark async UI logic `@MainActor` as seen in `PrestoCVTests/PrestoCVTests.swift:10`.
 - Keep resources organized: asset names mirror feature names (e.g., `Features/Profile` assets) and localization keys follow dot-separated feature scopes.
@@ -36,6 +37,7 @@
 
 ## Reviews
 - **Delta only.** Each review round covers only what changed since the last reviewed commit. Record that commit locally as `refs/reviewed/<branch>`, and list the reviewed commits in the pull request so another machine can continue. A full-branch review happens twice at most: the first one and the final gate. Commit before reviewing, because reviews read commits, not the working tree.
+- **Review checklist:** every review, dimension or final gate, goes through the checklist at the end of `docs/architecture/rules.md` and answers each question with the place it found, or "none".
 - **Reviewer by role:**
   - dimension reviews (security, concurrency, accessibility, code quality) and fix-check rounds use a mid-tier model;
   - only the final gate uses the strongest model.

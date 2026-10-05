@@ -9,7 +9,7 @@ This is the authoritative list of production modules and of what each may import
 A new target, or a new edge between targets, changes this file in the same pull request.
 
 Notation:
-- **May import** lists every module the target may `import`. Swift and Foundation are always allowed; in domain targets only as value types (R2).
+- **May import** lists every module the target may `import`. Swift and Foundation are always allowed; in domain targets only as value types (`PureCore`).
 - The platform column reads iOS / macOS / Linux. **Linux ✓** means the target must build and pass its tests on Linux in CI.
 
 Test targets and test-support targets are described below each package. The checker applies only its import allow-lists to them.
@@ -55,7 +55,7 @@ Test targets and test-support targets are described below each package. The chec
   - one `CVFileV1` file per CV, named from its id;
   - atomic writes with `complete` protection, and a read-back check before every write;
   - every mutation under an exclusive `flock` on the store;
-  - reads classified as described in R12;
+  - reads classified as described in `PersistedSchema`;
   - `Quarantine/` with validated restore, erase and purge.
 - `DirectorySampleCVSource`: sample CVs from an injected directory, in the same v1 format and through the store's own reader. The app ships them in `PrestoCV/Resources/Samples/`.
 
@@ -129,7 +129,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - `SecureWebViewConfiguration.compileRules()` is called once by the composition root: a block rule per network scheme, plus a block on every subresource type. `make(rules:)` then builds each configuration: JavaScript off for content, non-persistent store, media only on user action.
 - `SingleLoadNavigationDelegate` loads the HTML string with no base URL, reports when that load has finished, and cancels every later navigation.
 - `DocumentReadiness` waits until the document is complete and its fonts are ready. Its script runs in a content world of its own, with a timeout.
-- Content blockers do not see `data:` URLs on Apple platforms: a test records this. None can enter the document, because the builder emits only http(s) links and the CSS policy has no `url()` (R8).
+- Content blockers do not see `data:` URLs on Apple platforms: a test records this. None can enter the document, because the builder emits only http(s) links and the CSS policy has no `url()` (`ValidatingBoundary`).
 - A clicked link, which only happens in the preview, may open a connection to its host before the navigation is cancelled (a WebKit preconnect). Nothing is sent over it. A document's links and a refresh make no connection at all; tests record both.
 - Every file is wrapped in `#if canImport(WebKit)`.
 - **`CVRenderingWebKitSupportTests`** check each of these on iOS and macOS. Each network test has a control without the rules, which shows that the test can see a request.
@@ -153,7 +153,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - `MinimalPDFInspector`.
 - **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test, in-flight cancellation and the content-completeness test for every bundled design.
 
-**Separate package `CVPDFExporterExamples`** holds the demos and the template viewer. The library package contains no executables (R14).
+**Separate package `CVPDFExporterExamples`** holds the demos and the template viewer. The library package contains no executables (`NoDeadCode`).
 
 ---
 
@@ -209,7 +209,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 - **View-model initialisers do no I/O.** Loading happens in the view's `.task`, so the factory can be called on every view init.
 
 **`PrestoCVComposition`**
-- The only place that creates infrastructure (R4). The `@main` App type holds it in a `static let`. It owns:
+- The only place that creates infrastructure (`DIP`). The `@main` App type holds it in a `static let`. It owns:
   - file locations under Application Support;
   - one `FileCVRepository` and one `FileDesignStore`;
   - the web-view rule list, compiled once;

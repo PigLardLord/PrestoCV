@@ -50,7 +50,7 @@ html[lang]
 - The native renderer tests check the separation in the printed text (#78).
 
 **Links print their destination.** Every link's destination is printed as text, exactly as its `href`.
-- Whether a PDF keeps clickable link annotations depends on the platform's PDF path. The printed text is what completeness checks ([R8](rules.md#r8-untrusted-input-enters-through-one-validating-boundary)), so a PDF that keeps a link's label but loses its destination fails.
+- Whether a PDF keeps clickable link annotations depends on the platform's PDF path. The printed text is what completeness checks ([`ValidatingBoundary`](rules.md#validatingboundary-untrusted-input-enters-through-one-validating-boundary)), so a PDF that keeps a link's label but loses its destination fails.
 - Where a platform keeps the annotations, the native renderer tests also check that they match the `href`s.
 - The builder's own base style sets `a { overflow-wrap: anywhere }`, so a long destination wraps instead of running off the page. Designs cannot set `overflow-wrap`.
 
@@ -124,7 +124,7 @@ Units and bounds:
 | `break-inside`, `page-break-inside` | `auto`, `avoid` |
 | `break-before`, `break-after` | `auto`, `page`, `avoid` |
 
-Anything that could load a resource, or hide, move, reorder or inject content, is absent from this table by design. That includes `position`, `transform`, `zoom`, `filter`, `mask`, `clip`, `overflow`, `visibility`, `opacity`, `height`, `content`, `list-style`, `quotes`, counters, `direction`, `unicode-bidi`, `order` and grid placement. The palette itself only exists with readable contrast ([R8](rules.md#r8-untrusted-input-enters-through-one-validating-boundary)).
+Anything that could load a resource, or hide, move, reorder or inject content, is absent from this table by design. That includes `position`, `transform`, `zoom`, `filter`, `mask`, `clip`, `overflow`, `visibility`, `opacity`, `height`, `content`, `list-style`, `quotes`, counters, `direction`, `unicode-bidi`, `order` and grid placement. The palette itself only exists with readable contrast ([`ValidatingBoundary`](rules.md#validatingboundary-untrusted-input-enters-through-one-validating-boundary)).
 
 ## Changelog
 

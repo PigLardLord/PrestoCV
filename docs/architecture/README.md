@@ -6,7 +6,7 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 
 | Document | Contents |
 |---|---|
-| [rules.md](rules.md) | The rules (R1–R14), why each exists, and how each is enforced |
+| [rules.md](rules.md) | The rules (SOLID, Clean Architecture, Clean Code and the project's own), why each exists, and how each is enforced |
 | [modules.md](modules.md) | Every package and target: responsibility, allowed dependencies, platforms |
 | [glossary.md](glossary.md) | The vocabulary used in code, UI copy and tickets |
 | [markup-contract.md](markup-contract.md) | The HTML structure designs may style, versioned |
@@ -41,7 +41,7 @@ CV optimisation will come later from external APIs, as a separate context. AI ta
 ```
 
 - The three domain packages **never import each other**. Each publishes its own model: `CV` in Authoring, `CVDocument` in Rendering, `CVDraft` in Drafting.
-- Inside `CVPDFExporter`, Document Rendering is downstream of Design Catalog: it consumes validated stylesheets and palettes. That is the only edge between contexts inside a package, and it goes one way ([R1](rules.md#r1-packages-are-isolated-contexts-depend-only-along-documented-edges)).
+- Inside `CVPDFExporter`, Document Rendering is downstream of Design Catalog: it consumes validated stylesheets and palettes. That is the only edge between contexts inside a package, and it goes one way ([`DependencyRule`](rules.md#dependencyrule-packages-are-isolated-contexts-depend-only-along-documented-edges)).
 - All translation between contexts happens in one place: the app's integration layer (`PrestoCVIntegration`). Each mapper is exhaustive and tested ([ADR 0007](adr/0007-each-package-owns-its-model.md)).
 - `CVPDFExporter` is reusable outside the app, including on a Linux backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)).
 
@@ -99,7 +99,7 @@ Dependencies point inwards only. The domain knows nothing about storage, UI, loc
 | `CVDraftingFoundationModels` | ✓ 26 | ✓ 26 | |
 | Xcode app target | ✓ 26 | ✓ 26 | |
 
-Linux support is not a nice-to-have. It is what proves that platform code stayed in the adapters ([R11](rules.md#r11-platform-code-lives-only-in-adapters)), and it is where the renderer for a backend will run.
+Linux support is not a nice-to-have. It is what proves that platform code stayed in the adapters ([`PlatformAdapters`](rules.md#platformadapters-platform-code-lives-only-in-adapters)), and it is where the renderer for a backend will run.
 
 ## Migration strategy
 

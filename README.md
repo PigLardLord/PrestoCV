@@ -14,7 +14,7 @@ The current app and packages are the legacy code the migration replaces, one con
 
 | Path | What it is |
 |---|---|
-| `docs/architecture/` | The target architecture: overview and migration strategy, rules R1–R14, modules and allowed imports, document markup contract, glossary, ADRs. |
+| `docs/architecture/` | The target architecture: overview and migration strategy, rules (SOLID, Clean Architecture, Clean Code and the project's own), modules and allowed imports, document markup contract, glossary, ADRs. |
 | `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). |
 | `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The current packages (legacy, being replaced). |
 | `Tools/ArchitectureCheck/` | The checker that enforces the rules, and its pre-commit hook. |
@@ -35,7 +35,7 @@ On Linux, the packages contain only the new targets. They build today and stay e
 
 ## Development data
 
-- **Saved CVs.** The CVs a development build saves today are stored by the legacy code. When the app switches to the new persistence (schema 1, ADR 0009), they are not migrated, so a development build loses them once. There are no users yet, so no migration ships (R12).
+- **Saved CVs.** The CVs a development build saves today are stored by the legacy code. When the app switches to the new persistence (schema 1, ADR 0009), they are not migrated, so a development build loses them once. There are no users yet, so no migration ships (`PersistedSchema`).
 - **Samples.** The sample CVs offered on first run are in `PrestoCV/Resources/Samples/`, in schema 1, read by `DirectorySampleCVSource` through the store's own reader. The legacy app still reads the old samples, `PrestoCV/Resources/*_cv.json`, until the switch; they go with the legacy code (#47).
 
 ## Contributing

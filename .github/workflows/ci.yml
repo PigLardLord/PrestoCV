@@ -88,7 +88,7 @@ jobs:
         # PrestoCVApp has no tests until step 5 (#88); building it checks its targets and cross-package dependencies.
         run: swift build --package-path PrestoCVApp
       - name: Build the exporter examples
-        # The demos and the template viewer, apart from the library (R14); they use the legacy exporter, Apple hosts only.
+        # The demos and the template viewer, apart from the library (NoDeadCode); they use the legacy exporter, Apple hosts only.
         run: swift build --package-path CVPDFExporterExamples
       - name: App tests on the iOS simulator
         run: |
