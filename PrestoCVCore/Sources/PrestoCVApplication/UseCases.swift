@@ -1,6 +1,9 @@
 import Foundation
 import PrestoCVDomain
 
+// Every use case reports a failure of its port as the `AuthoringError` that `AuthoringError(_:)` gives it, so a use case
+// surfaces every case of that translation, not only the ones its documentation names.
+
 /// A new, unsaved CV with a fresh identity.
 public struct NewCV: Sendable {
     let ids: any IDGenerator
@@ -21,9 +24,9 @@ public struct SaveCV: Sendable {
 
     /// - Parameter cv: The CV to save, at the revision the caller last saw.
     /// - Returns: The stored CV, with its new revision and timestamps.
-    /// - Throws: `AuthoringError.notEnoughContent` when the CV cannot be saved yet; `.conflict` when the stored revision is
-    ///   not the one the caller saw; `.deletedElsewhere` when the CV is gone; `.tooLarge` when its file would exceed the
-    ///   size cap; `.unavailable` for any other failure of the store.
+    /// - Throws: `AuthoringError.notEnoughContent` when the CV cannot be saved yet. Otherwise the translation of the
+    ///   store's failure, such as `.conflict` when the stored revision is not the one the caller saw, `.deletedElsewhere`
+    ///   when the CV is gone, `.tooLarge` when its file would exceed the size cap, or `.unavailable`.
     public func callAsFunction(_ cv: CV) async throws(AuthoringError) -> CV {
         guard cv.canBeSaved else { throw .notEnoughContent }
         do throws(RepositoryError) { return try await createOrUpdate(cv) } catch { throw AuthoringError(error) }
@@ -43,7 +46,8 @@ public struct LoadCV: Sendable {
     public init(repository: any CVLoader) { self.repository = repository }
 
     /// - Parameter id: The identity of the CV, from a listing.
-    /// - Throws: `AuthoringError.deletedElsewhere` when the CV is gone; `.unavailable` when the store cannot be read.
+    /// - Throws: The translation of the store's failure: `AuthoringError.deletedElsewhere` when the CV is gone, and
+    ///   `.unavailable` when the store or the file cannot be read.
     public func callAsFunction(_ id: CVID) async throws(AuthoringError) -> CV {
         do throws(RepositoryError) { return try await repository.load(id) } catch { throw AuthoringError(error) }
     }
@@ -56,8 +60,8 @@ public struct ListCVs: Sendable {
     /// - Parameter repository: The store that is listed.
     public init(repository: any CVLister) { self.repository = repository }
 
-    /// - Throws: `AuthoringError.unavailable` when the store itself cannot be listed. A file that cannot be read is an issue
-    ///   of the listing, not a failure.
+    /// - Throws: The translation of the store's failure, in practice `AuthoringError.unavailable` when the store itself
+    ///   cannot be listed. A file that cannot be read is an issue of the listing, not a failure.
     public func callAsFunction() async throws(AuthoringError) -> CVListing {
         do throws(RepositoryError) { return try await repository.list() } catch { throw AuthoringError(error) }
     }
@@ -110,8 +114,8 @@ public struct DeleteCV: Sendable {
     public init(repository: any CVDeleter) { self.repository = repository }
 
     /// - Parameter cv: The CV to delete, at the revision the caller last saw.
-    /// - Throws: `AuthoringError.conflict` when the stored revision is not the one the caller saw; `.deletedElsewhere` when
-    ///   the CV is already gone; `.unavailable` for any other failure of the store.
+    /// - Throws: The translation of the store's failure: `AuthoringError.conflict` when the stored revision is not the one
+    ///   the caller saw, `.deletedElsewhere` when the CV is already gone, or `.unavailable`.
     public func callAsFunction(_ cv: CV) async throws(AuthoringError) {
         do throws(RepositoryError) { try await repository.delete(cv.id, revision: cv.revision) } catch { throw AuthoringError(error) }
     }
@@ -128,7 +132,7 @@ public struct StartFromSample: Sendable {
     public init(samples: any SampleCVSource, ids: any IDGenerator) { self.samples = samples; self.ids = ids }
 
     /// - Returns: The samples to offer.
-    /// - Throws: `AuthoringError.unavailable` when a sample cannot be used.
+    /// - Throws: The translation of the source's failure, in practice `AuthoringError.unavailable` when a sample cannot be used.
     public func available() async throws(AuthoringError) -> [CV] {
         do throws(RepositoryError) { return try await samples.samples() } catch { throw AuthoringError(error) }
     }
@@ -140,7 +144,12 @@ public struct StartFromSample: Sendable {
 
 /// First run is when the store holds nothing at all: no CV and no file with an issue, so data that
 /// could not be read never makes the app look empty.
-public enum OnboardingState: Equatable, Sendable { case firstRun, returning }
+public enum OnboardingState: Equatable, Sendable {
+    /// The store holds nothing at all.
+    case firstRun
+    /// The store holds a CV, or a file with an issue.
+    case returning
+}
 
 /// Tells whether the app is on its first run.
 public struct DetermineOnboarding: Sendable {
@@ -149,7 +158,7 @@ public struct DetermineOnboarding: Sendable {
     /// - Parameter repository: The store that is looked at.
     public init(repository: any CVLister) { list = ListCVs(repository: repository) }
 
-    /// - Throws: `AuthoringError.unavailable` when the store cannot be listed.
+    /// - Throws: The translation of the store's failure, in practice `AuthoringError.unavailable` when the store cannot be listed.
     public func callAsFunction() async throws(AuthoringError) -> OnboardingState {
         let listing = try await list()
         return listing.cvs.isEmpty && listing.issues.isEmpty ? .firstRun : .returning

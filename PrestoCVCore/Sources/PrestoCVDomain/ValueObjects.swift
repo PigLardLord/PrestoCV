@@ -4,7 +4,10 @@ import Foundation   // value types only (PureCore): UUID and Date as types, neve
 
 /// The identity of a CV. A type of its own, so that no other identifier can be passed where a CV's is expected.
 public struct CVID: Hashable, Sendable, Codable {
+    /// The underlying identifier, which is what is stored.
     public let raw: UUID
+
+    /// - Parameter raw: The identifier of the CV. A new CV gets one from an `IDGenerator`.
     public init(_ raw: UUID) { self.raw = raw }
 }
 
@@ -12,7 +15,10 @@ public struct CVID: Hashable, Sendable, Codable {
 
 /// Year, or year and month. Only a partial order exists between dates of different precision.
 public struct PartialDate: Hashable, Sendable {
-    public let year: Int, month: Int?
+    /// The year, from 1900 to 2200.
+    public let year: Int
+    /// The month from 1 to 12, or `nil` when only the year is known.
+    public let month: Int?
 
     /// Returns `nil` when the year is outside 1900...2200, or the month, if given, is outside 1...12.
     public init?(year: Int, month: Int? = nil) {
@@ -29,16 +35,35 @@ public struct PartialDate: Hashable, Sendable {
 }
 
 /// `.unknown` means the period has ended but its end date was not given; it is never invented.
-public enum PeriodEnd: Hashable, Sendable { case current, date(PartialDate), unknown }
+public enum PeriodEnd: Hashable, Sendable {
+    /// The period is still going on.
+    case current
+    /// The period ended at this date.
+    case date(PartialDate)
+    /// The period has ended, but its end date was not given.
+    case unknown
+}
 
 /// Why loose data is not a valid period.
 public enum PeriodError: Error, Equatable, Sendable {
-    case invalidDate, endWithoutStart, currentWithoutStart, currentWithEndDate, endBeforeStart
+    /// A year or a month is out of range.
+    case invalidDate
+    /// There is an end date but no start.
+    case endWithoutStart
+    /// The period is current but has no start.
+    case currentWithoutStart
+    /// The period is current and also has an end date.
+    case currentWithEndDate
+    /// The end date is before the start.
+    case endBeforeStart
 }
 
 /// A span of time that starts at a date and ends at a date, is still current, or has ended on an unknown date.
 public struct Period: Hashable, Sendable {
-    public let start: PartialDate, end: PeriodEnd
+    /// When the period began.
+    public let start: PartialDate
+    /// How the period ends.
+    public let end: PeriodEnd
 
     /// Returns `nil` when the end is a date before the start.
     public init?(start: PartialDate, end: PeriodEnd) {
@@ -79,6 +104,7 @@ public struct Period: Hashable, Sendable {
 
 /// Bounded value object: invalid levels cannot exist (RichDomain).
 public struct SkillLevel: Hashable, Sendable {
+    /// The level, from 1 to 5.
     public let value: Int
 
     /// Returns `nil` unless `value` is in 1...5.
@@ -87,7 +113,10 @@ public struct SkillLevel: Hashable, Sendable {
 
 /// The CEFR levels, plus native. Its display name belongs to presentation (LocalisationAtEdges).
 public enum LanguageProficiency: String, CaseIterable, Hashable, Sendable {
-    case a1, a2, b1, b2, c1, c2, native
+    /// The six CEFR levels, from beginner to mastery.
+    case a1, a2, b1, b2, c1, c2
+    /// The user's own language.
+    case native
 }
 
 // MARK: - Contact details
@@ -98,6 +127,7 @@ public enum LanguageProficiency: String, CaseIterable, Hashable, Sendable {
 /// and separator characters (NUL, zero-width space, bidirectional overrides) are not, since they can hide or disguise
 /// what is printed. No atom or label starts with a mark.
 public struct EmailAddress: Hashable, Sendable {
+    /// The address, trimmed.
     public let value: String
     private static let atom = #"[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-][\p{L}\p{M}\p{N}!#$%&'*+/=?^_`{|}~-]*"#
     private static let label = #"[\p{L}\p{N}](?:[\p{L}\p{M}\p{N}-]{0,61}[\p{L}\p{M}\p{N}])?"#
@@ -131,6 +161,7 @@ public struct EmailAddress: Hashable, Sendable {
 
 /// A phone number as written: digits with the usual separators, and at least three digits.
 public struct PhoneNumber: Hashable, Sendable {
+    /// The number as written, trimmed.
     public let value: String
 
     /// Returns `nil` when the trimmed text is not 3 to 32 characters of digits and separators with at least three digits.
@@ -146,6 +177,7 @@ public struct PhoneNumber: Hashable, Sendable {
 /// An http or https address with a host, no credentials and the scheme's default port (ValidatingBoundary). Kept in the form
 /// the parser serialises, never as the raw input.
 public struct WebLink: Hashable, Sendable {
+    /// The address as the URL parser serialises it.
     public let value: String
     private static let maxBytes = 2048
     private static let defaultPorts = ["https": 443, "http": 80]
@@ -194,6 +226,7 @@ public struct WebLink: Hashable, Sendable {
 /// The language a CV is written in, as a BCP 47 tag: a language, an optional script and an optional region
 /// ("it", "pt-BR", "zh-Hant-TW"). Stored in canonical case.
 public struct DocumentLanguage: Hashable, Sendable {
+    /// The tag in canonical case, such as `pt-BR`.
     public let tag: String
 
     /// Returns `nil` when the trimmed text is not a language with at most a script and a region.
@@ -240,7 +273,12 @@ public struct DocumentLanguage: Hashable, Sendable {
 /// The design a CV is exported with, by identifier: the design, and optionally a palette and a font scheme.
 /// The catalog resolves them; an identifier it does not know falls back to the design's defaults.
 public struct DesignChoice: Hashable, Sendable {
-    public let design: String, palette: String?, fonts: String?
+    /// The identifier of the design.
+    public let design: String
+    /// The identifier of the palette, or `nil` for the design's default.
+    public let palette: String?
+    /// The identifier of the font scheme, or `nil` for the design's default.
+    public let fonts: String?
 
     /// Returns `nil` unless every identifier given is 1 to 64 lower-case letters, digits or hyphens.
     public init?(design: String, palette: String? = nil, fonts: String? = nil) {

@@ -50,36 +50,78 @@ public protocol CVStoreMaintenance: Sendable {
 
 /// The result of listing a store: the healthy CVs, and what was wrong with the files that are not.
 public struct CVListing: Sendable, Equatable {
-    public var cvs: [CV], issues: [StoreIssue]
+    /// The healthy CVs, most recently changed first.
+    public var cvs: [CV]
+    /// One issue for each file that is not a CV the app can use.
+    public var issues: [StoreIssue]
+
+    /// - Parameters:
+    ///   - cvs: The healthy CVs, most recently changed first.
+    ///   - issues: The issues found with the other files.
     public init(cvs: [CV], issues: [StoreIssue]) { self.cvs = cvs; self.issues = issues }
 }
 
 /// A file of the store that is not a CV the app can use, and what became of it.
 public enum StoreIssue: Sendable, Equatable {
-    case corrupt(file: String, reason: String)       // quarantined, restorable
-    case upgradeRequired(file: String, version: Int) // left untouched
-    case unreadable(file: String)                    // I/O failure or symlink: left untouched, retried next time
-    case tooLarge(file: String, bytes: Int)          // left untouched, never read
-    case quarantineFailed(file: String)              // corrupt, but could not be moved aside
+    /// The file is not a valid CV of a supported schema. It was moved to the quarantine and can be restored.
+    case corrupt(file: String, reason: String)
+    /// The file comes from a newer schema. It is left untouched.
+    case upgradeRequired(file: String, version: Int)
+    /// The file could not be read, or is not a regular file. It is left untouched, and read again next time.
+    case unreadable(file: String)
+    /// The file is over the size cap. It is left untouched, and never read.
+    case tooLarge(file: String, bytes: Int)
+    /// The file is corrupt, but could not be moved to the quarantine.
+    case quarantineFailed(file: String)
 }
 
 /// Why a store cannot be used as a whole.
-public enum StoreFailure: Sendable, Equatable { case notADirectory, cannotList, cannotLock }
+public enum StoreFailure: Sendable, Equatable {
+    /// The store is there, but is not a directory.
+    case notADirectory
+    /// The store, or a part of it, cannot be listed or reached.
+    case cannotList
+    /// The store cannot be locked for writing.
+    case cannotLock
+}
 
 /// No paths or free-form strings: file names only, and coded failures (CleanErrors).
 public enum RepositoryError: Error, Equatable, Sendable {
-    case notFound(CVID), alreadyExists(CVID), conflict(CVID, storedRevision: Int)
-    case corrupt(file: String), unreadable(file: String), upgradeRequired(file: String, version: Int), tooLarge(file: String)
-    case invalidName(String), storeUnavailable(StoreFailure), writeFailed(file: String)
+    /// No CV has that identity.
+    case notFound(CVID)
+    /// A CV already has that identity.
+    case alreadyExists(CVID)
+    /// The stored revision is not the one the caller saw.
+    case conflict(CVID, storedRevision: Int)
+    /// The file is not a valid CV of a supported schema.
+    case corrupt(file: String)
+    /// The file could not be read, or is not a regular file.
+    case unreadable(file: String)
+    /// The file comes from a newer schema.
+    case upgradeRequired(file: String, version: Int)
+    /// The file is over the size cap.
+    case tooLarge(file: String)
+    /// The name is not a quarantined file's.
+    case invalidName(String)
+    /// The store cannot be used as a whole.
+    case storeUnavailable(StoreFailure)
+    /// The file could not be written, moved or removed.
+    case writeFailed(file: String)
     /// Refused before writing: the file would exceed the size cap, or would not read back (the previous version is kept).
     case wouldNotReadBack(file: String)
 }
 
 /// Where new identities come from, so that no domain or application code creates one itself (PureCore).
-public protocol IDGenerator: Sendable { func next() -> CVID }
+public protocol IDGenerator: Sendable {
+    /// A new identity, different from every one given before.
+    func next() -> CVID
+}
 
 /// Where the current time comes from (PureCore). Named to avoid shadowing Swift.Clock.
-public protocol TimeSource: Sendable { func now() -> Date }
+public protocol TimeSource: Sendable {
+    /// The current time.
+    func now() -> Date
+}
 
 /// The sample CVs offered on first run, in the stored format (docs/architecture/modules.md).
 public protocol SampleCVSource: Sendable {

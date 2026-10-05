@@ -26,6 +26,11 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
 
     // MARK: CVRepository
 
+    /// Stores a never-saved CV as revision 1, stamped with the clock's time.
+    ///
+    /// - Throws: `RepositoryError.alreadyExists` when a file of that identity is stored, `.wouldNotReadBack` when the file
+    ///   would exceed the size cap or would not read back, `.writeFailed` or `.storeUnavailable` when the store cannot be
+    ///   written, and the read errors of an existing file that cannot be read.
     public func create(_ cv: CV) async throws(RepositoryError) -> CV {
         try lock.withExclusiveAccess { () throws(RepositoryError) -> CV in
             guard try storedCV(cv.id) == nil else { throw .alreadyExists(cv.id) }
@@ -35,6 +40,10 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         }
     }
 
+    /// Replaces the stored CV, which must be at `cv.revision`, and returns it one revision later with a new update time.
+    ///
+    /// - Throws: `RepositoryError.notFound` when the CV is not stored, `.conflict` when it is stored at another revision,
+    ///   and the errors of `create(_:)` for the write.
     public func update(_ cv: CV) async throws(RepositoryError) -> CV {
         try lock.withExclusiveAccess { () throws(RepositoryError) -> CV in
             guard let existing = try storedCV(cv.id) else { throw .notFound(cv.id) }
@@ -45,11 +54,19 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         }
     }
 
+    /// Loads the stored CV.
+    ///
+    /// - Throws: `RepositoryError.notFound` when the store is there and holds no such CV, `.storeUnavailable` when the store
+    ///   is not there or cannot be reached, and `.corrupt`, `.unreadable`, `.upgradeRequired` or `.tooLarge` for the file.
     public func load(_ id: CVID) async throws(RepositoryError) -> CV {
         guard let cv = try storedCV(id) else { throw StoreState(of: directory).failureToLoad(id) }
         return cv
     }
 
+    /// Deletes the stored CV if it is at `revision`.
+    ///
+    /// - Throws: `RepositoryError.notFound` when the CV is not stored, `.conflict` when it is stored at another revision,
+    ///   `.writeFailed` when the file cannot be removed, and the read errors of `load(_:)`.
     public func delete(_ id: CVID, revision: Int) async throws(RepositoryError) {
         try lock.withExclusiveAccess { () throws(RepositoryError) in
             guard let existing = try storedCV(id) else { throw .notFound(id) }
@@ -58,6 +75,11 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         }
     }
 
+    /// Lists the healthy CVs, most recently changed first, and an issue for every other file. A corrupt file is moved to the
+    /// quarantine as it is found. A store that does not exist yet lists as empty.
+    ///
+    /// - Throws: `RepositoryError.storeUnavailable` when the store exists but cannot be reached or listed. A file that cannot
+    ///   be read is an issue of the listing, never a failure.
     public func list() async throws(RepositoryError) -> CVListing {
         // Only a store that does not exist yet means "empty" (first run). Anything else is an error: a store that cannot be
         // reached, or one behind a link whose target is gone.
@@ -70,11 +92,21 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
 
     // MARK: CVStoreMaintenance
 
+    /// Moves a quarantined file back into the store, once it passes the checks of a read.
+    ///
+    /// - Parameter name: The file's name in the quarantine.
+    /// - Throws: `RepositoryError.invalidName` when `name` is not a quarantined file's, `.alreadyExists` when a CV of that
+    ///   name is stored, `.storeUnavailable` when the quarantine is not a directory, `.writeFailed` when the move fails, and
+    ///   the read errors of `load(_:)` for the file, `.unreadable` among them when it is not there.
     public func restore(quarantined name: String) async throws(RepositoryError) -> CV {
         guard let quarantined = QuarantinedName(name) else { throw .invalidName(name) }
         return try lock.withExclusiveAccess { () throws(RepositoryError) -> CV in try restoreFile(quarantined) }
     }
 
+    /// Removes every copy of the CV: the stored file, whatever its schema, and its quarantined copies.
+    ///
+    /// - Throws: `RepositoryError.storeUnavailable` when the quarantine is not a directory, `.unreadable` when a copy cannot
+    ///   be inspected, and `.writeFailed` when one cannot be removed.
     public func erase(_ id: CVID) async throws(RepositoryError) {
         try lock.withExclusiveAccess { () throws(RepositoryError) in
             let copies = try [url(of: id)] + quarantine.copies(of: StoredFileName.of(id))
@@ -82,6 +114,10 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         }
     }
 
+    /// Removes the quarantined files that entered the quarantine before `date`, and returns how many.
+    ///
+    /// - Throws: `RepositoryError.storeUnavailable` when the quarantine is not a directory, `.unreadable` when a file cannot
+    ///   be inspected, and `.writeFailed` when one cannot be removed.
     public func purgeQuarantine(olderThan date: Date) async throws(RepositoryError) -> Int {
         try lock.withExclusiveAccess { () throws(RepositoryError) -> Int in try quarantine.purge(olderThan: date) }
     }

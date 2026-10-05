@@ -3,18 +3,34 @@ import Foundation
 /// The aggregate a user edits: personal details plus ordered sections of entries (RichDomain). State changes go through
 /// methods. The revision and the timestamps belong to the repository: they can only be set from inside the package.
 public struct CV: Hashable, Sendable {
+    /// The identity of the CV, which no edit changes.
     public let id: CVID
     /// 0 until a repository stores the CV for the first time.
     public let revision: Int
-    public let createdAt: Date?, updatedAt: Date?
+    /// When a repository first stored the CV, or `nil` until it does.
+    public let createdAt: Date?
+    /// When a repository last stored the CV, or `nil` until it does.
+    public let updatedAt: Date?
     /// The user's name for this CV in the list, such as "iOS roles". Not printed.
     public private(set) var title: String
+    /// The details printed at the top of the CV. Changed through `setPersonalDetails(_:)`.
     public private(set) var personal: PersonalDetails
+    /// The entries, by section. Changed through `setSections(_:)`.
     public private(set) var sections: CVSections
+    /// The design the CV is exported with, or `nil` for the default. Changed through `choose(design:)`.
     public private(set) var design: DesignChoice?
+    /// The language the CV is written in, or `nil` when it was not chosen. Changed through `setLanguage(_:)`.
     public private(set) var language: DocumentLanguage?
 
     /// A CV that has never been stored: revision 0, no timestamps.
+    ///
+    /// - Parameters:
+    ///   - id: The identity of the CV.
+    ///   - title: The user's name for the CV in the list. Empty until the user gives one.
+    ///   - personal: The details printed at the top.
+    ///   - sections: The entries.
+    ///   - design: The design to export with, if chosen.
+    ///   - language: The language the CV is written in, if chosen.
     public init(id: CVID, title: String = "", personal: PersonalDetails = PersonalDetails(), sections: CVSections = CVSections(),
                 design: DesignChoice? = nil, language: DocumentLanguage? = nil) {
         self.init(id: id, revision: 0, createdAt: nil, updatedAt: nil, title: title, personal: personal, sections: sections,
