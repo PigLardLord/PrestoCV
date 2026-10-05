@@ -7,6 +7,7 @@ import PrestoCVDomain
 public final class SequentialIDGenerator: IDGenerator {
     private let issued = Mutex(0)
 
+    /// A generator that starts at `…001`.
     public init() {}
 
     /// The next identity in the sequence.

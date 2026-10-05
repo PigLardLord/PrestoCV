@@ -7,6 +7,7 @@ import PrestoCVDomain
 public enum CVRepositoryContract {
     /// What a step found wrong.
     public struct Failure: Error, CustomStringConvertible {
+        /// What was found wrong, in a sentence.
         public let description: String
     }
 

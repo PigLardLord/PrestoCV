@@ -3,6 +3,7 @@ import PrestoCVDomain
 
 /// A repository whose every operation fails with `failure`, to test how a use case reports a failure of its port.
 public struct FailingRepository: CVRepository {
+    /// The error every operation throws.
     public let failure: RepositoryError
 
     /// - Parameter failure: The error every operation throws.
@@ -22,6 +23,7 @@ public struct FailingRepository: CVRepository {
 
 /// A sample source that fails with `failure`.
 public struct FailingSampleCVSource: SampleCVSource {
+    /// The error `samples()` throws.
     public let failure: RepositoryError
 
     /// - Parameter failure: The error `samples()` throws.
