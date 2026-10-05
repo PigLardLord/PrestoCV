@@ -51,19 +51,28 @@ struct CSSSelectorParser {
         }
     }
 
-    /// A run of white space and combinator signs: a descendant combinator, or the one sign it holds.
     private mutating func readCombinator() throws(CSSRejection) {
-        var combinator = " "
-        while let token = tokens.current, Self.isCombinator(token) {
-            if case .delim(let sign) = token {
-                guard combinator == " " else { throw CSSRejection(reason: "double combinator") }
-                combinator = String(sign)
-            }
-            tokens.advance()
-        }
+        let combinator = try takeCombinator()
         guard !expectsCompound else { throw Self.danglingCombinator }
         selector += combinator
         expectsCompound = true
+    }
+
+    /// A run of white space and combinator signs: a descendant combinator, or the one sign it holds.
+    private mutating func takeCombinator() throws(CSSRejection) -> String {
+        var combinator = " "
+        while let token = tokens.current, Self.isCombinator(token) {
+            combinator = try Self.combinator(afterReading: token, in: combinator)
+            tokens.advance()
+        }
+        return combinator
+    }
+
+    /// White space leaves the combinator as it is; a sign replaces the descendant combinator, and a second sign is refused.
+    private static func combinator(afterReading token: CSSToken, in combinator: String) throws(CSSRejection) -> String {
+        guard case .delim(let sign) = token else { return combinator }
+        guard combinator == " " else { throw CSSRejection(reason: "double combinator") }
+        return String(sign)
     }
 
     private mutating func readSimpleSelector(startingWith token: CSSToken) throws(CSSRejection) -> String {
