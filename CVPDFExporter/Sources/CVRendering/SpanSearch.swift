@@ -21,8 +21,9 @@ struct SpanClaims {
 /// Identical texts take increasing positions, so their permutations are never explored twice, and a choice that leaves
 /// a later text without any free span is undone at once.
 struct SpanSearch {
-    private static let stepBudget = 100_000
+    static let defaultStepBudget = 100_000
 
+    private let stepBudget: Int
     private let texts: [ExpectedText]
     private let groups: [Range<Int>]
     private var claims: SpanClaims
@@ -30,7 +31,8 @@ struct SpanSearch {
     private var steps = 0
     private var exhausted = false
 
-    init(_ expected: ExpectedTexts, pdfLength: Int) {
+    init(_ expected: ExpectedTexts, pdfLength: Int, stepBudget: Int = SpanSearch.defaultStepBudget) {
+        self.stepBudget = stepBudget
         texts = expected.items
         groups = expected.groups
         claims = SpanClaims(count: pdfLength)
@@ -58,7 +60,7 @@ struct SpanSearch {
 
     private mutating func consumeStep() -> Bool {
         steps += 1
-        exhausted = steps > Self.stepBudget
+        exhausted = steps > stepBudget
         return !exhausted
     }
 

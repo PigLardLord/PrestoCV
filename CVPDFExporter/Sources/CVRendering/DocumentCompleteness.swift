@@ -23,9 +23,14 @@ public enum DocumentCompleteness {
     ///   - textNodes: the text nodes of the document, as `RenderedDocument.textNodes` lists them.
     /// - Returns: the nodes with no span of their own, each text once and in document order; empty when the PDF is complete.
     public static func missing(in pdfText: String, expected textNodes: [String]) -> [String] {
+        missing(in: pdfText, expected: textNodes, stepBudget: SpanSearch.defaultStepBudget)
+    }
+
+    /// `missing(in:expected:)` with the number of steps the search may take before it gives up and fails closed.
+    static func missing(in pdfText: String, expected textNodes: [String], stepBudget: Int) -> [String] {
         let pdf = PDFTextIndex(pdfText)
         let expected = ExpectedTexts(textNodes, in: pdf)
-        var search = SpanSearch(expected, pdfLength: pdf.scalars.count)
+        var search = SpanSearch(expected, pdfLength: pdf.scalars.count, stepBudget: stepBudget)
         if search.placesEveryText() { return [] }
         let unplaced = ShortfallDiagnosis(expected, pdfLength: pdf.scalars.count).unplacedIndices()
         return distinctTexts(of: textNodes, at: unplaced)
