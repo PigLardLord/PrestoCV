@@ -15,7 +15,7 @@ Tools/ArchitectureCheck/check.sh --against base.json    # also fail if the basel
 swift build -c release --package-path Tools/ArchitectureCheck && Tools/ArchitectureCheck/selftest.sh
 ```
 
-The first build takes a few minutes, because it compiles SwiftSyntax.
+The first build takes a few minutes, because it compiles SwiftSyntax. `selftest.sh` runs the cases of the core checks and then those of the size, shape and comment detectors, kept in `selftest-measures.sh`.
 
 ## Rules and detectors
 
@@ -27,6 +27,39 @@ A rule is cited by its name from `rules.md` (`DIP`, `PureCore`, `CleanErrors`, â
 - **`swift5Mode` and `unsafeFlags`** (`StrictConcurrency`) read package manifests and run on manifest targets only; the other detectors read sources and never run on a manifest.
 
 A finding reads `<file>:<line>: <rule>: <detector>: <detail>`, and its baseline entry starts `<file>|<rule>|<detector>|`.
+
+## Size, shape and comment detectors
+
+They enforce `CleanFunctions`, `CleanTypes`, `ISP` and `CleanComments` on production targets, as [ADR 0021](../../docs/architecture/adr/0021-solid-and-clean-rules.md) (c) measures them. A target that lists none of these rules is not measured: tests, test support, tools, manifests and legacy targets list none. They have no baseline; a finding is fixed.
+
+| Detector | Rule | Finding when |
+|---|---|---|
+| `functionLength` | `CleanFunctions` | a body has more than 20 lines of code |
+| `parameterCount` | `CleanFunctions` | a function or initialiser has more than 3 parameters |
+| `nestingDepth` | `CleanFunctions` | a function nests more than 2 levels |
+| `cyclomaticComplexity` | `CleanFunctions` | a function has a complexity above 5 |
+| `typeLength` | `CleanTypes` | a type declaration or an extension has more than 200 lines of code |
+| `fileLength` | `CleanTypes` | a file has more than 300 lines of code |
+| `protocolSize` | `ISP` | a protocol declares more than 5 requirements |
+| `ruleNumberCitation` | `CleanComments` | a comment cites a rule by the number it had before ADR 0021 |
+
+**What counts.** A line is code when a token other than a brace touches it, so blank, comment-only and brace-only lines do not count. A token that spans lines, such as a line of a multi-line string, makes each of them code. A line that holds a compiler directive (`#if`, `#else`, `#endif`) is code, and every `#if` branch is counted, active or not.
+
+**Bodies.** A body is the statements of a function, initialiser, deinitialiser, accessor, shorthand getter (a computed property or subscript) or closure.
+- A closure is measured on its own and its lines are not counted again in the body that holds it. A nested function is measured on its own and also counts in the body that holds it, like a nested type in its type.
+- The header of a nested function or closure, the line that holds its name or call, counts in the body that holds it.
+
+**Nesting.** `if`, `guard`, `switch`, `for`, `while`, `repeat`, `do` and a closure are a level each. `else if` continues the chain of its `if`, a `case` and a `catch` are no level, and neither is `defer`. A `guard` whose `else` is a single `return`, `throw`, `break` or `continue` is no level. A closure inside a function is a level of it. A closure that no function holds (a property initialiser) and a nested function are measured as functions of their own.
+
+**Complexity.** One, plus one for each `if` (so each `else if`), `guard`, `while`, `for`, `repeat`, `catch`, `&&`, `||`, `??` and ternary, and one for each `switch`, whatever its cases. The decisions inside a closure count in the function that holds it; a nested function has its own count.
+
+**Parameters.** The parameters of a function or initialiser, protocol requirements included, not those of a closure. A data initialiser is exempt: every statement is `self.x = x`, naming a property after its parameter, each parameter assigned once; or the only statement is `self.init(...)` and every argument is one of the parameters, each passed once.
+
+**Types.** Struct, class, enum, actor, protocol and extension, counted from their member list. A nested type counts in its type and in itself.
+
+**Protocol requirements.** Functions, variables (one per binding), subscripts, initialisers and associated types, in every `#if` branch. Inherited requirements and `typealias` are not counted.
+
+**Citations.** The letter R followed by a number from 1 to 14 and an optional `m`, in line, block and documentation comments. A string that holds one is not a comment.
 
 ## Pre-commit hook
 
