@@ -1,5 +1,3 @@
-import Foundation
-
 extension CVFileV1 {
     /// Texts and lists within the caps of schema 1. A file over them is corrupt, not truncated.
     func checkSizes() throws(Invalid) {
@@ -9,8 +7,10 @@ extension CVFileV1 {
     }
 
     private var allTexts: [String] {
-        var texts = [title] + personal.texts + (design?.texts ?? [])
-        texts += [language].compactMap { $0 }
+        var texts = [title]
+        texts += personal.texts
+        texts += design?.texts ?? []
+        texts += present(language)
         texts += experiences.flatMap(\.texts)
         texts += education.flatMap(\.texts)
         texts += skills.flatMap(\.texts)
@@ -27,7 +27,7 @@ extension CVFileV1 {
 }
 
 extension CVFileV1.PersonalV1 {
-    var texts: [String] { [fullName, professionalTitle, location, summary] + [email, phone, website].compactMap { $0 } }
+    var texts: [String] { [fullName, professionalTitle, location, summary] + present(email, phone, website) }
 }
 
 extension CVFileV1.ExperienceV1 {
@@ -47,7 +47,7 @@ extension CVFileV1.LanguageV1 {
 }
 
 extension CVFileV1.CertificationV1 {
-    var texts: [String] { [name, issuer, description] + [link].compactMap { $0 } }
+    var texts: [String] { [name, issuer, description] + present(link) }
 }
 
 extension CVFileV1.ProfileV1 {
@@ -55,5 +55,8 @@ extension CVFileV1.ProfileV1 {
 }
 
 extension CVFileV1.DesignV1 {
-    var texts: [String] { [design] + [palette, fonts].compactMap { $0 } }
+    var texts: [String] { [design] + present(palette, fonts) }
 }
+
+/// The texts among `values` that are there.
+private func present(_ values: String?...) -> [String] { values.compactMap { $0 } }

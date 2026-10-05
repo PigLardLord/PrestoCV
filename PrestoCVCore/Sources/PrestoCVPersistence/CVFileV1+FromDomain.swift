@@ -4,12 +4,16 @@ import PrestoCVDomain
 extension CVFileV1 {
     init(_ cv: CV, createdAt: Date, updatedAt: Date) {
         let sections = cv.sections
+        let experiences: [ExperienceV1] = sections.experiences.map(ExperienceV1.init)
+        let education: [EducationV1] = sections.education.map(EducationV1.init)
+        let skills: [SkillV1] = sections.skills.map(SkillV1.init)
+        let languages: [LanguageV1] = sections.languages.map(LanguageV1.init)
+        let certifications: [CertificationV1] = sections.certifications.map(CertificationV1.init)
+        let profiles: [ProfileV1] = sections.profiles.map(ProfileV1.init)
         self.init(schemaVersion: Self.version, id: cv.id.raw, revision: cv.revision, createdAt: createdAt, updatedAt: updatedAt,
-                  title: cv.title, personal: PersonalV1(cv.personal), experiences: sections.experiences.map(ExperienceV1.init),
-                  education: sections.education.map(EducationV1.init), skills: sections.skills.map(SkillV1.init),
-                  languages: sections.languages.map(LanguageV1.init), certifications: sections.certifications.map(CertificationV1.init),
-                  profiles: sections.profiles.map(ProfileV1.init), interests: sections.interests, design: cv.design.map(DesignV1.init),
-                  language: cv.language?.tag)
+                  title: cv.title, personal: PersonalV1(cv.personal), experiences: experiences, education: education, skills: skills,
+                  languages: languages, certifications: certifications, profiles: profiles, interests: sections.interests,
+                  design: cv.design.map(DesignV1.init), language: cv.language?.tag)
     }
 }
 
