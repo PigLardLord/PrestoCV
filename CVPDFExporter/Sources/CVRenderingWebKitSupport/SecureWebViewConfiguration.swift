@@ -75,19 +75,27 @@ public final class SingleLoadNavigationDelegate: NSObject, WKNavigationDelegate 
         guard let navigation = webView.loadHTMLString(html, baseURL: nil) else { throw .loadFailed }
         initialNavigation = navigation
         let result = await withTaskCancellationHandler {
-            await withCheckedContinuation { (continuation: CheckedContinuation<Result<Void, Failure>, Never>) in
-                if let outcome { continuation.resume(returning: outcome); return }
-                waiter = continuation
-                timer = Task { @MainActor [weak self, weak webView] in
-                    do { try await Task.sleep(for: timeout) } catch { return }
-                    self?.stop(webView, .timedOut)
-                }
-            }
+            await waitForOutcome(of: webView, timeout: timeout)
         } onCancel: {
             Task { @MainActor [weak self, weak webView] in self?.stop(webView, .cancelled) }
         }
         timer?.cancel()
         try result.get()
+    }
+
+    private func waitForOutcome(of webView: WKWebView, timeout: Duration) async -> Result<Void, Failure> {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Result<Void, Failure>, Never>) in
+            if let outcome { continuation.resume(returning: outcome); return }
+            waiter = continuation
+            startTimer(for: webView, timeout: timeout)
+        }
+    }
+
+    private func startTimer(for webView: WKWebView, timeout: Duration) {
+        timer = Task { @MainActor [weak self, weak webView] in
+            do { try await Task.sleep(for: timeout) } catch { return }
+            self?.stop(webView, .timedOut)
+        }
     }
 
     private func stop(_ webView: WKWebView?, _ failure: Failure) {
@@ -159,19 +167,7 @@ public enum DocumentReadiness {
         let result = await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Result<String?, Failure>, Never>) in
                 first.start(continuation)
-                let timer = Task { @MainActor in
-                    do { try await Task.sleep(for: timeout) } catch { return }
-                    first.resume(.failure(.timedOut))
-                }
-                Task { @MainActor in
-                    do {
-                        let value = try await webView.callAsyncJavaScript(script, contentWorld: world)
-                        first.resume(.success((value as? Bool).map { String($0) } ?? value as? String))
-                    } catch {
-                        first.resume(.failure(.scriptFailed))
-                    }
-                    timer.cancel()
-                }
+                first.race(script: script, in: webView, timeout: timeout)
             }
         } onCancel: {
             Task { @MainActor in first.resume(.failure(.cancelled)) }
@@ -195,6 +191,30 @@ private final class FirstResult<Value: Sendable> {
         continuation.resume(returning: value)
         self.continuation = nil
         done = true
+    }
+}
+
+extension FirstResult where Value == Result<String?, DocumentReadiness.Failure> {
+    /// Starts the script and the timeout. Whichever settles first resumes the continuation, and the timeout stops
+    /// waiting once the script has.
+    func race(script: String, in webView: WKWebView, timeout: Duration) {
+        let timer = Task { @MainActor in
+            do { try await Task.sleep(for: timeout) } catch { return }
+            self.resume(.failure(.timedOut))
+        }
+        Task { @MainActor in
+            self.resume(await Self.outcome(of: script, in: webView))
+            timer.cancel()
+        }
+    }
+
+    private static func outcome(of script: String, in webView: WKWebView) async -> Result<String?, DocumentReadiness.Failure> {
+        do {
+            let value = try await webView.callAsyncJavaScript(script, contentWorld: DocumentReadiness.world)
+            return .success((value as? Bool).map { String($0) } ?? value as? String)
+        } catch {
+            return .failure(.scriptFailed)
+        }
     }
 }
 #endif
