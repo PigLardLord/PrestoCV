@@ -27,26 +27,3 @@ struct CodeLines {
         return counted.count
     }
 }
-
-/// The code lines of each open region, a body or a type. A token counts in the innermost open region that holds it
-/// and in no region around that one, so a closure, a nested function or a nested type is not counted again in what
-/// holds it. Its header, the line that holds its name or its call, still belongs to the holder.
-struct Regions {
-    struct Region {
-        let name: String
-        let line: Int
-        let range: Range<AbsolutePosition>
-        var lines: Set<Int> = []
-    }
-
-    private var open: [Region] = []
-
-    mutating func open(_ region: Region) { open.append(region) }
-
-    mutating func close() -> Region { open.removeLast() }
-
-    mutating func add(_ span: ClosedRange<Int>, at position: AbsolutePosition) {
-        guard let index = open.lastIndex(where: { $0.range.contains(position) }) else { return }
-        open[index].lines.formUnion(span)
-    }
-}

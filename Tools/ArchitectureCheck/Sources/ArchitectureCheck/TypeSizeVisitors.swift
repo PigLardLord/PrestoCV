@@ -14,12 +14,12 @@ final class TypeLengthVisitor: SyntaxVisitor {
 
     private func enter(_ node: some DeclGroupSyntax, _ name: String) -> SyntaxVisitorContinueKind {
         let members = node.memberBlock.members
-        regions.open(Regions.Region(name: name, line: lines.line(of: node.introducer), range: members.position..<members.endPosition))
+        regions.push(Regions.Region(name: name, line: lines.line(of: node.introducer), range: members.position..<members.endPosition))
         return .visitChildren
     }
 
     private func leave() {
-        let region = regions.close()
+        let region = regions.pop()
         guard region.lines.count > Limits.typeLines else { return }
         hits.append(Hit(measured: "typeLength", "\(region.name) has \(region.lines.count) lines of code, at most \(Limits.typeLines)",
                         line: region.line))
@@ -39,7 +39,7 @@ final class TypeLengthVisitor: SyntaxVisitor {
     override func visitPost(_ node: ExtensionDeclSyntax) { leave() }
 
     override func visit(_ token: TokenSyntax) -> SyntaxVisitorContinueKind {
-        if let span = lines.span(of: token) { regions.add(span, at: token.positionAfterSkippingLeadingTrivia) }
+        regions.add(token, counting: lines)
         return .visitChildren
     }
 }
