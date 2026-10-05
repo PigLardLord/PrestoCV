@@ -67,6 +67,26 @@ struct MacPDFRendererTests {
         #expect(ContinuousClock.now - start < .seconds(10))
     }
 
+    @Test("the load timeout given to the renderer is the one the load uses")
+    func loadTimeout() async throws {
+        let renderer = MacPDFRenderer(rules: try await SecureWebViewConfiguration.compileRules(), timeouts: .init(load: .zero))
+        await #expect(throws: SingleLoadNavigationDelegate.Failure.timedOut) { _ = try await renderer.render(html: "<p>x</p>", page: .a4) }
+    }
+
+    @Test("the readiness timeout given to the renderer is the one the wait for the page uses")
+    func readinessTimeout() async throws {
+        let renderer = MacPDFRenderer(rules: try await SecureWebViewConfiguration.compileRules(), timeouts: .init(readiness: .zero))
+        await #expect(throws: DocumentReadiness.Failure.timedOut) { _ = try await renderer.render(html: "<p>x</p>", page: .a4) }
+    }
+
+    @Test("timeouts longer than the defaults render the document as the defaults do")
+    func longerTimeouts() async throws {
+        let renderer = MacPDFRenderer(rules: try await SecureWebViewConfiguration.compileRules(),
+                                      timeouts: .init(load: .seconds(90), readiness: .seconds(30), printing: .seconds(180)))
+        let pdf = try await renderer.render(html: try ContractFixture.rendered().html, page: .a4)
+        #expect(PDFKitInspector().pageCount(of: pdf.data) == pdf.pageCount)
+    }
+
     @Test("a page setup with no page or no printable height is refused", arguments: [
         PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 0), PageSetup(widthPoints: 595, heightPoints: 60, maxPages: 1),
     ])
