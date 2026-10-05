@@ -368,8 +368,11 @@ Every review, dimension or final gate, answers each question with the place it f
 - **LSP:** does every adapter, and every test double, pass its port's contract?
 - **ISP:** does a consumer depend on requirements it never calls?
 - **DIP:** does a port speak its consumer's language? Is infrastructure created anywhere but the composition root?
+- **HumbleViews:** does a view decide, build a view model or a service, or hold a business rule? Does a view model import a UI framework or expose a domain type?
+- **RichDomain:** is a field public and mutable, is state changed outside a method, or is a value built without validation?
 - **CleanNames:** is every name intention-revealing, in the glossary's words?
 - **CleanFunctions:** does a function do more than one thing, mix levels of abstraction, take a flag, or hide a side effect? (Size, parameters, nesting and complexity are the checker's.)
+- **CleanTypes:** does a function use none of its type's state? Does a type mix data and behaviour? (Size is the checker's.)
 - **CleanComments:** does a comment restate the code, carry history, or cite a rule by number? Does public API lack a doc comment?
 - **CleanErrors:** is an error swallowed, untyped, or translated more than once?
 - **CleanTests:** does a test check more than one concept, depend on another test or the clock, or hide what it asserts?
