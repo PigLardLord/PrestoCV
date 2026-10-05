@@ -159,8 +159,8 @@ data_init() {   # $1 = name, $2 = clean or flag, $3 = the body of an initialiser
   local src; src="$(printf '%s\nstruct S {\n    let a: Int, b: Int, c: Int, d: Int\n    var e, f, g: Any?\n    init(a: Int, b: Int, c: Int, d: Int) { %s }\n}\n' "${4:-}" "$3")"
   if [[ "$2" == clean ]]; then clean "parameterCount: $1" "$src"; else flag "parameterCount: $1" "$src" "parameterCount: init takes 4"; fi
 }
-delegating_init() {   # the same, for a convenience initialiser
-  local src; src="$(printf '%s\nfinal class S {\n    convenience init(a: Int, b: Int, c: Int, d: Int) { %s }\n}\n' "${4:-}" "$3")"
+delegating_init() {   # the same, for a convenience initialiser that delegates to the designated one, a data initialiser
+  local src; src="$(printf '%s\nfinal class S {\n    let a: Int, b: Int, c: Int, d: Int\n    var e, f, g: Any?\n    init(a: Int, b: Int, c: Int, d: Int, e: Any? = nil, f: Any? = nil, g: Any? = nil) {\n        self.a = a; self.b = b; self.c = c; self.d = d; self.e = e; self.f = f; self.g = g\n    }\n    convenience init(first a: Int, b: Int, c: Int, d: Int) { %s }\n}\n' "${4:-}" "$3")"
   if [[ "$2" == clean ]]; then clean "parameterCount: $1" "$src"; else flag "parameterCount: $1" "$src" "parameterCount: init takes 4"; fi
 }
 STORE='self.a = a; self.b = b; self.c = c; self.d = d'
@@ -176,7 +176,9 @@ data_init "assignment: a private file-level let is a constant" clean "$STORE; se
 data_init "assignment: a file-level let in an #if branch is a constant" clean "$STORE; self.e = limit" $'#if DEBUG\nlet limit = 9\n#else\nlet limit = 8\n#endif'
 data_init "assignment: a static let is a constant" clean "$STORE; self.e = Self.limit" "extension S { static let limit = 1 }"
 data_init "assignment: a static member of a type declared elsewhere is taken on trust" clean "$STORE; self.e = Other.limit"
-delegating_init "delegation: the parameters may be passed in any order, with literals between them" clean "self.init(d: d, e: 0, c: c, f: nil, b: b, g: [], a: a)"
+delegating_init "delegation: the parameters may go to other parameters of the callee, with literals between them" clean "self.init(a: d, b: c, c: b, d: a, e: 0, f: nil, g: [])"
+delegating_init "delegation: the callee's parameters with a default value may be left out" clean "self.init(a: a, b: b, c: c, d: d, g: [])"
+delegating_init "delegation: arguments whose labels are not the callee's are no delegation to it" flag "self.init(d: d, e: 0, c: c, f: nil, b: b, g: [], a: a)"
 delegating_init "delegation: a file-level let is a constant" clean "self.init($PASS, e: limit)" "let limit = 9"
 data_init "assignment: a computed value is behaviour" flag "$STORE; self.e = 1 + 2"
 for value in 'Kind.currently' 'Kind.nowhere' '.mainStreet' 'Kind.defaults' '.sharedKey'; do
@@ -226,9 +228,9 @@ compiles() {   # $1 = name, $2 = source, $3 = the other file of the module, if a
   if swiftc -typecheck -swift-version 5 -parse-as-library "${files[@]}" > "$dir/out.txt" 2>&1; then pass=$((pass+1)); echo "ok   compiles: $1"
   else fail=$((fail+1)); echo "FAIL the fixture of '$1' does not compile"; sed 's/^/     /' "$dir/out.txt"; fi
 }
-typed() {   # $1 = name, $2 = clean or flag, $3 = source, $4 = the other file of the module, if any
+typed() {   # $1 = name, $2 = clean or flag, $3 = source, $4 = the other file of the module, if any, $5 = what a finding says
   compiles "$1" "$3" "${4:-}"
-  if [[ "$2" == clean ]]; then clean "parameterCount: $1" "$3"; else flag "parameterCount: $1" "$3" "parameterCount: init takes 4"; fi
+  if [[ "$2" == clean ]]; then clean "parameterCount: $1" "$3"; else flag "parameterCount: $1" "$3" "${5:-parameterCount: init takes 4}"; fi
 }
 INIT4='init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; self.d = d }'
 NL=$'\n'
@@ -260,6 +262,32 @@ typed "destinations: two types of one name in different scopes are one name, and
   $'struct A {\n    struct S {\n        let a: Int, b: Int, c: Int, d: Int\n    }\n}\nstruct B {\n    struct S {\n        let a: Int, b: Int, c: Int\n        private var storage = 0\n        var d: Int { get { storage } set { storage = newValue } }\n        '"$INIT4"$'\n    }\n}'
 # Not Swift that compiles: a getter-only property cannot be assigned, but the checker must not call it stored all the same.
 flag "destinations: a property with only a getter is not stored" $'struct S {\n    let a: Int, b: Int, c: Int\n    var d: Int { 0 }\n    '"$INIT4"$'\n}' "parameterCount: init takes 4"
+# A delegation has to reach a data initialiser that the file declares for the same type.
+DELEGATE4='init(a: Int, b: Int, c: Int, d: Int) { self.init(values: a, b, c, d) }'
+STORING='init(first a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; self.d = d }'
+FIELDS='    let a: Int, b: Int, c: Int, d: Int'
+typed "delegation: to a designated initialiser that stores" clean "struct S {${NL}$FIELDS${NL}    $STORING${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}}"
+typed "delegation: to a chain of initialisers that ends in one that stores" clean "struct S {${NL}$FIELDS${NL}    $STORING${NL}    init(second a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(second: a, b: b, c: c, d: d) }${NL}}"
+typed "delegation: from an extension to an initialiser of the type, which the file declares" clean "struct S {${NL}$FIELDS${NL}    $STORING${NL}}${NL}extension S {${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}}"
+typed "delegation: to an initialiser declared in an extension" clean "struct S {${NL}$FIELDS${NL}}${NL}extension S {${NL}    $STORING${NL}    init(second a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}}"
+typed "delegation: to a variadic initialiser that computes" flag "struct S {${NL}    var total = 0${NL}    init(values: Int...) { total = values.reduce(0, +) }${NL}    $DELEGATE4${NL}}"
+typed "delegation: to a variadic initialiser that only stores" flag "struct S {${NL}    var values: [Int]${NL}    init(values: Int...) { self.values = values }${NL}    $DELEGATE4${NL}}"
+typed "delegation: to an initialiser that computes" flag "struct S {${NL}    var sum = 0${NL}    init(first a: Int, b: Int, c: Int, d: Int) { sum = a + b + c + d }${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}}"
+typed "delegation: to an initialiser that assigns a computed property" flag "struct S {${NL}$STORAGE${NL}$(computed a 0)${NL}$(computed b 1)${NL}$(computed c 2)${NL}$(computed d 3)${NL}    $STORING${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}}"
+typed "delegation: when one of the initialisers it can mean computes, the caller is no data initialiser" flag "struct S {${NL}$FIELDS${NL}    $STORING${NL}    init(first a: Double, b: Int, c: Int, d: Int) { self.a = Int(a); self.b = b; self.c = c; self.d = d }${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}}" "" "P.swift:5: CleanFunctions: parameterCount: init takes 4"
+typed "delegation: to a variadic parameter that one argument fills" flag "struct S {${NL}    let a: Int, b: Int, c: Int, ds: [Int]${NL}    init(a: Int, b: Int, c: Int, ds: Int...) { self.a = a; self.b = b; self.c = c; self.ds = ds }${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, ds: d) }${NL}}" "" "P.swift:4: CleanFunctions: parameterCount: init takes 4"
+typed "delegation: to an initialiser of a type that another file declares" flag \
+  $'extension S {\n    init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) { self.init(first: a, b: b, c: c, d: d) }\n}' \
+  $'struct S {\n    let a: Int, b: Int, c: Int, d: Int\n    init(first a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; self.d = d }\n}'
+typed "delegation: to the memberwise initialiser, which the file does not declare" flag "struct S {${NL}$FIELDS${NL}}${NL}extension S {${NL}    init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) { self.init(a: a, b: b, c: c, d: d) }${NL}}"
+# Not Swift that compiles, which is the point: a call that no declaration answers cannot be resolved.
+flag "delegation: to an initialiser that nothing declares" "struct S {${NL}$FIELDS${NL}    $STORING${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}    init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) { self.init(a: a, b: b, c: c, d: d, e: 0) }${NL}}" "parameterCount: init takes 4"
+# Not Swift that compiles: the call leaves out a parameter that has no default value.
+flag "delegation: to an initialiser that needs an argument the call leaves out" "struct S {${NL}    let a: Int, b: Int, c: Int, d: Int, e: Int${NL}    init(a: Int, b: Int, c: Int, d: Int, e: Int) { self.a = a; self.b = b; self.c = c; self.d = d; self.e = e }${NL}    init(first a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d) }${NL}}" "P.swift:4: CleanFunctions: parameterCount: init takes 4"
+# A cycle is not Swift that compiles, which is the point: the checker has to end on it.
+flag "delegation: two initialisers that delegate to each other end the check and are no data initialisers" "struct S {${NL}$FIELDS${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}    init(first a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d) }${NL}}" "parameterCount: init takes 4"
+flag "delegation: an initialiser that delegates to itself ends the check and is no data initialiser" "struct S {${NL}$FIELDS${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d) }${NL}}" "parameterCount: init takes 4"
+flag "delegation: a cycle of three" "struct S {${NL}$FIELDS${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}    init(first a: Int, b: Int, c: Int, d: Int) { self.init(second: a, b: b, c: c, d: d) }${NL}    init(second a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d) }${NL}}" "parameterCount: init takes 4"
 typed "destinations: a class stores in its own properties" clean $'final class S {\n    let a: Int, b: Int, c: Int, d: Int\n    '"$INIT4"$'\n}'
 
 # --- typeLength: 200 lines of code per declaration or extension

@@ -7,26 +7,28 @@ import SwiftSyntax
 ///   a stored instance property that the file declares for the type or one of its extensions: a computed property
 ///   runs code, a `static` one is no instance's, and one that cannot be found is not known to be stored;
 /// - **delegation**: the only statement is `self.init(...)`, and each argument is a parameter passed unchanged, each
-///   parameter once, or a literal or a constant.
+///   parameter once, or a literal or a constant. The call must reach an initialiser of the same type that the file
+///   declares, with those argument labels and no variadic parameter, and that initialiser must be a data initialiser
+///   in its turn; a call that reaches itself again, or one that cannot be resolved in the file, is not exempt.
 struct DataInitializer {
     let constants: FileConstants
     let types: FileTypes
 
-    func matches(_ node: InitializerDeclSyntax) -> Bool {
-        guard let statements = node.body?.statements, !statements.isEmpty else { return false }
-        let names = node.signature.parameterClause.parameters.map { ($0.secondName ?? $0.firstName).text }
-        let values = ConstantValue(constants: constants, parameters: Set(names))
-        return assigns(statements, names, values, in: node) || Self.delegates(statements, names, values)
+    func matches(_ node: InitializerDeclSyntax) -> Bool { matches(node, visiting: []) }
+
+    /// `visiting` holds the initialisers whose delegation is being followed, so that a cycle ends and is not exempt.
+    private func matches(_ node: InitializerDeclSyntax, visiting: Set<SyntaxIdentifier>) -> Bool {
+        guard !visiting.contains(node.id), let subject = Subject(node, constants: constants) else { return false }
+        return assigns(subject) || delegates(subject, visiting: visiting.union([node.id]))
     }
 
-    private func assigns(_ statements: CodeBlockItemListSyntax, _ names: [String], _ values: ConstantValue,
-                         in node: InitializerDeclSyntax) -> Bool {
-        let assignments = statements.compactMap { Assignment($0.item) }
-        guard assignments.count == statements.count, Set(assignments.map(\.target)).count == assignments.count,
-              targetsAreStored(assignments, in: node) else { return false }
-        let stored = assignments.filter { $0.storesParameter(of: values) }
-        let given = assignments.filter { $0.givesConstant(of: values) }
-        return stored.count + given.count == assignments.count && stored.map(\.target).sorted() == names.sorted()
+    private func assigns(_ subject: Subject) -> Bool {
+        let assignments = subject.statements.compactMap { Assignment($0.item) }
+        guard assignments.count == subject.statements.count, Set(assignments.map(\.target)).count == assignments.count,
+              targetsAreStored(assignments, in: subject.node) else { return false }
+        let stored = assignments.filter { $0.storesParameter(of: subject.values) }
+        let given = assignments.filter { $0.givesConstant(of: subject.values) }
+        return stored.count + given.count == assignments.count && stored.map(\.target).sorted() == subject.names.sorted()
     }
 
     /// Each assignment names a stored property of the type that the initialiser belongs to.
@@ -35,10 +37,24 @@ struct DataInitializer {
         return assignments.allSatisfy { stored.contains($0.target) }
     }
 
-    private static func delegates(_ statements: CodeBlockItemListSyntax, _ names: [String], _ values: ConstantValue) -> Bool {
-        guard statements.count == 1, let call = statements.first?.item.as(FunctionCallExprSyntax.self), isSelfInit(call),
-              let passed = passedParameters(of: call, values) else { return false }
-        return passed.sorted() == names.sorted()
+    private func delegates(_ subject: Subject, visiting: Set<SyntaxIdentifier>) -> Bool {
+        guard let call = Self.delegation(subject) else { return false }
+        return reachesDataInitializer(call, from: subject.node, visiting: visiting)
+    }
+
+    /// The call of a body that is one `self.init(...)` passing each parameter once and nothing but constants besides.
+    private static func delegation(_ subject: Subject) -> FunctionCallExprSyntax? {
+        guard subject.statements.count == 1, let call = subject.statements.first?.item.as(FunctionCallExprSyntax.self), isSelfInit(call),
+              passedParameters(of: call, subject.values)?.sorted() == subject.names.sorted() else { return nil }
+        return call
+    }
+
+    /// Every initialiser of the type that the call can mean is a data initialiser, and there is at least one.
+    private func reachesDataInitializer(_ call: FunctionCallExprSyntax, from node: InitializerDeclSyntax,
+                                        visiting: Set<SyntaxIdentifier>) -> Bool {
+        guard let declared = types.initializers(ofTypeHolding: node) else { return false }
+        let callees = declared.filter { $0.canBeCalled(by: call) }
+        return !callees.isEmpty && callees.allSatisfy { matches($0, visiting: visiting) }
     }
 
     /// `self.init(...)`, without a trailing closure.
@@ -59,6 +75,22 @@ struct DataInitializer {
             }
         }
         return passed
+    }
+}
+
+/// An initialiser under examination: its body, its parameters, and what a value it stores or passes may be.
+private struct Subject {
+    let node: InitializerDeclSyntax
+    let statements: CodeBlockItemListSyntax
+    let names: [String]
+    let values: ConstantValue
+
+    init?(_ node: InitializerDeclSyntax, constants: FileConstants) {
+        guard let statements = node.body?.statements, !statements.isEmpty else { return nil }
+        self.node = node
+        self.statements = statements
+        names = node.signature.parameterClause.parameters.map { ($0.secondName ?? $0.firstName).text }
+        values = ConstantValue(constants: constants, parameters: Set(names))
     }
 }
 
