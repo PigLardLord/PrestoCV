@@ -125,6 +125,12 @@ flag_only "cyclomaticComplexity: a nested function is measured on its own" \
 flag "cyclomaticComplexity: an initialiser" "$(printf 'struct S {\n    init() {\n%s\n    }\n}\n' "$(lines_of 5 '        if x%d { g() }')")" "cyclomaticComplexity: init has a cyclomatic complexity of 6"
 flag "cyclomaticComplexity: a computed property" "$(printf 'struct S {\n    var p: Int {\n%s\n        return 0\n    }\n}\n' "$(lines_of 5 '        if x%d { return 1 }')")" "cyclomaticComplexity: getter of p has"
 flag "cyclomaticComplexity: a closure that initialises a property" "$(printf 'struct S {\n    static let t: Int = {\n%s\n        return 0\n    }()\n}\n' "$(lines_of 5 '        if x%d { return 1 }')")" "cyclomaticComplexity: closure has"
+clean "cyclomaticComplexity: the operators of a compile-time condition are no decisions" $'func f() {\n#if DEBUG && FAST && SLOW && SMALL && TINY && LARGE\n    g()\n#elseif A || B || C || D || E || F\n    h()\n#endif\n}'
+clean "cyclomaticComplexity: a negated and parenthesised compile-time condition is no decision" $'func f() {\n#if !(A && B) || (C && D && E && G)\n    g()\n#endif\n}'
+flag "cyclomaticComplexity: the decisions inside a compile-time branch still count" "$(printf 'func f() {\n#if DEBUG && FAST\n%s\n#endif\n}\n' "$(lines_of 5 '    if x%d { g() }')")" "cyclomaticComplexity: func f has a cyclomatic complexity of 6"
+flag "cyclomaticComplexity: every branch of a compile-time condition counts its decisions" "$(printf 'func f() {\n#if DEBUG\n%s\n#else\n%s\n#endif\n}\n' "$(lines_of 3 '    if x%d { g() }')" "$(lines_of 3 '    if y%d { h() }')")" "cyclomatic complexity of 7"
+flag "cyclomaticComplexity: a runtime operator next to a compile-time one still counts" $'func f() -> Bool {\n#if DEBUG && FAST\n    return a && b && c && d && e && f\n#endif\n}' "cyclomatic complexity of 6"
+flag "cyclomaticComplexity: a condition inside a nested compile-time branch still counts" $'func f() -> Bool {\n#if DEBUG\n#if FAST && SLOW\n    return a && b && c && d && e && f\n#endif\n#endif\n}' "cyclomatic complexity of 6"
 clean "cyclomaticComplexity: decisions outside any body are not measured" 'let r = a && b && c && d && e && f && g'
 
 # --- parameterCount: 3 at most; a data initialiser is exempt

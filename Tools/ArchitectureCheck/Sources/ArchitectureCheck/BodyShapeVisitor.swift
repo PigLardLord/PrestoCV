@@ -129,11 +129,21 @@ final class BodyShapeVisitor: BodyVisitor {
     }
 
     override func visit(_ node: BinaryOperatorExprSyntax) -> SyntaxVisitorContinueKind {
-        if ["&&", "||", "??"].contains(node.operator.text) { decide() }
+        if ["&&", "||", "??"].contains(node.operator.text), !Self.isCompileTimeCondition(node) { decide() }
         return .visitChildren
     }
 
     // MARK: Shapes
+
+    /// The condition of a `#if` clause is settled when the code is compiled, not when it runs, so its operators are no decisions.
+    private static func isCompileTimeCondition(_ node: some SyntaxProtocol) -> Bool {
+        var child = Syntax(node)
+        while let parent = child.parent {
+            if let clause = parent.as(IfConfigClauseSyntax.self) { return clause.condition?.id == child.id }
+            child = parent
+        }
+        return false
+    }
 
     /// `else if` continues the chain of its `if`: it is neither a level nor a second one.
     private static func isElseIf(_ node: IfExprSyntax) -> Bool { node.parent?.is(IfExprSyntax.self) == true }
