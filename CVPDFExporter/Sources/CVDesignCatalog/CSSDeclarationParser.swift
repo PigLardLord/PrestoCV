@@ -23,11 +23,20 @@ enum CSSDeclarationParser {
     private static func declaration(from tokens: ArraySlice<CSSToken>) throws(CSSRejection) -> Declaration? {
         let parts = tokens.filter { $0 != .whitespace }
         if parts.isEmpty { return nil }
-        guard parts.count >= 3, case .ident(let rawName) = parts[0], parts[1] == .colon else { throw CSSRejection(reason: "malformed declaration") }
-        let name = rawName.lowercased()
+        let name = try propertyName(in: parts)
         if parts.contains(.delim("!")) { throw CSSRejection(reason: "!important is not allowed") }
+        return Declaration(name: name, value: try canonicalValue(Array(parts.dropFirst(2)), ofProperty: name))
+    }
+
+    /// The lower-cased property of a declaration that is written `property : value`.
+    private static func propertyName(in parts: [CSSToken]) throws(CSSRejection) -> String {
+        guard parts.count >= 3, case .ident(let name) = parts[0], parts[1] == .colon else { throw CSSRejection(reason: "malformed declaration") }
+        return name.lowercased()
+    }
+
+    private static func canonicalValue(_ value: [CSSToken], ofProperty name: String) throws(CSSRejection) -> String {
         guard let check = allowedProperties[name] else { throw CSSRejection(reason: "property \(name) is not allowed") }
-        return Declaration(name: name, value: try check(Array(parts.dropFirst(2))))
+        return try check(value)
     }
 
     /// Inline entries are separated by a space in the markup, which flex and grid do not render: a rule that makes a
