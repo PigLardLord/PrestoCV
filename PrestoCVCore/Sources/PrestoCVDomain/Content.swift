@@ -141,12 +141,7 @@ public struct CVSections: Hashable, Sendable {
     public var profiles: [ProfileLink]
     /// The interests: trimmed, never empty, and with no two equal ignoring case. Set only through `setInterests(_:)` or the
     /// initialiser, which both normalise what they are given.
-    public private(set) var interests: [String] {
-        get { normalisedInterests }
-        set { normalisedInterests = Self.normalise(newValue) }
-    }
-    // The rule lives in the setter above, so every way in goes through it and the initialiser only stores.
-    private var normalisedInterests: [String] = []
+    @NormalisedInterests public private(set) var interests: [String]
 
     /// Every parameter is the value of the property of the same name, and none is required. `interests` is normalised on the
     /// way in: each is trimmed, empty ones are dropped, and of two that are equal ignoring case the first stays.
@@ -160,10 +155,4 @@ public struct CVSections: Hashable, Sendable {
     ///
     /// - Parameter values: The new interests, in the order the user chose.
     public mutating func setInterests(_ values: [String]) { interests = values }
-
-    private static func normalise(_ values: [String]) -> [String] {
-        var seen = Set<String>()
-        return values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
-    }
 }

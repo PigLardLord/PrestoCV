@@ -28,8 +28,8 @@ enum Measurements {
     static func hits(of tree: SourceFileSyntax, file: String) -> [Hit] {
         let lines = CodeLines(converter: SourceLocationConverter(fileName: file, tree: tree))
         let length = BodyLengthVisitor(lines: lines), shape = BodyShapeVisitor(lines: lines)
-        let signatures = SignatureVisitor(lines: lines, constants: FileConstants(tree)), types = TypeLengthVisitor(lines: lines)
-        let protocols = ProtocolSizeVisitor(lines: lines)
+        let signatures = SignatureVisitor(lines: lines, constants: FileConstants(tree), types: FileTypes(tree))
+        let types = TypeLengthVisitor(lines: lines), protocols = ProtocolSizeVisitor(lines: lines)
         for visitor in [length, shape, signatures, types, protocols] as [SyntaxVisitor] { visitor.walk(tree) }
         return length.hits + shape.hits + signatures.hits + types.hits + protocols.hits
             + FileLength.hits(of: tree, lines: lines) + CommentCitations.hits(in: tree, lines: lines)

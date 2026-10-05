@@ -21,22 +21,16 @@ final class ProtocolSizeVisitor: SyntaxVisitor {
     }
 
     private static func requirements(in members: MemberBlockItemListSyntax) -> Int {
-        members.reduce(0) { $0 + requirements(of: $1.decl) }
+        members.declarations.reduce(0) { $0 + requirements(of: $1) }
     }
 
     private static func requirements(of decl: DeclSyntax) -> Int {
         if let variable = decl.as(VariableDeclSyntax.self) { return variable.bindings.count }
-        if let conditional = decl.as(IfConfigDeclSyntax.self) { return conditional.clauses.reduce(0) { $0 + requirements(in: $1) } }
         return isRequirement(decl) ? 1 : 0
     }
 
     private static func isRequirement(_ decl: DeclSyntax) -> Bool {
         decl.is(FunctionDeclSyntax.self) || decl.is(InitializerDeclSyntax.self)
             || decl.is(SubscriptDeclSyntax.self) || decl.is(AssociatedTypeDeclSyntax.self)
-    }
-
-    private static func requirements(in clause: IfConfigClauseSyntax) -> Int {
-        guard case .decls(let members)? = clause.elements else { return 0 }
-        return requirements(in: members)
     }
 }

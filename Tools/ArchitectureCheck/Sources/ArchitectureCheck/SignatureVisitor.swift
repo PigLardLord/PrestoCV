@@ -7,9 +7,9 @@ final class SignatureVisitor: SyntaxVisitor {
     private let lines: CodeLines
     private let dataInitializer: DataInitializer
 
-    init(lines: CodeLines, constants: FileConstants) {
+    init(lines: CodeLines, constants: FileConstants, types: FileTypes) {
         self.lines = lines
-        self.dataInitializer = DataInitializer(constants: constants)
+        self.dataInitializer = DataInitializer(constants: constants, types: types)
         super.init(viewMode: .sourceAccurate)
     }
 

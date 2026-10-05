@@ -3,25 +3,36 @@ import SwiftSyntax
 /// An initialiser that describes a data structure, not a behaviour (ADR 0021 (c)), so it may take as many parameters
 /// as the structure has. Its body is one of two shapes, and nothing else:
 /// - **assignments**: each statement is `self.x = x`, naming the property after its parameter, each parameter once,
-///   or gives another property a literal or a constant (`self.revision = 0`). A property is assigned once;
+///   or gives another property a literal or a constant (`self.revision = 0`). A property is assigned once, and each is
+///   a stored instance property that the file declares for the type or one of its extensions: a computed property
+///   runs code, a `static` one is no instance's, and one that cannot be found is not known to be stored;
 /// - **delegation**: the only statement is `self.init(...)`, and each argument is a parameter passed unchanged, each
 ///   parameter once, or a literal or a constant.
 struct DataInitializer {
     let constants: FileConstants
+    let types: FileTypes
 
     func matches(_ node: InitializerDeclSyntax) -> Bool {
         guard let statements = node.body?.statements, !statements.isEmpty else { return false }
         let names = node.signature.parameterClause.parameters.map { ($0.secondName ?? $0.firstName).text }
         let values = ConstantValue(constants: constants, parameters: Set(names))
-        return Self.assigns(statements, names, values) || Self.delegates(statements, names, values)
+        return assigns(statements, names, values, in: node) || Self.delegates(statements, names, values)
     }
 
-    private static func assigns(_ statements: CodeBlockItemListSyntax, _ names: [String], _ values: ConstantValue) -> Bool {
+    private func assigns(_ statements: CodeBlockItemListSyntax, _ names: [String], _ values: ConstantValue,
+                         in node: InitializerDeclSyntax) -> Bool {
         let assignments = statements.compactMap { Assignment($0.item) }
-        guard assignments.count == statements.count, Set(assignments.map(\.target)).count == assignments.count else { return false }
+        guard assignments.count == statements.count, Set(assignments.map(\.target)).count == assignments.count,
+              targetsAreStored(assignments, in: node) else { return false }
         let stored = assignments.filter { $0.storesParameter(of: values) }
         let given = assignments.filter { $0.givesConstant(of: values) }
         return stored.count + given.count == assignments.count && stored.map(\.target).sorted() == names.sorted()
+    }
+
+    /// Each assignment names a stored property of the type that the initialiser belongs to.
+    private func targetsAreStored(_ assignments: [Assignment], in node: InitializerDeclSyntax) -> Bool {
+        guard let stored = types.storedProperties(ofTypeHolding: node) else { return false }
+        return assignments.allSatisfy { stored.contains($0.target) }
     }
 
     private static func delegates(_ statements: CodeBlockItemListSyntax, _ names: [String], _ values: ConstantValue) -> Bool {

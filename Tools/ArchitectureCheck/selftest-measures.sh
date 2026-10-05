@@ -151,12 +151,12 @@ flag "parameterCount: an initialiser that stores a parameter in another property
 flag "parameterCount: an empty initialiser" $'struct S {\n    init(a: Int, b: Int, c: Int, d: Int) {}\n}' "parameterCount: init takes 4"
 clean "parameterCount: a data initialiser stores each parameter in the property of its name" $'struct S {\n    let a: Int, b: Int, c: Int, d: Int\n    init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; self.d = d }\n}'
 clean "parameterCount: a data initialiser keeps its parameter names, not its labels" $'struct S {\n    let a: Int, b: Int, c: Int, d: Int\n    init(first a: Int, _ b: Int, _ c: Int, last d: Int) {\n        self.d = d\n        self.c = c\n        self.b = b\n        self.a = a\n    }\n}'
-clean "parameterCount: an initialiser that passes its parameters unchanged is a data initialiser" $'final class S {\n    init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; self.d = d }\n    convenience init(origin a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d) }\n}'
+clean "parameterCount: an initialiser that passes its parameters unchanged is a data initialiser" $'final class S {\n    let a: Int, b: Int, c: Int, d: Int\n    init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; self.d = d }\n    convenience init(origin a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d) }\n}'
 flag "parameterCount: a delegating initialiser that changes a parameter" $'final class S {\n    convenience init(a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d + 1) }\n}' "parameterCount: init takes 4"
 flag "parameterCount: a delegating initialiser that drops a parameter" $'final class S {\n    convenience init(a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c) }\n}' "parameterCount: init takes 4"
 # A data initialiser may also give the other properties a literal or a constant, and pass literals and constants on.
 data_init() {   # $1 = name, $2 = clean or flag, $3 = the body of an initialiser of four parameters, $4 = what precedes the type
-  local src; src="$(printf '%s\nstruct S {\n    init(a: Int, b: Int, c: Int, d: Int) { %s }\n}\n' "${4:-}" "$3")"
+  local src; src="$(printf '%s\nstruct S {\n    let a: Int, b: Int, c: Int, d: Int\n    var e, f, g: Any?\n    init(a: Int, b: Int, c: Int, d: Int) { %s }\n}\n' "${4:-}" "$3")"
   if [[ "$2" == clean ]]; then clean "parameterCount: $1" "$src"; else flag "parameterCount: $1" "$src" "parameterCount: init takes 4"; fi
 }
 delegating_init() {   # the same, for a convenience initialiser
@@ -215,6 +215,52 @@ data_init "assignment: a dictionary with a constant key and a constant value" cl
 delegating_init "delegation: a second statement" flag "self.init($PASS, e: 0); register()"
 delegating_init "delegation: a name that a parameter shares with a file-level let is the parameter" flag "self.init(a: a, b: b, c: c, d: a)" "let a = 1"
 clean "parameterCount: the parameters of a closure are not counted" 'let f: (Int, Int, Int, Int) -> Void = { a, b, c, d in }'
+
+# A data initialiser assigns stored properties that the file declares (ADR 0021 (c)). These fixtures are Swift that compiles
+# (swiftc -typecheck, Swift 5 mode, with a second file for a type that the fixture's file does not declare), so a case
+# cannot pass for a reason that is a typo. SELFTEST_TYPECHECK=0 skips the compiling, and so does a machine without swiftc.
+compiles() {   # $1 = name, $2 = source, $3 = the other file of the module, if any
+  command -v swiftc > /dev/null && [[ "${SELFTEST_TYPECHECK:-1}" != 0 ]] || return 0
+  local dir files; dir="$(mktemp -d)"; ROOTS+=("$dir"); files=("$dir/Fixture.swift"); printf '%s\n' "$2" > "$dir/Fixture.swift"
+  if [[ -n "${3:-}" ]]; then printf '%s\n' "$3" > "$dir/Context.swift"; files+=("$dir/Context.swift"); fi
+  if swiftc -typecheck -swift-version 5 -parse-as-library "${files[@]}" > "$dir/out.txt" 2>&1; then pass=$((pass+1)); echo "ok   compiles: $1"
+  else fail=$((fail+1)); echo "FAIL the fixture of '$1' does not compile"; sed 's/^/     /' "$dir/out.txt"; fi
+}
+typed() {   # $1 = name, $2 = clean or flag, $3 = source, $4 = the other file of the module, if any
+  compiles "$1" "$3" "${4:-}"
+  if [[ "$2" == clean ]]; then clean "parameterCount: $1" "$3"; else flag "parameterCount: $1" "$3" "parameterCount: init takes 4"; fi
+}
+INIT4='init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; self.d = d }'
+NL=$'\n'
+STORAGE='    private var storage = [0, 0, 0, 0]'
+computed() { printf '    var %s: Int { get { storage[%d] } set { storage[%d] = newValue } }\n' "$1" "$2" "$2"; }   # $1 = name, $2 = index
+typed "destinations: stored properties of the type" clean $'struct S {\n    let a: Int, b: Int, c: Int, d: Int\n    '"$INIT4"$'\n}'
+typed "destinations: stored properties, a computed one beside them that is not assigned" clean $'struct S {\n    let a: Int, b: Int, c: Int, d: Int\n    var sum: Int { a + b + c + d }\n    '"$INIT4"$'\n}'
+typed "destinations: every one computed, whose setters do work" flag "struct S {${NL}$STORAGE${NL}$(computed a 0)${NL}$(computed b 1)${NL}$(computed c 2)${NL}$(computed d 3)${NL}    $INIT4${NL}}"
+typed "destinations: one of four computed" flag "struct S {${NL}    let a: Int, b: Int, c: Int${NL}$STORAGE${NL}$(computed d 3)${NL}    $INIT4${NL}}"
+typed "destinations: a computed one declared in an extension" flag "struct S {${NL}    let a: Int, b: Int, c: Int${NL}$STORAGE${NL}    $INIT4${NL}}${NL}extension S {${NL}$(computed d 3)${NL}}"
+typed "destinations: a computed property with a getter only is no destination either" flag $'struct S {\n    let a: Int, b: Int, c: Int\n    var d: Int { 0 }\n    init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c }\n}'
+typed "destinations: a static property is no instance's" flag $'struct S {\n    static var d = 0\n    let a: Int, b: Int, c: Int\n    init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; Self.d = d }\n}'
+typed "destinations: a class property is no instance's" flag $'class S {\n    class var d: Int { 0 }\n    let a: Int, b: Int, c: Int\n    init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c }\n}'
+typed "destinations: properties of a type that another file declares are not found" flag \
+  $'extension S {\n    init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) { self.a = a; self.b = b; self.c = c; self.d = d }\n}' \
+  $'struct S { var a = 0, b = 0, c = 0, d = 0 }'
+typed "destinations: the extended type is declared in this file, so its properties are found" clean \
+  $'struct S {\n    let a: Int, b: Int, c: Int, d: Int\n}\nextension S {\n    init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) { self.a = a; self.b = b; self.c = c; self.d = d }\n}'
+typed "destinations: the extension may come before the type" clean \
+  $'extension S {\n    init(_ a: Int, _ b: Int, _ c: Int, _ d: Int) { self.a = a; self.b = b; self.c = c; self.d = d }\n}\nstruct S {\n    let a: Int, b: Int, c: Int, d: Int\n}'
+typed "destinations: a property with observers stores, since the type's own observers do not run in its initialiser" clean \
+  $'struct S {\n    var count = 0\n    var a: Int { willSet { count += 1 } }\n    var b: Int { didSet { count += 1 } }\n    var c: Int { willSet { count += 1 } didSet { count += 2 } }\n    var d: Int { didSet { count += 1 } }\n    '"$INIT4"$'\n}'
+typed "destinations: a property with a getter and an observer is computed" flag $'struct S {\n    let a: Int, b: Int, c: Int\n    var d: Int { get { 0 } set { } }\n    '"$INIT4"$'\n}'
+typed "destinations: a property declared in a #if branch is found" clean $'struct S {\n    let a: Int, b: Int, c: Int\n#if DEBUG\n    let d: Int\n#else\n    let d: Int\n#endif\n    '"$INIT4"$'\n}'
+typed "destinations: a nested type has its own properties" clean $'struct Outer {\n    struct S {\n        let a: Int, b: Int, c: Int, d: Int\n        '"$INIT4"$'\n    }\n}'
+typed "destinations: the properties of an enclosing type are not the nested type's" flag $'struct Outer {\n    let a: Int, b: Int, c: Int, d: Int\n    struct S {\n        let a: Int, b: Int, c: Int\n        init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c }\n    }\n}'
+typed "destinations: a static property that shares a name with an instance property is not the instance's" clean $'struct S {\n    static var d: Int { 0 }\n    let a: Int, b: Int, c: Int, d: Int\n    '"$INIT4"$'\n}'
+typed "destinations: two types of one name in different scopes are one name, and a computed property in either is no destination" flag \
+  $'struct A {\n    struct S {\n        let a: Int, b: Int, c: Int, d: Int\n    }\n}\nstruct B {\n    struct S {\n        let a: Int, b: Int, c: Int\n        private var storage = 0\n        var d: Int { get { storage } set { storage = newValue } }\n        '"$INIT4"$'\n    }\n}'
+# Not Swift that compiles: a getter-only property cannot be assigned, but the checker must not call it stored all the same.
+flag "destinations: a property with only a getter is not stored" $'struct S {\n    let a: Int, b: Int, c: Int\n    var d: Int { 0 }\n    '"$INIT4"$'\n}' "parameterCount: init takes 4"
+typed "destinations: a class stores in its own properties" clean $'final class S {\n    let a: Int, b: Int, c: Int, d: Int\n    '"$INIT4"$'\n}'
 
 # --- typeLength: 200 lines of code per declaration or extension
 members() { lines_of "$1" '    var m%d = 0'; }
