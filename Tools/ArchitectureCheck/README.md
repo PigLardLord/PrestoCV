@@ -46,7 +46,7 @@ They enforce `CleanFunctions`, `CleanTypes`, `ISP` and `CleanComments` on produc
 **What counts.** A line is code when a token other than a brace touches it, so blank, comment-only and brace-only lines do not count. A token that spans lines, such as a line of a multi-line string, makes each of them code. A line that holds a compiler directive (`#if`, `#else`, `#endif`) is code, and every `#if` branch is counted, active or not.
 
 **Bodies.** A body is the statements of a function, initialiser, deinitialiser, accessor, shorthand getter (a computed property or subscript) or closure.
-- A closure is measured on its own and its lines are not counted again in the body that holds it. A nested function is measured on its own and also counts in the body that holds it, like a nested type in its type.
+- A closure and a nested function are each measured on their own, and their lines are not counted again in the body that holds them.
 - The header of a nested function or closure, the line that holds its name or call, counts in the body that holds it.
 
 **Nesting.** `if`, `guard`, `switch`, `for`, `while`, `repeat`, `do` and a closure are a level each. `else if` continues the chain of its `if`, a `case` and a `catch` are no level, and neither is `defer`. A `guard` whose `else` is a single `return`, `throw`, `break` or `continue` is no level. A closure inside a function is a level of it. A closure that no function holds (a property initialiser) and a nested function are measured as functions of their own.
@@ -55,7 +55,7 @@ They enforce `CleanFunctions`, `CleanTypes`, `ISP` and `CleanComments` on produc
 
 **Parameters.** The parameters of a function or initialiser, protocol requirements included, not those of a closure. A data initialiser is exempt: every statement is `self.x = x`, naming a property after its parameter, each parameter assigned once; or the only statement is `self.init(...)` and every argument is one of the parameters, each passed once.
 
-**Types.** Struct, class, enum, actor, protocol and extension, counted from their member list. A nested type counts in its type and in itself.
+**Types.** Struct, class, enum, actor, protocol and extension, counted from their member list. A nested type is measured on its own and not counted again in its type; its header line counts in its type.
 
 **Protocol requirements.** Functions, variables (one per binding), subscripts, initialisers and associated types, in every `#if` branch. Inherited requirements and `typealias` are not counted.
 

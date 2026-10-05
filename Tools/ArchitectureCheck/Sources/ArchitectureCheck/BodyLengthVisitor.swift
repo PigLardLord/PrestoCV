@@ -1,14 +1,14 @@
 import SwiftSyntax
 
-/// `functionLength`: the code lines of each body. A closure is measured on its own and not counted again in the body
-/// that holds it. A nested function is measured on its own and also counts in the body that holds it.
+/// `functionLength`: the code lines of each body. A closure and a nested function are measured on their own and not
+/// counted again in the body that holds them.
 final class BodyLengthVisitor: BodyVisitor {
     private(set) var hits: [Hit] = []
     private var regions = Regions()
 
     override func enter(_ body: Body) {
         let range = body.statements.position..<body.statements.endPosition
-        regions.open(Regions.Region(name: body.name, line: body.line, range: range, isolated: body.isClosure))
+        regions.open(Regions.Region(name: body.name, line: body.line, range: range))
     }
 
     override func leave(_ body: Body) {

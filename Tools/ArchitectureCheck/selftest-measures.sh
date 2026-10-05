@@ -30,8 +30,13 @@ flag_only "functionLength: a closure inside a closure is measured on its own" \
   "$(printf 'func f() {\n    run {\n%s\n        again {\n%s\n        }\n    }\n}\n' "$(lets 15)" "$(lets 21)")" "closure has 21" "closure has 1[0-9] |func f has"
 flag "functionLength: a trailing closure of a call" "$(printf 'func f() {\n    items.forEach { item in\n%s\n    }\n}\n' "$(lets 21)")" "functionLength: closure has 21"
 flag "functionLength: a closure that initialises a property" "$(printf 'struct S {\n    static let table: [Int] = {\n%s\n        return []\n    }()\n}\n' "$(lets 20)")" "functionLength: closure has 21"
-flag_only "functionLength: a nested function counts in its function and in itself" \
-  "$(printf 'func f() {\n%s\n    func g() {\n%s\n    }\n}\n' "$(lets 12)" "$(lets 12)")" "func f has 25" "func g has"
+clean "functionLength: a nested function's lines are not counted again in its function" "$(printf 'func f() {\n%s\n    func g() {\n%s\n    }\n}\n' "$(lets 10)" "$(lets 20)")"
+flag_only "functionLength: a nested function is measured on its own, not in its function" \
+  "$(printf 'func f() {\n%s\n    func g() {\n%s\n    }\n}\n' "$(lets 10)" "$(lets 21)")" "func g has 21" "func f has"
+flag_only "functionLength: a function counts its own lines and the header of its nested function" \
+  "$(printf 'func f() {\n%s\n    func g() {\n%s\n    }\n    h()\n}\n' "$(lets 19)" "$(lets 3)")" "func f has 21" "func g has"
+flag_only "functionLength: a function nested in a nested function is measured on its own" \
+  "$(printf 'func f() {\n    func g() {\n%s\n        func h() {\n%s\n        }\n    }\n}\n' "$(lets 10)" "$(lets 21)")" "func h has 21" "func f has|func g has"
 flag "functionLength: a nested function of 21 lines" "$(printf 'func f() {\n    func g() {\n%s\n    }\n}\n' "$(lets 21)")" "functionLength: func g has 21"
 flag "functionLength: every #if branch counts" "$(printf 'func f() {\n#if DEBUG\n%s\n#else\n%s\n#endif\n}\n' "$(lets 12)" "$(lets 12)")" "functionLength: func f has"
 clean "functionLength: a short #if is no finding" "$(printf 'func f() {\n#if DEBUG\n%s\n#else\n%s\n#endif\n}\n' "$(lets 5)" "$(lets 5)")"
@@ -135,8 +140,11 @@ flag "typeLength: an extension" "$(printf 'extension S {\n%s\n}\n' "$(members 20
 flag_only "typeLength: a declaration and its extension are measured separately" \
   "$(printf 'struct S {\n%s\n}\nextension S {\n%s\n}\n' "$(members 50)" "$(members 201)")" "extension S has 201" "struct S has"
 clean "typeLength: a declaration and its extension within the limit, 242 lines in all" "$(printf 'struct S {\n%s\n}\nextension S {\n%s\n}\n' "$(members 120)" "$(members 120)")"
-flag_only "typeLength: a nested type counts in its type and in itself" \
-  "$(printf 'struct S {\n%s\n    struct N {\n%s\n    }\n}\n' "$(members 150)" "$(lines_of 60 '        var n%d = 0')")" "struct S has 211" "struct N has"
+clean "typeLength: a nested type's lines are not counted again in its type" "$(printf 'struct S {\n%s\n    struct N {\n%s\n    }\n}\n' "$(members 150)" "$(lines_of 60 '        var n%d = 0')")"
+flag_only "typeLength: a nested type is measured on its own, not in its type" \
+  "$(printf 'struct S {\n%s\n    struct N {\n%s\n    }\n}\n' "$(members 100)" "$(lines_of 201 '        var n%d = 0')")" "struct N has 201" "struct S has"
+flag_only "typeLength: a type counts its own lines and the header of its nested type" \
+  "$(printf 'struct S {\n%s\n    struct N {\n%s\n    }\n}\n' "$(members 200)" "$(lines_of 60 '        var n%d = 0')")" "struct S has 201" "struct N has"
 clean "typeLength: braces, blank lines and comments do not count" "$(printf 'struct S {\n%s\n\n    // a comment\n\n    /* a block\n       comment */\n}\n' "$(members 200)")"
 
 # --- fileLength: 300 lines of code

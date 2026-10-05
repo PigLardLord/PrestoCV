@@ -1,7 +1,7 @@
 import SwiftSyntax
 
 /// `typeLength`: the code lines of each type declaration and of each extension, measured separately. A nested type is
-/// measured on its own and also counts in the type that holds it.
+/// measured on its own and not counted again in the type that holds it.
 final class TypeLengthVisitor: SyntaxVisitor {
     private(set) var hits: [Hit] = []
     private var regions = Regions()
