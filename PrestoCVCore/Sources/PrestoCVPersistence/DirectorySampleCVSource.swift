@@ -14,18 +14,19 @@ public struct DirectorySampleCVSource: SampleCVSource {
     }
 
     public func samples() async throws(RepositoryError) -> [CV] {
-        let names: [String]
-        do { names = try FileManager.default.contentsOfDirectory(atPath: directory.path) } catch { throw .storeUnavailable(.cannotList) }
         var samples: [CV] = []
-        for name in names.sorted() where name.hasSuffix(".cv.json") {
-            switch StoredCVFile.read(directory.appendingPathComponent(name), maxBytes: maxFileBytes) {
-            case .cv(let cv): samples.append(cv)
-            case .absent, .unreadable: throw .unreadable(file: name)
-            case .newer(let version): throw .upgradeRequired(file: name, version: version)
-            case .corrupt: throw .corrupt(file: name)
-            case .tooLarge: throw .tooLarge(file: name)
-            }
+        for name in try sampleFileNames() {
+            let file = StoredCVFile.read(directory.appendingPathComponent(name), maxBytes: maxFileBytes)
+            samples.append(try file.requireCV(named: name))
         }
         return samples
+    }
+
+    private func sampleFileNames() throws(RepositoryError) -> [String] {
+        do {
+            return try FileManager.default.contentsOfDirectory(atPath: directory.path).filter { $0.hasSuffix(StoredFileName.suffix) }.sorted()
+        } catch {
+            throw .storeUnavailable(.cannotList)
+        }
     }
 }

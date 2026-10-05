@@ -4,6 +4,7 @@ import Glibc
 #elseif canImport(Darwin)
 import Darwin
 #endif
+import PrestoCVApplication
 import PrestoCVDomain
 
 /// One stored CV file, read the one way every reader in this target uses (PersistedSchema): opened once, without following a
@@ -57,6 +58,19 @@ enum StoredCVFile {
         do { return .cv(try CVFileV1.decode(data).toDomain()) }
         catch let invalid as CVFileV1.Invalid { return .corrupt(invalid.reason) }
         catch { return .corrupt("not a CV file") }
+    }
+}
+
+extension StoredCVFile {
+    /// The CV, or the typed failure for the file called `name`. A file that is not there is unreadable: the caller knew it existed.
+    func requireCV(named name: String) throws(RepositoryError) -> CV {
+        switch self {
+        case .cv(let cv): return cv
+        case .absent, .unreadable: throw .unreadable(file: name)
+        case .newer(let version): throw .upgradeRequired(file: name, version: version)
+        case .corrupt: throw .corrupt(file: name)
+        case .tooLarge: throw .tooLarge(file: name)
+        }
     }
 }
 

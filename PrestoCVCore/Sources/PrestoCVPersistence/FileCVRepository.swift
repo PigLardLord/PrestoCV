@@ -21,11 +21,10 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         self.directory = directory; self.clock = clock; self.maxFileBytes = maxFileBytes
     }
 
-    static let suffix = ".cv.json"
     static let uuidPattern = "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
     /// Atomic, and on Apple platforms unreadable while the device is locked. The simulator does not apply protection.
     static let writeOptions: Data.WritingOptions = [.atomic, .completeFileProtection]
-    private func url(_ id: CVID) -> URL { directory.appendingPathComponent(id.raw.uuidString + Self.suffix) }
+    private func url(_ id: CVID) -> URL { directory.appendingPathComponent(StoredFileName.of(id)) }
 
     // MARK: Locking
 
@@ -100,23 +99,19 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     private func read(_ u: URL, asName name: String? = nil) -> StoredCVFile {
         let file = StoredCVFile.read(u, maxBytes: maxFileBytes)
         guard case .cv(let cv) = file else { return file }
-        guard (name ?? u.lastPathComponent) == cv.id.raw.uuidString + Self.suffix else { return .corrupt("id does not match file name") }
+        guard (name ?? u.lastPathComponent) == StoredFileName.of(cv.id) else { return .corrupt("id does not match file name") }
         return file
     }
 
     private func current(_ id: CVID) throws(RepositoryError) -> CV? {
-        let u = url(id)
-        switch read(u) {
-        case .absent:
+        let name = StoredFileName.of(id)
+        let file = read(url(id))
+        if case .absent = file {
             // Not found only in a store that can be reached; otherwise a missing store would read as a deleted CV.
             if case .unavailable(let failure) = storeState() { throw .storeUnavailable(failure) }
             return nil
-        case .cv(let cv): return cv
-        case .newer(let v): throw .upgradeRequired(file: u.lastPathComponent, version: v)
-        case .corrupt: throw .corrupt(file: u.lastPathComponent)
-        case .unreadable: throw .unreadable(file: u.lastPathComponent)
-        case .tooLarge: throw .tooLarge(file: u.lastPathComponent)
         }
+        return try file.requireCV(named: name)
     }
 
     /// Writes only what this repository will be able to read back: the encoded file must be within the size
@@ -192,7 +187,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
             do { files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) }
             catch { throw .storeUnavailable(.cannotList) }
             var cvs: [CV] = [], issues: [StoreIssue] = []
-            for file in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) where file.lastPathComponent.hasSuffix(Self.suffix) {
+            for file in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) where file.lastPathComponent.hasSuffix(StoredFileName.suffix) {
                 let name = file.lastPathComponent
                 switch read(file) {
                 case .absent: continue                                   // removed since the directory was listed
@@ -240,15 +235,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
             guard source.deletingLastPathComponent().standardizedFileURL == quarantine.standardizedFileURL else { throw .invalidName(name) }
             guard let uuid = UUID(uuidString: String(original.prefix(36))) else { throw .invalidName(name) }
             guard !FileManager.default.fileExists(atPath: target.path) else { throw .alreadyExists(CVID(uuid)) }
-            let cv: CV
-            switch read(source, asName: original) {
-            case .cv(let c): cv = c
-            case .absent: throw .unreadable(file: name)
-            case .tooLarge: throw .tooLarge(file: name)
-            case .unreadable: throw .unreadable(file: name)
-            case .newer(let v): throw .upgradeRequired(file: name, version: v)
-            case .corrupt: throw .corrupt(file: name)
-            }
+            let cv = try read(source, asName: original).requireCV(named: name)
             do { try FileManager.default.moveItem(at: source, to: target) } catch { throw .writeFailed(file: original) }
             return cv
         }
@@ -256,7 +243,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
 
     public func erase(_ id: CVID) async throws(RepositoryError) {
         try withStoreLock { () throws(RepositoryError) in
-            let name = id.raw.uuidString + Self.suffix
+            let name = StoredFileName.of(id)
             var victims = [directory.appendingPathComponent(name)]
             let quarantined = try quarantineNames()
             victims += quarantined.filter { $0 == name || $0.hasSuffix("~" + name) }.map { quarantine.appendingPathComponent($0) }
