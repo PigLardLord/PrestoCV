@@ -231,6 +231,17 @@ struct ClaimedIdentifierTests {
         #expect(DesignPackageValidator().claimedIdentifier(in: Data(json.utf8)) == nil)
     }
 
+    @Test("a package nested far deeper than JSON allows names none, and the validator rejects it the same way", arguments: [600, 100_000])
+    func hostileNesting(depth: Int) throws {
+        let open = String(repeating: "[", count: depth), close = String(repeating: "]", count: depth)
+        let json = Data(#"{"manifest":{"id":"clean","deep":\#(open)\#(close)}}"#.utf8)
+        let validator = DesignPackageValidator()
+        #expect(json.count <= validator.maxBytes)
+        #expect(validator.claimedIdentifier(in: json) == nil)
+        #expect(violations(of: json) == [.malformed("not JSON")])
+        #expect(validator.claimedIdentifier(in: Data(open.utf8)) == nil)
+    }
+
     @Test("a package larger than the validator's cap names none")
     func tooLarge() {
         let data = designData(".cv-name{color:var(--color-primary)}", id: "clean")
