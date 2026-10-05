@@ -72,6 +72,17 @@ extension StoredCVFile {
         case .tooLarge: throw .tooLarge(file: name)
         }
     }
+
+    /// What a listing reports for the file called `name`. A CV, and a file removed since the directory was read, are no issue.
+    func issue(named name: String) -> StoreIssue? {
+        switch self {
+        case .cv, .absent: return nil
+        case .newer(let version): return .upgradeRequired(file: name, version: version)
+        case .unreadable: return .unreadable(file: name)
+        case .tooLarge(let bytes): return .tooLarge(file: name, bytes: bytes)
+        case .corrupt(let reason): return .corrupt(file: name, reason: reason)
+        }
+    }
 }
 
 /// The frozen envelope: a newer integer `schemaVersion` is valid data from a newer build, so it is read before anything else.
