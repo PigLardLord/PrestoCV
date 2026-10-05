@@ -5,6 +5,8 @@ These rules are strict on purpose. A change that breaks one does not merge. Ther
 - **Baseline:** temporary. An existing violation is listed in the checker's baseline, which may only shrink.
 - **Exception:** permanent. It is an entry in the checker's `rules.json`, and it cites an ADR that explains why. The checker refuses an exception whose ADR does not exist.
 
+The rules are **SOLID**, **Clean Architecture** and **Clean Code**, and four rules of this project named by topic ([ADR 0021](adr/0021-solid-and-clean-rules.md)). Every rule is cited by its name, such as `SRP` or `ValidatingBoundary`, never by a number.
+
 Each rule says what is required, why, and what enforces it:
 
 - **compiler**: the SwiftPM target graph, `internal import`, or the Swift 6 language mode rejects the violation.
@@ -12,11 +14,79 @@ Each rule says what is required, why, and what enforces it:
 - **test**: a required test fails.
 - **review**: nothing automatic can catch it. Kept to a minimum, and marked as such.
 
-The checker applies to **production targets**: domain, application, integration, presentation and adapter targets, and the composition root. Test, test-support and tool targets get the import allow-lists only. Legacy targets are exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)).
+The checker applies to **production targets**: domain, application, integration, presentation and adapter targets, workflow ports and the composition root. Test, test-support and tool targets get the import allow-lists only, and are held to Clean Code by review. Legacy targets are exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)).
 
 ---
 
-## R1. Packages are isolated; contexts depend only along documented edges
+## SOLID
+
+### SRP: a type, a function and a target have one reason to change
+
+- **A type does one job.** It holds the state of one concept and the behaviour that keeps that state valid. A type that parses, validates, formats and stores is four types.
+- **A function does one thing,** at one level of abstraction. A function that reads, decides and writes is three.
+- **A target owns one concern** of its context, as [modules.md](modules.md) describes it.
+- **Views render; view models present; neither decides** (`HumbleViews`).
+
+**Why.** A type with several reasons to change changes for each of them, and every change risks the others. The size thresholds of `CleanFunctions` and `CleanTypes` are where a second responsibility shows first.
+
+**Enforced by:** checker (the thresholds of `CleanFunctions` and `CleanTypes`) and review.
+
+### OCP: behaviour is extended by adding, not by editing what works
+
+- **New behaviour arrives as a new type or new data:** a new adapter behind an existing port, a new design package, a new word-list file, a new case of a closed enumeration handled where the enumeration is mapped once.
+- **A decision about a closed set lives in one place.** The `switch` over a closed enumeration appears once, behind a function, and the compiler checks it is exhaustive; it is not repeated across files.
+- **What varies by language, design or provider is data,** loaded through one validated boundary, never code with one branch per case.
+
+**Why.** Editing working code to add a case breaks it more often than adding a type next to it, and repeated switches drift apart.
+
+**Enforced by:** review.
+
+### LSP: every adapter can stand in for its port
+
+- **Every adapter passes its port's contract.** The contract is a test suite in the port's test support, run against every adapter, the in-memory ones included.
+- **Contract tests.** Every adapter passes the contract tests of its port. All PDF renderers run the same contract suite, on their real platform.
+- **A test double keeps the contract too.** A fake that accepts what the real adapter refuses, or never fails where it can fail, makes the tests lie.
+- **A subtype strengthens nothing it promised and weakens nothing it requires:** no new error a caller does not expect, no precondition the protocol does not state.
+
+**Why.** A caller written against a port must work with whatever the composition root installs.
+
+**Enforced by:** test (the contract suites) and review.
+
+### ISP: ports are small and shaped for one consumer
+
+- **A protocol declared in a production target has at most five requirements.**
+- **A consumer that needs part of a port gets its own port.** A repository read by one use case and written by another can be two ports.
+- **A port speaks its consumer's language** (`DIP`), so it carries no requirement its consumer does not call.
+
+**Why.** A fat port couples every consumer to every other, and its fakes grow with it.
+
+**Enforced by:** checker (detector `protocolSize`) and review.
+
+### DIP: ports belong to the consumer; one composition root creates the infrastructure
+
+**Ports.** An outbound port is declared by the layer that needs it and implemented in an adapter target that imports that layer, never the other way round. A port:
+
+- speaks the consumer's language: it does not expose `URL`, `[String: Any]`, `WKWebView`, `Bundle` or framework types unless that is its purpose (a renderer returns `Data`);
+- is `Sendable` and not constrained to `Actor` or `AnyObject`;
+- is async when the work is async; there is no synchronous wrapper around async code;
+- lets `CancellationError` through when the work can be cancelled. Such ports use untyped `throws`. Repository operations are short, synchronous I/O. They are not cancellable, and use typed errors.
+
+A protocol with one implementation exists only if it is a port or has a test double in use. Speculative protocols are deleted.
+
+**One composition root.** Only `PrestoCVComposition` creates infrastructure: repositories, stores, renderers, the compiled web-view rule list, the AI adapter, file locations, time sources, identifier generators and loggers.
+
+- The `@main` App type creates the composition **once**, as a `static let`. That is the only process-wide instance.
+- Libraries do not provide `init()`s or default arguments that create infrastructure.
+- Libraries contain no containers, service locators or `static let shared` singletons.
+- Each stateful resource (the design store, the CV store) exists once per process. Across processes, the file store serialises writers with a lock ([ADR 0009](adr/0009-persisted-schema-v1.md)).
+
+**Why.** Today objects are built in four places, the template subsystem exists three times over the same files, and the export sheet builds its own container every time it opens. Issue #1 is a direct consequence.
+
+**Enforced by:** compiler (target graph), checker (detectors `singleton`, and `infrastructureConstruction` for the adapter types listed in `rules.json` and for `FileManager.default`, `Bundle.main`, `UserDefaults.standard`) and review.
+
+## Clean Architecture
+
+### DependencyRule: packages are isolated; contexts depend only along documented edges
 
 - **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI` never import one another. Translation between them happens only in `PrestoCVIntegration`.
 - **Inside a package, contexts depend only along the edges listed in [modules.md](modules.md).** There is exactly one such edge today: in `CVPDFExporter`, Document Rendering is downstream of Design Catalog (`CVRendering` imports `CVDesignCatalog`). The reverse is forbidden.
@@ -30,7 +100,7 @@ The checker applies to **production targets**: domain, application, integration,
 - **checker:** a per-target import allow-list, and the `exportedImport` detector. SwiftPM lets a target import its dependencies' dependencies, so declared dependencies are not enough.
 - **checker (`--packages`):** every dependency declared in a `Package.swift` must be an allowed import.
 
-## R2. Pure layers read no ambient state
+### PureCore: pure layers read no ambient state
 
 Domain, application, integration, presentation and workflow-port targets must not use:
 
@@ -44,33 +114,7 @@ Domain, application, integration, presentation and workflow-port targets must no
 
 **Enforced by:** checker (detectors `wallClock`, `randomIdentity`, `ambientEnvironment`, `localization`, `printing`).
 
-## R3. Ports belong to the consumer; adapters live in their own targets
-
-An outbound port is declared by the layer that needs it and implemented in an adapter target that imports that layer, never the other way round. A port:
-
-- speaks the consumer's language: it does not expose `URL`, `[String: Any]`, `WKWebView`, `Bundle` or framework types unless that is its purpose (a renderer returns `Data`);
-- is `Sendable` and not constrained to `Actor` or `AnyObject`;
-- is async when the work is async; there is no synchronous wrapper around async code;
-- lets `CancellationError` through when the work can be cancelled. Such ports use untyped `throws`. Repository operations are short, synchronous I/O. They are not cancellable, and use typed errors.
-
-A protocol with one implementation exists only if it is a port or has a test double in use. Speculative protocols are deleted.
-
-**Enforced by:** compiler (target graph) and review.
-
-## R4. One composition root
-
-Only `PrestoCVComposition` creates infrastructure: repositories, stores, renderers, the compiled web-view rule list, the AI adapter, file locations, time sources, identifier generators and loggers.
-
-- The `@main` App type creates the composition **once**, as a `static let`. That is the only process-wide instance.
-- Libraries do not provide `init()`s or default arguments that create infrastructure.
-- Libraries contain no containers, service locators or `static let shared` singletons.
-- Each stateful resource (the design store, the CV store) exists once per process. Across processes, the file store serialises writers with a lock ([ADR 0009](adr/0009-persisted-schema-v1.md)).
-
-**Why.** Today objects are built in four places, the template subsystem exists three times over the same files, and the export sheet builds its own container every time it opens. Issue #1 is a direct consequence.
-
-**Enforced by:** checker (detectors `singleton`, and `infrastructureConstruction` for the adapter types listed in `rules.json` and for `FileManager.default`, `Bundle.main`, `UserDefaults.standard`) and review.
-
-## R5. Views render; view models present; neither decides
+### HumbleViews: views render; view models present; neither decides
 
 - **Views** (Xcode app target) render presentation state and turn status enums into localised text. They forward user intents to the view model, and never construct view models or services.
 - **View models** (`PrestoCVPresentation`) hold presentation state and call workflow ports. Rules:
@@ -87,19 +131,72 @@ Only `PrestoCVComposition` creates infrastructure: repositories, stores, rendere
 - **checker:** import allow-lists, and the `importAccess` constraint. In `PrestoCVPresentation`, `PrestoCVDomain` and `PrestoCVApplication` must be imported `internal` or narrower. A plain `import` is public in Swift 6, so it fails as well.
 - **review:** whether a view contains a business rule.
 
-## R6. The domain is rich and keeps its invariants
+### RichDomain: the domain is rich and keeps its invariants
 
 - **Behaviour, not fields.** Aggregates and entities expose behaviour, not `public var` fields. State changes go through methods.
 - **Repository-owned state.** The revision and the timestamps are assigned only by repositories (`package` access).
 - **Value objects validate on creation.** `SkillLevel` is bounded. `PartialDate` has year or month precision, and only a partial order. `EmailAddress` and `WebLink` are parsed. Identifiers are typed.
-- **A rule exists once.** Periods are built only by `Period.make(start:end:current:)`, which both persistence and the AI mapper use. A second copy anywhere is a defect.
 - **Two separate validity rules, by design.** "Can be saved" is Authoring's rule. "Can be rendered" is the rendering policy of the published `CVDocument`. A test asserts that every saveable CV maps to a renderable document.
 
 **Why.** Today there are four definitions of "valid CV", three skill scales, three language-level parsers and four period formats.
 
 **Enforced by:** test (each invariant, and the saveable-implies-renderable property) and review.
 
-## R7. Errors are typed per context and translated at the boundary
+## Clean Code
+
+### CleanNames: names say what a thing is, or what a function does
+
+- **Intention-revealing and searchable.** No abbreviations except the domain's own terms, no single letters outside a short closure, no encodings or type prefixes.
+- **Types and properties are nouns; functions are verbs** or, for a query without side effects, the noun of what they return.
+- **One word for one concept,** the word of the [glossary](glossary.md). A concept the glossary names is called by that name in code, docs and tests.
+- **A name is as long as its scope needs:** short in a three-line function, explicit in a public API.
+
+**Why.** With functions of at most twenty lines, the names carry the design: a reader understands a function from the names of the ones it calls.
+
+**Enforced by:** review.
+
+### CleanFunctions: functions are small and do one thing
+
+In production targets:
+
+- **At most 20 lines** of code in a function's, initialiser's, accessor's or closure's body. Blank lines, comment lines and lines holding only a brace do not count; a closure is measured on its own.
+- **At most 3 parameters.** A **data initialiser** is exempt: one that only assigns each parameter to the stored property of the same name, or passes it unchanged to such an initialiser. Behaviour that needs more inputs takes a value that groups them.
+- **Nesting of at most 2 levels** of `if`, `guard`, `switch`, `for`, `while`, `repeat`, `do` and closures. A `guard` that only exits is no level.
+- **Cyclomatic complexity of at most 5:** one, plus one for each `if`, `guard`, `while`, `for`, `repeat`, `catch`, `&&`, `||`, `??` and ternary. A `switch` counts once, whatever its cases.
+- **One thing, at one level of abstraction.** A function reads like a paragraph of calls to well-named smaller ones.
+- **No flag arguments.** A `Bool` parameter that selects between two behaviours is two functions.
+- **No hidden side effects,** and a function either answers a question or changes state, not both (command-query separation).
+
+**Why.** Small functions with few branches can be read whole, named precisely, and tested one behaviour at a time.
+
+**Enforced by:** checker (detectors `functionLength`, `parameterCount`, `nestingDepth`, `cyclomaticComplexity`) and review.
+
+### CleanTypes: types and files are small and cohesive
+
+In production targets:
+
+- **A type's declaration, and each extension, holds at most 200 lines** of code, counted as for functions.
+- **A file holds at most 300 lines** of code.
+- **Cohesion.** A type's functions use its state; a function that uses none of it belongs elsewhere.
+- **Data structures and objects stay apart.** A value that only carries data exposes it; an object hides its state behind behaviour (`RichDomain`).
+
+**Why.** A long type almost always holds more than one responsibility (`SRP`).
+
+**Enforced by:** checker (detectors `typeLength`, `fileLength`) and review.
+
+### CleanComments: a comment explains why, never what
+
+- **A comment explains why:** a constraint, a non-obvious decision, the source of a rule (a ticket, an ADR, cv-giovanni's file), a known gap. It never restates what the code does; a comment that does is replaced by a better name or a smaller function.
+- **Public API keeps full doc comments:** what it does, its parameters, its errors, and an example where it helps.
+- **No history.** A comment says what is true now, not what changed; history lives in the commits.
+- **No commented-out code.**
+- **A rule is cited by its name,** never by a number.
+
+**Why.** A comment that restates the code goes stale the first time the code changes, and then it lies.
+
+**Enforced by:** checker (detector `ruleNumberCitation`) and review.
+
+### CleanErrors: errors are typed per context and translated at the boundary
 
 - **Each context has its own error type.** Errors carry codes and file names, never paths or free-form strings.
 - **`CancellationError` is always passed through unchanged.**
@@ -111,7 +208,46 @@ Only `PrestoCVComposition` creates infrastructure: repositories, stores, rendere
 
 **Enforced by:** checker (detector `swallowedError`) and review.
 
-## R8. Untrusted input enters through one validating boundary
+### CleanTests: tests are fast, hermetic and at the right level
+
+- **Rules without I/O.** Domain rules and use cases are tested without I/O, using the in-memory adapters from `…TestSupport` targets.
+- **Golden tests.** Rendering compares a fixture document against a **committed golden HTML file**. Changing that file is reviewed like code.
+- **Mapper completeness.** A Mirror-based test proves that every populated `CV` field reaches the `CVDocument`.
+- **Hermetic.** Tests use temporary directories and injected time and identifiers. They never touch the user's home, the real Application Support or `Bundle.main`.
+- **Doubles and waits.** Test doubles use `Mutex`, not `@unchecked Sendable`. Waits are bounded and record an issue when they time out.
+- **Bug fixes start with a failing test.** For key tests, swapping the old implementation back in must make them fail. This was done for the escaping, save-serialisation and golden tests.
+
+Each test is **fast, independent, repeatable, self-validating and timely**, checks **one concept**, and reads as arrange, act, assert. Its name states the behaviour it holds. A test holds a cost to counted work, never to the wall clock alone; a clock is only a backstop against a hang.
+
+**Enforced by:** CI (tests) and review.
+
+### NoDuplication: every piece of knowledge has one home
+
+- **A rule exists once.** Periods are built only by `Period.make(start:end:current:)`, which both persistence and the AI mapper use. A second copy anywhere is a defect.
+- **No copied code.** Two pieces of code that say the same thing become one function; two that look alike but mean different things keep different names.
+- **Data before code.** A list of words, a table of conventions or a mapping lives in one data file or one `switch`, and every reader reads that one.
+
+**Why.** Two copies of a rule drift apart, and then the code has two rules.
+
+**Enforced by:** test (where two readers must agree, a test holds them to one table) and review.
+
+### NoDeadCode: no dead code, no demos in libraries, no test doubles in production
+
+- Library targets contain only code reachable from their public API or used by it.
+- Demo and example executables live in a separate package that depends on the library.
+- Mocks, fakes, stubs and fixtures live in `…TestSupport` targets that production targets never depend on.
+- A production type that is not implemented yet throws a typed "unavailable" error. It never returns an empty or fake result.
+- Logging goes through an injected logger. There is no `print`.
+
+**Why.** About 45% of `CVPDFExporter` is unreachable from the app, `MockExportRepository` is the production export repository, and a fake "John Doe" document is returned on bad input.
+
+**Enforced by:** checker (detectors `testDouble` for `Mock…`, `Fake…`, `Stub…`, `Test…`, `Spy…`, `Dummy…` declared or referenced in production, and `printing`) and review.
+
+## This project's rules
+
+These are neither SOLID nor Clean, but each serves one of them: the boundary of untrusted input and the persisted schema are Clean Architecture's boundaries, platform code in adapters is the Dependency Rule applied to platforms, and localisation at the edges keeps the core pure.
+
+### ValidatingBoundary: untrusted input enters through one validating boundary
 
 Untrusted input is: design packages, AI output, persisted files, and on a backend every request. Each kind enters through one anti-corruption layer that validates it into domain types or rejects it.
 
@@ -131,13 +267,13 @@ Untrusted input is: design packages, AI output, persisted files, and on a backen
 - **Installing a design.** A design is stored only after it has been validated and has rendered a fixture document completely. The fixture exercises every section; a truncated render is a failure. The catalog owns the rendering-gate port, and `CVRendering` implements it. The renderer contract runs the same check.
 - **Native evidence.** The native renderers must also pass a geometric check: each field inside the page, and legible. It is pending until they exist ([ADR 0003](adr/0003-one-pdf-renderer-per-platform.md)).
 - **Documents** arriving as JSON (backend) pass `CVDocumentValidator`: supported version, required name, bounded text and counts, valid dates and ratings.
-- **Persisted files**: see R12.
+- **Persisted files**: see `PersistedSchema`.
 
 **Why.** See issue #9 and the security review of 2026-09-27: a regex deny-list let 34 of 34 content-hiding constructs through, and could be bypassed with CSS comments and strings. On a backend, a `<style>` breakout would be server-side request forgery.
 
 **Enforced by:** test (one per attack, listed in the Design Catalog and Rendering tests) and the type system (`ValidatedStylesheet` can only be created by the validator).
 
-## R9. Swift 6, complete concurrency checking, no escape hatches
+### StrictConcurrency: Swift 6, complete concurrency checking, no escape hatches
 
 Every production target builds in the Swift 6 language mode with complete concurrency checking. **No manifest** may use `swiftLanguageMode(.v5)` or `unsafeFlags`, except for legacy targets ([ADR 0012](adr/0012-legacy-targets-during-migration.md)).
 
@@ -150,19 +286,7 @@ Continuations resume exactly once, time out where they wait on the outside world
 
 **Enforced by:** compiler, checker (detectors `escapeHatch` in sources; `swift5Mode` and `unsafeFlags` in manifests, where only the declaration of a legacy target is exempt; with `--packages`, the effective language mode of every target that is not legacy must be Swift 6) and review for continuations. Module-qualified names (`Swift.fatalError`, `Foundation.Date()`) are checked like bare ones.
 
-## R10. Tests are fast, hermetic and at the right level
-
-- **Rules without I/O.** Domain rules and use cases are tested without I/O, using the in-memory adapters from `…TestSupport` targets.
-- **Contract tests.** Every adapter passes the contract tests of its port. All PDF renderers run the same contract suite, on their real platform.
-- **Golden tests.** Rendering compares a fixture document against a **committed golden HTML file**. Changing that file is reviewed like code.
-- **Mapper completeness.** A Mirror-based test proves that every populated `CV` field reaches the `CVDocument`.
-- **Hermetic.** Tests use temporary directories and injected time and identifiers. They never touch the user's home, the real Application Support or `Bundle.main`.
-- **Doubles and waits.** Test doubles use `Mutex`, not `@unchecked Sendable`. Waits are bounded and record an issue when they time out.
-- **Bug fixes start with a failing test.** For key tests, swapping the old implementation back in must make them fail. This was done for the escaping, save-serialisation and golden tests.
-
-**Enforced by:** CI (tests) and review.
-
-## R11. Platform code lives only in adapters
+### PlatformAdapters: platform code lives only in adapters
 
 `#if os(...)`, `#if canImport(...)`, `#if targetEnvironment(...)`, `#if arch(...)`, `#available` and `@available` appear only in:
 
@@ -177,7 +301,7 @@ A platform-only target wraps **every file** entirely in its platform condition. 
 
 **Enforced by:** checker (detector `platformCondition`, which visits every `#if` branch, including those inactive on the host), and the Linux CI job.
 
-## R12. Persisted data has an explicit, versioned schema
+### PersistedSchema: persisted data has an explicit, versioned schema
 
 ([ADR 0009](adr/0009-persisted-schema-v1.md))
 
@@ -200,7 +324,7 @@ A platform-only target wraps **every file** entirely in its platform condition. 
 
 **Enforced by:** test (the repository contract suite, and the file-store tests for every outcome above) and review.
 
-## R13. Localisation happens at the edges
+### LocalisationAtEdges: localisation happens at the edges
 
 - **Only two places produce user-facing text:**
   - the views of the app target (UI strings);
@@ -212,14 +336,41 @@ A platform-only target wraps **every file** entirely in its platform condition. 
 
 **Enforced by:** checker (detector `localization` outside the app target) and test (heading tables complete; unsupported languages rejected).
 
-## R14. No dead code, no demos in libraries, no test doubles in production
+## Former numbers
 
-- Library targets contain only code reachable from their public API or used by it.
-- Demo and example executables live in a separate package that depends on the library.
-- Mocks, fakes, stubs and fixtures live in `…TestSupport` targets that production targets never depend on.
-- A production type that is not implemented yet throws a typed "unavailable" error. It never returns an empty or fake result.
-- Logging goes through an injected logger. There is no `print`.
+The merged ADRs 0001 to 0012 cite the rules by the numbers they had then ([ADR 0021](adr/0021-solid-and-clean-rules.md)):
 
-**Why.** About 45% of `CVPDFExporter` is unreachable from the app, `MockExportRepository` is the production export repository, and a fake "John Doe" document is returned on bad input.
+| Former | Now |
+|---|---|
+| R1 | `DependencyRule` |
+| R2 | `PureCore` |
+| R3 | `DIP` and `ISP` |
+| R4 | `DIP` |
+| R5 | `HumbleViews` |
+| R6 | `RichDomain` and `NoDuplication` |
+| R7 | `CleanErrors` |
+| R8 | `ValidatingBoundary` |
+| R9 | `StrictConcurrency` |
+| R10 | `CleanTests` and `LSP` |
+| R11 | `PlatformAdapters` |
+| R12 | `PersistedSchema` |
+| R13 | `LocalisationAtEdges` |
+| R14 | `NoDeadCode` |
 
-**Enforced by:** checker (detectors `testDouble` for `Mock…`, `Fake…`, `Stub…`, `Test…`, `Spy…`, `Dummy…` declared or referenced in production, and `printing`) and review.
+## Review checklist
+
+Every review, dimension or final gate, answers each question with the place it found, or "none":
+
+- **SRP:** does a type, a function or a target do more than one job?
+- **OCP:** does adding a case edit working code that a new type or new data could have left alone? Is a decision about a closed set repeated?
+- **LSP:** does every adapter, and every test double, pass its port's contract?
+- **ISP:** does a consumer depend on requirements it never calls?
+- **DIP:** does a port speak its consumer's language? Is infrastructure created anywhere but the composition root?
+- **CleanNames:** is every name intention-revealing, in the glossary's words?
+- **CleanFunctions:** does a function do more than one thing, mix levels of abstraction, take a flag, or hide a side effect? (Size, parameters, nesting and complexity are the checker's.)
+- **CleanComments:** does a comment restate the code, carry history, or cite a rule by number? Does public API lack a doc comment?
+- **CleanErrors:** is an error swallowed, untyped, or translated more than once?
+- **CleanTests:** does a test check more than one concept, depend on another test or the clock, or hide what it asserts?
+- **NoDuplication:** is a rule, a list or a block of code written twice?
+- **NoDeadCode:** is anything unreachable, a demo in a library, or a double in production?
+- **The project's rules:** `ValidatingBoundary`, `StrictConcurrency`, `PlatformAdapters`, `PersistedSchema`, `LocalisationAtEdges`, where the change touches them.
