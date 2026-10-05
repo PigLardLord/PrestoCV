@@ -7,7 +7,6 @@ struct CSSParser {
 
     private var tokens: CSSTokenStream
 
-    /// The canonical text of the stylesheet, or the first reason to refuse it.
     static func canonical(_ tokens: [CSSToken]) throws(CSSRejection) -> String {
         var parser = CSSParser(tokens: CSSTokenStream(tokens))
         return try parser.readStylesheet()
@@ -62,7 +61,6 @@ struct CSSParser {
         return "\(selectors){\(declarations)}"
     }
 
-    /// The tokens before the rule's `{`, which is read too.
     private mutating func readPrelude() throws(CSSRejection) -> [CSSToken] {
         var prelude: [CSSToken] = []
         while let token = tokens.current, token != .lbrace {
@@ -74,7 +72,6 @@ struct CSSParser {
         return prelude
     }
 
-    /// The tokens between the rule's braces; the closing `}` is read too.
     private mutating func readBody() throws(CSSRejection) -> [CSSToken] {
         var body: [CSSToken] = []
         while let token = tokens.current, token != .rbrace {

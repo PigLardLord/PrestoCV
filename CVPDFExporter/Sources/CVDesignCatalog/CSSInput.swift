@@ -9,7 +9,6 @@ struct CSSInput {
 
     var isAtEnd: Bool { position >= scalars.count }
 
-    /// The scalar `offset` places ahead of the position, or nil past the end.
     func peek(_ offset: Int = 0) -> Unicode.Scalar? {
         let index = position + offset
         return index < scalars.count ? scalars[index] : nil
@@ -19,21 +18,18 @@ struct CSSInput {
         peek(offset).map(condition) ?? false
     }
 
-    /// Whether the scalars `offset` places ahead are exactly `text`.
     func matches(_ text: String, at offset: Int = 0) -> Bool {
         text.unicodeScalars.enumerated().allSatisfy { peek(offset + $0.offset) == $0.element }
     }
 
     mutating func skip(_ count: Int = 1) { position += count }
 
-    /// Reads and returns the next `count` scalars.
     mutating func take(_ count: Int) -> String {
         let taken = String(String.UnicodeScalarView(scalars[position..<min(position + count, scalars.count)]))
         skip(count)
         return taken
     }
 
-    /// Reads and returns scalars for as long as `condition` holds.
     mutating func take(while condition: (Unicode.Scalar) -> Bool) -> String {
         var taken = String.UnicodeScalarView()
         while let scalar = peek(), condition(scalar) {

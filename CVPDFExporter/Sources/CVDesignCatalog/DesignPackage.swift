@@ -1,5 +1,6 @@
 import Foundation
 
+/// The identity and the target of a design: who it is and which version of the markup contract its CSS was written for.
 public struct DesignManifest: Codable, Sendable, Equatable {
     public var id: String, name: String, version: String, description: String
     /// Version of the markup contract the design's CSS was written for (ADR 0011).
@@ -12,6 +13,7 @@ public struct DesignManifest: Codable, Sendable, Equatable {
     public static func isValidID(_ id: String) -> Bool { id.fullyMatches(#"[a-z0-9-]{1,64}"#) }
 }
 
+/// One reason a design package was refused.
 public enum DesignPackageViolation: Equatable, Sendable, CustomStringConvertible {
     case tooLarge(Int), malformed(String), unknownKeys([String]), containsHTML, invalidID(String),
          unsupportedContract(Int), css(String), invalidPreview(String)
@@ -43,4 +45,5 @@ public struct ValidatedStylesheet: Sendable, Equatable {
     init(css: String) { self.css = css }
 }
 
+/// A design package was refused, with every violation the validator found.
 public struct DesignPackageRejected: Error, Equatable { public let violations: [DesignPackageViolation] }

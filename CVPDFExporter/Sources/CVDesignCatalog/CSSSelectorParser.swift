@@ -10,7 +10,6 @@ struct CSSSelectorParser {
     private var selector = ""
     private var expectsCompound = true
 
-    /// The canonical text of comma-separated selectors.
     static func canonicalList(_ prelude: [CSSToken]) throws(CSSRejection) -> String {
         var selectors: [String] = []
         for part in prelude.split(separator: .comma, omittingEmptySubsequences: false) {

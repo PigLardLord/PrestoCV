@@ -16,22 +16,22 @@ indirect enum HTML: Sendable {
 
     var rendered: String {
         switch self {
-        case .text(let t): return Self.escape(t)
+        case .text(let text): return Self.escape(text)
         case .separator: return " "
         case .trustedStyle(let css):
             // Defence in depth: validated CSS cannot contain "<"; if it ever did, emit nothing.
             return css.unicodeScalars.contains("<") ? "<style></style>" : "<style>" + css + "</style>"
         case let .element(tag, attributes, children):
-            let attrs = attributes.map { " \($0.0.rawValue)=\"\(Self.escape($0.1))\"" }.joined()
-            if tag == .meta { return "<\(tag.rawValue)\(attrs)>" }            // void element: no end tag
-            return "<\(tag.rawValue)\(attrs)>" + children.map(\.rendered).joined() + "</\(tag.rawValue)>"
+            let attributeText = attributes.map { " \($0.0.rawValue)=\"\(Self.escape($0.1))\"" }.joined()
+            if tag == .meta { return "<\(tag.rawValue)\(attributeText)>" }            // void element: no end tag
+            return "<\(tag.rawValue)\(attributeText)>" + children.map(\.rendered).joined() + "</\(tag.rawValue)>"
         }
     }
 
     /// The text a reader sees, one entry per text node, in document order.
     var textNodes: [String] {
         switch self {
-        case .text(let t): return [t]
+        case .text(let text): return [text]
         case .separator, .trustedStyle: return []
         case let .element(_, _, children): return children.flatMap(\.textNodes)
         }
@@ -39,31 +39,29 @@ indirect enum HTML: Sendable {
 
     /// Escapes per Unicode scalar, never per Character: a quote followed by a combining mark is one
     /// grapheme cluster, and a Character-level switch would let it through unescaped.
-    static func escape(_ s: String) -> String {
-        var out = String.UnicodeScalarView()
-        for scalar in s.unicodeScalars {
+    static func escape(_ text: String) -> String {
+        var escaped = String.UnicodeScalarView()
+        for scalar in text.unicodeScalars {
             switch scalar {
-            case "&": out.append(contentsOf: "&amp;".unicodeScalars)
-            case "<": out.append(contentsOf: "&lt;".unicodeScalars)
-            case ">": out.append(contentsOf: "&gt;".unicodeScalars)
-            case "\"": out.append(contentsOf: "&quot;".unicodeScalars)
-            case "'": out.append(contentsOf: "&#39;".unicodeScalars)
-            default: out.append(scalar)
+            case "&": escaped.append(contentsOf: "&amp;".unicodeScalars)
+            case "<": escaped.append(contentsOf: "&lt;".unicodeScalars)
+            case ">": escaped.append(contentsOf: "&gt;".unicodeScalars)
+            case "\"": escaped.append(contentsOf: "&quot;".unicodeScalars)
+            case "'": escaped.append(contentsOf: "&#39;".unicodeScalars)
+            default: escaped.append(scalar)
             }
         }
-        return String(out)
+        return String(escaped)
     }
 }
 
 // MARK: - Elements of the markup contract
 
 extension HTML {
-    /// An element whose only attribute is its class.
     static func element(_ tag: Tag, class cls: String, children: [HTML]) -> HTML {
         .element(tag, attributes: [(.class, cls)], children: children)
     }
 
-    /// An element with a class that holds one text node.
     static func element(_ tag: Tag, class cls: String, text: String) -> HTML {
         .element(tag, class: cls, children: [.text(text)])
     }

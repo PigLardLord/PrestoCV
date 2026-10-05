@@ -11,7 +11,6 @@ enum CSSDeclarationParser {
         var setsColumnGap: Bool { name == "gap" || name == "column-gap" }
     }
 
-    /// The canonical text of the declarations in a rule's body.
     static func canonical(_ body: [CSSToken]) throws(CSSRejection) -> String {
         var declarations: [Declaration] = []
         for tokens in body.split(separator: .semicolon, omittingEmptySubsequences: false) {
@@ -21,7 +20,6 @@ enum CSSDeclarationParser {
         return declarations.map(\.text).joined(separator: ";")
     }
 
-    /// nil for the empty text between two semicolons.
     private static func declaration(from tokens: ArraySlice<CSSToken>) throws(CSSRejection) -> Declaration? {
         let parts = tokens.filter { $0 != .whitespace }
         if parts.isEmpty { return nil }

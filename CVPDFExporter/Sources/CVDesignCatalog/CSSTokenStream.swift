@@ -11,7 +11,6 @@ struct CSSTokenStream {
 
     var current: CSSToken? { peek() }
 
-    /// The token `offset` places ahead of the position, or nil past the end.
     func peek(_ offset: Int = 0) -> CSSToken? {
         let index = position + offset
         return index < tokens.count ? tokens[index] : nil

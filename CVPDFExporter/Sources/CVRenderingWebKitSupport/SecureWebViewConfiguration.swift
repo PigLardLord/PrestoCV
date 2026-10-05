@@ -38,6 +38,8 @@ public enum SecureWebViewConfiguration {
         return list
     }
 
+    /// A configuration with the network-blocking `rules` installed, JavaScript off for content, a non-persistent data
+    /// store, and media only on user action.
     public static func make(rules: WKContentRuleList) -> WKWebViewConfiguration {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
@@ -154,6 +156,10 @@ public enum DocumentReadiness {
     public static let world = WKContentWorld.world(name: "cv.readiness")
     static let script = "await document.fonts.ready; return document.readyState === 'complete';"
 
+    /// Returns when the document is complete and its fonts are ready.
+    ///
+    /// - Throws: `Failure.timedOut` after `timeout`, `Failure.cancelled` when the task is cancelled, and `Failure.scriptFailed`
+    ///   or `Failure.notReady` when the page cannot say it is ready.
     public static func wait(in webView: WKWebView, timeout: Duration) async throws(Failure) {
         guard try await evaluate(script, in: webView, timeout: timeout) == "true" else { throw .notReady }
     }

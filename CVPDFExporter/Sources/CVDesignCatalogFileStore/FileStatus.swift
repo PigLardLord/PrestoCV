@@ -9,13 +9,13 @@ import Darwin
 struct FileStatus {
     private let raw: stat
 
-    /// The status of `path`, following a symbolic link. nil when the call fails, and `errno` says why.
+    /// Follows a symbolic link. nil when the call fails, and `errno` says why.
     static func of(path: String) -> FileStatus? {
         var raw = stat()
         return stat(path, &raw) == 0 ? FileStatus(raw: raw) : nil
     }
 
-    /// The status of `path` itself, even when it is a symbolic link. nil when the call fails, and `errno` says why.
+    /// The status of a symbolic link itself, not of what it points to. nil when the call fails, and `errno` says why.
     static func ofLink(path: String) -> FileStatus? {
         var raw = stat()
         return lstat(path, &raw) == 0 ? FileStatus(raw: raw) : nil

@@ -4,9 +4,13 @@ import Foundation
 /// language with BCP 47 matching: the full tag, then the full primary language subtag. An unsupported
 /// language is an error, never a silent fallback to English (LocalisationAtEdges).
 public enum HeadingsCatalog {
+    /// The language has no table, a table lacks a key or holds an empty value, or a table cannot be read.
     public enum Failure: Error, Equatable { case unsupportedLanguage(String), incomplete(language: String, key: String), corruptTable(String) }
     static let keys = ["experience", "education", "skills", "languages", "certifications", "profiles", "interests", "summary", "present", "native"]
 
+    /// The headings for a document language, such as `it` or `pt-BR`.
+    ///
+    /// - Throws: `Failure.unsupportedLanguage` when the language is malformed or has no table, never a fallback to English.
     public static func headings(for language: String) throws(Failure) -> Headings {
         guard LanguageTag.isWellFormed(language) else { throw .unsupportedLanguage(language) }
         let primary = String(language.prefix { $0 != "-" }).lowercased()
@@ -17,6 +21,8 @@ public enum HeadingsCatalog {
     }
 
     /// Languages with a table, from the package's own index; used by the completeness test and the UI picker.
+    ///
+    /// - Throws: `Failure.corruptTable` when the index cannot be read.
     public static func supportedLanguages() throws(Failure) -> [String] {
         guard let url = Bundle.module.url(forResource: "Resources/Headings/index", withExtension: "json") else { throw .corruptTable("index") }
         do { return try JSONDecoder().decode([String].self, from: Data(contentsOf: url)) } catch { throw .corruptTable("index") }
@@ -28,13 +34,14 @@ public enum HeadingsCatalog {
         do { return try JSONDecoder().decode([String: String].self, from: Data(contentsOf: url)) } catch { throw .corruptTable(tag) }
     }
 
-    static func headings(_ d: [String: String], language: String) throws(Failure) -> Headings {
-        func v(_ k: String) throws(Failure) -> String {
-            guard let s = d[k], !s.isEmpty else { throw .incomplete(language: language, key: k) }
-            return s
+    static func headings(_ table: [String: String], language: String) throws(Failure) -> Headings {
+        func value(for key: String) throws(Failure) -> String {
+            guard let text = table[key], !text.isEmpty else { throw .incomplete(language: language, key: key) }
+            return text
         }
-        return Headings(experience: try v("experience"), education: try v("education"), skills: try v("skills"),
-                        languages: try v("languages"), certifications: try v("certifications"), profiles: try v("profiles"), interests: try v("interests"),
-                        summary: try v("summary"), present: try v("present"), native: try v("native"))
+        return Headings(experience: try value(for: "experience"), education: try value(for: "education"), skills: try value(for: "skills"),
+                        languages: try value(for: "languages"), certifications: try value(for: "certifications"),
+                        profiles: try value(for: "profiles"), interests: try value(for: "interests"),
+                        summary: try value(for: "summary"), present: try value(for: "present"), native: try value(for: "native"))
     }
 }

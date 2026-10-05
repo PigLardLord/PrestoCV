@@ -2,7 +2,7 @@ import Foundation
 
 /// A text node the PDF must hold: what to look for, and where the PDF text has it.
 struct ExpectedText {
-    /// Where the node stands among the document's text nodes.
+    /// Where the node stands among the document's text nodes, so it can be reported.
     let index: Int
     let needle: [Unicode.Scalar]
     /// The positions of the needle in the PDF text, best first (see `PDFTextIndex.occurrences`).
@@ -12,7 +12,6 @@ struct ExpectedText {
 
     var length: Int { needle.count }
 
-    /// nil for a node with no text to look for.
     init?(index: Int, text: String, in pdf: PDFTextIndex) {
         let needle = Array(DocumentCompleteness.normalize(text).unicodeScalars)
         guard !needle.isEmpty else { return nil }

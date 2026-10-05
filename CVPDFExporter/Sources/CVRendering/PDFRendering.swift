@@ -24,12 +24,17 @@ public struct RenderedPDF: Sendable, Equatable {
 
 /// Outbound port: one adapter per platform (ADR 0003). Sendable, async, not actor-constrained (DIP).
 public protocol PDFRendering: Sendable {
+    /// Prints `html` on pages of the given size, keeping at most `page.maxPages` of them.
+    ///
+    /// - Throws: `CancellationError` when the task is cancelled, before or during the work, and otherwise the adapter's own error.
     func render(html: String, page: PageSetup) async throws -> RenderedPDF
 }
 
 /// Reads what a PDF really contains (PDFKit on Apple platforms). Used by the export workflow to check
 /// every export, and by the renderer contract suite.
 public protocol PDFInspecting: Sendable {
+    /// The number of pages in `data`, or nil when it is not a PDF.
     func pageCount(of data: Data) -> Int?
+    /// The text of every page in order, separated by a newline, or nil when `data` is not a PDF.
     func text(of data: Data) -> String?
 }

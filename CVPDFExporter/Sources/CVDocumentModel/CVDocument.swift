@@ -3,12 +3,14 @@ import Foundation   // value types only
 /// Published language of the exporter: the only input rendering accepts, and the JSON a backend accepts.
 /// Its JSON shape is hand-written (a `kind` discriminator per section) and versioned.
 public struct CVDocument: Codable, Sendable, Equatable {
+    /// The only schema version this package reads and writes; `init(from:)` rejects any other.
     public static let currentSchemaVersion = 1
     public let schemaVersion: Int
     public var language: String            // BCP 47, e.g. "it", "en-GB"
     public var person: Person
     public var sections: [Section]
 
+    /// - Parameter language: a BCP 47 tag; rendering treats a value that is not shaped like one as undetermined.
     public init(language: String, person: Person, sections: [Section]) {
         self.schemaVersion = Self.currentSchemaVersion
         self.language = language; self.person = person; self.sections = sections
@@ -28,6 +30,7 @@ public struct CVDocument: Codable, Sendable, Equatable {
     }
 }
 
+/// The person a document is about. Only the name is required.
 public struct Person: Codable, Sendable, Equatable {
     public var name: String
     public var professionalTitle: String?
@@ -42,6 +45,7 @@ public struct Person: Codable, Sendable, Equatable {
     }
 }
 
+/// A certification: what it is, who issued it, and optionally the year, a link and a description.
 public struct CertificationItem: Codable, Sendable, Equatable {
     public var name: String, issuer: String, year: Int?, url: String?, description: String?
     public init(name: String, issuer: String, year: Int? = nil, url: String? = nil, description: String? = nil) {
@@ -58,6 +62,7 @@ public struct DocumentDate: Codable, Sendable, Equatable {
 /// The end of a period is explicit: "present", a date, or ended-but-unspecified. Never a display string.
 public enum PeriodEnd: Sendable, Equatable { case present, date(DocumentDate), unspecified }
 
+/// When something started and how it ended.
 public struct DocumentPeriod: Codable, Sendable, Equatable {
     public var start: DocumentDate, end: PeriodEnd
     public init(start: DocumentDate, end: PeriodEnd) { self.start = start; self.end = end }
@@ -84,6 +89,7 @@ public struct DocumentPeriod: Codable, Sendable, Equatable {
     }
 }
 
+/// A job: the role at a company, with an optional place, period and description.
 public struct ExperienceItem: Codable, Sendable, Equatable {
     public var role: String, company: String, location: String?, period: DocumentPeriod?, description: String?
     public init(role: String, company: String, location: String? = nil, period: DocumentPeriod? = nil, description: String? = nil) {
@@ -91,6 +97,7 @@ public struct ExperienceItem: Codable, Sendable, Equatable {
     }
 }
 
+/// A degree at a school, with an optional period and description.
 public struct EducationItem: Codable, Sendable, Equatable {
     public var degree: String, school: String, period: DocumentPeriod?, description: String?
     public init(degree: String, school: String, period: DocumentPeriod? = nil, description: String? = nil) {
@@ -98,17 +105,20 @@ public struct EducationItem: Codable, Sendable, Equatable {
     }
 }
 
+/// A skill, optionally rated from 1 to 5.
 public struct SkillItem: Codable, Sendable, Equatable {
     public var name: String, rating: Int?   // 1...5, nil = not rated
     public init(name: String, rating: Int? = nil) { self.name = name; self.rating = rating }
 }
 
+/// A language the person speaks, and how well, on the CEFR scale or as a native speaker.
 public struct LanguageItem: Codable, Sendable, Equatable {
     public enum Level: String, Codable, Sendable { case a1, a2, b1, b2, c1, c2, native }
     public var language: String, level: Level
     public init(language: String, level: Level) { self.language = language; self.level = level }
 }
 
+/// A profile on a platform, such as a code host or a professional network, with its address.
 public struct ProfileLink: Codable, Sendable, Equatable {
     public var platform: String, url: String
     public init(platform: String, url: String) { self.platform = platform; self.url = url }
