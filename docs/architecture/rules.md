@@ -166,6 +166,7 @@ In production targets:
 - **Cyclomatic complexity of at most 5:** one, plus one for each `if`, `guard`, `while`, `for`, `repeat`, `catch`, `&&`, `||`, `??` and ternary, and one for each condition after the first in a condition list (`if a, b`), which is an `&&` written with a comma. A `switch` counts once, whatever its cases.
 - **One thing, at one level of abstraction.** A function reads like a paragraph of calls to well-named smaller ones.
 - **No flag arguments.** A `Bool` parameter that selects between two behaviours is two functions.
+- **The caps are not to be evaded.** A function that is cut into nested functions or closures, or whose statements are joined with `;`, only to stay under a cap is still one function with several jobs. The checker measures each nested function and closure on its own and counts a line, not a statement, so review is the backstop: every piece is a named thing with one job.
 - **No hidden side effects,** and a function either answers a question or changes state, not both (command-query separation).
 
 **Why.** Small functions with few branches can be read whole, named precisely, and tested one behaviour at a time.
@@ -370,7 +371,7 @@ Every review, dimension or final gate, answers each question with the place it f
 - **HumbleViews:** does a view decide, build a view model or a service, or hold a business rule? Does a view model import a UI framework or expose a domain type?
 - **RichDomain:** is a field public and mutable, is state changed outside a method, or is a value built without validation?
 - **CleanNames:** is every name intention-revealing, in the glossary's words?
-- **CleanFunctions:** does a function do more than one thing, mix levels of abstraction, take a flag, or hide a side effect? (Size, parameters, nesting and complexity are the checker's.)
+- **CleanFunctions:** does a function do more than one thing, mix levels of abstraction, take a flag, or hide a side effect? Is it cut into nested functions, closures or `;`-joined statements only to stay under a cap? (Size, parameters, nesting and complexity are the checker's.)
 - **CleanTypes:** does a function use none of its type's state? Does a type mix data and behaviour? (Size is the checker's.)
 - **CleanComments:** does a comment restate the code, carry history, or cite a rule by number? Does public API lack a doc comment?
 - **CleanErrors:** is an error swallowed, untyped, or translated more than once?
