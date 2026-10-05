@@ -14,7 +14,7 @@ Each rule says what is required, why, and what enforces it:
 - **test**: a required test fails.
 - **review**: nothing automatic can catch it. Kept to a minimum, and marked as such.
 
-A target's list of rules in `rules.json` names the rules whose **detectors** run on it. The rules held by the compiler, tests or review apply to every production target, listed or not.
+A target's list of rules in `rules.json` names the rules whose **detectors** run on it. The size, shape and comment rules (`CleanFunctions`, `CleanTypes`, `ISP`, `CleanComments`) are the exception: their detectors run on every production target by kind, listed or not, so a new target cannot forget them. The rules held by the compiler, tests or review apply to every production target, listed or not.
 
 The checker applies to **production targets**: domain, application, integration, presentation and adapter targets, workflow ports and the composition root. Test, test-support and tool targets get the import allow-lists only, and are held to Clean Code by review. Legacy targets are exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)).
 

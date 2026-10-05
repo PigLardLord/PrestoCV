@@ -290,15 +290,53 @@ if grep -q "never baselined" "$ROOT/out.txt"; then pass=$((pass+1)); echo "ok   
 else fail=$((fail+1)); echo "FAIL --write-baseline does not say it left findings out"; sed 's/^/     /' "$ROOT/out.txt"; fi
 expect "after --write-baseline the measurement finding is still reported" 1 "functionLength"
 
-# --- the policy: these detectors run on production targets only (ADR 0021 (c))
+# --- the policy: these rules apply to every production target by kind, and to no other (ADR 0021 (c))
+kind_case() {   # $1 = the kind of the target that holds a function of 21 lines, "" for a production target
+  setup; src 'let x = 1'
+  if [[ -n "$1" ]]; then python3 - "$ROOT/rules.json" "$1" <<'PYJ'
+import json, sys
+p, kind = sys.argv[1:3]; r = json.load(open(p)); r["targets"][0]["kind"] = kind
+json.dump(r, open(p, "w"))
+PYJ
+  fi
+  printf '%s\n' "$(fn 21)" > "$ROOT/Sources/Pure/P.swift"
+}
+kind_case ""; expect "a production target is measured" 1 "functionLength"
 setup; src 'let x = 1'; printf '%s\n' "$(fn 21)" > "$ROOT/Sources/Other/O.swift"
-expect "a target that does not list the rules is not measured" 0 ""
+expect "a production target that lists no rule is measured all the same" 1 "Sources/Other/O.swift:1: CleanFunctions: functionLength"
+setup; src 'let x = 1'; mkdir -p "$ROOT/Sources/Late"; printf '%s\n' "$(fn 21)" > "$ROOT/Sources/Late/L.swift"
+python3 - "$ROOT/rules.json" <<'PYJ'
+import json, sys
+p = sys.argv[1]; r = json.load(open(p))
+r["targets"].append({"name": "Late", "path": "Sources/Late", "allowedImports": ["Foundation"], "rules": []})
+json.dump(r, open(p, "w"))
+PYJ
+expect "a target added later cannot forget the rules" 1 "Sources/Late/L.swift:1: CleanFunctions: functionLength"
+for kind in test tool legacy excluded; do
+  kind_case "$kind"; expect "a $kind target is not measured" 0 ""
+done
+setup; src 'let x = 1'; printf '%s\n' "$(fn 21)" >> "$ROOT/Package.swift"
+expect "a manifest is not measured" 0 ""
+kind_case ""; python3 - "$ROOT/rules.json" <<'PYJ'
+import json, sys
+p = sys.argv[1]; r = json.load(open(p)); r["targets"][0]["rules"] += ["CleanFunctions", "CleanTypes"]
+json.dump(r, open(p, "w"))
+PYJ
+expect "a target that also lists a rule is measured once" 1 "functionLength"
+if [[ "$(grep -c 'functionLength' "$ROOT/out.txt")" == 1 ]]; then pass=$((pass+1)); echo "ok   a rule listed by the target and by kind reports its finding once"
+else fail=$((fail+1)); echo "FAIL a rule listed twice reports its finding twice"; sed 's/^/     /' "$ROOT/out.txt"; fi
+kind_case ""; python3 - "$ROOT/rules.json" <<'PYJ'
+import json, sys
+p = sys.argv[1]; r = json.load(open(p)); r["productionRules"].append("NoSuchRule")
+json.dump(r, open(p, "w"))
+PYJ
+expect "a production rule that rules.json does not define is a problem" 1 "production rule NoSuchRule, which rules.json does not define"
 if python3 - "$HERE/rules.json" <<'PYJ'
 import json, sys
 r = json.load(open(sys.argv[1]))
 sized = {"CleanFunctions", "CleanTypes", "CleanComments", "ISP"}
-bad = [t["name"] for t in r["targets"] if t.get("kind", "production") != "production" and sized & set(t["rules"])]
-sys.exit(1 if bad else 0)
+listed = [t["name"] for t in r["targets"] if sized & set(t["rules"])]
+sys.exit(0 if sized <= set(r.get("productionRules", [])) and not listed else 1)
 PYJ
-then pass=$((pass+1)); echo "ok   rules.json: no test, tool, manifest, legacy or excluded target lists a size, shape or comment rule"
-else fail=$((fail+1)); echo "FAIL rules.json: a target that is not a production target lists a size, shape or comment rule"; fi
+then pass=$((pass+1)); echo "ok   rules.json: the size, shape and comment rules are held by kind, and no target lists them"
+else fail=$((fail+1)); echo "FAIL rules.json: the size, shape and comment rules are not all production rules, or a target lists them"; fi

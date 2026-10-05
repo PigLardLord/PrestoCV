@@ -32,6 +32,7 @@ struct Config: Decodable {
     struct Exception: Decodable { let path: String; let detector: String; let adr: String; let reason: String }
     let targets: [Target]
     let rules: [String: [String]]         // rule name → detectors
+    let productionRules: [String]?        // rules whose detectors run on every production target, listed or not
     let infrastructureTypes: [String]
     let exceptions: [Exception]?
     let notYetImplemented: [String]?
@@ -116,15 +117,25 @@ for (rule, detectors) in config.rules.sorted(by: { $0.key < $1.key }) {
         problems.append("rule \(rule) lists the detector \(detector), which the checker does not implement")
     }
 }
+for rule in config.productionRules ?? [] where config.rules[rule] == nil {
+    problems.append("productionRules lists the production rule \(rule), which rules.json does not define")
+}
 for target in config.targets {
     for rule in target.rules where config.rules[rule] == nil {
         problems.append("target \(target.name) lists the rule \(rule), which rules.json does not define")
     }
 }
 
+/// The rules whose detectors run on a target: the ones it lists, and on every production target the production rules, so
+/// that a new target cannot forget them.
+func rulesRunning(on target: Config.Target) -> [String] {
+    let isProduction = target.kind == nil || target.kind == "production"
+    return target.rules + (isProduction ? (config.productionRules ?? []).filter { !target.rules.contains($0) } : [])
+}
+
 let detectorToRules: (Config.Target) -> [String: [String]] = { target in
     var map: [String: [String]] = [:]
-    for rule in target.rules { for d in config.rules[rule] ?? [] { map[d, default: []].append(rule) } }
+    for rule in rulesRunning(on: target) { for d in config.rules[rule] ?? [] { map[d, default: []].append(rule) } }
     return map
 }
 

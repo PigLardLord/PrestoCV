@@ -22,7 +22,8 @@ The first build takes a few minutes, because it compiles SwiftSyntax. `selftest.
 A rule is cited by its name from `rules.md` (`DIP`, `PureCore`, `CleanErrors`, …), never by a number. In `rules.json`:
 
 - **`rules`** maps each rule to the detectors that enforce it. A detector can serve two rules: `localization` is `PureCore` and `LocalisationAtEdges`, `printing` is `PureCore` and `NoDeadCode`, and a finding is reported under each.
-- **a target's `rules`** names the rules whose **detectors** run on that target. A rule held by the compiler, by tests or by review applies to every production target whatever this list says. An adapter is not listed under `PureCore` or `PlatformAdapters`: it may read the clock, and it may hold platform code. A rule name that `rules` does not define is an error, and so is a detector name that the checker does not implement, so a typo cannot disable a detector.
+- **`productionRules`** lists the rules whose detectors run on every production target, by kind, listed or not: `ISP`, `CleanFunctions`, `CleanTypes` and `CleanComments`. A new target cannot forget them. A rule name that `rules` does not define is an error here too.
+- **a target's `rules`** names the rules whose **detectors** run on that target, besides the production rules. A rule held by the compiler, by tests or by review applies to every production target whatever this list says. An adapter is not listed under `PureCore` or `PlatformAdapters`: it may read the clock, and it may hold platform code. A rule name that `rules` does not define is an error, and so is a detector name that the checker does not implement, so a typo cannot disable a detector.
 - **`DependencyRule`** also covers the import allow-list of every target (detector `import`), and **`HumbleViews`** the `requiredImportAccess` constraint (detector `importAccess`). Neither needs to be listed.
 - **`swift5Mode` and `unsafeFlags`** (`StrictConcurrency`) read package manifests and run on manifest targets only; the other detectors read sources and never run on a manifest.
 
@@ -30,7 +31,7 @@ A finding reads `<file>:<line>: <rule>: <detector>: <detail>`, and its baseline 
 
 ## Size, shape and comment detectors
 
-They enforce `CleanFunctions`, `CleanTypes`, `ISP` and `CleanComments` on production targets, as [ADR 0021](../../docs/architecture/adr/0021-solid-and-clean-rules.md) (c) measures them. A target that lists none of these rules is not measured: tests, test support, tools, manifests and legacy targets list none. They have no baseline: a finding is fixed, and the checker refuses a baseline entry of theirs.
+They enforce `CleanFunctions`, `CleanTypes`, `ISP` and `CleanComments` on production targets, as [ADR 0021](../../docs/architecture/adr/0021-solid-and-clean-rules.md) (c) measures them. They run on every production target by kind (`productionRules` in `rules.json`), whether or not the target lists them. Tests, test support, tools, manifests and legacy targets are not measured. They have no baseline: a finding is fixed, and the checker refuses a baseline entry of theirs.
 
 | Detector | Rule | Finding when |
 |---|---|---|
@@ -83,7 +84,7 @@ chmod +x .githooks/pre-commit.d/architecture-check
 
 ## Changing the rules
 
-- **A new target:** add it to `rules.json` and to `docs/architecture/modules.md` in the same pull request, and remove it from `notYetImplemented`.
+- **A new target:** add it to `rules.json` and to `docs/architecture/modules.md` in the same pull request, and remove it from `notYetImplemented`. A production target is measured by the size, shape and comment detectors from its first commit; it needs no list for that.
 - **A permanent exception:** an entry in `exceptions` that cites an ADR.
 - **A temporary one:** a baseline entry. The baseline may only shrink. The size, shape and comment detectors are never baselined: the checker refuses an entry of theirs, whatever its fingerprint, and `--write-baseline` leaves their findings out and says so.
 - **Legacy targets** are exempt until they are deleted (ADR 0012).

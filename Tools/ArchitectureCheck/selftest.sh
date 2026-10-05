@@ -22,8 +22,9 @@ P
   "StrictConcurrency":["escapeHatch","swift5Mode","unsafeFlags"],"PlatformAdapters":["platformCondition"],
   "ISP":["protocolSize"],"CleanFunctions":["functionLength","nestingDepth","cyclomaticComplexity","parameterCount"],"CleanTypes":["typeLength","fileLength"],"CleanComments":["ruleNumberCitation"],
   "LocalisationAtEdges":["localization"],"NoDeadCode":["printing","testDouble"]},
+ "productionRules":["ISP","CleanFunctions","CleanTypes","CleanComments"],
  "infrastructureTypes":["FileStore"],
- "targets":[{"name":"Pure","path":"Sources/Pure","allowedImports":["Foundation"],"rules":["DependencyRule","PureCore","DIP","ISP","CleanFunctions","CleanTypes","CleanComments","CleanErrors","StrictConcurrency","PlatformAdapters","LocalisationAtEdges","NoDeadCode"]},
+ "targets":[{"name":"Pure","path":"Sources/Pure","allowedImports":["Foundation"],"rules":["DependencyRule","PureCore","DIP","CleanErrors","StrictConcurrency","PlatformAdapters","LocalisationAtEdges","NoDeadCode"]},
             {"name":"Other","path":"Sources/Other","allowedImports":["Foundation"],"rules":[]},
             {"name":"Manifest","path":"Package.swift","kind":"manifest","allowedImports":["PackageDescription"],"rules":["StrictConcurrency"]}]}
 J
