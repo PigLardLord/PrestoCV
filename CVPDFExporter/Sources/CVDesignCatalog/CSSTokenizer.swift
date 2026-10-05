@@ -10,10 +10,11 @@ protocol CSSTokenReader: Sendable {
 
 /// A subset of CSS Syntax 3: text outside it is rejected, never skipped.
 enum CSSTokenizer {
-    /// Tried in order, so a reader that refuses a character comes before the readers that would take it.
+    /// Tried in order, so a reader that refuses a character comes before the readers that would take it. The
+    /// delimiter reader is last: it begins at every scalar, so every scalar is read by some reader.
     private static let readers: [any CSSTokenReader] = [
         CSSWhitespaceReader(), CSSCommentReader(), CSSStringReader(), CSSUnsupportedCharacterReader(),
-        CSSNumericReader(), CSSNameReader(), CSSAtKeywordReader(), CSSHashReader(),
+        CSSNumericReader(), CSSNameReader(), CSSAtKeywordReader(), CSSHashReader(), CSSDelimiterReader(),
     ]
 
     static func tokenize(_ css: String) throws(CSSRejection) -> [CSSToken] {
@@ -37,7 +38,6 @@ enum CSSTokenizer {
     }
 
     private static func readToken(from input: inout CSSInput) throws(CSSRejection) -> CSSToken? {
-        let reader = readers.first { $0.begins(in: input) } ?? CSSDelimiterReader()
-        return try reader.read(from: &input)
+        try readers.first { $0.begins(in: input) }?.read(from: &input)
     }
 }
