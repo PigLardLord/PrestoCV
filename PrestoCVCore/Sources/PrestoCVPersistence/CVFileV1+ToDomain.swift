@@ -6,12 +6,9 @@ extension CVFileV1 {
     func toDomain() throws(Invalid) -> CV {
         try checkEnvelope()
         try checkSizes()
-        var cv = try CV(id: CVID(id), title: title, personal: personal.toDomain(), sections: sectionsToDomain(),
-                        design: design?.toDomain(), language: DocumentLanguage.canonical(ifPresent: language, field: "language"))
-        cv.revision = revision
-        cv.createdAt = createdAt
-        cv.updatedAt = updatedAt
-        return cv
+        return try CV(id: CVID(id), revision: revision, createdAt: createdAt, updatedAt: updatedAt, title: title,
+                      personal: personal.toDomain(), sections: sectionsToDomain(), design: design?.toDomain(),
+                      language: DocumentLanguage.canonical(ifPresent: language, field: "language"))
     }
 
     private func checkEnvelope() throws(Invalid) {

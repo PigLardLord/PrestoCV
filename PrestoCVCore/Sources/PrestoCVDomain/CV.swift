@@ -5,8 +5,8 @@ import Foundation
 public struct CV: Hashable, Sendable {
     public let id: CVID
     /// 0 until a repository stores the CV for the first time.
-    public package(set) var revision = 0
-    public package(set) var createdAt: Date?, updatedAt: Date?
+    public let revision: Int
+    public let createdAt: Date?, updatedAt: Date?
     /// The user's name for this CV in the list, such as "iOS roles". Not printed.
     public private(set) var title: String
     public private(set) var personal: PersonalDetails
@@ -17,16 +17,26 @@ public struct CV: Hashable, Sendable {
     /// A CV that has never been stored: revision 0, no timestamps.
     public init(id: CVID, title: String = "", personal: PersonalDetails = PersonalDetails(), sections: CVSections = CVSections(),
                 design: DesignChoice? = nil, language: DocumentLanguage? = nil) {
-        self.id = id; self.title = title; self.personal = personal; self.sections = sections; self.design = design; self.language = language
+        self.init(id: id, revision: 0, createdAt: nil, updatedAt: nil, title: title, personal: personal, sections: sections,
+                  design: design, language: language)
     }
 
-    /// The same content as stored by a repository at `revision`, at time `now`.
+    /// A CV as a repository stores it. Only repositories set the revision and the timestamps.
+    package init(id: CVID, revision: Int, createdAt: Date?, updatedAt: Date?, title: String, personal: PersonalDetails,
+                 sections: CVSections, design: DesignChoice?, language: DocumentLanguage?) {
+        self.id = id; self.revision = revision; self.createdAt = createdAt; self.updatedAt = updatedAt
+        self.title = title; self.personal = personal; self.sections = sections; self.design = design; self.language = language
+    }
+
+    /// The same content as stored by a repository at `revision`, created at `createdAt` and last changed at `updatedAt`.
+    package func stored(revision: Int, createdAt: Date?, updatedAt: Date) -> CV {
+        CV(id: id, revision: revision, createdAt: createdAt, updatedAt: updatedAt, title: title, personal: personal,
+           sections: sections, design: design, language: language)
+    }
+
+    /// The same content as stored by a repository at `revision`, at time `now`. A CV that was never stored is created at `now`.
     package func stored(revision: Int, at now: Date) -> CV {
-        var stored = self
-        stored.revision = revision
-        stored.createdAt = createdAt ?? now
-        stored.updatedAt = now
-        return stored
+        stored(revision: revision, createdAt: createdAt ?? now, updatedAt: now)
     }
 
     /// The one definition of "has enough content to be saved".

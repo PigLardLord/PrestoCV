@@ -39,8 +39,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         try lock.withExclusiveAccess { () throws(RepositoryError) -> CV in
             guard let existing = try storedCV(cv.id) else { throw .notFound(cv.id) }
             guard existing.revision == cv.revision else { throw .conflict(cv.id, storedRevision: existing.revision) }
-            var written = cv.stored(revision: cv.revision + 1, at: now())
-            written.createdAt = existing.createdAt
+            let written = cv.stored(revision: cv.revision + 1, createdAt: existing.createdAt, updatedAt: now())
             try write(written)
             return try storedCV(cv.id) ?? written
         }
