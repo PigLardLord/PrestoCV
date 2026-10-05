@@ -27,7 +27,7 @@ struct Config: Decodable {
         let rules: [String]               // the rules whose detectors run on this target
         /// module → "internal": the import must be `internal`, `fileprivate` or `private` (HumbleViews: no domain
         /// type in a public API). A plain `import` is public in the Swift 6 language mode, so it fails too.
-        let requiredImportAccess: [String: String]?
+        let requiredImportAccess: [String: ImportAccess]?
 
         /// A target without a kind is a production target.
         var isProduction: Bool { (kind ?? .production) == .production }
@@ -186,7 +186,7 @@ for (file, target) in assignment where target.kind != .legacy {
     for imp in scanner.imports where !allowed.contains(imp.module) {
         record(rule: "DependencyRule", detector: "import", detail: imp.node, node: imp.node, line: imp.line)
     }
-    for imp in scanner.imports where target.requiredImportAccess?[imp.module] == "internal" {
+    for imp in scanner.imports where target.requiredImportAccess?[imp.module] == .internal {
         if !["internal", "fileprivate", "private"].contains(imp.access ?? "public") {
             record(rule: "HumbleViews", detector: "importAccess", detail: "\(imp.access ?? "(default public)") import \(imp.module) must be internal",
                    node: (imp.access ?? "") + " " + imp.node, line: imp.line)

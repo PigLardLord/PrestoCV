@@ -140,6 +140,24 @@ kind_of_pure "prodution"; expect "the message says where the kind is" 2 "targets
 for kind in production test tool legacy excluded; do
   kind_of_pure "$kind"; expect "a target of kind \"$kind\" is read" 0 ""
 done
+# The access that an import must have is a closed set as well: a misspelt "internal" would switch the check off silently.
+access_of_pure() {   # $1 = the access to write for the module Foundation in the first target
+  setup; src 'import Foundation'
+  python3 - "$ROOT/rules.json" "$1" <<'PY'
+import json,sys; p,access=sys.argv[1:3]; r=json.load(open(p)); r["targets"][0]["requiredImportAccess"]={"Foundation":access}; json.dump(r,open(p,"w"))
+PY
+}
+for access in intrnal Internal "" " internal" private public package; do
+  access_of_pure "$access"; expect "an import access of \"$access\" fails the run" 2 "unknown import access \"$access\""
+done
+access_of_pure intrnal; expect "the message names the accesses that exist" 2 "the choices are internal"
+access_of_pure intrnal; expect "the message says where the access is" 2 "targets.Index 0.requiredImportAccess.Foundation"
+access_of_pure internal; expect "an import access of internal is read, and a public import is refused" 1 "HumbleViews: importAccess"
+setup; src 'internal import Foundation'
+python3 - "$ROOT/rules.json" <<'PY'
+import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"][0]["requiredImportAccess"]={"Foundation":"internal"}; json.dump(r,open(p,"w"))
+PY
+expect "an internal import is accepted where internal is required" 0 ""
 for kind in legacy excluded; do
   kind_of_pure "$kind"; src $'import Other\nfunc f() { fatalError("x") }\nlet d = Date()'
   expect "a $kind target is not scanned, whatever it holds" 0 ""
