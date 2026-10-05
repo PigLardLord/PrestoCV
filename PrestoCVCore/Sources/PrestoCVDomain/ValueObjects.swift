@@ -244,10 +244,14 @@ public struct DesignChoice: Hashable, Sendable {
 
     /// Returns `nil` unless every identifier given is 1 to 64 lower-case letters, digits or hyphens.
     public init?(design: String, palette: String? = nil, fonts: String? = nil) {
-        func isIdentifier(_ id: String) -> Bool { id.range(of: #"^[a-z0-9-]{1,64}\z"#, options: .regularExpression) != nil }
-        guard isIdentifier(design), palette.map(isIdentifier) ?? true, fonts.map(isIdentifier) ?? true else { return nil }
+        guard Self.isIdentifier(design), Self.isIdentifierIfGiven(palette), Self.isIdentifierIfGiven(fonts) else { return nil }
         self.design = design; self.palette = palette; self.fonts = fonts
     }
+
+    private static func isIdentifier(_ id: String) -> Bool { id.range(of: #"^[a-z0-9-]{1,64}\z"#, options: .regularExpression) != nil }
+
+    /// An identifier that is not given is fine; one that is given must be valid.
+    private static func isIdentifierIfGiven(_ id: String?) -> Bool { id.map(isIdentifier) ?? true }
 }
 
 extension Character {
