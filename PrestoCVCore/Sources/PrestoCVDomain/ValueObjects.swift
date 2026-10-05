@@ -152,22 +152,36 @@ public struct WebLink: Hashable, Sendable {
 /// ("it", "pt-BR", "zh-Hant-TW"). Stored in canonical case.
 public struct DocumentLanguage: Hashable, Sendable {
     public let tag: String
+
     public init?(_ raw: String) {
-        let parts = raw.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "-", omittingEmptySubsequences: false).map(String.init)
-        guard let first = parts.first, (2...3).contains(first.count), first.allSatisfy(\.isASCIILetter), parts.count <= 3 else { return nil }
-        var canonical = [first.lowercased()]
-        var rest = parts.dropFirst()
-        if let script = rest.first, script.count == 4, script.allSatisfy(\.isASCIILetter) {
-            canonical.append(script.prefix(1).uppercased() + script.dropFirst().lowercased()); rest = rest.dropFirst()
-        }
-        if let region = rest.first {
-            if region.count == 2, region.allSatisfy(\.isASCIILetter) { canonical.append(region.uppercased()) }
-            else if region.count == 3, region.allSatisfy(\.isASCIIDigit) { canonical.append(region) }
-            else { return nil }
-            rest = rest.dropFirst()
-        }
-        guard rest.isEmpty else { return nil }
-        tag = canonical.joined(separator: "-")
+        let subtags = raw.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "-", omittingEmptySubsequences: false)
+        guard let tag = Self.canonicalTag(of: subtags) else { return nil }
+        self.tag = tag
+    }
+
+    private static func canonicalTag(of subtags: [Substring]) -> String? {
+        guard let first = subtags.first, let language = language(first) else { return nil }
+        var canonical = [language]
+        var rest = subtags.dropFirst()
+        if let script = rest.first.flatMap(script) { canonical.append(script); rest = rest.dropFirst() }
+        if let region = rest.first.flatMap(region) { canonical.append(region); rest = rest.dropFirst() }
+        return rest.isEmpty ? canonical.joined(separator: "-") : nil
+    }
+
+    /// Two or three letters, in lower case.
+    private static func language(_ subtag: Substring) -> String? {
+        (2...3).contains(subtag.count) && subtag.allSatisfy(\.isASCIILetter) ? subtag.lowercased() : nil
+    }
+
+    /// Four letters, the first in upper case.
+    private static func script(_ subtag: Substring) -> String? {
+        subtag.count == 4 && subtag.allSatisfy(\.isASCIILetter) ? subtag.prefix(1).uppercased() + subtag.dropFirst().lowercased() : nil
+    }
+
+    /// Two letters, in upper case, or three digits.
+    private static func region(_ subtag: Substring) -> String? {
+        if subtag.count == 2, subtag.allSatisfy(\.isASCIILetter) { return subtag.uppercased() }
+        return subtag.count == 3 && subtag.allSatisfy(\.isASCIIDigit) ? String(subtag) : nil
     }
 }
 
