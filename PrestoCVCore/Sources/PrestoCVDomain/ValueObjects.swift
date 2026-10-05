@@ -119,6 +119,24 @@ public enum LanguageProficiency: String, CaseIterable, Hashable, Sendable {
     case native
 }
 
+// MARK: - Interests
+
+/// What a CV lists as interests: each trimmed, none empty, and no two equal ignoring case. The list is normalised when it is
+/// made, so no other list can exist (RichDomain), and the type that holds it only stores it.
+public struct Interests: Hashable, Sendable {
+    /// The interests, in the order the user chose.
+    public let values: [String]
+
+    /// Trims each interest, drops the empty ones, and of two that are equal ignoring case keeps the first.
+    ///
+    /// - Parameter values: The interests as given, in the order the user chose.
+    public init(_ values: [String]) {
+        var seen = Set<String>()
+        self.values = values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
+    }
+}
+
 // MARK: - Contact details
 
 /// A local part of dot-separated atoms (no leading, trailing or doubled dot) and a domain of labels (letters or

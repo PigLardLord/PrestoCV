@@ -19,8 +19,8 @@ extension CVFileV1 {
     private func sectionsToDomain() throws(Invalid) -> CVSections {
         let sections = try CVSections(experiences: experiences.toDomain(), education: education.toDomain(), skills: skills.toDomain(),
                                       languages: languages.toDomain(), certifications: certifications.toDomain(),
-                                      profiles: profiles.toDomain(), interests: interests)
-        guard sections.interests == interests else { throw Invalid(reason: "interests") }   // trimmed, non-empty, unique
+                                      profiles: profiles.toDomain(), interests: Interests(interests))
+        guard sections.interests.values == interests else { throw Invalid(reason: "interests") }   // trimmed, non-empty, unique
         return sections
     }
 }

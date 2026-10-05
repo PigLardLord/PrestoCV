@@ -110,10 +110,42 @@ struct DomainTests {
         #expect(DesignChoice(design: "modern\n") == nil && DesignChoice(design: "") == nil)
     }
 
-    @Test("interests are trimmed, never empty, and unique ignoring case")
-    func interests() {
-        let sections = CVSections(interests: [" Chess ", "", "chess", "Running", "  "])
-        #expect(sections.interests == ["Chess", "Running"])
+    @Test("each interest is trimmed of spaces, tabs and newlines")
+    func interestsAreTrimmed() {
+        #expect(Interests(["  Chess\n", "\tRunning "]).values == ["Chess", "Running"])
+    }
+
+    @Test("an empty interest is dropped, and so is one that is only white space")
+    func emptyInterestsAreDropped() {
+        #expect(Interests(["", "Chess", "  ", "\n", "Running"]).values == ["Chess", "Running"])
+    }
+
+    @Test("of two interests equal ignoring case the first stays, wherever the second is")
+    func duplicatesIgnoringCaseKeepTheFirst() {
+        #expect(Interests(["chess", "Running", "CHESS", "Chess"]).values == ["chess", "Running"])
+        #expect(Interests(["Écoute", "écoute"]).values == ["Écoute"])
+    }
+
+    @Test("an interest that is equal to another only after trimming is a duplicate")
+    func duplicatesAfterTrimming() {
+        #expect(Interests(["Chess", " chess\n"]).values == ["Chess"])
+    }
+
+    @Test("interests keep the order they were given in")
+    func interestsKeepTheirOrder() {
+        #expect(Interests(["b", "a", "c", "A"]).values == ["b", "a", "c"])
+    }
+
+    @Test("normalising a normalised list changes nothing")
+    func interestsAreStable() {
+        let interests = Interests([" Chess ", "", "chess", "Running", "  "])
+        #expect(interests.values == ["Chess", "Running"] && Interests(interests.values) == interests)
+    }
+
+    @Test("sections start with no interests and hold the ones they are given")
+    func sectionsHoldInterests() {
+        #expect(CVSections().interests.values.isEmpty)
+        #expect(CVSections(interests: Interests(["Chess", "chess", "Running"])).interests.values == ["Chess", "Running"])
     }
 
     @Test("a listing orders the CVs by last change, and a CV that was never stored comes last")

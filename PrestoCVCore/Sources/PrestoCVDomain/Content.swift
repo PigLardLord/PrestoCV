@@ -139,20 +139,13 @@ public struct CVSections: Hashable, Sendable {
     public var certifications: [Certification]
     /// Public profiles, in the order the user chose.
     public var profiles: [ProfileLink]
-    /// The interests: trimmed, never empty, and with no two equal ignoring case. Set only through `setInterests(_:)` or the
-    /// initialiser, which both normalise what they are given.
-    @NormalisedInterests public private(set) var interests: [String]
+    /// The interests, normalised when they were made.
+    public var interests: Interests
 
-    /// Every parameter is the value of the property of the same name, and none is required. `interests` is normalised on the
-    /// way in: each is trimmed, empty ones are dropped, and of two that are equal ignoring case the first stays.
+    /// Every parameter is the value of the property of the same name, and none is required.
     public init(experiences: [Experience] = [], education: [Education] = [], skills: [Skill] = [], languages: [LanguageSkill] = [],
-                certifications: [Certification] = [], profiles: [ProfileLink] = [], interests: [String] = []) {
+                certifications: [Certification] = [], profiles: [ProfileLink] = [], interests: Interests = Interests([])) {
         self.experiences = experiences; self.education = education; self.skills = skills; self.languages = languages
         self.certifications = certifications; self.profiles = profiles; self.interests = interests
     }
-
-    /// Replaces the interests, normalised as the initialiser normalises them.
-    ///
-    /// - Parameter values: The new interests, in the order the user chose.
-    public mutating func setInterests(_ values: [String]) { interests = values }
 }

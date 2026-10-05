@@ -26,7 +26,7 @@ public enum FixtureCV {
     private static func sections() -> CVSections {
         CVSections(experiences: [experience()], education: [education()], skills: skills(), languages: languages(),
                    certifications: [certification()], profiles: [ProfileLink(platform: "GitHub", link: link("https://github.com/ada"))],
-                   interests: ["Chess", "Running"])
+                   interests: Interests(["Chess", "Running"]))
     }
 
     private static func experience() -> Experience {

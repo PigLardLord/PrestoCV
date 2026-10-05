@@ -37,6 +37,7 @@ Test targets and test-support targets are described below each package. The chec
   - `Period`, whose end is a date, "current" or "ended, date unknown" (`PeriodEnd.unknown`);
   - `SkillLevel` (1–5);
   - `LanguageProficiency` (CEFR + native);
+  - `Interests` (trimmed, none empty, no two equal ignoring case, normalised when made);
   - `EmailAddress`, `PhoneNumber`, `WebLink`, `DocumentLanguage`, `DesignChoice`.
 - **`Period.make(start:end:current:)`** is the single rule that turns loose data into a period, or into a typed `PeriodError`.
 - Planned: projects (#54), photo (#53).

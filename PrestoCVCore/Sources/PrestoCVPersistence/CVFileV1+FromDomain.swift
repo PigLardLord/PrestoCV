@@ -12,7 +12,7 @@ extension CVFileV1 {
         let profiles: [ProfileV1] = sections.profiles.map(ProfileV1.init)
         self.init(schemaVersion: Self.version, id: cv.id.raw, revision: cv.revision, createdAt: createdAt, updatedAt: updatedAt,
                   title: cv.title, personal: PersonalV1(cv.personal), experiences: experiences, education: education, skills: skills,
-                  languages: languages, certifications: certifications, profiles: profiles, interests: sections.interests,
+                  languages: languages, certifications: certifications, profiles: profiles, interests: sections.interests.values,
                   design: cv.design.map(DesignV1.init), language: cv.language?.tag)
     }
 }
