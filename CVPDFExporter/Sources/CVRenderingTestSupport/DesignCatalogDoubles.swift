@@ -89,7 +89,7 @@ public actor SpyDesignStore: DesignStore {
     public func installedOrigins() async throws -> [String: DesignOrigin] {
         if cancelling.contains(.installedOrigins) { throw CancellationError() }
         if listingFails { throw Failure() }
-        return origins
+        return origins.filter { designs[$0.key] != nil }
     }
     /// Adopting fails for the identifiers whose saves fail.
     public func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool {

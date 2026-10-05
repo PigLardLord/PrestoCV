@@ -58,6 +58,15 @@ private func installedBySync(_ design: ValidatedDesign, in store: some DesignSto
     _ = try await store.saveIfNewer(design)
 }
 
+@Suite("the spy store keeps the port's promises (#127)")
+struct SpyDesignStoreTests {
+    @Test("origins are listed only for the designs the store holds")
+    func originsOfInstalledDesigns() async throws {
+        let store = SpyDesignStore(installed: [try DesignStoreContract.design(id: "clean")], origins: ["clean": .bundled, "ghost": .imported])
+        #expect(try await store.installedOrigins() == ["clean": .bundled])
+    }
+}
+
 @Suite("syncing the bundled designs (#125)")
 struct SyncBundledDesignsTests {
     // MARK: Installing and upgrading
