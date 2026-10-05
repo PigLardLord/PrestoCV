@@ -565,7 +565,7 @@ struct InstallDesignTests {
         }
     }
 
-    @Test("the real bundle's identifiers are reserved today, although every package of it is refused")
+    @Test("the identifiers of the designs that ship with the app are reserved")
     func realBundleReservesItsIdentifiers() async throws {
         let install = InstallDesign(source: BundleDesignSource(), gate: FakeRenderingGate(), store: InMemoryDesignStore())
         for id in ["minimal", "modern", "professional"] {

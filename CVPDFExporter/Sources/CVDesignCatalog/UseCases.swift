@@ -99,8 +99,8 @@ public struct SyncReport: Equatable, Sendable {
     public internal(set) var installed: [String] = []
     /// Rendered and saved because the installed design was older.
     public internal(set) var upgraded: [String] = []
-    /// Left alone: the installed design has the same or a newer version. It is not rendered, unless it became the same or
-    /// newer while this design rendered: then the store kept it (`ConditionalSave.keptInstalled`).
+    /// Left alone: the installed design, a bundled one, has the same or a newer version. It is not rendered, unless it
+    /// became the same or newer while this design rendered: then the store kept it (`ConditionalSave.keptInstalled`).
     public internal(set) var unchanged: [String] = []
     /// Not saved: the validator refused the package. These are named as the source names them.
     public internal(set) var rejected: [RejectedBundledDesign] = []
@@ -114,9 +114,10 @@ public struct SyncReport: Equatable, Sendable {
     /// rendered.
     public internal(set) var adopted: [String] = []
     /// Not saved: the store holds a design with this identifier that the sync did not install, so it is left alone,
-    /// whatever the versions. That is an import, or a design with no recorded origin that is not the bundled one (the
-    /// same identifier, version and content), or one the store no longer adopts because an import took it meanwhile. It is not rendered, unless it appeared while this design rendered: then the store
-    /// kept it (`ConditionalSave.keptImported`).
+    /// whatever the versions. That is an import, or a design with no recorded origin that is not the bundled one (the same
+    /// identifier, version and content), or one the store no longer adopts because an import took it meanwhile. It is
+    /// not rendered, unless it appeared while this design rendered: then the store kept it
+    /// (`ConditionalSave.keptImported`).
     public internal(set) var conflicts: [String] = []
 }
 
