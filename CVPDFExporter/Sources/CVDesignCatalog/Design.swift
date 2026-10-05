@@ -68,6 +68,17 @@ public enum DesignPackageViolation: Equatable, Sendable, CustomStringConvertible
     }
 }
 
+/// What `DesignPackageValidator.claimedIdentifier(in:)` found in a package.
+public enum ClaimedIdentifier: Equatable, Sendable {
+    /// The manifest has a valid identifier.
+    case identifier(String)
+    /// The manifest was read, and its `id` is missing, not a string or not a valid identifier: the package names none.
+    case noIdentifier
+    /// The package cannot be looked at: it is over the validator's size cap, or it is not a JSON object with a `manifest`
+    /// object.
+    case uninspectable
+}
+
 /// A design that passed every check. Only the validator creates one.
 public struct ValidatedDesign: Sendable, Equatable {
     public let manifest: DesignManifest
@@ -94,17 +105,17 @@ public struct DesignPackageValidator: Sendable {
         let markupContract: Int
     }
 
-    /// The identifier a package claims, read without validating the rest of it: nil unless the bytes are within `maxBytes`
-    /// and are a JSON object whose `manifest` has a string `id` that is a valid identifier. The catalog reserves with it
-    /// the identifier of every bundled package, also of one that fails validation. An identifier that is not valid can
-    /// never be installed, so it needs no reservation.
-    public func claimedIdentifier(in data: Data) -> String? {
-        guard data.count <= maxBytes else { return nil }
+    /// What a package claims as its identifier, read without validating the rest of it. The catalog reserves with it the
+    /// identifier of every bundled package, also of one that fails validation. The answer tells a package that names no
+    /// identifier from one that cannot be looked at: the first can never be installed under any identifier, the second
+    /// may name any identifier once it is repaired.
+    public func claimedIdentifier(in data: Data) -> ClaimedIdentifier {
+        guard data.count <= maxBytes else { return .uninspectable }
         let parsed: Any
-        do { parsed = try JSONSerialization.jsonObject(with: data) } catch { return nil }
-        guard let object = parsed as? [String: Any], let manifest = object["manifest"] as? [String: Any],
-              let id = manifest["id"] as? String, DesignManifest.isValidID(id) else { return nil }
-        return id
+        do { parsed = try JSONSerialization.jsonObject(with: data) } catch { return .uninspectable }
+        guard let object = parsed as? [String: Any], let manifest = object["manifest"] as? [String: Any] else { return .uninspectable }
+        guard let id = manifest["id"] as? String, DesignManifest.isValidID(id) else { return .noIdentifier }
+        return .identifier(id)
     }
 
     public func validate(_ data: Data) throws(DesignPackageRejected) -> ValidatedDesign {

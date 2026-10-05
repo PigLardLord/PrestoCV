@@ -12,6 +12,10 @@ public enum DesignCatalogError: Error, Equatable, Sendable {
     /// An import named the identifier of a bundled design. The design is refused, whatever its version: a CV's design
     /// choice names the identifier, and bundled fixes must reach it.
     case bundledIdentifier(String)
+    /// A bundled package, named as the source names it, cannot be inspected for its identifier: it is over the validator's
+    /// cap, or it is not a design package. Every import is refused: the bundle is the app's own, so this is a defect of the
+    /// app, and the package may name any identifier once it is repaired.
+    case bundledPackageUninspectable(String)
 }
 
 /// Installing a design from untrusted bytes: validate, then refuse the identifier of a bundled design, then prove it
@@ -20,7 +24,9 @@ public enum DesignCatalogError: Error, Equatable, Sendable {
 ///   whatever its version: it would shadow the bundled design, and later fixes would never reach a CV that names it.
 ///   Storing it under another identifier would change what the CV's design choice names. A bundled identifier is one the
 ///   source's packages claim, whether or not the validator accepts the package and whether or not the sync has installed
-///   the design, and one the store records as bundled, even if the design has left the bundle.
+///   the design, and one the store records as bundled, even if the design has left the bundle. The reservation fails
+///   closed: a bundled package that cannot be inspected (over the cap, not a design package) may name any identifier once it
+///   is repaired, so it stops every import (`DesignCatalogError.bundledPackageUninspectable`).
 /// - The checks before rendering are an early out. The store decides at the save, under its lock, and refuses an import
 ///   over a design it records as bundled (`ImportSave.keptBundled`), which is the same error.
 /// - The source is read after the package is validated, so an invalid package is reported as invalid. A source that cannot
@@ -54,14 +60,22 @@ public struct InstallDesign: Sendable {
         }
     }
 
-    /// The identifiers the bundled packages claim, whether or not the validator accepts them. A package that names no
-    /// valid identifier reserves nothing.
+    /// The identifiers the bundled packages claim, whether or not the validator accepts them. A package whose manifest
+    /// names no valid identifier reserves nothing. One that cannot be inspected stops the import: it fails closed.
     private func bundledIdentifiers() async throws -> Set<String> {
         let packages: [(name: String, data: Data)]
         do { packages = try await source.bundledPackages() } catch let cancellation as CancellationError { throw cancellation } catch {
             throw DesignCatalogError.bundledDesignsUnavailable
         }
-        return Set(packages.compactMap { validator.claimedIdentifier(in: $0.data) })
+        var identifiers: Set<String> = []
+        for package in packages {
+            switch validator.claimedIdentifier(in: package.data) {
+            case .identifier(let id): identifiers.insert(id)
+            case .noIdentifier: break
+            case .uninspectable: throw DesignCatalogError.bundledPackageUninspectable(package.name)
+            }
+        }
+        return identifiers
     }
 }
 

@@ -205,12 +205,20 @@ struct DesignManifestTests {
     }
 }
 
-/// Packages that claim no usable identifier, built step by step: a long literal array is slow to type-check.
+/// Packages whose manifest can be read and names no valid identifier, built step by step: a long literal array is slow
+/// to type-check.
 private let packagesWithoutIdentifier: [String] = {
     var texts: [String] = []
-    texts.append(contentsOf: ["not JSON", "[]", "{}", #"{"manifest":[]}"#, #"{"manifest":{}}"#, #"{"manifest":{"id":5}}"#, #"{"manifest":{"id":null}}"#])
+    texts.append(contentsOf: [#"{"manifest":{}}"#, #"{"manifest":{"id":5}}"#, #"{"manifest":{"id":null}}"#, #"{"manifest":{"id":["clean"]}}"#])
     texts.append(contentsOf: [#"{"manifest":{"id":""}}"#, #"{"manifest":{"id":"../clean"}}"#, #"{"manifest":{"id":"Clean"}}"#, #"{"manifest":{"id":"clean\n"}}"#])
     texts.append(#"{"manifest":{"id":"\#(String(repeating: "a", count: 65))"}}"#)
+    return texts
+}()
+
+/// Packages that cannot be inspected: not JSON, not an object, or without a manifest object.
+private let uninspectablePackages: [String] = {
+    var texts: [String] = []
+    texts.append(contentsOf: ["", "not JSON", "[]", "{}", "5", "null", #"{"manifest":[]}"#, #"{"manifest":"clean"}"#, #"{"manifest":null}"#, #"{"id":"clean"}"#])
     return texts
 }()
 
@@ -219,33 +227,38 @@ struct ClaimedIdentifierTests {
     @Test("a package's identifier is read whether or not the rest of the package passes the validator")
     func claimed() {
         let validator = DesignPackageValidator()
-        #expect(validator.claimedIdentifier(in: designData(".cv-name{color:var(--color-primary)}", id: "clean")) == "clean")
+        #expect(validator.claimedIdentifier(in: designData(".cv-name{color:var(--color-primary)}", id: "clean")) == .identifier("clean"))
         let refused = designData(".cv{display:none}", id: "modern", extra: ["htmlContent": "<p>"], manifestExtra: ["version": "1"])
         #expect(violations(of: refused) != nil)
-        #expect(validator.claimedIdentifier(in: refused) == "modern")
-        #expect(validator.claimedIdentifier(in: designData("", id: "a-1")) == "a-1")
+        #expect(validator.claimedIdentifier(in: refused) == .identifier("modern"))
+        #expect(validator.claimedIdentifier(in: designData("", id: "a-1")) == .identifier("a-1"))
     }
 
-    @Test("a package that claims no valid identifier names none", arguments: packagesWithoutIdentifier)
+    @Test("a package whose manifest names no valid identifier claims none", arguments: packagesWithoutIdentifier)
     func notClaimed(json: String) {
-        #expect(DesignPackageValidator().claimedIdentifier(in: Data(json.utf8)) == nil)
+        #expect(DesignPackageValidator().claimedIdentifier(in: Data(json.utf8)) == .noIdentifier)
     }
 
-    @Test("a package nested far deeper than JSON allows names none, and the validator rejects it the same way", arguments: [600, 100_000])
+    @Test("a package that is not JSON, not an object or without a manifest cannot be inspected", arguments: uninspectablePackages)
+    func uninspectable(json: String) {
+        #expect(DesignPackageValidator().claimedIdentifier(in: Data(json.utf8)) == .uninspectable)
+    }
+
+    @Test("a package nested far deeper than JSON allows cannot be inspected, and the validator rejects it the same way", arguments: [600, 100_000])
     func hostileNesting(depth: Int) throws {
         let open = String(repeating: "[", count: depth), close = String(repeating: "]", count: depth)
         let json = Data(#"{"manifest":{"id":"clean","deep":\#(open)\#(close)}}"#.utf8)
         let validator = DesignPackageValidator()
         #expect(json.count <= validator.maxBytes)
-        #expect(validator.claimedIdentifier(in: json) == nil)
+        #expect(validator.claimedIdentifier(in: json) == .uninspectable)
         #expect(violations(of: json) == [.malformed("not JSON")])
-        #expect(validator.claimedIdentifier(in: Data(open.utf8)) == nil)
+        #expect(validator.claimedIdentifier(in: Data(open.utf8)) == .uninspectable)
     }
 
-    @Test("a package larger than the validator's cap names none")
+    @Test("a package larger than the validator's cap cannot be inspected, whatever it claims")
     func tooLarge() {
         let data = designData(".cv-name{color:var(--color-primary)}", id: "clean")
-        #expect(DesignPackageValidator(maxBytes: data.count).claimedIdentifier(in: data) == "clean")
-        #expect(DesignPackageValidator(maxBytes: data.count - 1).claimedIdentifier(in: data) == nil)
+        #expect(DesignPackageValidator(maxBytes: data.count).claimedIdentifier(in: data) == .identifier("clean"))
+        #expect(DesignPackageValidator(maxBytes: data.count - 1).claimedIdentifier(in: data) == .uninspectable)
     }
 }

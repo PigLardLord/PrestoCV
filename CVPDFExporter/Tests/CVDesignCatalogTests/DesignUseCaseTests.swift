@@ -547,22 +547,39 @@ struct InstallDesignTests {
         #expect(await gate.verified.isEmpty)
     }
 
-    @Test("one validator, one cap: a bundled package the sync accepts reserves its identifier, and one it rejects as too large reserves none",
-          arguments: [0, -1])
-    func reservationUsesTheSyncsCap(capOffset: Int) async throws {
+    @Test("one validator, one cap: a bundled package the sync installs is reserved by the import, and the others still import")
+    func withinTheCapIsInstalledAndReserved() async throws {
         let package = try bundled("modern", css: String(repeating: ".cv-name{color:var(--color-primary)}", count: 20))
-        let validator = DesignPackageValidator(maxBytes: package.data.count + capOffset)
+        let validator = DesignPackageValidator(maxBytes: package.data.count)
         let source = FixedBundledSource(packages: [package])
         let report = try await SyncBundledDesigns(source: source, validator: validator, gate: FakeRenderingGate(), store: InMemoryDesignStore())()
+        #expect(report.installed == ["modern"])
         let install = InstallDesign(source: source, validator: validator, gate: FakeRenderingGate(), store: InMemoryDesignStore())
-        let shadow = try DesignStoreContract.package(id: "modern", version: "999999999.0.0")
-        if capOffset == 0 {
-            #expect(report.installed == ["modern"])
-            await #expect(throws: DesignCatalogError.bundledIdentifier("modern")) { _ = try await install(shadow) }
-        } else {
-            #expect(report.rejected.map(\.violations) == [[.tooLarge(package.data.count)]])
-            #expect(try await install(shadow).manifest.id == "modern")
+        await #expect(throws: DesignCatalogError.bundledIdentifier("modern")) { _ = try await install(DesignStoreContract.package(id: "modern", version: "999999999.0.0")) }
+        #expect(try await install(DesignStoreContract.package(id: "mine")).manifest.id == "mine")
+    }
+
+    @Test("a bundled package over the cap cannot be inspected: it blocks every import, and once the bundle is repaired the sync installs it with no conflict")
+    func oversizedBundledPackageFailsClosed() async throws {
+        let oversized = try bundled("modern", css: String(repeating: ".cv-name{color:var(--color-primary)}", count: 20))
+        let validator = DesignPackageValidator(maxBytes: oversized.data.count - 1)
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let broken = FixedBundledSource(packages: [try bundled("clean"), oversized])
+        let install = InstallDesign(source: broken, validator: validator, gate: gate, store: store)
+        for id in ["modern", "mine"] {
+            await #expect(throws: DesignCatalogError.bundledPackageUninspectable("modern")) { _ = try await install(DesignStoreContract.package(id: id, version: "999999999.0.0")) }
         }
+        #expect(try await store.installedDesigns().isEmpty)
+        #expect(await gate.verified.isEmpty)
+        let before = try await SyncBundledDesigns(source: broken, validator: validator, gate: gate, store: store)()
+        #expect(before.rejected.map(\.violations) == [[.tooLarge(oversized.data.count)]] && before.installed == ["clean"])
+        // The bundle is repaired: the package fits the cap, and nothing took its identifier meanwhile.
+        let repaired = FixedBundledSource(packages: [try bundled("clean"), try bundled("modern")])
+        let after = try await SyncBundledDesigns(source: repaired, validator: validator, gate: gate, store: store)()
+        #expect(after.installed == ["modern"] && after.unchanged == ["clean"] && after.conflicts.isEmpty && after.rejected.isEmpty)
+        let again = InstallDesign(source: repaired, validator: validator, gate: gate, store: store)
+        #expect(try await again(DesignStoreContract.package(id: "mine")).manifest.id == "mine")
+        await #expect(throws: DesignCatalogError.bundledIdentifier("modern")) { _ = try await again(DesignStoreContract.package(id: "modern", version: "999999999.0.0")) }
     }
 
     @Test("the identifiers of the designs that ship with the app are reserved")
@@ -573,10 +590,21 @@ struct InstallDesignTests {
         }
     }
 
-    @Test("a bundled package that names no identifier reserves nothing, and does not stop the import")
-    func unreadableBundledPackageReservesNothing() async throws {
+    @Test("a bundled package that cannot be inspected blocks every import, named as the source names it: nothing is rendered or stored",
+          arguments: ["not JSON", "{}", #"{"manifest":[]}"#, ""])
+    func uninspectableBundledPackageFailsClosed(json: String) async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let packages: [(name: String, data: Data)] = [try bundled("clean"), ("damaged-file", Data(json.utf8))]
+        let install = InstallDesign(source: FixedBundledSource(packages: packages), gate: gate, store: store)
+        await #expect(throws: DesignCatalogError.bundledPackageUninspectable("damaged-file")) { _ = try await install(DesignStoreContract.package(id: "mine")) }
+        #expect(try await store.installedDesigns().isEmpty)
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("a bundled package whose manifest names no valid identifier reserves nothing, and does not stop the import")
+    func noIdentifierReservesNothing() async throws {
         let store = InMemoryDesignStore()
-        let packages: [(name: String, data: Data)] = [("garbage", Data("not JSON".utf8)), ("no-manifest", Data("{}".utf8))]
+        let packages: [(name: String, data: Data)] = [("no-id", designData(".cv{}", id: "../clean")), ("no-key", designData(".cv{}", manifestWithout: ["id"]))]
         let install = InstallDesign(source: FixedBundledSource(packages: packages), gate: FakeRenderingGate(), store: store)
         _ = try await install(DesignStoreContract.package(id: "mine"))
         #expect(try await store.installedOrigins() == ["mine": .imported])
