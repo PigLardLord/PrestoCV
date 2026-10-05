@@ -86,7 +86,7 @@ private struct Subject {
     let values: ConstantValue
 
     init?(_ node: InitializerDeclSyntax, constants: FileConstants) {
-        guard let statements = node.body?.statements, !statements.isEmpty else { return nil }
+        guard !node.isVariadic, let statements = node.body?.statements, !statements.isEmpty else { return nil }
         self.node = node
         self.statements = statements
         names = node.signature.parameterClause.parameters.map { ($0.secondName ?? $0.firstName).text }
