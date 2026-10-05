@@ -20,8 +20,8 @@ struct LanguageTagTests {
 
     @Test("a document language that is not well formed is printed as undetermined")
     func undetermined() {
-        #expect(DocumentHTMLBuilder.languageTag("en-GB") == "en-GB")
-        #expect(DocumentHTMLBuilder.languageTag("en-GB-US-x1-yy") == "und")
-        #expect(DocumentHTMLBuilder.languageTag("") == "und")
+        #expect(LanguageTag.printable("en-GB") == "en-GB")
+        #expect(LanguageTag.printable("en-GB-US-x1-yy") == "und")
+        #expect(LanguageTag.printable("") == "und")
     }
 }

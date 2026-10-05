@@ -18,11 +18,6 @@ public struct DocumentHTMLBuilder: Sendable {
     /// clickable annotation; the base style lets that text wrap, since designs cannot set overflow-wrap.
     static let baseStyle = "a{overflow-wrap:anywhere}"
 
-    /// Anything that is not the shape of a language tag becomes "und" (undetermined).
-    static func languageTag(_ raw: String) -> String {
-        LanguageTag.isWellFormed(raw) ? raw : "und"
-    }
-
     /// The document as an HTML page.
     public func build(_ document: CVDocument, style: DocumentStyle, headings: Headings) -> String {
         render(document, style: style, headings: headings).html
@@ -36,7 +31,7 @@ public struct DocumentHTMLBuilder: Sendable {
     ///   - headings: the section titles in the document's language.
     public func render(_ document: CVDocument, style: DocumentStyle, headings: Headings) -> RenderedDocument {
         let body = body(of: document, headings: headings)
-        let page = HTML.element(.html, attributes: [(.lang, Self.languageTag(document.language))], children: [
+        let page = HTML.element(.html, attributes: [(.lang, LanguageTag.printable(document.language))], children: [
             head(title: document.person.name, style: style),
             .element(.body, children: [body]),
         ])
