@@ -46,6 +46,10 @@ flag "functionLength: blank lines inside a multi-line string count" \
   "$(printf 'func f() -> String {\n    return """\n%s\n    """\n}\n' "$(spaced 10)")" "functionLength: func f has 21"
 flag "functionLength: a multi-line expression counts line by line" "$(printf 'func f() {\n    g(\n%s\n        0\n    )\n}\n' "$(lines_of 18 '        %d,')")" "functionLength: func f has 21"
 clean "functionLength: a multi-line expression of 20 lines" "$(printf 'func f() {\n    g(\n%s\n        0\n    )\n}\n' "$(lines_of 17 '        %d,')")"
+regex_body() { printf 'func f() {\n    let r = #/\n%s\n    /#\n}\n' "$(lines_of "$1" '        part%d')"; }   # one token that spans every line of it
+flag "functionLength: a token that spans lines, an extended regex literal, counts line by line" "$(regex_body 19)" "functionLength: func f has 21"
+clean "functionLength: an extended regex literal of 20 lines" "$(regex_body 18)"
+flag "functionLength: a regex literal is counted with its blank lines" "$(printf 'func f() {\n    let r = #/\n%s\n    /#\n}\n' "$(spaced 10)")" "functionLength: func f has 21"
 flag "functionLength: a defer body counts in its function" "$(printf 'func f() {\n    defer {\n        a()\n        b()\n        c()\n        d()\n    }\n%s\n}\n' "$(lets 17)")" "functionLength: func f has 22"
 clean "functionLength: a function with a defer within the limit" "$(printf 'func f() {\n    defer {\n        a()\n    }\n%s\n}\n' "$(lets 17)")"
 flag "functionLength: a result-builder body is a computed property" "$(printf 'struct V {\n    @Builder var body: Int {\n        Stack {\n%s\n        }\n    }\n}\n' "$(lets 21)")" "functionLength: closure has 21"
@@ -71,6 +75,8 @@ clean "nestingDepth: a catch clause is at the level of its do" $'func f() {\n   
 flag "nestingDepth: while, repeat, for" $'func f() {\n    while a {\n        repeat {\n            for x in y { g() }\n        } while b\n    }\n}' "nestingDepth: func f nests 3 levels"
 clean "nestingDepth: a defer is no level" $'func f() {\n    if a {\n        if b {\n            defer { g() }\n        }\n    }\n}'
 clean "nestingDepth: a nested function starts again at its own body" $'func f() {\n    if a {\n        func g() {\n            if b {\n                if c { h() }\n            }\n        }\n    }\n}'
+flag "nestingDepth: reported on the line of the first construct over the limit" $'func f() {\n    if a {\n        for x in y {\n            if b {\n                while c { g() }\n            }\n        }\n    }\n}' "P.swift:4: CleanFunctions: nestingDepth: func f nests 4 levels"
+flag "nestingDepth: reported once, at the first construct, however many are too deep" $'func f() {\n    if a {\n        for x in y {\n            if b { g() }\n            if c { g() }\n        }\n    }\n}' "P.swift:4: CleanFunctions: nestingDepth: func f nests 3 levels"
 flag "nestingDepth: an initialiser" $'struct S {\n    init() {\n        if a {\n            for x in y {\n                if b { g() }\n            }\n        }\n    }\n}' "nestingDepth: init nests 3 levels"
 flag "nestingDepth: a computed property" $'struct S {\n    var p: Int {\n        if a {\n            for x in y {\n                if b { return 1 }\n            }\n        }\n        return 0\n    }\n}' "nestingDepth: getter of p nests 3 levels"
 flag "nestingDepth: a closure that initialises a property" $'struct S {\n    static let t: Int = {\n        if a {\n            for x in y {\n                if b { return 1 }\n            }\n        }\n        return 0\n    }()\n}' "nestingDepth: closure nests 3 levels"
@@ -198,6 +204,14 @@ delegating_init "delegation: a parameter passed twice" flag "self.init($PASS, e:
 delegating_init "delegation: a parameter replaced by a literal" flag "self.init(a: a, b: b, c: c, d: 0)"
 delegating_init "delegation: a name that is neither a parameter nor a file-level let" flag "self.init($PASS, e: unknown)"
 delegating_init "delegation: a trailing closure" flag "self.init($PASS) { }"
+delegating_init "delegation: a call of another type's initialiser is no delegation" flag "Other.init($PASS)"
+delegating_init "delegation: a call of the superclass initialiser is no delegation" flag "super.init($PASS)"
+delegating_init "delegation: a call of Self.init is no delegation" flag "Self.init($PASS)"
+data_init "assignment: a dictionary whose key is a call is behaviour" flag "$STORE; self.e = [Foo(): 1]"
+data_init "assignment: a dictionary whose key is a parameter is behaviour" flag "$STORE; self.e = [a: 1]"
+data_init "assignment: a dictionary whose value is a call is behaviour" flag "$STORE; self.e = [\"k\": Foo()]"
+data_init "assignment: a dictionary of literals is a constant" clean "$STORE; self.e = [\"k\": 1, \"j\": 2]"
+data_init "assignment: a dictionary with a constant key and a constant value" clean "$STORE; self.e = [Kind.empty: .none]"
 delegating_init "delegation: a second statement" flag "self.init($PASS, e: 0); register()"
 delegating_init "delegation: a name that a parameter shares with a file-level let is the parameter" flag "self.init(a: a, b: b, c: c, d: a)" "let a = 1"
 clean "parameterCount: the parameters of a closure are not counted" 'let f: (Int, Int, Int, Int) -> Void = { a, b, c, d in }'
@@ -245,6 +259,10 @@ for form in "// ${R}8" "/// The domain is pure (${R}2)." "/* ${R}10 */" "let x =
   flag "ruleNumberCitation: ${form//$'\n'/⏎}" "$form" "CleanComments: ruleNumberCitation"
 done
 flag "ruleNumberCitation: reported on the line of the comment" $'let a = 1\n/* two\n   lines '"${R}6"$' */\nlet b = 2' "P.swift:3: CleanComments: ruleNumberCitation"
+for form in "/** ${R}5 */" $'/**\n * The domain\n * ('"${R}2"$').\n */' "/*! ${R}9 */" "/// ${R}11" $'/* open\n   '"${R}12"$' */' "func f() {} // ${R}13"; do
+  flag "ruleNumberCitation: ${form//$'\n'/⏎}" "$form" "CleanComments: ruleNumberCitation"
+done
+flag "ruleNumberCitation: reported on the line of a documentation block" $'let a = 1\n/**\n * Text\n * '"${R}6"$'\n */\nlet b = 2' "P.swift:4: CleanComments: ruleNumberCitation"
 for form in "// ${R}15" "// A${R}8" "// ${R}80" "// ${R}0" "// the rule is DependencyRule" "let s = \"${R}8\"" "let r = \"(${R}2)\"" "// ${R}${R}8" "// ${R}8x"; do
   clean "ruleNumberCitation: not a citation: $form" "$form"
 done
