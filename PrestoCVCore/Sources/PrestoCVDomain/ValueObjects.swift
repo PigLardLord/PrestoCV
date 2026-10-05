@@ -204,26 +204,34 @@ public struct DocumentLanguage: Hashable, Sendable {
     }
 
     private static func canonicalTag(of subtags: [Substring]) -> String? {
-        guard let first = subtags.first, let language = language(first) else { return nil }
-        var canonical = [language]
-        var rest = subtags.dropFirst()
-        if let script = rest.first.flatMap(script) { canonical.append(script); rest = rest.dropFirst() }
-        if let region = rest.first.flatMap(region) { canonical.append(region); rest = rest.dropFirst() }
-        return rest.isEmpty ? canonical.joined(separator: "-") : nil
+        var rest = subtags[...]
+        guard let language = take(canonicalLanguage, from: &rest) else { return nil }
+        let script = take(canonicalScript, from: &rest)
+        let region = take(canonicalRegion, from: &rest)
+        guard rest.isEmpty else { return nil }
+        let present: [String?] = [language, script, region]
+        return present.compactMap { $0 }.joined(separator: "-")
+    }
+
+    /// Removes the first subtag and returns its canonical form, if `canonical` accepts it; otherwise leaves it in place.
+    private static func take(_ canonical: (Substring) -> String?, from subtags: inout ArraySlice<Substring>) -> String? {
+        guard let first = subtags.first, let accepted = canonical(first) else { return nil }
+        subtags.removeFirst()
+        return accepted
     }
 
     /// Two or three letters, in lower case.
-    private static func language(_ subtag: Substring) -> String? {
+    private static func canonicalLanguage(_ subtag: Substring) -> String? {
         (2...3).contains(subtag.count) && subtag.allSatisfy(\.isASCIILetter) ? subtag.lowercased() : nil
     }
 
     /// Four letters, the first in upper case.
-    private static func script(_ subtag: Substring) -> String? {
+    private static func canonicalScript(_ subtag: Substring) -> String? {
         subtag.count == 4 && subtag.allSatisfy(\.isASCIILetter) ? subtag.prefix(1).uppercased() + subtag.dropFirst().lowercased() : nil
     }
 
     /// Two letters, in upper case, or three digits.
-    private static func region(_ subtag: Substring) -> String? {
+    private static func canonicalRegion(_ subtag: Substring) -> String? {
         if subtag.count == 2, subtag.allSatisfy(\.isASCIILetter) { return subtag.uppercased() }
         return subtag.count == 3 && subtag.allSatisfy(\.isASCIIDigit) ? String(subtag) : nil
     }
