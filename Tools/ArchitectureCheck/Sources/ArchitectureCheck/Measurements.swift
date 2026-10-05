@@ -9,6 +9,8 @@ enum Limits {
     static let typeLines = 200
     static let fileLines = 300
     static let protocolRequirements = 5
+    /// What the search for data initialisers in one file may spend, in steps, unless `--search-steps` says otherwise.
+    static let searchSteps = 1_000_000
 }
 
 extension Hit {
@@ -25,10 +27,11 @@ enum Measurements {
         "ruleNumberCitation",
     ]
 
-    static func hits(of tree: SourceFileSyntax, file: String) -> [Hit] {
+    static func hits(of tree: SourceFileSyntax, file: String, searchSteps: Int) -> [Hit] {
         let lines = CodeLines(converter: SourceLocationConverter(fileName: file, tree: tree))
+        let dataInitializer = DataInitializer(constants: FileConstants(tree), types: FileTypes(tree), meter: WorkMeter(budget: searchSteps))
         let length = BodyLengthVisitor(lines: lines), shape = BodyShapeVisitor(lines: lines)
-        let signatures = SignatureVisitor(lines: lines, constants: FileConstants(tree), types: FileTypes(tree))
+        let signatures = SignatureVisitor(lines: lines, dataInitializer: dataInitializer)
         let types = TypeLengthVisitor(lines: lines), protocols = ProtocolSizeVisitor(lines: lines)
         for visitor in [length, shape, signatures, types, protocols] as [SyntaxVisitor] { visitor.walk(tree) }
         return length.hits + shape.hits + signatures.hits + types.hits + protocols.hits

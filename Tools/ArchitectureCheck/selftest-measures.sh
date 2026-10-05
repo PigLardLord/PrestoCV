@@ -289,6 +289,37 @@ typed "variadic: a delegation that a variadic overload can take is not exempt, b
 typed "variadic: a variadic parameter that the call leaves out still fits" flag "struct W {${NL}$FIELDS${NL}    $INIT4${NL}    init(a: Int, b: Int, c: Int, d: Int, rest: Int...) { self.init(a: a, b: b, c: c, d: d) }${NL}    init(first a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d) }${NL}}" "" "P.swift:5: CleanFunctions: parameterCount: init takes 4"
 typed "variadic: a delegation to a variadic overload that the labels fit, with several arguments" flag "struct W {${NL}    var values: [Int]${NL}    init(_ values: Int...) { self.values = values }${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(a, b, c, d) }${NL}}" "" "P.swift:4: CleanFunctions: parameterCount: init takes 4"
 typed "variadic: the delegation is exempt when no variadic overload can take it" clean "struct W {${NL}$FIELDS${NL}    $STORING${NL}    init(other: Int, values: Int...) { self.init(first: other, b: 0, c: 0, d: 0) }${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}}"
+# The search is bounded by counted work, not by time: each initialiser is examined once, a delegation that comes back to it is a
+# cycle, the labels of a call are matched against the parameters in one pass, and a file whose search spends more than the
+# budget (--search-steps, a million by default) reports it and exempts nothing. A file built to blow the search up still ends.
+fan() {   # $1 = n: n initialisers, each with one parameter more than the last and delegating to the next, the last one storing
+  local i j args params
+  printf 'struct Fan {\n    var '; for ((i = 1; i <= $1; i++)); do printf 'l%d: Int%s' "$i" "$([[ $i -lt $1 ]] && printf ', ')"; done; printf '\n'
+  for ((i = 1; i < $1; i++)); do
+    params=""; args=""
+    for ((j = 1; j <= i; j++)); do params+="l$j: Int = 0, "; args+="l$j: l$j, "; done
+    printf '    init(%s) { self.init(%sl%d: 0) }\n' "${params%, }" "$args" "$((i + 1))"
+  done
+  params=""; args=""
+  for ((j = 1; j <= $1; j++)); do params+="l$j: Int = 0, "; args+="self.l$j = l$j; "; done
+  printf '    init(%s) { %s}\n}\n' "${params%, }" "$args"
+}
+unlabeled() {   # $1 = n: an initialiser of n defaulted unlabeled parameters, a variadic one, and one of n + 1 that delegates
+  local i params args xs
+  params=""; args=""; xs=""
+  for ((i = 1; i <= $1; i++)); do params+="_ a$i: Int = 0, "; args+="a$i, "; done
+  local calls=""; for ((i = 1; i <= $1 + 1; i++)); do xs+="x$i: Int, "; calls+="x$i, "; done
+  printf 'struct U {\n    var values: [Int] = []\n    init(_ values: Int...) { self.values = values }\n    init(%s) { self.values = [%s] }\n    init(%s) { self.init(%s) }\n}\n' "${params%, }" "${args%, }" "${xs%, }" "${calls%, }"
+}
+setup; src "$(fan 20)"; expect "search: twenty overloads that each delegate to the next, all data initialisers, finish within the budget" 0 ""
+setup; src "$(fan 20)"; expect "search: the same file with a budget of 100 steps is reported, and nothing in it is exempt" 1 "the search for data initialisers stopped at its budget of 100 steps" --search-steps 100
+setup; src "$(fan 20)"; expect "search: a budget that is spent leaves the initialisers it reached as findings" 1 "init takes 19 parameters" --search-steps 100
+setup; src "$(unlabeled 24)"; expect "search: twenty-four defaulted unlabeled parameters and a variadic overload are matched in one pass" 1 "init takes 25 parameters"
+setup; src "$(unlabeled 24)"; got=$(run)
+if grep -q "stopped at its budget" "$ROOT/out.txt"; then fail=$((fail+1)); echo "FAIL search: the unlabeled parameters spent the whole budget"; else pass=$((pass+1)); echo "ok   search: the unlabeled parameters stay within the budget"; fi
+setup; src $'struct S {\n    let a: Int, b: Int, c: Int\n    init(a: Int, b: Int, c: Int) { self.a = a; self.b = b; self.c = c }\n}'; expect "search: an initialiser within the parameter cap is not searched, so it spends nothing" 0 "" --search-steps 0
+setup; src "$(fan 20)"; got=$(run --search-steps 1000000)
+if [[ "$got" == 0 ]]; then pass=$((pass+1)); echo "ok   search: the default budget is a million steps"; else fail=$((fail+1)); echo "FAIL search: the default budget"; fi
 # Known limit, stated in ADR 0021 and the README: resolution is per file, so an overload that another file declares is not seen.
 # The delegation below can mean the overload of Q.swift at compile time, which computes; the checker sees only the one in P.swift.
 # Review is the backstop for it.

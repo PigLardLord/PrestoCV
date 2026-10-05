@@ -7,19 +7,40 @@ import SwiftSyntax
 ///   a stored instance property that the file declares for the type or one of its extensions: a computed property
 ///   runs code, a `static` one is no instance's, and one that cannot be found is not known to be stored;
 /// - **delegation**: the only statement is `self.init(...)`, and each argument is a parameter passed unchanged, each
-///   parameter once, or a literal or a constant. The call must reach an initialiser of the same type that the file
-///   declares, with those argument labels and no variadic parameter, and that initialiser must be a data initialiser
-///   in its turn; a call that reaches itself again, or one that cannot be resolved in the file, is not exempt.
-struct DataInitializer {
-    let constants: FileConstants
-    let types: FileTypes
+///   parameter once, or a literal or a constant. The call must reach initialisers of the same type that the file
+///   declares, found by its argument labels, and each must be a data initialiser in its turn; an initialiser with a
+///   variadic parameter never is, and a call that comes back to itself, or one that cannot be resolved in the file, is
+///   not exempt.
+///
+/// Each initialiser is examined once, and the work is counted: a search that spends its budget gives up, and the
+/// initialisers it had not found to be data initialisers are not exempt.
+final class DataInitializer {
+    private let constants: FileConstants
+    private let types: FileTypes
+    private let meter: WorkMeter
+    /// What is known of each initialiser: its answer once it is found, false while it is being examined, so that a
+    /// delegation that comes back to one that it is following is a cycle and no data initialiser.
+    private var answers: [SyntaxIdentifier: Bool] = [:]
 
-    func matches(_ node: InitializerDeclSyntax) -> Bool { matches(node, visiting: []) }
+    init(constants: FileConstants, types: FileTypes, meter: WorkMeter) {
+        self.constants = constants
+        self.types = types
+        self.meter = meter
+    }
 
-    /// `visiting` holds the initialisers whose delegation is being followed, so that a cycle ends and is not exempt.
-    private func matches(_ node: InitializerDeclSyntax, visiting: Set<SyntaxIdentifier>) -> Bool {
-        guard !visiting.contains(node.id), let subject = Subject(node, constants: constants) else { return false }
-        return assigns(subject) || delegates(subject, visiting: visiting.union([node.id]))
+    /// Whether the search was cut short, so that some initialiser that is exempt was not found to be.
+    var isExhausted: Bool { meter.isExhausted }
+
+    /// The steps the search may take.
+    var budget: Int { meter.budget }
+
+    func matches(_ node: InitializerDeclSyntax) -> Bool {
+        if let known = answers[node.id] { return known }
+        answers[node.id] = false
+        guard meter.spend(), let subject = Subject(node, constants: constants) else { return false }
+        let answer = assigns(subject) || delegates(subject)
+        answers[node.id] = answer
+        return answer
     }
 
     private func assigns(_ subject: Subject) -> Bool {
@@ -37,9 +58,9 @@ struct DataInitializer {
         return assignments.allSatisfy { stored.contains($0.target) }
     }
 
-    private func delegates(_ subject: Subject, visiting: Set<SyntaxIdentifier>) -> Bool {
+    private func delegates(_ subject: Subject) -> Bool {
         guard let call = Self.delegation(subject) else { return false }
-        return reachesDataInitializer(call, from: subject.node, visiting: visiting)
+        return reachesDataInitializer(call, from: subject.node)
     }
 
     /// The call of a body that is one `self.init(...)` passing each parameter once and nothing but constants besides.
@@ -50,11 +71,15 @@ struct DataInitializer {
     }
 
     /// Every initialiser of the type that the call can mean is a data initialiser, and there is at least one.
-    private func reachesDataInitializer(_ call: FunctionCallExprSyntax, from node: InitializerDeclSyntax,
-                                        visiting: Set<SyntaxIdentifier>) -> Bool {
+    private func reachesDataInitializer(_ call: FunctionCallExprSyntax, from node: InitializerDeclSyntax) -> Bool {
         guard let declared = types.initializers(ofTypeHolding: node) else { return false }
-        let callees = declared.filter { $0.canBeCalled(by: call) }
-        return !callees.isEmpty && callees.allSatisfy { matches($0, visiting: visiting) }
+        let callees = declared.filter { canBeCalled($0, by: call) }
+        return !callees.isEmpty && callees.allSatisfy { matches($0) }
+    }
+
+    private func canBeCalled(_ candidate: InitializerDeclSyntax, by call: FunctionCallExprSyntax) -> Bool {
+        meter.spend(candidate.matchingCost(of: call))
+        return candidate.canBeCalled(by: call)
     }
 
     /// `self.init(...)`, without a trailing closure.

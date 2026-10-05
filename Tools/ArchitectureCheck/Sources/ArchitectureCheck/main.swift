@@ -56,9 +56,11 @@ func describe(_ error: Error) -> String {
 }
 
 guard CommandLine.arguments.count > 1, let rulesPath = value(after: "--rules"), let baselinePath = value(after: "--baseline") else {
-    fail("usage: ArchitectureCheck <root> --rules <json> --baseline <json> [--against <json>] [--modules <md>] [--adr-dir <dir>] [--packages a,b] [--write-baseline]")
+    fail("usage: ArchitectureCheck <root> --rules <json> --baseline <json> [--against <json>] [--modules <md>] [--adr-dir <dir>] [--packages a,b] [--write-baseline] [--search-steps n]")
 }
 let root = URL(fileURLWithPath: CommandLine.arguments[1]).standardizedFileURL
+/// What the search for data initialisers in one file may spend (see `WorkMeter`); `--search-steps` lowers it for a test.
+let searchSteps = value(after: "--search-steps").flatMap { Int($0) } ?? Limits.searchSteps
 let config: Config
 do { config = try JSONDecoder().decode(Config.self, from: Data(contentsOf: URL(fileURLWithPath: rulesPath))) }
 catch { fail("cannot read rules: \(describe(error))") }
@@ -191,7 +193,7 @@ for (file, target) in assignment where target.kind != .legacy {
         }
     }
     let rulesFor = detectorToRules(target)
-    let measured = Measurements.detectors.isDisjoint(with: rulesFor.keys) ? [] : Measurements.hits(of: tree, file: file)
+    let measured = Measurements.detectors.isDisjoint(with: rulesFor.keys) ? [] : Measurements.hits(of: tree, file: file, searchSteps: searchSteps)
     for hit in scanner.hits + measured {
         // Inside a manifest, the declaration of a legacy target is exempt like its sources (ADR 0012); anything
         // else in the manifest, including package-level settings and new targets, is checked.

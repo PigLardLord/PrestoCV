@@ -7,9 +7,9 @@ final class SignatureVisitor: SyntaxVisitor {
     private let lines: CodeLines
     private let dataInitializer: DataInitializer
 
-    init(lines: CodeLines, constants: FileConstants, types: FileTypes) {
+    init(lines: CodeLines, dataInitializer: DataInitializer) {
         self.lines = lines
-        self.dataInitializer = DataInitializer(constants: constants, types: types)
+        self.dataInitializer = dataInitializer
         super.init(viewMode: .sourceAccurate)
     }
 
@@ -18,11 +18,17 @@ final class SignatureVisitor: SyntaxVisitor {
         return .visitChildren
     }
 
+    /// The parameters are counted first, and only an initialiser over the cap is searched for a reason to be exempt.
     override func visit(_ node: InitializerDeclSyntax) -> SyntaxVisitorContinueKind {
-        if !dataInitializer.matches(node) {
-            check("init", node.signature.parameterClause.parameters.count, at: lines.line(of: node.initKeyword))
-        }
+        let count = node.signature.parameterClause.parameters.count
+        if count > Limits.parameters, !dataInitializer.matches(node) { check("init", count, at: lines.line(of: node.initKeyword)) }
         return .visitChildren
+    }
+
+    override func visitPost(_ node: SourceFileSyntax) {
+        guard dataInitializer.isExhausted else { return }
+        let detail = "the search for data initialisers stopped at its budget of \(dataInitializer.budget) steps, so the initialisers it did not reach count as not exempt"
+        hits.append(Hit(measured: "parameterCount", detail, line: 1))
     }
 
     private func check(_ name: String, _ count: Int, at line: Int) {
