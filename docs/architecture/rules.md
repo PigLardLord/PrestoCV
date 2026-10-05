@@ -196,7 +196,7 @@ In production targets:
 
 **Why.** A comment that restates the code goes stale the first time the code changes, and then it lies.
 
-**Enforced by:** checker (detector `ruleNumberCitation`) and review.
+**Enforced by:** checker (detector `ruleNumberCitation`, in the comments of production sources and in the documents) and review.
 
 ### CleanErrors: errors are typed per context and translated at the boundary
 

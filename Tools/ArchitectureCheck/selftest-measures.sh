@@ -239,6 +239,34 @@ for form in "// ${R}15" "// A${R}8" "// ${R}80" "// ${R}0" "// the rule is Depen
   clean "ruleNumberCitation: not a citation: $form" "$form"
 done
 
+# The same detector reads the documents that cite the rules: docs/**/*.md, AGENTS.md and every README.md. The merged ADRs
+# 0001 to 0012 and ADR 0021 keep the former numbers, and so does the table of rules.md that maps them.
+doc() { mkdir -p "$ROOT/$(dirname "$1")"; printf '%s\n' "$2" > "$ROOT/$1"; }   # $1 = path under the root, $2 = contents
+doc_flag() { setup; src 'let x = 1'; doc "$2" "$3"; expect "ruleNumberCitation in a document: $1" 1 "$4"; }   # $1 = name, $2 = path, $3 = contents, $4 = expected line
+doc_clean() { setup; src 'let x = 1'; doc "$2" "$3"; expect "ruleNumberCitation in a document: $1" 0 ""; }
+CITED="the (${R}8) rule"
+doc_flag "AGENTS.md" AGENTS.md "$CITED" "AGENTS.md:1: CleanComments: ruleNumberCitation"
+doc_flag "the README of the repository" README.md "$CITED" "README.md:1: CleanComments: ruleNumberCitation"
+doc_flag "the README of a package" Package/README.md "$CITED" "Package/README.md:1: CleanComments: ruleNumberCitation"
+doc_flag "a document of docs/" docs/architecture/modules.md "$CITED" "docs/architecture/modules.md:1: CleanComments: ruleNumberCitation"
+doc_flag "a nested document of docs/" docs/guides/deep/guide.md "$CITED" "docs/guides/deep/guide.md:1: CleanComments: ruleNumberCitation"
+doc_flag "an ADR that is not merged yet" docs/architecture/adr/0013-new.md "$CITED" "adr/0013-new.md:1: CleanComments: ruleNumberCitation"
+doc_flag "the first ADR after the merged ones" docs/architecture/adr/0020-last.md "$CITED" "adr/0020-last.md:1"
+doc_flag "reported on the line of the citation" README.md $'first\nsecond\nthird '"(${R}2)" "README.md:3: CleanComments: ruleNumberCitation"
+doc_flag "every citation of a line" README.md "${R}1 and ${R}14 and ${R}9m" "ruleNumberCitation: the document cites"
+for adr in 0001 0006 0012 0021; do
+  doc_clean "ADR $adr keeps the former numbers" "docs/architecture/adr/$adr-record.md" "$CITED"
+done
+doc_clean "a Markdown file outside docs, AGENTS.md and the READMEs is not read" notes/other.md "$CITED"
+doc_clean "a prototype is not read" Prototypes/Demo/README.md "$CITED"
+for text in "${R}15" "A${R}8" "${R}80" "${R}0" "the rule is DependencyRule" "${R}8x"; do
+  doc_clean "not a citation: $text" README.md "$text"
+done
+doc_clean "rules.md keeps the table of former numbers" docs/architecture/rules.md $'# Rules\n\n## Former numbers\n\n| '"${R}1"$' | `DependencyRule` |\n| '"${R}14"$' | `NoDeadCode` |\n\n'
+doc_flag "rules.md before its table of former numbers" docs/architecture/rules.md $'# Rules '"(${R}3)"$'\n\n## Former numbers\n\n| '"${R}1"$' | `DependencyRule` |\n' "docs/architecture/rules.md:1: CleanComments"
+doc_flag "rules.md after its table of former numbers" docs/architecture/rules.md $'## Former numbers\n\n| '"${R}1"$' | x |\n\n## Review checklist\n\nSee '"${R}4"$'.\n' "docs/architecture/rules.md:7: CleanComments"
+doc_flag "another document with a section of the same name" docs/architecture/modules.md $'## Former numbers\n\n| '"${R}1"$' | x |\n' "docs/architecture/modules.md:3: CleanComments"
+
 # --- the policy: these detectors run on production targets only (ADR 0021 (c))
 setup; src 'let x = 1'; printf '%s\n' "$(fn 21)" > "$ROOT/Sources/Other/O.swift"
 expect "a target that does not list the rules is not measured" 0 ""

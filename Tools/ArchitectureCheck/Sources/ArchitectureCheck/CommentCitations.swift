@@ -31,12 +31,13 @@ enum CommentCitations {
         }
     }
 
-    private static func citations(in comment: String, at firstLine: Int) -> [Hit] {
-        let text = comment as NSString
-        return pattern.matches(in: comment, range: NSRange(location: 0, length: text.length)).map { match in
-            let number = text.substring(with: match.range)
-            let line = firstLine + text.substring(to: match.range.location).filter { $0 == "\n" }.count
-            return Hit(measured: "ruleNumberCitation", "the comment cites a rule by its former number \(number); cite it by name", line: line)
+    /// The former numbers cited in `text`, which starts at line `firstLine`.
+    static func citations(in text: String, at firstLine: Int) -> [Hit] {
+        let characters = text as NSString
+        return pattern.matches(in: text, range: NSRange(location: 0, length: characters.length)).map { match in
+            let number = characters.substring(with: match.range)
+            let line = firstLine + characters.substring(to: match.range.location).filter { $0 == "\n" }.count
+            return Hit(measured: "ruleNumberCitation", "the document cites a rule by its former number \(number); cite it by name", line: line)
         }
     }
 }

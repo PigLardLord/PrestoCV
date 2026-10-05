@@ -41,7 +41,7 @@ They enforce `CleanFunctions`, `CleanTypes`, `ISP` and `CleanComments` on produc
 | `typeLength` | `CleanTypes` | a type declaration or an extension has more than 200 lines of code |
 | `fileLength` | `CleanTypes` | a file has more than 300 lines of code |
 | `protocolSize` | `ISP` | a protocol declares more than 5 requirements |
-| `ruleNumberCitation` | `CleanComments` | a comment cites a rule by the number it had before ADR 0021 |
+| `ruleNumberCitation` | `CleanComments` | a comment or a document cites a rule by the number it had before ADR 0021 |
 
 **What counts.** A line is code when a token other than a brace touches it, so blank, comment-only and brace-only lines do not count. A token that spans lines, such as a line of a multi-line string, makes each of them code. A line that holds a compiler directive (`#if`, `#else`, `#endif`) is code, and every `#if` branch is counted, active or not.
 
@@ -69,7 +69,7 @@ Everything else is behaviour and makes the initialiser an ordinary one: a call, 
 
 **Protocol requirements.** Functions, variables (one per binding), subscripts, initialisers and associated types, in every `#if` branch. Inherited requirements and `typealias` are not counted.
 
-**Citations.** The letter R followed by a number from 1 to 14 and an optional `m`, in line, block and documentation comments. A string that holds one is not a comment.
+**Citations.** The letter R followed by a number from 1 to 14 and an optional `m`, in line, block and documentation comments of a source. A string that holds one is not a comment. The same detector reads `docs/**/*.md`, `AGENTS.md` and every `README.md`, except the merged ADRs 0001 to 0012, ADR 0021, the section "Former numbers" of `docs/architecture/rules.md` and anything under `Prototypes/`.
 
 ## Pre-commit hook
 

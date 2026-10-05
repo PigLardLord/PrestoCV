@@ -56,10 +56,10 @@
   - **Where:** the thresholds apply to production targets, the ones the checker already holds to the rules: domain, application, integration, presentation, workflow ports, adapters and the composition root. Tests, test support and tools are held to Clean Code by review, with no thresholds. Legacy targets stay exempt until they are deleted ([ADR 0012](0012-legacy-targets-during-migration.md)).
   - **Interface segregation:** a protocol a production target declares has at most five requirements.
 - **(d) What enforces each rule.**
-  - **The checker** names its findings by rule. It gains the detectors `functionLength`, `parameterCount`, `nestingDepth`, `cyclomaticComplexity`, `typeLength`, `fileLength` and `protocolSize`, each with a self-test, and `ruleNumberCitation`, which refuses a former rule number cited in a production source.
+  - **The checker** names its findings by rule. It gains the detectors `functionLength`, `parameterCount`, `nestingDepth`, `cyclomaticComplexity`, `typeLength`, `fileLength` and `protocolSize`, each with a self-test, and `ruleNumberCitation`, which refuses a former rule number cited in a comment of a production source and in a document.
   - **Review** holds what no tool can see: names, a single responsibility, open/closed, comments that restate code, and duplication. Every review, dimension or final gate, goes through the checklist at the end of `rules.md`.
 - **(e) No baseline.** A finding of the new detectors is not baselined. The pull request that adds them brings `main`'s production code to the rules, and every open pull request is brought to them before it merges. An exception stays what [ADR 0006](0006-enforce-architecture-mechanically.md) made it: an entry in `rules.json` that cites an ADR.
-- **(f) Citations.** Docs, code comments and commit messages cite a rule by its name, such as `ValidatingBoundary` or `SRP`. The docs check (#183) refuses a former number in a document other than the merged ADRs and this one.
+- **(f) Citations.** Docs, code comments and commit messages cite a rule by its name, such as `ValidatingBoundary` or `SRP`. The checker's `ruleNumberCitation` refuses a former number in a comment of a production source and in `docs/**/*.md`, `AGENTS.md` and every `README.md`, except in the merged ADRs 0001 to 0012, in this ADR and in the table of former numbers of `rules.md`. A document that cites one is corrected when it is next changed.
 
 ## Consequences
 

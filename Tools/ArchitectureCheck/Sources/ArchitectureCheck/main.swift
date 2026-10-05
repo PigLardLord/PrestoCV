@@ -65,7 +65,7 @@ for (p, ts) in byPath where ts.count > 1 { problems.append("path \(p) is claimed
 for t in config.targets where !FileManager.default.fileExists(atPath: root.appendingPathComponent(t.path).path) {
     problems.append("target \(t.name): path \(t.path) does not exist")
 }
-var files: [String] = []
+var files: [String] = [], documents: [String] = []
 if let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isSymbolicLinkKey]) {
     for case let url as URL in e {
         let rel = url.standardizedFileURL.path.replacingOccurrences(of: root.path + "/", with: "")
@@ -74,6 +74,7 @@ if let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: 
             problems.append("symbolic link in the source tree: \(rel)"); continue
         }
         if url.pathExtension == "swift" { files.append(rel) }
+        if url.pathExtension == "md" { documents.append(rel) }
     }
 }
 var assignment: [(file: String, target: Config.Target)] = []
@@ -121,6 +122,14 @@ let detectorToRules: (Config.Target) -> [String: [String]] = { target in
     return map
 }
 
+var ordinals: [String: Int] = [:]
+@MainActor func recordFinding(file: String, rule: String, detector: String, detail: String, node: String, line: Int) {
+    if exceptionsValid.contains(where: { file.hasPrefix($0.path) && $0.detector == detector }) { return }
+    let base = "\(file)|\(rule)|\(detector)|\(fingerprint(node))"
+    let n = ordinals[base, default: 0]; ordinals[base] = n + 1
+    findings.append(Finding(key: "\(base)#\(n)", message: "\(file):\(line): \(rule): \(detector): \(detail)"))
+}
+
 let legacyTargets = config.targets.filter { $0.kind == "legacy" }
 
 let manifestPaths = config.targets.filter { $0.kind == "manifest" }.map(\.path)
@@ -143,12 +152,8 @@ for (file, target) in assignment where target.kind != "legacy" {
     let tree = Parser.parse(source: source)
     let scanner = Scanner(tree: tree, file: file, infrastructureTypes: Set(config.infrastructureTypes))
     scanner.walk(tree)
-    var ordinals: [String: Int] = [:]
     func record(rule: String, detector: String, detail: String, node: String, line: Int) {
-        if exceptionsValid.contains(where: { file.hasPrefix($0.path) && $0.detector == detector }) { return }
-        let base = "\(file)|\(rule)|\(detector)|\(fingerprint(node))"
-        let n = ordinals[base, default: 0]; ordinals[base] = n + 1
-        findings.append(Finding(key: "\(base)#\(n)", message: "\(file):\(line): \(rule): \(detector): \(detail)"))
+        recordFinding(file: file, rule: rule, detector: detector, detail: detail, node: node, line: line)
     }
     let allowed = Set(target.allowedImports + ["Swift"])
     for imp in scanner.imports where !allowed.contains(imp.module) {
@@ -182,6 +187,16 @@ for (file, target) in assignment where target.kind != "legacy" {
                        node: String(line), line: 1)
             }
         }
+    }
+}
+
+// MARK: Documents: a rule cited by its former number
+
+let citationRules = config.rules.filter { $0.value.contains("ruleNumberCitation") }.keys.sorted()
+for path in documents.sorted() where DocumentCitations.isChecked(path) {
+    guard let text = try? String(contentsOf: root.appendingPathComponent(path), encoding: .utf8) else { problems.append("cannot read \(path)"); continue }
+    for hit in DocumentCitations.hits(in: text, at: path) {
+        for rule in citationRules { recordFinding(file: path, rule: rule, detector: hit.detector, detail: hit.detail, node: hit.node, line: hit.line) }
     }
 }
 
