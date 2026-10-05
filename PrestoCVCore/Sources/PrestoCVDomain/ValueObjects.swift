@@ -116,17 +116,34 @@ public struct PhoneNumber: Hashable, Sendable {
 /// the parser serialises, never as the raw input.
 public struct WebLink: Hashable, Sendable {
     public let value: String
+    private static let maxBytes = 2048
+    private static let defaultPorts = ["https": 443, "http": 80]
+
     public init?(_ raw: String) {
-        let v = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard v.utf8.count <= 2048, v.unicodeScalars.allSatisfy({ $0.isASCII && $0.value > 0x20 && $0.value != 0x7F && $0 != "\\" }),
-              let c = URLComponents(string: v), let scheme = c.scheme?.lowercased(), scheme == "https" || scheme == "http",
-              let host = c.host, host.range(of: #"^[A-Za-z0-9.-]{1,253}\z"#, options: .regularExpression) != nil,
-              c.user == nil, c.password == nil, c.port == nil || c.port == (scheme == "https" ? 443 : 80),
-              let serialized = c.string, serialized.utf8.count <= 2048,
-              serialized.unicodeScalars.allSatisfy({ $0.isASCII && $0.value > 0x20 && $0.value != 0x7F && $0 != "\\" }),
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard Self.isPlainASCII(trimmed), let components = URLComponents(string: trimmed), Self.isWebAddress(components),
+              let serialized = components.string, Self.isPlainASCII(serialized),
               URLComponents(string: serialized)?.string == serialized else { return nil }   // the value rebuilds itself
         value = serialized
     }
+
+    private static func isPlainASCII(_ text: String) -> Bool {
+        text.utf8.count <= maxBytes && text.unicodeScalars.allSatisfy(isPlainScalar)
+    }
+
+    /// Printable ASCII, and no backslash, which some parsers read as a slash.
+    private static func isPlainScalar(_ scalar: Unicode.Scalar) -> Bool {
+        scalar.isASCII && scalar.value > 0x20 && scalar.value != 0x7F && scalar != "\\"
+    }
+
+    private static func isWebAddress(_ components: URLComponents) -> Bool {
+        guard let scheme = components.scheme?.lowercased(), let defaultPort = defaultPorts[scheme], let host = components.host else { return false }
+        return isHostName(host) && hasNoCredentials(components) && [nil, defaultPort].contains(components.port)
+    }
+
+    private static func isHostName(_ host: String) -> Bool { host.range(of: #"^[A-Za-z0-9.-]{1,253}\z"#, options: .regularExpression) != nil }
+
+    private static func hasNoCredentials(_ components: URLComponents) -> Bool { components.user == nil && components.password == nil }
 }
 
 // MARK: - The document
