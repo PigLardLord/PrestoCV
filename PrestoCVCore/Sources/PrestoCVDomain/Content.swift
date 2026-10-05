@@ -67,19 +67,25 @@ public struct CVSections: Hashable, Sendable {
     public var languages: [LanguageSkill]
     public var certifications: [Certification]
     public var profiles: [ProfileLink]
-    /// Trimmed, never empty, no duplicates ignoring case.
-    public private(set) var interests: [String]
+    /// Trimmed, never empty, no duplicates ignoring case. The first of two equal interests stays.
+    public private(set) var interests: [String] {
+        get { distinctInterests }
+        set { distinctInterests = Self.distinctTrimmed(newValue) }
+    }
+    private var distinctInterests: [String] = []
 
+    /// The initialiser only stores what it is given; the interests rule is the setter of `interests`.
     public init(experiences: [Experience] = [], education: [Education] = [], skills: [Skill] = [], languages: [LanguageSkill] = [],
                 certifications: [Certification] = [], profiles: [ProfileLink] = [], interests: [String] = []) {
         self.experiences = experiences; self.education = education; self.skills = skills; self.languages = languages
-        self.certifications = certifications; self.profiles = profiles; self.interests = []
-        setInterests(interests)
+        self.certifications = certifications; self.profiles = profiles; self.interests = interests
     }
 
-    public mutating func setInterests(_ values: [String]) {
+    public mutating func setInterests(_ values: [String]) { interests = values }
+
+    private static func distinctTrimmed(_ values: [String]) -> [String] {
         var seen = Set<String>()
-        interests = values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        return values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
     }
 }
