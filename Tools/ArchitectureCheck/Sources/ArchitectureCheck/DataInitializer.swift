@@ -40,11 +40,15 @@ final class DataInitializer {
     func matches(_ node: InitializerDeclSyntax) -> Bool {
         if let known = answers[node.id] { return known }
         answers[node.id] = false
-        guard meter.spend(), !types.isClassWithInheritanceClause(holding: node),
-              let subject = Subject(node, constants: constants) else { return false }
-        let answer = assigns(subject) || delegates(subject)
+        let answer = examine(node)
         answers[node.id] = answer
         return answer
+    }
+
+    private func examine(_ node: InitializerDeclSyntax) -> Bool {
+        guard meter.spend(), !types.isClassWithInheritanceClause(holding: node),
+              let subject = Subject(node, constants: constants) else { return false }
+        return assigns(subject) || delegates(subject)
     }
 
     private func assigns(_ subject: Subject) -> Bool {
@@ -120,9 +124,14 @@ private struct Subject {
         guard !node.isVariadic, let statements = node.body?.statements, !statements.isEmpty else { return nil }
         self.node = node
         self.statements = statements
-        names = node.signature.parameterClause.parameters.map { ($0.secondName ?? $0.firstName).text }
+        names = Self.parameterNames(of: node)
         values = ConstantValue(constants: constants, parameters: Set(names))
         guard Self.defaults(of: node).allSatisfy({ values.accepts($0) }) else { return nil }
+    }
+
+    /// The names that the body uses for the parameters, which are the second names when a parameter has two.
+    private static func parameterNames(of node: InitializerDeclSyntax) -> [String] {
+        node.signature.parameterClause.parameters.map { ($0.secondName ?? $0.firstName).text }
     }
 
     private static func defaults(of node: InitializerDeclSyntax) -> [ExprSyntax] {
