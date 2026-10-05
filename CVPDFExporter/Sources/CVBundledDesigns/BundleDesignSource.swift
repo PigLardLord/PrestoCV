@@ -5,6 +5,8 @@ import CVDesignCatalog
 public struct BundleDesignSource: BundledDesignSource {
     public init() {}
 
+    /// - Throws: `CocoaError(.fileNoSuchFile)` when the `Designs` resource folder is missing, and the file system's error
+    ///   when a package cannot be read.
     public func bundledPackages() async throws -> [(name: String, data: Data)] {
         guard let folder = Bundle.module.url(forResource: "Designs", withExtension: nil) else { throw CocoaError(.fileNoSuchFile) }
         let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)

@@ -3,7 +3,11 @@ import Foundation
 /// Anti-corruption layer for design packages (ValidatingBoundary). Works on the raw bytes: size first, then a strict
 /// decode (unknown keys and any `htmlContent` key are rejected), then id, contract, CSS and preview.
 public struct DesignPackageValidator: Sendable {
-    public var maxBytes: Int, maxPreviewBytes: Int
+    /// The largest package accepted, in bytes. It is checked before anything is parsed.
+    public var maxBytes: Int
+    /// The largest preview PNG accepted, in bytes after decoding.
+    public var maxPreviewBytes: Int
+
     public init(maxBytes: Int = 512 * 1024, maxPreviewBytes: Int = 256 * 1024) { self.maxBytes = maxBytes; self.maxPreviewBytes = maxPreviewBytes }
 
     /// Checks a package and returns the design it holds.

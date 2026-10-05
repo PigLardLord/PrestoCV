@@ -22,6 +22,10 @@ public protocol DesignRenderingGate: Sendable {
 /// Nothing is stored unless both checks pass.
 public struct InstallDesign: Sendable {
     let validator: DesignPackageValidator, gate: any DesignRenderingGate, store: any DesignStore
+    /// - Parameters:
+    ///   - validator: checks the package bytes; the default bounds apply when omitted.
+    ///   - gate: proves that the validated design renders completely.
+    ///   - store: keeps the design once both checks have passed.
     public init(validator: DesignPackageValidator = DesignPackageValidator(), gate: any DesignRenderingGate, store: any DesignStore) {
         self.validator = validator; self.gate = gate; self.store = store
     }

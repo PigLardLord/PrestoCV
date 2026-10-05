@@ -17,6 +17,10 @@ public struct CVDocument: Codable, Sendable, Equatable {
     }
 
     enum CodingKeys: String, CodingKey { case schemaVersion, language, person, sections }
+
+    /// - Throws: `DecodingError` when a key is missing or has the wrong type, or when `schemaVersion` is not
+    ///   `currentSchemaVersion`. A document that arrives from outside should go through `CVDocumentValidator.decode(json:)`,
+    ///   which also bounds its size and content.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let version = try container.decode(Int.self, forKey: .schemaVersion)
@@ -68,6 +72,10 @@ public struct DocumentPeriod: Codable, Sendable, Equatable {
     public init(start: DocumentDate, end: PeriodEnd) { self.start = start; self.end = end }
 
     enum CodingKeys: String, CodingKey { case start, end, endDate }
+
+    /// The end is written as `"present"`, `"unspecified"`, or `"date"` with an `endDate`.
+    ///
+    /// - Throws: `DecodingError` for any other end, or for a date end without its `endDate`.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         start = try container.decode(DocumentDate.self, forKey: .start)
@@ -78,6 +86,8 @@ public struct DocumentPeriod: Codable, Sendable, Equatable {
         case let other: throw DecodingError.dataCorruptedError(forKey: .end, in: container, debugDescription: "unknown end \(other)")
         }
     }
+
+    /// Writes the end in the form `init(from:)` reads.
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(start, forKey: .start)
@@ -113,6 +123,7 @@ public struct SkillItem: Codable, Sendable, Equatable {
 
 /// A language the person speaks, and how well, on the CEFR scale or as a native speaker.
 public struct LanguageItem: Codable, Sendable, Equatable {
+    /// The CEFR levels A1 to C2, or a native speaker.
     public enum Level: String, Codable, Sendable { case a1, a2, b1, b2, c1, c2, native }
     public var language: String, level: Level
     public init(language: String, level: Level) { self.language = language; self.level = level }
@@ -136,6 +147,10 @@ public enum Section: Codable, Sendable, Equatable {
     case interests([String])
 
     enum CodingKeys: String, CodingKey { case kind, text, items }
+
+    /// A section is written as `{"kind": …}` with its `items`, or its `text` for a summary.
+    ///
+    /// - Throws: `DecodingError` for an unknown kind, or for a section that lacks its items or its text.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         switch try container.decode(String.self, forKey: .kind) {
@@ -150,6 +165,7 @@ public enum Section: Codable, Sendable, Equatable {
         case let other: throw DecodingError.dataCorruptedError(forKey: .kind, in: container, debugDescription: "unknown section \(other)")
         }
     }
+    /// Writes the section in the form `init(from:)` reads.
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {

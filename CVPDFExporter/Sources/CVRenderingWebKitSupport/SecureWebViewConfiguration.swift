@@ -176,6 +176,7 @@ public enum DocumentReadiness {
         case cancelled
     }
 
+    /// The content world the readiness script runs in, apart from the page's own.
     public static let world = WKContentWorld.world(name: "cv.readiness")
     static let script = "await document.fonts.ready; return document.readyState === 'complete';"
 

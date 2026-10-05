@@ -4,8 +4,14 @@ import CVDocumentModel
 /// The page the renderers print on. Every page keeps `verticalMarginPoints` free at its top and bottom, which a design's
 /// padding cannot do past the first page; the left and right margins are the design's (markup-contract.md, "Pages").
 public struct PageSetup: Sendable, Equatable {
-    public var widthPoints: Double, heightPoints: Double, maxPages: Int, verticalMarginPoints: Double
+    public var widthPoints: Double, heightPoints: Double
+    /// The pages a render keeps; a longer document is cut and reported as truncated.
+    public var maxPages: Int
+    public var verticalMarginPoints: Double
+
+    /// A4 in points, with room for up to four pages.
     public static let a4 = PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 4)
+
     public init(widthPoints: Double, heightPoints: Double, maxPages: Int, verticalMarginPoints: Double = 36) {
         self.widthPoints = widthPoints; self.heightPoints = heightPoints; self.maxPages = maxPages
         self.verticalMarginPoints = verticalMarginPoints
@@ -16,6 +22,7 @@ public struct PageSetup: Sendable, Equatable {
 /// Truncation is derived, never self-declared.
 public struct RenderedPDF: Sendable, Equatable {
     public var data: Data, pageCount: Int, requiredPages: Int
+    /// Whether the content needed more pages than `data` holds.
     public var truncated: Bool { requiredPages > pageCount }
     public init(data: Data, pageCount: Int, requiredPages: Int) {
         self.data = data; self.pageCount = pageCount; self.requiredPages = requiredPages

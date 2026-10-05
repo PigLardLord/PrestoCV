@@ -4,6 +4,7 @@ import CVDesignCatalog
 /// A link that is safe to print (RichDomain, ValidatingBoundary). Built only from input that parses cleanly; the emitted form is
 /// the parser's serialisation, not the input text.
 public struct WebLink: Sendable, Equatable {
+    /// The link as the URL parser serialises it, which is what is printed and linked to.
     public let url: String
     static let maxLength = 2048
 
