@@ -288,6 +288,19 @@ flag "delegation: to an initialiser that needs an argument the call leaves out" 
 flag "delegation: two initialisers that delegate to each other end the check and are no data initialisers" "struct S {${NL}$FIELDS${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}    init(first a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d) }${NL}}" "parameterCount: init takes 4"
 flag "delegation: an initialiser that delegates to itself ends the check and is no data initialiser" "struct S {${NL}$FIELDS${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d) }${NL}}" "parameterCount: init takes 4"
 flag "delegation: a cycle of three" "struct S {${NL}$FIELDS${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}    init(first a: Int, b: Int, c: Int, d: Int) { self.init(second: a, b: b, c: c, d: d) }${NL}    init(second a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d) }${NL}}" "parameterCount: init takes 4"
+# A property with an attribute is not stored, whatever the attribute: a property wrapper runs code on every assignment, a macro can
+# rewrite the property, and syntax cannot tell either from @MainActor or @available.
+WRAPPER=$'@propertyWrapper\nstruct Clamped {\n    private var value: Int\n    init(wrappedValue: Int) { value = max(0, wrappedValue) }\n    var wrappedValue: Int { get { value } set { value = max(0, newValue) } }\n}'
+typed "attributes: a property wrapper on a destination runs code, so it is no destination" flag "$WRAPPER${NL}struct S {${NL}    @Clamped var a: Int${NL}    let b: Int, c: Int, d: Int${NL}    $INIT4${NL}}"
+typed "attributes: the same type without the wrapper stores" clean "struct S {${NL}    var a: Int${NL}    let b: Int, c: Int, d: Int${NL}    $INIT4${NL}}"
+typed "attributes: a wrapper on every destination" flag "$WRAPPER${NL}struct S {${NL}    @Clamped var a: Int${NL}    @Clamped var b: Int${NL}    @Clamped var c: Int${NL}    @Clamped var d: Int${NL}    $INIT4${NL}}"
+typed "attributes: an attribute that is no wrapper counts all the same" flag "struct S {${NL}    let a: Int, b: Int, c: Int${NL}    @usableFromInline var d: Int${NL}    $INIT4${NL}}"
+typed "attributes: an actor isolation counts" flag "struct S {${NL}    let a: Int, b: Int, c: Int${NL}    @MainActor var d: Int${NL}    @MainActor $INIT4${NL}}"
+typed "attributes: an attribute with arguments, on its own line" flag "struct S {${NL}    let a: Int, b: Int, c: Int${NL}    @_documentation(visibility: private)${NL}    var d: Int${NL}    $INIT4${NL}}"
+typed "attributes: a wrapper on a property that the initialiser does not assign is no matter" clean "$WRAPPER${NL}struct S {${NL}    @Clamped var extra = 0${NL}    let a: Int, b: Int, c: Int, d: Int${NL}    $INIT4${NL}}"
+typed "attributes: an attribute on the type is no matter" clean "@MainActor${NL}struct S {${NL}    let a: Int, b: Int, c: Int, d: Int${NL}    $INIT4${NL}}"
+typed "attributes: an attribute on the initialiser is no matter" clean "struct S {${NL}    let a: Int, b: Int, c: Int, d: Int${NL}    @inlinable $INIT4${NL}}"
+typed "attributes: a delegation to an initialiser that assigns a wrapped property" flag "$WRAPPER${NL}struct S {${NL}    @Clamped var a: Int${NL}    let b: Int, c: Int, d: Int${NL}    init(first a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; self.d = d }${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}}" "" "P.swift:10: CleanFunctions: parameterCount: init takes 4"
 typed "destinations: a class stores in its own properties" clean $'final class S {\n    let a: Int, b: Int, c: Int, d: Int\n    '"$INIT4"$'\n}'
 
 # --- typeLength: 200 lines of code per declaration or extension

@@ -15,9 +15,9 @@ struct FileTypes {
     /// The instance properties that the type holding an initialiser stores; nil when the file does not declare the type.
     func storedProperties(ofTypeHolding initializer: InitializerDeclSyntax) -> Set<String>? {
         guard let declarations = declarations(ofTypeHolding: initializer) else { return nil }
-        let bindings = declarations.flatMap { Self.instanceBindings(of: $0) }
-        let computed = Set(bindings.filter { !$0.isStored }.compactMap(\.propertyName))
-        return Set(bindings.filter(\.isStored).compactMap(\.propertyName)).subtracting(computed)
+        let properties = declarations.flatMap { Self.instanceProperties(of: $0) }
+        let computed = Set(properties.filter { !$0.isStored }.map(\.name))
+        return Set(properties.filter(\.isStored).map(\.name)).subtracting(computed)
     }
 
     /// The initialisers that the type holding an initialiser declares, in the type and in its extensions in the file;
@@ -47,8 +47,8 @@ struct FileTypes {
         !(group is ExtensionDeclSyntax) && !(group is ProtocolDeclSyntax)
     }
 
-    private static func instanceBindings(of group: any DeclGroupSyntax) -> [PatternBindingSyntax] {
-        group.memberBlock.members.declarations.compactMap { $0.as(VariableDeclSyntax.self) }.filter { !$0.isTypeLevel }.flatMap { Array($0.bindings) }
+    private static func instanceProperties(of group: any DeclGroupSyntax) -> [Property] {
+        group.memberBlock.members.declarations.compactMap { $0.as(VariableDeclSyntax.self) }.filter { !$0.isTypeLevel }.flatMap(\.properties)
     }
 
     /// The simple name of a type, or of the type that an extension extends.
