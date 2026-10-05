@@ -147,9 +147,15 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     private func listQuarantiningCorruptFiles() throws(RepositoryError) -> CVListing {
         var cvs: [CV] = [], issues: [StoreIssue] = []
         for url in try storedFileURLs() {
-            let file = read(url, named: url.lastPathComponent)
-            if case .cv(let cv) = file { cvs.append(cv) }
-            else if let issue = file.issue(named: url.lastPathComponent) { issues.append(quarantineIfCorrupt(issue, at: url)) }
+            let name = url.lastPathComponent
+            switch read(url, named: name) {
+            case .absent: continue   // removed since the directory was listed
+            case .cv(let cv): cvs.append(cv)
+            case .corrupt(let reason): issues.append(isolateCorruptFile(url, because: reason))
+            case .newer(let version): issues.append(.upgradeRequired(file: name, version: version))
+            case .unreadable: issues.append(.unreadable(file: name))
+            case .tooLarge(let bytes): issues.append(.tooLarge(file: name, bytes: bytes))
+            }
         }
         return CVListing(cvs: cvs.mostRecentlyChangedFirst(), issues: issues)
     }
@@ -160,14 +166,15 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         return files.filter { $0.lastPathComponent.hasSuffix(StoredFileName.suffix) }.sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
-    /// A corrupt file is moved aside so it is not read again. When that fails it stays, and the listing says so.
-    private func quarantineIfCorrupt(_ issue: StoreIssue, at url: URL) -> StoreIssue {
-        guard case .corrupt = issue else { return issue }
-        do throws(Quarantine.Failed) {
-            try quarantine.admit(url, at: now())
-            return issue
+    /// Moves a corrupt file aside so it is not read again, and says what became of it: corrupt and restorable, or corrupt and
+    /// still where it was because the quarantine could not take it.
+    private func isolateCorruptFile(_ url: URL, because reason: String) -> StoreIssue {
+        let name = url.lastPathComponent
+        do throws(RepositoryError) {
+            try quarantine.admit(url, stampedWith: now)
+            return .corrupt(file: name, reason: reason)
         } catch {
-            return .quarantineFailed(file: url.lastPathComponent)
+            return .quarantineFailed(file: name)
         }
     }
 

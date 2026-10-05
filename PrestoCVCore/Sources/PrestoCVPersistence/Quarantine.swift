@@ -10,9 +10,6 @@ struct Quarantine {
 
     init(storeDirectory: URL) { folder = storeDirectory.appendingPathComponent("Quarantine", isDirectory: true) }
 
-    /// A file that could not be moved into the quarantine.
-    struct Failed: Error {}
-
     /// What is at the folder's path. A link is not a directory: it is never followed.
     private var kind: FileKind { StoreFiles.status(of: folder.path).kind }
 
@@ -46,16 +43,20 @@ struct Quarantine {
         try names().filter { QuarantinedName.isCopy($0, of: storedName) }.map { folder.appendingPathComponent($0) }
     }
 
-    /// Moves `file` into the folder, stamped with `time`: the retention period starts when a file is isolated, and its own
-    /// modification time says nothing about that.
-    func admit(_ file: URL, at time: Date) throws(Failed) {
-        do { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) } catch { throw Failed() }
-        guard kind == .directory else { throw Failed() }
+    /// Moves `file` into the folder, stamped with the time `now` gives: the retention period starts when a file is
+    /// isolated, and its own modification time says nothing about that. `now` is read only once the folder can take the
+    /// file.
+    ///
+    /// - Throws: `RepositoryError.writeFailed` for the file, whatever the reason it could not be moved.
+    func admit(_ file: URL, stampedWith now: () -> Date) throws(RepositoryError) {
+        let failure = RepositoryError.writeFailed(file: file.lastPathComponent)
+        do { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) } catch { throw failure }
+        guard kind == .directory else { throw failure }
         do {
-            try FileManager.default.setAttributes([.modificationDate: time], ofItemAtPath: file.path)
+            try FileManager.default.setAttributes([.modificationDate: now()], ofItemAtPath: file.path)
             try FileManager.default.moveItem(at: file, to: unusedURL(for: file.lastPathComponent))
         } catch {
-            throw Failed()
+            throw failure
         }
     }
 
