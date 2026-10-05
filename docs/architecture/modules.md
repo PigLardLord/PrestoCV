@@ -43,7 +43,7 @@ Test targets and test-support targets are described below each package. The chec
 
 **`PrestoCVApplication`**
 - **Ports:**
-  - `CVRepository`: create, conditional update, load, list, conditional delete. Typed `RepositoryError`, not cancellable.
+  - `CVSaver` (create, conditional update), `CVLoader`, `CVLister`, `CVDeleter` (conditional delete): one port for what each use case calls. `CVRepository` composes the four, for the adapters and the contract suite. Typed `RepositoryError`, not cancellable.
   - `CVStoreMaintenance`: restore from quarantine, erase every copy, purge quarantine.
   - `SampleCVSource`, `IDGenerator`, `TimeSource`. `TimeSource` is so named to avoid shadowing `Swift.Clock`.
 - **Use cases:**

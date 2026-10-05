@@ -14,10 +14,10 @@ public struct NewCV: Sendable {
 
 /// Saves a CV: create when never saved, conditional update otherwise.
 public struct SaveCV: Sendable {
-    let repository: any CVRepository
+    let repository: any CVSaver
 
     /// - Parameter repository: The store the CV is saved in.
-    public init(repository: any CVRepository) { self.repository = repository }
+    public init(repository: any CVSaver) { self.repository = repository }
 
     /// - Parameter cv: The CV to save, at the revision the caller last saw.
     /// - Returns: The stored CV, with its new revision and timestamps.
@@ -26,10 +26,10 @@ public struct SaveCV: Sendable {
     ///   size cap; `.unavailable` for any other failure of the store.
     public func callAsFunction(_ cv: CV) async throws(AuthoringError) -> CV {
         guard cv.canBeSaved else { throw .notEnoughContent }
-        do throws(RepositoryError) { return try await store(cv) } catch { throw AuthoringError(error) }
+        do throws(RepositoryError) { return try await createOrUpdate(cv) } catch { throw AuthoringError(error) }
     }
 
-    private func store(_ cv: CV) async throws(RepositoryError) -> CV {
+    private func createOrUpdate(_ cv: CV) async throws(RepositoryError) -> CV {
         if cv.revision == 0 { return try await repository.create(cv) }
         return try await repository.update(cv)
     }
@@ -37,10 +37,10 @@ public struct SaveCV: Sendable {
 
 /// Loads a stored CV.
 public struct LoadCV: Sendable {
-    let repository: any CVRepository
+    let repository: any CVLoader
 
     /// - Parameter repository: The store the CV is loaded from.
-    public init(repository: any CVRepository) { self.repository = repository }
+    public init(repository: any CVLoader) { self.repository = repository }
 
     /// - Parameter id: The identity of the CV, from a listing.
     /// - Throws: `AuthoringError.deletedElsewhere` when the CV is gone; `.unavailable` when the store cannot be read.
@@ -51,10 +51,10 @@ public struct LoadCV: Sendable {
 
 /// The healthy CVs, most recently changed first, and every issue the store found.
 public struct ListCVs: Sendable {
-    let repository: any CVRepository
+    let repository: any CVLister
 
     /// - Parameter repository: The store that is listed.
-    public init(repository: any CVRepository) { self.repository = repository }
+    public init(repository: any CVLister) { self.repository = repository }
 
     /// - Throws: `AuthoringError.unavailable` when the store itself cannot be listed. A file that cannot be read is an issue
     ///   of the listing, not a failure.
@@ -68,7 +68,7 @@ public struct RenameCV: Sendable {
     let save: SaveCV
 
     /// - Parameter repository: The store the CV is saved in.
-    public init(repository: any CVRepository) { save = SaveCV(repository: repository) }
+    public init(repository: any CVSaver) { save = SaveCV(repository: repository) }
 
     /// - Parameters:
     ///   - cv: The stored CV, at the revision the caller last saw.
@@ -90,7 +90,7 @@ public struct DuplicateCV: Sendable {
     /// - Parameters:
     ///   - repository: The store the copy is saved in.
     ///   - ids: Where the identity of the copy comes from.
-    public init(repository: any CVRepository, ids: any IDGenerator) { self.ids = ids; save = SaveCV(repository: repository) }
+    public init(repository: any CVSaver, ids: any IDGenerator) { self.ids = ids; save = SaveCV(repository: repository) }
 
     /// - Parameters:
     ///   - cv: The CV to copy.
@@ -104,10 +104,10 @@ public struct DuplicateCV: Sendable {
 
 /// Deletes the CV only if it is still at the revision the caller saw.
 public struct DeleteCV: Sendable {
-    let repository: any CVRepository
+    let repository: any CVDeleter
 
     /// - Parameter repository: The store the CV is deleted from.
-    public init(repository: any CVRepository) { self.repository = repository }
+    public init(repository: any CVDeleter) { self.repository = repository }
 
     /// - Parameter cv: The CV to delete, at the revision the caller last saw.
     /// - Throws: `AuthoringError.conflict` when the stored revision is not the one the caller saw; `.deletedElsewhere` when
@@ -147,7 +147,7 @@ public struct DetermineOnboarding: Sendable {
     let list: ListCVs
 
     /// - Parameter repository: The store that is looked at.
-    public init(repository: any CVRepository) { list = ListCVs(repository: repository) }
+    public init(repository: any CVLister) { list = ListCVs(repository: repository) }
 
     /// - Throws: `AuthoringError.unavailable` when the store cannot be listed.
     public func callAsFunction() async throws(AuthoringError) -> OnboardingState {

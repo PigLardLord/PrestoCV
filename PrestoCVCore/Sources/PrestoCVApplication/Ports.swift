@@ -5,19 +5,37 @@ import PrestoCVDomain
 // across instances and processes (the file adapter locks the store). Repository operations are short,
 // synchronous I/O and are not cancellable: they complete or fail.
 
-public protocol CVRepository: Sendable {
+/// What `SaveCV` needs of a store: to create a CV and to replace it.
+public protocol CVSaver: Sendable {
     /// Stores a never-saved CV (revision 0) as revision 1. Fails with `alreadyExists`.
     func create(_ cv: CV) async throws(RepositoryError) -> CV
-    /// Replaces the stored CV only if its revision equals `cv.revision`; returns it at revision + 1.
+    /// Replaces the stored CV only if its revision equals `cv.revision`; returns it at revision + 1. Fails with `conflict`
+    /// when the stored revision is another, and with `notFound` when the CV is gone.
     func update(_ cv: CV) async throws(RepositoryError) -> CV
+}
+
+/// What `LoadCV` needs of a store.
+public protocol CVLoader: Sendable {
     /// Loads a stored CV. Fails with `notFound` when no CV has that identity, and with `storeUnavailable` when the store
     /// itself is not there.
     func load(_ id: CVID) async throws(RepositoryError) -> CV
+}
+
+/// What `ListCVs` needs of a store.
+public protocol CVLister: Sendable {
     /// Healthy CVs, most recently changed first, plus every issue found. Never fails because of one file.
     func list() async throws(RepositoryError) -> CVListing
+}
+
+/// What `DeleteCV` needs of a store.
+public protocol CVDeleter: Sendable {
     /// Deletes the CV only if it is stored at `revision`. Fails with `conflict` otherwise, and with `notFound` if it is gone.
     func delete(_ id: CVID, revision: Int) async throws(RepositoryError)
 }
+
+/// A store of CVs, which is every port a use case reads or writes through. An adapter implements this one; a use case
+/// depends only on the part it calls.
+public protocol CVRepository: CVSaver, CVLoader, CVLister, CVDeleter {}
 
 /// Recovery and erasure, reachable from the UI (quarantine review, "delete everything about this CV").
 public protocol CVStoreMaintenance: Sendable {
