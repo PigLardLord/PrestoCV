@@ -1,11 +1,6 @@
 import Foundation
 import PrestoCVDomain
 
-/// What presentation needs to know, without the port's error shape (CleanErrors).
-public enum AuthoringError: Error, Equatable, Sendable {
-    case notEnoughContent, conflict(storedRevision: Int), deletedElsewhere, tooLarge, unavailable
-}
-
 /// A new, unsaved CV with a fresh identity.
 public struct NewCV: Sendable {
     let ids: any IDGenerator
@@ -19,11 +14,12 @@ public struct SaveCV: Sendable {
     public init(repository: any CVRepository) { self.repository = repository }
     public func callAsFunction(_ cv: CV) async throws(AuthoringError) -> CV {
         guard cv.canBeSaved else { throw .notEnoughContent }
-        do { return cv.revision == 0 ? try await repository.create(cv) : try await repository.update(cv) }
-        catch .conflict(_, let stored) { throw .conflict(storedRevision: stored) }
-        catch .notFound { throw .deletedElsewhere }
-        catch .wouldNotReadBack { throw .tooLarge }
-        catch { throw .unavailable }
+        do throws(RepositoryError) { return try await store(cv) } catch { throw AuthoringError(error) }
+    }
+
+    private func store(_ cv: CV) async throws(RepositoryError) -> CV {
+        if cv.revision == 0 { return try await repository.create(cv) }
+        return try await repository.update(cv)
     }
 }
 
@@ -31,7 +27,7 @@ public struct LoadCV: Sendable {
     let repository: any CVRepository
     public init(repository: any CVRepository) { self.repository = repository }
     public func callAsFunction(_ id: CVID) async throws(AuthoringError) -> CV {
-        do { return try await repository.load(id) } catch .notFound { throw .deletedElsewhere } catch { throw .unavailable }
+        do throws(RepositoryError) { return try await repository.load(id) } catch { throw AuthoringError(error) }
     }
 }
 
@@ -40,7 +36,7 @@ public struct ListCVs: Sendable {
     let repository: any CVRepository
     public init(repository: any CVRepository) { self.repository = repository }
     public func callAsFunction() async throws(AuthoringError) -> CVListing {
-        do { return try await repository.list() } catch { throw .unavailable }
+        do throws(RepositoryError) { return try await repository.list() } catch { throw AuthoringError(error) }
     }
 }
 
@@ -70,10 +66,7 @@ public struct DeleteCV: Sendable {
     let repository: any CVRepository
     public init(repository: any CVRepository) { self.repository = repository }
     public func callAsFunction(_ cv: CV) async throws(AuthoringError) {
-        do { try await repository.delete(cv.id, revision: cv.revision) }
-        catch .conflict(_, let stored) { throw .conflict(storedRevision: stored) }
-        catch .notFound { throw .deletedElsewhere }
-        catch { throw .unavailable }
+        do throws(RepositoryError) { try await repository.delete(cv.id, revision: cv.revision) } catch { throw AuthoringError(error) }
     }
 }
 
@@ -83,7 +76,7 @@ public struct StartFromSample: Sendable {
     let ids: any IDGenerator
     public init(samples: any SampleCVSource, ids: any IDGenerator) { self.samples = samples; self.ids = ids }
     public func available() async throws(AuthoringError) -> [CV] {
-        do { return try await samples.samples() } catch { throw .unavailable }
+        do throws(RepositoryError) { return try await samples.samples() } catch { throw AuthoringError(error) }
     }
     public func callAsFunction(_ sample: CV) -> CV { sample.duplicated(as: ids.next(), title: sample.title) }
 }

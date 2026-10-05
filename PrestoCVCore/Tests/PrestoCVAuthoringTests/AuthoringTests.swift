@@ -138,6 +138,16 @@ struct ContractTests {
     @Test("in-memory adapter passes") func inMemory() async throws { try await CVRepositoryContract.verify(InMemoryCVRepository()) }
 }
 
+/// A repository whose every operation fails with `failure`.
+struct FailingRepository: CVRepository {
+    let failure: RepositoryError
+    func create(_ cv: CV) async throws(RepositoryError) -> CV { throw failure }
+    func update(_ cv: CV) async throws(RepositoryError) -> CV { throw failure }
+    func load(_ id: CVID) async throws(RepositoryError) -> CV { throw failure }
+    func list() async throws(RepositoryError) -> CVListing { throw failure }
+    func delete(_ id: CVID, revision: Int) async throws(RepositoryError) { throw failure }
+}
+
 @Suite("use cases")
 struct UseCaseTests {
     @Test("save creates once, then updates; errors are translated (#4, #5)")
@@ -153,6 +163,20 @@ struct UseCaseTests {
         await #expect(throws: AuthoringError.conflict(storedRevision: 2)) { _ = try await SaveCV(repository: r)(cv) }
         try await r.delete(saved.id, revision: 2)
         await #expect(throws: AuthoringError.deletedElsewhere) { _ = try await SaveCV(repository: r)(saved) }
+    }
+
+    @Test("a repository failure reaches presentation as the same AuthoringError from every use case that stores or reads",
+          arguments: [(RepositoryError.conflict(id1, storedRevision: 7), AuthoringError.conflict(storedRevision: 7)),
+                      (.notFound(id1), .deletedElsewhere), (.wouldNotReadBack(file: "f"), .tooLarge),
+                      (.alreadyExists(id1), .unavailable), (.corrupt(file: "f"), .unavailable), (.unreadable(file: "f"), .unavailable),
+                      (.upgradeRequired(file: "f", version: 2), .unavailable), (.tooLarge(file: "f"), .unavailable),
+                      (.invalidName("f"), .unavailable), (.storeUnavailable(.cannotList), .unavailable), (.writeFailed(file: "f"), .unavailable)])
+    func translation(failure: RepositoryError, translated: AuthoringError) async {
+        let repository = FailingRepository(failure: failure), stored = named("Ada").stored(revision: 1, at: Date(timeIntervalSince1970: 0))
+        await #expect(throws: translated) { _ = try await SaveCV(repository: repository)(stored) }
+        await #expect(throws: translated) { _ = try await LoadCV(repository: repository)(id1) }
+        await #expect(throws: translated) { _ = try await ListCVs(repository: repository)() }
+        await #expect(throws: translated) { try await DeleteCV(repository: repository)(stored) }
     }
 
     @Test("an empty CV is not persisted")
