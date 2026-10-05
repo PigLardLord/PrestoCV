@@ -125,8 +125,55 @@ clean "parameterCount: a data initialiser stores each parameter in the property 
 clean "parameterCount: a data initialiser keeps its parameter names, not its labels" $'struct S {\n    let a: Int, b: Int, c: Int, d: Int\n    init(first a: Int, _ b: Int, _ c: Int, last d: Int) {\n        self.d = d\n        self.c = c\n        self.b = b\n        self.a = a\n    }\n}'
 clean "parameterCount: an initialiser that passes its parameters unchanged is a data initialiser" $'final class S {\n    init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; self.d = d }\n    convenience init(origin a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d) }\n}'
 flag "parameterCount: a delegating initialiser that changes a parameter" $'final class S {\n    convenience init(a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d + 1) }\n}' "parameterCount: init takes 4"
-flag "parameterCount: a delegating initialiser that adds an argument" $'final class S {\n    convenience init(a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d, e: 0) }\n}' "parameterCount: init takes 4"
 flag "parameterCount: a delegating initialiser that drops a parameter" $'final class S {\n    convenience init(a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c) }\n}' "parameterCount: init takes 4"
+# A data initialiser may also give the other properties a literal or a constant, and pass literals and constants on.
+data_init() {   # $1 = name, $2 = clean or flag, $3 = the body of an initialiser of four parameters, $4 = what precedes the type
+  local src; src="$(printf '%s\nstruct S {\n    init(a: Int, b: Int, c: Int, d: Int) { %s }\n}\n' "${4:-}" "$3")"
+  if [[ "$2" == clean ]]; then clean "parameterCount: $1" "$src"; else flag "parameterCount: $1" "$src" "parameterCount: init takes 4"; fi
+}
+delegating_init() {   # the same, for a convenience initialiser
+  local src; src="$(printf '%s\nfinal class S {\n    convenience init(a: Int, b: Int, c: Int, d: Int) { %s }\n}\n' "${4:-}" "$3")"
+  if [[ "$2" == clean ]]; then clean "parameterCount: $1" "$src"; else flag "parameterCount: $1" "$src" "parameterCount: init takes 4"; fi
+}
+STORE='self.a = a; self.b = b; self.c = c; self.d = d'
+PASS='a: a, b: b, c: c, d: d'
+for value in '0' '-1' '+2' '1.5' '-0.5' 'true' '"text"' '""' 'nil' '[]' '[:]' '[0, 1]' '["a": 1]' '[[0], []]' '.none' 'Kind.empty' 'Self.zero' 'Module.Kind.empty'; do
+  data_init "assignment: a data initialiser gives another property $value" clean "$STORE; self.e = $value"
+  delegating_init "delegation: a data initialiser passes $value on" clean "self.init($PASS, e: $value)"
+done
+data_init "assignment: the literals may come before the parameters" clean "self.e = 0; self.f = nil; $STORE; self.g = []"
+data_init "assignment: a property may be named without self" clean "$STORE; e = 0"
+data_init "assignment: a file-level let is a constant" clean "$STORE; self.e = limit" "let limit = 9"
+data_init "assignment: a private file-level let is a constant" clean "$STORE; self.e = limit" "private let limit = 9"
+data_init "assignment: a file-level let in an #if branch is a constant" clean "$STORE; self.e = limit" $'#if DEBUG\nlet limit = 9\n#else\nlet limit = 8\n#endif'
+data_init "assignment: a static let is a constant" clean "$STORE; self.e = Self.limit" "extension S { static let limit = 1 }"
+data_init "assignment: a static member of a type declared elsewhere is taken on trust" clean "$STORE; self.e = Other.limit"
+delegating_init "delegation: the parameters may be passed in any order, with literals between them" clean "self.init(d: d, e: 0, c: c, f: nil, b: b, g: [], a: a)"
+delegating_init "delegation: a file-level let is a constant" clean "self.init($PASS, e: limit)" "let limit = 9"
+data_init "assignment: a computed value is behaviour" flag "$STORE; self.e = 1 + 2"
+for value in 'makeDefault()' 'Foo()' '.make()' '.some(1)' 'Kind.make(1)' 'Kind.make(a:)' '"\(a)"' '[a]' '-a' 'a' 'a ?? 0' 'flag ? 1 : 2' 'defaults.limit' 'limit' 'Type.init' '[makeDefault()]' '["k": Foo()]'; do
+  data_init "assignment: $value is not a literal or a constant" flag "$STORE; self.e = $value"
+  delegating_init "delegation: $value is not a literal or a constant" flag "self.init($PASS, e: $value)"
+done
+delegating_init "delegation: a computed argument is behaviour" flag "self.init($PASS, e: 1 + 2)"
+data_init "assignment: a parameter stored a second time" flag "$STORE; self.e = a"
+data_init "assignment: a name that a parameter shares with a file-level let is the parameter" flag "$STORE; self.e = a" "let a = 1"
+data_init "assignment: two parameters stored in each other's property" flag "self.a = b; self.b = a; self.c = c; self.d = d"
+data_init "assignment: a transformed parameter" flag "self.a = a; self.b = b; self.c = c; self.d = d!"
+data_init "assignment: a parameter that a literal replaces" flag "self.a = a; self.b = b; self.c = c; self.d = 0"
+data_init "assignment: a property given a literal twice" flag "$STORE; self.e = 0; self.e = 1"
+data_init "assignment: a parameter stored under its own name and again by a literal" flag "$STORE; self.d = 0"
+data_init "assignment: a file-level var is not a constant" flag "$STORE; self.e = counter" "var counter = 0"
+data_init "assignment: a let inside a function is not a constant" flag "$STORE; self.e = local" "func g() { let local = 1 }"
+data_init "assignment: a static var of the file is not a constant" flag "$STORE; self.e = Self.shared" "extension S { static var shared = 0 }"
+data_init "assignment: a class var of the file is not a constant" flag "$STORE; self.e = .shared" "extension S { class var shared: Int { 0 } }"
+data_init "assignment: a call after the assignments" flag "$STORE; self.e = 0; register()"
+delegating_init "delegation: a parameter passed twice" flag "self.init($PASS, e: d)"
+delegating_init "delegation: a parameter replaced by a literal" flag "self.init(a: a, b: b, c: c, d: 0)"
+delegating_init "delegation: a name that is neither a parameter nor a file-level let" flag "self.init($PASS, e: unknown)"
+delegating_init "delegation: a trailing closure" flag "self.init($PASS) { }"
+delegating_init "delegation: a second statement" flag "self.init($PASS, e: 0); register()"
+delegating_init "delegation: a name that a parameter shares with a file-level let is the parameter" flag "self.init(a: a, b: b, c: c, d: a)" "let a = 1"
 clean "parameterCount: the parameters of a closure are not counted" 'let f: (Int, Int, Int, Int) -> Void = { a, b, c, d in }'
 
 # --- typeLength: 200 lines of code per declaration or extension

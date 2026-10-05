@@ -53,7 +53,17 @@ They enforce `CleanFunctions`, `CleanTypes`, `ISP` and `CleanComments` on produc
 
 **Complexity.** One, plus one for each `if` (so each `else if`), `guard`, `while`, `for`, `repeat`, `catch`, `&&`, `||`, `??` and ternary, and one for each `switch`, whatever its cases. The decisions inside a closure count in the function that holds it; a nested function has its own count.
 
-**Parameters.** The parameters of a function or initialiser, protocol requirements included, not those of a closure. A data initialiser is exempt: every statement is `self.x = x`, naming a property after its parameter, each parameter assigned once; or the only statement is `self.init(...)` and every argument is one of the parameters, each passed once.
+**Parameters.** The parameters of a function or initialiser, protocol requirements included, not those of a closure. A **data initialiser** is exempt, as ADR 0021 (c) defines it. Its body is one of two shapes, and nothing else:
+- **Assignments.** Each statement is `self.x = x`, naming a property after its parameter, each parameter once, or gives another property a literal or a constant: `self.revision = 0` or `revision = 0`. A property is assigned once.
+- **Delegation.** The only statement is `self.init(...)`, with no trailing closure, and each argument is a parameter passed unchanged, each parameter once, or a literal or a constant.
+
+A **literal or constant** is one of the following. The checker resolves no name, so it goes by the spelling.
+- An integer, floating-point, boolean or string literal, a string without interpolation, or `nil`, with a `-` or `+` on a number: `0`, `-1`, `1.5`, `true`, `"x"`, `nil`.
+- An array or a dictionary literal whose elements are themselves literals or constants: `[]`, `[:]`, `[0, 1]`, `["a": 1]`.
+- A member that is not called, such as an enum case without payload or a static constant: `.name`, `Type.name`, `Self.name`, `Module.Type.name`. Every type in the path starts with a capital letter. A name that the same file declares as a `static var` or a `class var` is refused, and a member of a type declared in another file is taken on trust, so a computed `static var` there passes.
+- A name that the same file declares with `let` at file level, in any `#if` branch, unless a parameter has that name. A `let` inside a type or a function is not one; reach a type's constant as `Type.name`.
+
+Everything else is behaviour and makes the initialiser an ordinary one: a call, an operator, a conditional, an interpolation, a parameter in any other shape (used twice, transformed, inside an array), a name the file does not declare, a property reached through a value.
 
 **Types.** Struct, class, enum, actor, protocol and extension, counted from their member list. A nested type is measured on its own and not counted again in its type; its header line counts in its type.
 
