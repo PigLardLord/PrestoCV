@@ -62,7 +62,7 @@ The validation prototype in `Prototypes/ADRValidation/` (Swift 6.3.3, Linux). 15
 **Found**
 - The previous save loop let a coalesced caller return before its edits were stored, and one message slot mixed save and export results (internal Swift review).
 - The previous view model exposed `CV` publicly, so a view could read domain types without importing the domain.
-- `String(localized:)` does not compile on Linux, which confirms that status enums are the right boundary ([R13](../rules.md#r13-localisation-happens-at-the-edges)).
+- `String(localized:)` does not compile on Linux, which confirms that status enums are the right boundary ([R13](../rules.md#localisationatedges-localisation-happens-at-the-edges)).
 - SwiftPM's incremental build twice reused a stale object when a file was restored within the same second as the previous compile. Mutation checks force a rebuild.
 
 ## Alternatives considered

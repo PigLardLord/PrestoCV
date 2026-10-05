@@ -48,7 +48,7 @@
   The merged ADRs 0001 to 0012 keep their numbers, because a merged ADR does not change; `rules.md` carries this table for their readers.
 - **(c) How the thresholds are measured.**
   - **What counts:** a line counts when it holds code. Blank lines, comment lines and lines that hold only a brace do not count.
-  - **Function length:** the lines of a function's, initialiser's, accessor's or closure's body. A closure is measured on its own and not counted twice in the function that holds it.
+  - **Function length:** the lines of a function's, initialiser's, accessor's or closure's body. A closure or a nested function is measured on its own, and not counted again in the function that holds it.
   - **Parameters:** the parameters of a function or an initialiser. A **data initialiser** is exempt: one that only assigns each parameter to the stored property of the same name, or passes it unchanged to such an initialiser. It describes a data structure, not a behaviour (Clean Code's distinction between data structures and objects); its validation goes in the type's own small functions.
   - **Nesting:** the depth of `if`, `guard`, `switch`, `for`, `while`, `repeat`, `do` and closures inside a function body. A `guard` that only exits counts as no level.
   - **Cyclomatic complexity:** one, plus one for each `if`, `guard`, `while`, `for`, `repeat`, `catch`, `&&`, `||`, `??` and ternary. A `switch` counts **once**, however many cases it has: a switch that maps the cases of a closed enumeration is the shape Clean Code asks for, buried once behind a function.

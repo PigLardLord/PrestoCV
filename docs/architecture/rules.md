@@ -14,6 +14,8 @@ Each rule says what is required, why, and what enforces it:
 - **test**: a required test fails.
 - **review**: nothing automatic can catch it. Kept to a minimum, and marked as such.
 
+A target's list of rules in `rules.json` names the rules whose **detectors** run on it. The rules held by the compiler, tests or review apply to every production target, listed or not.
+
 The checker applies to **production targets**: domain, application, integration, presentation and adapter targets, workflow ports and the composition root. Test, test-support and tool targets get the import allow-lists only, and are held to Clean Code by review. Legacy targets are exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)).
 
 ---
@@ -159,7 +161,7 @@ Domain, application, integration, presentation and workflow-port targets must no
 
 In production targets:
 
-- **At most 20 lines** of code in a function's, initialiser's, accessor's or closure's body. Blank lines, comment lines and lines holding only a brace do not count; a closure is measured on its own.
+- **At most 20 lines** of code in a function's, initialiser's, accessor's or closure's body. Blank lines, comment lines and lines holding only a brace do not count; a closure or a nested function is measured on its own.
 - **At most 3 parameters.** A **data initialiser** is exempt: one that only assigns each parameter to the stored property of the same name, or passes it unchanged to such an initialiser. Behaviour that needs more inputs takes a value that groups them.
 - **Nesting of at most 2 levels** of `if`, `guard`, `switch`, `for`, `while`, `repeat`, `do` and closures. A `guard` that only exits is no level.
 - **Cyclomatic complexity of at most 5:** one, plus one for each `if`, `guard`, `while`, `for`, `repeat`, `catch`, `&&`, `||`, `??` and ternary. A `switch` counts once, whatever its cases.
