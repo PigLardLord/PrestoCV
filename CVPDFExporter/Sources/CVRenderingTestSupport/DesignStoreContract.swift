@@ -23,15 +23,11 @@ public actor InMemoryDesignStore: DesignStore {
     public func design(id: String) async throws -> ValidatedDesign? { designs[id] }
     public func installedDesigns() async throws -> [DesignManifest] { designs.values.map(\.manifest).sorted { $0.id < $1.id } }
     public func installedOrigins() async throws -> [String: DesignOrigin] { origins }
-    public func adoptAsBundled(_ manifest: DesignManifest) async throws -> Bool {
-        guard designs[manifest.id]?.manifest.version == manifest.version else { return false }
-        switch origins[manifest.id] {
-        case .bundled?: return true
-        case .imported?: return false
-        case nil:
-            origins[manifest.id] = .bundled
-            return true
-        }
+    public func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool {
+        let id = design.manifest.id
+        guard designs[id] == design, origins[id] != .imported else { return false }
+        origins[id] = .bundled
+        return true
     }
 }
 
@@ -87,11 +83,12 @@ public enum DesignStoreContract {
         try check(await store.installedOrigins()["mine"] == .imported, "a kept imported design stays imported")
 
         // Adopting records an installed design as bundled only when its version matches and no import made it.
-        try check(await store.adoptAsBundled(mine.manifest) == false, "an imported design is not adopted")
+        try check(await store.adoptAsBundled(mine) == false, "an imported design is not adopted")
         try check(await store.installedOrigins()["mine"] == .imported, "an imported design stays imported")
-        try check(await store.adoptAsBundled(later.manifest) == true, "a design recorded as bundled with the same version counts as adopted")
-        try check(await store.adoptAsBundled(first.manifest) == false, "a design of another version is not adopted")
-        try check(await store.adoptAsBundled(unknown.manifest) == false, "a design that is not installed is not adopted")
+        try check(await store.adoptAsBundled(later) == true, "a design equal to the installed one, which is recorded as bundled, counts as adopted")
+        try check(await store.adoptAsBundled(first) == false, "a design of another version is not adopted")
+        try check(await store.adoptAsBundled(sameVersion) == false, "a design of the same version and other content is not adopted")
+        try check(await store.adoptAsBundled(unknown) == false, "a design that is not installed is not adopted")
         try check(await store.design(id: "unknown") == nil, "adopting a design that is not installed installs nothing")
         try check(await store.installedOrigins() == ["bold": .imported, "clean": .imported, "fresh": .bundled, "mine": .imported],
                   "adopting changes no origin that is recorded")

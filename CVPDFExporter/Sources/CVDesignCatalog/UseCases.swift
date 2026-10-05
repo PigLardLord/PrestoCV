@@ -109,12 +109,13 @@ public struct SyncReport: Equatable, Sendable {
     /// Not saved: the design is valid and rendered, but the store failed to save it. Also a design the store failed to
     /// adopt.
     public internal(set) var failed: [String] = []
-    /// Left alone, and its origin recorded as bundled: it was installed before origins were recorded, with the identifier
-    /// and the version of this bundled design. From now on the sync upgrades it like any bundled design. Not rendered.
+    /// Left alone, and its origin recorded as bundled: it was installed before origins were recorded, and equals this
+    /// bundled design (identifier, version and content). From now on the sync upgrades it like any bundled design. Not
+    /// rendered.
     public internal(set) var adopted: [String] = []
     /// Not saved: the store holds a design with this identifier that the sync did not install, so it is left alone,
     /// whatever the versions. That is an import, or a design with no recorded origin that is not the bundled one (the
-    /// same identifier and version), or one the store no longer adopts because an import took it meanwhile. It is not rendered, unless it appeared while this design rendered: then the store
+    /// same identifier, version and content), or one the store no longer adopts because an import took it meanwhile. It is not rendered, unless it appeared while this design rendered: then the store
     /// kept it (`ConditionalSave.keptImported`).
     public internal(set) var conflicts: [String] = []
 }
@@ -127,15 +128,17 @@ public struct SyncReport: Equatable, Sendable {
 /// - The sync replaces only designs it installed itself. The store records each design's origin, and an installed design
 ///   that an import saved holds its identifier: it is left alone and not rendered, whatever the versions, and the
 ///   identifier is a `conflict`. A design with no recorded origin, one installed before origins were recorded, counts as
-///   bundled only if its version is the bundled design's version exactly: the sync adopts it (`DesignStore.adoptAsBundled`
-///   records the origin, without rendering) and upgrades it later like any bundled design. Otherwise it counts as an
-///   import.
+///   bundled only if it equals the bundled design (identifier, version and content): the sync adopts it
+///   (`DesignStore.adoptAsBundled` compares the two, then records the origin, without rendering) and upgrades it later like
+///   any bundled design. Otherwise it counts as an import.
 /// - Rendering takes long, and another caller may save the design meanwhile. So the save is `DesignStore.saveIfNewer`,
 ///   which compares again under the store's lock, and the report states what the store did: a design the store kept
 ///   because it became the same or a newer version is `unchanged`, and is never overwritten by the older one. A design
 ///   that an import saved meanwhile is kept as well, and is a `conflict`: the sync replaces only what it installed.
-/// - The installed designs and their recorded origins are listed once, and only their manifests are compared. An installed design is never read, so
-///   one whose file is damaged does not stop the sync while the bundled design is unchanged.
+/// - The installed designs and their recorded origins are listed once, and only their manifests are compared. An installed
+///   design is never read, so one whose file is damaged does not stop the sync while the bundled design is unchanged. The one
+///   exception is a design with no recorded origin and the bundled design's version: the store reads it to adopt it, and
+///   a store that cannot reports it as `failed`.
 /// - A package fails on its own: the validator refuses it (`rejected`), the gate refuses it or fails (`notRendered`), or
 ///   the store fails to save it (`failed`). The other packages still sync.
 /// - What stops the sync: a store that cannot list its designs (`DesignCatalogError.storeUnavailable`), a source that
@@ -169,7 +172,7 @@ public struct SyncBundledDesigns: Sendable {
                     }
                 case nil where version == installed:
                     do {
-                        if try await store.adoptAsBundled(design.manifest) {
+                        if try await store.adoptAsBundled(design) {
                             origins[id] = .bundled
                             report.adopted.append(id)
                         } else {

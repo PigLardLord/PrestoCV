@@ -93,9 +93,9 @@ struct FileDesignStoreOriginTests {
             try FileManager.default.removeItem(at: dir.origins)
             try await store.save(DesignStoreContract.design(id: "plain"))   // the record lists "plain" only
             let index = try Data(contentsOf: dir.index), files = dir.designFiles
-            #expect(try await store.adoptAsBundled(clean.manifest))
+            #expect(try await store.adoptAsBundled(clean))
             #expect(try String(decoding: Data(contentsOf: dir.origins), as: UTF8.self) == record("[\(entry("clean", "bundled")),\(entry("plain"))]"))
-            #expect(try await store.adoptAsBundled(clean.manifest))   // already recorded: nothing to do
+            #expect(try await store.adoptAsBundled(clean))   // already recorded: nothing to do
             #expect(try Data(contentsOf: dir.index) == index)
             #expect(dir.designFiles == files)
             #expect(try await store.design(id: "clean") == clean)
@@ -105,7 +105,7 @@ struct FileDesignStoreOriginTests {
         }
     }
 
-    @Test("adopting a design that is imported, of another version or not installed changes nothing")
+    @Test("adopting a design that is imported, of another version, of other content or not installed changes nothing")
     func notAdopted() async throws {
         try await inTemporaryStore { dir in
             let store = FileDesignStore(directory: dir)
@@ -113,13 +113,35 @@ struct FileDesignStoreOriginTests {
             try FileManager.default.removeItem(at: dir.origins)
             try await store.save(DesignStoreContract.design(id: "mine"))
             let index = try Data(contentsOf: dir.index), origins = try Data(contentsOf: dir.origins), files = dir.designFiles
-            #expect(try await store.adoptAsBundled(DesignStoreContract.design(id: "mine").manifest) == false)
-            #expect(try await store.adoptAsBundled(DesignStoreContract.design(id: "clean", version: "1.0.0").manifest) == false)
-            #expect(try await store.adoptAsBundled(DesignStoreContract.design(id: "clean", version: "2.0.1").manifest) == false)
-            #expect(try await store.adoptAsBundled(DesignStoreContract.design(id: "other").manifest) == false)
+            #expect(try await store.adoptAsBundled(DesignStoreContract.design(id: "mine")) == false)
+            #expect(try await store.adoptAsBundled(DesignStoreContract.design(id: "clean", version: "1.0.0")) == false)
+            #expect(try await store.adoptAsBundled(DesignStoreContract.design(id: "clean", version: "2.0.1")) == false)
+            #expect(try await store.adoptAsBundled(DesignStoreContract.design(id: "other")) == false)
+            #expect(try await store.adoptAsBundled(DesignStoreContract.design(id: "clean", version: "2.0.0", css: ".cv-skill{font-weight:700}")) == false)
             #expect(try Data(contentsOf: dir.index) == index)
             #expect(try Data(contentsOf: dir.origins) == origins)
             #expect(dir.designFiles == files)
+        }
+    }
+
+    @Test("adopting compares the design on disk, not only the index: a file changed on disk is not adopted, and an unreadable one is an error")
+    func adoptionReadsTheFile() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            let clean = try DesignStoreContract.design(id: "clean")
+            try await store.save(clean)
+            try FileManager.default.removeItem(at: dir.origins)
+            let index = try Data(contentsOf: dir.index), files = dir.designFiles
+            try DesignStoreContract.package(id: "clean", css: ".cv-skill{font-weight:700}").write(to: dir.file("clean"))
+            #expect(try await store.adoptAsBundled(clean) == false)
+            try DesignStoreContract.package(id: "clean", css: ".cv{display:none}").write(to: dir.file("clean"))
+            let rejected = await #expect(throws: FileDesignStoreError.self) { _ = try await store.adoptAsBundled(clean) }
+            guard case .designRejected(id: "clean", _)? = rejected else { Issue.record("\(String(describing: rejected))"); return }
+            try FileManager.default.removeItem(at: dir.file("clean"))
+            await #expect(throws: FileDesignStoreError.designUnreadable(id: "clean")) { _ = try await store.adoptAsBundled(clean) }
+            #expect(!FileManager.default.fileExists(atPath: dir.origins.path))
+            #expect(try Data(contentsOf: dir.index) == index)
+            #expect(dir.designFiles == files.subtracting(["clean.1.mcvt"]))
         }
     }
 
@@ -146,7 +168,7 @@ struct FileDesignStoreOriginTests {
             await #expect(throws: error) { _ = try await store.installedOrigins() }
             await #expect(throws: error) { try await store.save(DesignStoreContract.design(id: "bold")) }
             await #expect(throws: error) { _ = try await store.saveIfNewer(DesignStoreContract.design(id: "bold")) }
-            await #expect(throws: error) { _ = try await store.adoptAsBundled(clean.manifest) }
+            await #expect(throws: error) { _ = try await store.adoptAsBundled(clean) }
             #expect(try Data(contentsOf: dir.origins) == Data(contents.utf8))
             #expect(!FileManager.default.fileExists(atPath: dir.file("bold").path))
             #expect(try await store.installedDesigns() == [clean.manifest])
@@ -192,7 +214,7 @@ struct FileDesignStoreOriginTests {
             try await store.save(DesignStoreContract.design(id: "mine"))
             try await store.save(DesignStoreContract.design(id: "legacy"))
             try FileManager.default.removeItem(at: dir.origins)   // "shipped", "mine" and "legacy" now have no origin
-            #expect(try await store.adoptAsBundled(shipped.manifest))
+            #expect(try await store.adoptAsBundled(shipped))
             let index = try Data(contentsOf: dir.index), origins = try Data(contentsOf: dir.origins), files = dir.designFiles
             for version in ["0.0.1", "1.0.0", "999999999.0.0"] {
                 let outcome = try await store.save(DesignStoreContract.design(id: "shipped", version: version, css: ".cv-skill{font-weight:700}"))

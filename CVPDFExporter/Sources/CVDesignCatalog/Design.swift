@@ -199,11 +199,11 @@ public protocol DesignStore: Sendable {
     /// The origins the store has recorded, by identifier, for the designs it lists. A design with no recorded origin
     /// (one installed before origins were recorded) is absent.
     func installedOrigins() async throws -> [String: DesignOrigin]
-    /// Records the installed design that has this manifest's identifier and version as `bundled`, when it has no recorded
-    /// origin (one installed before origins were recorded). It is one step under the store's lock, and writes only the
-    /// record. Returns whether that design is now recorded as bundled: false when no design has the identifier, the
-    /// installed one has another version, or an import made it.
-    func adoptAsBundled(_ manifest: DesignManifest) async throws -> Bool
+    /// Records the installed design as `bundled`, when it equals `design` (identifier, version and content) and has no
+    /// recorded origin (one installed before origins were recorded). It is one step under the store's lock, and writes
+    /// only the record. Returns whether the installed design equals `design` and is now recorded as bundled: false when
+    /// no design has the identifier, the installed one differs from `design` in any way, or an import made it.
+    func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool
 }
 
 /// Proves that a design renders a fixture document without losing content (ADR 0011). Owned by the

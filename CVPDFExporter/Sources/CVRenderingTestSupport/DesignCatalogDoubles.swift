@@ -10,7 +10,7 @@ public struct UnavailableStore: DesignStore {
     public func design(id: String) async throws -> ValidatedDesign? { throw Failure() }
     public func installedDesigns() async throws -> [DesignManifest] { throw Failure() }
     public func installedOrigins() async throws -> [String: DesignOrigin] { throw Failure() }
-    public func adoptAsBundled(_ manifest: DesignManifest) async throws -> Bool { throw Failure() }
+    public func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { throw Failure() }
 }
 
 /// A bundled source with a fixed list of packages; `nil` is a source that cannot be read.
@@ -78,17 +78,12 @@ public actor SpyDesignStore: DesignStore {
         return origins
     }
     /// Adopting fails for the identifiers whose saves fail.
-    public func adoptAsBundled(_ manifest: DesignManifest) async throws -> Bool {
-        let id = manifest.id
+    public func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool {
+        let id = design.manifest.id
         if savesFailFor.contains(id) { throw Failure() }
-        guard designs[id]?.manifest.version == manifest.version else { return false }
-        switch origins[id] {
-        case .bundled?: return true
-        case .imported?: return false
-        case nil:
-            origins[id] = .bundled
-            return true
-        }
+        guard designs[id] == design, origins[id] != .imported else { return false }
+        origins[id] = .bundled
+        return true
     }
 }
 

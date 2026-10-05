@@ -224,10 +224,10 @@ struct SyncBundledDesignsTests {
         #expect(await gate.verified.isEmpty)
     }
 
-    @Test("a design with no recorded origin is the bundled one if its identifier and version match: it is adopted. Otherwise it is an import",
-          arguments: [("1.0.0", false), ("0.9.0", true), ("1.0.1", true), ("2.0.0", true)])
-    func unrecordedOrigin(installedVersion: String, isConflict: Bool) async throws {
-        let installed = try DesignStoreContract.design(id: "clean", version: installedVersion, css: otherCSS)
+    @Test("a design with no recorded origin is the bundled one if it equals it, identifier, version and content: it is adopted. Otherwise it is an import",
+          arguments: [("1.0.0", false, false), ("1.0.0", true, true), ("0.9.0", false, true), ("1.0.1", false, true), ("2.0.0", false, true)])
+    func unrecordedOrigin(installedVersion: String, otherContent: Bool, isConflict: Bool) async throws {
+        let installed = try DesignStoreContract.design(id: "clean", version: installedVersion, css: otherContent ? otherCSS : ".cv-name{color:var(--color-primary)}")
         let store = SpyDesignStore(installed: [installed]), gate = FakeRenderingGate()
         let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean")]), gate: gate, store: store)()
         #expect(report.conflicts == (isConflict ? ["clean"] : []))
@@ -242,7 +242,7 @@ struct SyncBundledDesignsTests {
 
     @Test("an adopted design is bundled from then on: a second sync leaves it alone, and a newer bundled version upgrades it")
     func adoptedUpgradesLater() async throws {
-        let installed = try DesignStoreContract.design(id: "clean", css: otherCSS)
+        let installed = try DesignStoreContract.design(id: "clean")
         let store = SpyDesignStore(installed: [installed]), gate = FakeRenderingGate()
         func sync(_ package: (name: String, data: Data)) async throws -> SyncReport {
             try await SyncBundledDesigns(source: FixedBundledSource(packages: [package]), gate: gate, store: store)()
@@ -276,7 +276,7 @@ struct SyncBundledDesignsTests {
             func design(id: String) async throws -> ValidatedDesign? { try await base.design(id: id) }
             func installedDesigns() async throws -> [DesignManifest] { try await base.installedDesigns() }
             func installedOrigins() async throws -> [String: DesignOrigin] { [:] }
-            func adoptAsBundled(_ manifest: DesignManifest) async throws -> Bool { false }
+            func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { false }
         }
         let store = Refusing()
         try await store.save(DesignStoreContract.design(id: "clean"))
@@ -468,7 +468,7 @@ struct InstallDesignTests {
             func design(id: String) async throws -> ValidatedDesign? { try await base.design(id: id) }
             func installedDesigns() async throws -> [DesignManifest] { try await base.installedDesigns() }
             func installedOrigins() async throws -> [String: DesignOrigin] { try await base.installedOrigins() }
-            func adoptAsBundled(_ manifest: DesignManifest) async throws -> Bool { try await base.adoptAsBundled(manifest) }
+            func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { try await base.adoptAsBundled(design) }
         }
         let store = SyncedMeanwhile()
         let install = InstallDesign(source: FixedBundledSource(packages: []), gate: FakeRenderingGate(), store: store)

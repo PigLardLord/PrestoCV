@@ -136,39 +136,44 @@ public actor FileDesignStore: DesignStore {
         guard DesignManifest.isValidID(id) else { return nil }   // never a path, such as "../x", or "Clean" on a case-insensitive volume
         return try withLock(exclusive: false) { () throws(FileDesignStoreError) -> ValidatedDesign? in
             guard let entry = try readIndex().first(where: { $0.manifest.id == id }) else { return nil }
-            let data: Data
-            switch readRegularFile(file(entry), cap: validator.maxBytes) {
-            case .data(let bytes): data = bytes
-            case .absent, .unreadable: throw .designUnreadable(id: id)
-            case .tooLarge(let bytes): throw .designTooLarge(id: id, bytes: bytes)
-            }
-            let design: ValidatedDesign
-            do throws(DesignPackageRejected) { design = try validator.validate(data) } catch { throw .designRejected(id: id, error.violations) }
-            guard design.manifest == entry.manifest else { throw .designRejected(id: id, [.malformed("the manifest differs from the index")]) }
-            return design
+            return try readDesign(entry)
         } ?? nil
+    }
+
+    /// The design a listed entry's file holds, validated again, and the same as the index says.
+    private func readDesign(_ entry: Entry) throws(FileDesignStoreError) -> ValidatedDesign {
+        let id = entry.manifest.id
+        let data: Data
+        switch readRegularFile(file(entry), cap: validator.maxBytes) {
+        case .data(let bytes): data = bytes
+        case .absent, .unreadable: throw .designUnreadable(id: id)
+        case .tooLarge(let bytes): throw .designTooLarge(id: id, bytes: bytes)
+        }
+        let design: ValidatedDesign
+        do throws(DesignPackageRejected) { design = try validator.validate(data) } catch { throw .designRejected(id: id, error.violations) }
+        guard design.manifest == entry.manifest else { throw .designRejected(id: id, [.malformed("the manifest differs from the index")]) }
+        return design
     }
 
     public func installedDesigns() async throws(FileDesignStoreError) -> [DesignManifest] {
         try withLock(exclusive: false) { () throws(FileDesignStoreError) in try readIndex().map(\.manifest) } ?? []
     }
 
-    /// Records the installed design with this manifest's identifier and version as bundled, when it has no recorded origin.
-    /// Only the record is written.
-    public func adoptAsBundled(_ manifest: DesignManifest) async throws(FileDesignStoreError) -> Bool {
-        let id = manifest.id
+    /// Records the installed design as bundled when it equals `design` and has no recorded origin. The index's manifest is
+    /// compared first, then the design's own file, read and validated again. Only the record is written.
+    public func adoptAsBundled(_ design: ValidatedDesign) async throws(FileDesignStoreError) -> Bool {
+        let id = design.manifest.id
         let adopted = try withLock(exclusive: true) { () throws(FileDesignStoreError) -> Bool in
             let entries = try readIndex()
             var origins = try readOrigins()
-            guard let installed = entries.first(where: { $0.manifest.id == id }), installed.manifest.version == manifest.version else { return false }
-            switch origins[id] {
-            case .bundled?: return true
-            case .imported?: return false
-            case nil:
+            guard let installed = entries.first(where: { $0.manifest.id == id }), installed.manifest == design.manifest,
+                  origins[id] != .imported else { return false }
+            guard try readDesign(installed) == design else { return false }
+            if origins[id] == nil {
                 origins[id] = .bundled
                 try write(try encodeOrigins(origins, listing: entries, for: id), to: originsFile, for: id)
-                return true
             }
+            return true
         }
         guard let adopted else { throw .storeUnavailable }   // an exclusive lock creates the store, so it is never absent
         return adopted
