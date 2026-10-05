@@ -154,8 +154,7 @@ public struct WebLink: Hashable, Sendable {
     public init?(_ raw: String) {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard Self.isPlainASCII(trimmed), let components = URLComponents(string: trimmed), Self.isWebAddress(components),
-              let serialized = components.string, Self.isPlainASCII(serialized),
-              URLComponents(string: serialized)?.string == serialized else { return nil }   // the value rebuilds itself
+              let serialized = Self.stableSerialization(of: components) else { return nil }
         value = serialized
     }
 
@@ -169,8 +168,20 @@ public struct WebLink: Hashable, Sendable {
     }
 
     private static func isWebAddress(_ components: URLComponents) -> Bool {
-        guard let scheme = components.scheme?.lowercased(), let defaultPort = defaultPorts[scheme], let host = components.host else { return false }
+        guard let defaultPort = defaultPort(of: components), let host = components.host else { return false }
         return isHostName(host) && hasNoCredentials(components) && [nil, defaultPort].contains(components.port)
+    }
+
+    /// The port the scheme uses unless another is written; `nil` for a scheme that is neither http nor https.
+    private static func defaultPort(of components: URLComponents) -> Int? {
+        components.scheme.flatMap { defaultPorts[$0.lowercased()] }
+    }
+
+    /// What the parser makes of the components, when that text is plain and parsing it again gives the same text: the
+    /// value rebuilds itself.
+    private static func stableSerialization(of components: URLComponents) -> String? {
+        guard let text = components.string, isPlainASCII(text), URLComponents(string: text)?.string == text else { return nil }
+        return text
     }
 
     private static func isHostName(_ host: String) -> Bool { host.range(of: #"^[A-Za-z0-9.-]{1,253}\z"#, options: .regularExpression) != nil }
