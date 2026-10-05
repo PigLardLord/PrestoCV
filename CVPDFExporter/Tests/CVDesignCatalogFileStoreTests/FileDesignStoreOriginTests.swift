@@ -310,6 +310,24 @@ struct FileDesignStoreOriginTests {
         }
     }
 
+    @Test("two instances on one directory adopting 40 designs at once lose no record update")
+    func twoInstancesAdopt() async throws {
+        try await inTemporaryStore { dir in
+            let designs = try (0..<40).map { try DesignStoreContract.design(id: "design-\($0)") }
+            let seed = FileDesignStore(directory: dir)
+            for design in designs { try await seed.save(design) }
+            try FileManager.default.removeItem(at: dir.origins)   // every design now has no recorded origin
+            let stores = [FileDesignStore(directory: dir), FileDesignStore(directory: dir)]
+            let adopted = try await withThrowingTaskGroup(of: Bool.self) { group in
+                for (n, design) in designs.enumerated() { group.addTask { try await stores[n % 2].adoptAsBundled(design) } }
+                return try await group.reduce(into: []) { $0.append($1) }
+            }
+            #expect(adopted.count == 40 && adopted.allSatisfy { $0 })
+            let expected = Dictionary(uniqueKeysWithValues: designs.map { ($0.manifest.id, DesignOrigin.bundled) })
+            #expect(try await FileDesignStore(directory: dir).installedOrigins() == expected)
+        }
+    }
+
     @Test("an import over a bundled design is refused under the lock and writes nothing; over an import or an unrecorded design it replaces")
     func importOverBundled() async throws {
         try await inTemporaryStore { dir in
