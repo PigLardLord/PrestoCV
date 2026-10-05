@@ -1,5 +1,5 @@
 import Foundation
-#if canImport(Glibc)   // outbound adapter: platform code is allowed here (PlatformAdapters)
+#if canImport(Glibc)
 import Glibc
 #elseif canImport(Darwin)
 import Darwin
