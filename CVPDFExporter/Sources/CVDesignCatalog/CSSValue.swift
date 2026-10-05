@@ -1,7 +1,5 @@
 import Foundation
 
-enum Unit { case pt, em, percent, fr }
-
 /// Bounds are what a CV design plausibly needs; anything outside them can hide or displace content.
 /// `relativeUnits: false` accepts only pt and px. em and % compound through nesting (60% of 60% of …), and rem
 /// depends on the root's size; an absolute unit is the only way a floor holds whatever the rest of the stylesheet does.
