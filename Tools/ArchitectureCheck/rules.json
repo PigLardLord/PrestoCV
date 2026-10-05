@@ -15,11 +15,18 @@
    "singleton",
    "infrastructureConstruction"
   ],
+  "ISP": [
+   "protocolSize"
+  ],
   "CleanFunctions": [
    "functionLength",
    "parameterCount",
    "nestingDepth",
    "cyclomaticComplexity"
+  ],
+  "CleanTypes": [
+   "typeLength",
+   "fileLength"
   ],
   "CleanErrors": [
    "swallowedError"

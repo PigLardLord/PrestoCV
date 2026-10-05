@@ -124,6 +124,38 @@ flag "parameterCount: a delegating initialiser that adds an argument" $'final cl
 flag "parameterCount: a delegating initialiser that drops a parameter" $'final class S {\n    convenience init(a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c) }\n}' "parameterCount: init takes 4"
 clean "parameterCount: the parameters of a closure are not counted" 'let f: (Int, Int, Int, Int) -> Void = { a, b, c, d in }'
 
+# --- typeLength: 200 lines of code per declaration or extension
+members() { lines_of "$1" '    var m%d = 0'; }
+flag "typeLength: a struct of 201 lines" "$(printf 'struct S {\n%s\n}\n' "$(members 201)")" "CleanTypes: typeLength: struct S has 201"
+clean "typeLength: a struct of 200 lines" "$(printf 'struct S {\n%s\n}\n' "$(members 200)")"
+flag "typeLength: a class" "$(printf 'final class C {\n%s\n}\n' "$(members 201)")" "typeLength: class C has 201"
+flag "typeLength: an enumeration" "$(printf 'enum E {\n%s\n}\n' "$(lines_of 201 '    case c%d')")" "typeLength: enum E has 201"
+flag "typeLength: an actor" "$(printf 'actor A {\n%s\n}\n' "$(members 201)")" "typeLength: actor A has 201"
+flag "typeLength: an extension" "$(printf 'extension S {\n%s\n}\n' "$(members 201)")" "typeLength: extension S has 201"
+flag_only "typeLength: a declaration and its extension are measured separately" \
+  "$(printf 'struct S {\n%s\n}\nextension S {\n%s\n}\n' "$(members 50)" "$(members 201)")" "extension S has 201" "struct S has"
+clean "typeLength: a declaration and its extension within the limit, 242 lines in all" "$(printf 'struct S {\n%s\n}\nextension S {\n%s\n}\n' "$(members 120)" "$(members 120)")"
+flag_only "typeLength: a nested type counts in its type and in itself" \
+  "$(printf 'struct S {\n%s\n    struct N {\n%s\n    }\n}\n' "$(members 150)" "$(lines_of 60 '        var n%d = 0')")" "struct S has 211" "struct N has"
+clean "typeLength: braces, blank lines and comments do not count" "$(printf 'struct S {\n%s\n\n    // a comment\n\n    /* a block\n       comment */\n}\n' "$(members 200)")"
+
+# --- fileLength: 300 lines of code
+flag "fileLength: 301 lines" "$(lets 301)" "CleanTypes: fileLength: the file has 301"
+clean "fileLength: 300 lines" "$(lets 300)"
+clean "fileLength: blank, comment and brace-only lines do not count" "$(printf '%s\n\n// a comment\n\n/* a block\n   comment */\nstruct S\n{\n    var a = 0\n}\n' "$(lets 298)")"
+
+# --- protocolSize: 5 requirements at most
+flag "protocolSize: 6 requirements" "$(printf 'protocol P {\n%s\n}\n' "$(lines_of 6 '    func f%d()')")" "ISP: protocolSize: protocol P declares 6"
+clean "protocolSize: 5 requirements" "$(printf 'protocol P {\n%s\n}\n' "$(lines_of 5 '    func f%d()')")"
+clean "protocolSize: functions, variables, subscripts, initialisers and associated types are 5; a typealias is none" \
+  $'protocol P {\n    associatedtype T\n    init()\n    subscript(i: Int) -> Int { get }\n    var a: Int { get }\n    func f()\n    typealias U = Int\n}'
+flag "protocolSize: each kind of requirement counts" \
+  $'protocol P {\n    associatedtype T\n    init()\n    subscript(i: Int) -> Int { get }\n    var a: Int { get }\n    var b: Int { get set }\n    func f()\n}' "protocol P declares 6"
+flag "protocolSize: every #if branch counts" "$(printf 'protocol P {\n%s\n#if DEBUG\n    func a()\n    func b()\n#else\n    func c()\n#endif\n}\n' "$(lines_of 3 '    func f%d()')")" "protocol P declares 6"
+flag_only "protocolSize: what a protocol inherits is not counted, what it declares is" \
+  "$(printf 'protocol Base {\n%s\n}\nprotocol P: Base {\n    func extra()\n}\n' "$(lines_of 6 '    func f%d()')")" "protocol Base declares 6" "protocol P declares"
+clean "protocolSize: a struct with many methods is not a protocol" "$(printf 'struct S {\n%s\n}\n' "$(lines_of 6 '    func f%d() {}')")"
+
 # --- the policy: these detectors run on production targets only (ADR 0021 (c))
 setup; src 'let x = 1'; printf '%s\n' "$(fn 21)" > "$ROOT/Sources/Other/O.swift"
 expect "a target that does not list the rules is not measured" 0 ""

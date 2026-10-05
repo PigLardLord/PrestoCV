@@ -20,6 +20,12 @@ struct CodeLines {
 
     static func isBrace(_ token: TokenSyntax) -> Bool { token.tokenKind == .leftBrace || token.tokenKind == .rightBrace }
 
+    /// The number of code lines among the tokens of a node.
+    func count(in node: some SyntaxProtocol) -> Int {
+        var counted: Set<Int> = []
+        for token in node.tokens(viewMode: .sourceAccurate) { if let span = span(of: token) { counted.formUnion(span) } }
+        return counted.count
+    }
 }
 
 /// The code lines of each open region, a body or a type. A token counts in the innermost region that holds it and in
