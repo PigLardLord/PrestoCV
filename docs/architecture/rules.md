@@ -2,7 +2,7 @@
 
 These rules are strict on purpose. A change that breaks one does not merge. There are two ways to live with a violation, and both are explicit ([ADR 0006](adr/0006-enforce-architecture-mechanically.md)):
 
-- **Baseline:** temporary. An existing violation is listed in the checker's baseline, which may only shrink.
+- **Baseline:** temporary. An existing violation is listed in the checker's baseline, which may only shrink. The size, shape and comment rules (`CleanFunctions`, `CleanTypes`, `ISP`, `CleanComments`) are never baselined: the checker refuses such an entry, and a finding is fixed.
 - **Exception:** permanent. It is an entry in the checker's `rules.json`, and it cites an ADR that explains why. The checker refuses an exception whose ADR does not exist.
 
 The rules are **SOLID**, **Clean Architecture** and **Clean Code**, and five rules of this project named by topic ([ADR 0021](adr/0021-solid-and-clean-rules.md)). Every rule is cited by its name, such as `SRP` or `ValidatingBoundary`, never by a number.

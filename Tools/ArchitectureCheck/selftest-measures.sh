@@ -267,6 +267,29 @@ doc_flag "rules.md before its table of former numbers" docs/architecture/rules.m
 doc_flag "rules.md after its table of former numbers" docs/architecture/rules.md $'## Former numbers\n\n| '"${R}1"$' | x |\n\n## Review checklist\n\nSee '"${R}4"$'.\n' "docs/architecture/rules.md:7: CleanComments"
 doc_flag "another document with a section of the same name" docs/architecture/modules.md $'## Former numbers\n\n| '"${R}1"$' | x |\n' "docs/architecture/modules.md:3: CleanComments"
 
+# --- no baseline (ADR 0021 (e)): the checker refuses a baseline entry of these detectors and never writes one
+fingerprint() { python3 -c 'import sys; h = 0xcbf29ce484222325
+for b in " ".join(sys.argv[1].split()).encode(): h = ((h ^ b) * 0x100000001b3) % 2**64
+print(format(h, "x"))' "$1"; }
+baseline_with() { printf '[%s]\n' "$1" > "$ROOT/baseline.json"; }
+for entry in "CleanFunctions|functionLength|func f has 21 lines of code, at most 20" "CleanFunctions|parameterCount|x" "CleanFunctions|nestingDepth|x" \
+             "CleanFunctions|cyclomaticComplexity|x" "CleanTypes|typeLength|x" "CleanTypes|fileLength|x" "ISP|protocolSize|x" "CleanComments|ruleNumberCitation|x"; do
+  rule="${entry%%|*}"; rest="${entry#*|}"; detector="${rest%%|*}"; node="${rest#*|}"
+  setup; src 'let x = 1'; baseline_with "\"Sources/Pure/P.swift|$rule|$detector|$(fingerprint "$node")#0\""
+  expect "baseline: an entry of $detector is refused" 1 "baseline entry of the measurement detector $detector"
+done
+setup; src "$(fn 21)"; baseline_with "\"Sources/Pure/P.swift|CleanFunctions|functionLength|$(fingerprint 'func f has 21 lines of code, at most 20')#0\""
+expect "baseline: an entry of a measurement detector does not suppress its finding" 1 "new violation Sources/Pure/P.swift:1: CleanFunctions: functionLength"
+setup; src 'let x = 1'; baseline_with "\"Sources/Pure/P.swift|CleanErrors|swallowedError|abc#0\""
+expect "baseline: an entry of another detector is judged as before (stale)" 1 "no longer occurs"
+setup; src "$(printf 'func g() { fatalError("x") }\n%s\n' "$(fn 21 | sed 's/func f/func h/')")"
+"$CHECK" "$ROOT" --rules "$ROOT/rules.json" --baseline "$ROOT/baseline.json" --adr-dir "$ROOT/adr" --write-baseline > "$ROOT/out.txt" 2>&1
+if grep -q "escapeHatch" "$ROOT/baseline.json" && ! grep -q "functionLength" "$ROOT/baseline.json"; then pass=$((pass+1)); echo "ok   --write-baseline writes the other findings and none of a measurement detector"
+else fail=$((fail+1)); echo "FAIL --write-baseline wrote: $(cat "$ROOT/baseline.json")"; fi
+if grep -q "never baselined" "$ROOT/out.txt"; then pass=$((pass+1)); echo "ok   --write-baseline says it left the measurement findings out"
+else fail=$((fail+1)); echo "FAIL --write-baseline does not say it left findings out"; sed 's/^/     /' "$ROOT/out.txt"; fi
+expect "after --write-baseline the measurement finding is still reported" 1 "functionLength"
+
 # --- the policy: these detectors run on production targets only (ADR 0021 (c))
 setup; src 'let x = 1'; printf '%s\n' "$(fn 21)" > "$ROOT/Sources/Other/O.swift"
 expect "a target that does not list the rules is not measured" 0 ""

@@ -4,7 +4,7 @@
 - The target architecture and its rules are in `docs/architecture/`: start from `docs/architecture/README.md`, then `rules.md` (the rules, and the review checklist) and `modules.md` (targets and allowed imports). Decisions are recorded as ADRs in `docs/architecture/adr/`.
 - The rules are SOLID, Clean Architecture, Clean Code and the project's own, named by topic ([ADR 0021](docs/architecture/adr/0021-solid-and-clean-rules.md)). A rule is cited by its name, such as `SRP` or `ValidatingBoundary`, never by a number.
 - New code follows the target architecture, not the current structure described below. The migration is in progress (see the migration strategy in `docs/architecture/README.md`); where this file and `docs/architecture/` disagree, `docs/architecture/` wins.
-- A change that needs a new target or a new dependency between targets updates `modules.md` in the same pull request. A permanent exception to a rule is an entry in the checker's `rules.json` that cites an ADR; a temporary one is a baseline entry, and the baseline may only shrink.
+- A change that needs a new target or a new dependency between targets updates `modules.md` in the same pull request. A permanent exception to a rule is an entry in the checker's `rules.json` that cites an ADR; a temporary one is a baseline entry, and the baseline may only shrink. The size, shape and comment rules are never baselined: the checker refuses such an entry.
 - Proposed ADRs describe the target and guide new code; a rule becomes binding when its ADR is Accepted and merged.
 
 ## Project Structure & Module Organization (current, being migrated)

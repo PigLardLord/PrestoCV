@@ -30,7 +30,7 @@ A finding reads `<file>:<line>: <rule>: <detector>: <detail>`, and its baseline 
 
 ## Size, shape and comment detectors
 
-They enforce `CleanFunctions`, `CleanTypes`, `ISP` and `CleanComments` on production targets, as [ADR 0021](../../docs/architecture/adr/0021-solid-and-clean-rules.md) (c) measures them. A target that lists none of these rules is not measured: tests, test support, tools, manifests and legacy targets list none. They have no baseline; a finding is fixed.
+They enforce `CleanFunctions`, `CleanTypes`, `ISP` and `CleanComments` on production targets, as [ADR 0021](../../docs/architecture/adr/0021-solid-and-clean-rules.md) (c) measures them. A target that lists none of these rules is not measured: tests, test support, tools, manifests and legacy targets list none. They have no baseline: a finding is fixed, and the checker refuses a baseline entry of theirs.
 
 | Detector | Rule | Finding when |
 |---|---|---|
@@ -85,7 +85,7 @@ chmod +x .githooks/pre-commit.d/architecture-check
 
 - **A new target:** add it to `rules.json` and to `docs/architecture/modules.md` in the same pull request, and remove it from `notYetImplemented`.
 - **A permanent exception:** an entry in `exceptions` that cites an ADR.
-- **A temporary one:** a baseline entry. The baseline may only shrink.
+- **A temporary one:** a baseline entry. The baseline may only shrink. The size, shape and comment detectors are never baselined: the checker refuses an entry of theirs, whatever its fingerprint, and `--write-baseline` leaves their findings out and says so.
 - **Legacy targets** are exempt until they are deleted (ADR 0012).
 - **`Prototypes/` is excluded.**
 - **Module qualifiers do not hide a name:** `Swift.fatalError` and `Foundation.Date()` are checked like `fatalError` and `Date()`.

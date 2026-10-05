@@ -273,14 +273,25 @@ if let packages = value(after: "--packages") {
 
 // MARK: Report
 
+/// The detector of a baseline key, which reads `file|rule|detector|fingerprint#n`, when it is a size, shape or comment
+/// detector. Their findings are never baselined (ADR 0021 (e)): they are fixed.
+func measurementDetector(ofKey key: String) -> String? {
+    let parts = key.split(separator: "|", omittingEmptySubsequences: false)
+    return parts.count > 2 && Measurements.detectors.contains(String(parts[2])) ? String(parts[2]) : nil
+}
+
 let current = Set(findings.map(\.key))
 if CommandLine.arguments.contains("--write-baseline") {
     guard problems.isEmpty else { for p in problems { print("error: \(p)") }; print("refusing to write a baseline while there are problems"); exit(1) }
-    do { try JSONEncoder().encode(current.sorted()).write(to: URL(fileURLWithPath: baselinePath)) } catch { fail("cannot write baseline") }
-    print("wrote \(current.count) entries to \(baselinePath)"); exit(0)
+    let writable = current.filter { measurementDetector(ofKey: $0) == nil }
+    do { try JSONEncoder().encode(writable.sorted()).write(to: URL(fileURLWithPath: baselinePath)) } catch { fail("cannot write baseline") }
+    print("wrote \(writable.count) entries to \(baselinePath)")
+    if writable.count < current.count { print("left out \(current.count - writable.count) findings of the size, shape and comment detectors: they are never baselined") }
+    exit(0)
 }
 guard let baseline = loadBaseline(baselinePath) else { fail("cannot read baseline \(baselinePath)") }
-let baselined = Set(baseline)
+for key in baseline { if let detector = measurementDetector(ofKey: key) { problems.append("baseline entry of the measurement detector \(detector) is refused, fix the finding instead: \(key)") } }
+let baselined = Set(baseline.filter { measurementDetector(ofKey: $0) == nil })
 let new = findings.filter { !baselined.contains($0.key) }
 let stale = baselined.subtracting(current).sorted()
 var added: [String] = []
