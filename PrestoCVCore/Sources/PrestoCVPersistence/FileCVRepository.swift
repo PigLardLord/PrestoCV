@@ -152,19 +152,27 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
 
     // MARK: Writing
 
-    /// Writes only what this repository will be able to read back: the encoded file must be within the size
-    /// cap and must decode, through the same strict path as a read, to the same CV. Otherwise nothing is
-    /// written and the previous version stays (review round 2: the writer accepted what the reader rejects).
+    /// Writes only what this repository will be able to read back, so the previous version stays when it would not.
     private func write(_ cv: CV) throws(RepositoryError) {
         let name = StoredFileName.of(cv.id)
+        let data = try encodedFile(of: cv, named: name)
+        try requireReadsBack(data, as: cv, named: name)
+        do { try data.write(to: url(of: cv.id), options: Self.writeOptions) } catch { throw .writeFailed(file: name) }
+    }
+
+    private func encodedFile(of cv: CV, named name: String) throws(RepositoryError) -> Data {
         guard let created = cv.createdAt, let updated = cv.updatedAt else { throw .writeFailed(file: name) }
-        let data: Data
-        do { data = try CVFileV1(cv, createdAt: created, updatedAt: updated).encoded() } catch { throw .writeFailed(file: name) }
+        do { return try CVFileV1(cv, createdAt: created, updatedAt: updated).encoded() } catch { throw .writeFailed(file: name) }
+    }
+
+    /// The encoded file must be within the size cap and must decode, through the same strict path as a read, to the same CV.
+    private func requireReadsBack(_ data: Data, as cv: CV, named name: String) throws(RepositoryError) {
         guard data.count <= maxFileBytes else { throw .wouldNotReadBack(file: name) }
         do {
             guard try CVFileV1.decode(data).toDomain() == cv else { throw RepositoryError.wouldNotReadBack(file: name) }
-        } catch { throw .wouldNotReadBack(file: name) }
-        do { try data.write(to: url(of: cv.id), options: Self.writeOptions) } catch { throw .writeFailed(file: name) }
+        } catch {
+            throw .wouldNotReadBack(file: name)
+        }
     }
 
     /// Timestamps are stored with whole-second precision (ISO 8601), so they are normalised before use; otherwise a
