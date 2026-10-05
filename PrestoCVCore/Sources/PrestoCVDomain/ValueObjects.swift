@@ -103,20 +103,29 @@ public struct EmailAddress: Hashable, Sendable {
     private static let label = #"[\p{L}\p{N}](?:[\p{L}\p{M}\p{N}-]{0,61}[\p{L}\p{M}\p{N}])?"#
     private static let topLevel = #"(?:\p{L}\p{M}*){2,63}"#   // two to 63 letters, each with its marks
     private static let pattern = "^" + atom + #"(?:\."# + atom + ")*@(?:" + label + #"\.)+"# + topLevel + #"\z"#
+    private static let hiddenCategories: Set<Unicode.GeneralCategory> = [.control, .format, .lineSeparator, .paragraphSeparator,
+                                                                         .spaceSeparator, .privateUse, .surrogate, .unassigned]
+    private static let maxBytes = 254, maxLocalPartBytes = 64, maxLabelCharacters = 63
 
     /// Returns `nil` when the trimmed text is not an address in the form above.
     public init?(_ raw: String) {
         let address = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        let hidden: Set<Unicode.GeneralCategory> = [.control, .format, .lineSeparator, .paragraphSeparator, .spaceSeparator,
-                                                    .privateUse, .surrogate, .unassigned]
-        guard address.utf8.count <= 254, !address.unicodeScalars.contains(where: { hidden.contains($0.properties.generalCategory) }),
-              address.range(of: Self.pattern, options: .regularExpression) != nil else { return nil }
-        // Length limits the pattern cannot express once marks are allowed: a local part of at most 64 bytes, and
-        // domain labels of at most 63 characters, marks included. The exact IDNA length is not checked.
-        let parts = address.split(separator: "@", omittingEmptySubsequences: false)
-        guard parts.count == 2, parts[0].utf8.count <= 64,
-              parts[1].split(separator: ".").allSatisfy({ $0.unicodeScalars.count <= 63 }) else { return nil }
+        guard Self.isShortAndVisible(address), Self.matchesPattern(address), Self.isWithinPartLimits(address) else { return nil }
         value = address
+    }
+
+    private static func isShortAndVisible(_ address: String) -> Bool {
+        address.utf8.count <= maxBytes && !address.unicodeScalars.contains { hiddenCategories.contains($0.properties.generalCategory) }
+    }
+
+    private static func matchesPattern(_ address: String) -> Bool { address.range(of: pattern, options: .regularExpression) != nil }
+
+    /// The limits the pattern cannot express once marks are allowed: the local part in bytes, and each domain label in
+    /// characters, marks included. The exact IDNA length is not checked.
+    private static func isWithinPartLimits(_ address: String) -> Bool {
+        let parts = address.split(separator: "@", omittingEmptySubsequences: false)
+        return parts.count == 2 && parts[0].utf8.count <= maxLocalPartBytes
+            && parts[1].split(separator: ".").allSatisfy { $0.unicodeScalars.count <= maxLabelCharacters }
     }
 }
 
