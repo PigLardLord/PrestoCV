@@ -173,7 +173,11 @@ data_init "assignment: a static member of a type declared elsewhere is taken on 
 delegating_init "delegation: the parameters may be passed in any order, with literals between them" clean "self.init(d: d, e: 0, c: c, f: nil, b: b, g: [], a: a)"
 delegating_init "delegation: a file-level let is a constant" clean "self.init($PASS, e: limit)" "let limit = 9"
 data_init "assignment: a computed value is behaviour" flag "$STORE; self.e = 1 + 2"
-for value in 'makeDefault()' 'Foo()' '.make()' '.some(1)' 'Kind.make(1)' 'Kind.make(a:)' '"\(a)"' '[a]' '-a' 'a' 'a ?? 0' 'flag ? 1 : 2' 'defaults.limit' 'limit' 'Type.init' '[makeDefault()]' '["k": Foo()]'; do
+for value in 'Kind.currently' 'Kind.nowhere' '.mainStreet' 'Kind.defaults' '.sharedKey'; do
+  data_init "assignment: $value does not name ambient state" clean "$STORE; self.e = $value"
+done
+for value in '.now' 'Date.now' 'Foundation.Date.now' '.shared' 'URLSession.shared' 'Self.shared' '.default' 'FileManager.default' '.current' 'Locale.current' \
+             'Calendar.autoupdatingCurrent' '.main' 'Bundle.main' '.standard' 'UserDefaults.standard' 'makeDefault()' 'Foo()' '.make()' '.some(1)' 'Kind.make(1)' 'Kind.make(a:)' '"\(a)"' '[a]' '-a' 'a' 'a ?? 0' 'flag ? 1 : 2' 'defaults.limit' 'limit' 'Type.init' '[makeDefault()]' '["k": Foo()]'; do
   data_init "assignment: $value is not a literal or a constant" flag "$STORE; self.e = $value"
   delegating_init "delegation: $value is not a literal or a constant" flag "self.init($PASS, e: $value)"
 done
