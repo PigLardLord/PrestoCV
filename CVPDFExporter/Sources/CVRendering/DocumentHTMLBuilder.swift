@@ -20,7 +20,7 @@ public struct DocumentHTMLBuilder: Sendable {
 
     /// BCP 47-shaped language tags only; anything else becomes "und" (undetermined).
     static func languageTag(_ raw: String) -> String {
-        raw.fullyMatches(#"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,3}"#) ? raw : "und"
+        LanguageTag.isWellFormed(raw) ? raw : "und"
     }
 
     public func build(_ doc: CVDocument, stylesheet: ValidatedStylesheet, palette: Palette,

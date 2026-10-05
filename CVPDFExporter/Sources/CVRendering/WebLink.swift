@@ -1,4 +1,5 @@
 import Foundation
+import CVDesignCatalog
 
 /// A link that is safe to print (RichDomain, ValidatingBoundary). Built only from input that parses cleanly; the emitted form is
 /// the parser's serialisation, not the input text.
@@ -24,12 +25,5 @@ public struct WebLink: Sendable, Equatable {
         }
         guard let serialized = c.string else { return nil }
         url = serialized
-    }
-}
-
-extension String {
-    /// Whole-string match: `^…$` would accept a trailing newline, `\z` does not.
-    func fullyMatches(_ pattern: String) -> Bool {
-        range(of: "^(?:" + pattern + ")\\z", options: .regularExpression) != nil
     }
 }

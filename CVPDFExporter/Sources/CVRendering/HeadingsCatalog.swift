@@ -8,7 +8,7 @@ public enum HeadingsCatalog {
     static let keys = ["experience", "education", "skills", "languages", "certifications", "profiles", "interests", "summary", "present", "native"]
 
     public static func headings(for language: String) throws(Failure) -> Headings {
-        guard language.fullyMatches(#"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,3}"#) else { throw .unsupportedLanguage(language) }
+        guard LanguageTag.isWellFormed(language) else { throw .unsupportedLanguage(language) }
         let primary = String(language.prefix { $0 != "-" }).lowercased()
         for candidate in [language.lowercased(), primary] {
             if let table = try table(candidate) { return try headings(table, language: candidate) }
