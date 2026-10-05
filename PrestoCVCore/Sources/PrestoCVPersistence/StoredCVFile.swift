@@ -14,23 +14,51 @@ enum StoredCVFile {
     case cv(CV), absent, newer(Int), corrupt(String), unreadable, tooLarge(Int)
 
     static func read(_ url: URL, maxBytes: Int) -> StoredCVFile {
-        let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
-        guard fd >= 0 else { return errno == ENOENT ? .absent : .unreadable }
-        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
-        var status = stat()
-        guard fstat(fd, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { return .unreadable }
-        guard Int(status.st_size) <= maxBytes else { return .tooLarge(Int(status.st_size)) }
+        do throws(Unusable) {
+            let handle = try openForReading(url)
+            return classify(try contents(of: handle, maxBytes: maxBytes))
+        } catch {
+            return error.file
+        }
+    }
+
+    /// A file that cannot be read any further, with the outcome to report for it.
+    private struct Unusable: Error { let file: StoredCVFile }
+
+    private static func openForReading(_ url: URL) throws(Unusable) -> FileHandle {
+        let descriptor = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+        guard descriptor >= 0 else { throw Unusable(file: errno == ENOENT ? .absent : .unreadable) }
+        return FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+    }
+
+    private static func contents(of handle: FileHandle, maxBytes: Int) throws(Unusable) -> Data {
+        let size = try sizeOfRegularFile(handle.fileDescriptor)
+        guard size <= maxBytes else { throw Unusable(file: .tooLarge(size)) }
         let data: Data
-        do { data = try handle.read(upToCount: maxBytes + 1) ?? Data() } catch { return .unreadable }
-        guard data.count <= maxBytes else { return .tooLarge(data.count) }
-        // The frozen envelope: a newer integer schemaVersion is valid data from a newer build.
-        struct Peek: Decodable { let schemaVersion: Int }
-        do {
-            let peek = try JSONDecoder().decode(Peek.self, from: data)
-            if peek.schemaVersion > CVFileV1.version { return .newer(peek.schemaVersion) }
-        } catch { return .corrupt("no schemaVersion envelope") }
+        do { data = try handle.read(upToCount: maxBytes + 1) ?? Data() } catch { throw Unusable(file: .unreadable) }
+        guard data.count <= maxBytes else { throw Unusable(file: .tooLarge(data.count)) }
+        return data
+    }
+
+    private static func sizeOfRegularFile(_ descriptor: Int32) throws(Unusable) -> Int {
+        var status = stat()
+        guard fstat(descriptor, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw Unusable(file: .unreadable) }
+        return Int(status.st_size)
+    }
+
+    private static func classify(_ data: Data) -> StoredCVFile {
+        let version: Int
+        do { version = try JSONDecoder().decode(Envelope.self, from: data).schemaVersion } catch { return .corrupt("no schemaVersion envelope") }
+        guard version <= CVFileV1.version else { return .newer(version) }
+        return decodeCV(data)
+    }
+
+    private static func decodeCV(_ data: Data) -> StoredCVFile {
         do { return .cv(try CVFileV1.decode(data).toDomain()) }
         catch let invalid as CVFileV1.Invalid { return .corrupt(invalid.reason) }
         catch { return .corrupt("not a CV file") }
     }
 }
+
+/// The frozen envelope: a newer integer `schemaVersion` is valid data from a newer build, so it is read before anything else.
+private struct Envelope: Decodable { let schemaVersion: Int }
