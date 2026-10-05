@@ -6,12 +6,9 @@ final class WorkMeter {
 
     init(budget: Int) { self.budget = budget }
 
-    /// Records steps; false once more than the budget has been spent.
-    @discardableResult
-    func spend(_ count: Int = 1) -> Bool {
-        steps += count
-        return !isExhausted
-    }
+    /// Records steps, whether or not the budget allows them.
+    func charge(_ count: Int = 1) { steps += count }
 
+    /// Whether more than the budget has been spent.
     var isExhausted: Bool { steps > budget }
 }

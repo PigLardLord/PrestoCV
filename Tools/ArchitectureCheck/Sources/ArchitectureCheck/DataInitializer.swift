@@ -45,8 +45,10 @@ final class DataInitializer {
         return answer
     }
 
+    /// Looking at an initialiser costs a step, and costs nothing more once the budget is spent: it is not looked at.
     private func examine(_ node: InitializerDeclSyntax) -> Bool {
-        guard meter.spend(), !types.isClassWithInheritanceClause(holding: node),
+        meter.charge()
+        guard !meter.isExhausted, !types.isClassWithInheritanceClause(holding: node),
               let subject = Subject(node, constants: constants) else { return false }
         return assigns(subject) || delegates(subject)
     }
@@ -81,13 +83,9 @@ final class DataInitializer {
     /// Every initialiser of the type that the call can mean is a data initialiser, and there is at least one.
     private func reachesDataInitializer(_ call: FunctionCallExprSyntax, from node: InitializerDeclSyntax) -> Bool {
         guard let declared = types.initializers(ofTypeHolding: node) else { return false }
-        let callees = declared.filter { canBeCalled($0, by: call) }
+        meter.charge(declared.reduce(0) { $0 + $1.matchingCost(of: call) })   // matching the labels of each candidate
+        let callees = declared.filter { $0.canBeCalled(by: call) }
         return !callees.isEmpty && callees.allSatisfy { matches($0) }
-    }
-
-    private func canBeCalled(_ candidate: InitializerDeclSyntax, by call: FunctionCallExprSyntax) -> Bool {
-        meter.spend(candidate.matchingCost(of: call))
-        return candidate.canBeCalled(by: call)
     }
 
     /// `self.init(...)`, without a trailing closure.
