@@ -1,15 +1,18 @@
 import SwiftSyntax
 
-/// The types a file declares, found by name and nothing else resolved: a type and its extensions in the file are one
-/// type. A data initialiser has to find, here, the stored properties it assigns and the initialisers it delegates to
-/// (ADR 0021 (c)); one that cannot is not exempt.
+/// The types a file declares, found by their full path (`Outer.Inner`), and nothing else resolved: a type and the extensions
+/// in the file that name its path are one type. A data initialiser has to find, here, the stored properties it assigns and
+/// the initialisers it delegates to (ADR 0021 (c)); one that cannot is not exempt. A path that no single declaration
+/// answers, because there is none in the file or because the branches of a `#if` declare it twice, finds nothing.
 struct FileTypes {
     private let groups: [String: [any DeclGroupSyntax]]
 
     init(_ tree: SourceFileSyntax) {
         let collector = DeclarationCollector(viewMode: .sourceAccurate)
         collector.walk(tree)
-        groups = Dictionary(grouping: collector.declarations) { Self.name(of: $0) ?? "" }
+        groups = collector.declarations.reduce(into: [:]) { result, group in
+            if let path = TypePath.of(group) { result[path, default: []].append(group) }
+        }
     }
 
     /// The instance properties that the type holding an initialiser stores; nil when the file does not declare the type.
@@ -26,10 +29,15 @@ struct FileTypes {
         declarations(ofTypeHolding: initializer)?.flatMap { $0.memberBlock.members.declarations.compactMap { $0.as(InitializerDeclSyntax.self) } }
     }
 
-    /// The declaration of the type that holds a member, and its extensions in the file.
+    /// The one declaration of the type that holds a member, and the extensions of its path in the file.
     private func declarations(ofTypeHolding member: some SyntaxProtocol) -> [any DeclGroupSyntax]? {
-        guard let holder = Self.holder(of: member), let name = Self.name(of: holder), let all = groups[name],
-              all.contains(where: Self.isDeclaration) else { return nil }
+        guard let holder = Self.holder(of: member) else { return nil }
+        guard let path = TypePath.of(holder) else { return Self.isDeclaration(holder) ? [holder] : nil }
+        return declarations(at: path)
+    }
+
+    private func declarations(at path: String) -> [any DeclGroupSyntax]? {
+        guard let all = groups[path], all.filter(Self.isDeclaration).count == 1 else { return nil }
         return all
     }
 
@@ -49,13 +57,6 @@ struct FileTypes {
 
     private static func instanceProperties(of group: any DeclGroupSyntax) -> [Property] {
         group.memberBlock.members.declarations.compactMap { $0.as(VariableDeclSyntax.self) }.filter { !$0.isTypeLevel }.flatMap(\.properties)
-    }
-
-    /// The simple name of a type, or of the type that an extension extends.
-    private static func name(of group: any DeclGroupSyntax) -> String? {
-        if let named = group as? any NamedDeclSyntax { return named.name.text }
-        guard let type = (group as? ExtensionDeclSyntax)?.extendedType else { return nil }
-        return type.as(IdentifierTypeSyntax.self)?.name.text ?? type.as(MemberTypeSyntax.self)?.name.text
     }
 }
 
