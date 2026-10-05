@@ -154,9 +154,12 @@ struct CVFileV1: Codable, Equatable {
             guard let valid = DesignChoice(design: d.design, palette: d.palette, fonts: d.fonts) else { throw Invalid(reason: "design") }
             choice = valid
         }
-        return CV(id: CVID(id), revision: revision, createdAt: createdAt, updatedAt: updatedAt, title: title, personal: details,
-                  sections: sections, design: choice,
-                  language: try Self.canonical(language, DocumentLanguage.init, \.tag, "language"))
+        var cv = CV(id: CVID(id), title: title, personal: details, sections: sections, design: choice,
+                    language: try Self.canonical(language, DocumentLanguage.init, \.tag, "language"))
+        cv.revision = revision
+        cv.createdAt = createdAt
+        cv.updatedAt = updatedAt
+        return cv
     }
 
     /// A stored value is exactly what its value object produces from it.
