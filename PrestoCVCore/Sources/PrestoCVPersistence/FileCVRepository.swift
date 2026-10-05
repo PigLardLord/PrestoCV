@@ -38,18 +38,6 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         return false
     }
 
-    private enum StoreState { case present, absent, unavailable(StoreFailure) }
-
-    /// The store itself: absent before the first save; unavailable when it cannot be reached, sits behind a link whose
-    /// target is gone, or is not a directory. The store may be reached through a link.
-    private func storeState() -> StoreState {
-        var status = stat()
-        guard stat(directory.path, &status) == 0 else {
-            return errno == ENOENT && !Self.passesThroughDanglingLink(directory.path) ? .absent : .unavailable(.cannotList)
-        }
-        return (status.st_mode & S_IFMT) == S_IFDIR ? .present : .unavailable(.notADirectory)
-    }
-
     /// Whether `url` is a real directory, not a link to one; nil when nothing is there.
     private static func isRealDirectory(_ url: URL) -> Bool? {
         var status = stat()
@@ -67,18 +55,6 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         }
     }
 
-    /// Whether the path, or one of its ancestors, is a symbolic link whose target is missing: a store that was moved
-    /// away, not one that was never created.
-    private static func passesThroughDanglingLink(_ path: String) -> Bool {
-        var current = path
-        while !current.isEmpty, current != "/" {
-            var link = stat(), target = stat()
-            if lstat(current, &link) == 0, (link.st_mode & S_IFMT) == S_IFLNK, stat(current, &target) != 0 { return true }
-            current = (current as NSString).deletingLastPathComponent
-        }
-        return false
-    }
-
     // MARK: Reading one file
 
     /// A stored CV, which must also carry the identifier its file is named after.
@@ -94,7 +70,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         let file = read(url(id))
         if case .absent = file {
             // Not found only in a store that can be reached; otherwise a missing store would read as a deleted CV.
-            if case .unavailable(let failure) = storeState() { throw .storeUnavailable(failure) }
+            if case .unavailable(let failure) = StoreState(of: directory) { throw .storeUnavailable(failure) }
             return nil
         }
         return try file.requireCV(named: name)
@@ -139,16 +115,8 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         }
     }
 
-    /// A CV is loaded by an identifier from a listing, so a store that is not there at all is unavailable: its CVs
-    /// were not deleted one by one. Only a listing reads a missing store as a first run.
     public func load(_ id: CVID) async throws(RepositoryError) -> CV {
-        guard let cv = try current(id) else {
-            switch storeState() {
-            case .present: throw .notFound(id)
-            case .absent: throw .storeUnavailable(.cannotList)
-            case .unavailable(let failure): throw .storeUnavailable(failure)
-            }
-        }
+        guard let cv = try current(id) else { throw StoreState(of: directory).failureToLoad(id) }
         return cv
     }
 
@@ -163,7 +131,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     public func list() async throws(RepositoryError) -> CVListing {
         // Only a store that does not exist yet means "empty" (first run). Anything else is an error: a store that
         // cannot be reached, or one behind a link whose target is gone. The store itself may be reached through a link.
-        switch storeState() {
+        switch StoreState(of: directory) {
         case .absent: return CVListing(cvs: [], issues: [])
         case .unavailable(let failure): throw .storeUnavailable(failure)
         case .present: break
