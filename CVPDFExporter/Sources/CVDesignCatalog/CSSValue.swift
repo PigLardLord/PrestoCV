@@ -18,11 +18,21 @@ enum CSSValue {
     static func variable(_ allowed: Set<String>, orKeywords keywords: Set<String> = []) -> Check {
         { (tokens: [CSSToken]) throws(CSSRejection) -> String in
             if let word = lowercasedKeyword(in: tokens, from: keywords) { return word }
-            guard tokens.count == 3, tokens[0] == .function("var"), case .ident(let name) = tokens[1], allowed.contains(name), tokens[2] == .rparen else {
+            guard let name = variableName(in: tokens), allowed.contains(name) else {
                 throw CSSRejection(reason: "only \(allowed.sorted()) are allowed here")
             }
             return "var(\(name))"
         }
+    }
+
+    /// The name in `var(--name)` when that call is the whole of `tokens`.
+    private static func variableName(in tokens: [CSSToken]) -> String? {
+        guard isVariableCall(tokens), case .ident(let name) = tokens[1] else { return nil }
+        return name
+    }
+
+    private static func isVariableCall(_ tokens: [CSSToken]) -> Bool {
+        tokens.count == 3 && tokens[0] == .function("var") && tokens[2] == .rparen
     }
 
     static func lengths(_ bounds: LengthBounds, count: ClosedRange<Int>) -> Check {
