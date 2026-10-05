@@ -1,4 +1,4 @@
-import Foundation   // value types only (R2): UUID and Date as types, never UUID() / Date()
+import Foundation   // value types only (PureCore): UUID and Date as types, never UUID() / Date()
 
 // MARK: - Identity
 
@@ -39,7 +39,7 @@ public struct Period: Hashable, Sendable {
     }
 
     /// The single rule for building a period from loose data (persistence, AI drafts): every
-    /// combination is either a valid period, no period, or a typed error. Nothing is defaulted (R6).
+    /// combination is either a valid period, no period, or a typed error. Nothing is defaulted (RichDomain).
     public static func make(start: (year: Int, month: Int?)?, end: (year: Int, month: Int?)?, current: Bool) throws(PeriodError) -> Period? {
         func date(_ d: (year: Int, month: Int?)) throws(PeriodError) -> PartialDate {
             guard let p = PartialDate(year: d.year, month: d.month) else { throw .invalidDate }
@@ -61,13 +61,13 @@ public struct Period: Hashable, Sendable {
 
 // MARK: - Levels
 
-/// Bounded value object: invalid levels cannot exist (R6).
+/// Bounded value object: invalid levels cannot exist (RichDomain).
 public struct SkillLevel: Hashable, Sendable {
     public let value: Int
     public init?(_ value: Int) { guard (1...5).contains(value) else { return nil }; self.value = value }
 }
 
-/// The CEFR levels, plus native. Its display name belongs to presentation (R13).
+/// The CEFR levels, plus native. Its display name belongs to presentation (LocalisationAtEdges).
 public enum LanguageProficiency: String, CaseIterable, Hashable, Sendable {
     case a1, a2, b1, b2, c1, c2, native
 }
@@ -112,7 +112,7 @@ public struct PhoneNumber: Hashable, Sendable {
     }
 }
 
-/// An http or https address with a host, no credentials and the scheme's default port (R8). Kept in the form
+/// An http or https address with a host, no credentials and the scheme's default port (ValidatingBoundary). Kept in the form
 /// the parser serialises, never as the raw input.
 public struct WebLink: Hashable, Sendable {
     public let value: String

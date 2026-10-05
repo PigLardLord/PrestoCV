@@ -1,12 +1,12 @@
 import Foundation
-#if canImport(Glibc)   // outbound adapter: platform code is allowed here (R11)
+#if canImport(Glibc)   // outbound adapter: platform code is allowed here (PlatformAdapters)
 import Glibc
 #elseif canImport(Darwin)
 import Darwin
 #endif
 import PrestoCVDomain
 
-/// One stored CV file, read the one way every reader in this target uses (R12): opened once, without following a
+/// One stored CV file, read the one way every reader in this target uses (PersistedSchema): opened once, without following a
 /// link or blocking, checked and read through that descriptor within a size cap, then decoded strictly. The outcome
 /// distinguishes what must not be touched (an I/O failure, anything but a regular file, too large, a newer schema)
 /// from what is genuinely corrupt.

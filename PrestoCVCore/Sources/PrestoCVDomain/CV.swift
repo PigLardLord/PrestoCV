@@ -1,6 +1,6 @@
 import Foundation
 
-/// Aggregate root: state changes go through methods (R6). Revision and timestamps belong to the
+/// Aggregate root: state changes go through methods (RichDomain). Revision and timestamps belong to the
 /// repository: they can only be set from inside the package (`package` access).
 public struct CV: Hashable, Sendable {
     public let id: CVID
@@ -42,7 +42,7 @@ public struct CV: Hashable, Sendable {
     public mutating func setLanguage(_ language: DocumentLanguage?) { self.language = language }
 
     /// Duplication rule: the copy keeps the content and the design, not the identity or the history.
-    /// The new title is composed by presentation, which knows the language (R13).
+    /// The new title is composed by presentation, which knows the language (LocalisationAtEdges).
     public func duplicated(as newID: CVID, title: String) -> CV {
         CV(id: newID, title: title, personal: personal, sections: sections, design: design, language: language)
     }

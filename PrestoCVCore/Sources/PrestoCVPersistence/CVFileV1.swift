@@ -1,7 +1,7 @@
 import Foundation
 import PrestoCVDomain
 
-/// The stored form of a CV, schema 1: a DTO separate from the domain (ADR 0009, R12). Decoding is strict: required
+/// The stored form of a CV, schema 1: a DTO separate from the domain (ADR 0009, PersistedSchema). Decoding is strict: required
 /// fields are required, sizes are capped, and every value must be in the canonical, valid form its value object
 /// produces. A file is never normalised or defaulted on read. The envelope is frozen: `schemaVersion` is a top-level
 /// integer in every future version.

@@ -56,7 +56,7 @@ public enum CVRepositoryContract {
         throw Failure(description: "\(what): expected \(error)")
     }
 
-    /// Every CVRepository adapter must pass this (R10).
+    /// Every CVRepository adapter must pass this (LSP).
     public static func verify(_ repo: some CVRepository) async throws {
         let id = CVID(UUID(uuidString: "11111111-1111-1111-1111-111111111111")!)
         let v1 = try await repo.create(CV(id: id, personal: PersonalDetails(fullName: "Ada")))
@@ -135,7 +135,7 @@ public enum FixtureCV {
 
 /// The leaves of a value, walked with Mirror: strings, integers, booleans and enum cases without a payload. A nil is
 /// `missing` and an empty collection is `empty`, so a completeness test can require a fixture to populate every field,
-/// and the mapper test (R10) can check that each leaf reaches the document.
+/// and the mapper test (CleanTests) can check that each leaf reaches the document.
 public enum FieldLeaves {
     public static let missing = "<nil>", empty = "<empty>"
 

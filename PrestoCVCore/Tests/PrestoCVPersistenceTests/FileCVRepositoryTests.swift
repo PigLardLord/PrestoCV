@@ -16,7 +16,7 @@ let runningInSimulator = true
 let runningInSimulator = false
 #endif
 
-func tempDir() -> URL { FileManager.default.temporaryDirectory.appendingPathComponent("cv-store-\(UUID().uuidString)") }   // hermetic (R10)
+func tempDir() -> URL { FileManager.default.temporaryDirectory.appendingPathComponent("cv-store-\(UUID().uuidString)") }   // hermetic (CleanTests)
 let id1 = CVID(UUID(uuidString: "11111111-1111-1111-1111-111111111111")!)
 let id2 = CVID(UUID(uuidString: "22222222-2222-2222-2222-222222222222")!)
 let isRoot = geteuid() == 0
@@ -385,7 +385,7 @@ struct FileRepositoryTests {
     #endif
 }
 
-@Suite("R10 · repository contract, file adapter")
+@Suite("LSP · repository contract, file adapter")
 struct FileContractTests {
     @Test("the file adapter passes")
     func file() async throws {

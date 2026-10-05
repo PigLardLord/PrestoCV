@@ -1,5 +1,5 @@
 import Foundation
-#if canImport(Glibc)   // outbound adapter: platform code is allowed here (R11)
+#if canImport(Glibc)   // outbound adapter: platform code is allowed here (PlatformAdapters)
 import Glibc
 #elseif canImport(Darwin)
 import Darwin
@@ -7,7 +7,7 @@ import Darwin
 import PrestoCVDomain
 import PrestoCVApplication
 
-/// The CV store on disk (ADR 0009, R12). One file per CV, named from its identifier, in schema 1. Every mutating
+/// The CV store on disk (ADR 0009, PersistedSchema). One file per CV, named from its identifier, in schema 1. Every mutating
 /// operation holds an exclusive `flock` on the store, so revision checks hold across repository instances and
 /// processes; the composition root still keeps one instance per process (ADR 0008). Waiting for the lock blocks a
 /// thread of the cooperative pool: #111.

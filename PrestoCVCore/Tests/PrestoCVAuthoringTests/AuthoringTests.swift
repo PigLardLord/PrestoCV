@@ -17,7 +17,7 @@ let emailLengthCases: [(String, Bool)] = {
             ("ada@example." + label63, true), ("ada@example." + label64, false)]
 }()
 
-@Suite("R6 · rich domain")
+@Suite("RichDomain")
 struct DomainTests {
     @Test("invalid values cannot exist; validators reject trailing newlines")
     func invariants() {
@@ -133,7 +133,7 @@ struct DomainTests {
     }
 }
 
-@Suite("R10 · repository contract")
+@Suite("LSP · repository contract")
 struct ContractTests {
     @Test("in-memory adapter passes") func inMemory() async throws { try await CVRepositoryContract.verify(InMemoryCVRepository()) }
 }

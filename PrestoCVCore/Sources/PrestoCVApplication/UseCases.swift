@@ -1,7 +1,7 @@
 import Foundation
 import PrestoCVDomain
 
-/// What presentation needs to know, without the port's error shape (R7).
+/// What presentation needs to know, without the port's error shape (CleanErrors).
 public enum AuthoringError: Error, Equatable, Sendable {
     case notEnoughContent, conflict(storedRevision: Int), deletedElsewhere, tooLarge, unavailable
 }
@@ -55,7 +55,7 @@ public struct RenameCV: Sendable {
     }
 }
 
-/// Stores a copy of a CV under a new identity. The title is composed by presentation (R13).
+/// Stores a copy of a CV under a new identity. The title is composed by presentation (LocalisationAtEdges).
 public struct DuplicateCV: Sendable {
     let ids: any IDGenerator
     let save: SaveCV

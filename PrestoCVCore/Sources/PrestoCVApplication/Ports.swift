@@ -1,7 +1,7 @@
 import Foundation
 import PrestoCVDomain
 
-// MARK: - Outbound ports (R3). Every method is atomic within the repository's serialisation boundary,
+// MARK: - Outbound ports (DIP). Every method is atomic within the repository's serialisation boundary,
 // across instances and processes (the file adapter locks the store). Repository operations are short,
 // synchronous I/O and are not cancellable: they complete or fail.
 
@@ -40,7 +40,7 @@ public enum StoreIssue: Sendable, Equatable {
 
 public enum StoreFailure: Sendable, Equatable { case notADirectory, cannotList, cannotLock }
 
-/// No paths or free-form strings: file names only, and coded failures (R7).
+/// No paths or free-form strings: file names only, and coded failures (CleanErrors).
 public enum RepositoryError: Error, Equatable, Sendable {
     case notFound(CVID), alreadyExists(CVID), conflict(CVID, storedRevision: Int)
     case corrupt(file: String), unreadable(file: String), upgradeRequired(file: String, version: Int), tooLarge(file: String)

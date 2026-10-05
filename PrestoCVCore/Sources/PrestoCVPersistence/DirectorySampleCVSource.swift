@@ -3,7 +3,7 @@ import PrestoCVDomain
 import PrestoCVApplication
 
 /// The sample CVs offered on first run, read from an injected directory: every `.cv.json` file, in file-name order,
-/// in the stored format and through the store's own reader (R12). The samples ship with the app, so one that cannot
+/// in the stored format and through the store's own reader (PersistedSchema). The samples ship with the app, so one that cannot
 /// be used is an error, never skipped. Starting from a sample gives it a fresh identity (`StartFromSample`), so the
 /// identifiers inside the files only need to differ from each other.
 public struct DirectorySampleCVSource: SampleCVSource {
