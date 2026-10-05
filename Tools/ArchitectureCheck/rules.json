@@ -15,6 +15,9 @@
    "singleton",
    "infrastructureConstruction"
   ],
+  "CleanFunctions": [
+   "functionLength"
+  ],
   "CleanErrors": [
    "swallowedError"
   ],

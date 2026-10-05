@@ -20,9 +20,10 @@ P
 {"rules":{"DependencyRule":["exportedImport"],"PureCore":["wallClock","randomIdentity","ambientEnvironment","localization","printing"],
   "DIP":["singleton","infrastructureConstruction"],"CleanErrors":["swallowedError"],
   "StrictConcurrency":["escapeHatch","swift5Mode","unsafeFlags"],"PlatformAdapters":["platformCondition"],
+  "CleanFunctions":["functionLength"],
   "LocalisationAtEdges":["localization"],"NoDeadCode":["printing","testDouble"]},
  "infrastructureTypes":["FileStore"],
- "targets":[{"name":"Pure","path":"Sources/Pure","allowedImports":["Foundation"],"rules":["DependencyRule","PureCore","DIP","CleanErrors","StrictConcurrency","PlatformAdapters","LocalisationAtEdges","NoDeadCode"]},
+ "targets":[{"name":"Pure","path":"Sources/Pure","allowedImports":["Foundation"],"rules":["DependencyRule","PureCore","DIP","CleanFunctions","CleanErrors","StrictConcurrency","PlatformAdapters","LocalisationAtEdges","NoDeadCode"]},
             {"name":"Other","path":"Sources/Other","allowedImports":["Foundation"],"rules":[]},
             {"name":"Manifest","path":"Package.swift","kind":"manifest","allowedImports":["PackageDescription"],"rules":["StrictConcurrency"]}]}
 J
@@ -313,6 +314,8 @@ if [[ "$(uname)" == Darwin ]]; then
 else
   expect "packages: an Apple-only manifest branch is invisible on Linux, so CI also checks packages on macOS" 0 "" --packages .
 fi
+
+source "$HERE/selftest-measures.sh"
 
 echo "selftest: $pass passed, $fail failed"
 [[ $fail -eq 0 ]]

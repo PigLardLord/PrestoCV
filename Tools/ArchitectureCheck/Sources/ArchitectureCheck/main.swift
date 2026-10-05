@@ -161,7 +161,8 @@ for (file, target) in assignment where target.kind != "legacy" {
         }
     }
     let rulesFor = detectorToRules(target)
-    for hit in scanner.hits {
+    let measured = Measurements.detectors.isDisjoint(with: rulesFor.keys) ? [] : Measurements.hits(of: tree, file: file)
+    for hit in scanner.hits + measured {
         // Inside a manifest, the declaration of a legacy target is exempt like its sources (ADR 0012); anything
         // else in the manifest, including package-level settings and new targets, is checked.
         if target.kind == "manifest", let owner = hit.packageTarget, isLegacyDeclaration(owner, inManifest: file) { continue }
