@@ -35,8 +35,7 @@ struct StoreLock {
     }
 
     private func requireRegularFile(_ descriptor: Int32) throws(RepositoryError) {
-        var status = stat()
-        guard fstat(descriptor, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw .storeUnavailable(.cannotLock) }
+        guard StoreFiles.status(ofDescriptor: descriptor).kind == .regularFile else { throw .storeUnavailable(.cannotLock) }
     }
 
     private func acquire(_ descriptor: Int32) throws(RepositoryError) {

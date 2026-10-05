@@ -1,9 +1,4 @@
 import Foundation
-#if canImport(Glibc)
-import Glibc
-#elseif canImport(Darwin)
-import Darwin
-#endif
 import PrestoCVApplication
 import PrestoCVDomain
 
@@ -18,25 +13,23 @@ struct Quarantine {
     /// A file that could not be moved into the quarantine.
     struct Failed: Error {}
 
-    private enum Kind { case absent, realDirectory, other }
-
-    private var kind: Kind {
-        var status = stat()
-        guard lstat(folder.path, &status) == 0 else { return errno == ENOENT ? .absent : .other }
-        return (status.st_mode & S_IFMT) == S_IFDIR ? .realDirectory : .other
-    }
+    /// What is at the folder's path. A link is not a directory: it is never followed.
+    private var kind: FileKind { StoreFiles.status(of: folder.path).kind }
 
     /// Refuses a folder that is there but is not a real directory. An absent folder is fine: nothing was quarantined yet.
     func requireUsable() throws(RepositoryError) {
-        if kind == .other { throw .storeUnavailable(.notADirectory) }
+        switch kind {
+        case .missing, .directory: return
+        case .inaccessible, .regularFile, .symbolicLink, .other: throw .storeUnavailable(.notADirectory)
+        }
     }
 
     /// The entries of the folder. An absent folder is empty; one that is not a real directory is never used.
     func names() throws(RepositoryError) -> [String] {
         switch kind {
-        case .absent: return []
-        case .other: throw .storeUnavailable(.notADirectory)
-        case .realDirectory: return try entries()
+        case .missing: return []
+        case .directory: return try entries()
+        case .inaccessible, .regularFile, .symbolicLink, .other: throw .storeUnavailable(.notADirectory)
         }
     }
 
@@ -57,7 +50,7 @@ struct Quarantine {
     /// modification time says nothing about that.
     func admit(_ file: URL, at time: Date) throws(Failed) {
         do { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) } catch { throw Failed() }
-        guard kind == .realDirectory else { throw Failed() }
+        guard kind == .directory else { throw Failed() }
         do {
             try FileManager.default.setAttributes([.modificationDate: time], ofItemAtPath: file.path)
             try FileManager.default.moveItem(at: file, to: unusedURL(for: file.lastPathComponent))

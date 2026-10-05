@@ -1,9 +1,4 @@
 import Foundation
-#if canImport(Glibc)
-import Glibc
-#elseif canImport(Darwin)
-import Darwin
-#endif
 import PrestoCVApplication
 import PrestoCVDomain
 
@@ -13,9 +8,12 @@ enum StoreState {
     case present, absent, unavailable(StoreFailure)
 
     init(of directory: URL) {
-        var status = stat()
-        guard stat(directory.path, &status) == 0 else { self = Self.unreachable(directory.path, errno: errno); return }
-        self = (status.st_mode & S_IFMT) == S_IFDIR ? .present : .unavailable(.notADirectory)
+        switch StoreFiles.statusFollowingLinks(of: directory.path).kind {
+        case .directory: self = .present
+        case .missing: self = Self.whenMissing(directory.path)
+        case .inaccessible: self = .unavailable(.cannotList)
+        case .regularFile, .symbolicLink, .other: self = .unavailable(.notADirectory)
+        }
     }
 
     /// Why a CV that is not in the store cannot be loaded. A CV is loaded by an identifier from a listing, so a store that is
@@ -28,8 +26,8 @@ enum StoreState {
         }
     }
 
-    private static func unreachable(_ path: String, errno code: Int32) -> StoreState {
-        code == ENOENT && !passesThroughDanglingLink(path) ? .absent : .unavailable(.cannotList)
+    private static func whenMissing(_ path: String) -> StoreState {
+        passesThroughDanglingLink(path) ? .unavailable(.cannotList) : .absent
     }
 
     /// Whether the path, or one of its ancestors, is a symbolic link whose target is missing: a store that was moved
@@ -44,7 +42,6 @@ enum StoreState {
     }
 
     private static func isDanglingLink(_ path: String) -> Bool {
-        var link = stat(), target = stat()
-        return lstat(path, &link) == 0 && (link.st_mode & S_IFMT) == S_IFLNK && stat(path, &target) != 0
+        StoreFiles.status(of: path).kind == .symbolicLink && !StoreFiles.statusFollowingLinks(of: path).kind.isReachable
     }
 }

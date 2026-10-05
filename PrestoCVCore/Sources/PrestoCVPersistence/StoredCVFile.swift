@@ -42,9 +42,9 @@ enum StoredCVFile {
     }
 
     private static func sizeOfRegularFile(_ descriptor: Int32) throws(Unusable) -> Int {
-        var status = stat()
-        guard fstat(descriptor, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw Unusable(file: .unreadable) }
-        return Int(status.st_size)
+        let status = StoreFiles.status(ofDescriptor: descriptor)
+        guard status.kind == .regularFile else { throw Unusable(file: .unreadable) }
+        return status.size
     }
 
     private static func classify(_ data: Data) -> StoredCVFile {
