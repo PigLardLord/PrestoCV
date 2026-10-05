@@ -10,8 +10,8 @@ struct PDFTextIndex {
     init(_ pdfText: String) {
         var kept: [Unicode.Scalar] = [], afterBreak: [Bool] = []
         var sawBreak = true
-        for scalar in pdfText.lowercased().unicodeScalars {
-            if scalar.properties.isWhitespace { sawBreak = true; continue }
+        for scalar in Self.lowercasedScalars(pdfText) {
+            if Self.isBreak(scalar) { sawBreak = true; continue }
             kept.append(scalar)
             afterBreak.append(sawBreak)
             sawBreak = false
@@ -19,6 +19,17 @@ struct PDFTextIndex {
         scalars = kept
         startsAfterBreak = afterBreak
         endsBeforeBreak = kept.indices.map { $0 + 1 == kept.count || afterBreak[$0 + 1] }
+    }
+
+    /// The one rule for comparing text with the PDF's: case and white space do not count, since designs may use
+    /// text-transform and PDF text extraction does not preserve spacing.
+    static func lowercasedScalars(_ text: String) -> String.UnicodeScalarView { text.lowercased().unicodeScalars }
+
+    static func isBreak(_ scalar: Unicode.Scalar) -> Bool { scalar.properties.isWhitespace }
+
+    /// The scalars of a text node as the index holds the PDF's: lower-cased, with no white space.
+    static func comparableScalars(of text: String) -> [Unicode.Scalar] {
+        lowercasedScalars(text).filter { !isBreak($0) }
     }
 
     /// The positions where `needle` occurs, best first: the spans that start and end where the PDF text breaks, then

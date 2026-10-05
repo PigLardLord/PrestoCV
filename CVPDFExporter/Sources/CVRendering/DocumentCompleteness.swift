@@ -6,10 +6,6 @@ import Foundation
 /// occurrence is detected. Case and whitespace are ignored: designs may use text-transform, and PDF text
 /// extraction does not preserve spacing.
 public enum DocumentCompleteness {
-    static func normalize(_ text: String) -> String {
-        String(String.UnicodeScalarView(text.lowercased().unicodeScalars.filter { !$0.properties.isWhitespace }))
-    }
-
     /// The text nodes the PDF text does not contain. Every node, each occurrence counted, needs its own span of the
     /// PDF text that no other node uses, so a value made of the end of one field and the start of the next ("Greg" +
     /// "Officer" contains "go") cannot stand in for a missing field.

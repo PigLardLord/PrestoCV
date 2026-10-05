@@ -13,7 +13,7 @@ struct ExpectedText {
     var length: Int { needle.count }
 
     init?(index: Int, text: String, in pdf: PDFTextIndex) {
-        let needle = Array(DocumentCompleteness.normalize(text).unicodeScalars)
+        let needle = PDFTextIndex.comparableScalars(of: text)
         guard !needle.isEmpty else { return nil }
         self.index = index
         self.needle = needle
