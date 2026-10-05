@@ -25,7 +25,8 @@ public enum DesignCatalogError: Error, Equatable, Sendable {
 ///   over a design it records as bundled (`ImportSave.keptBundled`), which is the same error.
 /// - The source is read after the package is validated, so an invalid package is reported as invalid. A source that cannot
 ///   be read stops the import (`DesignCatalogError.bundledDesignsUnavailable`), and so does a store that cannot list its
-///   origins (`DesignCatalogError.storeUnavailable`), since the identifier cannot be judged.
+///   origins, since the identifier cannot be judged, or that fails to save the design (`DesignCatalogError.storeUnavailable`).
+///   A validation or rendering failure passes through as the validator's or the gate's error, and a cancellation unchanged.
 public struct InstallDesign: Sendable {
     let source: any BundledDesignSource, validator: DesignPackageValidator, gate: any DesignRenderingGate, store: any DesignStore
     public init(source: any BundledDesignSource, validator: DesignPackageValidator = DesignPackageValidator(),
@@ -37,7 +38,11 @@ public struct InstallDesign: Sendable {
         let id = design.manifest.id
         guard try await !holdsBundledIdentifier(id) else { throw DesignCatalogError.bundledIdentifier(id) }
         try await gate.verify(design)
-        guard try await store.save(design) == .saved else { throw DesignCatalogError.bundledIdentifier(id) }
+        let saved: ImportSave
+        do { saved = try await store.save(design) } catch let cancellation as CancellationError { throw cancellation } catch {
+            throw DesignCatalogError.storeUnavailable
+        }
+        guard saved == .saved else { throw DesignCatalogError.bundledIdentifier(id) }
         return design
     }
 

@@ -476,6 +476,14 @@ struct InstallDesignTests {
         #expect(try await store.installedOrigins() == ["late": .bundled])
     }
 
+    @Test("a store that fails to save the import is reported as unavailable, not passed through raw")
+    func saveFails() async throws {
+        let store = SpyDesignStore(savesFailFor: ["mine"]), gate = FakeRenderingGate()
+        let install = InstallDesign(source: FixedBundledSource(packages: []), gate: gate, store: store)
+        await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await install(DesignStoreContract.package(id: "mine")) }
+        #expect(await store.savedIDs.isEmpty)
+    }
+
     @Test("an import with an identifier of its own is rendered, stored and recorded as imported")
     func installsImport() async throws {
         let store = InMemoryDesignStore(), gate = FakeRenderingGate()
