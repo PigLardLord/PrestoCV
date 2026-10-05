@@ -45,9 +45,15 @@ public enum FileDesignStoreError: Error, Equatable, Sendable {
 ///   directory is never used. Only validated designs leave the store.
 public actor FileDesignStore: DesignStore {
     let directory: URL, validator: DesignPackageValidator
+    /// The most bytes the origin record may have, when it is read and before it is written.
+    let originsCap: Int
 
     public init(directory: URL, validator: DesignPackageValidator = DesignPackageValidator()) {
-        self.directory = directory; self.validator = validator
+        self.init(directory: directory, validator: validator, originsCap: Self.maxOriginsBytes)
+    }
+
+    init(directory: URL, validator: DesignPackageValidator = DesignPackageValidator(), originsCap: Int) {
+        self.directory = directory; self.validator = validator; self.originsCap = originsCap
     }
 
     /// The index's schema version. An index written with a new palette or font scheme cannot be read by an older app:
@@ -57,7 +63,8 @@ public actor FileDesignStore: DesignStore {
     /// when an origin is added.
     static let originsVersion = 1
     static let maxIndexBytes = 1024 * 1024, maxGeneration = Int(Int32.max)
-    /// An origin entry is shorter than an index entry, so the record of designs that fit the index fits this cap.
+    /// The origin record's cap. An origin entry is shorter than an index entry, so the record of designs that fit the
+    /// index fits it.
     static let maxOriginsBytes = maxIndexBytes
     private var designsDirectory: URL { directory.appendingPathComponent("Designs", isDirectory: true) }
     private var indexFile: URL { directory.appendingPathComponent("index.json") }
@@ -285,12 +292,17 @@ public actor FileDesignStore: DesignStore {
     /// The recorded origins. A missing record is an empty one; any other failure leaves it untouched.
     private func readOrigins() throws(FileDesignStoreError) -> [String: DesignOrigin] {
         let data: Data
-        switch readRegularFile(originsFile, cap: Self.maxOriginsBytes) {
+        switch readRegularFile(originsFile, cap: originsCap) {
         case .absent: return [:]
         case .data(let bytes): data = bytes
         case .unreadable: throw .originsUnreadable
         case .tooLarge: throw .originsCorrupt("too large")
         }
+        return try decodeOrigins(data)
+    }
+
+    /// The strict reader of the origin record: what a read decodes, and what a write must be read back as.
+    private func decodeOrigins(_ data: Data) throws(FileDesignStoreError) -> [String: DesignOrigin] {
         let version: Int
         do { version = try JSONDecoder().decode(Envelope.self, from: data).schemaVersion } catch { throw .originsCorrupt("no schema version") }
         guard version <= Self.originsVersion else { throw .originsFromNewerVersion(version) }
@@ -329,10 +341,18 @@ public actor FileDesignStore: DesignStore {
         return data
     }
 
-    /// The record of the origins of the listed designs, ordered by identifier. A design with no origin has no entry.
+    /// The record of the origins of the listed designs, ordered by identifier. A design with no origin has no entry. The
+    /// bytes are returned only if they are within the cap and the strict reader reads them back as the same origins, so
+    /// nothing is written that could not be read back (R12).
     private func encodeOrigins(_ origins: [String: DesignOrigin], listing entries: [Entry], for id: String) throws(FileDesignStoreError) -> Data {
-        let recorded = entries.map(\.manifest.id).compactMap { id in origins[id].map { OriginEntry(id: id, origin: $0) } }
-        return try encode(OriginsV1(schemaVersion: Self.originsVersion, designs: recorded), for: id)
+        let listed = entries.map(\.manifest.id)
+        let recorded = listed.compactMap { id in origins[id].map { OriginEntry(id: id, origin: $0) } }
+        let data = try encode(OriginsV1(schemaVersion: Self.originsVersion, designs: recorded), for: id)
+        guard data.count <= originsCap else { throw .wouldNotReadBack(id: id) }
+        let readBack: [String: DesignOrigin]
+        do throws(FileDesignStoreError) { readBack = try decodeOrigins(data) } catch { throw .wouldNotReadBack(id: id) }
+        guard readBack == Dictionary(uniqueKeysWithValues: recorded.map { ($0.id, $0.origin) }) else { throw .wouldNotReadBack(id: id) }
+        return data
     }
 
     private func write(_ data: Data, to url: URL, for id: String) throws(FileDesignStoreError) {

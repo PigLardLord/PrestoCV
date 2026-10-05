@@ -176,6 +176,38 @@ struct FileDesignStoreOriginTests {
         }
     }
 
+    @Test("a record that would exceed its cap is not written: nothing is, and the previous state stays")
+    func recordWouldNotReadBack() async throws {
+        try await inTemporaryStore { dir in
+            let importedRecord = record("[\(entry("clean"))]")
+            let tight = FileDesignStore(directory: dir, originsCap: record("[\(entry("clean", "bundled"))]").utf8.count - 1)   // "bundled" is the shorter
+            await #expect(throws: FileDesignStoreError.wouldNotReadBack(id: "clean")) { try await tight.save(DesignStoreContract.design(id: "clean")) }
+            await #expect(throws: FileDesignStoreError.wouldNotReadBack(id: "clean")) { _ = try await tight.saveIfNewer(DesignStoreContract.design(id: "clean")) }
+            #expect(dir.designFiles.isEmpty)
+            #expect(!FileManager.default.fileExists(atPath: dir.index.path) && !FileManager.default.fileExists(atPath: dir.origins.path))
+            let fitting = FileDesignStore(directory: dir, originsCap: importedRecord.utf8.count)
+            try await fitting.save(DesignStoreContract.design(id: "clean"))
+            #expect(try String(decoding: Data(contentsOf: dir.origins), as: UTF8.self) == importedRecord)
+            let index = try Data(contentsOf: dir.index), files = dir.designFiles
+            await #expect(throws: FileDesignStoreError.wouldNotReadBack(id: "bold")) { try await fitting.save(DesignStoreContract.design(id: "bold")) }
+            #expect(try Data(contentsOf: dir.index) == index && dir.designFiles == files)
+            #expect(try String(decoding: Data(contentsOf: dir.origins), as: UTF8.self) == importedRecord)
+            #expect(try await fitting.installedOrigins() == ["clean": .imported])
+        }
+    }
+
+    @Test("adopting does not write a record that would exceed its cap")
+    func adoptionRecordWouldNotReadBack() async throws {
+        try await inTemporaryStore { dir in
+            let clean = try DesignStoreContract.design(id: "clean")
+            try await FileDesignStore(directory: dir).save(clean)
+            try FileManager.default.removeItem(at: dir.origins)
+            let tight = FileDesignStore(directory: dir, originsCap: record("[\(entry("clean", "bundled"))]").utf8.count - 1)
+            await #expect(throws: FileDesignStoreError.wouldNotReadBack(id: "clean")) { _ = try await tight.adoptAsBundled(clean) }
+            #expect(!FileManager.default.fileExists(atPath: dir.origins.path))
+        }
+    }
+
     @Test("a record larger than the cap is reported without being read, and left untouched")
     func oversizedRecord() async throws {
         try await inTemporaryStore { dir in
