@@ -1,7 +1,7 @@
 import Foundation
 
 /// Design CSS is parsed into tokens, checked against an allow-list and re-serialised from the tokens
-/// (ADR 0011, R8). What is validated is exactly what is emitted: comments, strings and anything the
+/// (ADR 0011, ValidatingBoundary). What is validated is exactly what is emitted: comments, strings and anything the
 /// allow-list does not name cannot reach the document.
 public struct CSSRejection: Error, Equatable, Sendable, CustomStringConvertible {
     public let reason: String

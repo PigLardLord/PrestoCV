@@ -66,7 +66,7 @@ public enum PDFRenderingContractFailure: Error, Equatable {
          truncationNotReported, cancellationIgnored
 }
 
-/// Contract every PDFRendering adapter must pass (R10, ADR 0003). It checks what the PDF contains,
+/// Contract every PDFRendering adapter must pass (LSP, ADR 0003). It checks what the PDF contains,
 /// through an inspector, not what the renderer says about it.
 public enum PDFRenderingContract {
     public static func verify(_ renderer: some PDFRendering, inspector: some PDFInspecting,

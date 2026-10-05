@@ -1,6 +1,6 @@
 import Foundation
 
-/// A link that is safe to print (R6, R8). Built only from input that parses cleanly; the emitted form is
+/// A link that is safe to print (RichDomain, ValidatingBoundary). Built only from input that parses cleanly; the emitted form is
 /// the parser's serialisation, not the input text.
 public struct WebLink: Sendable, Equatable {
     public let url: String

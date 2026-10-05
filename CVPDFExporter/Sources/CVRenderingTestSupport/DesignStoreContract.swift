@@ -14,7 +14,7 @@ public struct DesignStoreContractFailure: Error, Equatable, CustomStringConverti
     public let description: String
 }
 
-/// The behaviour every `DesignStore` adapter shares (R10). `verify` needs an empty store.
+/// The behaviour every `DesignStore` adapter shares (LSP). `verify` needs an empty store.
 public enum DesignStoreContract {
     public static func verify(_ store: any DesignStore) async throws {
         func check(_ holds: Bool, _ rule: String) throws(DesignStoreContractFailure) {

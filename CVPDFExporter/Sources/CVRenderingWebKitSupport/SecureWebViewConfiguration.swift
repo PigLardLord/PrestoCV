@@ -1,8 +1,8 @@
-#if canImport(WebKit)   // Apple-only adapter support (R11): the whole file is platform-guarded
+#if canImport(WebKit)   // Apple-only adapter support (PlatformAdapters): the whole file is platform-guarded
 import Foundation
 import WebKit
 
-/// The only way to configure a web view for rendering (R8), shared by both Apple renderers and the preview:
+/// The only way to configure a web view for rendering (ValidatingBoundary), shared by both Apple renderers and the preview:
 /// no network, no JavaScript from the content, no persistent data, and media only on user action.
 @MainActor
 public enum SecureWebViewConfiguration {
@@ -23,7 +23,7 @@ public enum SecureWebViewConfiguration {
         return "[" + rules.joined(separator: ",") + "]"
     }()
 
-    /// Compiled once by the composition root (R4) and passed to every configuration. A list that cannot be compiled
+    /// Compiled once by the composition root (DIP) and passed to every configuration. A list that cannot be compiled
     /// fails closed: there is no configuration without it.
     public static func compileRules() async throws(Failure) -> WKContentRuleList {
         try await compile(denyNetworkRules, identifier: "cv.deny-network")

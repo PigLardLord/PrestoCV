@@ -36,7 +36,7 @@ public struct ValidatedDesign: Sendable, Equatable {
     public let previewPNG: Data?
 }
 
-/// Anti-corruption layer for design packages (R8). Works on the raw bytes: size first, then a strict
+/// Anti-corruption layer for design packages (ValidatingBoundary). Works on the raw bytes: size first, then a strict
 /// decode (unknown keys and any `htmlContent` key are rejected), then id, contract, CSS and preview.
 public struct DesignPackageValidator: Sendable {
     public var maxBytes: Int, maxPreviewBytes: Int
@@ -76,11 +76,11 @@ public struct DesignPackageValidator: Sendable {
     }
 }
 
-/// Stores validated designs. Owned by the catalog (R3); adapters live in CVDesignCatalogFileStore and test support,
+/// Stores validated designs. Owned by the catalog (DIP); adapters live in CVDesignCatalogFileStore and test support,
 /// and pass `DesignStoreContract`. Saving an identifier again replaces its design.
 public protocol DesignStore: Sendable {
     func save(_ design: ValidatedDesign) async throws
-    /// nil only when no design has this identifier; a stored design that cannot be read is an error (R7).
+    /// nil only when no design has this identifier; a stored design that cannot be read is an error (CleanErrors).
     func design(id: String) async throws -> ValidatedDesign?
     /// The stored designs' manifests, ordered by identifier.
     func installedDesigns() async throws -> [DesignManifest]
@@ -107,13 +107,13 @@ public struct InstallDesign: Sendable {
     }
 }
 
-/// Outbound port, owned by the catalog (R3). Raw bytes: validation happens in the catalog, not the source.
+/// Outbound port, owned by the catalog (DIP). Raw bytes: validation happens in the catalog, not the source.
 public protocol BundledDesignSource: Sendable {
     func bundledPackages() async throws -> [(name: String, data: Data)]
 }
 
 /// CSS that passed validation. Only the validator can create one (internal init), so rendering
-/// cannot receive unvalidated CSS: R8 enforced by the type system.
+/// cannot receive unvalidated CSS: ValidatingBoundary enforced by the type system.
 public struct ValidatedStylesheet: Sendable, Equatable {
     public let css: String
     init(css: String) { self.css = css }

@@ -45,7 +45,7 @@ struct BuilderTests {
         #expect(html.contains(#"<span class="cv-skill">Git</span>"#))         // no bare "0" rating (#21)
     }
 
-    @Test("user text is escaped and never re-parsed as template syntax (#21, R8)")
+    @Test("user text is escaped and never re-parsed as template syntax (#21, ValidatingBoundary)")
     func escaping() throws {
         let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "it"))
         #expect(html.contains("Writes {{title}} literally &amp; &lt;script&gt;alert(1)&lt;/script&gt;"))
@@ -53,7 +53,7 @@ struct BuilderTests {
         #expect(html.contains("Ada &lt;Lovelace&gt;"))
     }
 
-    @Test("links that could mislead or execute are dropped (R8, security S1)", arguments: [
+    @Test("links that could mislead or execute are dropped (ValidatingBoundary, security S1)", arguments: [
         "javascript:alert(1)", "JaVaScRiPt:alert(1)", " javascript:alert(1)", "java\tscript:alert(1)",
         "data:text/html,<script>", "vbscript:x", "https://ok.example/ with space", "//evil.example",
         "https://linkedin.com@example.org/", "http://@example.org", "https://аpple.com/", "https://example.org/\u{202E}fdp.exe",
@@ -90,7 +90,7 @@ struct BuilderTests {
         #expect(html.contains(#"<html lang="und">"#))
     }
 
-    @Test("headings and dates follow the document language, not the device (R13)")
+    @Test("headings and dates follow the document language, not the device (LocalisationAtEdges)")
     func headings() throws {
         let it = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: fixture.language))
         #expect(it.contains(#"<html lang="it">"#))
@@ -143,7 +143,7 @@ struct BuilderTests {
         #expect(html.contains(#"<span class="cv-language-level">\#(native)</span>"#))
     }
 
-    /// Golden test (R10): the committed file is the reviewed output. To change it on purpose, set
+    /// Golden test (CleanTests): the committed file is the reviewed output. To change it on purpose, set
     /// UPDATE_GOLDEN=1, run once, and review the diff of Golden/fixture-it.html like code.
     @Test("golden output: the fixture renders exactly to the reviewed HTML")
     func golden() throws {

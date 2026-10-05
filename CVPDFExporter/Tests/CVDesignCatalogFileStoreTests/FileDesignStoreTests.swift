@@ -9,7 +9,7 @@ import CVDesignCatalog
 import CVDesignCatalogFileStore
 import CVRenderingTestSupport
 
-/// Runs `body` with a store directory of its own, removed afterwards (R10: hermetic). The directory is not created.
+/// Runs `body` with a store directory of its own, removed afterwards (CleanTests: hermetic). The directory is not created.
 func inTemporaryStore(_ body: (URL) async throws -> Void) async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("design-store-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: url) }
@@ -22,7 +22,7 @@ extension URL {
     var designFiles: Set<String> { Set((try? FileManager.default.contentsOfDirectory(atPath: appendingPathComponent("Designs").path)) ?? []) }
 }
 
-@Suite("R10 · design store contract")
+@Suite("LSP · design store contract")
 struct DesignStoreContractTests {
     @Test("the in-memory store passes") func inMemory() async throws { try await DesignStoreContract.verify(InMemoryDesignStore()) }
     @Test("the file store passes") func file() async throws {

@@ -1,10 +1,10 @@
-#if os(macOS)   // macOS-only adapter (R11): the whole file is platform-guarded
+#if os(macOS)   // macOS-only adapter (PlatformAdapters): the whole file is platform-guarded
 import AppKit
 import WebKit
 import CVRendering
 import CVRenderingWebKitSupport
 
-/// The macOS PDF renderer (ADR 0003). The HTML is loaded into a secure web view (R8) and paginated by the print system
+/// The macOS PDF renderer (ADR 0003). The HTML is loaded into a secure web view (ValidatingBoundary) and paginated by the print system
 /// at the page size, so the design's page-break rules apply. The page count comes from the PDF itself; a document
 /// longer than the page limit keeps its first pages and reports how many it needed.
 public struct MacPDFRenderer: PDFRendering {
@@ -12,7 +12,7 @@ public struct MacPDFRenderer: PDFRendering {
 
     private let engine: MacPrintEngine
 
-    /// `rules` is the list the composition root compiled once (R4).
+    /// `rules` is the list the composition root compiled once (DIP).
     @MainActor
     public init(rules: WKContentRuleList, loadTimeout: Duration = .seconds(30), readinessTimeout: Duration = .seconds(10),
                 printTimeout: Duration = .seconds(60)) {

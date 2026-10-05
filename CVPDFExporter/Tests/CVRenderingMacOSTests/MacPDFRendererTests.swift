@@ -1,4 +1,4 @@
-#if os(macOS)   // macOS only (R11)
+#if os(macOS)   // macOS only (PlatformAdapters)
 import Testing
 import Foundation
 import PDFKit

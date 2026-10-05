@@ -13,7 +13,7 @@ func designData(_ css: String, id: String = "ok", extra: [String: Any] = [:], ma
 func rejected(_ css: String) -> Bool { (try? DesignPackageValidator().validate(designData(css))) == nil }
 let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0])
 
-@Suite("ADR 0002 / R8 · design packages")
+@Suite("ADR 0002 / ValidatingBoundary · design packages")
 struct CatalogTests {
     @Test("bundled designs load from Bundle.module on every platform, Linux included")
     func bundledLoad() async throws {

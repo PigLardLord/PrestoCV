@@ -3,7 +3,7 @@ import CVDocumentModel
 import CVDesignCatalog
 import CVRendering
 
-/// The document the native renderers' contract runs print, shared by the iOS and macOS tests (R10). It exercises every
+/// The document the native renderers' contract runs print, shared by the iOS and macOS tests (LSP). It exercises every
 /// section: a current period and one that ended on an unknown date, a rated and an unrated skill, a native level, a
 /// certification with a link, a profile, and text that must be escaped.
 public enum ContractFixture {

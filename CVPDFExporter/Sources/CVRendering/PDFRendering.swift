@@ -22,7 +22,7 @@ public struct RenderedPDF: Sendable, Equatable {
     }
 }
 
-/// Outbound port: one adapter per platform (ADR 0003). Sendable, async, not actor-constrained (R3).
+/// Outbound port: one adapter per platform (ADR 0003). Sendable, async, not actor-constrained (DIP).
 public protocol PDFRendering: Sendable {
     func render(html: String, page: PageSetup) async throws -> RenderedPDF
 }
@@ -34,7 +34,7 @@ public protocol PDFInspecting: Sendable {
     func text(of data: Data) -> String?
 }
 
-/// Completeness (R8, ADR 0011): every text node the builder produced must appear in the PDF, counted
+/// Completeness (ValidatingBoundary, ADR 0011): every text node the builder produced must appear in the PDF, counted
 /// occurrence by occurrence. A value that also occurs elsewhere (a skill named in the summary, two
 /// identical entries, a date) is required as many times as the document contains it, so removing one
 /// occurrence is detected. Case and whitespace are ignored: designs may use text-transform, and PDF text

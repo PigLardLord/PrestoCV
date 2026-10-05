@@ -1,7 +1,7 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// The exporter's demos and template viewer, apart from the library, which contains no executables (R14). They use the
+// The exporter's demos and template viewer, apart from the library, which contains no executables (NoDeadCode). They use the
 // legacy exporter, so they build on Apple hosts only and go when it does (ADR 0012, #47).
 var targets: [Target] = []
 

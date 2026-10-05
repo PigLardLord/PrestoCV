@@ -155,7 +155,7 @@ public enum Section: Codable, Sendable, Equatable {
     }
 }
 
-/// Anti-corruption layer for documents arriving from outside (a backend request, a file). R8.
+/// Anti-corruption layer for documents arriving from outside (a backend request, a file). ValidatingBoundary.
 public enum CVDocumentValidator {
     public struct Invalid: Error, Equatable, Sendable { public let reason: String }
     /// Bounds in UTF-8 bytes, not characters: a letter followed by any number of combining marks is one character.

@@ -2,7 +2,7 @@ import Foundation
 
 /// Heading translations are package resources (JSON per language), looked up in the document's
 /// language with BCP 47 matching: the full tag, then the full primary language subtag. An unsupported
-/// language is an error, never a silent fallback to English (R13).
+/// language is an error, never a silent fallback to English (LocalisationAtEdges).
 public enum HeadingsCatalog {
     public enum Failure: Error, Equatable { case unsupportedLanguage(String), incomplete(language: String, key: String), corruptTable(String) }
     static let keys = ["experience", "education", "skills", "languages", "certifications", "profiles", "interests", "summary", "present", "native"]
@@ -22,7 +22,7 @@ public enum HeadingsCatalog {
         do { return try JSONDecoder().decode([String].self, from: Data(contentsOf: url)) } catch { throw .corruptTable("index") }
     }
 
-    /// nil only when the language has no table; a table that exists but cannot be read is an error (R7).
+    /// nil only when the language has no table; a table that exists but cannot be read is an error (CleanErrors).
     static func table(_ tag: String) throws(Failure) -> [String: String]? {
         guard let url = Bundle.module.url(forResource: "Resources/Headings/\(tag)", withExtension: "json") else { return nil }
         do { return try JSONDecoder().decode([String: String].self, from: Data(contentsOf: url)) } catch { throw .corruptTable(tag) }

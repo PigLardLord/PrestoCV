@@ -1,4 +1,4 @@
-#if canImport(WebKit)   // Apple platforms only (R11)
+#if canImport(WebKit)   // Apple platforms only (PlatformAdapters)
 import Testing
 import Foundation
 import Network
@@ -57,7 +57,7 @@ final class ConnectionCounter: Sendable {
 /// offscreen. Recorded on iOS 26.5 and macOS 26: the kinds marked false are not loaded even without the rules (a
 /// favicon, a prefetch hint, ftp:, which WebKit no longer supports, and media: on iOS an offscreen web view does not
 /// fetch it even when a script starts muted, inline playback). None of these can enter the document: the builder's
-/// closed tag set has no media, link or icon elements, and a link must be http(s) (R8). If WebKit starts to make one of
+/// closed tag set has no media, link or icon elements, and a link must be http(s) (ValidatingBoundary). If WebKit starts to make one of
 /// these loads, the control fails and the kind moves to the loaded ones, where the rules are then proven against it.
 let pageLoads: [(kind: String, html: @Sendable (_ base: String, _ port: String) -> String, loadedWithoutRules: Bool)] = [
     ("image", { b, _ in "<img src=\"\(b)/i.png\">" }, true),
@@ -203,7 +203,7 @@ struct SecureWebViewTests {
 
     /// Characterisation: content blockers do not see data: URLs on Apple platforms, whatever the rule list says. A
     /// data: URL is not a network load, and none can enter the document: the builder emits only http(s) links, and the
-    /// CSS policy has no url() (R8). If WebKit starts to block them, this test fails and the note in modules.md changes.
+    /// CSS policy has no url() (ValidatingBoundary). If WebKit starts to block them, this test fails and the note in modules.md changes.
     @Test("content blockers do not see data: URLs; the document never contains one")
     func dataScheme() async throws {
         for secure in [true, false] {

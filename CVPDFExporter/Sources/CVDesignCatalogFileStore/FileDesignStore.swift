@@ -1,12 +1,12 @@
 import Foundation
-#if canImport(Glibc)   // outbound adapter: platform code is allowed here (R11)
+#if canImport(Glibc)   // outbound adapter: platform code is allowed here (PlatformAdapters)
 import Glibc
 #elseif canImport(Darwin)
 import Darwin
 #endif
 import CVDesignCatalog
 
-/// Every way the store can fail has its own case (R7): nothing is reported as "no design".
+/// Every way the store can fail has its own case (CleanErrors): nothing is reported as "no design".
 public enum FileDesignStoreError: Error, Equatable, Sendable {
     /// The store directory cannot be created or listed, its lock cannot be taken, or its `Designs` folder is not a
     /// real directory.
@@ -29,7 +29,7 @@ public enum FileDesignStoreError: Error, Equatable, Sendable {
 ///   written leaves the listed version untouched; superseded and unlisted files are removed at the next save.
 /// - A save holds an exclusive `flock` on the store and a read a shared one, so a second instance or another
 ///   process loses no index update.
-/// - Files on disk are untrusted input (R8): every read goes through the validator again and must match the index,
+/// - Files on disk are untrusted input (ValidatingBoundary): every read goes through the validator again and must match the index,
 ///   and a path that is not a regular file (a symbolic link, a named pipe) or a `Designs` folder that is not a real
 ///   directory is never used. Only validated designs leave the store.
 public actor FileDesignStore: DesignStore {
@@ -94,7 +94,7 @@ public actor FileDesignStore: DesignStore {
     // MARK: Locking
 
     /// Runs `body` holding the store lock. A shared lock on a store that does not exist yet returns nil and creates
-    /// nothing: nothing has been saved. A store that exists but cannot be reached is unavailable, never empty (R7).
+    /// nothing: nothing has been saved. A store that exists but cannot be reached is unavailable, never empty (CleanErrors).
     private func withLock<T>(exclusive: Bool, _ body: () throws(FileDesignStoreError) -> T) throws(FileDesignStoreError) -> T? {
         if exclusive {
             do { try FileManager.default.createDirectory(at: designsDirectory, withIntermediateDirectories: true) } catch { throw .storeUnavailable }
