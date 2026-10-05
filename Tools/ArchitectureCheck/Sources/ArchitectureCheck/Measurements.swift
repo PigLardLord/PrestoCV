@@ -3,6 +3,7 @@ import SwiftSyntax
 /// The thresholds of `CleanFunctions`, `CleanTypes` and `ISP` (ADR 0021 (c)). A measure above its limit is a finding.
 enum Limits {
     static let functionLines = 20
+    static let parameters = 3
     static let nesting = 2
     static let complexity = 5
 }
@@ -16,14 +17,16 @@ extension Hit {
 
 /// Runs the detectors that measure the size and shape of code, and the one that reads its comments.
 enum Measurements {
-    static let detectors: Set<String> = ["functionLength", "nestingDepth", "cyclomaticComplexity"]
+    static let detectors: Set<String> = ["functionLength", "parameterCount", "nestingDepth", "cyclomaticComplexity"]
 
     static func hits(of tree: SourceFileSyntax, file: String) -> [Hit] {
         let lines = CodeLines(converter: SourceLocationConverter(fileName: file, tree: tree))
         let length = BodyLengthVisitor(lines: lines)
         let shape = BodyShapeVisitor(lines: lines)
+        let signatures = SignatureVisitor(lines: lines)
         length.walk(tree)
         shape.walk(tree)
-        return length.hits + shape.hits
+        signatures.walk(tree)
+        return length.hits + shape.hits + signatures.hits
     }
 }

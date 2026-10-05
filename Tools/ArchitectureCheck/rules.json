@@ -17,6 +17,7 @@
   ],
   "CleanFunctions": [
    "functionLength",
+   "parameterCount",
    "nestingDepth",
    "cyclomaticComplexity"
   ],

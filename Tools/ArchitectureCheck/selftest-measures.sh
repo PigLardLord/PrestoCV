@@ -106,6 +106,24 @@ flag "cyclomaticComplexity: a computed property" "$(printf 'struct S {\n    var 
 flag "cyclomaticComplexity: a closure that initialises a property" "$(printf 'struct S {\n    static let t: Int = {\n%s\n        return 0\n    }()\n}\n' "$(lines_of 5 '        if x%d { return 1 }')")" "cyclomaticComplexity: closure has"
 clean "cyclomaticComplexity: decisions outside any body are not measured" 'let r = a && b && c && d && e && f && g'
 
+# --- parameterCount: 3 at most; a data initialiser is exempt
+flag "parameterCount: 4 parameters" 'func f(a: Int, b: Int, c: Int, d: Int) {}' "CleanFunctions: parameterCount: func f takes 4"
+clean "parameterCount: 3 parameters" 'func f(a: Int, b: Int, c: Int) {}'
+flag "parameterCount: a protocol requirement counts" $'protocol P {\n    func f(a: Int, b: Int, c: Int, d: Int)\n}' "parameterCount: func f takes 4"
+flag "parameterCount: an initialiser that does more than store" $'struct S {\n    let a: Int, b: Int, c: Int, d: Int\n    init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; self.d = d + 1 }\n}' "parameterCount: init takes 4"
+flag "parameterCount: an initialiser that leaves a parameter unused" $'struct S {\n    let a: Int, b: Int, c: Int\n    init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c }\n}' "parameterCount: init takes 4"
+flag "parameterCount: an initialiser that assigns one parameter twice" $'struct S {\n    let a: Int, b: Int, c: Int, d: Int\n    init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; self.d = d; self.d = d }\n}' "parameterCount: init takes 4"
+flag "parameterCount: an initialiser with a body besides the assignments" $'struct S {\n    let a: Int, b: Int, c: Int, d: Int\n    init(a: Int, b: Int, c: Int, d: Int) {\n        self.a = a; self.b = b; self.c = c; self.d = d\n        register()\n    }\n}' "parameterCount: init takes 4"
+flag "parameterCount: an initialiser that stores a parameter in another property" $'struct S {\n    let a: Int, b: Int, c: Int, d: Int\n    init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; self.b = d }\n}' "parameterCount: init takes 4"
+flag "parameterCount: an empty initialiser" $'struct S {\n    init(a: Int, b: Int, c: Int, d: Int) {}\n}' "parameterCount: init takes 4"
+clean "parameterCount: a data initialiser stores each parameter in the property of its name" $'struct S {\n    let a: Int, b: Int, c: Int, d: Int\n    init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; self.d = d }\n}'
+clean "parameterCount: a data initialiser keeps its parameter names, not its labels" $'struct S {\n    let a: Int, b: Int, c: Int, d: Int\n    init(first a: Int, _ b: Int, _ c: Int, last d: Int) {\n        self.d = d\n        self.c = c\n        self.b = b\n        self.a = a\n    }\n}'
+clean "parameterCount: an initialiser that passes its parameters unchanged is a data initialiser" $'final class S {\n    init(a: Int, b: Int, c: Int, d: Int) { self.a = a; self.b = b; self.c = c; self.d = d }\n    convenience init(origin a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d) }\n}'
+flag "parameterCount: a delegating initialiser that changes a parameter" $'final class S {\n    convenience init(a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d + 1) }\n}' "parameterCount: init takes 4"
+flag "parameterCount: a delegating initialiser that adds an argument" $'final class S {\n    convenience init(a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c, d: d, e: 0) }\n}' "parameterCount: init takes 4"
+flag "parameterCount: a delegating initialiser that drops a parameter" $'final class S {\n    convenience init(a: Int, b: Int, c: Int, d: Int) { self.init(a: a, b: b, c: c) }\n}' "parameterCount: init takes 4"
+clean "parameterCount: the parameters of a closure are not counted" 'let f: (Int, Int, Int, Int) -> Void = { a, b, c, d in }'
+
 # --- the policy: these detectors run on production targets only (ADR 0021 (c))
 setup; src 'let x = 1'; printf '%s\n' "$(fn 21)" > "$ROOT/Sources/Other/O.swift"
 expect "a target that does not list the rules is not measured" 0 ""
