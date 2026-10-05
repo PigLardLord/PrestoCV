@@ -178,6 +178,8 @@ public struct SyncBundledDesigns: Sendable {
                         } else {
                             report.conflicts.append(id)
                         }
+                    } catch let cancellation as CancellationError {
+                        throw cancellation
                     } catch {
                         report.failed.append(id)
                     }
@@ -209,9 +211,13 @@ public struct SyncBundledDesigns: Sendable {
     }
 
     /// The installed versions and the recorded origins, by identifier.
-    private func listInstalled() async throws(DesignCatalogError) -> (versions: [String: DesignVersion], origins: [String: DesignOrigin]) {
+    private func listInstalled() async throws -> (versions: [String: DesignVersion], origins: [String: DesignOrigin]) {
         let manifests: [DesignManifest], origins: [String: DesignOrigin]
-        do { manifests = try await store.installedDesigns(); origins = try await store.installedOrigins() } catch { throw .storeUnavailable }
+        do { manifests = try await store.installedDesigns(); origins = try await store.installedOrigins() } catch let cancellation as CancellationError {
+            throw cancellation
+        } catch {
+            throw DesignCatalogError.storeUnavailable
+        }
         return (Dictionary(manifests.map { ($0.id, $0.version) }, uniquingKeysWith: max), origins)
     }
 }

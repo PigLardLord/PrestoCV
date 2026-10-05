@@ -13,6 +13,12 @@ public struct UnavailableStore: DesignStore {
     public func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { throw Failure() }
 }
 
+/// A bundled source that is cancelled while it is read.
+public struct CancelledBundledSource: BundledDesignSource {
+    public init() {}
+    public func bundledPackages() async throws -> [(name: String, data: Data)] { throw CancellationError() }
+}
+
 /// A bundled source with a fixed list of packages; `nil` is a source that cannot be read.
 public struct FixedBundledSource: BundledDesignSource {
     public struct Unreachable: Error {}
@@ -24,25 +30,29 @@ public struct FixedBundledSource: BundledDesignSource {
     }
 }
 
-/// An in-memory design store for the sync tests: it records the identifiers it saved, and can be told which calls fail.
+/// An in-memory design store for the sync tests: it records the identifiers it saved, and can be told which calls fail or
+/// are cancelled.
 /// A design it starts with has the origin the test gives it, or none, as one installed before origins were recorded.
 public actor SpyDesignStore: DesignStore {
     public struct Failure: Error {}
     private var designs: [String: ValidatedDesign]
     private var origins: [String: DesignOrigin]
-    private let savesFailFor: Set<String>, unreadable: Set<String>, listingFails: Bool
+    private let savesFailFor: Set<String>, unreadable: Set<String>, listingFails: Bool, cancelling: Set<Operation>
+    /// The operations of the port, so that a test can cancel one of them.
+    public enum Operation: Sendable, CaseIterable { case save, saveIfNewer, design, installedDesigns, installedOrigins, adoptAsBundled }
     /// The identifiers saved, in order; a save that failed is not recorded.
     public private(set) var savedIDs: [String] = []
 
     public init(installed: [ValidatedDesign] = [], origins: [String: DesignOrigin] = [:], savesFailFor: Set<String> = [],
-                unreadable: Set<String> = [], listingFails: Bool = false) {
+                unreadable: Set<String> = [], listingFails: Bool = false, cancelling: Set<Operation> = []) {
         self.designs = Dictionary(installed.map { ($0.manifest.id, $0) }, uniquingKeysWith: { $1 })
         self.origins = origins
-        self.savesFailFor = savesFailFor; self.unreadable = unreadable; self.listingFails = listingFails
+        self.savesFailFor = savesFailFor; self.unreadable = unreadable; self.listingFails = listingFails; self.cancelling = cancelling
     }
 
     @discardableResult public func save(_ design: ValidatedDesign) async throws -> ImportSave {
         let id = design.manifest.id
+        if cancelling.contains(.save) { throw CancellationError() }
         if savesFailFor.contains(id) { throw Failure() }
         if origins[id] == .bundled { return .keptBundled }
         designs[id] = design
@@ -52,6 +62,7 @@ public actor SpyDesignStore: DesignStore {
     }
     public func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave {
         let id = design.manifest.id
+        if cancelling.contains(.saveIfNewer) { throw CancellationError() }
         if savesFailFor.contains(id) { throw Failure() }
         let outcome: ConditionalSave
         if let installed = designs[id] {
@@ -66,20 +77,24 @@ public actor SpyDesignStore: DesignStore {
         return outcome
     }
     public func design(id: String) async throws -> ValidatedDesign? {
+        if cancelling.contains(.design) { throw CancellationError() }
         if unreadable.contains(id) { throw Failure() }
         return designs[id]
     }
     public func installedDesigns() async throws -> [DesignManifest] {
+        if cancelling.contains(.installedDesigns) { throw CancellationError() }
         if listingFails { throw Failure() }
         return designs.values.map(\.manifest).sorted { $0.id < $1.id }
     }
     public func installedOrigins() async throws -> [String: DesignOrigin] {
+        if cancelling.contains(.installedOrigins) { throw CancellationError() }
         if listingFails { throw Failure() }
         return origins
     }
     /// Adopting fails for the identifiers whose saves fail.
     public func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool {
         let id = design.manifest.id
+        if cancelling.contains(.adoptAsBundled) { throw CancellationError() }
         if savesFailFor.contains(id) { throw Failure() }
         guard designs[id] == design, origins[id] != .imported else { return false }
         origins[id] = .bundled

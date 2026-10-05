@@ -368,6 +368,23 @@ struct SyncBundledDesignsTests {
 
     // MARK: What stops the sync
 
+    @Test("a cancellation while the installed designs or their origins are listed ends the sync in a cancellation, not in an unavailable store",
+          arguments: [SpyDesignStore.Operation.installedDesigns, .installedOrigins])
+    func cancelledListing(operation: SpyDesignStore.Operation) async throws {
+        let gate = FakeRenderingGate(), store = SpyDesignStore(cancelling: [operation])
+        let sync = SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean")]), gate: gate, store: store)
+        await #expect(throws: CancellationError.self) { _ = try await sync() }
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("a cancellation while a design is adopted ends the sync in a cancellation, not in a failed design")
+    func cancelledAdoption() async throws {
+        let store = SpyDesignStore(installed: [try DesignStoreContract.design(id: "clean")], cancelling: [.adoptAsBundled])
+        let sync = SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean"), try bundled("bold")]), gate: FakeRenderingGate(), store: store)
+        await #expect(throws: CancellationError.self) { _ = try await sync() }
+        #expect(await store.savedIDs.isEmpty)
+    }
+
     @Test("a source that cannot be read is reported")
     func sourceUnavailable() async {
         let sync = SyncBundledDesigns(source: FixedBundledSource(packages: nil), gate: FakeRenderingGate(), store: InMemoryDesignStore())
@@ -482,6 +499,20 @@ struct InstallDesignTests {
         let install = InstallDesign(source: FixedBundledSource(packages: []), gate: gate, store: store)
         await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await install(DesignStoreContract.package(id: "mine")) }
         #expect(await store.savedIDs.isEmpty)
+    }
+
+    @Test("a cancellation while the bundled source is read, the origins are listed or the design is saved passes through unchanged")
+    func cancelled() async throws {
+        let gate = FakeRenderingGate()
+        let cancelledSource = InstallDesign(source: CancelledBundledSource(), gate: gate, store: InMemoryDesignStore())
+        await #expect(throws: CancellationError.self) { _ = try await cancelledSource(DesignStoreContract.package(id: "mine")) }
+        #expect(await gate.verified.isEmpty)
+        for operation in [SpyDesignStore.Operation.installedOrigins, .save] {
+            let store = SpyDesignStore(cancelling: [operation])
+            let install = InstallDesign(source: FixedBundledSource(packages: []), gate: FakeRenderingGate(), store: store)
+            await #expect(throws: CancellationError.self) { _ = try await install(DesignStoreContract.package(id: "mine")) }
+            #expect(await store.savedIDs.isEmpty)
+        }
     }
 
     @Test("an import with an identifier of its own is rendered, stored and recorded as imported")
