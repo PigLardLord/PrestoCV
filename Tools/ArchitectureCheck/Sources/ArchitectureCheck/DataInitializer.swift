@@ -12,6 +12,9 @@ import SwiftSyntax
 ///   variadic parameter never is, and a call that comes back to itself, or one that cannot be resolved in the file, is
 ///   not exempt.
 ///
+/// A class initialiser can run its superclass's initialiser without saying so, so the initialisers of a class that has an
+/// inheritance clause are never data initialisers.
+///
 /// Each initialiser is examined once, and the work is counted: a search that spends its budget gives up, and the
 /// initialisers it had not found to be data initialisers are not exempt.
 final class DataInitializer {
@@ -37,7 +40,8 @@ final class DataInitializer {
     func matches(_ node: InitializerDeclSyntax) -> Bool {
         if let known = answers[node.id] { return known }
         answers[node.id] = false
-        guard meter.spend(), let subject = Subject(node, constants: constants) else { return false }
+        guard meter.spend(), !types.isClassWithInheritanceClause(holding: node),
+              let subject = Subject(node, constants: constants) else { return false }
         let answer = assigns(subject) || delegates(subject)
         answers[node.id] = answer
         return answer

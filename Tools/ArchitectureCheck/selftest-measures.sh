@@ -320,6 +320,19 @@ if grep -q "stopped at its budget" "$ROOT/out.txt"; then fail=$((fail+1)); echo 
 setup; src $'struct S {\n    let a: Int, b: Int, c: Int\n    init(a: Int, b: Int, c: Int) { self.a = a; self.b = b; self.c = c }\n}'; expect "search: an initialiser within the parameter cap is not searched, so it spends nothing" 0 "" --search-steps 0
 setup; src "$(fan 20)"; got=$(run --search-steps 1000000)
 if [[ "$got" == 0 ]]; then pass=$((pass+1)); echo "ok   search: the default budget is a million steps"; else fail=$((fail+1)); echo "FAIL search: the default budget"; fi
+# A class initialiser can run its superclass's initialiser without saying so, and syntax cannot tell a superclass from a protocol
+# in the inheritance clause, so an initialiser of a class that has one is no data initialiser. A struct, an enum, an actor and a
+# class without an inheritance clause have nothing to run.
+typed "classes: an initialiser of a class with a superclass runs the superclass's, silently" flag "class Base {${NL}    init() { _ = 1 + 1 }${NL}}${NL}final class Child: Base {${NL}$FIELDS${NL}    $INIT4${NL}}" "" "P.swift:6: CleanFunctions: parameterCount: init takes 4"
+typed "classes: an inheritance clause that names a protocol counts all the same, since syntax cannot tell" flag "protocol Named { }${NL}final class Child: Named {${NL}$FIELDS${NL}    $INIT4${NL}}"
+typed "classes: a Sendable class is one with an inheritance clause" flag "final class Child: Sendable {${NL}$FIELDS${NL}    $INIT4${NL}}"
+typed "classes: a class without an inheritance clause stores" clean "final class Child {${NL}$FIELDS${NL}    $INIT4${NL}}"
+typed "classes: a class that conforms in an extension, not in its declaration, stores" clean "protocol Named { }${NL}final class Child {${NL}$FIELDS${NL}    $INIT4${NL}}${NL}extension Child: Named { }"
+typed "classes: a struct with an inheritance clause stores" clean "protocol Named { }${NL}struct Value: Named {${NL}$FIELDS${NL}    $INIT4${NL}}"
+typed "classes: an actor stores" clean "actor Keeper {${NL}    let a: Int, b: Int, c: Int, d: Int${NL}    $INIT4${NL}}"
+typed "classes: a convenience initialiser of a class with an inheritance clause is no data initialiser either" flag "protocol Named { }${NL}final class Child: Named {${NL}$FIELDS${NL}    $STORING${NL}    convenience init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}}" "" "P.swift:5: CleanFunctions: parameterCount: init takes 4"
+typed "classes: an initialiser in an extension of a class with an inheritance clause is no data initialiser" flag "protocol Named { }${NL}final class Child: Named {${NL}$FIELDS${NL}    $STORING${NL}}${NL}extension Child {${NL}    convenience init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}}"
+typed "classes: a nested class with an inheritance clause is held to it" flag "protocol Named { }${NL}struct Outer {${NL}    final class Inner: Named {${NL}    $FIELDS${NL}        $INIT4${NL}    }${NL}}"
 # The default values of an initialiser are part of it: they run each time a call leaves the argument out, so each has to be a
 # literal or a constant, as the values it stores are, and so do the defaults of the initialiser that a delegation reaches.
 typed "defaults: values that run code are behaviour, however plainly the initialiser stores them" flag "import Foundation${NL}struct Stamped {${NL}    let id: UUID, at: Date, b: Int, c: Int${NL}    init(id: UUID = UUID(), at: Date = Date(), b: Int, c: Int) { self.id = id; self.at = at; self.b = b; self.c = c }${NL}}"

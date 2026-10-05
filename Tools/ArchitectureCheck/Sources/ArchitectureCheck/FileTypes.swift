@@ -29,6 +29,12 @@ struct FileTypes {
         declarations(ofTypeHolding: initializer)?.flatMap { $0.memberBlock.members.declarations.compactMap { $0.as(InitializerDeclSyntax.self) } }
     }
 
+    /// Whether the class that holds an initialiser has an inheritance clause. It may name a superclass, whose initialiser then
+    /// runs without being written, and syntax cannot tell a superclass from a protocol.
+    func isClassWithInheritanceClause(holding initializer: InitializerDeclSyntax) -> Bool {
+        declarations(ofTypeHolding: initializer)?.contains { ($0 as? ClassDeclSyntax)?.inheritanceClause != nil } ?? false
+    }
+
     /// The one declaration of the type that holds a member, and the extensions of its path in the file.
     private func declarations(ofTypeHolding member: some SyntaxProtocol) -> [any DeclGroupSyntax]? {
         guard let holder = Self.holder(of: member) else { return nil }
