@@ -363,6 +363,7 @@
    "allowedImports": [
     "Testing",
     "Foundation",
+    "Synchronization",
     "CVDesignCatalog",
     "CVDesignCatalogFileStore",
     "CVRenderingTestSupport",

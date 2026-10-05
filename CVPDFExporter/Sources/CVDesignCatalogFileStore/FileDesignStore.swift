@@ -47,14 +47,26 @@ public actor FileDesignStore: DesignStore {
     let directory: URL, validator: DesignPackageValidator
     /// The most bytes the origin record may have, when it is read and before it is written.
     let originsCap: Int
+    /// How a file of the store is written. Tests replace it to see the order of the writes and to fail one of them.
+    let writeFile: @Sendable (Data, URL) throws -> Void
 
     public init(directory: URL, validator: DesignPackageValidator = DesignPackageValidator()) {
-        self.init(directory: directory, validator: validator, originsCap: Self.maxOriginsBytes)
+        self.init(directory: directory, validator: validator, originsCap: Self.maxOriginsBytes, writeFile: Self.writeAtomically)
     }
 
     init(directory: URL, validator: DesignPackageValidator = DesignPackageValidator(), originsCap: Int) {
-        self.directory = directory; self.validator = validator; self.originsCap = originsCap
+        self.init(directory: directory, validator: validator, originsCap: originsCap, writeFile: Self.writeAtomically)
     }
+
+    init(directory: URL, validator: DesignPackageValidator = DesignPackageValidator(), writeFile: @escaping @Sendable (Data, URL) throws -> Void) {
+        self.init(directory: directory, validator: validator, originsCap: Self.maxOriginsBytes, writeFile: writeFile)
+    }
+
+    private init(directory: URL, validator: DesignPackageValidator, originsCap: Int, writeFile: @escaping @Sendable (Data, URL) throws -> Void) {
+        self.directory = directory; self.validator = validator; self.originsCap = originsCap; self.writeFile = writeFile
+    }
+
+    private static func writeAtomically(_ data: Data, to url: URL) throws { try data.write(to: url, options: .atomic) }
 
     /// The index's schema version. An index written with a new palette or font scheme cannot be read by an older app:
     /// bump the index version when these change.
@@ -356,7 +368,7 @@ public actor FileDesignStore: DesignStore {
     }
 
     private func write(_ data: Data, to url: URL, for id: String) throws(FileDesignStoreError) {
-        do { try data.write(to: url, options: .atomic) } catch { throw .writeFailed(id: id) }
+        do { try writeFile(data, url) } catch { throw .writeFailed(id: id) }
     }
 
     /// Removes the design files the index does not list: generations a later save superseded, and files a failed
