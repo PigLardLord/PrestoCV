@@ -18,15 +18,15 @@ public struct CVDocument: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey { case schemaVersion, language, person, sections }
     public init(from decoder: any Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        let version = try c.decode(Int.self, forKey: .schemaVersion)
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let version = try container.decode(Int.self, forKey: .schemaVersion)
         guard version == Self.currentSchemaVersion else {
-            throw DecodingError.dataCorruptedError(forKey: .schemaVersion, in: c, debugDescription: "unsupported schemaVersion \(version)")
+            throw DecodingError.dataCorruptedError(forKey: .schemaVersion, in: container, debugDescription: "unsupported schemaVersion \(version)")
         }
         schemaVersion = version
-        language = try c.decode(String.self, forKey: .language)
-        person = try c.decode(Person.self, forKey: .person)
-        sections = try c.decode([Section].self, forKey: .sections)
+        language = try container.decode(String.self, forKey: .language)
+        person = try container.decode(Person.self, forKey: .person)
+        sections = try container.decode([Section].self, forKey: .sections)
     }
 }
 
@@ -69,22 +69,22 @@ public struct DocumentPeriod: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey { case start, end, endDate }
     public init(from decoder: any Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        start = try c.decode(DocumentDate.self, forKey: .start)
-        switch try c.decode(String.self, forKey: .end) {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        start = try container.decode(DocumentDate.self, forKey: .start)
+        switch try container.decode(String.self, forKey: .end) {
         case "present": end = .present
         case "unspecified": end = .unspecified
-        case "date": end = .date(try c.decode(DocumentDate.self, forKey: .endDate))
-        case let other: throw DecodingError.dataCorruptedError(forKey: .end, in: c, debugDescription: "unknown end \(other)")
+        case "date": end = .date(try container.decode(DocumentDate.self, forKey: .endDate))
+        case let other: throw DecodingError.dataCorruptedError(forKey: .end, in: container, debugDescription: "unknown end \(other)")
         }
     }
     public func encode(to encoder: any Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(start, forKey: .start)
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(start, forKey: .start)
         switch end {
-        case .present: try c.encode("present", forKey: .end)
-        case .unspecified: try c.encode("unspecified", forKey: .end)
-        case .date(let d): try c.encode("date", forKey: .end); try c.encode(d, forKey: .endDate)
+        case .present: try container.encode("present", forKey: .end)
+        case .unspecified: try container.encode("unspecified", forKey: .end)
+        case .date(let date): try container.encode("date", forKey: .end); try container.encode(date, forKey: .endDate)
         }
     }
 }
@@ -137,30 +137,30 @@ public enum Section: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey { case kind, text, items }
     public init(from decoder: any Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        switch try c.decode(String.self, forKey: .kind) {
-        case "summary": self = .summary(try c.decode(String.self, forKey: .text))
-        case "experience": self = .experience(try c.decode([ExperienceItem].self, forKey: .items))
-        case "education": self = .education(try c.decode([EducationItem].self, forKey: .items))
-        case "skills": self = .skills(try c.decode([SkillItem].self, forKey: .items))
-        case "languages": self = .languages(try c.decode([LanguageItem].self, forKey: .items))
-        case "certifications": self = .certifications(try c.decode([CertificationItem].self, forKey: .items))
-        case "profiles": self = .profiles(try c.decode([ProfileLink].self, forKey: .items))
-        case "interests": self = .interests(try c.decode([String].self, forKey: .items))
-        case let other: throw DecodingError.dataCorruptedError(forKey: .kind, in: c, debugDescription: "unknown section \(other)")
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        switch try container.decode(String.self, forKey: .kind) {
+        case "summary": self = .summary(try container.decode(String.self, forKey: .text))
+        case "experience": self = .experience(try container.decode([ExperienceItem].self, forKey: .items))
+        case "education": self = .education(try container.decode([EducationItem].self, forKey: .items))
+        case "skills": self = .skills(try container.decode([SkillItem].self, forKey: .items))
+        case "languages": self = .languages(try container.decode([LanguageItem].self, forKey: .items))
+        case "certifications": self = .certifications(try container.decode([CertificationItem].self, forKey: .items))
+        case "profiles": self = .profiles(try container.decode([ProfileLink].self, forKey: .items))
+        case "interests": self = .interests(try container.decode([String].self, forKey: .items))
+        case let other: throw DecodingError.dataCorruptedError(forKey: .kind, in: container, debugDescription: "unknown section \(other)")
         }
     }
     public func encode(to encoder: any Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
+        var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .summary(let t): try c.encode("summary", forKey: .kind); try c.encode(t, forKey: .text)
-        case .experience(let i): try c.encode("experience", forKey: .kind); try c.encode(i, forKey: .items)
-        case .education(let i): try c.encode("education", forKey: .kind); try c.encode(i, forKey: .items)
-        case .skills(let i): try c.encode("skills", forKey: .kind); try c.encode(i, forKey: .items)
-        case .languages(let i): try c.encode("languages", forKey: .kind); try c.encode(i, forKey: .items)
-        case .certifications(let i): try c.encode("certifications", forKey: .kind); try c.encode(i, forKey: .items)
-        case .profiles(let i): try c.encode("profiles", forKey: .kind); try c.encode(i, forKey: .items)
-        case .interests(let i): try c.encode("interests", forKey: .kind); try c.encode(i, forKey: .items)
+        case .summary(let text): try container.encode("summary", forKey: .kind); try container.encode(text, forKey: .text)
+        case .experience(let items): try container.encode("experience", forKey: .kind); try container.encode(items, forKey: .items)
+        case .education(let items): try container.encode("education", forKey: .kind); try container.encode(items, forKey: .items)
+        case .skills(let items): try container.encode("skills", forKey: .kind); try container.encode(items, forKey: .items)
+        case .languages(let items): try container.encode("languages", forKey: .kind); try container.encode(items, forKey: .items)
+        case .certifications(let items): try container.encode("certifications", forKey: .kind); try container.encode(items, forKey: .items)
+        case .profiles(let items): try container.encode("profiles", forKey: .kind); try container.encode(items, forKey: .items)
+        case .interests(let items): try container.encode("interests", forKey: .kind); try container.encode(items, forKey: .items)
         }
     }
 }
