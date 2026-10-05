@@ -538,6 +538,24 @@ struct InstallDesignTests {
         #expect(await gate.verified.isEmpty)
     }
 
+    @Test("one validator, one cap: a bundled package the sync accepts reserves its identifier, and one it rejects as too large reserves none",
+          arguments: [0, -1])
+    func reservationUsesTheSyncsCap(capOffset: Int) async throws {
+        let package = try bundled("modern", css: String(repeating: ".cv-name{color:var(--color-primary)}", count: 20))
+        let validator = DesignPackageValidator(maxBytes: package.data.count + capOffset)
+        let source = FixedBundledSource(packages: [package])
+        let report = try await SyncBundledDesigns(source: source, validator: validator, gate: FakeRenderingGate(), store: InMemoryDesignStore())()
+        let install = InstallDesign(source: source, validator: validator, gate: FakeRenderingGate(), store: InMemoryDesignStore())
+        let shadow = try DesignStoreContract.package(id: "modern", version: "999999999.0.0")
+        if capOffset == 0 {
+            #expect(report.installed == ["modern"])
+            await #expect(throws: DesignCatalogError.bundledIdentifier("modern")) { _ = try await install(shadow) }
+        } else {
+            #expect(report.rejected.map(\.violations) == [[.tooLarge(package.data.count)]])
+            #expect(try await install(shadow).manifest.id == "modern")
+        }
+    }
+
     @Test("the real bundle's identifiers are reserved today, although every package of it is refused")
     func realBundleReservesItsIdentifiers() async throws {
         let install = InstallDesign(source: BundleDesignSource(), gate: FakeRenderingGate(), store: InMemoryDesignStore())
