@@ -10,13 +10,23 @@ import CVRenderingWebKitSupport
 public struct MacPDFRenderer: PDFRendering {
     public enum Failure: Error, Equatable, Sendable { case invalidPageSetup, tooManyPrints, printFailed, printTimedOut, unreadableOutput }
 
+    /// How long each step of a render may take before it fails.
+    public struct Timeouts: Sendable, Equatable {
+        public var load: Duration, readiness: Duration, printing: Duration
+
+        public init(load: Duration = .seconds(30), readiness: Duration = .seconds(10), printing: Duration = .seconds(60)) {
+            self.load = load; self.readiness = readiness; self.printing = printing
+        }
+    }
+
     private let engine: MacPrintEngine
 
-    /// `rules` is the list the composition root compiled once (DIP).
+    /// - Parameters:
+    ///   - rules: the list the composition root compiled once (DIP).
+    ///   - timeouts: how long loading, readiness and printing may each take.
     @MainActor
-    public init(rules: WKContentRuleList, loadTimeout: Duration = .seconds(30), readinessTimeout: Duration = .seconds(10),
-                printTimeout: Duration = .seconds(60)) {
-        engine = MacPrintEngine(rules: rules, loadTimeout: loadTimeout, readinessTimeout: readinessTimeout, printTimeout: printTimeout)
+    public init(rules: WKContentRuleList, timeouts: Timeouts = Timeouts()) {
+        engine = MacPrintEngine(rules: rules, timeouts: timeouts)
     }
 
     /// Cancellation, before or during the work, ends in `CancellationError`.
@@ -30,65 +40,41 @@ public struct MacPDFRenderer: PDFRendering {
 @MainActor
 final class MacPrintEngine {
     let rules: WKContentRuleList
-    let loadTimeout: Duration, readinessTimeout: Duration, printTimeout: Duration
+    let timeouts: MacPDFRenderer.Timeouts
 
-    init(rules: WKContentRuleList, loadTimeout: Duration, readinessTimeout: Duration, printTimeout: Duration) {
-        self.rules = rules; self.loadTimeout = loadTimeout; self.readinessTimeout = readinessTimeout; self.printTimeout = printTimeout
+    init(rules: WKContentRuleList, timeouts: MacPDFRenderer.Timeouts) {
+        self.rules = rules; self.timeouts = timeouts
     }
 
     func render(_ html: String, _ page: PageSetup) async throws -> RenderedPDF {
-        guard page.maxPages >= 1, page.widthPoints > 0, page.heightPoints > 2 * page.verticalMarginPoints else {
-            throw MacPDFRenderer.Failure.invalidPageSetup
-        }
+        guard page.isPrintable else { throw MacPDFRenderer.Failure.invalidPageSetup }
         // A print AppKit never finishes keeps its window and web view; bounding the prints still running bounds that.
         // This early check saves a load; the print job enforces the limit where it starts a print.
         guard PrintJob.runningCount < PrintJob.maxRunning else { throw MacPDFRenderer.Failure.tooManyPrints }
         let frame = NSRect(x: 0, y: 0, width: page.widthPoints, height: page.heightPoints)
         let view = WKWebView(frame: frame, configuration: SecureWebViewConfiguration.make(rules: rules))
-        // Printing a web view needs a window. This one is never shown.
-        let window = NSWindow(contentRect: frame.offsetBy(dx: -20_000, dy: -20_000), styleMask: [.borderless], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.contentView = view
-        let delegate = SingleLoadNavigationDelegate()
-        let job = PrintJob(window: window, navigation: delegate,
-                           file: FileManager.default.temporaryDirectory.appendingPathComponent("cv-print-\(UUID().uuidString).pdf"))
+        let navigation = SingleLoadNavigationDelegate()
+        let job = PrintJob.makeOffscreen(holding: view, navigation: navigation, frame: frame)
         defer { job.release() }
 
-        do { try await delegate.load(html, in: view, timeout: loadTimeout) }
-        catch .cancelled { throw CancellationError() }
-        do { try await DocumentReadiness.wait(in: view, timeout: readinessTimeout) }
-        catch .cancelled { throw CancellationError() }
+        try await load(html, in: view, using: navigation)
+        try await awaitReadiness(of: view)
         try Task.checkCancellation()
         let full = try await printPages(view, job: job, page)
         try Task.checkCancellation()
-        let rendered = try await Self.keepFirstPages(of: full, upTo: page.maxPages)
+        let rendered = try await PDFFirstPages.keep(of: full, upTo: page.maxPages)
         try Task.checkCancellation()
         return rendered
     }
 
-    /// Reads the page count from the PDF and keeps the first pages up to the limit, off the main actor, checking for
-    /// cancellation on every page. `limit` is at least 1.
-    nonisolated static func keepFirstPages(of full: Data, upTo limit: Int) async throws -> RenderedPDF {
-        guard let provider = CGDataProvider(data: full as CFData), let document = CGPDFDocument(provider), document.numberOfPages > 0 else {
-            throw MacPDFRenderer.Failure.unreadableOutput
-        }
-        let required = document.numberOfPages
-        let kept = min(required, limit)
-        guard kept < required else { return RenderedPDF(data: full, pageCount: kept, requiredPages: required) }
-        let output = NSMutableData()
-        guard let consumer = CGDataConsumer(data: output as CFMutableData), let context = CGContext(consumer: consumer, mediaBox: nil, nil) else {
-            throw MacPDFRenderer.Failure.unreadableOutput
-        }
-        for number in 1...kept {
-            try Task.checkCancellation()
-            guard let pdfPage = document.page(at: number) else { throw MacPDFRenderer.Failure.unreadableOutput }
-            var box = pdfPage.getBoxRect(.mediaBox)
-            context.beginPage(mediaBox: &box)
-            context.drawPDFPage(pdfPage)
-            context.endPage()
-        }
-        context.closePDF()
-        return RenderedPDF(data: output as Data, pageCount: kept, requiredPages: required)
+    private func load(_ html: String, in view: WKWebView, using navigation: SingleLoadNavigationDelegate) async throws {
+        do { try await navigation.load(html, in: view, timeout: timeouts.load) }
+        catch .cancelled { throw CancellationError() }
+    }
+
+    private func awaitReadiness(of view: WKWebView) async throws {
+        do { try await DocumentReadiness.wait(in: view, timeout: timeouts.readiness) }
+        catch .cancelled { throw CancellationError() }
     }
 
     /// Prints every page into the job's file, asynchronously: a synchronous print waits on the web content process,
@@ -108,7 +94,7 @@ final class MacPrintEngine {
         operation.showsProgressPanel = false
         operation.view?.frame = NSRect(x: 0, y: 0, width: page.widthPoints, height: page.heightPoints)
 
-        switch await job.run(operation, timeout: printTimeout) {
+        switch await job.run(operation, timeout: timeouts.printing) {
         case .printed(true): break
         case .printed(false): throw MacPDFRenderer.Failure.printFailed
         case .timedOut: throw MacPDFRenderer.Failure.printTimedOut
@@ -142,6 +128,15 @@ final class PrintJob: NSObject {
         self.window = window; self.navigation = navigation; self.file = file
     }
 
+    /// A job that prints from a window that holds `view`: printing a web view needs a window, and this one is never shown.
+    static func makeOffscreen(holding view: WKWebView, navigation: SingleLoadNavigationDelegate, frame: NSRect) -> PrintJob {
+        let window = NSWindow(contentRect: frame.offsetBy(dx: -20_000, dy: -20_000), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = view
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("cv-print-\(UUID().uuidString).pdf")
+        return PrintJob(window: window, navigation: navigation, file: file)
+    }
+
     /// Refused when `maxRunning` prints are still running. The check and the insertion happen together on the main
     /// actor, with no suspension between them, so concurrent renders cannot exceed the limit.
     func run(_ operation: NSPrintOperation, timeout: Duration) async -> Outcome {
@@ -151,15 +146,19 @@ final class PrintJob: NSObject {
         return await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Outcome, Never>) in
                 self.continuation = continuation
-                timer = Task { @MainActor [weak self] in
-                    do { try await Task.sleep(for: timeout) } catch { return }
-                    self?.resume(.timedOut)
-                }
+                startTimer(after: timeout)
                 operation.runModal(for: window, delegate: self,
                                    didRun: #selector(PrintJob.printOperationDidRun(_:success:contextInfo:)), contextInfo: nil)
             }
         } onCancel: {
             Task { @MainActor [weak self] in self?.resume(.cancelled) }
+        }
+    }
+
+    private func startTimer(after timeout: Duration) {
+        timer = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: timeout) } catch { return }
+            self?.resume(.timedOut)
         }
     }
 
@@ -191,6 +190,52 @@ final class PrintJob: NSObject {
         window.contentView = nil
         window.close()
         _ = unlink(file.path)
+    }
+}
+
+private extension PageSetup {
+    /// At least one page, a width, and a height that the two vertical margins leave room in.
+    var isPrintable: Bool { maxPages >= 1 && widthPoints > 0 && heightPoints > 2 * verticalMarginPoints }
+}
+
+/// Keeps the first pages of a PDF, off the main actor.
+enum PDFFirstPages {
+    /// Reads the page count from the PDF and keeps the first pages up to the limit, checking for cancellation on every
+    /// page. `limit` is at least 1.
+    static func keep(of full: Data, upTo limit: Int) async throws -> RenderedPDF {
+        let document = try openDocument(full)
+        let required = document.numberOfPages
+        let kept = min(required, limit)
+        guard kept < required else { return RenderedPDF(data: full, pageCount: kept, requiredPages: required) }
+        return RenderedPDF(data: try copyPages(kept, of: document), pageCount: kept, requiredPages: required)
+    }
+
+    private static func openDocument(_ data: Data) throws -> CGPDFDocument {
+        guard let provider = CGDataProvider(data: data as CFData), let document = CGPDFDocument(provider), document.numberOfPages > 0 else {
+            throw MacPDFRenderer.Failure.unreadableOutput
+        }
+        return document
+    }
+
+    private static func copyPages(_ count: Int, of document: CGPDFDocument) throws -> Data {
+        let output = NSMutableData()
+        guard let consumer = CGDataConsumer(data: output as CFMutableData), let context = CGContext(consumer: consumer, mediaBox: nil, nil) else {
+            throw MacPDFRenderer.Failure.unreadableOutput
+        }
+        for number in 1...count {
+            try Task.checkCancellation()
+            try copyPage(number, of: document, to: context)
+        }
+        context.closePDF()
+        return output as Data
+    }
+
+    private static func copyPage(_ number: Int, of document: CGPDFDocument, to context: CGContext) throws {
+        guard let page = document.page(at: number) else { throw MacPDFRenderer.Failure.unreadableOutput }
+        var box = page.getBoxRect(.mediaBox)
+        context.beginPage(mediaBox: &box)
+        context.drawPDFPage(page)
+        context.endPage()
     }
 }
 #endif
