@@ -5,8 +5,7 @@ import Foundation
 /// in `rules.md` maps them; none of these is read. A prototype is not read either.
 enum DocumentCitations {
     static func isChecked(_ path: String) -> Bool {
-        guard path.hasSuffix(".md"), !path.hasPrefix("Prototypes/"), !isRecordOfFormerNumbers(path) else { return false }
-        return path.hasPrefix("docs/") || path == "AGENTS.md" || path.split(separator: "/").last == "README.md"
+        path.hasSuffix(".md") && citesRules(path) && !isExempt(path)
     }
 
     static func hits(in text: String, at path: String) -> [Hit] {
@@ -18,6 +17,12 @@ enum DocumentCitations {
 
     private static let rulesPath = "docs/architecture/rules.md"
     private static let formerNumbersHeading = "## Former numbers"
+
+    private static func citesRules(_ path: String) -> Bool {
+        path.hasPrefix("docs/") || path == "AGENTS.md" || path.split(separator: "/").last == "README.md"
+    }
+
+    private static func isExempt(_ path: String) -> Bool { path.hasPrefix("Prototypes/") || isRecordOfFormerNumbers(path) }
 
     private static func isRecordOfFormerNumbers(_ path: String) -> Bool {
         path.range(of: #"^docs/architecture/adr/(00(0[1-9]|1[0-2])|0021)-"#, options: .regularExpression) != nil

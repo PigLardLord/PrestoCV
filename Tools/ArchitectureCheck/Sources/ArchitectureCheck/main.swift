@@ -140,11 +140,11 @@ let detectorToRules: (Config.Target) -> [String: [String]] = { target in
 }
 
 var ordinals: [String: Int] = [:]
-@MainActor func recordFinding(file: String, rule: String, detector: String, detail: String, node: String, line: Int) {
-    if exceptionsValid.contains(where: { file.hasPrefix($0.path) && $0.detector == detector }) { return }
-    let base = "\(file)|\(rule)|\(detector)|\(fingerprint(node))"
+@MainActor func recordFinding(_ hit: Hit, in file: String, rule: String) {
+    if exceptionsValid.contains(where: { file.hasPrefix($0.path) && $0.detector == hit.detector }) { return }
+    let base = "\(file)|\(rule)|\(hit.detector)|\(fingerprint(hit.node))"
     let n = ordinals[base, default: 0]; ordinals[base] = n + 1
-    findings.append(Finding(key: "\(base)#\(n)", message: "\(file):\(line): \(rule): \(detector): \(detail)"))
+    findings.append(Finding(key: "\(base)#\(n)", message: "\(file):\(hit.line): \(rule): \(hit.detector): \(hit.detail)"))
 }
 
 let legacyTargets = config.targets.filter { $0.kind == "legacy" }
@@ -170,7 +170,7 @@ for (file, target) in assignment where target.kind != "legacy" {
     let scanner = Scanner(tree: tree, file: file, infrastructureTypes: Set(config.infrastructureTypes))
     scanner.walk(tree)
     func record(rule: String, detector: String, detail: String, node: String, line: Int) {
-        recordFinding(file: file, rule: rule, detector: detector, detail: detail, node: node, line: line)
+        recordFinding(Hit(detector: detector, detail: detail, node: node, line: line, packageTarget: nil), in: file, rule: rule)
     }
     let allowed = Set(target.allowedImports + ["Swift"])
     for imp in scanner.imports where !allowed.contains(imp.module) {
@@ -213,7 +213,7 @@ let citationRules = config.rules.filter { $0.value.contains("ruleNumberCitation"
 for path in documents.sorted() where DocumentCitations.isChecked(path) {
     guard let text = try? String(contentsOf: root.appendingPathComponent(path), encoding: .utf8) else { problems.append("cannot read \(path)"); continue }
     for hit in DocumentCitations.hits(in: text, at: path) {
-        for rule in citationRules { recordFinding(file: path, rule: rule, detector: hit.detector, detail: hit.detail, node: hit.node, line: hit.line) }
+        for rule in citationRules { recordFinding(hit, in: path, rule: rule) }
     }
 }
 

@@ -54,10 +54,13 @@ struct ConstantValue {
     }
 
     private func acceptsMember(_ member: MemberAccessExprSyntax) -> Bool {
-        let name = member.declName.baseName.text
-        guard member.declName.argumentNames == nil, name != "init", !Self.ambientMembers.contains(name),
-              !constants.mutableStatics.contains(name) else { return false }
+        guard member.declName.argumentNames == nil, isConstantName(member.declName.baseName.text) else { return false }
         return member.base.map(Self.isType) ?? true
+    }
+
+    /// A member that is not an initialiser, ambient state or a `static var` of the file.
+    private func isConstantName(_ name: String) -> Bool {
+        name != "init" && !Self.ambientMembers.contains(name) && !constants.mutableStatics.contains(name)
     }
 
     /// A type written by name: capitalised identifiers, qualified by module or enclosing types.
