@@ -30,6 +30,11 @@ final class Scanner: SyntaxVisitor {
     static let infrastructureMembers: [String: String] = ["FileManager": "default", "Bundle": "main", "UserDefaults": "standard"]
     static let escapeCalls: Set<String> = ["fatalError", "precondition", "preconditionFailure", "unsafeBitCast"]
     static let printCalls: Set<String> = ["print", "debugPrint", "NSLog", "dump"]
+    /// Every detector `Scanner` can report. A rule in `rules.json` may list only these and the ones of `Measurements`.
+    static let detectors: Set<String> = [
+        "ambientEnvironment", "escapeHatch", "exportedImport", "infrastructureConstruction", "localization", "platformCondition",
+        "printing", "randomIdentity", "singleton", "swallowedError", "swift5Mode", "testDouble", "unsafeFlags", "wallClock",
+    ]
     /// Detectors that read a package manifest. They run on manifests only, and the others on sources only.
     static let manifestDetectors: Set<String> = ["swift5Mode", "unsafeFlags"]
 

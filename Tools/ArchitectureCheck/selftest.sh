@@ -123,6 +123,25 @@ python3 - "$ROOT/rules.json" <<'PY'
 import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"][0]["rules"].append("NoSuchRule"); json.dump(r,open(p,"w"))
 PY
 expect "a target listing an undefined rule is a problem" 1 "lists the rule NoSuchRule, which rules.json does not define"
+# A detector that the checker does not implement would be a rule enforced by nothing.
+setup; src 'let x = 1'
+python3 - "$ROOT/rules.json" <<'PY'
+import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["rules"]["PureCore"].append("noSuchDetector"); json.dump(r,open(p,"w"))
+PY
+expect "a rule listing a detector the checker does not implement is a problem" 1 "rule PureCore lists the detector noSuchDetector, which the checker does not implement"
+setup; src 'let x = 1'
+python3 - "$ROOT/rules.json" <<'PY'
+import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["rules"]["NoDeadCode"].append("wallclock"); json.dump(r,open(p,"w"))
+PY
+expect "a detector name is matched exactly, so a misspelt one is a problem" 1 "rule NoDeadCode lists the detector wallclock"
+python3 - "$HERE/rules.json" "$ROOT/rules.json" <<'PY'
+import json,sys
+real = json.load(open(sys.argv[1])); fixture = json.load(open(sys.argv[2]))
+used = {d for ds in real["rules"].values() for d in ds}
+sys.exit(0 if used <= {d for ds in fixture["rules"].values() for d in ds} else 1)
+PY
+if [[ $? -eq 0 ]]; then pass=$((pass+1)); echo "ok   every detector of the repository's rules.json is exercised by this self-test's rules"
+else fail=$((fail+1)); echo "FAIL the repository's rules.json lists a detector that this self-test's rules do not"; fi
 # Manifest detectors read manifests only, and the source detectors read sources only.
 clean "a language-mode spelling in a source is not a manifest setting" $'enum IPVersion { case v4, v5 }\nlet v = IPVersion.v5'
 # --- HumbleViews: import access (the domain must not leak through a public API)

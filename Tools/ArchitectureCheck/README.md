@@ -22,7 +22,7 @@ The first build takes a few minutes, because it compiles SwiftSyntax. `selftest.
 A rule is cited by its name from `rules.md` (`DIP`, `PureCore`, `CleanErrors`, …), never by a number. In `rules.json`:
 
 - **`rules`** maps each rule to the detectors that enforce it. A detector can serve two rules: `localization` is `PureCore` and `LocalisationAtEdges`, `printing` is `PureCore` and `NoDeadCode`, and a finding is reported under each.
-- **a target's `rules`** names the rules whose **detectors** run on that target. A rule held by the compiler, by tests or by review applies to every production target whatever this list says. An adapter is not listed under `PureCore` or `PlatformAdapters`: it may read the clock, and it may hold platform code. A rule name that `rules` does not define is an error, so a typo cannot disable a detector.
+- **a target's `rules`** names the rules whose **detectors** run on that target. A rule held by the compiler, by tests or by review applies to every production target whatever this list says. An adapter is not listed under `PureCore` or `PlatformAdapters`: it may read the clock, and it may hold platform code. A rule name that `rules` does not define is an error, and so is a detector name that the checker does not implement, so a typo cannot disable a detector.
 - **`DependencyRule`** also covers the import allow-list of every target (detector `import`), and **`HumbleViews`** the `requiredImportAccess` constraint (detector `importAccess`). Neither needs to be listed.
 - **`swift5Mode` and `unsafeFlags`** (`StrictConcurrency`) read package manifests and run on manifest targets only; the other detectors read sources and never run on a manifest.
 

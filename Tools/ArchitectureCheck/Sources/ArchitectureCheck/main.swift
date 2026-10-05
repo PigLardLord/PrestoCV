@@ -110,6 +110,12 @@ func fingerprint(_ text: String) -> String {
     return String(h, radix: 16)
 }
 
+let implementedDetectors = Scanner.detectors.union(Measurements.detectors)
+for (rule, detectors) in config.rules.sorted(by: { $0.key < $1.key }) {
+    for detector in detectors where !implementedDetectors.contains(detector) {
+        problems.append("rule \(rule) lists the detector \(detector), which the checker does not implement")
+    }
+}
 for target in config.targets {
     for rule in target.rules where config.rules[rule] == nil {
         problems.append("target \(target.name) lists the rule \(rule), which rules.json does not define")
