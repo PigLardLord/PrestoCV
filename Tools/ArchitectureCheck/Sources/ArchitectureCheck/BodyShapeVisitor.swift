@@ -38,6 +38,9 @@ final class BodyShapeVisitor: BodyVisitor {
 
     // MARK: Levels and decisions
 
+    // An `if`, a `guard` and a `while` decide once for the statement and once for each condition after the first: a
+    // comma in a condition list is an `&&` written another way.
+
     private func enterLevel(at line: Int) {
         guard !units.isEmpty else { return }
         units[units.count - 1].depth += 1
@@ -51,13 +54,13 @@ final class BodyShapeVisitor: BodyVisitor {
         units[units.count - 1].depth -= 1
     }
 
-    private func decide() {
+    private func decide(_ decisions: Int = 1) {
         guard !units.isEmpty else { return }
-        units[units.count - 1].complexity += 1
+        units[units.count - 1].complexity += decisions
     }
 
     override func visit(_ node: IfExprSyntax) -> SyntaxVisitorContinueKind {
-        decide()
+        decide(node.conditions.count)
         if !Self.isElseIf(node) { enterLevel(at: lines.line(of: node)) }
         return .visitChildren
     }
@@ -67,7 +70,7 @@ final class BodyShapeVisitor: BodyVisitor {
     }
 
     override func visit(_ node: GuardStmtSyntax) -> SyntaxVisitorContinueKind {
-        decide()
+        decide(node.conditions.count)
         if !Self.onlyExits(node) { enterLevel(at: lines.line(of: node)) }
         return .visitChildren
     }
@@ -93,7 +96,7 @@ final class BodyShapeVisitor: BodyVisitor {
     override func visitPost(_ node: ForStmtSyntax) { exitLevel() }
 
     override func visit(_ node: WhileStmtSyntax) -> SyntaxVisitorContinueKind {
-        decide()
+        decide(node.conditions.count)
         enterLevel(at: lines.line(of: node))
         return .visitChildren
     }

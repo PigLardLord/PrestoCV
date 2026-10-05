@@ -100,7 +100,23 @@ flag "cyclomaticComplexity: 5 catch clauses make 6" "$(catches 5)" "cyclomaticCo
 clean "cyclomaticComplexity: 4 catch clauses make 5" "$(catches 4)"
 clean "cyclomaticComplexity: a switch counts once, however many cases (10 cases and 3 ifs make 5)" "$(printf 'func f() {\n    switch x {\n%s\n    default: break\n    }\n%s\n}\n' "$(lines_of 10 '    case %d: g()')" "$(lines_of 3 '    if x%d { g() }')")"
 flag "cyclomaticComplexity: a switch counts once (10 cases and 4 ifs make 6)" "$(printf 'func f() {\n    switch x {\n%s\n    default: break\n    }\n%s\n}\n' "$(lines_of 10 '    case %d: g()')" "$(lines_of 4 '    if x%d { g() }')")" "cyclomaticComplexity: func f has a cyclomatic complexity of 6"
-clean "cyclomaticComplexity: the commas of a condition list are not decisions" $'func f() {\n    if let a = x, let b = y, c, d, e, g { h() }\n}'
+condition_list() {   # $1 = if, guard or while, $2 = how many conditions
+  local i list="c1"; for ((i = 2; i <= $2; i++)); do list+=", c$i"; done
+  if [[ "$1" == guard ]]; then printf 'func f() {\n    guard %s else { return }\n}\n' "$list"; else printf 'func f() {\n    %s %s { g() }\n}\n' "$1" "$list"; fi
+}
+for kw in if guard while; do
+  flag "cyclomaticComplexity: $kw with a list of 5 conditions makes 6" "$(condition_list $kw 5)" "cyclomaticComplexity: func f has a cyclomatic complexity of 6"
+  clean "cyclomaticComplexity: $kw with a list of 4 conditions makes 5" "$(condition_list $kw 4)"
+  flag "cyclomaticComplexity: $kw with a list of 7 conditions makes 8" "$(condition_list $kw 7)" "cyclomaticComplexity: func f has a cyclomatic complexity of 8"
+done
+flag "cyclomaticComplexity: every kind of condition in a list counts" $'func f() {\n    if let a = x, case .y = z, x is Int, b > 0, c { h() }\n}' "cyclomatic complexity of 6"
+clean "cyclomaticComplexity: four kinds of condition make 5" $'func f() {\n    if let a = x, case .y = z, x is Int, b > 0 { h() }\n}'
+flag "cyclomaticComplexity: a guard with optional bindings and a pattern counts each" $'func f() {\n    guard let x = a, let y = b, case .z = c, let w = d, let v = e else { return }\n}' "cyclomatic complexity of 6"
+clean "cyclomaticComplexity: a condition list and an && count together (an if, an &&, a comma make 4)" $'func f() {\n    if a && b, c { h() }\n}'
+flag "cyclomaticComplexity: the lists of an else if chain each count" $'func f() {\n    if a, b { g() } else if c, d { g() } else if e, f { g() }\n}' "cyclomatic complexity of 7"
+clean "cyclomaticComplexity: two lists of two make 5" $'func f() {\n    if a, b { g() } else if c, d { g() }\n}'
+clean "cyclomaticComplexity: a repeat-while has one condition" $'func f() {\n    repeat { g() } while a\n}'
+flag "cyclomaticComplexity: the list of a statement in a closure counts in its function" $'func f() {\n    run {\n        if a, b, c, d, e { g() }\n    }\n}' "cyclomatic complexity of 6"
 clean "cyclomaticComplexity: else if counts per if, an else counts for nothing" $'func f() {\n    if a { g() } else if b { g() } else if c { g() } else if d { g() } else { g() }\n}'
 flag "cyclomaticComplexity: else if counts per if" $'func f() {\n    if a { g() } else if b { g() } else if c { g() } else if d { g() } else if e { g() } else { g() }\n}' "cyclomatic complexity of 6"
 flag "cyclomaticComplexity: the decisions of a closure count in its function" "$(printf 'func f() {\n    run {\n%s\n    }\n}\n' "$(lines_of 5 '        if x%d { g() }')")" "cyclomaticComplexity: func f has a cyclomatic complexity of 6"
