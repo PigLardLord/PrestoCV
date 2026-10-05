@@ -6,7 +6,6 @@ import Foundation
 enum CSSPolicy {
     /// Returns the canonical re-serialisation of an allowed stylesheet, or the first reason to reject it.
     static func canonical(_ css: String) throws(CSSRejection) -> String {
-        var parser = CSSParser(t: try CSSTokenizer.tokenize(css))
-        return try parser.stylesheet()
+        try CSSParser.canonical(try CSSTokenizer.tokenize(css))
     }
 }

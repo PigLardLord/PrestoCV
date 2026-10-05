@@ -13,4 +13,9 @@ public enum MarkupContract {
     public static let sectionKinds: Set<String> = ["summary", "experience", "education", "skills", "languages", "certifications", "profiles", "interests"]
     public static let ratings: Set<String> = ["1", "2", "3", "4", "5"]
     public static let pseudoClasses: Set<String> = ["first-child", "last-child", "only-child"]
+
+    /// Whether a design may select `[name=value]`.
+    static func allowsAttribute(_ name: String, value: String) -> Bool {
+        (name == "data-section" && sectionKinds.contains(value)) || (name == "data-rating" && ratings.contains(value))
+    }
 }
