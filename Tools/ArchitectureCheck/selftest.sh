@@ -124,6 +124,36 @@ python3 - "$ROOT/rules.json" <<'PY'
 import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"][0]["rules"].append("NoSuchRule"); json.dump(r,open(p,"w"))
 PY
 expect "a target listing an undefined rule is a problem" 1 "lists the rule NoSuchRule, which rules.json does not define"
+# The kind of a target is one of a closed set. A misspelt one would leave a production target unmeasured while the modules check
+# still treats it as production, so it fails the run instead.
+kind_of_pure() {   # $1 = the kind to write into rules.json for the first target
+  setup; src 'let x = 1'
+  python3 - "$ROOT/rules.json" "$1" <<'PY'
+import json,sys; p,kind=sys.argv[1:3]; r=json.load(open(p)); r["targets"][0]["kind"]=kind; json.dump(r,open(p,"w"))
+PY
+}
+for kind in prodution Production produktion "" " production" "production " tests library; do
+  kind_of_pure "$kind"; expect "a target of kind \"$kind\" fails the run" 2 "unknown target kind \"$kind\""
+done
+kind_of_pure "prodution"; expect "the message names the kinds that exist" 2 "production, test, tool, manifest, legacy, excluded"
+kind_of_pure "prodution"; expect "the message says where the kind is" 2 "targets.Index 0.kind"
+for kind in production test tool legacy excluded; do
+  kind_of_pure "$kind"; expect "a target of kind \"$kind\" is read" 0 ""
+done
+for kind in legacy excluded; do
+  kind_of_pure "$kind"; src $'import Other\nfunc f() { fatalError("x") }\nlet d = Date()'
+  expect "a $kind target is not scanned, whatever it holds" 0 ""
+done
+setup; src 'let x = 1'
+python3 - "$ROOT/rules.json" <<'PY'
+import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"][0]["kind"]=None; json.dump(r,open(p,"w"))
+PY
+expect "a target with a null kind is a production target" 0 ""
+setup; src 'let x = 1'
+python3 - "$ROOT/rules.json" <<'PY'
+import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"][0]["kind"]=7; json.dump(r,open(p,"w"))
+PY
+expect "a kind that is not a string fails the run" 2 "cannot read rules"
 # A detector that the checker does not implement would be a rule enforced by nothing.
 setup; src 'let x = 1'
 python3 - "$ROOT/rules.json" <<'PY'

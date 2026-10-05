@@ -21,13 +21,16 @@ import SwiftSyntax
 struct Config: Decodable {
     struct Target: Decodable {
         let name: String, path: String
-        let kind: String?                 // production (default), test, tool, manifest, legacy, excluded
+        let kind: TargetKind?             // production when absent
         let docName: String?              // row name in modules.md, when it differs (app folders)
         let allowedImports: [String]
         let rules: [String]               // the rules whose detectors run on this target
         /// module → "internal": the import must be `internal`, `fileprivate` or `private` (HumbleViews: no domain
         /// type in a public API). A plain `import` is public in the Swift 6 language mode, so it fails too.
         let requiredImportAccess: [String: String]?
+
+        /// A target without a kind is a production target.
+        var isProduction: Bool { (kind ?? .production) == .production }
     }
     struct Exception: Decodable { let path: String; let detector: String; let adr: String; let reason: String }
     let targets: [Target]
@@ -46,13 +49,19 @@ func value(after flag: String) -> String? {
 }
 func fail(_ message: String) -> Never { print("error: \(message)"); exit(2) }
 
+/// A decoding error in words: what is wrong, and where in the file.
+func describe(_ error: Error) -> String {
+    guard case DecodingError.dataCorrupted(let context) = error else { return "\(error)" }
+    return "\(context.debugDescription) (at \(context.codingPath.map(\.stringValue).joined(separator: ".")))"
+}
+
 guard CommandLine.arguments.count > 1, let rulesPath = value(after: "--rules"), let baselinePath = value(after: "--baseline") else {
     fail("usage: ArchitectureCheck <root> --rules <json> --baseline <json> [--against <json>] [--modules <md>] [--adr-dir <dir>] [--packages a,b] [--write-baseline]")
 }
 let root = URL(fileURLWithPath: CommandLine.arguments[1]).standardizedFileURL
 let config: Config
 do { config = try JSONDecoder().decode(Config.self, from: Data(contentsOf: URL(fileURLWithPath: rulesPath))) }
-catch { fail("cannot read rules: \(error)") }
+catch { fail("cannot read rules: \(describe(error))") }
 
 func loadBaseline(_ path: String) -> [String]? { try? JSONDecoder().decode([String].self, from: Data(contentsOf: URL(fileURLWithPath: path))) }
 var problems: [String] = []
@@ -82,7 +91,7 @@ var assignment: [(file: String, target: Config.Target)] = []
 for file in files.sorted() {
     let owners = byPath.filter { $0.key.hasSuffix(".swift") ? file == $0.key : file.hasPrefix($0.key) }.sorted { $0.key.count > $1.key.count }
     guard let target = owners.first?.value.first else { problems.append("unmapped file: \(file)"); continue }
-    if target.kind == "excluded" { continue }
+    if target.kind == .excluded { continue }
     assignment.append((file, target))
 }
 
@@ -129,8 +138,7 @@ for target in config.targets {
 /// The rules whose detectors run on a target: the ones it lists, and on every production target the production rules, so
 /// that a new target cannot forget them.
 func rulesRunning(on target: Config.Target) -> [String] {
-    let isProduction = target.kind == nil || target.kind == "production"
-    return target.rules + (isProduction ? (config.productionRules ?? []).filter { !target.rules.contains($0) } : [])
+    return target.rules + (target.isProduction ? (config.productionRules ?? []).filter { !target.rules.contains($0) } : [])
 }
 
 let detectorToRules: (Config.Target) -> [String: [String]] = { target in
@@ -147,9 +155,9 @@ var ordinals: [String: Int] = [:]
     findings.append(Finding(key: "\(base)#\(n)", message: "\(file):\(hit.line): \(rule): \(hit.detector): \(hit.detail)"))
 }
 
-let legacyTargets = config.targets.filter { $0.kind == "legacy" }
+let legacyTargets = config.targets.filter { $0.kind == .legacy }
 
-let manifestPaths = config.targets.filter { $0.kind == "manifest" }.map(\.path)
+let manifestPaths = config.targets.filter { $0.kind == .manifest }.map(\.path)
 func packageDirectory(_ manifest: String) -> String { manifest.split(separator: "/").dropLast().joined(separator: "/") }
 
 /// The manifest that owns a path: the nearest `Package.swift` above it, so a nested package is never owned
@@ -164,7 +172,7 @@ func isLegacyDeclaration(_ name: String, inManifest manifest: String) -> Bool {
     legacyTargets.contains { $0.name == name && owningManifest(of: $0.path) == manifest }
 }
 
-for (file, target) in assignment where target.kind != "legacy" {
+for (file, target) in assignment where target.kind != .legacy {
     guard let source = try? String(contentsOf: root.appendingPathComponent(file), encoding: .utf8) else { problems.append("cannot read \(file)"); continue }
     let tree = Parser.parse(source: source)
     let scanner = Scanner(tree: tree, file: file, infrastructureTypes: Set(config.infrastructureTypes))
@@ -187,14 +195,14 @@ for (file, target) in assignment where target.kind != "legacy" {
     for hit in scanner.hits + measured {
         // Inside a manifest, the declaration of a legacy target is exempt like its sources (ADR 0012); anything
         // else in the manifest, including package-level settings and new targets, is checked.
-        if target.kind == "manifest", let owner = hit.packageTarget, isLegacyDeclaration(owner, inManifest: file) { continue }
+        if target.kind == .manifest, let owner = hit.packageTarget, isLegacyDeclaration(owner, inManifest: file) { continue }
         // A manifest runs the manifest detectors only, and a source file never does.
-        guard Scanner.manifestDetectors.contains(hit.detector) == (target.kind == "manifest") else { continue }
+        guard Scanner.manifestDetectors.contains(hit.detector) == (target.kind == .manifest) else { continue }
         for rule in rulesFor[hit.detector] ?? [] { record(rule: rule, detector: hit.detector, detail: hit.detail, node: hit.node, line: hit.line) }
     }
     // A tools version below 6 builds every target without an explicit mode in Swift 5 mode. Only a manifest
     // whose targets are all legacy may keep one.
-    if target.kind == "manifest",
+    if target.kind == .manifest,
        let line = source.split(separator: "\n", maxSplits: 1).first, line.contains("swift-tools-version"),
        let major = Int(line.split(separator: ":").last?.trimmingCharacters(in: .whitespaces).prefix { $0.isNumber } ?? ""), major < 6 {
         let newTargets = scanner.declaredPackageTargets.filter { !isLegacyDeclaration($0, inManifest: file) }
@@ -233,7 +241,7 @@ if let modulesPath = value(after: "--modules") {
         for word in allowCell.components(separatedBy: CharacterSet.alphanumerics.inverted) where frameworks.contains(word) { allowed.insert(word) }
         documented[name] = .some(allowed)
     }
-    let checked = config.targets.filter { ![ "test", "tool", "manifest", "legacy", "excluded"].contains($0.kind ?? "production") }
+    let checked = config.targets.filter(\.isProduction)
     for t in checked {
         let docName = t.docName ?? t.name
         guard let entry = documented[docName] else { problems.append("target \(t.name) is not listed in modules.md"); continue }
@@ -269,7 +277,7 @@ if let packages = value(after: "--packages") {
         for t in targets {
             guard let name = t["name"] as? String else { continue }
             guard let rule = byName[name] else { problems.append("package \(dir) declares target \(name), which rules.json does not know"); continue }
-            let isLegacyHere = rule.kind == "legacy" && owningManifest(of: rule.path) == manifestPath
+            let isLegacyHere = rule.kind == .legacy && owningManifest(of: rule.path) == manifestPath
             // Every language-mode setting counts, whatever its condition: a Swift 5 mode for one platform is still Swift 5.
             let targetModes = (t["settings"] as? [[String: Any]] ?? []).compactMap { s -> String? in
                 ((s["kind"] as? [String: Any])?["swiftLanguageMode"] as? [String: Any])?["_0"] as? String
