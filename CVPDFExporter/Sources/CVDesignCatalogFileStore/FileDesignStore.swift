@@ -162,6 +162,6 @@ private enum GenerationFileName {
     static func make(id: String, generation: Int) -> String { "\(id).\(generation).mcvt" }
 
     static func matches(_ name: String) -> Bool {
-        name.range(of: #"^[a-z0-9-]{1,64}\.[1-9][0-9]{0,9}\.mcvt\z"#, options: .regularExpression) != nil
+        name.fullyMatches(#"[a-z0-9-]{1,64}\.[1-9][0-9]{0,9}\.mcvt"#)
     }
 }
