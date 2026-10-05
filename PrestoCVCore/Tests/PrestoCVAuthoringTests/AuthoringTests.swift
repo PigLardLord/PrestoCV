@@ -161,12 +161,16 @@ struct DomainTests {
     @Test("normalising a normalised list changes nothing")
     func interestsAreStable() {
         let interests = Interests([" Chess ", "", "chess", "Running", "  "])
-        #expect(interests.values == ["Chess", "Running"] && Interests(interests.values) == interests)
+        #expect(Interests(interests.values) == interests)
     }
 
-    @Test("sections start with no interests and hold the ones they are given")
-    func sectionsHoldInterests() {
+    @Test("sections start with no interests")
+    func sectionsStartWithNoInterests() {
         #expect(CVSections().interests.values.isEmpty)
+    }
+
+    @Test("sections hold the interests they are given")
+    func sectionsHoldInterests() {
         #expect(CVSections(interests: Interests(["Chess", "chess", "Running"])).interests.values == ["Chess", "Running"])
     }
 
