@@ -15,12 +15,9 @@ struct FileTypes {
         }
     }
 
-    /// The instance properties that the type holding an initialiser stores; nil when the file does not declare the type.
-    func storedProperties(ofTypeHolding initializer: InitializerDeclSyntax) -> Set<String>? {
-        guard let declarations = declarations(ofTypeHolding: initializer) else { return nil }
-        let properties = declarations.flatMap { Self.instanceProperties(of: $0) }
-        let computed = Set(properties.filter { !$0.isStored }.map(\.name))
-        return Set(properties.filter(\.isStored).map(\.name)).subtracting(computed)
+    /// The instance properties of the type holding an initialiser; nil when the file does not declare the type.
+    func properties(ofTypeHolding initializer: InitializerDeclSyntax) -> [Property]? {
+        declarations(ofTypeHolding: initializer)?.flatMap { Self.instanceProperties(of: $0) }
     }
 
     /// The initialisers that the type holding an initialiser declares, in the type and in its extensions in the file;

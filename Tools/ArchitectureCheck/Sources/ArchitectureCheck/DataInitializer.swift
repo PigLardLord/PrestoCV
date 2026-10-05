@@ -5,7 +5,8 @@ import SwiftSyntax
 /// - **assignments**: each statement is `self.x = x`, naming the property after its parameter, each parameter once,
 ///   or gives another property a literal or a constant (`self.revision = 0`). A property is assigned once, and each is
 ///   a stored instance property that the file declares for the type or one of its extensions: a computed property
-///   runs code, a `static` one is no instance's, and one that cannot be found is not known to be stored;
+///   runs code, a `static` one is no instance's, and one that cannot be found is not known to be stored. A property that
+///   it leaves alone starts with its initial value, which has to be a literal or a constant, unless it is lazy;
 /// - **delegation**: the only statement is `self.init(...)`, and each argument is a parameter passed unchanged, each
 ///   parameter once, or a literal or a constant. The call must reach initialisers of the same type that the file
 ///   declares, found by its argument labels, and each must be a data initialiser in its turn; an initialiser with a
@@ -21,6 +22,8 @@ final class DataInitializer {
     private let constants: FileConstants
     private let types: FileTypes
     private let meter: WorkMeter
+    /// What a property's initial value may be: a literal or a constant, with no parameter in sight.
+    private let plainValues: ConstantValue
     /// What is known of each initialiser: its answer once it is found, false while it is being examined, so that a
     /// delegation that comes back to one that it is following is a cycle and no data initialiser.
     private var answers: [SyntaxIdentifier: Bool] = [:]
@@ -29,6 +32,7 @@ final class DataInitializer {
         self.constants = constants
         self.types = types
         self.meter = meter
+        plainValues = ConstantValue(constants: constants, parameters: [])
     }
 
     /// Whether the search was cut short, so that some initialiser that is exempt was not found to be.
@@ -56,16 +60,19 @@ final class DataInitializer {
     private func assigns(_ subject: Subject) -> Bool {
         let assignments = subject.statements.compactMap { Assignment($0.item) }
         guard assignments.count == subject.statements.count, Set(assignments.map(\.target)).count == assignments.count,
-              targetsAreStored(assignments, in: subject.node) else { return false }
+              suits(assignments, in: subject.node) else { return false }
         let stored = assignments.filter { $0.storesParameter(of: subject.values) }
         let given = assignments.filter { $0.givesConstant(of: subject.values) }
         return stored.count + given.count == assignments.count && stored.map(\.target).sorted() == subject.names.sorted()
     }
 
-    /// Each assignment names a stored property of the type that the initialiser belongs to.
-    private func targetsAreStored(_ assignments: [Assignment], in node: InitializerDeclSyntax) -> Bool {
-        guard let stored = types.storedProperties(ofTypeHolding: node) else { return false }
-        return assignments.allSatisfy { stored.contains($0.target) }
+    /// The type stores each assigned property, and each property that the initialiser leaves alone runs nothing of its own,
+    /// because its initial value is a literal or a constant.
+    private func suits(_ assignments: [Assignment], in node: InitializerDeclSyntax) -> Bool {
+        guard let properties = types.properties(ofTypeHolding: node) else { return false }
+        let assigned = Set(assignments.map(\.target))
+        return assigned.isSubset(of: properties.storedNames)
+            && properties.allSatisfy { assigned.contains($0.name) || $0.runsNothing(under: plainValues) }
     }
 
     private func delegates(_ subject: Subject) -> Bool {
