@@ -153,7 +153,7 @@ public struct DesignPackageValidator: Sendable {
 
 /// Where an installed design came from. The store records it, outside the package: a package is untrusted, so it
 /// cannot say what it is.
-public enum DesignOrigin: String, Sendable, Equatable, CaseIterable, Codable {
+public enum DesignOrigin: Sendable, Equatable, CaseIterable {
     /// Installed by `SyncBundledDesigns`, from the designs that ship with the app.
     case bundled
     /// Installed by `InstallDesign`, from a package someone supplied.

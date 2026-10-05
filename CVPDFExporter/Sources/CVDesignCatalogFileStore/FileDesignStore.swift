@@ -91,7 +91,24 @@ public actor FileDesignStore: DesignStore {
     private struct Entry: Codable { let manifest: DesignManifest; let generation: Int }
     /// Origin record schema 1: the origin of each design that has one, ordered by identifier.
     private struct OriginsV1: Codable { let schemaVersion: Int; let designs: [OriginEntry] }
-    private struct OriginEntry: Codable { let id: String; let origin: DesignOrigin }
+    private struct OriginEntry: Codable { let id: String; let origin: OriginName }
+    /// How an origin is written. The catalog's `DesignOrigin` does not decide what is on disk, and a new origin does not
+    /// compile until it has a name here.
+    private enum OriginName: String, Codable {
+        case bundled, imported
+        init(_ origin: DesignOrigin) {
+            switch origin {
+            case .bundled: self = .bundled
+            case .imported: self = .imported
+            }
+        }
+        var origin: DesignOrigin {
+            switch self {
+            case .bundled: .bundled
+            case .imported: .imported
+            }
+        }
+    }
     private struct Envelope: Decodable { let schemaVersion: Int }
 
     // MARK: DesignStore
@@ -323,7 +340,7 @@ public actor FileDesignStore: DesignStore {
         do { record = try JSONDecoder().decode(OriginsV1.self, from: data) } catch { throw .originsCorrupt("not an origin record") }
         let ids = record.designs.map(\.id)
         guard ids.allSatisfy(DesignManifest.isValidID), ids == ids.sorted(), Set(ids).count == ids.count else { throw .originsCorrupt("entries") }
-        return Dictionary(uniqueKeysWithValues: record.designs.map { ($0.id, $0.origin) })
+        return Dictionary(uniqueKeysWithValues: record.designs.map { ($0.id, $0.origin.origin) })
     }
 
     /// The fields an index holds are checked as the validator checks them in a package (the identifier is checked
@@ -358,12 +375,12 @@ public actor FileDesignStore: DesignStore {
     /// nothing is written that could not be read back (R12).
     private func encodeOrigins(_ origins: [String: DesignOrigin], listing entries: [Entry], for id: String) throws(FileDesignStoreError) -> Data {
         let listed = entries.map(\.manifest.id)
-        let recorded = listed.compactMap { id in origins[id].map { OriginEntry(id: id, origin: $0) } }
+        let recorded = listed.compactMap { id in origins[id].map { OriginEntry(id: id, origin: OriginName($0)) } }
         let data = try encode(OriginsV1(schemaVersion: Self.originsVersion, designs: recorded), for: id)
         guard data.count <= originsCap else { throw .wouldNotReadBack(id: id) }
         let readBack: [String: DesignOrigin]
         do throws(FileDesignStoreError) { readBack = try decodeOrigins(data) } catch { throw .wouldNotReadBack(id: id) }
-        guard readBack == Dictionary(uniqueKeysWithValues: recorded.map { ($0.id, $0.origin) }) else { throw .wouldNotReadBack(id: id) }
+        guard readBack == Dictionary(uniqueKeysWithValues: recorded.map { ($0.id, $0.origin.origin) }) else { throw .wouldNotReadBack(id: id) }
         return data
     }
 

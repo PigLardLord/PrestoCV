@@ -423,6 +423,6 @@ struct FileDesignStoreOriginTests {
     func recordVersionFollowsOrigins() {
         let message: Comment = "a record written with a new origin cannot be read by an older app: bump the record version when an origin is added"
         #expect(FileDesignStore.originsVersion == 1, message)
-        #expect(DesignOrigin.allCases.map(\.rawValue) == ["bundled", "imported"], message)
+        #expect(DesignOrigin.allCases.map { "\($0)" } == ["bundled", "imported"], message)
     }
 }
