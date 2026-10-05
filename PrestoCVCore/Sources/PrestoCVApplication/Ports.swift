@@ -10,14 +10,19 @@ public protocol CVRepository: Sendable {
     func create(_ cv: CV) async throws(RepositoryError) -> CV
     /// Replaces the stored CV only if its revision equals `cv.revision`; returns it at revision + 1.
     func update(_ cv: CV) async throws(RepositoryError) -> CV
+    /// Loads a stored CV. Fails with `notFound` when no CV has that identity, and with `storeUnavailable` when the store
+    /// itself is not there.
     func load(_ id: CVID) async throws(RepositoryError) -> CV
     /// Healthy CVs, most recently changed first, plus every issue found. Never fails because of one file.
     func list() async throws(RepositoryError) -> CVListing
+    /// Deletes the CV only if it is stored at `revision`. Fails with `conflict` otherwise, and with `notFound` if it is gone.
     func delete(_ id: CVID, revision: Int) async throws(RepositoryError)
 }
 
 /// Recovery and erasure, reachable from the UI (quarantine review, "delete everything about this CV").
 public protocol CVStoreMaintenance: Sendable {
+    /// Moves a quarantined file back into the store, if it now passes every read check. Fails with `invalidName` for a name
+    /// that is not a quarantined file's, and with `alreadyExists` when the store holds a CV of that name.
     func restore(quarantined name: String) async throws(RepositoryError) -> CV
     /// Removes every copy of a CV: the stored file whatever its schema, and quarantined copies (GDPR erasure).
     func erase(_ id: CVID) async throws(RepositoryError)
@@ -25,11 +30,13 @@ public protocol CVStoreMaintenance: Sendable {
     func purgeQuarantine(olderThan date: Date) async throws(RepositoryError) -> Int
 }
 
+/// The result of listing a store: the healthy CVs, and what was wrong with the files that are not.
 public struct CVListing: Sendable, Equatable {
     public var cvs: [CV], issues: [StoreIssue]
     public init(cvs: [CV], issues: [StoreIssue]) { self.cvs = cvs; self.issues = issues }
 }
 
+/// A file of the store that is not a CV the app can use, and what became of it.
 public enum StoreIssue: Sendable, Equatable {
     case corrupt(file: String, reason: String)       // quarantined, restorable
     case upgradeRequired(file: String, version: Int) // left untouched
@@ -38,6 +45,7 @@ public enum StoreIssue: Sendable, Equatable {
     case quarantineFailed(file: String)              // corrupt, but could not be moved aside
 }
 
+/// Why a store cannot be used as a whole.
 public enum StoreFailure: Sendable, Equatable { case notADirectory, cannotList, cannotLock }
 
 /// No paths or free-form strings: file names only, and coded failures (CleanErrors).
@@ -49,11 +57,14 @@ public enum RepositoryError: Error, Equatable, Sendable {
     case wouldNotReadBack(file: String)
 }
 
+/// Where new identities come from, so that no domain or application code creates one itself (PureCore).
 public protocol IDGenerator: Sendable { func next() -> CVID }
-/// Named to avoid shadowing Swift.Clock.
+
+/// Where the current time comes from (PureCore). Named to avoid shadowing Swift.Clock.
 public protocol TimeSource: Sendable { func now() -> Date }
 
 /// The sample CVs offered on first run, in the stored format (docs/architecture/modules.md).
 public protocol SampleCVSource: Sendable {
+    /// Every sample, in a fixed order. Fails when one cannot be used: the samples ship with the app, so none is skipped.
     func samples() async throws(RepositoryError) -> [CV]
 }
