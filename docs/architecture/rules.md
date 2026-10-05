@@ -5,7 +5,7 @@ These rules are strict on purpose. A change that breaks one does not merge. Ther
 - **Baseline:** temporary. An existing violation is listed in the checker's baseline, which may only shrink.
 - **Exception:** permanent. It is an entry in the checker's `rules.json`, and it cites an ADR that explains why. The checker refuses an exception whose ADR does not exist.
 
-The rules are **SOLID**, **Clean Architecture** and **Clean Code**, and four rules of this project named by topic ([ADR 0021](adr/0021-solid-and-clean-rules.md)). Every rule is cited by its name, such as `SRP` or `ValidatingBoundary`, never by a number.
+The rules are **SOLID**, **Clean Architecture** and **Clean Code**, and five rules of this project named by topic ([ADR 0021](adr/0021-solid-and-clean-rules.md)). Every rule is cited by its name, such as `SRP` or `ValidatingBoundary`, never by a number.
 
 Each rule says what is required, why, and what enforces it:
 
@@ -45,8 +45,7 @@ The checker applies to **production targets**: domain, application, integration,
 
 ### LSP: every adapter can stand in for its port
 
-- **Every adapter passes its port's contract.** The contract is a test suite in the port's test support, run against every adapter, the in-memory ones included.
-- **Contract tests.** Every adapter passes the contract tests of its port. All PDF renderers run the same contract suite, on their real platform.
+- **Every adapter passes its port's contract.** The contract is a test suite in the port's test support, run against every adapter, the in-memory ones included. All PDF renderers run the same contract suite, on their real platform.
 - **A test double keeps the contract too.** A fake that accepts what the real adapter refuses, or never fails where it can fail, makes the tests lie.
 - **A subtype strengthens nothing it promised and weakens nothing it requires:** no new error a caller does not expect, no precondition the protocol does not state.
 
@@ -219,7 +218,7 @@ In production targets:
 - **Doubles and waits.** Test doubles use `Mutex`, not `@unchecked Sendable`. Waits are bounded and record an issue when they time out.
 - **Bug fixes start with a failing test.** For key tests, swapping the old implementation back in must make them fail. This was done for the escaping, save-serialisation and golden tests.
 
-Each test is **fast, independent, repeatable, self-validating and timely**, checks **one concept**, and reads as arrange, act, assert. Its name states the behaviour it holds. A test holds a cost to counted work, never to the wall clock alone; a clock is only a backstop against a hang.
+Each test is **fast, independent, repeatable, self-validating and timely**, checks **one concept**, and reads as arrange, act, assert. Its name states the behaviour it holds. A test bounds its cost by counted work, never by the wall clock alone; a clock is only a backstop against a hang.
 
 **Enforced by:** CI (tests) and review.
 
@@ -247,7 +246,7 @@ Each test is **fast, independent, repeatable, self-validating and timely**, chec
 
 ## This project's rules
 
-These are neither SOLID nor Clean, but each serves one of them: the boundary of untrusted input and the persisted schema are Clean Architecture's boundaries, platform code in adapters is the Dependency Rule applied to platforms, and localisation at the edges keeps the core pure.
+These are neither SOLID nor Clean, but each serves one of them: the boundary of untrusted input and the persisted schema are Clean Architecture's boundaries, strict concurrency has the compiler prove that layers share no unguarded state, platform code in adapters is the Dependency Rule applied to platforms, and localisation at the edges keeps the core pure.
 
 ### ValidatingBoundary: untrusted input enters through one validating boundary
 
