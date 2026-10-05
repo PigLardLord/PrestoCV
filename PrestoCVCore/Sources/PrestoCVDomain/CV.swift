@@ -45,3 +45,10 @@ public struct CV: Hashable, Sendable {
         CV(id: newID, title: title, personal: personal, sections: sections, design: design, language: language)
     }
 }
+
+extension Sequence where Element == CV {
+    /// The CVs most recently changed first: the order of every listing. A CV that was never stored comes last.
+    public func mostRecentlyChangedFirst() -> [CV] {
+        sorted { ($0.updatedAt ?? .distantPast) > ($1.updatedAt ?? .distantPast) }
+    }
+}

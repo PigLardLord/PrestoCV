@@ -116,11 +116,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
             if case .cv(let cv) = file { cvs.append(cv) }
             else if let issue = file.issue(named: url.lastPathComponent) { issues.append(quarantineIfCorrupt(issue, at: url)) }
         }
-        return CVListing(cvs: Self.mostRecentlyChangedFirst(cvs), issues: issues)
-    }
-
-    private static func mostRecentlyChangedFirst(_ cvs: [CV]) -> [CV] {
-        cvs.sorted { ($0.updatedAt ?? .distantPast) > ($1.updatedAt ?? .distantPast) }
+        return CVListing(cvs: cvs.mostRecentlyChangedFirst(), issues: issues)
     }
 
     private func storedFileURLs() throws(RepositoryError) -> [URL] {

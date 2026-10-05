@@ -18,7 +18,7 @@ public actor InMemoryCVRepository: CVRepository {
     }
     public func load(_ id: CVID) async throws(RepositoryError) -> CV { guard let cv = store[id] else { throw .notFound(id) }; return cv }
     public func list() async throws(RepositoryError) -> CVListing {
-        CVListing(cvs: store.values.sorted { ($0.updatedAt ?? .distantPast) > ($1.updatedAt ?? .distantPast) }, issues: [])
+        CVListing(cvs: store.values.mostRecentlyChangedFirst(), issues: [])
     }
     public func delete(_ id: CVID, revision: Int) async throws(RepositoryError) {
         guard let existing = store[id] else { throw .notFound(id) }

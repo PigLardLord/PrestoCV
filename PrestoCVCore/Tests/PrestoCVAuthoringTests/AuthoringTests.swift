@@ -113,6 +113,15 @@ struct DomainTests {
         #expect(sections.interests == ["Chess", "Running"])
     }
 
+    @Test("a listing orders the CVs by last change, and a CV that was never stored comes last")
+    func mostRecentlyChangedFirst() {
+        let ids = SequentialIDGenerator()
+        let older = named("Older", id: ids.next()).stored(revision: 1, at: Date(timeIntervalSince1970: 100))
+        let newer = named("Newer", id: ids.next()).stored(revision: 1, at: Date(timeIntervalSince1970: 200))
+        let unsaved = named("Unsaved", id: ids.next())
+        #expect([unsaved, older, newer].mostRecentlyChangedFirst().map(\.personal.fullName) == ["Newer", "Older", "Unsaved"])
+    }
+
     @Test("the full fixture populates every field, so a completeness test over it sees every leaf")
     func fixtureCoversEveryField() {
         let values = FieldLeaves.of(FixtureCV.full(), skipping: ["revision", "createdAt", "updatedAt"])
