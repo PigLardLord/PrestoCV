@@ -110,6 +110,28 @@ struct DomainTests {
         #expect(DesignChoice(design: "modern\n") == nil && DesignChoice(design: "") == nil)
     }
 
+    @Test("an array literal of interests is normalised as the initialiser normalises its list")
+    func interestsLiteral() {
+        let literal: Interests = [" Chess ", "", "chess", "Running", "  "]
+        #expect(literal == Interests([" Chess ", "", "chess", "Running", "  "]))
+        #expect(literal.values == ["Chess", "Running"])
+    }
+
+    @Test("an empty array literal is no interests")
+    func emptyInterestsLiteral() {
+        #expect(([] as Interests).values.isEmpty)
+    }
+
+    @Test("a new CV starts without details")
+    func newCVStartsWithoutDetails() {
+        #expect(CV(id: id1).personal == PersonalDetails())
+    }
+
+    @Test("a new CV starts without sections")
+    func newCVStartsWithoutSections() {
+        #expect(CV(id: id1).sections == CVSections())
+    }
+
     @Test("each interest is trimmed of spaces, tabs and newlines")
     func interestsAreTrimmed() {
         #expect(Interests(["  Chess\n", "\tRunning "]).values == ["Chess", "Running"])

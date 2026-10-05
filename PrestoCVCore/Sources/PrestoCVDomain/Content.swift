@@ -19,6 +19,9 @@ public struct PersonalDetails: Hashable, Sendable {
     /// A short presentation of the person.
     public var summary: String
 
+    /// No details: every text empty, nothing else given.
+    public static let empty = PersonalDetails()
+
     /// Every parameter is the value of the property of the same name; none is required.
     public init(fullName: String = "", professionalTitle: String = "", email: EmailAddress? = nil, phone: PhoneNumber? = nil,
                 location: String = "", website: WebLink? = nil, summary: String = "") {
@@ -142,9 +145,12 @@ public struct CVSections: Hashable, Sendable {
     /// The interests, normalised when they were made.
     public var interests: Interests
 
+    /// No entry in any section.
+    public static let empty = CVSections()
+
     /// Every parameter is the value of the property of the same name, and none is required.
     public init(experiences: [Experience] = [], education: [Education] = [], skills: [Skill] = [], languages: [LanguageSkill] = [],
-                certifications: [Certification] = [], profiles: [ProfileLink] = [], interests: Interests = Interests([])) {
+                certifications: [Certification] = [], profiles: [ProfileLink] = [], interests: Interests = []) {
         self.experiences = experiences; self.education = education; self.skills = skills; self.languages = languages
         self.certifications = certifications; self.profiles = profiles; self.interests = interests
     }

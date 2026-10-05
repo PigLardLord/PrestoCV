@@ -137,6 +137,12 @@ public struct Interests: Hashable, Sendable {
     }
 }
 
+extension Interests: ExpressibleByArrayLiteral {
+    /// An array literal is normalised as `init(_:)` normalises its list, so `[]` is no interests and a default value that a
+    /// data initialiser may store.
+    public init(arrayLiteral elements: String...) { self.init(elements) }
+}
+
 // MARK: - Contact details
 
 /// A local part of dot-separated atoms (no leading, trailing or doubled dot) and a domain of labels (letters or

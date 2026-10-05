@@ -31,7 +31,7 @@ public struct CV: Hashable, Sendable {
     ///   - sections: The entries.
     ///   - design: The design to export with, if chosen.
     ///   - language: The language the CV is written in, if chosen.
-    public init(id: CVID, title: String = "", personal: PersonalDetails = PersonalDetails(), sections: CVSections = CVSections(),
+    public init(id: CVID, title: String = "", personal: PersonalDetails = .empty, sections: CVSections = .empty,
                 design: DesignChoice? = nil, language: DocumentLanguage? = nil) {
         self.init(id: id, revision: 0, createdAt: nil, updatedAt: nil, title: title, personal: personal, sections: sections,
                   design: design, language: language)

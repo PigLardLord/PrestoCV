@@ -103,7 +103,9 @@ final class DataInitializer {
     }
 }
 
-/// An initialiser under examination: its body, its parameters, and what a value it stores or passes may be.
+/// An initialiser under examination: its body, its parameters, and what a value it stores or passes may be. A parameter's
+/// default value is part of the initialiser, and runs each time a call leaves the argument out, so it has to be a literal
+/// or a constant as well.
 private struct Subject {
     let node: InitializerDeclSyntax
     let statements: CodeBlockItemListSyntax
@@ -116,6 +118,11 @@ private struct Subject {
         self.statements = statements
         names = node.signature.parameterClause.parameters.map { ($0.secondName ?? $0.firstName).text }
         values = ConstantValue(constants: constants, parameters: Set(names))
+        guard Self.defaults(of: node).allSatisfy({ values.accepts($0) }) else { return nil }
+    }
+
+    private static func defaults(of node: InitializerDeclSyntax) -> [ExprSyntax] {
+        node.signature.parameterClause.parameters.compactMap { $0.defaultValue?.value }
     }
 }
 

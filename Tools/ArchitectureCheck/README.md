@@ -66,6 +66,8 @@ They enforce `CleanFunctions`, `CleanTypes`, `ISP` and `CleanComments` on produc
   - **Resolution stops at the file.** An overload, an extension or a property that another file of the module declares is not seen, so a delegation can mean an initialiser that the checker never looked at; the extension that declares it is not resolved either, and its initialisers are not exempt. This is a known limit, and review is the backstop for it. The synthesised memberwise initialiser is not declared, so it is not found.
   - **The callee is a data initialiser in its turn,** by the same two shapes, and so is every one that the call can fit. The search keeps the initialisers it is following, so a delegation that comes back to one of them, directly or through others, ends and is not exempt.
 
+**Default values.** The default value of each parameter is part of the initialiser, because it runs whenever a call leaves the argument out, so it has to be a literal or a constant too, by the test below, whether the initialiser assigns or delegates. A delegation also reaches the defaults of the initialiser it calls, and that initialiser is a data initialiser only if its own are constants: `init(at: Date = Date(), …)` that only stores is not exempt.
+
 A **literal or constant** is one of the following, judged by its spelling: the checker resolves no name of a value.
 - An integer, floating-point, boolean or string literal, a string without interpolation, or `nil`, with a `-` or `+` on a number: `0`, `-1`, `1.5`, `true`, `"x"`, `nil`.
 - An array or a dictionary literal whose elements are themselves literals or constants: `[]`, `[:]`, `[0, 1]`, `["a": 1]`.
