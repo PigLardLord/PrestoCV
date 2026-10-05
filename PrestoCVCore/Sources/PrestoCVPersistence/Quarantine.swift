@@ -112,10 +112,10 @@ struct QuarantinedName {
 
     private static let separator = "~"   // never occurs in an identifier
     private static let uuidPattern = "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
-    private static let prefixPattern = "^\\d+" + separator
+    private static let prefixPattern = "^[0-9]+" + separator
 
     init?(_ value: String) {
-        let pattern = "(\\d+" + Self.separator + ")?" + Self.uuidPattern + NSRegularExpression.escapedPattern(for: StoredFileName.suffix)
+        let pattern = "([0-9]+" + Self.separator + ")?" + Self.uuidPattern + NSRegularExpression.escapedPattern(for: StoredFileName.suffix)
         guard value.range(of: "^" + pattern + "\\z", options: .regularExpression) != nil else { return nil }
         let storedName = value.replacingOccurrences(of: Self.prefixPattern, with: "", options: .regularExpression)
         guard let uuid = UUID(uuidString: String(storedName.prefix(36))) else { return nil }
