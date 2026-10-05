@@ -138,8 +138,8 @@ public struct Interests: Hashable, Sendable {
 }
 
 extension Interests: ExpressibleByArrayLiteral {
-    /// An array literal is normalised as `init(_:)` normalises its list, so `[]` is no interests and a default value that a
-    /// data initialiser may store.
+    /// Builds the interests from an array literal, normalised as `init(_:)` normalises its list: `[" Chess ", "chess"]` is
+    /// the interest "Chess", and `[]` is no interests.
     public init(arrayLiteral elements: String...) { self.init(elements) }
 }
 

@@ -1,4 +1,3 @@
-
 // MARK: - Personal details
 
 /// The details printed at the top of a CV. Text is kept as given; the email, phone and website are validated value objects.
