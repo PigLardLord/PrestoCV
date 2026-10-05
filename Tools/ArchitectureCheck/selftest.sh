@@ -20,7 +20,7 @@ P
 {"rules":{"DependencyRule":["exportedImport"],"PureCore":["wallClock","randomIdentity","ambientEnvironment","localization","printing"],
   "DIP":["singleton","infrastructureConstruction"],"CleanErrors":["swallowedError"],
   "StrictConcurrency":["escapeHatch","swift5Mode","unsafeFlags"],"PlatformAdapters":["platformCondition"],
-  "CleanFunctions":["functionLength"],
+  "CleanFunctions":["functionLength","nestingDepth","cyclomaticComplexity"],
   "LocalisationAtEdges":["localization"],"NoDeadCode":["printing","testDouble"]},
  "infrastructureTypes":["FileStore"],
  "targets":[{"name":"Pure","path":"Sources/Pure","allowedImports":["Foundation"],"rules":["DependencyRule","PureCore","DIP","CleanFunctions","CleanErrors","StrictConcurrency","PlatformAdapters","LocalisationAtEdges","NoDeadCode"]},

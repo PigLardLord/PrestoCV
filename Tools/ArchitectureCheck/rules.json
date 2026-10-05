@@ -16,7 +16,9 @@
    "infrastructureConstruction"
   ],
   "CleanFunctions": [
-   "functionLength"
+   "functionLength",
+   "nestingDepth",
+   "cyclomaticComplexity"
   ],
   "CleanErrors": [
    "swallowedError"
