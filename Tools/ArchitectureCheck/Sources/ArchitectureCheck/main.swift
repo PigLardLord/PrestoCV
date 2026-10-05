@@ -59,8 +59,15 @@ guard CommandLine.arguments.count > 1, let rulesPath = value(after: "--rules"), 
     fail("usage: ArchitectureCheck <root> --rules <json> --baseline <json> [--against <json>] [--modules <md>] [--adr-dir <dir>] [--packages a,b] [--write-baseline] [--search-steps n]")
 }
 let root = URL(fileURLWithPath: CommandLine.arguments[1]).standardizedFileURL
-/// What the search for data initialisers in one file may spend (see `WorkMeter`); `--search-steps` lowers it for a test.
-let searchSteps = value(after: "--search-steps").flatMap { Int($0) } ?? Limits.searchSteps
+/// What the search for data initialisers in one file may spend (see `WorkMeter`); `--search-steps` lowers it for a test. The
+/// flag takes a whole number above zero, and anything else fails the run.
+let searchSteps: Int = {
+    guard CommandLine.arguments.contains("--search-steps") else { return Limits.searchSteps }
+    guard let steps = value(after: "--search-steps").flatMap({ Int($0) }), steps > 0 else {
+        fail("--search-steps needs a whole number above zero")
+    }
+    return steps
+}()
 let config: Config
 do { config = try JSONDecoder().decode(Config.self, from: Data(contentsOf: URL(fileURLWithPath: rulesPath))) }
 catch { fail("cannot read rules: \(describe(error))") }

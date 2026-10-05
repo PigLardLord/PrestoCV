@@ -317,7 +317,14 @@ setup; src "$(fan 20)"; expect "search: a budget that is spent leaves the initia
 setup; src "$(unlabeled 24)"; expect "search: twenty-four defaulted unlabeled parameters and a variadic overload are matched in one pass" 1 "init takes 25 parameters"
 setup; src "$(unlabeled 24)"; got=$(run)
 if grep -q "stopped at its budget" "$ROOT/out.txt"; then fail=$((fail+1)); echo "FAIL search: the unlabeled parameters spent the whole budget"; else pass=$((pass+1)); echo "ok   search: the unlabeled parameters stay within the budget"; fi
-setup; src $'struct S {\n    let a: Int, b: Int, c: Int\n    init(a: Int, b: Int, c: Int) { self.a = a; self.b = b; self.c = c }\n}'; expect "search: an initialiser within the parameter cap is not searched, so it spends nothing" 0 "" --search-steps 0
+setup; src $'struct S {\n    let a: Int, b: Int, c: Int\n    init(a: Int, b: Int, c: Int) { self.a = a; self.b = b; self.c = c }\n    init(first a: Int, b: Int, c: Int) { self.init(a: a, b: b, c: c) }\n}'; expect "search: initialisers within the parameter cap are not searched, so they spend nothing" 0 "" --search-steps 1
+# The budget is a whole number above zero: anything else is a mistake of the command line, and fails the run.
+for steps in abc "" -5 0 1.5 1e3 " 7" 0x10 99999999999999999999 --write-baseline; do
+  setup; src 'let x = 1'; expect "search: --search-steps \"$steps\" is refused" 2 "--search-steps needs a whole number above zero" --search-steps "$steps"
+done
+setup; src 'let x = 1'; expect "search: --search-steps without a value is refused" 2 "--search-steps needs a whole number above zero" --search-steps
+setup; src 'let x = 1'; expect "search: --search-steps 1 is a budget" 0 "" --search-steps 1
+setup; src 'let x = 1'; expect "search: --search-steps is not needed" 0 ""
 setup; src "$(fan 20)"; got=$(run --search-steps 1000000)
 if [[ "$got" == 0 ]]; then pass=$((pass+1)); echo "ok   search: the default budget is a million steps"; else fail=$((fail+1)); echo "FAIL search: the default budget"; fi
 # A class initialiser can run its superclass's initialiser without saying so, and syntax cannot tell a superclass from a protocol
