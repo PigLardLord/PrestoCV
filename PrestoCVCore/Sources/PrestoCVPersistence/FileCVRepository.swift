@@ -26,22 +26,8 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     static let writeOptions: Data.WritingOptions = [.atomic, .completeFileProtection]
     private func url(_ id: CVID) -> URL { directory.appendingPathComponent(StoredFileName.of(id)) }
 
-    // MARK: Locking
-
     private func withStoreLock<T>(_ body: () throws(RepositoryError) -> T) throws(RepositoryError) -> T {
-        do { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) }
-        catch { throw .storeUnavailable(.cannotLock) }
-        // Never through a link, and never on anything but a regular file: opening does not block.
-        let fd = open(directory.appendingPathComponent(".lock").path, O_CREAT | O_RDWR | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC, 0o600)
-        guard fd >= 0 else { throw .storeUnavailable(.cannotLock) }
-        defer { close(fd) }
-        var status = stat()
-        guard fstat(fd, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw .storeUnavailable(.cannotLock) }
-        while flock(fd, LOCK_EX) != 0 {
-            guard errno == EINTR else { throw .storeUnavailable(.cannotLock) }
-        }
-        defer { flock(fd, LOCK_UN) }
-        return try body()
+        try StoreLock(directory: directory).withExclusiveAccess(body)
     }
 
     /// Whether anything is at `url`, a link included, without following it. Only ENOENT means nothing is there.
