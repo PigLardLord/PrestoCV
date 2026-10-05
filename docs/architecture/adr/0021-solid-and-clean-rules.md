@@ -47,12 +47,12 @@
 
   The merged ADRs 0001 to 0012 keep their numbers, because a merged ADR does not change; `rules.md` carries this table for their readers.
 - **(c) How the thresholds are measured.**
-  - **What counts:** a line counts when it holds code. Blank lines, comment lines and lines that hold only a brace do not count.
-  - **Function length:** the lines of a function's, initialiser's, accessor's or closure's body. A closure or a nested function is measured on its own, and not counted again in the function that holds it.
+  - **What counts:** a line counts when it holds code. Blank lines, comment lines and lines that hold only a brace do not count. A token that spans lines makes each of them code, so every line of a multi-line string counts, blank ones included. A line that holds `#if`, `#else` or `#endif` counts, and every `#if` branch is counted, active on the checking host or not.
+  - **Function length:** the lines of a function's, initialiser's, accessor's or closure's body. A closure or a nested function is measured on its own, and not counted again in the function that holds it; the line that holds its header or its call still counts in the holder.
   - **Parameters:** the parameters of a function or an initialiser. A **data initialiser** is exempt: one whose statements only assign each parameter to the stored property of the same name and give the other stored properties a literal or a constant, or that only passes its parameters unchanged, beside literals or constants, to such an initialiser. It describes a data structure, not a behaviour (Clean Code's distinction between data structures and objects); its validation goes in the type's own small functions.
-  - **Nesting:** the depth of `if`, `guard`, `switch`, `for`, `while`, `repeat`, `do` and closures inside a function body. A `guard` that only exits counts as no level.
-  - **Cyclomatic complexity:** one, plus one for each `if`, `guard`, `while`, `for`, `repeat`, `catch`, `&&`, `||`, `??` and ternary, and one for each condition after the first in a condition list (`if a, b`, `guard let x, y`), which is an `&&` written with a comma. A `switch` counts **once**, however many cases it has: a switch that maps the cases of a closed enumeration is the shape Clean Code asks for, buried once behind a function. A mapping `switch` that is longer than the function length is split by group of cases, or becomes a data table where the compiler's exhaustiveness check is not needed.
-  - **Types and files:** a type's declaration and each extension are measured separately. The file bounds them together.
+  - **Nesting:** the depth of `if`, `guard`, `switch`, `for`, `while`, `repeat`, `do` and closures inside a function body. A `guard` whose `else` holds one `return`, `throw`, `break` or `continue` and nothing else counts as no level. A `catch` clause sits at the level of its `do`, and `else if` continues the chain of its `if`. A closure is a level of the function that holds it, while a nested function starts again at its own body.
+  - **Cyclomatic complexity:** one, plus one for each `if`, `guard`, `while`, `for`, `repeat`, `catch`, `&&`, `||`, `??` and ternary, and one for each condition after the first in a condition list (`if a, b`, `guard let x, y`), which is an `&&` written with a comma. The decisions inside a closure count in the function that holds it, and a nested function has its own count. The condition of a compile-time `#if` is no decision. A `switch` counts **once**, however many cases it has: a switch that maps the cases of a closed enumeration is the shape Clean Code asks for, buried once behind a function. A mapping `switch` that is longer than the function length is split by group of cases, or becomes a data table where the compiler's exhaustiveness check is not needed.
+  - **Types and files:** a type's declaration and each extension are measured separately, on the lines of their member list, so the line of the declaration itself does not count. A nested type is measured on its own and not counted again in its type. The file bounds them together.
   - **Where:** the thresholds apply to production targets, the ones the checker already holds to the rules: domain, application, integration, presentation, workflow ports, adapters and the composition root. Tests, test support and tools are held to Clean Code by review, with no thresholds. Legacy targets stay exempt until they are deleted ([ADR 0012](0012-legacy-targets-during-migration.md)).
   - **Interface segregation:** a protocol a production target declares has at most five requirements.
 - **(d) What enforces each rule.**
@@ -70,7 +70,7 @@
 - **Costs:**
   - the code on `main` and in every open pull request is restructured before more is merged: parsers, readers, gates and the loop are well over the thresholds today;
   - a strict function length makes more, smaller functions and more names to choose; `CleanNames` is what keeps that readable;
-  - the checker grows seven detectors, and its own code is held to Clean Code by review;
+  - the checker grows eight detectors, and its own code is held to Clean Code by review;
   - the former numbers survive in the merged ADRs, read through the table in `rules.md`.
 - **Validation:**
   - every new detector has a self-test that fails on a planted violation and passes on the fixed version;
