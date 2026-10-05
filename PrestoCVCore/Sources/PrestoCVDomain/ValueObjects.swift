@@ -2,6 +2,7 @@ import Foundation   // value types only (PureCore): UUID and Date as types, neve
 
 // MARK: - Identity
 
+/// The identity of a CV. A type of its own, so that no other identifier can be passed where a CV's is expected.
 public struct CVID: Hashable, Sendable, Codable {
     public let raw: UUID
     public init(_ raw: UUID) { self.raw = raw }
@@ -12,49 +13,64 @@ public struct CVID: Hashable, Sendable, Codable {
 /// Year, or year and month. Only a partial order exists between dates of different precision.
 public struct PartialDate: Hashable, Sendable {
     public let year: Int, month: Int?
+
+    /// Returns `nil` when the year is outside 1900...2200, or the month, if given, is outside 1...12.
     public init?(year: Int, month: Int? = nil) {
         guard (1900...2200).contains(year), month.map({ (1...12).contains($0) }) ?? true else { return nil }
         self.year = year; self.month = month
     }
-    /// "May 2020 – 2020" is ordered: months are compared only when both are known.
+
+    /// Whether this date is not after `other`. Months are compared only when both are known, so "May 2020" is not after "2020".
     public func isNotAfter(_ other: PartialDate) -> Bool {
         if year != other.year { return year < other.year }
-        guard let a = month, let b = other.month else { return true }
-        return a <= b
+        guard let month, let otherMonth = other.month else { return true }
+        return month <= otherMonth
     }
 }
 
 /// `.unknown` means the period has ended but its end date was not given; it is never invented.
 public enum PeriodEnd: Hashable, Sendable { case current, date(PartialDate), unknown }
 
+/// Why loose data is not a valid period.
 public enum PeriodError: Error, Equatable, Sendable {
     case invalidDate, endWithoutStart, currentWithoutStart, currentWithEndDate, endBeforeStart
 }
 
+/// A span of time that starts at a date and ends at a date, is still current, or has ended on an unknown date.
 public struct Period: Hashable, Sendable {
     public let start: PartialDate, end: PeriodEnd
+
+    /// Returns `nil` when the end is a date before the start.
     public init?(start: PartialDate, end: PeriodEnd) {
-        if case .date(let e) = end, !start.isNotAfter(e) { return nil }
+        if case .date(let endDate) = end, !start.isNotAfter(endDate) { return nil }
         self.start = start; self.end = end
     }
 
     /// The single rule for building a period from loose data (persistence, AI drafts): every
     /// combination is either a valid period, no period, or a typed error. Nothing is defaulted (RichDomain).
+    ///
+    /// - Parameters:
+    ///   - start: The year, and month if known, the period began.
+    ///   - end: The year, and month if known, it ended.
+    ///   - current: Whether it is still going on.
+    /// - Returns: The period, or `nil` when there is no start, no end and the period is not current.
+    /// - Throws: `PeriodError` when a date is not valid, an end or `current` has no start, `current` comes with an end, or the
+    ///   end is before the start.
     public static func make(start: (year: Int, month: Int?)?, end: (year: Int, month: Int?)?, current: Bool) throws(PeriodError) -> Period? {
-        func date(_ d: (year: Int, month: Int?)) throws(PeriodError) -> PartialDate {
-            guard let p = PartialDate(year: d.year, month: d.month) else { throw .invalidDate }
-            return p
+        func date(_ parts: (year: Int, month: Int?)) throws(PeriodError) -> PartialDate {
+            guard let date = PartialDate(year: parts.year, month: parts.month) else { throw .invalidDate }
+            return date
         }
         switch (start, end, current) {
         case (nil, nil, false): return nil
         case (nil, nil, true): throw .currentWithoutStart
-        case (nil, .some(let e), _): _ = try date(e); throw .endWithoutStart
+        case (nil, .some(let endParts), _): _ = try date(endParts); throw .endWithoutStart
         case (.some, .some, true): throw .currentWithEndDate
-        case (.some(let s), nil, true): return Period(start: try date(s), end: .current)
-        case (.some(let s), nil, false): return Period(start: try date(s), end: .unknown)
-        case (.some(let s), .some(let e), false):
-            guard let p = Period(start: try date(s), end: .date(try date(e))) else { throw .endBeforeStart }
-            return p
+        case (.some(let startParts), nil, true): return Period(start: try date(startParts), end: .current)
+        case (.some(let startParts), nil, false): return Period(start: try date(startParts), end: .unknown)
+        case (.some(let startParts), .some(let endParts), false):
+            guard let period = Period(start: try date(startParts), end: .date(try date(endParts))) else { throw .endBeforeStart }
+            return period
         }
     }
 }
@@ -64,6 +80,8 @@ public struct Period: Hashable, Sendable {
 /// Bounded value object: invalid levels cannot exist (RichDomain).
 public struct SkillLevel: Hashable, Sendable {
     public let value: Int
+
+    /// Returns `nil` unless `value` is in 1...5.
     public init?(_ value: Int) { guard (1...5).contains(value) else { return nil }; self.value = value }
 }
 
@@ -81,34 +99,38 @@ public enum LanguageProficiency: String, CaseIterable, Hashable, Sendable {
 /// what is printed. No atom or label starts with a mark.
 public struct EmailAddress: Hashable, Sendable {
     public let value: String
-    static let atom = #"[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-][\p{L}\p{M}\p{N}!#$%&'*+/=?^_`{|}~-]*"#
-    static let label = #"[\p{L}\p{N}](?:[\p{L}\p{M}\p{N}-]{0,61}[\p{L}\p{M}\p{N}])?"#
-    static let topLevel = #"(?:\p{L}\p{M}*){2,63}"#   // two to 63 letters, each with its marks
-    static let pattern = "^" + atom + #"(?:\."# + atom + ")*@(?:" + label + #"\.)+"# + topLevel + #"\z"#
+    private static let atom = #"[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-][\p{L}\p{M}\p{N}!#$%&'*+/=?^_`{|}~-]*"#
+    private static let label = #"[\p{L}\p{N}](?:[\p{L}\p{M}\p{N}-]{0,61}[\p{L}\p{M}\p{N}])?"#
+    private static let topLevel = #"(?:\p{L}\p{M}*){2,63}"#   // two to 63 letters, each with its marks
+    private static let pattern = "^" + atom + #"(?:\."# + atom + ")*@(?:" + label + #"\.)+"# + topLevel + #"\z"#
+
+    /// Returns `nil` when the trimmed text is not an address in the form above.
     public init?(_ raw: String) {
-        let v = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let address = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         let hidden: Set<Unicode.GeneralCategory> = [.control, .format, .lineSeparator, .paragraphSeparator, .spaceSeparator,
                                                     .privateUse, .surrogate, .unassigned]
-        guard v.utf8.count <= 254, !v.unicodeScalars.contains(where: { hidden.contains($0.properties.generalCategory) }),
-              v.range(of: Self.pattern, options: .regularExpression) != nil else { return nil }
+        guard address.utf8.count <= 254, !address.unicodeScalars.contains(where: { hidden.contains($0.properties.generalCategory) }),
+              address.range(of: Self.pattern, options: .regularExpression) != nil else { return nil }
         // Length limits the pattern cannot express once marks are allowed: a local part of at most 64 bytes, and
         // domain labels of at most 63 characters, marks included. The exact IDNA length is not checked.
-        let parts = v.split(separator: "@", omittingEmptySubsequences: false)
+        let parts = address.split(separator: "@", omittingEmptySubsequences: false)
         guard parts.count == 2, parts[0].utf8.count <= 64,
               parts[1].split(separator: ".").allSatisfy({ $0.unicodeScalars.count <= 63 }) else { return nil }
-        value = v
+        value = address
     }
 }
 
 /// A phone number as written: digits with the usual separators, and at least three digits.
 public struct PhoneNumber: Hashable, Sendable {
     public let value: String
+
+    /// Returns `nil` when the trimmed text is not 3 to 32 characters of digits and separators with at least three digits.
     public init?(_ raw: String) {
-        let v = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard (3...32).contains(v.count),
-              v.range(of: #"^\+?[0-9 ()./-]+\z"#, options: .regularExpression) != nil,
-              v.filter(\.isASCIIDigit).count >= 3 else { return nil }
-        value = v
+        let number = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard (3...32).contains(number.count),
+              number.range(of: #"^\+?[0-9 ()./-]+\z"#, options: .regularExpression) != nil,
+              number.filter(\.isASCIIDigit).count >= 3 else { return nil }
+        value = number
     }
 }
 
@@ -119,6 +141,7 @@ public struct WebLink: Hashable, Sendable {
     private static let maxBytes = 2048
     private static let defaultPorts = ["https": 443, "http": 80]
 
+    /// Returns `nil` unless the trimmed text is such an address, at most 2048 bytes of printable ASCII once serialised.
     public init?(_ raw: String) {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard Self.isPlainASCII(trimmed), let components = URLComponents(string: trimmed), Self.isWebAddress(components),
@@ -153,6 +176,7 @@ public struct WebLink: Hashable, Sendable {
 public struct DocumentLanguage: Hashable, Sendable {
     public let tag: String
 
+    /// Returns `nil` when the trimmed text is not a language with at most a script and a region.
     public init?(_ raw: String) {
         let subtags = raw.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "-", omittingEmptySubsequences: false)
         guard let tag = Self.canonicalTag(of: subtags) else { return nil }
@@ -189,9 +213,11 @@ public struct DocumentLanguage: Hashable, Sendable {
 /// The catalog resolves them; an identifier it does not know falls back to the design's defaults.
 public struct DesignChoice: Hashable, Sendable {
     public let design: String, palette: String?, fonts: String?
+
+    /// Returns `nil` unless every identifier given is 1 to 64 lower-case letters, digits or hyphens.
     public init?(design: String, palette: String? = nil, fonts: String? = nil) {
-        func valid(_ id: String) -> Bool { id.range(of: #"^[a-z0-9-]{1,64}\z"#, options: .regularExpression) != nil }
-        guard valid(design), palette.map(valid) ?? true, fonts.map(valid) ?? true else { return nil }
+        func isIdentifier(_ id: String) -> Bool { id.range(of: #"^[a-z0-9-]{1,64}\z"#, options: .regularExpression) != nil }
+        guard isIdentifier(design), palette.map(isIdentifier) ?? true, fonts.map(isIdentifier) ?? true else { return nil }
         self.design = design; self.palette = palette; self.fonts = fonts
     }
 }

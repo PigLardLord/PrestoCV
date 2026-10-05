@@ -2,6 +2,7 @@ import Foundation
 
 // MARK: - Personal details
 
+/// The details printed at the top of a CV. Text is kept as given; the email, phone and website are validated value objects.
 public struct PersonalDetails: Hashable, Sendable {
     public var fullName: String
     public var professionalTitle: String
@@ -20,6 +21,7 @@ public struct PersonalDetails: Hashable, Sendable {
 
 // MARK: - Entries
 
+/// A job: a role at a company, over a period if one is known.
 public struct Experience: Hashable, Sendable {
     public var role: String, company: String, location: String, period: Period?, description: String
     public init(role: String, company: String, location: String = "", period: Period? = nil, description: String = "") {
@@ -27,6 +29,7 @@ public struct Experience: Hashable, Sendable {
     }
 }
 
+/// A course of study at a school, over a period if one is known.
 public struct Education: Hashable, Sendable {
     public var degree: String, school: String, period: Period?, description: String
     public init(degree: String, school: String, period: Period? = nil, description: String = "") {
@@ -34,16 +37,19 @@ public struct Education: Hashable, Sendable {
     }
 }
 
+/// A skill, with a level from 1 to 5 if the user rated it.
 public struct Skill: Hashable, Sendable {
     public var name: String, level: SkillLevel?
     public init(name: String, level: SkillLevel? = nil) { self.name = name; self.level = level }
 }
 
+/// How well the user speaks a language, by CEFR level or as a native.
 public struct LanguageSkill: Hashable, Sendable {
     public var language: String, proficiency: LanguageProficiency
     public init(language: String, proficiency: LanguageProficiency) { self.language = language; self.proficiency = proficiency }
 }
 
+/// A certification, with the month or year it was issued and a link to it if there are any.
 public struct Certification: Hashable, Sendable {
     public var name: String, issuer: String, issued: PartialDate?, link: WebLink?, description: String
     public init(name: String, issuer: String, issued: PartialDate? = nil, link: WebLink? = nil, description: String = "") {

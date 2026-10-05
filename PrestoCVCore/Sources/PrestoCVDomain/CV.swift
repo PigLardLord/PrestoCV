@@ -1,7 +1,7 @@
 import Foundation
 
-/// Aggregate root: state changes go through methods (RichDomain). Revision and timestamps belong to the
-/// repository: they can only be set from inside the package (`package` access).
+/// The aggregate a user edits: personal details plus ordered sections of entries (RichDomain). State changes go through
+/// methods. The revision and the timestamps belong to the repository: they can only be set from inside the package.
 public struct CV: Hashable, Sendable {
     public let id: CVID
     /// 0 until a repository stores the CV for the first time.
@@ -32,15 +32,22 @@ public struct CV: Hashable, Sendable {
     /// The one definition of "has enough content to be saved".
     public var canBeSaved: Bool { !personal.fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
+    /// Gives the CV another title in the list. The title is never printed.
     public mutating func rename(_ newTitle: String) { title = newTitle }
+    /// Replaces the personal details.
     public mutating func setPersonalDetails(_ details: PersonalDetails) { personal = details }
     /// Every edit of the entries goes through here; the order is the one the user chose.
     public mutating func setSections(_ newSections: CVSections) { sections = newSections }
+    /// Chooses the design the CV is exported with, or clears the choice.
     public mutating func choose(design: DesignChoice?) { self.design = design }
+    /// Sets the language the CV is written in, or clears it.
     public mutating func setLanguage(_ language: DocumentLanguage?) { self.language = language }
 
-    /// Duplication rule: the copy keeps the content and the design, not the identity or the history.
-    /// The new title is composed by presentation, which knows the language (LocalisationAtEdges).
+    /// A copy under a new identity. It keeps the content and the design, not the identity or the history.
+    ///
+    /// - Parameters:
+    ///   - newID: The identity of the copy.
+    ///   - title: The title of the copy, composed by presentation, which knows the language (LocalisationAtEdges).
     public func duplicated(as newID: CVID, title: String) -> CV {
         CV(id: newID, title: title, personal: personal, sections: sections, design: design, language: language)
     }
