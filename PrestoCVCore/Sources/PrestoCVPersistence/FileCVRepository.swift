@@ -181,7 +181,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     private func restoreFile(_ name: QuarantinedName) throws(RepositoryError) -> CV {
         try quarantine.requireUsable()
         let source = try quarantine.file(name)
-        let target = directory.appendingPathComponent(name.storedName)
+        let target = url(of: name.id)
         guard !FileManager.default.fileExists(atPath: target.path) else { throw .alreadyExists(name.id) }
         let cv = try read(source, named: name.storedName).requireCV(named: name.value)
         do { try FileManager.default.moveItem(at: source, to: target) } catch { throw .writeFailed(file: name.storedName) }

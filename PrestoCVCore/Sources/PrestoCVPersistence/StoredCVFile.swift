@@ -19,31 +19,31 @@ enum StoredCVFile {
             let handle = try openForReading(url)
             return classify(try contents(of: handle, maxBytes: maxBytes))
         } catch {
-            return error.file
+            return error.outcome
         }
     }
 
     /// A file that cannot be read any further, with the outcome to report for it.
-    private struct Unusable: Error { let file: StoredCVFile }
+    private struct Unusable: Error { let outcome: StoredCVFile }
 
     private static func openForReading(_ url: URL) throws(Unusable) -> FileHandle {
         let descriptor = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
-        guard descriptor >= 0 else { throw Unusable(file: errno == ENOENT ? .absent : .unreadable) }
+        guard descriptor >= 0 else { throw Unusable(outcome: errno == ENOENT ? .absent : .unreadable) }
         return FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
     }
 
     private static func contents(of handle: FileHandle, maxBytes: Int) throws(Unusable) -> Data {
         let size = try sizeOfRegularFile(handle.fileDescriptor)
-        guard size <= maxBytes else { throw Unusable(file: .tooLarge(size)) }
+        guard size <= maxBytes else { throw Unusable(outcome: .tooLarge(size)) }
         let data: Data
-        do { data = try handle.read(upToCount: maxBytes + 1) ?? Data() } catch { throw Unusable(file: .unreadable) }
-        guard data.count <= maxBytes else { throw Unusable(file: .tooLarge(data.count)) }
+        do { data = try handle.read(upToCount: maxBytes + 1) ?? Data() } catch { throw Unusable(outcome: .unreadable) }
+        guard data.count <= maxBytes else { throw Unusable(outcome: .tooLarge(data.count)) }
         return data
     }
 
     private static func sizeOfRegularFile(_ descriptor: Int32) throws(Unusable) -> Int {
         let status = StoreFiles.status(ofDescriptor: descriptor)
-        guard status.kind == .regularFile else { throw Unusable(file: .unreadable) }
+        guard status.kind == .regularFile else { throw Unusable(outcome: .unreadable) }
         return status.size
     }
 
