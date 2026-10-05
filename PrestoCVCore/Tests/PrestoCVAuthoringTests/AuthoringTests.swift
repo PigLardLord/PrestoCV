@@ -48,6 +48,9 @@ struct DomainTests {
         #expect(try Period.make(start: nil, end: nil, current: false) == nil)
     }
 
+    @Test("the scheme is matched ignoring case, and keeps the case it was written in", arguments: ["HTTPS://example.org:443/x", "Http://example.org"])
+    func schemeCase(raw: String) { #expect(WebLink(raw)?.value == raw) }
+
     @Test("default ports are accepted", arguments: ["https://example.org:443/x", "http://example.org:80"])
     func defaultPorts(raw: String) { #expect(WebLink(raw) != nil) }
 

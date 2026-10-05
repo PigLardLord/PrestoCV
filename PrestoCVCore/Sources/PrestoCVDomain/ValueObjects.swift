@@ -180,17 +180,34 @@ public struct WebLink: Hashable, Sendable {
     /// The address as the URL parser serialises it.
     public let value: String
     private static let maxBytes = 2048
-    private static let defaultPorts = ["https": 443, "http": 80]
+
+    /// The schemes a link may use. A scheme that is not here is refused.
+    private enum Scheme: String {
+        case http, https
+
+        /// The port the scheme uses unless another is written.
+        var defaultPort: Int {
+            switch self {
+            case .http: return 80
+            case .https: return 443
+            }
+        }
+
+        init?(of components: URLComponents) {
+            guard let name = components.scheme?.lowercased() else { return nil }
+            self.init(rawValue: name)
+        }
+    }
 
     /// Returns `nil` unless the trimmed text is such an address, at most 2048 bytes of printable ASCII once serialised.
     public init?(_ raw: String) {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard Self.isPlainASCII(trimmed), let components = URLComponents(string: trimmed), Self.isWebAddress(components),
+        guard Self.isPlainASCIIWithinSizeLimit(trimmed), let components = URLComponents(string: trimmed), Self.isWebAddress(components),
               let serialized = Self.stableSerialization(of: components) else { return nil }
         value = serialized
     }
 
-    private static func isPlainASCII(_ text: String) -> Bool {
+    private static func isPlainASCIIWithinSizeLimit(_ text: String) -> Bool {
         text.utf8.count <= maxBytes && text.unicodeScalars.allSatisfy(isPlainScalar)
     }
 
@@ -200,19 +217,14 @@ public struct WebLink: Hashable, Sendable {
     }
 
     private static func isWebAddress(_ components: URLComponents) -> Bool {
-        guard let defaultPort = defaultPort(of: components), let host = components.host else { return false }
-        return isHostName(host) && hasNoCredentials(components) && [nil, defaultPort].contains(components.port)
-    }
-
-    /// The port the scheme uses unless another is written; `nil` for a scheme that is neither http nor https.
-    private static func defaultPort(of components: URLComponents) -> Int? {
-        components.scheme.flatMap { defaultPorts[$0.lowercased()] }
+        guard let scheme = Scheme(of: components), let host = components.host else { return false }
+        return isHostName(host) && hasNoCredentials(components) && [nil, scheme.defaultPort].contains(components.port)
     }
 
     /// What the parser makes of the components, when that text is plain and parsing it again gives the same text: the
     /// value rebuilds itself.
     private static func stableSerialization(of components: URLComponents) -> String? {
-        guard let text = components.string, isPlainASCII(text), URLComponents(string: text)?.string == text else { return nil }
+        guard let text = components.string, isPlainASCIIWithinSizeLimit(text), URLComponents(string: text)?.string == text else { return nil }
         return text
     }
 
@@ -238,19 +250,19 @@ public struct DocumentLanguage: Hashable, Sendable {
 
     private static func canonicalTag(of subtags: [Substring]) -> String? {
         var rest = subtags[...]
-        guard let language = take(canonicalLanguage, from: &rest) else { return nil }
-        let script = take(canonicalScript, from: &rest)
-        let region = take(canonicalRegion, from: &rest)
+        guard let language = popSubtag(canonicalisedBy: canonicalLanguage, from: &rest) else { return nil }
+        let script = popSubtag(canonicalisedBy: canonicalScript, from: &rest)
+        let region = popSubtag(canonicalisedBy: canonicalRegion, from: &rest)
         guard rest.isEmpty else { return nil }
-        let present: [String?] = [language, script, region]
-        return present.compactMap { $0 }.joined(separator: "-")
+        let parts: [String?] = [language, script, region]
+        return parts.compactMap { $0 }.joined(separator: "-")
     }
 
-    /// Removes the first subtag and returns its canonical form, if `canonical` accepts it; otherwise leaves it in place.
-    private static func take(_ canonical: (Substring) -> String?, from subtags: inout ArraySlice<Substring>) -> String? {
-        guard let first = subtags.first, let accepted = canonical(first) else { return nil }
+    /// Removes the first subtag and returns its canonical form, if `canonicalise` accepts it; otherwise leaves it in place.
+    private static func popSubtag(canonicalisedBy canonicalise: (Substring) -> String?, from subtags: inout ArraySlice<Substring>) -> String? {
+        guard let first = subtags.first, let canonical = canonicalise(first) else { return nil }
         subtags.removeFirst()
-        return accepted
+        return canonical
     }
 
     /// Two or three letters, in lower case.
