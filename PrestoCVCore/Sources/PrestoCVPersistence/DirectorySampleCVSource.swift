@@ -9,10 +9,15 @@ import PrestoCVApplication
 public struct DirectorySampleCVSource: SampleCVSource {
     let directory: URL, maxFileBytes: Int
 
+    /// - Parameters:
+    ///   - directory: The folder that holds the sample files.
+    ///   - maxFileBytes: The largest sample file that is read. A larger one fails the whole listing.
     public init(directory: URL, maxFileBytes: Int = 5 * 1024 * 1024) {
         self.directory = directory; self.maxFileBytes = maxFileBytes
     }
 
+    /// - Throws: `RepositoryError.storeUnavailable` when the folder cannot be listed; `.unreadable`, `.upgradeRequired`,
+    ///   `.corrupt` or `.tooLarge`, naming the file, when a sample cannot be used.
     public func samples() async throws(RepositoryError) -> [CV] {
         var samples: [CV] = []
         for name in try sampleFileNames() {

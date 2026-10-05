@@ -28,7 +28,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
 
     public func create(_ cv: CV) async throws(RepositoryError) -> CV {
         try lock.withExclusiveAccess { () throws(RepositoryError) -> CV in
-            guard try current(cv.id) == nil else { throw .alreadyExists(cv.id) }
+            guard try storedCV(cv.id) == nil else { throw .alreadyExists(cv.id) }
             let stored = cv.stored(revision: 1, at: now())
             try write(stored)
             return stored
@@ -37,23 +37,23 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
 
     public func update(_ cv: CV) async throws(RepositoryError) -> CV {
         try lock.withExclusiveAccess { () throws(RepositoryError) -> CV in
-            guard let existing = try current(cv.id) else { throw .notFound(cv.id) }
+            guard let existing = try storedCV(cv.id) else { throw .notFound(cv.id) }
             guard existing.revision == cv.revision else { throw .conflict(cv.id, storedRevision: existing.revision) }
             var written = cv.stored(revision: cv.revision + 1, at: now())
             written.createdAt = existing.createdAt
             try write(written)
-            return try current(cv.id) ?? written
+            return try storedCV(cv.id) ?? written
         }
     }
 
     public func load(_ id: CVID) async throws(RepositoryError) -> CV {
-        guard let cv = try current(id) else { throw StoreState(of: directory).failureToLoad(id) }
+        guard let cv = try storedCV(id) else { throw StoreState(of: directory).failureToLoad(id) }
         return cv
     }
 
     public func delete(_ id: CVID, revision: Int) async throws(RepositoryError) {
         try lock.withExclusiveAccess { () throws(RepositoryError) in
-            guard let existing = try current(id) else { throw .notFound(id) }
+            guard let existing = try storedCV(id) else { throw .notFound(id) }
             guard existing.revision == revision else { throw .conflict(id, storedRevision: existing.revision) }
             try StoreFiles.remove(url(of: id))
         }
@@ -65,7 +65,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         switch StoreState(of: directory) {
         case .absent: return CVListing(cvs: [], issues: [])
         case .unavailable(let failure): throw .storeUnavailable(failure)
-        case .present: return try lock.withExclusiveAccess { () throws(RepositoryError) -> CVListing in try listStoredFiles() }
+        case .present: return try lock.withExclusiveAccess { () throws(RepositoryError) -> CVListing in try listQuarantiningCorruptFiles() }
         }
     }
 
@@ -73,7 +73,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
 
     public func restore(quarantined name: String) async throws(RepositoryError) -> CV {
         guard let quarantined = QuarantinedName(name) else { throw .invalidName(name) }
-        return try lock.withExclusiveAccess { () throws(RepositoryError) -> CV in try restore(quarantined) }
+        return try lock.withExclusiveAccess { () throws(RepositoryError) -> CV in try restoreFile(quarantined) }
     }
 
     public func erase(_ id: CVID) async throws(RepositoryError) {
@@ -98,7 +98,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         return file
     }
 
-    private func current(_ id: CVID) throws(RepositoryError) -> CV? {
+    private func storedCV(_ id: CVID) throws(RepositoryError) -> CV? {
         let name = StoredFileName.of(id)
         let file = read(url(of: id), named: name)
         if case .absent = file {
@@ -109,7 +109,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         return try file.requireCV(named: name)
     }
 
-    private func listStoredFiles() throws(RepositoryError) -> CVListing {
+    private func listQuarantiningCorruptFiles() throws(RepositoryError) -> CVListing {
         var cvs: [CV] = [], issues: [StoreIssue] = []
         for url in try storedFileURLs() {
             let file = read(url, named: url.lastPathComponent)
@@ -136,7 +136,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         }
     }
 
-    private func restore(_ name: QuarantinedName) throws(RepositoryError) -> CV {
+    private func restoreFile(_ name: QuarantinedName) throws(RepositoryError) -> CV {
         try quarantine.requireUsable()
         let source = try quarantine.file(name)
         let target = directory.appendingPathComponent(name.storedName)
