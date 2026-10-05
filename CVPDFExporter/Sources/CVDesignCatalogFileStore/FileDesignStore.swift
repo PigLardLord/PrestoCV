@@ -27,14 +27,17 @@ public enum FileDesignStoreError: Error, Equatable, Sendable {
 /// The design store on disk (ADR 0002, ADR 0011). The directory is injected, and the composition root keeps one
 /// instance per process (ADR 0008).
 ///
-/// - Every save of a design writes a new generation of its package file under `Designs/`, then `index.json`, which
-///   lists each design with its current generation. Both writes are atomic. A save that fails before the index is
-///   written leaves the listed version untouched; superseded and unlisted files are removed at the next save.
+/// - Every save of a design writes a new generation of its package file under `Designs/`, then `origins.json`, then
+///   `index.json`, which lists each design with its current generation. Each write is atomic. A save that fails before
+///   the index is written leaves the listed version untouched; superseded and unlisted files are removed at the next save.
 /// - `origins.json`, next to the index, records for each design whether the catalog's sync installed it (`bundled`) or
 ///   an import did (`imported`). It is the store's own record: a package is untrusted, so it cannot say what it is.
-///   A save writes it between the package file and the index, so a save that stops early leaves, at worst, an entry
-///   for a design the index does not list. Such an entry is never reported and the next save drops it. A design that
-///   has no entry (installed before origins were recorded) has no origin: the caller decides what that means.
+///   Because it is written before the index, a save that stops early leaves, at worst, an entry for a design the index
+///   does not list. Such an entry is never reported and the next save drops it. A design that has no entry (installed
+///   before origins were recorded) has no origin: the caller decides what that means.
+/// - A save never replaces a design of the other origin, and the store decides that under its lock: an import leaves an
+///   installed bundled design alone (`ImportSave.keptBundled`), and a conditional save leaves alone one that is not
+///   recorded as bundled (`ConditionalSave.keptImported`).
 /// - A save holds an exclusive `flock` on the store and a read a shared one, so a second instance or another
 ///   process loses no index update.
 /// - Files on disk are untrusted input (R8): every read goes through the validator again and must match the index,
@@ -74,27 +77,42 @@ public actor FileDesignStore: DesignStore {
 
     // MARK: DesignStore
 
-    public func save(_ design: ValidatedDesign) async throws(FileDesignStoreError) {
-        _ = try saveEntry(design, as: .imported, onlyIfNewer: false)
+    @discardableResult public func save(_ design: ValidatedDesign) async throws(FileDesignStoreError) -> ImportSave {
+        switch try saveEntry(design, as: .imported, onlyIfNewer: false) {
+        case .keptOtherOrigin: .keptBundled
+        case .installed, .upgraded, .keptInstalled: .saved
+        }
     }
 
     public func saveIfNewer(_ design: ValidatedDesign) async throws(FileDesignStoreError) -> ConditionalSave {
-        try saveEntry(design, as: .bundled, onlyIfNewer: true)
+        switch try saveEntry(design, as: .bundled, onlyIfNewer: true) {
+        case .installed: .installed
+        case .upgraded: .upgraded
+        case .keptInstalled: .keptInstalled
+        case .keptOtherOrigin: .keptImported
+        }
     }
 
-    /// The one write path, which records the design's `origin`. With `onlyIfNewer`, the installed design is judged inside
-    /// the exclusive lock that the write holds: one that the store did not record as bundled, or one of the same or a
-    /// newer version, leaves the store untouched.
-    private func saveEntry(_ design: ValidatedDesign, as origin: DesignOrigin, onlyIfNewer: Bool) throws(FileDesignStoreError) -> ConditionalSave {
+    private enum Written { case installed, upgraded, keptInstalled, keptOtherOrigin }
+
+    /// The one write path, which records the design's `origin`. The installed design is judged inside the exclusive lock
+    /// that the write holds, and a save never replaces a design of the other origin: an import leaves an installed bundled
+    /// design alone, and a bundled save leaves alone one that the store did not record as bundled (`keptOtherOrigin`).
+    /// With `onlyIfNewer`, an installed design of the same or a newer version is left alone as well.
+    private func saveEntry(_ design: ValidatedDesign, as origin: DesignOrigin, onlyIfNewer: Bool) throws(FileDesignStoreError) -> Written {
         let id = design.manifest.id
         let package = try encodeReadingBack(design)
-        let outcome = try withLock(exclusive: true) { () throws(FileDesignStoreError) -> ConditionalSave in
+        let outcome = try withLock(exclusive: true) { () throws(FileDesignStoreError) -> Written in
             let entries = try readIndex()
             var origins = try readOrigins()
             let installed = entries.first { $0.manifest.id == id }
-            if onlyIfNewer, let installed {
-                guard origins[id] == .bundled else { return .keptImported }
-                if design.manifest.version <= installed.manifest.version { return .keptInstalled }
+            if let installed {
+                if onlyIfNewer {
+                    guard origins[id] == .bundled else { return .keptOtherOrigin }
+                    if design.manifest.version <= installed.manifest.version { return .keptInstalled }
+                } else if origins[id] == .bundled {
+                    return .keptOtherOrigin
+                }
             }
             try removeUnlistedFiles(keeping: entries, for: id)
             let generation = (installed?.generation ?? 0) + 1

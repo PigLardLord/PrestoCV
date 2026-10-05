@@ -183,6 +183,56 @@ struct FileDesignStoreOriginTests {
         }
     }
 
+    @Test("an import over a bundled design is refused under the lock and writes nothing; over an import or an unrecorded design it replaces")
+    func importOverBundled() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            let shipped = try DesignStoreContract.design(id: "shipped")
+            #expect(try await store.saveIfNewer(shipped) == .installed)
+            try await store.save(DesignStoreContract.design(id: "mine"))
+            try await store.save(DesignStoreContract.design(id: "legacy"))
+            try FileManager.default.removeItem(at: dir.origins)   // "shipped", "mine" and "legacy" now have no origin
+            #expect(try await store.adoptAsBundled(shipped.manifest))
+            let index = try Data(contentsOf: dir.index), origins = try Data(contentsOf: dir.origins), files = dir.designFiles
+            for version in ["0.0.1", "1.0.0", "999999999.0.0"] {
+                let outcome = try await store.save(DesignStoreContract.design(id: "shipped", version: version, css: ".cv-skill{font-weight:700}"))
+                #expect(outcome == .keptBundled)
+            }
+            #expect(try Data(contentsOf: dir.index) == index)
+            #expect(try Data(contentsOf: dir.origins) == origins)
+            #expect(dir.designFiles == files)
+            #expect(try await store.design(id: "shipped") == shipped)
+            #expect(try await store.save(DesignStoreContract.design(id: "mine", version: "2.0.0")) == .saved)
+            #expect(try await store.save(DesignStoreContract.design(id: "legacy", version: "2.0.0")) == .saved)
+            #expect(try await store.installedOrigins() == ["shipped": .bundled, "mine": .imported, "legacy": .imported])
+        }
+    }
+
+    @Test("a bundled save and an import of one identifier from two instances: exactly one of them wins, never both")
+    func bundledAndImportRace() async throws {
+        try await inTemporaryStore { dir in
+            let stores = [FileDesignStore(directory: dir), FileDesignStore(directory: dir)]
+            let ids = (0..<40).map { "design-\($0)" }
+            for id in ids {
+                let bundled = try DesignStoreContract.design(id: id), imported = try DesignStoreContract.design(id: id, css: ".cv-skill{font-weight:700}")
+                async let fromSync = stores[0].saveIfNewer(bundled)
+                async let fromImport = stores[1].save(imported)
+                let (syncOutcome, importOutcome) = try await (fromSync, fromImport)
+                switch (syncOutcome, importOutcome) {
+                case (.installed, .keptBundled):
+                    #expect(try await stores[0].design(id: id) == bundled)
+                    #expect(try await stores[0].installedOrigins()[id] == .bundled)
+                case (.keptImported, .saved):
+                    #expect(try await stores[0].design(id: id) == imported)
+                    #expect(try await stores[0].installedOrigins()[id] == .imported)
+                default:
+                    Issue.record("\(id): \(syncOutcome) and \(importOutcome)")
+                }
+            }
+            #expect(try await stores[0].installedOrigins().count == ids.count)
+        }
+    }
+
     @Test("the sync through the file store never replaces an imported design, and still upgrades the bundled ones it installed")
     func syncThroughTheFileStore() async throws {
         try await inTemporaryStore { dir in

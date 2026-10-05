@@ -271,7 +271,7 @@ struct SyncBundledDesignsTests {
     func adoptionRefused() async throws {
         struct Refusing: DesignStore {
             let base = InMemoryDesignStore()
-            func save(_ design: ValidatedDesign) async throws { try await base.save(design) }
+            @discardableResult func save(_ design: ValidatedDesign) async throws -> ImportSave { try await base.save(design) }
             func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave { try await base.saveIfNewer(design) }
             func design(id: String) async throws -> ValidatedDesign? { try await base.design(id: id) }
             func installedDesigns() async throws -> [DesignManifest] { try await base.installedDesigns() }
@@ -454,6 +454,26 @@ struct InstallDesignTests {
         await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await install(DesignStoreContract.package(id: "mine")) }
         #expect(await store.savedIDs.isEmpty)
         #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("a store that keeps its bundled design when the import is saved, because the sync installed it meanwhile, refuses the import")
+    func refusedAtTheSave() async throws {
+        struct SyncedMeanwhile: DesignStore {
+            let base = InMemoryDesignStore()
+            func save(_ design: ValidatedDesign) async throws -> ImportSave {
+                _ = try await base.saveIfNewer(design)   // the sync installs the bundled design while the import renders
+                return try await base.save(design)
+            }
+            func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave { try await base.saveIfNewer(design) }
+            func design(id: String) async throws -> ValidatedDesign? { try await base.design(id: id) }
+            func installedDesigns() async throws -> [DesignManifest] { try await base.installedDesigns() }
+            func installedOrigins() async throws -> [String: DesignOrigin] { try await base.installedOrigins() }
+            func adoptAsBundled(_ manifest: DesignManifest) async throws -> Bool { try await base.adoptAsBundled(manifest) }
+        }
+        let store = SyncedMeanwhile()
+        let install = InstallDesign(source: FixedBundledSource(packages: []), gate: FakeRenderingGate(), store: store)
+        await #expect(throws: DesignCatalogError.bundledIdentifier("late")) { _ = try await install(DesignStoreContract.package(id: "late")) }
+        #expect(try await store.installedOrigins() == ["late": .bundled])
     }
 
     @Test("an import with an identifier of its own is rendered, stored and recorded as imported")

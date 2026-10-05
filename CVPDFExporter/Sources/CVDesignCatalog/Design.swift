@@ -160,6 +160,14 @@ public enum DesignOrigin: String, Sendable, Equatable, CaseIterable, Codable {
     case imported
 }
 
+/// What `DesignStore.save` did.
+public enum ImportSave: Equatable, Sendable {
+    /// The design was saved: no design had the identifier, or the installed one was an import or had no recorded origin.
+    case saved
+    /// The installed design is recorded as bundled: nothing was written, whatever the versions.
+    case keptBundled
+}
+
 /// What `DesignStore.saveIfNewer` did.
 public enum ConditionalSave: Equatable, Sendable {
     /// No design had the identifier: the design was saved.
@@ -176,8 +184,9 @@ public enum ConditionalSave: Equatable, Sendable {
 /// Stores validated designs, and records where each came from. Owned by the catalog (R3); adapters live in
 /// CVDesignCatalogFileStore and test support, and pass `DesignStoreContract`. Saving an identifier again replaces its design.
 public protocol DesignStore: Sendable {
-    /// Saves a design that an import installs, and records its origin as `imported`.
-    func save(_ design: ValidatedDesign) async throws
+    /// Saves a design that an import installs, and records its origin as `imported`. It never replaces a design recorded
+    /// as bundled, whatever the versions: the store checks that under its lock, and says so (`keptBundled`).
+    @discardableResult func save(_ design: ValidatedDesign) async throws -> ImportSave
     /// Saves a design that the sync installs, and records its origin as `bundled`. It saves only if no design has its
     /// identifier or the installed one has an older version, and says which.
     /// The comparison and the write are one step under the store's lock, so a design saved meanwhile by another caller

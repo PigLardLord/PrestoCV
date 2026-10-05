@@ -5,7 +5,7 @@ import CVDesignCatalog
 public struct UnavailableStore: DesignStore {
     public struct Failure: Error {}
     public init() {}
-    public func save(_ design: ValidatedDesign) async throws { throw Failure() }
+    @discardableResult public func save(_ design: ValidatedDesign) async throws -> ImportSave { throw Failure() }
     public func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave { throw Failure() }
     public func design(id: String) async throws -> ValidatedDesign? { throw Failure() }
     public func installedDesigns() async throws -> [DesignManifest] { throw Failure() }
@@ -41,12 +41,14 @@ public actor SpyDesignStore: DesignStore {
         self.savesFailFor = savesFailFor; self.unreadable = unreadable; self.listingFails = listingFails
     }
 
-    public func save(_ design: ValidatedDesign) async throws {
+    @discardableResult public func save(_ design: ValidatedDesign) async throws -> ImportSave {
         let id = design.manifest.id
         if savesFailFor.contains(id) { throw Failure() }
+        if origins[id] == .bundled { return .keptBundled }
         designs[id] = design
         origins[id] = .imported
         savedIDs.append(id)
+        return .saved
     }
     public func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave {
         let id = design.manifest.id

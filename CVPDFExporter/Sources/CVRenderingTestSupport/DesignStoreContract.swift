@@ -6,9 +6,11 @@ public actor InMemoryDesignStore: DesignStore {
     var designs: [String: ValidatedDesign] = [:]
     var origins: [String: DesignOrigin] = [:]
     public init() {}
-    public func save(_ design: ValidatedDesign) async throws {
+    @discardableResult public func save(_ design: ValidatedDesign) async throws -> ImportSave {
+        guard origins[design.manifest.id] != .bundled else { return .keptBundled }
         designs[design.manifest.id] = design
         origins[design.manifest.id] = .imported
+        return .saved
     }
     public func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave {
         let id = design.manifest.id
@@ -49,7 +51,7 @@ public enum DesignStoreContract {
         try check(await store.installedDesigns().isEmpty, "an empty store lists no designs")
         try check(await store.design(id: "clean") == nil, "an empty store has no design")
         try check(await store.installedOrigins().isEmpty, "an empty store has no origins")
-        try await store.save(clean)
+        try check(await store.save(clean) == .saved, "a save of an identifier no design has saves the design")
         try check(await store.design(id: "clean") == clean, "a saved design comes back unchanged, preview included")
         try check(await store.installedOrigins() == ["clean": .imported], "a saved design is recorded as imported")
         try await store.save(bold)
@@ -93,6 +95,14 @@ public enum DesignStoreContract {
         try check(await store.design(id: "unknown") == nil, "adopting a design that is not installed installs nothing")
         try check(await store.installedOrigins() == ["bold": .imported, "clean": .imported, "fresh": .bundled, "mine": .imported],
                   "adopting changes no origin that is recorded")
+
+        // A save is the import's: it never replaces a design recorded as bundled, whatever its version.
+        let shipped = try design(id: "shipped"), shadow = try design(id: "shipped", version: "999999999.0.0", css: ".cv-skill{font-weight:700}")
+        try check(await store.saveIfNewer(shipped) == .installed, "a conditional save installs a bundled design")
+        try check(await store.save(shadow) == .keptBundled, "an import never replaces a bundled design")
+        try check(await store.design(id: "shipped") == shipped, "a kept bundled design is not replaced")
+        try check(await store.installedOrigins()["shipped"] == .bundled, "a kept bundled design stays bundled")
+        try check(await store.save(mine) == .saved, "an import replaces a design an import made")
     }
 
     /// A design as the validator accepts it; `preview` adds a PNG preview, which is stored too.

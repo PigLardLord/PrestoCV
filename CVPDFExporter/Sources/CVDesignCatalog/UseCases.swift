@@ -21,6 +21,8 @@ public enum DesignCatalogError: Error, Equatable, Sendable {
 ///   Storing it under another identifier would change what the CV's design choice names. A bundled identifier is one the
 ///   source's packages claim, whether or not the validator accepts the package and whether or not the sync has installed
 ///   the design, and one the store records as bundled, even if the design has left the bundle.
+/// - The checks before rendering are an early out. The store decides at the save, under its lock, and refuses an import
+///   over a design it records as bundled (`ImportSave.keptBundled`), which is the same error.
 /// - The source is read after the package is validated, so an invalid package is reported as invalid. A source that cannot
 ///   be read stops the import (`DesignCatalogError.bundledDesignsUnavailable`), and so does a store that cannot list its
 ///   origins (`DesignCatalogError.storeUnavailable`), since the identifier cannot be judged.
@@ -35,7 +37,7 @@ public struct InstallDesign: Sendable {
         let id = design.manifest.id
         guard try await !holdsBundledIdentifier(id) else { throw DesignCatalogError.bundledIdentifier(id) }
         try await gate.verify(design)
-        try await store.save(design)
+        guard try await store.save(design) == .saved else { throw DesignCatalogError.bundledIdentifier(id) }
         return design
     }
 
