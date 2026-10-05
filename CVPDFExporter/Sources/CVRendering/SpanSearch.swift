@@ -8,12 +8,12 @@ struct SpanClaims {
 
     func isFree(_ start: Int, length: Int) -> Bool { !taken[start..<start + length].contains(true) }
 
-    mutating func claim(_ start: Int, length: Int) { setTaken(true, start, length) }
+    mutating func claim(_ start: Int, length: Int) {
+        taken.replaceSubrange(start..<start + length, with: repeatElement(true, count: length))
+    }
 
-    mutating func release(_ start: Int, length: Int) { setTaken(false, start, length) }
-
-    private mutating func setTaken(_ value: Bool, _ start: Int, _ length: Int) {
-        for position in start..<start + length { taken[position] = value }
+    mutating func release(_ start: Int, length: Int) {
+        taken.replaceSubrange(start..<start + length, with: repeatElement(false, count: length))
     }
 }
 
