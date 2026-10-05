@@ -28,6 +28,9 @@
    "typeLength",
    "fileLength"
   ],
+  "CleanComments": [
+   "ruleNumberCitation"
+  ],
   "CleanErrors": [
    "swallowedError"
   ],

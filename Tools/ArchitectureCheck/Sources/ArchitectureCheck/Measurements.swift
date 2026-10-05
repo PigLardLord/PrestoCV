@@ -20,20 +20,18 @@ extension Hit {
 
 /// Runs the detectors that measure the size and shape of code, and the one that reads its comments.
 enum Measurements {
-    static let detectors: Set<String> = ["functionLength", "parameterCount", "nestingDepth", "cyclomaticComplexity", "typeLength", "fileLength", "protocolSize"]
+    static let detectors: Set<String> = [
+        "functionLength", "parameterCount", "nestingDepth", "cyclomaticComplexity", "typeLength", "fileLength", "protocolSize",
+        "ruleNumberCitation",
+    ]
 
     static func hits(of tree: SourceFileSyntax, file: String) -> [Hit] {
         let lines = CodeLines(converter: SourceLocationConverter(fileName: file, tree: tree))
-        let length = BodyLengthVisitor(lines: lines)
-        let shape = BodyShapeVisitor(lines: lines)
-        let signatures = SignatureVisitor(lines: lines)
-        let types = TypeLengthVisitor(lines: lines)
+        let length = BodyLengthVisitor(lines: lines), shape = BodyShapeVisitor(lines: lines)
+        let signatures = SignatureVisitor(lines: lines), types = TypeLengthVisitor(lines: lines)
         let protocols = ProtocolSizeVisitor(lines: lines)
-        length.walk(tree)
-        shape.walk(tree)
-        signatures.walk(tree)
-        types.walk(tree)
-        protocols.walk(tree)
-        return length.hits + shape.hits + signatures.hits + types.hits + protocols.hits + FileLength.hits(of: tree, lines: lines)
+        for visitor in [length, shape, signatures, types, protocols] as [SyntaxVisitor] { visitor.walk(tree) }
+        return length.hits + shape.hits + signatures.hits + types.hits + protocols.hits
+            + FileLength.hits(of: tree, lines: lines) + CommentCitations.hits(in: tree, lines: lines)
     }
 }

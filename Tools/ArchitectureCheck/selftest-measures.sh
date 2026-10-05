@@ -156,6 +156,18 @@ flag_only "protocolSize: what a protocol inherits is not counted, what it declar
   "$(printf 'protocol Base {\n%s\n}\nprotocol P: Base {\n    func extra()\n}\n' "$(lines_of 6 '    func f%d()')")" "protocol Base declares 6" "protocol P declares"
 clean "protocolSize: a struct with many methods is not a protocol" "$(printf 'struct S {\n%s\n}\n' "$(lines_of 6 '    func f%d() {}')")"
 
+# --- ruleNumberCitation: a former rule number in a comment. The numbers are built from parts, so that no literal one
+# is left anywhere in the repository outside the merged ADRs.
+R=R
+for form in "// ${R}8" "/// The domain is pure (${R}2)." "/* ${R}10 */" "let x = 1   // ${R}14" "// see ${R}1 and ${R}4" "// ${R}9m" \
+            $'/// First line.\n/// '"${R}3"$' on the second.' "//${R}5"; do
+  flag "ruleNumberCitation: ${form//$'\n'/⏎}" "$form" "CleanComments: ruleNumberCitation"
+done
+flag "ruleNumberCitation: reported on the line of the comment" $'let a = 1\n/* two\n   lines '"${R}6"$' */\nlet b = 2' "P.swift:3: CleanComments: ruleNumberCitation"
+for form in "// ${R}15" "// A${R}8" "// ${R}80" "// ${R}0" "// the rule is DependencyRule" "let s = \"${R}8\"" "let r = \"(${R}2)\"" "// ${R}${R}8" "// ${R}8x"; do
+  clean "ruleNumberCitation: not a citation: $form" "$form"
+done
+
 # --- the policy: these detectors run on production targets only (ADR 0021 (c))
 setup; src 'let x = 1'; printf '%s\n' "$(fn 21)" > "$ROOT/Sources/Other/O.swift"
 expect "a target that does not list the rules is not measured" 0 ""

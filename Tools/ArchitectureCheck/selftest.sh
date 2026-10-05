@@ -20,10 +20,10 @@ P
 {"rules":{"DependencyRule":["exportedImport"],"PureCore":["wallClock","randomIdentity","ambientEnvironment","localization","printing"],
   "DIP":["singleton","infrastructureConstruction"],"CleanErrors":["swallowedError"],
   "StrictConcurrency":["escapeHatch","swift5Mode","unsafeFlags"],"PlatformAdapters":["platformCondition"],
-  "ISP":["protocolSize"],"CleanFunctions":["functionLength","nestingDepth","cyclomaticComplexity","parameterCount"],"CleanTypes":["typeLength","fileLength"],
+  "ISP":["protocolSize"],"CleanFunctions":["functionLength","nestingDepth","cyclomaticComplexity","parameterCount"],"CleanTypes":["typeLength","fileLength"],"CleanComments":["ruleNumberCitation"],
   "LocalisationAtEdges":["localization"],"NoDeadCode":["printing","testDouble"]},
  "infrastructureTypes":["FileStore"],
- "targets":[{"name":"Pure","path":"Sources/Pure","allowedImports":["Foundation"],"rules":["DependencyRule","PureCore","DIP","ISP","CleanFunctions","CleanTypes","CleanErrors","StrictConcurrency","PlatformAdapters","LocalisationAtEdges","NoDeadCode"]},
+ "targets":[{"name":"Pure","path":"Sources/Pure","allowedImports":["Foundation"],"rules":["DependencyRule","PureCore","DIP","ISP","CleanFunctions","CleanTypes","CleanComments","CleanErrors","StrictConcurrency","PlatformAdapters","LocalisationAtEdges","NoDeadCode"]},
             {"name":"Other","path":"Sources/Other","allowedImports":["Foundation"],"rules":[]},
             {"name":"Manifest","path":"Package.swift","kind":"manifest","allowedImports":["PackageDescription"],"rules":["StrictConcurrency"]}]}
 J
