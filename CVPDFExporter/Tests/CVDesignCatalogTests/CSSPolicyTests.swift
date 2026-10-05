@@ -46,6 +46,39 @@ struct CSSPolicyTests {
         #expect(throws: CSSRejection(reason: reason)) { _ = try CSSPolicy.canonical(css) }
     }
 
+    @Test("a rule with two problems is refused for its selector, which is judged before the declarations", arguments: [
+        (".nope{position:absolute}", "class is not in the markup contract"), ("div{color}", "element div is not in the markup contract"),
+        (".cv >{font-size:1pt}", "dangling combinator"), ("*{display:flex}", "the universal selector is not allowed"),
+    ])
+    func selectorBeforeDeclarations(css: String, reason: String) {
+        #expect(throws: CSSRejection(reason: reason)) { _ = try CSSPolicy.canonical(css) }
+    }
+
+    @Test("a rule that is not closed is refused for that before its contents are judged", arguments: [
+        (".nope{position:absolute", "unterminated rule"), (".nope;{position:absolute}", "unexpected token in selector"),
+        (".nope{.cv{position:absolute}}", "nested rules are not allowed"),
+    ])
+    func structureBeforeContents(css: String, reason: String) {
+        #expect(throws: CSSRejection(reason: reason)) { _ = try CSSPolicy.canonical(css) }
+    }
+
+    @Test("a border takes one width, one style and one palette colour; a second style or width is refused", arguments: [
+        (".cv{border:solid dashed}", "length out of bounds or unit not allowed"), (".cv{border:solid solid}", "length out of bounds or unit not allowed"),
+        (".cv{border:1pt 2pt}", "border value not allowed"), (".cv{border:1pt solid 2pt}", "border value not allowed"),
+        (".cv{border:1pt var(--color-background)}", "only [\"--color-primary\", \"--color-text\"] are allowed here"),
+        (".cv{border:solid var(--color-text}", "length out of bounds or unit not allowed"),
+    ])
+    func borderParts(css: String, reason: String) {
+        #expect(throws: CSSRejection(reason: reason)) { _ = try CSSPolicy.canonical(css) }
+    }
+
+    @Test("a border may list its parts in any order, and a flex container's gap may come before or after it")
+    func borderOrder() throws {
+        #expect(try CSSPolicy.canonical(".cv{border:solid var(--color-text) 1pt}") == ".cv{border:1pt solid var(--color-text)}")
+        #expect(try CSSPolicy.canonical(".cv{border-top:var(--color-primary) DASHED 2px}") == ".cv{border-top:2px dashed var(--color-primary)}")
+        #expect(try CSSPolicy.canonical(".cv{gap:3pt;display:flex}") == ".cv{gap:3pt;display:flex}")
+    }
+
     @Test("selectors, combinators and attribute values are written in one canonical form")
     func canonicalSelectors() throws {
         #expect(try CSSPolicy.canonical("  .cv  >  .cv-entry , SECTION~article:First-Child +h1{ color : var(--color-text) ; }")

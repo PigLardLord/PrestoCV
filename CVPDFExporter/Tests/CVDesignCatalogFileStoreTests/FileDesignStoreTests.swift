@@ -119,6 +119,13 @@ struct FileDesignStoreTests {
                        .indexCorrupt("entries")),
                       (#"{"schemaVersion":1,"designs":[{"generation":0,"manifest":{"id":"x","name":"","version":"1","description":"","markupContract":1}}]}"#,
                        .indexCorrupt("entries")),
+                      (#"{"schemaVersion":1,"designs":[{"generation":1,"manifest":{"id":"b","name":"","version":"1","description":"","markupContract":1}},{"generation":1,"manifest":{"id":"a","name":"","version":"1","description":"","markupContract":1}}]}"#,
+                       .indexCorrupt("entries")),
+                      (#"{"schemaVersion":1,"designs":[{"generation":1,"manifest":{"id":"a","name":"","version":"1","description":"","markupContract":1}},{"generation":2,"manifest":{"id":"a","name":"","version":"1","description":"","markupContract":1}}]}"#,
+                       .indexCorrupt("entries")),
+                      (#"{"schemaVersion":1,"designs":[{"generation":2147483648,"manifest":{"id":"x","name":"","version":"1","description":"","markupContract":1}}]}"#,
+                       .indexCorrupt("entries")),
+                      (#"{"schemaVersion":0,"designs":[]}"#, .indexCorrupt("schema version 0")),
                       (#"{"schemaVersion":1}"#, .indexCorrupt("not an index"))] as [(String, FileDesignStoreError)])
     func badIndex(contents: String, error: FileDesignStoreError) async throws {
         try await inTemporaryStore { dir in

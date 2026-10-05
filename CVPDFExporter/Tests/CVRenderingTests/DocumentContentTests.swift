@@ -95,12 +95,14 @@ struct DocumentContentTests {
         #expect(Self.reason(of: Self.experience(DocumentPeriod(start: DocumentDate(year: 2000), end: .date(date)))) == "date")
     }
 
-    @Test("a rating outside 1 to 5 and a certification year outside 1900 to 2200 are refused")
-    func ratingsAndYears() {
-        #expect(Self.reason(of: Self.document(.skills([SkillItem(name: "n", rating: 0)]))) == "rating")
-        #expect(Self.reason(of: Self.document(.skills([SkillItem(name: "n", rating: 6)]))) == "rating")
-        #expect(Self.reason(of: Self.document(.skills([SkillItem(name: "n", rating: 5)]))) == nil)
-        #expect(Self.reason(of: Self.document(.certifications([CertificationItem(name: "n", issuer: "i", year: 2201)]))) == "date")
-        #expect(Self.reason(of: Self.document(.certifications([CertificationItem(name: "n", issuer: "i", year: 2021)]))) == nil)
+    @Test("a rating outside 1 to 5 is refused", arguments: [(0, false), (1, true), (5, true), (6, false), (-1, false)])
+    func ratings(rating: Int, valid: Bool) {
+        #expect(Self.reason(of: Self.document(.skills([SkillItem(name: "n", rating: rating)]))) == (valid ? nil : "rating"))
+    }
+
+    @Test("a certification year outside 1900 to 2200 is refused", arguments: [(1899, false), (1900, true), (2200, true), (2201, false)])
+    func certificationYears(year: Int, valid: Bool) {
+        let reason = Self.reason(of: Self.document(.certifications([CertificationItem(name: "n", issuer: "i", year: year)])))
+        #expect(reason == (valid ? nil : "date"))
     }
 }
