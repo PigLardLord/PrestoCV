@@ -46,7 +46,8 @@ struct SpanSearch {
 
     private mutating func place(_ index: Int) -> Bool {
         guard index < texts.count else { return true }
-        guard consumeStep() else { return false }
+        spendStep()
+        guard !exhausted else { return false }
         return placeOnSomeSpan(index)
     }
 
@@ -58,10 +59,9 @@ struct SpanSearch {
         return false
     }
 
-    private mutating func consumeStep() -> Bool {
+    private mutating func spendStep() {
         steps += 1
         exhausted = steps > stepBudget
-        return !exhausted
     }
 
     /// Claims the span and places the later texts; the claim is released unless they all fit.
