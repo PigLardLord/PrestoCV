@@ -122,6 +122,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 **`CVRendering`**
 - **`DocumentHTMLBuilder`:**
+  - takes the document, its headings and a `DocumentStyle`: the validated stylesheet with the palette and font scheme chosen for it;
   - produces the markup contract, with closed `Tag` and `Attr` enums and per-scalar escaping;
   - validates the language tag;
   - keeps only `WebLink`s, and prints each link's destination as its text;

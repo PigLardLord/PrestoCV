@@ -1,3 +1,5 @@
+import Foundation
+
 /// Typed HTML (ADR 0011): tag and attribute names are closed enums, text and attribute values are
 /// always escaped, raw HTML is not representable.
 enum Tag: String { case html, head, meta, title, body, main, header, section, article, h1, h2, h3, p, span, a }
@@ -53,6 +55,37 @@ indirect enum HTML: Sendable {
     }
 }
 
-func el(_ tag: Tag, _ cls: String? = nil, _ attrs: [(Attr, String)] = [], _ children: [HTML] = []) -> HTML {
-    .element(tag, attributes: (cls.map { [(.class, $0)] } ?? []) + attrs, children: children)
+// MARK: - Elements of the markup contract
+
+extension HTML {
+    /// An element whose only attribute is its class.
+    static func element(_ tag: Tag, class cls: String, children: [HTML]) -> HTML {
+        .element(tag, attributes: [(.class, cls)], children: children)
+    }
+
+    /// An element with a class that holds one text node.
+    static func element(_ tag: Tag, class cls: String, text: String) -> HTML {
+        .element(tag, class: cls, children: [.text(text)])
+    }
+
+    /// A paragraph holding `text`, or nothing when there is no text to print.
+    static func optionalParagraph(class cls: String, text: String?) -> [HTML] {
+        guard let text, !text.isEmpty else { return [] }
+        return [.element(.p, class: cls, text: text)]
+    }
+
+    /// An anchor to `link`, which prints its destination as its text.
+    static func anchor(class cls: String, to link: WebLink) -> HTML {
+        anchor(class: cls, to: link, children: [.text(link.url)])
+    }
+
+    static func anchor(class cls: String, to link: WebLink, children: [HTML]) -> HTML {
+        .element(.a, attributes: [(.class, cls), (.href, link.url)], children: children)
+    }
+
+    /// An anchor to the link in `raw`, or nothing when `raw` is absent or is not a safe link.
+    static func optionalAnchor(class cls: String, to raw: String?) -> [HTML] {
+        guard let raw, let link = WebLink(raw) else { return [] }
+        return [.anchor(class: cls, to: link)]
+    }
 }

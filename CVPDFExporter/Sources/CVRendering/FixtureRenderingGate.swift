@@ -13,7 +13,7 @@ public struct FixtureRenderingGate: DesignRenderingGate {
     }
 
     public func verify(_ design: ValidatedDesign) async throws {
-        let doc = DocumentHTMLBuilder().render(fixture, stylesheet: design.stylesheet, palette: palette, headings: headings)
+        let doc = DocumentHTMLBuilder().render(fixture, style: DocumentStyle(stylesheet: design.stylesheet, palette: palette), headings: headings)
         let pdf = try await renderer.render(html: doc.html, page: .a4)
         guard !pdf.truncated else { throw Rejection.truncated }
         guard let text = inspector.text(of: pdf.data) else { throw Rejection.unreadablePDF }

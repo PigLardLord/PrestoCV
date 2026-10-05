@@ -35,6 +35,6 @@ public enum ContractFixture {
     /// The fixture as the builder renders it: the HTML and the text nodes the PDF must contain.
     public static func rendered(css: String? = nil) throws -> RenderedDocument {
         let sheet = try css.map { try stylesheet($0) } ?? stylesheet()
-        return DocumentHTMLBuilder().render(document, stylesheet: sheet, palette: palette, headings: try HeadingsCatalog.headings(for: "it"))
+        return DocumentHTMLBuilder().render(document, style: DocumentStyle(stylesheet: sheet, palette: palette), headings: try HeadingsCatalog.headings(for: "it"))
     }
 }
