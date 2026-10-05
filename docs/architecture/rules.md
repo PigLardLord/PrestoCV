@@ -162,7 +162,7 @@ Domain, application, integration, presentation and workflow-port targets must no
 In production targets:
 
 - **At most 20 lines** of code in a function's, initialiser's, accessor's or closure's body. Blank lines, comment lines and lines holding only a brace do not count; a closure or a nested function is measured on its own.
-- **At most 3 parameters.** A **data initialiser** is exempt: one that only assigns each parameter to the stored property of the same name, or passes it unchanged to such an initialiser. Behaviour that needs more inputs takes a value that groups them.
+- **At most 3 parameters.** A **data initialiser** is exempt: one whose statements only assign each parameter to the stored property of the same name and give the other stored properties a literal or a constant, or that only passes its parameters unchanged, beside literals or constants, to such an initialiser. Behaviour that needs more inputs takes a value that groups them.
 - **Nesting of at most 2 levels** of `if`, `guard`, `switch`, `for`, `while`, `repeat`, `do` and closures. A `guard` that only exits is no level.
 - **Cyclomatic complexity of at most 5:** one, plus one for each `if`, `guard`, `while`, `for`, `repeat`, `catch`, `&&`, `||`, `??` and ternary. A `switch` counts once, whatever its cases.
 - **One thing, at one level of abstraction.** A function reads like a paragraph of calls to well-named smaller ones.
