@@ -340,9 +340,28 @@ typed "classes: an actor stores" clean "actor Keeper {${NL}    let a: Int, b: In
 typed "classes: a convenience initialiser of a class with an inheritance clause is no data initialiser either" flag "protocol Named { }${NL}final class Child: Named {${NL}$FIELDS${NL}    $STORING${NL}    convenience init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}}" "" "P.swift:5: CleanFunctions: parameterCount: init takes 4"
 typed "classes: an initialiser in an extension of a class with an inheritance clause is no data initialiser" flag "protocol Named { }${NL}final class Child: Named {${NL}$FIELDS${NL}    $STORING${NL}}${NL}extension Child {${NL}    convenience init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}}"
 typed "classes: a nested class with an inheritance clause is held to it" flag "protocol Named { }${NL}struct Outer {${NL}    final class Inner: Named {${NL}    $FIELDS${NL}        $INIT4${NL}    }${NL}}"
-# The initial values of the properties are part of it too: a property that the initialiser does not assign starts with its initial
-# value in every initialiser, so that value has to be a literal or a constant, as a default is. One it assigns is replaced, and a
-# lazy one is not run in the initialiser at all, only when first used, as a static one is.
+# The initial values of the properties are part of it too: Swift runs the initial value of every stored property at the start of
+# every designated initialiser, before the body, and the body's assignment replaces the value, not the run. So each initial value
+# has to be a literal or a constant, as a default is, whether the initialiser assigns the property or not. A lazy one is not run
+# in the initialiser at all, only when first used, as a static one is. The first case compiles and runs a program that counts the
+# runs, so that the assumptions are checked where they are made.
+runs_of() {   # $1 = name, $2 = what the program prints, $3 = its source (a main.swift that counts runs of sideEffect)
+  command -v swiftc > /dev/null && [[ "${SELFTEST_TYPECHECK:-1}" != 0 ]] || return 0
+  local dir out; dir="$(mktemp -d)"; ROOTS+=("$dir"); printf '%s\n' "$3" > "$dir/main.swift"
+  if ! swiftc -swift-version 5 -o "$dir/program" "$dir/main.swift" > "$dir/build.txt" 2>&1; then
+    fail=$((fail+1)); echo "FAIL the program of '$1' does not compile"; sed 's/^/     /' "$dir/build.txt"; return
+  fi
+  out="$("$dir/program")"
+  if [[ "$out" == "$2" ]]; then pass=$((pass+1)); echo "ok   runs: $1"; else fail=$((fail+1)); echo "FAIL runs: $1 (printed '$out', wanted '$2')"; fi
+}
+runs_of "a stored property's initial value runs in an initialiser that assigns it, in a struct and in a class; a lazy one and a static one do not run in it" "1 1 0 0" "var runs = 0
+func sideEffect() -> Int { runs += 1; return 1 }
+struct Assigned { var d = sideEffect(); init(d: Int) { self.d = d } }
+final class AssignedClass { var d = sideEffect(); init(d: Int) { self.d = d } }
+struct LazyOne { lazy var l = sideEffect(); var d: Int; init(d: Int) { self.d = d } }
+struct StaticOne { static let s = sideEffect(); var d: Int; init(d: Int) { self.d = d } }
+func count(_ make: () -> Void) -> Int { runs = 0; make(); return runs }
+print(count { _ = Assigned(d: 5) }, count { _ = AssignedClass(d: 5) }, count { _ = LazyOne(d: 5) }, count { _ = StaticOne(d: 5) })"
 SIDE='func sideEffect() -> Int { 1 }'
 typed "initial values: a clock and an identifier that the type starts with run in every initialiser" flag "import Foundation${NL}struct PropDefault {${NL}$FIELDS${NL}    var stamp = Date()${NL}    var id = UUID()${NL}    $INIT4${NL}}" "" "P.swift:6: CleanFunctions: parameterCount: init takes 4"
 typed "initial values: a call in a struct" flag "$SIDE${NL}struct PropCall {${NL}$FIELDS${NL}    var hidden = sideEffect()${NL}    $INIT4${NL}}" "" "P.swift:5: CleanFunctions: parameterCount: init takes 4"
@@ -353,8 +372,9 @@ typed "initial values: a static property starts when first used, not in the init
 typed "initial values: literals and constants start a property without running code" clean "let limit = 9${NL}enum Kind { case none, some }${NL}struct S {${NL}$FIELDS${NL}    var e = 0, f = \"\", g: [Int] = [], h: Int? = nil${NL}    var i = Kind.none, j = limit, k: [String: Int] = [:], l = -1.5${NL}    $INIT4${NL}}"
 typed "initial values: a property without one is nothing to run" clean "struct S {${NL}$FIELDS${NL}    var e: Int?${NL}    $INIT4${NL}}"
 typed "initial values: a computed property is nothing to run" clean "struct S {${NL}$FIELDS${NL}    var sum: Int { a + b + c + d }${NL}    $INIT4${NL}}"
-typed "initial values: a property that the initialiser assigns is replaced, so its initial value does not count" clean "$SIDE${NL}struct S {${NL}    let a: Int, b: Int, c: Int${NL}    var d = sideEffect()${NL}    $INIT4${NL}}"
-typed "initial values: a property that another initialiser assigns counts in the one that does not" flag "$SIDE${NL}struct S {${NL}    let a: Int, b: Int, c: Int, e: Int${NL}    var d = sideEffect()${NL}    $INIT4${NL}    init(first a: Int, b: Int, c: Int, e: Int) { self.a = a; self.b = b; self.c = c; self.e = e }${NL}}" "" "P.swift:6: CleanFunctions: parameterCount: init takes 4"
+typed "initial values: a property that the initialiser assigns still starts with its initial value, which runs before the assignment" flag "$SIDE${NL}struct S {${NL}    let a: Int, b: Int, c: Int${NL}    var d = sideEffect()${NL}    $INIT4${NL}}"
+typed "initial values: a property that one initialiser assigns and another leaves alone counts in both" flag "$SIDE${NL}struct S {${NL}    let a: Int, b: Int, c: Int, e: Int${NL}    var d = sideEffect()${NL}    $INIT4${NL}    init(first a: Int, b: Int, c: Int, e: Int) { self.a = a; self.b = b; self.c = c; self.e = e }${NL}}" "" "P.swift:6: CleanFunctions: parameterCount: init takes 4"
+typed "initial values: a property that one initialiser assigns and another leaves alone counts in the one that assigns it" flag "$SIDE${NL}struct S {${NL}    let a: Int, b: Int, c: Int, e: Int${NL}    var d = sideEffect()${NL}    $INIT4${NL}    init(first a: Int, b: Int, c: Int, e: Int) { self.a = a; self.b = b; self.c = c; self.e = e }${NL}}" "" "P.swift:5: CleanFunctions: parameterCount: init takes 4"
 typed "initial values: a delegation to an initialiser of a type whose property runs code is no data initialiser" flag "$SIDE${NL}struct S {${NL}$FIELDS${NL}    var hidden = sideEffect()${NL}    $STORING${NL}    init(a: Int, b: Int, c: Int, d: Int) { self.init(first: a, b: b, c: c, d: d) }${NL}}" "" "P.swift:6: CleanFunctions: parameterCount: init takes 4"
 typed "initial values: a tuple pattern that runs code" flag "$SIDE${NL}struct S {${NL}$FIELDS${NL}    var (x, y) = (sideEffect(), 1)${NL}    $INIT4${NL}}" "" "P.swift:5: CleanFunctions: parameterCount: init takes 4"
 typed "initial values: a tuple is no literal or constant, even of constants" flag "struct S {${NL}$FIELDS${NL}    var (x, y) = (0, 1)${NL}    $INIT4${NL}}" "" "P.swift:4: CleanFunctions: parameterCount: init takes 4"

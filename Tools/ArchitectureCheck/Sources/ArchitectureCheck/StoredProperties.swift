@@ -1,6 +1,6 @@
 import SwiftSyntax
 
-/// A property a type declares, and what an initialiser that does not assign it runs for it.
+/// A property a type declares, and what every initialiser runs for it.
 struct Property {
     let name: String
     private let isComputed: Bool
@@ -21,8 +21,9 @@ struct Property {
     /// other attribute.
     var isStored: Bool { !isComputed && !hasAttribute }
 
-    /// Whether an initialiser that leaves it alone runs nothing for it: a computed property has nothing to start, and a
-    /// stored one starts with its initial value, which has to be a literal or a constant, and a wrapper runs code to start.
+    /// Whether an initialiser runs nothing for it, whether it assigns it or not: a computed property has nothing to start, and a
+    /// stored one starts with its initial value, before the body of the initialiser, which has to be a literal or a constant, and
+    /// a wrapper runs code to start.
     func runsNothing(under values: ConstantValue) -> Bool {
         isComputed || (!hasAttribute && initialValue.map { values.accepts($0) } ?? true)
     }

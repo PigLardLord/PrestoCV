@@ -5,8 +5,9 @@ import SwiftSyntax
 /// - **assignments**: each statement is `self.x = x`, naming the property after its parameter, each parameter once,
 ///   or gives another property a literal or a constant (`self.revision = 0`). A property is assigned once, and each is
 ///   a stored instance property that the file declares for the type or one of its extensions: a computed property
-///   runs code, a `static` one is no instance's, and one that cannot be found is not known to be stored. A property that
-///   it leaves alone starts with its initial value, which has to be a literal or a constant, unless it is lazy;
+///   runs code, a `static` one is no instance's, and one that cannot be found is not known to be stored. Every stored
+///   property of the type, assigned or not, starts with its initial value in every initialiser, so that value has to be a
+///   literal or a constant, unless the property is lazy;
 /// - **delegation**: the only statement is `self.init(...)`, and each argument is a parameter passed unchanged, each
 ///   parameter once, or a literal or a constant. The call must reach initialisers of the same type that the file
 ///   declares, found by its argument labels, and each must be a data initialiser in its turn; an initialiser with a
@@ -66,13 +67,13 @@ final class DataInitializer {
         return stored.count + given.count == assignments.count && stored.map(\.target).sorted() == subject.names.sorted()
     }
 
-    /// The type stores each assigned property, and each property that the initialiser leaves alone runs nothing of its own,
-    /// because its initial value is a literal or a constant.
+    /// The type stores each assigned property, and no property of it runs anything of its own: Swift runs the initial value of
+    /// every stored property at the start of every designated initialiser, before the body, so an initial value counts whether
+    /// the body then assigns the property or not.
     private func suits(_ assignments: [Assignment], in node: InitializerDeclSyntax) -> Bool {
         guard let properties = types.properties(ofTypeHolding: node) else { return false }
-        let assigned = Set(assignments.map(\.target))
-        return assigned.isSubset(of: properties.storedNames)
-            && properties.allSatisfy { assigned.contains($0.name) || $0.runsNothing(under: plainValues) }
+        return Set(assignments.map(\.target)).isSubset(of: properties.storedNames)
+            && properties.allSatisfy { $0.runsNothing(under: plainValues) }
     }
 
     private func delegates(_ subject: Subject) -> Bool {
