@@ -164,7 +164,7 @@ In production targets:
 - **At most 3 parameters.** Behaviour that needs more inputs takes a value that groups them. A **data initialiser** is exempt, and [ADR 0021](adr/0021-solid-and-clean-rules.md) (c) says exactly when an initialiser is one. In short, it:
   - only stores each parameter in the stored property of the same name, or only delegates its parameters unchanged to data initialisers of the same type in the same file;
   - has no variadic parameter, and its default values are literals or constants;
-  - leaves no stored property, assigned or not, starting with anything but a literal or a constant (a `lazy` one excepted);
+  - starts no instance property, assigned or not, with an attribute or with anything but a literal or a constant (a `lazy` one is excepted, and a computed one has nothing to start);
   - does not belong to a class with an inheritance clause.
 
   A property with an attribute, or with accessors other than `willSet` and `didSet`, is not stored. Resolution stops at the file: an overload that another file declares is not seen, and review is the backstop for that.
