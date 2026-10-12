@@ -47,7 +47,7 @@ struct TemplateLocalizerTests {
         // Then
         #expect(!result.contains("{{i18n_work_experience}}"))
         #expect(!result.contains("{{i18n_education}}"))
-        #expect(result.contains("Work Experience") || result.contains("work"))
+        #expect(result.contains("Work experience"))
         #expect(result.contains("Education") || result.contains("education"))
     }
 
@@ -350,5 +350,63 @@ struct TemplateLocalizerTests {
         // Then
         #expect(!result.contains("{{i18n_work_experience}}"))
         #expect(result.contains("{{name}}"))
+    }
+
+    // MARK: - Built-in Languages
+
+    private static let allPlaceholders = [
+        "{{i18n_work_experience}}", "{{i18n_education}}", "{{i18n_skills}}", "{{i18n_languages}}",
+        "{{i18n_certifications}}", "{{i18n_social_links}}", "{{i18n_interests}}", "{{i18n_summary}}",
+        "{{i18n_present}}", "{{i18n_native}}", "{{i18n_at}}",
+    ]
+
+    private static let expectedHeadings: [(language: String, headings: [String])] = [
+        ("en", ["Work experience", "Education", "Skills", "Languages", "Certifications", "Profiles", "Interests", "Profile", "Present", "Native", "at"]),
+        ("it", ["Esperienza professionale", "Formazione", "Competenze", "Lingue", "Certificazioni", "Profili", "Interessi", "Profilo professionale", "Oggi", "Madrelingua", "presso"]),
+        ("de", ["Berufserfahrung", "Ausbildung", "Kenntnisse", "Sprachen", "Zertifikate", "Profile", "Interessen", "Kurzprofil", "Heute", "Muttersprache", "bei"]),
+        ("es", ["Experiencia laboral", "Formación", "Competencias", "Idiomas", "Certificaciones", "Perfiles", "Intereses", "Perfil profesional", "Actualidad", "Lengua materna", "en"]),
+        ("fr", ["Expérience professionnelle", "Formation", "Compétences", "Langues", "Certifications", "Profils", "Centres d’intérêt", "Profil professionnel", "Aujourd’hui", "Langue maternelle", "chez"]),
+        ("pt", ["Experiência profissional", "Formação", "Competências", "Idiomas", "Certificações", "Perfis", "Interesses", "Perfil profissional", "Presente", "Língua materna", "em"]),
+    ]
+
+    @Test("Each built-in language has its own headings for every placeholder", arguments: expectedHeadings.map(\.language))
+    func builtInLanguageHeadings(language: String) throws {
+        // Given
+        let expected = try #require(Self.expectedHeadings.first { $0.language == language }).headings
+        let template = Self.allPlaceholders.joined(separator: "|")
+
+        // When
+        let result = TemplateLocalizer(locale: Locale(identifier: language)).localize(template: template)
+
+        // Then
+        #expect(result == expected.joined(separator: "|"))
+    }
+
+    @Test("A regional variant uses the headings of its language")
+    func regionalVariantUsesItsLanguage() {
+        let template = "{{i18n_education}}"
+
+        #expect(TemplateLocalizer(locale: Locale(identifier: "pt-BR")).localize(template: template) == "Formação")
+        #expect(TemplateLocalizer(locale: Locale(identifier: "de_CH")).localize(template: template) == "Ausbildung")
+    }
+
+    @Test("A language without headings falls back to English")
+    func unsupportedLanguageFallsBackToEnglish() {
+        let result = TemplateLocalizer(locale: Locale(identifier: "ja")).localize(template: "{{i18n_education}}")
+
+        #expect(result == "Education")
+    }
+
+    @Test("The default locale gives English, whatever the language of the device")
+    func defaultLocaleIsEnglish() {
+        #expect(TemplateLocalizer().localize(template: "{{i18n_education}}") == "Education")
+    }
+
+    @Test("The level of a native speaker is named in each language", arguments: [
+        ("en", "Native"), ("it", "Madrelingua"), ("de", "Muttersprache"),
+        ("es", "Lengua materna"), ("fr", "Langue maternelle"), ("pt", "Língua materna"),
+    ])
+    func nativeLevelName(language: String, expected: String) {
+        #expect(TemplateLocalizer(locale: Locale(identifier: language)).nativeLevelName == expected)
     }
 }

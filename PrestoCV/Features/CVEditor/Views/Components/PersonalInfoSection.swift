@@ -3,6 +3,7 @@ import PrestoCVCore
 
 struct PersonalInfoSection: View {
     @Binding var cv: CVModel
+    @Binding var documentLanguage: DocumentLanguage?
     
     var body: some View {
         Form {
@@ -11,6 +12,13 @@ struct PersonalInfoSection: View {
                 TextField("field.cv_name", text: $cv.name)
                     .font(DesignTokens.Typography.headline.font)
                     .fontWeight(DesignTokens.Typography.headline.fontWeight)
+
+                Picker("field.document_language", selection: $documentLanguage) {
+                    Text("language.automatic").tag(DocumentLanguage?.none)
+                    ForEach(DocumentLanguage.allCases) { language in
+                        Text(language.nativeName).tag(Optional(language))
+                    }
+                }
             } header: {
                 SectionHeader(title: "section.cv_details".localized)
             }
@@ -97,5 +105,5 @@ struct SectionHeader: View {
 }
 
 #Preview {
-    PersonalInfoSection(cv: .constant(CVModel()))
+    PersonalInfoSection(cv: .constant(CVModel()), documentLanguage: .constant(nil))
 }

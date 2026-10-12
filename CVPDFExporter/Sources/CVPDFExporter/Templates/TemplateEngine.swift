@@ -7,6 +7,18 @@ public protocol TemplateEngine: Sendable {
     func render(template: Template, data: CVDocument, customization: CustomizationOptions) async throws -> String
 }
 
+// MARK: - Style Value
+
+/// A colour or font from the app's own palettes and font schemes. It goes into CSS as written: escaping it as
+/// HTML would turn the quotes of a font name into entities, which CSS does not decode.
+private struct StyleValue {
+    let css: String
+
+    init(_ css: String) {
+        self.css = css
+    }
+}
+
 // MARK: - Mustache Template Engine
 
 /// Template engine implementation using Mustache-style templates
@@ -15,7 +27,8 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
     public init() {}
 
     public func render(template: Template, data: CVDocument, customization: CustomizationOptions = CustomizationOptions()) async throws -> String {
-        var html = template.htmlContent
+        // Headings first, from the template alone: text from the CV is never read as a placeholder
+        var html = TemplateLocalizer(locale: Locale(identifier: data.metadata.language)).localize(template: template.htmlContent)
 
         // Prepare context from CV data and customization
         let context = prepareContext(from: data, customization: customization)
@@ -30,6 +43,8 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
 
     private func prepareContext(from document: CVDocument, customization: CustomizationOptions) -> [String: Any] {
         var context: [String: Any] = [:]
+
+        context["lang"] = document.metadata.language
 
         // Personal info
         context["name"] = document.personalInfo.name
@@ -59,6 +74,7 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                         "description": item.description ?? "",
                         "startDate": item.startDate ?? "",
                         "endDate": item.endDate ?? "",
+                        "period": periodText(for: item),
                         "location": item.location ?? ""
                     ])
                 }
@@ -80,7 +96,8 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                         "school": item.subtitle ?? "",
                         "description": item.description ?? "",
                         "startDate": item.startDate ?? "",
-                        "endDate": item.endDate ?? ""
+                        "endDate": item.endDate ?? "",
+                        "period": periodText(for: item)
                     ])
                 }
             }
@@ -108,11 +125,12 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                         skillDict["tags"] = item.tags
                     }
 
-                    // Check if metadata contains skill level
-                    if let levelStr = item.metadata["level"], let level = Int(levelStr) {
-                        skillDict["level"] = level
+                    // A level of 0 means the skill is not rated: no level, no dots
+                    if let levelStr = item.metadata["level"], let level = Int(levelStr), level > 0 {
+                        let ratedLevel = min(level, Self.maxSkillLevel)
+                        skillDict["level"] = ratedLevel
                         skillDict["hasLevel"] = true
-                        skillDict["levelDots"] = createLevelDots(level: level)
+                        skillDict["levelDots"] = createLevelDots(level: ratedLevel)
                     } else {
                         skillDict["hasLevel"] = false
                     }
@@ -136,7 +154,8 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                         "title": item.title,
                         "issuer": item.subtitle ?? "",
                         "description": item.description ?? "",
-                        "date": item.startDate ?? ""
+                        "date": item.startDate ?? "",
+                        "url": item.url ?? ""
                     ])
                 }
             }
@@ -180,44 +199,45 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
         }
 
         // Social Links / Online Profiles
-        let socialSections = document.sections.filter { $0.title == "Online Profiles" || $0.type == .custom }
-        if !socialSections.isEmpty {
-            var socialItems: [[String: String]] = []
-            for section in socialSections {
-                // Only process if it's actually a social/online profiles section
-                if section.title == "Online Profiles" {
-                    for item in section.items {
-                        socialItems.append([
-                            "platform": item.title,
-                            "url": item.url ?? item.subtitle ?? ""
-                        ])
-                    }
-                }
+        var socialItems: [[String: String]] = []
+        for section in document.sections where section.id == CVSection.socialID {
+            for item in section.items {
+                socialItems.append([
+                    "platform": item.title,
+                    "url": item.url ?? item.subtitle ?? ""
+                ])
             }
-            if !socialItems.isEmpty {
-                context["socialLinks"] = socialItems
-                context["hasSocialLinks"] = true
-            } else {
-                context["hasSocialLinks"] = false
-            }
-        } else {
-            context["hasSocialLinks"] = false
+        }
+        context["hasSocialLinks"] = !socialItems.isEmpty
+        if !socialItems.isEmpty {
+            context["socialLinks"] = socialItems
         }
 
         // Add customization values
         let colors = customization.colorPalette.colors
-        context["colorPrimary"] = colors.primary
-        context["colorSecondary"] = colors.secondary
-        context["colorAccent"] = colors.accent
-        context["colorBackground"] = colors.background
-        context["colorText"] = colors.text
+        context["colorPrimary"] = StyleValue(colors.primary)
+        context["colorSecondary"] = StyleValue(colors.secondary)
+        context["colorAccent"] = StyleValue(colors.accent)
+        context["colorBackground"] = StyleValue(colors.background)
+        context["colorText"] = StyleValue(colors.text)
 
         let fonts = customization.fontScheme.fonts
-        context["fontHeading"] = fonts.heading
-        context["fontBody"] = fonts.body
-        context["fontSize"] = fonts.size
+        context["fontHeading"] = StyleValue(fonts.heading)
+        context["fontBody"] = StyleValue(fonts.body)
+        context["fontSize"] = StyleValue(fonts.size)
 
         return context
+    }
+
+    /// The period as the person wrote it, or the start and end dates joined when there is none
+    private func periodText(for item: CVItem) -> String {
+        if let period = item.period?.trimmingCharacters(in: .whitespacesAndNewlines), !period.isEmpty {
+            return period
+        }
+        return [item.startDate, item.endDate]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " – ")
     }
 
     private func processTemplate(_ template: String, with context: [String: Any]) -> String {
@@ -290,6 +310,10 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                                 // It's a boolean conditional
                                 result.replaceSubrange(fullRange, with: boolValue ? content : "")
                                 hasChanges = true
+                            } else if let stringValue = value as? String {
+                                // An empty string is false, like a missing value
+                                result.replaceSubrange(fullRange, with: stringValue.isEmpty ? "" : content)
+                                hasChanges = true
                             } else {
                                 // Non-nil, non-array, non-bool means true
                                 result.replaceSubrange(fullRange, with: content)
@@ -323,140 +347,13 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                     if let value = context[key] {
                         if let boolValue = value as? Bool {
                             result.replaceSubrange(fullRange, with: !boolValue ? content : "")
+                        } else if let stringValue = value as? String {
+                            result.replaceSubrange(fullRange, with: stringValue.isEmpty ? content : "")
                         } else {
                             result.replaceSubrange(fullRange, with: "")
                         }
                     } else {
                         result.replaceSubrange(fullRange, with: content)
-                    }
-                }
-            }
-        }
-
-        return result
-    }
-
-    private func processConditionals(_ template: String, context: [String: Any]) -> String {
-        var result = template
-
-        // Process positive conditionals {{#key}}...{{/key}}
-        let positivePattern = #"\{\{#(\w+)\}\}(.*?)\{\{/\1\}\}"#
-        if let regex = try? NSRegularExpression(pattern: positivePattern, options: [.dotMatchesLineSeparators]) {
-            let matches = regex.matches(in: result, range: NSRange(result.startIndex..., in: result))
-            for match in matches.reversed() {
-                if let keyRange = Range(match.range(at: 1), in: result),
-                   let contentRange = Range(match.range(at: 2), in: result),
-                   let fullRange = Range(match.range, in: result) {
-                    let key = String(result[keyRange])
-                    let content = String(result[contentRange])
-
-                    if let value = context[key] {
-                        if let boolValue = value as? Bool {
-                            result.replaceSubrange(fullRange, with: boolValue ? content : "")
-                        } else if value is [[String: Any]] {
-                            // Arrays are handled by processLoops, don't touch them here
-                            // Just leave the content as is
-                        } else {
-                            // Non-nil value means condition is true
-                            result.replaceSubrange(fullRange, with: content)
-                        }
-                    } else {
-                        result.replaceSubrange(fullRange, with: "")
-                    }
-                }
-            }
-        }
-
-        // Process negative conditionals {{^key}}...{{/key}}
-        let negativePattern = #"\{\{\^(\w+)\}\}(.*?)\{\{/\1\}\}"#
-        if let regex = try? NSRegularExpression(pattern: negativePattern, options: [.dotMatchesLineSeparators]) {
-            let matches = regex.matches(in: result, range: NSRange(result.startIndex..., in: result))
-            for match in matches.reversed() {
-                if let keyRange = Range(match.range(at: 1), in: result),
-                   let contentRange = Range(match.range(at: 2), in: result),
-                   let fullRange = Range(match.range, in: result) {
-                    let key = String(result[keyRange])
-                    let content = String(result[contentRange])
-
-                    if let value = context[key] {
-                        if let boolValue = value as? Bool {
-                            result.replaceSubrange(fullRange, with: !boolValue ? content : "")
-                        } else {
-                            result.replaceSubrange(fullRange, with: "")
-                        }
-                    } else {
-                        result.replaceSubrange(fullRange, with: content)
-                    }
-                }
-            }
-        }
-
-        return result
-    }
-
-    private func processLoops(_ template: String, context: [String: Any]) -> String {
-        var result = template
-
-        // Process array loops {{#array}}...{{/array}}
-        let loopPattern = #"\{\{#(\w+)\}\}(.*?)\{\{/\1\}\}"#
-        if let regex = try? NSRegularExpression(pattern: loopPattern, options: [.dotMatchesLineSeparators]) {
-            let matches = regex.matches(in: result, range: NSRange(result.startIndex..., in: result))
-            for match in matches.reversed() {
-                if let keyRange = Range(match.range(at: 1), in: result),
-                   let contentRange = Range(match.range(at: 2), in: result),
-                   let fullRange = Range(match.range, in: result) {
-                    let key = String(result[keyRange])
-                    let itemTemplate = String(result[contentRange])
-
-                    if let array = context[key] as? [[String: Any]] {
-                        var loopResult = ""
-                        for item in array {
-                            var itemContent = itemTemplate
-                            // Replace variables in item template
-                            for (itemKey, itemValue) in item {
-                                itemContent = itemContent.replacingOccurrences(
-                                    of: "{{\(itemKey)}}",
-                                    with: String(describing: itemValue)
-                                )
-                            }
-                            loopResult += itemContent
-                        }
-                        result.replaceSubrange(fullRange, with: loopResult)
-                    }
-                }
-            }
-        }
-
-        return result
-    }
-
-    private func processNestedConditionals(_ template: String, context: [String: Any]) -> String {
-        var result = template
-
-        // Process {{#key}}...{{/key}} conditionals for non-empty strings
-        let conditionalPattern = #"\{\{#(\w+)\}\}(.*?)\{\{/\1\}\}"#
-        if let regex = try? NSRegularExpression(pattern: conditionalPattern, options: [.dotMatchesLineSeparators]) {
-            let matches = regex.matches(in: result, range: NSRange(result.startIndex..., in: result))
-
-            for match in matches.reversed() {
-                if let keyRange = Range(match.range(at: 1), in: result),
-                   let contentRange = Range(match.range(at: 2), in: result),
-                   let fullRange = Range(match.range, in: result) {
-                    let key = String(result[keyRange])
-                    let content = String(result[contentRange])
-
-                    if let value = context[key] {
-                        // Check if value is non-empty
-                        if let stringValue = value as? String, !stringValue.isEmpty {
-                            result.replaceSubrange(fullRange, with: content)
-                        } else if value is Bool {
-                            let boolValue = value as! Bool
-                            result.replaceSubrange(fullRange, with: boolValue ? content : "")
-                        } else {
-                            result.replaceSubrange(fullRange, with: content)
-                        }
-                    } else {
-                        result.replaceSubrange(fullRange, with: "")
                     }
                 }
             }
@@ -471,11 +368,9 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
         // Process simple variables {{key}}
         for (key, value) in context {
             if let stringValue = value as? String {
-                // Escape HTML by default (use {{key}} for escaped, {{{key}}} for unescaped)
-                let escapedValue = escapeHTML(stringValue)
-                result = result.replacingOccurrences(of: "{{\(key)}}", with: escapedValue)
-                // Support triple mustache for unescaped HTML
-                result = result.replacingOccurrences(of: "{{{\(key)}}}", with: stringValue)
+                result = result.replacingOccurrences(of: "{{\(key)}}", with: escapeHTML(stringValue))
+            } else if let styleValue = value as? StyleValue {
+                result = result.replacingOccurrences(of: "{{\(key)}}", with: styleValue.css)
             } else if !(value is [Any]) {
                 // Only replace non-array values
                 result = result.replacingOccurrences(of: "{{\(key)}}", with: String(describing: value))
@@ -495,6 +390,7 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
         return result
     }
 
+    /// Escapes HTML and the braces of template syntax, so that text from the CV is never read as a template tag
     private func escapeHTML(_ string: String) -> String {
         return string
             .replacingOccurrences(of: "&", with: "&amp;")
@@ -502,10 +398,14 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
             .replacingOccurrences(of: ">", with: "&gt;")
             .replacingOccurrences(of: "\"", with: "&quot;")
             .replacingOccurrences(of: "'", with: "&#39;")
+            .replacingOccurrences(of: "{", with: "&#123;")
+            .replacingOccurrences(of: "}", with: "&#125;")
     }
 
+    private static let maxSkillLevel = 5
+
     private func createLevelDots(level: Int) -> String {
-        let maxLevel = 5
+        let maxLevel = Self.maxSkillLevel
         let filledDot = "●"
         let emptyDot = "○"
         var dots = ""

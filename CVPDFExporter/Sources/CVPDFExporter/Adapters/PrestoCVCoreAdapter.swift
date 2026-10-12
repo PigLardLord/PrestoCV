@@ -6,7 +6,13 @@ import PrestoCVCore
 /// Adapter to convert PrestoCVCore data to CVDocument format
 public struct PrestoCVCoreAdapter: Sendable {
 
-    public init() {}
+    private let preferredLanguages: [String]
+
+    /// - Parameter preferredLanguages: The languages of the user, most wanted first. A CV with no document
+    ///   language of its own is written in the first of them that the templates support.
+    public init(preferredLanguages: [String] = Locale.preferredLanguages) {
+        self.preferredLanguages = preferredLanguages
+    }
 
     /// Convert PrestoCVCore CVModel to CVDocument
     /// - Parameter cvModel: The source CVModel from PrestoCVCore
@@ -29,6 +35,9 @@ public struct PrestoCVCoreAdapter: Sendable {
 
     #if canImport(PrestoCVCore)
     private func convertFromCVModel(_ model: CVModel) -> CVDocument {
+        let language = DocumentLanguage.resolve(model.documentLanguage, preferredLanguages: preferredLanguages)
+        let localizer = TemplateLocalizer(locale: Locale(identifier: language.rawValue))
+
         let personalInfo = PersonalInfo(
             name: model.personalInfo.name,
             email: model.personalInfo.email,
@@ -49,6 +58,7 @@ public struct PrestoCVCoreAdapter: Sendable {
                 description: exp.description,
                 startDate: extractStartDate(from: exp.period),
                 endDate: extractEndDate(from: exp.period),
+                period: exp.period,
                 location: exp.location,
                 tags: []
             )
@@ -69,6 +79,7 @@ public struct PrestoCVCoreAdapter: Sendable {
                 description: edu.description,
                 startDate: extractStartDate(from: edu.period),
                 endDate: extractEndDate(from: edu.period),
+                period: edu.period,
                 location: nil,
                 tags: []
             )
@@ -106,7 +117,7 @@ public struct PrestoCVCoreAdapter: Sendable {
         let languageItems = model.languages.map { lang in
             CVItem(
                 title: lang.name,
-                subtitle: lang.level.rawValue,
+                subtitle: lang.level == .native ? localizer.nativeLevelName : lang.level.rawValue,
                 description: nil,
                 startDate: nil,
                 endDate: nil,
@@ -174,7 +185,7 @@ public struct PrestoCVCoreAdapter: Sendable {
             }
             sections.append(
                 CVSection(
-                    id: "social",
+                    id: CVSection.socialID,
                     type: .custom,
                     title: "Online Profiles",
                     items: socialItems,
@@ -186,7 +197,7 @@ public struct PrestoCVCoreAdapter: Sendable {
         return CVDocument(
             personalInfo: personalInfo,
             sections: sections,
-            metadata: DocumentMetadata()
+            metadata: DocumentMetadata(language: language.rawValue)
         )
     }
     #endif
@@ -638,7 +649,7 @@ public struct PrestoCVCoreAdapter: Sendable {
         }
 
         return CVSection(
-            id: "social",
+            id: CVSection.socialID,
             type: .custom,
             title: "Online Profiles",
             items: items,

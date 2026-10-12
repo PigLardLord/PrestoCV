@@ -65,7 +65,7 @@ struct CVEditorView: View {
     private var editorView: some View {
         VStack(spacing: 0) {
             TabView {
-                PersonalInfoSection(cv: $viewModel.cv)
+                PersonalInfoSection(cv: $viewModel.cv, documentLanguage: $viewModel.documentLanguageSelection)
                     .tabItem {
                         Label("section.basics".localized, systemImage: "person.circle")
                     }

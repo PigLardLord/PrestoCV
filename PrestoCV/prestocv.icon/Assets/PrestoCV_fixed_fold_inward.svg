@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" version="1.1">
+  <title>PrestoCV Fold (flat, inward, rounded corner)</title>
+  <rect x="0" y="0" width="1024" height="1024" fill="none"/>
+  <path d="
+M 688,144
+L 816,272
+Q 712,272 688,248
+L 688,144
+Z
+" fill="#F2F6FF" stroke="none"/>
+  <!-- Crisp fold edge along the diagonal (optional flat stroke) -->
+  <path d="M 672,128 L 832,288" stroke="#E6EBFF" stroke-width="2" fill="none"/>
+</svg>

@@ -165,16 +165,23 @@ struct BaseHTMLTemplateTests {
         #expect(html.contains("{{/skills}}"))
     }
 
-    // MARK: - Print-Friendly Tests
+    // MARK: - Stylesheet Tests
 
-    @Test("Base template includes print CSS rules")
-    func baseTemplateIncludesPrintCSS() {
+    @Test("Base template takes its whole stylesheet from the package")
+    func baseTemplateTakesItsStylesheetFromThePackage() {
         // Given/When
         let html = BaseHTMLTemplate.html
 
-        // Then
-        #expect(html.contains("@page"))
-        #expect(html.contains("page-break-inside: avoid") || html.contains("break-inside: avoid"))
+        // Then - the style element holds the slot and nothing else
+        let styleStart = html.range(of: "<style>")!
+        let styleEnd = html.range(of: "</style>")!
+        let styleContent = html[styleStart.upperBound..<styleEnd.lowerBound]
+        #expect(styleContent.trimmingCharacters(in: .whitespacesAndNewlines) == "{{customCSS}}")
+    }
+
+    @Test("Base template declares the language of the document")
+    func baseTemplateDeclaresTheLanguage() {
+        #expect(BaseHTMLTemplate.html.contains("<html lang=\"{{lang}}\">"))
     }
 
     // MARK: - Accessibility Tests
