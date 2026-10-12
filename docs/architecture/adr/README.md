@@ -22,5 +22,6 @@ Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected*
 | [0010](0010-ui-free-presentation-package.md) | View models live in a UI-framework-free package target | Accepted |
 | [0011](0011-typed-html-builder.md) | Generate document HTML with a typed builder; designs are allow-listed CSS only | Accepted |
 | [0012](0012-legacy-targets-during-migration.md) | Keep legacy targets out of Linux builds and out of the rules until deleted | Accepted |
+| [0022](0022-ship-legacy-app-as-v1.md) | Ship the legacy app, fixed, as version 1 | Accepted |
 
 New ADRs copy [template.md](template.md).
