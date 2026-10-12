@@ -64,7 +64,10 @@ public struct CVSection: Codable, Equatable, Identifiable, Sendable, Hashable {
     public let items: [CVItem]
     public let order: Int
     public let visible: Bool
-    
+
+    /// Identifier of the section that lists the person's online profiles
+    public static let socialID = "social"
+
     public init(
         id: String = UUID().uuidString,
         type: SectionType,
@@ -125,6 +128,8 @@ public struct CVItem: Codable, Equatable, Identifiable, Sendable, Hashable {
     public let description: String?
     public let startDate: String?
     public let endDate: String?
+    /// Free-text period, printed as written (for example "March 2020 – Present")
+    public let period: String?
     public let location: String?
     public let url: String?
     public let tags: [String]
@@ -137,6 +142,7 @@ public struct CVItem: Codable, Equatable, Identifiable, Sendable, Hashable {
         description: String? = nil,
         startDate: String? = nil,
         endDate: String? = nil,
+        period: String? = nil,
         location: String? = nil,
         url: String? = nil,
         tags: [String] = [],
@@ -148,6 +154,7 @@ public struct CVItem: Codable, Equatable, Identifiable, Sendable, Hashable {
         self.description = description
         self.startDate = startDate
         self.endDate = endDate
+        self.period = period
         self.location = location
         self.url = url
         self.tags = tags

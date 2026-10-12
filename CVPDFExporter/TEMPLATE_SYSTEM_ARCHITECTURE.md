@@ -142,7 +142,7 @@ template-name.mcvt (JSON file)
     "price": 0.0
   },
   "cssContent": "/* CSS styles */",
-  "htmlContent": null  // Optional, uses base template if null
+  "htmlContent": null  // Optional; the page of the package. Uses the base template if null
 }
 ```
 
@@ -155,9 +155,10 @@ template-name.mcvt (JSON file)
 ## Template Rendering Flow
 
 1. **Template Selection**: User chooses template via GetAvailableTemplatesUseCase
-2. **Data Binding**: TemplateEngine injects CV data into template
-3. **Localization**: TemplateLocalizer replaces i18n placeholders (future)
-4. **PDF Generation**: HTMLToPDFRenderer converts to PDF
+2. **Page**: the package's `htmlContent`, or the base template when it has none, with the package's `cssContent` in the `{{customCSS}}` slot (`TemplatePackage.composedHTML`)
+3. **Localization**: TemplateLocalizer replaces the `{{i18n_*}}` placeholders with the headings of the document's language (English, Italian, German, Spanish, French, Portuguese; any other language gets English)
+4. **Data Binding**: TemplateEngine injects CV data into the template. Text from the CV is escaped, braces included, so it is never read as a template tag
+5. **PDF Generation**: HTMLToPDFRenderer converts to PDF
 
 ## Testing Strategy
 
@@ -210,10 +211,10 @@ enum TemplateInstallationError: Error {
 - [ ] Document type handler for AirDrop/Files integration
 - [ ] Share sheet support
 
-### Phase 5: Localization (Pending)
-- [ ] TemplateLocalizer service
-- [ ] i18n placeholder replacement ({{i18n_work_experience}})
-- [ ] Multi-language support
+### Phase 5: Localization (Done)
+- [x] TemplateLocalizer service
+- [x] i18n placeholder replacement ({{i18n_work_experience}})
+- [x] Multi-language support
 
 ### Phase 6: Template Refactoring (Pending)
 - [ ] Extract BaseHTMLTemplate with placeholders

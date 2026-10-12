@@ -13,6 +13,8 @@ public struct CVModel: Codable, Identifiable, Sendable, Equatable {
     public var certifications: [Certification]
     public var interests: [String]
     public var social: [Social]
+    /// BCP 47 language of the exported document. Nil follows the language of the app.
+    public var documentLanguage: String?
     
     // Custom CodingKeys to handle JSON field naming
     private enum CodingKeys: String, CodingKey {
@@ -26,6 +28,7 @@ public struct CVModel: Codable, Identifiable, Sendable, Equatable {
         case certifications
         case interests
         case social
+        case documentLanguage
     }
     
     public init(
@@ -38,7 +41,8 @@ public struct CVModel: Codable, Identifiable, Sendable, Equatable {
         languages: [Language] = [],
         certifications: [Certification] = [],
         interests: [String] = [],
-        social: [Social] = []
+        social: [Social] = [],
+        documentLanguage: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -50,6 +54,7 @@ public struct CVModel: Codable, Identifiable, Sendable, Equatable {
         self.certifications = certifications
         self.interests = interests
         self.social = social
+        self.documentLanguage = documentLanguage
     }
     
     /// Creates a new CV from an existing template with a new ID
@@ -89,5 +94,6 @@ public struct CVModel: Codable, Identifiable, Sendable, Equatable {
         self.certifications = try container.decodeIfPresent([Certification].self, forKey: .certifications) ?? []
         self.interests = try container.decodeIfPresent([String].self, forKey: .interests) ?? []
         self.social = try container.decodeIfPresent([Social].self, forKey: .social) ?? []
+        self.documentLanguage = try container.decodeIfPresent(String.self, forKey: .documentLanguage)
     }
 }

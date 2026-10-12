@@ -2,146 +2,126 @@ import Foundation
 
 /// Service for localizing i18n placeholders in CV templates
 ///
-/// Replaces Mustache-style i18n placeholders (e.g., `{{i18n_work_experience}}`)
-/// with localized strings based on the current locale.
+/// Replaces Mustache-style i18n placeholders (e.g., `{{i18n_work_experience}}`) with the headings of the
+/// document's language. The headings are built in for English, Italian, German, Spanish, French and
+/// Portuguese, so the language of the device never changes the result; any other language gets English.
 ///
 /// Usage:
 /// ```swift
-/// // With main app bundle:
-/// let localizer = TemplateLocalizer(bundle: .main, locale: Locale(identifier: "es"))
-/// let localizedHTML = localizer.localize(template: htmlTemplate)
-///
-/// // With fallback strings (for testing):
-/// let localizer = TemplateLocalizer(locale: Locale(identifier: "es"))
+/// let localizer = TemplateLocalizer(locale: Locale(identifier: "it"))
 /// let localizedHTML = localizer.localize(template: htmlTemplate)
 /// ```
 public struct TemplateLocalizer: Sendable {
 
-    /// The locale to use for localizations
+    /// The locale whose language selects the headings
     public let currentLocale: Locale
 
-    /// The bundle to use for loading localized strings
-    public let bundle: Bundle?
-
-    /// Initialize with a specific locale and optional bundle
-    /// - Parameters:
-    ///   - bundle: The bundle containing Localizable.xcstrings (defaults to nil for fallback behavior)
-    ///   - locale: The locale to use for localizations (defaults to current locale)
-    public init(bundle: Bundle? = nil, locale: Locale = .current) {
-        self.bundle = bundle
+    /// Initialize with the locale of the document
+    /// - Parameter locale: The locale whose language selects the headings (defaults to English)
+    public init(locale: Locale = Locale(identifier: "en")) {
         self.currentLocale = locale
     }
 
-    /// Localizes a template by replacing i18n placeholders with localized strings
+    /// Localizes a template by replacing i18n placeholders with headings
     /// - Parameter template: The template string containing i18n placeholders
-    /// - Returns: The template with i18n placeholders replaced by localized strings
+    /// - Returns: The template with i18n placeholders replaced by headings
     public func localize(template: String) -> String {
         var result = template
 
-        // Replace all i18n placeholders with localized strings
-        for (placeholder, key) in Self.i18nMappings {
-            let localizedValue = localizedString(for: key)
-            result = result.replacingOccurrences(of: placeholder, with: localizedValue)
+        for (placeholder, heading) in headings.replacements {
+            result = result.replacingOccurrences(of: placeholder, with: heading)
         }
 
         return result
     }
 
-    // MARK: - Private Helpers
-
-    /// Mapping of i18n placeholders to localization keys
-    private static let i18nMappings: [(placeholder: String, key: String)] = [
-        ("{{i18n_work_experience}}", "template.work_experience"),
-        ("{{i18n_education}}", "template.education"),
-        ("{{i18n_skills}}", "template.skills"),
-        ("{{i18n_languages}}", "template.languages"),
-        ("{{i18n_certifications}}", "template.certifications"),
-        ("{{i18n_social_links}}", "template.social_links"),
-        ("{{i18n_interests}}", "template.interests"),
-        ("{{i18n_summary}}", "template.summary"),
-        ("{{i18n_contact}}", "template.contact"),
-        ("{{i18n_projects}}", "template.projects"),
-        ("{{i18n_at}}", "template.at"),
-        ("{{i18n_present}}", "template.present"),
-        ("{{i18n_proficiency}}", "template.proficiency"),
-    ]
-
-    /// Fallback localizations for English
-    /// In production, these would come from Localizable.strings or .xcstrings
-    private static let fallbackLocalizations: [String: String] = [
-        "template.work_experience": "Work Experience",
-        "template.education": "Education",
-        "template.skills": "Skills",
-        "template.languages": "Languages",
-        "template.certifications": "Certifications",
-        "template.social_links": "Social Links",
-        "template.interests": "Interests",
-        "template.summary": "Summary",
-        "template.contact": "Contact",
-        "template.projects": "Projects",
-        "template.at": "at",
-        "template.present": "Present",
-        "template.proficiency": "Proficiency",
-    ]
-
-    /// Localized strings for Spanish
-    private static let spanishLocalizations: [String: String] = [
-        "template.work_experience": "Experiencia Laboral",
-        "template.education": "Educación",
-        "template.skills": "Habilidades",
-        "template.languages": "Idiomas",
-        "template.certifications": "Certificaciones",
-        "template.social_links": "Redes Sociales",
-        "template.interests": "Intereses",
-        "template.summary": "Resumen",
-        "template.contact": "Contacto",
-        "template.projects": "Proyectos",
-        "template.at": "en",
-        "template.present": "Actualidad",
-        "template.proficiency": "Dominio",
-    ]
-}
-
-// MARK: - Locale-Aware Localization
-
-extension TemplateLocalizer {
-    /// Gets the localized string for a given key, respecting the current locale
-    private func localizedString(for key: String) -> String {
-        // Try to use Bundle localization if available
-        if let bundle = bundle {
-            let localizedValue = NSLocalizedString(
-                key,
-                tableName: "Localizable",
-                bundle: bundle,
-                value: "",
-                comment: ""
-            )
-
-            // If NSLocalizedString returns the key, it means the key wasn't found
-            // Fall back to hardcoded localizations
-            if localizedValue != key && !localizedValue.isEmpty {
-                return localizedValue
-            }
-        }
-
-        // Fall back to hardcoded localizations for testing or when bundle is unavailable
-        let languageCode = currentLocale.language.languageCode?.identifier ?? "en"
-
-        let localizations: [String: String]
-        switch languageCode {
-        case "es":
-            localizations = Self.spanishLocalizations
-        case "en":
-            localizations = Self.fallbackLocalizations
-        default:
-            localizations = Self.fallbackLocalizations
-        }
-
-        // Get localized string or fall back to key-based default
-        let fallback = key.components(separatedBy: ".").last?
-            .replacingOccurrences(of: "_", with: " ")
-            .capitalized ?? key
-
-        return localizations[key, default: fallback]
+    /// The word for a native speaker, which is printed as the level of a language
+    public var nativeLevelName: String {
+        headings.native
     }
+
+    // MARK: - Headings
+
+    private var headings: Headings {
+        let languageCode = currentLocale.language.languageCode?.identifier ?? Self.defaultLanguage
+        return Self.tables[languageCode] ?? Self.english
+    }
+
+    private static let defaultLanguage = "en"
+
+    private static let tables: [String: Headings] = [
+        "en": english,
+        "it": italian,
+        "de": german,
+        "es": spanish,
+        "fr": french,
+        "pt": portuguese,
+    ]
+
+    /// The words of one language that the templates ask for through `{{i18n_*}}` placeholders
+    private struct Headings: Sendable {
+        let workExperience: String
+        let education: String
+        let skills: String
+        let languages: String
+        let certifications: String
+        let socialLinks: String
+        let interests: String
+        let summary: String
+        let present: String
+        let native: String
+        let at: String
+
+        var replacements: [(placeholder: String, heading: String)] {
+            [
+                ("{{i18n_work_experience}}", workExperience),
+                ("{{i18n_education}}", education),
+                ("{{i18n_skills}}", skills),
+                ("{{i18n_languages}}", languages),
+                ("{{i18n_certifications}}", certifications),
+                ("{{i18n_social_links}}", socialLinks),
+                ("{{i18n_interests}}", interests),
+                ("{{i18n_summary}}", summary),
+                ("{{i18n_present}}", present),
+                ("{{i18n_native}}", native),
+                ("{{i18n_at}}", at),
+            ]
+        }
+    }
+
+    private static let english = Headings(
+        workExperience: "Work experience", education: "Education", skills: "Skills", languages: "Languages",
+        certifications: "Certifications", socialLinks: "Profiles", interests: "Interests", summary: "Profile",
+        present: "Present", native: "Native", at: "at"
+    )
+
+    private static let italian = Headings(
+        workExperience: "Esperienza professionale", education: "Formazione", skills: "Competenze", languages: "Lingue",
+        certifications: "Certificazioni", socialLinks: "Profili", interests: "Interessi", summary: "Profilo professionale",
+        present: "Oggi", native: "Madrelingua", at: "presso"
+    )
+
+    private static let german = Headings(
+        workExperience: "Berufserfahrung", education: "Ausbildung", skills: "Kenntnisse", languages: "Sprachen",
+        certifications: "Zertifikate", socialLinks: "Profile", interests: "Interessen", summary: "Kurzprofil",
+        present: "Heute", native: "Muttersprache", at: "bei"
+    )
+
+    private static let spanish = Headings(
+        workExperience: "Experiencia laboral", education: "Formación", skills: "Competencias", languages: "Idiomas",
+        certifications: "Certificaciones", socialLinks: "Perfiles", interests: "Intereses", summary: "Perfil profesional",
+        present: "Actualidad", native: "Lengua materna", at: "en"
+    )
+
+    private static let french = Headings(
+        workExperience: "Expérience professionnelle", education: "Formation", skills: "Compétences", languages: "Langues",
+        certifications: "Certifications", socialLinks: "Profils", interests: "Centres d’intérêt", summary: "Profil professionnel",
+        present: "Aujourd’hui", native: "Langue maternelle", at: "chez"
+    )
+
+    private static let portuguese = Headings(
+        workExperience: "Experiência profissional", education: "Formação", skills: "Competências", languages: "Idiomas",
+        certifications: "Certificações", socialLinks: "Perfis", interests: "Interesses", summary: "Perfil profissional",
+        present: "Presente", native: "Língua materna", at: "em"
+    )
 }

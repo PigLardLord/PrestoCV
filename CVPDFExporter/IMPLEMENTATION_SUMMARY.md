@@ -336,9 +336,9 @@ let cssOnlyResult = try validator.validatePackage(cssOnlyPackage)
 - [ ] Share sheet support
 
 ### Localization
-- [ ] TemplateLocalizer service
-- [ ] i18n placeholder replacement ({{i18n_work_experience}})
-- [ ] Multi-language template support
+- [x] TemplateLocalizer service
+- [x] i18n placeholder replacement ({{i18n_work_experience}})
+- [x] Multi-language template support
 
 ### Template Optimization
 - [ ] Extract BaseHTMLTemplate with i18n placeholders

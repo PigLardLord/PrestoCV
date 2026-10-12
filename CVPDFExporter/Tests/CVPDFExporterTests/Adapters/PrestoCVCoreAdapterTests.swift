@@ -155,6 +155,88 @@ struct PrestoCVCoreAdapterTests {
         #expect(secondSocial?.url == "https://github.com/janesmith", "GitHub URL should be correct")
     }
 
+    #if canImport(PrestoCVCore)
+    @Test("Passes the period of an experience and of an education through as written")
+    func test_convertToCV_passesPeriodsThrough() {
+        // Given
+        let cvModel = CVModel(
+            personalInfo: PrestoCVCore.PersonalInfo(name: "Jane Smith", email: "jane@example.com"),
+            relevant_experience: [Experience(title: "Developer", company: "Tech Corp", period: "March 2020 – Present")],
+            education: [Education(degree: "Computer Science", school: "MIT", period: "2014 – 2018")]
+        )
+
+        // When
+        let document = PrestoCVCoreAdapter().convertToCV(from: cvModel)
+
+        // Then
+        let work = document.sections.first { $0.type == .work }?.items.first
+        let education = document.sections.first { $0.type == .education }?.items.first
+        #expect(work?.period == "March 2020 – Present")
+        #expect(education?.period == "2014 – 2018")
+    }
+
+    @Test("Writes the document in the language set on the CV, whatever the language of the device")
+    func test_convertToCV_usesTheLanguageOfTheCV() {
+        // Given
+        let cvModel = CVModel(
+            personalInfo: PrestoCVCore.PersonalInfo(name: "Jane Smith", email: "jane@example.com"),
+            documentLanguage: "it"
+        )
+
+        // When
+        let document = PrestoCVCoreAdapter(preferredLanguages: ["de-DE"]).convertToCV(from: cvModel)
+
+        // Then
+        #expect(document.metadata.language == "it")
+    }
+
+    @Test("Follows the language of the app when the CV has none")
+    func test_convertToCV_followsTheAppLanguageByDefault() {
+        // Given
+        let cvModel = CVModel(personalInfo: PrestoCVCore.PersonalInfo(name: "Jane Smith", email: "jane@example.com"))
+
+        // When
+        let german = PrestoCVCoreAdapter(preferredLanguages: ["de-DE", "en"]).convertToCV(from: cvModel)
+        let unsupported = PrestoCVCoreAdapter(preferredLanguages: ["ja-JP"]).convertToCV(from: cvModel)
+
+        // Then
+        #expect(german.metadata.language == "de")
+        #expect(unsupported.metadata.language == "en")
+    }
+
+    @Test("Names the native level in the language of the document and keeps the CEFR codes")
+    func test_convertToCV_localizesTheNativeLevel() {
+        // Given
+        let languages = [Language(name: "Italiano", level: .native), Language(name: "English", level: .b2)]
+        let german = CVModel(languages: languages, documentLanguage: "de")
+        let english = CVModel(languages: languages, documentLanguage: "en")
+
+        // When
+        let germanLevels = PrestoCVCoreAdapter().convertToCV(from: german).sections.first { $0.type == .languages }?.items.map(\.subtitle)
+        let englishLevels = PrestoCVCoreAdapter().convertToCV(from: english).sections.first { $0.type == .languages }?.items.map(\.subtitle)
+
+        // Then
+        #expect(germanLevels == ["Muttersprache", "B2"])
+        #expect(englishLevels == ["Native", "B2"])
+    }
+
+    @Test("Gives the social section the shared identifier")
+    func test_convertToCV_socialSectionUsesSharedIdentifier() {
+        // Given
+        let cvModel = CVModel(
+            personalInfo: PrestoCVCore.PersonalInfo(name: "Jane Smith", email: "jane@example.com"),
+            social: [Social(platform: "GitHub", url: "https://github.com/janesmith")]
+        )
+
+        // When
+        let document = PrestoCVCoreAdapter().convertToCV(from: cvModel)
+
+        // Then
+        let social = document.sections.first { $0.id == CVSection.socialID }
+        #expect(social?.items.first?.title == "GitHub")
+    }
+    #endif
+
     // MARK: - Helper Methods
 
     private func createSampleCVModel() -> MockCVModel {
