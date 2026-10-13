@@ -3,9 +3,9 @@ import PrestoCVCore
 import CVGeneratorAI
 
 final class ViewModelFactory {
-    private let dependencyContainer: DependencyContainer
+    private let dependencyContainer: PrestoCVCore.DependencyContainerProtocol
     
-    init(dependencyContainer: DependencyContainer) {
+    init(dependencyContainer: PrestoCVCore.DependencyContainerProtocol) {
         self.dependencyContainer = dependencyContainer
     }
     
@@ -17,15 +17,6 @@ final class ViewModelFactory {
         )
     }
     
-    @MainActor
-    func makeCVEditorViewModel(cvId: String?, initialCV: CVModel?) throws -> CVEditorViewModel {
-        return CVEditorViewModel(
-            cvId: cvId,
-            initialCV: initialCV,
-            cvManagementUseCase: try dependencyContainer.makeCVManagementUseCase()
-        )
-    }
-
     @MainActor
     func makeAIGenerationViewModel() throws -> AIGenerationViewModel {
         guard let cvGenerationUseCase = makeCVGeneratorUseCase() else {

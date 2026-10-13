@@ -23,12 +23,7 @@ struct ExperienceRowView: View {
                 
                 Spacer()
                 
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.caption)
-                        .foregroundColor(DesignTokens.Colors.error)
-                }
-                .buttonStyle(.plain)
+                DeleteButton(label: experience.displayName, action: onDelete)
             }
             
             // Location and Period
@@ -73,7 +68,7 @@ struct SkillRowView: View {
                 TextField("field.skill".localized, text: $skill.name)
                     .font(DesignTokens.Typography.subheadline.font)
                 Spacer()
-                DeleteButton(action: onDelete)
+                DeleteButton(label: skill.displayName, action: onDelete)
             }
             
             SkillLevelView(
@@ -109,12 +104,7 @@ struct EducationRowView: View {
                 
                 Spacer()
                 
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.caption)
-                        .foregroundColor(DesignTokens.Colors.error)
-                }
-                .buttonStyle(.plain)
+                DeleteButton(label: education.displayName, action: onDelete)
             }
             
             // Description
@@ -149,7 +139,7 @@ struct LanguageRowView: View {
                 
                 Spacer()
                 
-                DeleteButton(action: onDelete)
+                DeleteButton(label: language.displayName, action: onDelete)
             }
             
             HStack {
@@ -185,7 +175,7 @@ struct CertificationRowView: View {
                     .font(DesignTokens.Typography.subheadline.font)
                     .fontWeight(.semibold)
                 Spacer()
-                DeleteButton(action: onDelete)
+                DeleteButton(label: certification.displayName, action: onDelete)
             }
             
             TextField("field.issuer".localized, text: $certification.issuer)
@@ -249,7 +239,7 @@ struct SocialLinkRowView: View {
                 .font(DesignTokens.Typography.callout.font)
                 .foregroundColor(DesignTokens.Colors.accent)
             
-            DeleteButton(action: onDelete)
+            DeleteButton(label: social.displayName, action: onDelete)
         }
         .padding(.vertical, DesignTokens.Spacing.xs)
     }
@@ -266,7 +256,7 @@ struct InterestRowView: View {
             
             Spacer()
             
-            DeleteButton(action: onDelete)
+            DeleteButton(label: InterestEntry(text: interest).displayName, action: onDelete)
         }
         .padding(.vertical, DesignTokens.Spacing.xs)
     }
@@ -274,7 +264,11 @@ struct InterestRowView: View {
 
 // MARK: - Helper Components
 
+/// The trash button of a row. Borderless, so that a tap on the rest of the row never reaches it, and
+/// large enough to be hit without hitting a neighbour.
 struct DeleteButton: View {
+    /// What the button deletes, for VoiceOver.
+    let label: String
     let action: () -> Void
     
     var body: some View {
@@ -282,7 +276,14 @@ struct DeleteButton: View {
             Image(systemName: "trash")
                 .font(DesignTokens.IconSize.small.font)
                 .foregroundColor(DesignTokens.Colors.error)
+                .frame(
+                    width: DesignTokens.InputSize.minimumTapTarget,
+                    height: DesignTokens.InputSize.minimumTapTarget
+                )
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("accessibility.delete_row".localizedWithArgs(label))
     }
 }
 

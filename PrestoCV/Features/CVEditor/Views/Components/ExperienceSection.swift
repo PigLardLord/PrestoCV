@@ -37,7 +37,7 @@ struct WorkExperienceSubsection: View {
                 )
             },
             onAdd: viewModel.addExperience,
-            onRemove: { viewModel.removeExperience(at: $0) }
+            onRemove: { viewModel.requestRemoval(of: .experience, at: $0) }
         )
     }
 }
@@ -60,7 +60,7 @@ struct SkillsSubsection: View {
                 )
             },
             onAdd: viewModel.addSkill,
-            onRemove: { viewModel.removeSkill(at: $0) }
+            onRemove: { viewModel.requestRemoval(of: .skills, at: $0) }
         )
     }
 }
@@ -83,7 +83,7 @@ struct EducationSubsection: View {
                 )
             },
             onAdd: viewModel.addEducation,
-            onRemove: { viewModel.removeEducation(at: $0) }
+            onRemove: { viewModel.requestRemoval(of: .education, at: $0) }
         )
     }
 }

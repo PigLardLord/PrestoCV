@@ -4,53 +4,29 @@ import CVPDFExporter
 
 struct AppRootView: View {
     @StateObject private var router = AppRouter()
-    @StateObject private var onboardingViewModel: OnboardingViewModel
-    @StateObject private var cvListViewModel: CVListViewModel
-    private let dependencyContainer: DependencyContainer
+    @ObservedObject private var onboardingViewModel: OnboardingViewModel
+    @ObservedObject private var cvListViewModel: CVListViewModel
+    private let cvManagementUseCase: CVManagementUseCaseProtocol
     private let viewModelFactory: ViewModelFactory
     
-    init(dependencyContainer: DependencyContainer) {
-        self.dependencyContainer = dependencyContainer
-        self.viewModelFactory = ViewModelFactory(dependencyContainer: dependencyContainer)
-        
-        // Create dependencies using factory methods with error handling
-        do {
-            let onboardingUseCase = try dependencyContainer.makeOnboardingUseCase()
-            let sampleRepository = try dependencyContainer.makeSampleCVRepository()
-            let cvManagementUseCase = try dependencyContainer.makeCVManagementUseCase()
-            
-            self._onboardingViewModel = StateObject(
-                wrappedValue: OnboardingViewModel(
-                    onboardingUseCase: onboardingUseCase,
-                    sampleRepository: sampleRepository
-                )
-            )
-            
-            self._cvListViewModel = StateObject(
-                wrappedValue: CVListViewModel(
-                    cvManagementUseCase: cvManagementUseCase
-                )
-            )
-        } catch {
-            // For simplicity in this initial implementation, we'll create a fallback
-            // In production, this should be handled more robustly
-            fatalError("Failed to initialize dependencies: \(error)")
-        }
+    init(dependencies: RootDependencies) {
+        self.onboardingViewModel = dependencies.onboardingViewModel
+        self.cvListViewModel = dependencies.cvListViewModel
+        self.cvManagementUseCase = dependencies.cvManagementUseCase
+        self.viewModelFactory = dependencies.viewModelFactory
     }
     
     var body: some View {
         NavigationStack(path: $router.navigationPath) {
             Group {
-                switch onboardingViewModel.onboardingState {
+                switch RootDestination.resolve(onboardingViewModel.onboardingState) {
                 case .loading:
-                    LoadingView.fullscreen(message: "common.checking_account".asLoclizedKey)
-                case .firstTime:
-                    OnboardingView(viewModel: onboardingViewModel)
-                case .returning:
-                    CVListView(viewModel: cvListViewModel)
-                case .error:
+                    LoadingView.fullscreen(message: "common.loading".asLoclizedKey)
+                case .list:
+                    listView
+                case .error(let message):
                     ErrorView.generic(
-                        message: onboardingViewModel.errorMessage,
+                        message: message,
                         onRetry: onboardingViewModel.performCheckOnboardingStatus
                     )
                 }
@@ -60,21 +36,19 @@ struct AppRootView: View {
             }
         }
         .environmentObject(router)
-        .task {
-            // Bootstrap bundled templates on app launch
-            await bootstrapTemplates()
-            // Then check onboarding status
-            await onboardingViewModel.checkOnboardingStatus()
+    }
+    
+    private var listView: some View {
+        CVListView(viewModel: cvListViewModel) {
+            FirstRunView()
         }
     }
     
     @ViewBuilder
     private func destinationView(for route: Route) -> some View {
         switch route {
-        case .onboarding:
-            OnboardingView(viewModel: onboardingViewModel)
-        case .cvList:
-            CVListView(viewModel: cvListViewModel)
+        case .onboarding, .cvList:
+            listView
         case .templateSelection:
             TemplateSelectionView(isAIGenerationAvailable: viewModelFactory.isAIGenerationAvailable())
         case .aiGeneration:
@@ -82,9 +56,13 @@ struct AppRootView: View {
                 AIGenerationView(viewModel: try viewModelFactory.makeAIGenerationViewModel())
             }
         case .cvEditor(let cvId):
-            viewWithErrorHandling {
-                CVEditorView(viewModel: try viewModelFactory.makeCVEditorViewModel(cvId: cvId, initialCV: router.initialCVForEditor))
-            }
+            CVEditorView(
+                viewModel: CVEditorViewModel(
+                    cvId: cvId,
+                    initialCV: router.initialCVForEditor,
+                    cvManagementUseCase: cvManagementUseCase
+                )
+            )
         }
     }
     
@@ -95,23 +73,11 @@ struct AppRootView: View {
                 view
             } else {
                 ErrorView.generic(
-                    message: "Failed to load view. Please try again.",
                     onRetry: {
                         router.navigateBack()
                     }
                 )
             }
-        }
-    }
-
-    private func bootstrapTemplates() async {
-        do {
-            // Create bootstrap service directly to avoid circular dependency
-            let bootstrapService = try TemplateBootstrapService()
-            try await bootstrapService.syncBundledTemplates()
-        } catch {
-            // Log error but don't block app launch
-            print("⚠️ Failed to bootstrap templates: \(error)")
         }
     }
 }

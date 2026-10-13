@@ -6,11 +6,15 @@ import Foundation
 // MARK: - Mock CVManagementUseCase
 
 actor MockCVManagementUseCase: CVManagementUseCaseProtocol {
-    private(set) var createCVCalled = false
-    private(set) var updateCVCalled = false
-    private(set) var getCVCalled = false
+    private(set) var createCVCallCount = 0
+    private(set) var updateCVCallCount = 0
+    private(set) var getCVCallCount = 0
     private(set) var deleteCVCalled = false
     private(set) var getAllCVsCalled = false
+
+    var createCVCalled: Bool { createCVCallCount > 0 }
+    var updateCVCalled: Bool { updateCVCallCount > 0 }
+    var getCVCalled: Bool { getCVCallCount > 0 }
 
     private(set) var createdCVs: [CVModel] = []
     private(set) var updatedCVs: [CVModel] = []
@@ -18,6 +22,7 @@ actor MockCVManagementUseCase: CVManagementUseCaseProtocol {
     private var storedCVs: [UUID: CVModel] = [:]
     private var createCVResult: Result<CVModel, Error> = .success(CVModel())
     private var getCVResult: Result<CVModel?, Error> = .success(nil)
+    private var updateCVError: Error?
 
     // Configuration methods
     func setCreateCVResult(_ result: Result<CVModel, Error>) {
@@ -28,13 +33,17 @@ actor MockCVManagementUseCase: CVManagementUseCaseProtocol {
         self.getCVResult = result
     }
 
+    func setUpdateCVError(_ error: Error?) {
+        self.updateCVError = error
+    }
+
     func storeCV(_ cv: CVModel) {
         storedCVs[cv.id] = cv
     }
 
     // Protocol implementation
     func createCV(from model: CVModel) async throws -> CVModel {
-        createCVCalled = true
+        createCVCallCount += 1
 
         switch createCVResult {
         case .success(var cv):
@@ -59,14 +68,17 @@ actor MockCVManagementUseCase: CVManagementUseCaseProtocol {
     }
 
     func updateCV(_ model: CVModel) async throws -> CVModel {
-        updateCVCalled = true
+        updateCVCallCount += 1
+        if let updateCVError {
+            throw updateCVError
+        }
         updatedCVs.append(model)
         storedCVs[model.id] = model
         return model
     }
 
     func getCV(by id: UUID) async throws -> CVModel? {
-        getCVCalled = true
+        getCVCallCount += 1
 
         switch getCVResult {
         case .success(let cv):
@@ -95,6 +107,85 @@ actor MockCVManagementUseCase: CVManagementUseCaseProtocol {
         duplicate.name = "\(original.name) Copy"
         storedCVs[duplicate.id] = duplicate
         return duplicate
+    }
+}
+
+// MARK: - Gated CVManagementUseCase
+
+/// Holds the first call of one operation open until the test releases it, so a test can use the editor while a
+/// save is running. Later calls return at once, which makes an unwanted second create show up as a count instead of a hang.
+actor GatedCVManagementUseCase: CVManagementUseCaseProtocol {
+    enum Operation {
+        case create
+        case update
+    }
+
+    private(set) var createCVCallCount = 0
+    private(set) var createdCVs: [CVModel] = []
+    private(set) var updatedCVs: [CVModel] = []
+
+    private let gatedOperation: Operation
+    private let storedCV: CVModel?
+    private var gatedCallStarted = false
+    private var gateIsOpen = false
+    private var gatedCallStartedWaiter: CheckedContinuation<Void, Never>?
+    private var gateWaiter: CheckedContinuation<Void, Never>?
+
+    init(gating gatedOperation: Operation = .create, storedCV: CVModel? = nil) {
+        self.gatedOperation = gatedOperation
+        self.storedCV = storedCV
+    }
+
+    func waitUntilGatedCallStarts() async {
+        guard !gatedCallStarted else { return }
+        await withCheckedContinuation { gatedCallStartedWaiter = $0 }
+    }
+
+    func openGate() {
+        gateIsOpen = true
+        gateWaiter?.resume()
+        gateWaiter = nil
+    }
+
+    private func holdIfFirstCall(of operation: Operation, callCount: Int) async {
+        guard operation == gatedOperation, callCount == 1 else { return }
+        gatedCallStarted = true
+        gatedCallStartedWaiter?.resume()
+        gatedCallStartedWaiter = nil
+        if !gateIsOpen {
+            await withCheckedContinuation { gateWaiter = $0 }
+        }
+    }
+
+    func createCV(from template: CVModel) async throws -> CVModel {
+        createCVCallCount += 1
+        let created = template.copy()
+        createdCVs.append(created)
+        await holdIfFirstCall(of: .create, callCount: createCVCallCount)
+        return created
+    }
+
+    func updateCV(_ cv: CVModel) async throws -> CVModel {
+        updatedCVs.append(cv)
+        await holdIfFirstCall(of: .update, callCount: updatedCVs.count)
+        return cv
+    }
+
+    func getCV(by id: UUID) async throws -> CVModel? { storedCV }
+    func getAllCVs() async throws -> [CVModel] { [] }
+    func deleteCV(id: UUID) async throws {}
+    func duplicateCV(id: UUID) async throws -> CVModel { throw AppError.notFound("CV with id \(id)") }
+}
+
+private extension ViewState {
+    var isLoaded: Bool {
+        if case .loaded = self { return true }
+        return false
+    }
+
+    var isError: Bool {
+        if case .error = self { return true }
+        return false
     }
 }
 
@@ -214,7 +305,7 @@ struct CVEditorViewModelTests {
 
     // MARK: - Cancel Behavior Tests
 
-    @Test("handleCancelButtonTap returns true when no unsaved changes")
+    @Test("requestLeaving returns true when no unsaved changes")
     func handleCancelWithNoChanges() {
         // Given
         let mockUseCase = MockCVManagementUseCase()
@@ -225,14 +316,14 @@ struct CVEditorViewModelTests {
         )
 
         // When - CV is empty (no meaningful content)
-        let shouldNavigate = viewModel.handleCancelButtonTap()
+        let shouldNavigate = viewModel.requestLeaving()
 
         // Then - Should return true (navigate immediately) and not show confirmation
         #expect(shouldNavigate == true, "Should navigate immediately when no changes")
         #expect(viewModel.showingCancelConfirmation == false, "Should not show confirmation dialog")
     }
 
-    @Test("handleCancelButtonTap shows confirmation when there are unsaved changes")
+    @Test("requestLeaving shows confirmation when there are unsaved changes")
     func handleCancelWithChanges() {
         // Given
         let mockUseCase = MockCVManagementUseCase()
@@ -246,7 +337,7 @@ struct CVEditorViewModelTests {
         viewModel.cv.personalInfo.name = "John Doe"
 
         // When
-        let shouldNavigate = viewModel.handleCancelButtonTap()
+        let shouldNavigate = viewModel.requestLeaving()
 
         // Then - Should show confirmation and not navigate immediately
         #expect(shouldNavigate == false, "Should not navigate immediately with changes")
@@ -461,7 +552,7 @@ struct CVEditorViewModelTests {
 
         // When - Load existing CV and tap save without changes
         await viewModel.loadCV()
-        await viewModel.handleSaveButtonTap(onNavigate: {})
+        await viewModel.handleSaveButtonTap()
 
         // Then - Confirmation dialog should NOT be shown
         #expect(viewModel.showingSaveConfirmation == false, "Save confirmation should not be shown without changes")
@@ -537,7 +628,7 @@ struct CVEditorViewModelTests {
         // When - Load existing CV, make changes, and tap save
         await viewModel.loadCV()
         viewModel.cv.personalInfo.phone = "+1234567890"
-        await viewModel.handleSaveButtonTap(onNavigate: {})
+        await viewModel.handleSaveButtonTap()
 
         // Then - Confirmation dialog SHOULD be shown
         #expect(viewModel.showingSaveConfirmation == true, "Save confirmation should be shown with changes")
@@ -567,5 +658,353 @@ struct CVEditorViewModelTests {
         // Then - After save, no unsaved changes and save button disabled
         #expect(viewModel.hasUnsavedChanges == false, "Should have no unsaved changes after save")
         #expect(viewModel.isSaveButtonEnabled == false, "Save button should be disabled after save")
+    }
+
+    // MARK: - Saving a new CV more than once
+
+    @Test("Saving a new CV twice creates it once and then updates the same CV")
+    func savingNewCVTwiceCreatesOnceThenUpdates() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: mockUseCase)
+        viewModel.cv.personalInfo.name = "John Doe"
+
+        let firstSaved = await viewModel.saveCV()
+        viewModel.cv.personalInfo.email = "john@example.com"
+        let secondSaved = await viewModel.saveCV()
+
+        #expect(firstSaved == true)
+        #expect(secondSaved == true)
+        #expect(await mockUseCase.createCVCallCount == 1, "The second save must not create another CV")
+        #expect(await mockUseCase.updateCVCallCount == 1, "The second save updates the CV the first one created")
+        let createdId = await mockUseCase.createdCVs.first?.id
+        #expect(await mockUseCase.updatedCVs.first?.id == createdId, "Both saves must target the same CV")
+        #expect(await mockUseCase.updatedCVs.first?.personalInfo.email == "john@example.com")
+    }
+
+    @Test("A new CV has no unsaved changes after it is saved")
+    func newCVHasNoUnsavedChangesAfterSave() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: mockUseCase)
+        viewModel.cv.personalInfo.name = "John Doe"
+
+        _ = await viewModel.saveCV()
+
+        #expect(viewModel.hasUnsavedChanges == false)
+        #expect(viewModel.isSaveButtonEnabled == false)
+    }
+
+    @Test("Editing a saved new CV makes the changes unsaved again")
+    func editingSavedNewCVMakesChangesUnsavedAgain() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: mockUseCase)
+        viewModel.cv.personalInfo.name = "John Doe"
+        _ = await viewModel.saveCV()
+
+        viewModel.cv.personalInfo.phone = "+1234567890"
+
+        #expect(viewModel.hasUnsavedChanges == true)
+        #expect(viewModel.isSaveButtonEnabled == true)
+    }
+
+    @Test("Saving a new CV again without edits does nothing")
+    func savingSavedNewCVWithoutEditsDoesNothing() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: mockUseCase)
+        viewModel.cv.personalInfo.name = "John Doe"
+        _ = await viewModel.saveCV()
+
+        let saved = await viewModel.saveCV()
+
+        #expect(saved == false)
+        #expect(await mockUseCase.createCVCallCount == 1)
+        #expect(await mockUseCase.updateCVCallCount == 0)
+    }
+
+    // MARK: - Save in progress
+
+    @Test("A save in progress keeps the editor loaded, disables Save and ignores a second save")
+    func saveInProgressKeepsEditorAndIgnoresSecondSave() async {
+        let gatedUseCase = GatedCVManagementUseCase()
+        let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: gatedUseCase)
+        viewModel.cv.personalInfo.name = "John Doe"
+
+        let firstSave = Task { await viewModel.saveCV() }
+        await gatedUseCase.waitUntilGatedCallStarts()
+
+        #expect(viewModel.isSaving == true)
+        #expect(viewModel.viewState.isLoaded, "The editor must not be replaced by a spinner while saving")
+        #expect(viewModel.isSaveButtonEnabled == false)
+
+        let secondSave = await viewModel.saveCV()
+        #expect(secondSave == false, "A save started while another is running must be ignored")
+
+        await gatedUseCase.openGate()
+        #expect(await firstSave.value == true)
+        #expect(viewModel.isSaving == false)
+        #expect(await gatedUseCase.createCVCallCount == 1, "The CV must be created once")
+    }
+
+    @Test("Edits made while a new CV is being created are kept, unsaved, and the next save updates the same CV")
+    func editsDuringCreateAreKept() async {
+        let gatedUseCase = GatedCVManagementUseCase(gating: .create)
+        let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: gatedUseCase)
+        viewModel.cv.personalInfo.name = "John Doe"
+        viewModel.cv.skills = [Skill(name: "Swift"), Skill(name: "Kotlin")]
+
+        let saving = Task { await viewModel.saveCV() }
+        await gatedUseCase.waitUntilGatedCallStarts()
+        viewModel.cv.personalInfo.email = "john@example.com"
+        viewModel.removeSkill(at: 1)
+        await gatedUseCase.openGate()
+        #expect(await saving.value == true)
+
+        let createdId = await gatedUseCase.createdCVs.first?.id
+        #expect(viewModel.cv.personalInfo.email == "john@example.com", "An edit made during the save must survive it")
+        #expect(viewModel.cv.skills.map(\.name) == ["Swift"], "A row deleted during the save must stay deleted")
+        #expect(viewModel.cv.id == createdId, "The form adopts the id the store gave the new CV")
+        #expect(viewModel.hasUnsavedChanges == true, "What was not submitted is not saved")
+
+        #expect(await viewModel.saveCV() == true)
+        #expect(await gatedUseCase.createCVCallCount == 1, "The next save must not create the CV again")
+        #expect(await gatedUseCase.updatedCVs.map(\.id) == [createdId], "The next save updates the CV that was created")
+        #expect(await gatedUseCase.updatedCVs.first?.personalInfo.email == "john@example.com")
+        #expect(await gatedUseCase.updatedCVs.first?.skills.map(\.name) == ["Swift"])
+        #expect(viewModel.hasUnsavedChanges == false)
+    }
+
+    @Test("Edits made while a stored CV is being updated are kept, unsaved, and the next save updates the same CV")
+    func editsDuringUpdateAreKept() async {
+        let storedCV = CVModel(
+            id: UUID(),
+            name: "Stored CV",
+            personalInfo: PersonalInfo(name: "Jane Doe"),
+            skills: [Skill(name: "Swift"), Skill(name: "Kotlin")]
+        )
+        let gatedUseCase = GatedCVManagementUseCase(gating: .update, storedCV: storedCV)
+        let viewModel = CVEditorViewModel(cvId: storedCV.id.uuidString, cvManagementUseCase: gatedUseCase)
+        await viewModel.loadCV()
+        viewModel.cv.personalInfo.phone = "+1234567890"
+
+        let saving = Task { await viewModel.saveCV() }
+        await gatedUseCase.waitUntilGatedCallStarts()
+        viewModel.cv.personalInfo.email = "jane@example.com"
+        viewModel.removeSkill(at: 0)
+        await gatedUseCase.openGate()
+        #expect(await saving.value == true)
+
+        #expect(viewModel.cv.personalInfo.email == "jane@example.com", "An edit made during the save must survive it")
+        #expect(viewModel.cv.skills.map(\.name) == ["Kotlin"], "A row deleted during the save must stay deleted")
+        #expect(viewModel.cv.id == storedCV.id)
+        #expect(viewModel.hasUnsavedChanges == true, "What was not submitted is not saved")
+
+        #expect(await viewModel.saveCV() == true)
+        #expect(await gatedUseCase.createCVCallCount == 0)
+        #expect(await gatedUseCase.updatedCVs.map(\.id) == [storedCV.id, storedCV.id], "Both saves update the stored CV")
+        #expect(await gatedUseCase.updatedCVs.first?.personalInfo.phone == "+1234567890")
+        #expect(await gatedUseCase.updatedCVs.first?.personalInfo.email == "", "The first save submitted what was on screen then")
+        #expect(await gatedUseCase.updatedCVs.last?.personalInfo.email == "jane@example.com")
+        #expect(viewModel.hasUnsavedChanges == false)
+    }
+
+    @Test("An edit made during a save and undone before it returns leaves nothing unsaved")
+    func undoneEditDuringSaveLeavesNothingUnsaved() async {
+        let gatedUseCase = GatedCVManagementUseCase(gating: .create)
+        let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: gatedUseCase)
+        viewModel.cv.personalInfo.name = "John Doe"
+
+        let saving = Task { await viewModel.saveCV() }
+        await gatedUseCase.waitUntilGatedCallStarts()
+        viewModel.cv.personalInfo.email = "john@example.com"
+        viewModel.cv.personalInfo.email = ""
+        await gatedUseCase.openGate()
+        #expect(await saving.value == true)
+
+        #expect(viewModel.hasUnsavedChanges == false)
+    }
+
+    @Test("A save that returns after edits were made offers no success dialog, and leaving asks first")
+    func editsDuringCreateOfferNoSuccessDialog() async {
+        let gatedUseCase = GatedCVManagementUseCase(gating: .create)
+        let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: gatedUseCase)
+        viewModel.cv.personalInfo.name = "John Doe"
+
+        let saving = Task { await viewModel.handleSaveButtonTap() }
+        await gatedUseCase.waitUntilGatedCallStarts()
+        viewModel.cv.personalInfo.email = "john@example.com"
+        await gatedUseCase.openGate()
+        await saving.value
+
+        #expect(viewModel.showingSaveConfirmation == false, "Done in the success dialog would drop the edit made during the save")
+        #expect(viewModel.hasUnsavedChanges == true)
+        #expect(viewModel.isSaveButtonEnabled == true, "Save stays available for what was not stored")
+        #expect(viewModel.requestLeaving() == false, "Leaving must ask first")
+        #expect(viewModel.showingCancelConfirmation == true)
+
+        viewModel.showingCancelConfirmation = false
+        await viewModel.handleSaveButtonTap()
+
+        #expect(await gatedUseCase.updatedCVs.last?.personalInfo.email == "john@example.com", "Saving again stores the edit")
+        #expect(viewModel.showingSaveConfirmation == true, "The success dialog is offered once the form is clean")
+        #expect(viewModel.requestLeaving() == true)
+    }
+
+    @Test("Updating a stored CV that is edited meanwhile offers no success dialog, and leaving asks first")
+    func editsDuringUpdateOfferNoSuccessDialog() async {
+        let storedCV = CVModel(id: UUID(), name: "Stored CV", personalInfo: PersonalInfo(name: "Jane Doe"))
+        let gatedUseCase = GatedCVManagementUseCase(gating: .update, storedCV: storedCV)
+        let viewModel = CVEditorViewModel(cvId: storedCV.id.uuidString, cvManagementUseCase: gatedUseCase)
+        await viewModel.loadCV()
+        viewModel.cv.personalInfo.phone = "+1234567890"
+
+        let saving = Task { await viewModel.handleSaveButtonTap() }
+        await gatedUseCase.waitUntilGatedCallStarts()
+        viewModel.cv.skills = [Skill(name: "Swift")]
+        await gatedUseCase.openGate()
+        await saving.value
+
+        #expect(viewModel.showingSaveConfirmation == false)
+        #expect(viewModel.isSaveButtonEnabled == true)
+        #expect(viewModel.requestLeaving() == false)
+        #expect(viewModel.showingCancelConfirmation == true)
+
+        viewModel.showingCancelConfirmation = false
+        await viewModel.handleSaveButtonTap()
+
+        #expect(await gatedUseCase.updatedCVs.last?.skills.map(\.name) == ["Swift"], "Saving again stores the edit")
+        #expect(viewModel.showingSaveConfirmation == true)
+    }
+
+    @Test("A save with no edits meanwhile offers the success dialog and Done leaves without asking")
+    func cleanSaveOffersSuccessDialogAndLeaves() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: mockUseCase)
+        viewModel.cv.personalInfo.name = "John Doe"
+
+        await viewModel.handleSaveButtonTap()
+
+        #expect(viewModel.showingSaveConfirmation == true)
+        #expect(viewModel.requestLeaving() == true)
+        #expect(viewModel.showingCancelConfirmation == false)
+    }
+
+    @Test("Leaving is refused, without a dialog, while a save is running")
+    func leavingIsRefusedDuringASave() async {
+        let gatedUseCase = GatedCVManagementUseCase(gating: .create)
+        let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: gatedUseCase)
+        viewModel.cv.personalInfo.name = "John Doe"
+
+        let saving = Task { await viewModel.saveCV() }
+        await gatedUseCase.waitUntilGatedCallStarts()
+
+        #expect(viewModel.requestLeaving() == false, "The save would finish after the editor was left")
+        #expect(viewModel.showingCancelConfirmation == false)
+
+        await gatedUseCase.openGate()
+        #expect(await saving.value == true)
+        #expect(viewModel.requestLeaving() == true)
+    }
+
+    // MARK: - Failed saves
+
+    @Test("A failed create keeps the CV and reports the error")
+    func failedCreateKeepsCVAndReportsError() async {
+        let mockUseCase = MockCVManagementUseCase()
+        await mockUseCase.setCreateCVResult(.failure(AppError.fileSystemError("disk full")))
+        let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: mockUseCase)
+        viewModel.cv.personalInfo.name = "John Doe"
+
+        let saved = await viewModel.saveCV()
+
+        #expect(saved == false)
+        #expect(viewModel.saveError != nil)
+        #expect(viewModel.isShowingError == true)
+        #expect(viewModel.cv.personalInfo.name == "John Doe", "The edits must survive a failed save")
+        #expect(viewModel.hasUnsavedChanges == true)
+        #expect(viewModel.isSaving == false)
+        #expect(viewModel.viewState.isLoaded)
+        #expect(viewModel.showingSaveConfirmation == false)
+    }
+
+    @Test("After a failed create the next save creates the CV")
+    func saveAfterFailedCreateCreatesCV() async {
+        let mockUseCase = MockCVManagementUseCase()
+        await mockUseCase.setCreateCVResult(.failure(AppError.fileSystemError("disk full")))
+        let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: mockUseCase)
+        viewModel.cv.personalInfo.name = "John Doe"
+        _ = await viewModel.saveCV()
+
+        await mockUseCase.setCreateCVResult(.success(CVModel()))
+        let saved = await viewModel.saveCV()
+
+        #expect(saved == true)
+        #expect(viewModel.saveError == nil, "A new save attempt starts without the previous error")
+        #expect(await mockUseCase.createdCVs.count == 1)
+        #expect(await mockUseCase.updateCVCallCount == 0)
+    }
+
+    @Test("A failed update followed by clearError keeps the edits and the loaded editor")
+    func failedUpdateThenClearErrorKeepsEdits() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let existingCV = CVModel(
+            id: UUID(),
+            name: "Existing CV",
+            personalInfo: PersonalInfo(name: "Jane Doe", email: "jane@example.com")
+        )
+        await mockUseCase.storeCV(existingCV)
+        await mockUseCase.setUpdateCVError(AppError.fileSystemError("disk full"))
+        let viewModel = CVEditorViewModel(cvId: existingCV.id.uuidString, cvManagementUseCase: mockUseCase)
+        await viewModel.loadCV()
+        viewModel.cv.personalInfo.phone = "+1234567890"
+
+        let saved = await viewModel.saveCV()
+        viewModel.clearError()
+
+        #expect(saved == false)
+        #expect(viewModel.saveError == nil)
+        #expect(viewModel.isShowingError == false)
+        #expect(viewModel.cv.personalInfo.phone == "+1234567890", "The edits must survive the error alert")
+        #expect(viewModel.hasUnsavedChanges == true)
+        #expect(viewModel.viewState.isLoaded)
+        #expect(await mockUseCase.getCVCallCount == 1, "Dismissing the error must not reload the CV from storage")
+    }
+
+    // MARK: - Loading
+
+    @Test("Loading an existing CV twice reads it once and keeps the edits")
+    func loadingExistingCVTwiceReadsOnce() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let existingCV = CVModel(
+            id: UUID(),
+            name: "Existing CV",
+            personalInfo: PersonalInfo(name: "Jane Doe", email: "jane@example.com")
+        )
+        await mockUseCase.storeCV(existingCV)
+        let viewModel = CVEditorViewModel(cvId: existingCV.id.uuidString, cvManagementUseCase: mockUseCase)
+
+        await viewModel.loadCV()
+        viewModel.cv.personalInfo.phone = "+1234567890"
+        await viewModel.loadCV()
+
+        #expect(await mockUseCase.getCVCallCount == 1, "A CV already loaded must not be read again")
+        #expect(viewModel.cv.personalInfo.phone == "+1234567890", "A second load must not drop the edits")
+    }
+
+    @Test("A failed load shows the error and a retry reads the CV again")
+    func failedLoadCanBeRetried() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let existingCV = CVModel(id: UUID(), name: "Existing CV", personalInfo: PersonalInfo(name: "Jane Doe"))
+        await mockUseCase.storeCV(existingCV)
+        await mockUseCase.setGetCVResult(.failure(AppError.fileSystemError("unreadable")))
+        let viewModel = CVEditorViewModel(cvId: existingCV.id.uuidString, cvManagementUseCase: mockUseCase)
+
+        await viewModel.loadCV()
+        #expect(viewModel.viewState.isError)
+
+        await mockUseCase.setGetCVResult(.success(nil))
+        await viewModel.loadCV()
+
+        #expect(viewModel.viewState.isLoaded)
+        #expect(viewModel.cv.name == "Existing CV")
+        #expect(await mockUseCase.getCVCallCount == 2)
     }
 }

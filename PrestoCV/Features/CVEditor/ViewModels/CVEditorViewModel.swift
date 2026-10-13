@@ -7,20 +7,23 @@ final class CVEditorViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var cv: CVModel = CVModel()
     @Published var viewState: ViewState<CVModel> = .idle
+    @Published private(set) var isSaving = false
+    @Published var saveError: String?
     @Published var showingSaveConfirmation = false
     @Published var showingCancelConfirmation = false
+    @Published private(set) var pendingDeletion: PendingDeletion?
     
     // MARK: - Private Properties
     private let cvManagementUseCase: CVManagementUseCaseProtocol
     private let cvId: String?
-    private var isNewCV: Bool { cvId == nil }
-    private var originalCV: CVModel = CVModel()
+    /// The CV as last read from or written to storage; nil until the first load or save.
+    private var savedSnapshot: CVModel?
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Computed Properties
     
     var errorMessage: String {
-        viewState.errorMessage ?? ""
+        saveError ?? ""
     }
     
     /// Determines if the CV has meaningful content beyond just the name
@@ -90,19 +93,18 @@ final class CVEditorViewModel: ObservableObject {
         return Double(filledSections) / Double(totalSections)
     }
     
-    /// Indicates if there are unsaved changes by comparing with original CV
+    /// Indicates if there are unsaved changes: a CV that was never stored has them once it holds
+    /// meaningful content, a stored one when it differs from what was last stored.
     var hasUnsavedChanges: Bool {
-        // For new CVs, check if meaningful content was added
-        if isNewCV {
+        guard let savedSnapshot else {
             return hasMeaningfulContent
         }
-        // For existing CVs, compare with original
-        return cv != originalCV
+        return cv != savedSnapshot
     }
     
     /// Computed property for save button enabled state
     var isSaveButtonEnabled: Bool {
-        hasMeaningfulContent && hasUnsavedChanges && !viewState.isLoading
+        hasMeaningfulContent && hasUnsavedChanges && !isSaving
     }
     
     /// Computed property for save button color
@@ -112,10 +114,7 @@ final class CVEditorViewModel: ObservableObject {
     
     /// Computed property for error alert binding
     var isShowingError: Bool {
-        if case .error = viewState {
-            return true
-        }
-        return false
+        saveError != nil
     }
     
     // MARK: - Initialization
@@ -130,7 +129,6 @@ final class CVEditorViewModel: ObservableObject {
         // For new CVs, initialize with provided template or empty CV
         if cvId == nil {
             self.cv = initialCV ?? CVModel()
-            self.originalCV = CVModel() // New CVs start with empty original
             viewState = .loaded(self.cv)
         }
     }
@@ -146,6 +144,9 @@ final class CVEditorViewModel: ObservableObject {
             viewState = .loaded(cv)
             return 
         }
+
+        // A CV that is already loaded stays as it is: reading it again would drop the edits made since.
+        guard savedSnapshot == nil else { return }
         
         viewState = .loading
         
@@ -170,44 +171,59 @@ final class CVEditorViewModel: ObservableObject {
             return false
         }
 
-        viewState = .loading
+        // A second save while one is running would store the same new CV twice
+        guard !isSaving else {
+            return false
+        }
+
+        isSaving = true
+        saveError = nil
+        defer { isSaving = false }
+
+        // The form stays editable while the store works, so what is submitted is not what is on screen when it returns
+        let submittedCV = cv
 
         do {
             let savedCV: CVModel
-            if isNewCV {
-                // Create new CV from current data
-                savedCV = try await cvManagementUseCase.createCV(from: cv)
+            if savedSnapshot == nil {
+                // Never stored: create it from the submitted data
+                savedCV = try await cvManagementUseCase.createCV(from: submittedCV)
             } else {
-                // Update existing CV
-                savedCV = try await cvManagementUseCase.updateCV(cv)
+                // Already stored: update it
+                savedCV = try await cvManagementUseCase.updateCV(submittedCV)
             }
-            // Update the local CV with the saved one (might have updated ID or timestamps)
-            cv = savedCV
-            originalCV = savedCV // Update original after successful save
-            viewState = .loaded(cv)
+            adoptStored(savedCV, submitted: submittedCV)
             return true
         } catch {
-            let appError = error as? AppError ?? AppError.unknown(error.localizedDescription)
-            viewState = .error(appError.localizedDescription)
+            saveError = error.localizedAppErrorDescription
             return false
         }
     }
     
     @MainActor
-    func handleSaveButtonTap(onNavigate: @escaping () -> Void) async {
-        if await saveCV() {
+    func handleSaveButtonTap() async {
+        guard await saveCV() else {
+            return
+        }
+        // Edits made while the store worked are not saved yet. Offering Done now would let the user leave without them.
+        if !hasUnsavedChanges {
             showingSaveConfirmation = true
         }
     }
     
+    /// The question every way out of the editor asks first: Cancel, and Done in the save confirmation.
+    /// True when leaving would lose nothing. Otherwise the user is asked what to do, or, while a save is
+    /// running, has to wait for it, since it would finish after the editor is gone.
     @MainActor
-    func handleCancelButtonTap() -> Bool {
-        if hasUnsavedChanges {
-            showingCancelConfirmation = true
+    func requestLeaving() -> Bool {
+        guard !isSaving else {
             return false
-        } else {
+        }
+        guard hasUnsavedChanges else {
             return true
         }
+        showingCancelConfirmation = true
+        return false
     }
     
     @MainActor
@@ -221,13 +237,8 @@ final class CVEditorViewModel: ObservableObject {
     }
     
     @MainActor
-    func finishEditingAndNavigateBack() {
-        // No cleanup needed anymore
-    }
-    
-    @MainActor
     func clearError() {
-        viewState = viewState.clearingError()
+        saveError = nil
     }
     
     @MainActor
@@ -237,7 +248,7 @@ final class CVEditorViewModel: ObservableObject {
     
     @MainActor
     func removeSkill(at index: Int) {
-        cv.skills.remove(at: index)
+        removeRow(at: index, from: \.skills)
     }
     
     @MainActor
@@ -247,7 +258,7 @@ final class CVEditorViewModel: ObservableObject {
     
     @MainActor
     func removeExperience(at index: Int) {
-        cv.relevant_experience.remove(at: index)
+        removeRow(at: index, from: \.relevant_experience)
     }
     
     @MainActor
@@ -257,7 +268,7 @@ final class CVEditorViewModel: ObservableObject {
     
     @MainActor
     func removeEducation(at index: Int) {
-        cv.education.remove(at: index)
+        removeRow(at: index, from: \.education)
     }
     
     @MainActor
@@ -267,7 +278,7 @@ final class CVEditorViewModel: ObservableObject {
     
     @MainActor
     func removeLanguage(at index: Int) {
-        cv.languages.remove(at: index)
+        removeRow(at: index, from: \.languages)
     }
     
     @MainActor
@@ -277,7 +288,7 @@ final class CVEditorViewModel: ObservableObject {
     
     @MainActor
     func removeCertification(at index: Int) {
-        cv.certifications.remove(at: index)
+        removeRow(at: index, from: \.certifications)
     }
     
     @MainActor
@@ -287,7 +298,7 @@ final class CVEditorViewModel: ObservableObject {
     
     @MainActor
     func removeSocial(at index: Int) {
-        cv.social.remove(at: index)
+        removeRow(at: index, from: \.social)
     }
     
     @MainActor
@@ -297,16 +308,97 @@ final class CVEditorViewModel: ObservableObject {
     
     @MainActor
     func removeInterest(at index: Int) {
-        cv.interests.remove(at: index)
+        removeRow(at: index, from: \.interests)
+    }
+
+    // MARK: - Deleting Rows
+
+    /// Asks to remove a row. A row the user has put nothing in goes at once; any other waits for
+    /// `confirmDeletion`, because nothing can be undone.
+    @MainActor
+    func requestRemoval(of section: EditorSection, at index: Int) {
+        guard let row = row(of: section, at: index) else {
+            return
+        }
+        guard row.isBlank else {
+            pendingDeletion = PendingDeletion(section: section, index: index, rowName: row.displayName)
+            return
+        }
+        removeRow(of: section, at: index)
+    }
+
+    @MainActor
+    func confirmDeletion(_ deletion: PendingDeletion) {
+        pendingDeletion = nil
+        removeRow(of: deletion.section, at: deletion.index)
+    }
+
+    @MainActor
+    func cancelDeletion() {
+        pendingDeletion = nil
     }
 
     // MARK: - Private Methods
+
+    /// Records `storedCV` as what is in storage. A form that was not edited during the save takes the stored
+    /// values as they are. One that was edited keeps its edits and only adopts the identity of the stored CV,
+    /// so those edits still count as unsaved and the next save updates the same CV.
+    @MainActor
+    private func adoptStored(_ storedCV: CVModel, submitted submittedCV: CVModel) {
+        savedSnapshot = storedCV
+        if cv == submittedCV {
+            cv = storedCV
+        } else {
+            cv.id = storedCV.id
+        }
+    }
+
     @MainActor
     private func loadExistingCV(with uuid: UUID) async throws {
         guard let loadedCV = try await cvManagementUseCase.getCV(by: uuid) else {
             throw AppError.notFound("CV with id \(uuid)")
         }
         cv = loadedCV
-        originalCV = loadedCV // Store original for change tracking
+        savedSnapshot = loadedCV
+    }
+
+    private func row(of section: EditorSection, at index: Int) -> (any EditorRow)? {
+        switch section {
+        case .skills: return cv.skills[safe: index]
+        case .experience: return cv.relevant_experience[safe: index]
+        case .education: return cv.education[safe: index]
+        case .languages: return cv.languages[safe: index]
+        case .certifications: return cv.certifications[safe: index]
+        case .social: return cv.social[safe: index]
+        case .interests: return cv.interests[safe: index].map(InterestEntry.init)
+        }
+    }
+
+    @MainActor
+    private func removeRow(of section: EditorSection, at index: Int) {
+        switch section {
+        case .skills: removeSkill(at: index)
+        case .experience: removeExperience(at: index)
+        case .education: removeEducation(at: index)
+        case .languages: removeLanguage(at: index)
+        case .certifications: removeCertification(at: index)
+        case .social: removeSocial(at: index)
+        case .interests: removeInterest(at: index)
+        }
+    }
+
+    /// Removes the row at `index` if there is one: a list can ask for a row that is already gone.
+    @MainActor
+    private func removeRow<Row>(at index: Int, from rows: WritableKeyPath<CVModel, [Row]>) {
+        guard cv[keyPath: rows].indices.contains(index) else {
+            return
+        }
+        cv[keyPath: rows].remove(at: index)
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

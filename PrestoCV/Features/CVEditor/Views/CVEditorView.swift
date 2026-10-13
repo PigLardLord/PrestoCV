@@ -3,8 +3,13 @@ import PrestoCVCore
 
 struct CVEditorView: View {
     @EnvironmentObject var router: AppRouter
-    @ObservedObject var viewModel: CVEditorViewModel
+    @StateObject private var viewModel: CVEditorViewModel
     @State private var showingExportSheet = false
+
+    /// The view model is built once, when the screen first appears, and survives every re-render of the parent.
+    init(viewModel: @autoclosure @escaping () -> CVEditorViewModel) {
+        self._viewModel = StateObject(wrappedValue: viewModel())
+    }
     
     var body: some View {
         ViewStateContainer(
@@ -16,6 +21,8 @@ struct CVEditorView: View {
         }
         .navigationTitle(viewModel.cv.name.isEmpty ? "editor.new_cv".localized : viewModel.cv.name)
         .navigationBarTitleDisplayMode(.inline)
+        // Back and the edge swipe would leave without the discard confirmation that Cancel asks for
+        .navigationBarBackButtonHidden(true)
         .toolbar {
             // Leading: Cancel button with confirmation if unsaved changes
             ToolbarItem(placement: .navigationBarLeading) {
@@ -54,6 +61,21 @@ struct CVEditorView: View {
             Button("common.done".localized, action: handleSaveConfirmationDone)
         } message: {
             Text("dialog.save_success.message".asLoclizedKey)
+        }
+        .confirmationDialog(
+            "editor.delete_row.title".localized,
+            isPresented: isShowingDeleteConfirmation,
+            titleVisibility: .visible,
+            presenting: viewModel.pendingDeletion
+        ) { deletion in
+            Button("common.delete".localized, role: .destructive) {
+                withAnimation(DesignTokens.Animations.standardEaseInOut) {
+                    viewModel.confirmDeletion(deletion)
+                }
+            }
+            Button("common.cancel".localized, role: .cancel) { }
+        } message: { deletion in
+            Text("editor.delete_row.message".localizedWithArgs(deletion.rowName))
         }
         .sheet(isPresented: $showingExportSheet) {
             CVExportSheetView(cv: viewModel.cv)
@@ -100,20 +122,33 @@ struct CVEditorView: View {
         }
     }
     
+    private var isShowingDeleteConfirmation: Binding<Bool> {
+        Binding(
+            get: { viewModel.pendingDeletion != nil },
+            set: { isShowing in
+                if !isShowing {
+                    viewModel.cancelDeletion()
+                }
+            }
+        )
+    }
+    
     // MARK: - Action Handlers
     
     private func handleCancelTap() {
-        if viewModel.handleCancelButtonTap() {
-            // For new CVs, always go to root (CV List), not just back one level
+        leaveEditorUnlessEditsWouldBeLost()
+    }
+
+    /// For new CVs, always go to root (CV List), not just back one level
+    private func leaveEditorUnlessEditsWouldBeLost() {
+        if viewModel.requestLeaving() {
             router.navigateToRoot()
         }
     }
     
     private func handleSaveTap() {
         Task {
-            await viewModel.handleSaveButtonTap {
-                router.navigateBack()
-            }
+            await viewModel.handleSaveButtonTap()
         }
     }
     
@@ -123,8 +158,7 @@ struct CVEditorView: View {
     }
     
     private func handleSaveConfirmationDone() {
-        viewModel.finishEditingAndNavigateBack()
-        router.navigateToRoot()
+        leaveEditorUnlessEditsWouldBeLost()
     }
 }
 

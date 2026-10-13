@@ -40,7 +40,7 @@ struct LanguagesSubsection: View {
                 )
             },
             onAdd: viewModel.addLanguage,
-            onRemove: { viewModel.removeLanguage(at: $0) }
+            onRemove: { viewModel.requestRemoval(of: .languages, at: $0) }
         )
     }
 }
@@ -63,7 +63,7 @@ struct CertificationsSubsection: View {
                 )
             },
             onAdd: viewModel.addCertification,
-            onRemove: { viewModel.removeCertification(at: $0) }
+            onRemove: { viewModel.requestRemoval(of: .certifications, at: $0) }
         )
     }
 }
@@ -86,7 +86,7 @@ struct SocialLinksSubsection: View {
                 )
             },
             onAdd: viewModel.addSocial,
-            onRemove: { viewModel.removeSocial(at: $0) }
+            onRemove: { viewModel.requestRemoval(of: .social, at: $0) }
         )
     }
 }
@@ -109,7 +109,7 @@ struct InterestsSubsection: View {
                 )
             },
             onAdd: viewModel.addInterest,
-            onRemove: { viewModel.removeInterest(at: $0) }
+            onRemove: { viewModel.requestRemoval(of: .interests, at: $0) }
         )
     }
 }

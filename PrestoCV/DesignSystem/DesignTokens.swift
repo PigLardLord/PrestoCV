@@ -79,6 +79,8 @@ enum DesignTokens {
         static let textEditorMinHeight: CGFloat = 100
         static let textFieldWidth: CGFloat = 80
         static let textFieldMaxWidth: CGFloat = 100
+        /// The smallest size of anything the user taps.
+        static let minimumTapTarget: CGFloat = 44
     }
     
     // MARK: - Border Widths

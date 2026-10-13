@@ -23,7 +23,7 @@ struct ViewStateContainer<T, Content: View>: View {
     var body: some View {
         switch viewState {
         case .idle:
-            idleStateView
+            Color.clear
         case .loading:
             loadingStateView
         case .loaded(let data):
@@ -34,12 +34,6 @@ struct ViewStateContainer<T, Content: View>: View {
     }
     
     // MARK: - State Views
-    
-    @ViewBuilder
-    private var idleStateView: some View {
-        Color.clear
-            .onAppear(perform: triggerInitialLoadIfNeeded)
-    }
     
     @ViewBuilder
     private var loadingStateView: some View {
@@ -68,13 +62,6 @@ struct ViewStateContainer<T, Content: View>: View {
     }
     
     // MARK: - Helper Methods
-    
-    private func triggerInitialLoadIfNeeded() {
-        guard let onRetry = onRetry else { return }
-        Task {
-            await onRetry()
-        }
-    }
     
     private func createRetryAction() {
         guard let onRetry = onRetry else { return }

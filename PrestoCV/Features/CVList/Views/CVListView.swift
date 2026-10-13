@@ -1,12 +1,19 @@
 import SwiftUI
 import PrestoCVCore
 
-struct CVListView: View {
+/// The list of the user's CVs, which is the root of the app. `emptyState` is what it shows while there is no CV.
+struct CVListView<EmptyState: View>: View {
     @ObservedObject var viewModel: CVListViewModel
     @EnvironmentObject var router: AppRouter
     @State private var exportTarget: CVModel?
     @State private var deleteTarget: CVModel?
     @State private var showDeleteConfirmation = false
+    private let emptyState: EmptyState
+
+    init(viewModel: CVListViewModel, @ViewBuilder emptyState: () -> EmptyState) {
+        self.viewModel = viewModel
+        self.emptyState = emptyState()
+    }
     
     var body: some View {
         ViewStateContainer(
@@ -17,7 +24,7 @@ struct CVListView: View {
             ConditionalContentView(
                 isEmpty: cvs.isEmpty,
                 content: { cvListView },
-                emptyContent: { emptyStateView }
+                emptyContent: { emptyState }
             )
         }
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -69,12 +76,6 @@ struct CVListView: View {
     }
     
     // MARK: - View Components
-    
-    private var emptyStateView: some View {
-        EmptyStateView.noCVs {
-            router.navigate(to: .templateSelection)
-        }
-    }
     
     private var cvListView: some View {
         DeletableList(items: viewModel.cvs) { cv in
@@ -129,7 +130,9 @@ private struct CVRowView: View {
 struct CVListView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            CVListView(viewModel: createMockViewModel())
+            CVListView(viewModel: createMockViewModel()) {
+                FirstRunView()
+            }
         }
         .environmentObject(AppRouter())
     }
