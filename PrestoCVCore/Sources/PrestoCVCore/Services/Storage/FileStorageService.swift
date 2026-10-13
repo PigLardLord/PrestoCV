@@ -23,7 +23,7 @@ public actor FileStorageService: StorageServiceProtocol{
     private let fileManager: FileManager
     private let baseDirectory: URL
     private let fileExtension = "json"
-    private let logger = Logger(subsystem: "com.pplsoftware.PrestoCV", category: "storage")
+    private let logger = Logger(subsystem: "com.PigLardLord.prestocv", category: "storage")
 
     public init(fileManager: FileManager = .default, baseDirectory: URL) throws {
         self.fileManager = fileManager

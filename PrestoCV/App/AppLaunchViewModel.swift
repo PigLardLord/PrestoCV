@@ -4,7 +4,7 @@ import PrestoCVCore
 import CVPDFExporter
 import os
 
-private let launchLogger = Logger(subsystem: "com.pplsoftware.PrestoCV", category: "launch")
+private let launchLogger = Logger(subsystem: "com.PigLardLord.prestocv", category: "launch")
 
 /// Installs the templates that ship with the app. A failure is logged and does not block the launch.
 func installBundledTemplates() async {
