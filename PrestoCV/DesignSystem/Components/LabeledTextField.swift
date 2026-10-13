@@ -54,9 +54,9 @@ struct LabeledTextField: View {
 // MARK: - Convenience Initializers
 extension LabeledTextField {
     static func email(
-        label: String = "Email",
+        label: String = "field.email".localized,
         text: Binding<String>,
-        placeholder: String = "Enter your email",
+        placeholder: String = "field.email.placeholder".localized,
         isRequired: Bool = false,
         onCommit: (() -> Void)? = nil
     ) -> LabeledTextField {
@@ -74,31 +74,16 @@ extension LabeledTextField {
             textContentType: .emailAddress,
             isRequired: isRequired,
             validationState: validationState,
-            errorMessage: validationState == .invalid ? "Please enter a valid email address" : nil,
-            helpText: isRequired ? "Required field" : "We'll use this for professional contact",
-            onCommit: onCommit
-        )
-    }
-    
-    static func password(
-        label: String = "Password",
-        text: Binding<String>,
-        placeholder: String = "Enter your password",
-        onCommit: (() -> Void)? = nil
-    ) -> LabeledTextField {
-        LabeledTextField(
-            label: label,
-            text: text,
-            placeholder: placeholder,
-            isSecure: true,
+            errorMessage: validationState == .invalid ? "field.email.error_invalid".localized : nil,
+            helpText: isRequired ? "field.help.required".localized : "field.email.help".localized,
             onCommit: onCommit
         )
     }
     
     static func phone(
-        label: String = "Phone",
+        label: String = "field.phone".localized,
         text: Binding<String>,
-        placeholder: String = "Enter your phone number",
+        placeholder: String = "field.phone.placeholder".localized,
         isRequired: Bool = false,
         onCommit: (() -> Void)? = nil
     ) -> LabeledTextField {
@@ -109,16 +94,16 @@ extension LabeledTextField {
             keyboardType: .phonePad,
             textContentType: .telephoneNumber,
             isRequired: isRequired,
-            helpText: "Include country code for international contacts",
+            helpText: "field.phone.help".localized,
             onCommit: onCommit
         )
     }
     
     static func url(
-        label: String = "URL",
+        label: String = "field.url".localized,
         text: Binding<String>,
         placeholder: String = "https://example.com",
-        helpText: String? = "Include https:// for web links",
+        helpText: String? = "field.url.help".localized,
         onCommit: (() -> Void)? = nil
     ) -> LabeledTextField {
         let validationState: ValidationState = {
@@ -143,7 +128,6 @@ extension LabeledTextField {
 struct LabeledTextField_Previews: PreviewProvider {
     @State static var text = "Sample text"
     @State static var email = ""
-    @State static var password = ""
     @State static var phone = ""
     @State static var url = ""
     
@@ -153,10 +137,6 @@ struct LabeledTextField_Previews: PreviewProvider {
             
             LabeledTextField.email(text: $email) {
                 print("Email submitted")
-            }
-            
-            LabeledTextField.password(text: $password) {
-                print("Password submitted")
             }
             
             LabeledTextField.phone(text: $phone)

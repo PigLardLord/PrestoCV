@@ -113,7 +113,7 @@ extension EmptyStateView {
     static func noSearchResults(query: String = "") -> EmptyStateView {
         let message = query.isEmpty
             ? "empty.search_no_results_default".localized
-            : "No results found for \"\(query)\". Try different keywords."
+            : "empty.search_no_results_for".localizedWithArgs(query)
 
         return EmptyStateView(
             icon: "magnifyingglass",

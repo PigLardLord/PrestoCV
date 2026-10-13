@@ -89,7 +89,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tippen Sie, um den CV-Editor zu öffnen"
+            "value" : "Tippen, um den Lebenslauf-Editor zu öffnen"
           }
         },
         "en" : {
@@ -101,25 +101,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Toque para abrir el editor de CV"
+            "value" : "Toca para abrir el editor de CV"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Appuyez pour ouvrir l'éditeur de CV"
+            "value" : "Touchez pour ouvrir l’éditeur de CV"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tocca per aprire l'editor del CV"
+            "value" : "Tocca per aprire l’editor del CV"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Toque para abrir o editor de CV"
+            "value" : "Toque para abrir o editor de currículo"
           }
         }
       }
@@ -130,7 +130,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zu %@ navigieren"
+            "value" : "Zu %@ wechseln"
           }
         },
         "en" : {
@@ -142,7 +142,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Navegar a %@"
+            "value" : "Ir a %@"
           }
         },
         "fr" : {
@@ -160,7 +160,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Navegar para %@"
+            "value" : "Ir para %@"
           }
         }
       }
@@ -171,7 +171,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fähigkeitslevel-Auswahl"
+            "value" : "Auswahl der Fähigkeitsstufe"
           }
         },
         "en" : {
@@ -183,25 +183,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Selector de nivel de habilidad"
+            "value" : "Selector del nivel de competencia"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sélecteur de niveau de compétence"
+            "value" : "Sélecteur du niveau de compétence"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Selettore livello competenza"
+            "value" : "Selettore del livello di competenza"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seletor de nível de habilidade"
+            "value" : "Seletor do nível de competência"
           }
         }
       }
@@ -212,7 +212,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fertigkeitsstufe %1$lld von %2$lld"
+            "value" : "Fähigkeitsstufe %1$lld von %2$lld"
           }
         },
         "en" : {
@@ -224,25 +224,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nivel de habilidad %1$lld de %2$lld"
+            "value" : "Nivel de competencia %1$lld de %2$lld"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Niveau de compétence %1$lld sur %2$lld"
+            "value" : "Niveau de compétence : %1$lld sur %2$lld"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Livello di abilità %1$lld su %2$lld"
+            "value" : "Livello di competenza %1$lld su %2$lld"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nível de habilidade %1$lld de %2$lld"
+            "value" : "Nível de competência %1$lld de %2$lld"
           }
         }
       }
@@ -294,7 +294,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Es gibt ungespeicherte Änderungen in diesem Formular"
+            "value" : "Dieses Formular enthält ungespeicherte Änderungen"
           }
         },
         "en" : {
@@ -306,25 +306,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hay cambios sin guardar en este formulario"
+            "value" : "Este formulario tiene cambios sin guardar"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il y a des modifications non sauvegardées dans ce formulaire"
+            "value" : "Ce formulaire contient des modifications non enregistrées"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ci sono modifiche non salvate in questo modulo"
+            "value" : "Questo modulo contiene modifiche non salvate"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Há alterações não salvas neste formulário"
+            "value" : "Este formulário tem alterações não salvas"
           }
         }
       }
@@ -335,7 +335,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zertifizierung Hinzufügen"
+            "value" : "Zertifikat hinzufügen"
           }
         },
         "en" : {
@@ -347,25 +347,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agregar Certificación"
+            "value" : "Agregar certificación"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajouter une Certification"
+            "value" : "Ajouter une certification"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiungi Certificazione"
+            "value" : "Aggiungi certificazione"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicionar Certificação"
+            "value" : "Adicionar certificação"
           }
         }
       }
@@ -376,7 +376,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bildung Hinzufügen"
+            "value" : "Ausbildung hinzufügen"
           }
         },
         "en" : {
@@ -388,25 +388,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agregar Educación"
+            "value" : "Agregar formación"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajouter une Éducation"
+            "value" : "Ajouter une formation"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiungi Istruzione"
+            "value" : "Aggiungi formazione"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicionar Educação"
+            "value" : "Adicionar formação"
           }
         }
       }
@@ -417,7 +417,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erfahrung Hinzufügen"
+            "value" : "Berufserfahrung hinzufügen"
           }
         },
         "en" : {
@@ -429,25 +429,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agregar Experiencia"
+            "value" : "Agregar experiencia"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajouter une Expérience"
+            "value" : "Ajouter une expérience"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiungi Esperienza"
+            "value" : "Aggiungi esperienza"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicionar Experiência"
+            "value" : "Adicionar experiência"
           }
         }
       }
@@ -458,7 +458,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interesse Hinzufügen"
+            "value" : "Interesse hinzufügen"
           }
         },
         "en" : {
@@ -470,25 +470,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agregar Interés"
+            "value" : "Agregar interés"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajouter un Intérêt"
+            "value" : "Ajouter un centre d’intérêt"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiungi Interesse"
+            "value" : "Aggiungi interesse"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicionar Interesse"
+            "value" : "Adicionar interesse"
           }
         }
       }
@@ -499,7 +499,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sprache Hinzufügen"
+            "value" : "Sprache hinzufügen"
           }
         },
         "en" : {
@@ -511,25 +511,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agregar Idioma"
+            "value" : "Agregar idioma"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajouter une Langue"
+            "value" : "Ajouter une langue"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiungi Lingua"
+            "value" : "Aggiungi lingua"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicionar Idioma"
+            "value" : "Adicionar idioma"
           }
         }
       }
@@ -540,7 +540,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fähigkeit Hinzufügen"
+            "value" : "Fähigkeit hinzufügen"
           }
         },
         "en" : {
@@ -552,25 +552,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agregar Habilidad"
+            "value" : "Agregar competencia"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajouter une Compétence"
+            "value" : "Ajouter une compétence"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiungi Competenza"
+            "value" : "Aggiungi competenza"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicionar Habilidade"
+            "value" : "Adicionar competência"
           }
         }
       }
@@ -581,7 +581,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Social Link Hinzufügen"
+            "value" : "Profil hinzufügen"
           }
         },
         "en" : {
@@ -593,25 +593,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agregar Enlace Social"
+            "value" : "Agregar perfil"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajouter un Lien Social"
+            "value" : "Ajouter un profil"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiungi Link Social"
+            "value" : "Aggiungi profilo"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicionar Link Social"
+            "value" : "Adicionar perfil"
           }
         }
       }
@@ -745,7 +745,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "KI-CV-Erstellung"
+            "value" : "Lebenslauf mit KI erstellen"
           }
         },
         "en" : {
@@ -909,7 +909,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "KI-gestützte CV-Erstellung"
+            "value" : "KI-gestützte Lebenslauf-Erstellung"
           }
         },
         "en" : {
@@ -950,7 +950,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erstelle deinen Lebenslauf mit KI..."
+            "value" : "Ihr Lebenslauf wird mit KI erstellt …"
           }
         },
         "en" : {
@@ -1108,47 +1108,6 @@
         }
       }
     },
-    "common.continue_editing" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bearbeitung Fortsetzen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continue Editing"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuar Editando"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuer l'Édition"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continua Modifica"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuar Editando"
-          }
-        }
-      }
-    },
     "common.delete" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1214,7 +1173,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Annuler"
+            "value" : "Ignorer"
           }
         },
         "it" : {
@@ -1249,7 +1208,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hecho"
+            "value" : "Listo"
           }
         },
         "fr" : {
@@ -1261,7 +1220,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fatto"
+            "value" : "Fine"
           }
         },
         "pt" : {
@@ -1313,88 +1272,6 @@
         }
       }
     },
-    "common.format.sentence_join" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. %2$@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. %2$@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. %2$@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. %2$@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. %2$@"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. %2$@"
-          }
-        }
-      }
-    },
-    "common.keep_editing" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Weiter Bearbeiten"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keep Editing"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuar Editando"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuer l'Édition"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continua a Modificare"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuar Editando"
-          }
-        }
-      }
-    },
     "common.loading" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1442,7 +1319,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CVs werden geladen..."
+            "value" : "Ihre Lebensläufe werden geladen …"
           }
         },
         "en" : {
@@ -1454,13 +1331,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cargando tus CVs..."
+            "value" : "Cargando tus CV..."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chargement de vos CVs..."
+            "value" : "Chargement de vos CV..."
           }
         },
         "it" : {
@@ -1472,7 +1349,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carregando seus CVs..."
+            "value" : "Carregando seus currículos..."
           }
         }
       }
@@ -1524,7 +1401,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verarbeitung..."
+            "value" : "Wird verarbeitet …"
           }
         },
         "en" : {
@@ -1542,13 +1419,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Traitement..."
+            "value" : "Traitement en cours..."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Elaborazione..."
+            "value" : "Elaborazione in corso..."
           }
         },
         "pt" : {
@@ -1641,95 +1518,13 @@
         }
       }
     },
-    "cv.changes_saved" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ihre Änderungen wurden gespeichert."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your changes have been saved."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tus cambios han sido guardados."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vos modifications ont été sauvegardées."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le tue modifiche sono state salvate."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Suas alterações foram salvas."
-          }
-        }
-      }
-    },
-    "cv.creating" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lebenslauf wird erstellt..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Creating CV..."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Creando CV..."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Création du CV..."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Creazione CV..."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Criando CV..."
-          }
-        }
-      }
-    },
     "cv.delete.confirmation.message" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Möchten Sie diesen Lebenslauf wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden."
+            "value" : "Möchten Sie diesen Lebenslauf wirklich löschen? Dies kann nicht rückgängig gemacht werden."
           }
         },
         "en" : {
@@ -1741,7 +1536,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "¿Seguro que deseas eliminar este CV? Esta acción no se puede deshacer."
+            "value" : "¿Seguro que quieres eliminar este CV? Esta acción no se puede deshacer."
           }
         },
         "fr" : {
@@ -1753,13 +1548,13 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sei sicuro di voler eliminare questo CV? Questa azione non può essere annullata."
+            "value" : "Vuoi davvero eliminare questo CV? Questa azione non può essere annullata."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tem certeza de que deseja excluir este currículo? Esta ação não pode ser desfeita."
+            "value" : "Tem certeza de que quer excluir este currículo? Esta ação não pode ser desfeita."
           }
         }
       }
@@ -1924,7 +1719,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lebenslauf wird geladen..."
+            "value" : "Lebenslauf wird geladen …"
           }
         },
         "en" : {
@@ -1948,95 +1743,13 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Caricamento CV..."
+            "value" : "Caricamento del CV..."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carregando CV..."
-          }
-        }
-      }
-    },
-    "cv.loading_list" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ihre Lebensläufe werden geladen..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading your CVs..."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cargando tus CVs..."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chargement de vos CVs..."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Caricamento dei tuoi CV..."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Carregando seus CVs..."
-          }
-        }
-      }
-    },
-    "cv.my_cvs" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Meine Lebensläufe"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "My CVs"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mis CVs"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mes CVs"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I miei CV"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Meus CVs"
+            "value" : "Carregando currículo..."
           }
         }
       }
@@ -2077,48 +1790,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Novo CV"
-          }
-        }
-      }
-    },
-    "cv.saved_success" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lebenslauf Erfolgreich Gespeichert"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CV Saved Successfully"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CV Guardado Exitosamente"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CV Sauvegardé avec Succès"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CV Salvato con Successo"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CV Salvo com Sucesso"
+            "value" : "Novo currículo"
           }
         }
       }
@@ -2129,7 +1801,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unbenannter Lebenslauf"
+            "value" : "Lebenslauf ohne Titel"
           }
         },
         "en" : {
@@ -2141,25 +1813,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV Sin Título"
+            "value" : "CV sin título"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV Sans Titre"
+            "value" : "CV sans titre"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV Senza Titolo"
+            "value" : "CV senza titolo"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV Sem Título"
+            "value" : "Currículo sem título"
           }
         }
       }
@@ -2182,13 +1854,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se perderán todos los cambios no guardados."
+            "value" : "Se perderán todos los cambios sin guardar."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Toutes les modifications non sauvegardées seront perdues."
+            "value" : "Toutes les modifications non enregistrées seront perdues."
           }
         },
         "it" : {
@@ -2211,7 +1883,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Änderungen Verwerfen?"
+            "value" : "Änderungen verwerfen?"
           }
         },
         "en" : {
@@ -2223,25 +1895,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "¿Descartar Cambios?"
+            "value" : "¿Descartar los cambios?"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Annuler les Modifications ?"
+            "value" : "Ignorer les modifications ?"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scartare le Modifiche?"
+            "value" : "Scartare le modifiche?"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Descartar Alterações?"
+            "value" : "Descartar as alterações?"
           }
         }
       }
@@ -2252,7 +1924,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ihr Lebenslauf wurde erfolgreich gespeichert."
+            "value" : "Ihr Lebenslauf wurde gespeichert."
           }
         },
         "en" : {
@@ -2264,148 +1936,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Su CV ha sido guardado exitosamente."
+            "value" : "Tu CV se ha guardado correctamente."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Votre CV a été sauvegardé avec succès."
+            "value" : "Votre CV a bien été enregistré."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il tuo CV è stato salvato con successo."
+            "value" : "Il tuo CV è stato salvato."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seu CV foi salvo com sucesso."
-          }
-        }
-      }
-    },
-    "dialog.unsaved_changes.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Es gibt ungespeicherte Änderungen in diesem Formular"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "There are unsaved changes in this form"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hay cambios no guardados en este formulario"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il y a des modifications non sauvegardées dans ce formulaire"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ci sono modifiche non salvate in questo modulo"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Há alterações não salvas neste formulário"
-          }
-        }
-      }
-    },
-    "dialog.unsaved_changes.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ungespeicherte Änderungen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unsaved changes"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cambios no guardados"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modifications non sauvegardées"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modifiche non salvate"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alterações não salvas"
-          }
-        }
-      }
-    },
-    "dialog.unsaved_changes.warning" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sie haben ungespeicherte Änderungen, die verloren gehen, wenn Sie fortfahren."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You have unsaved changes that will be lost if you continue."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tienes cambios no guardados que se perderán si continúas."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous avez des modifications non sauvegardées qui seront perdues si vous continuez."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hai modifiche non salvate che andranno perse se continui."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Você tem alterações não salvas que serão perdidas se continuar."
+            "value" : "Seu currículo foi salvo."
           }
         }
       }
@@ -2428,25 +1977,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Continuar Editando"
+            "value" : "Seguir editando"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Continuer l'Édition"
+            "value" : "Continuer la modification"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Continua a Modificare"
+            "value" : "Continua a modificare"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Continuar Editando"
+            "value" : "Continuar editando"
           }
         }
       }
@@ -2551,25 +2100,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seguir Editando"
+            "value" : "Seguir editando"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Continuer l'Édition"
+            "value" : "Continuer la modification"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Continua a Modificare"
+            "value" : "Continua a modificare"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Continuar Editando"
+            "value" : "Continuar editando"
           }
         }
       }
@@ -2610,7 +2159,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Novo CV"
+            "value" : "Novo currículo"
           }
         }
       }
@@ -2633,66 +2182,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guardado Exitosamente"
+            "value" : "Guardado correctamente"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sauvegardé avec Succès"
+            "value" : "Enregistré avec succès"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Salvato con Successo"
+            "value" : "Salvato con successo"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Salvo com Sucesso"
-          }
-        }
-      }
-    },
-    "editor.tab_guidance" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wischen Sie zwischen den Tabs, um verschiedene Abschnitte Ihres Lebenslaufs zu bearbeiten"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Swipe between tabs to edit different sections of your CV"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desliza entre pestañas para editar diferentes secciones de tu CV"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Balayez entre les onglets pour éditer différentes sections de votre CV"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scorri tra le schede per modificare diverse sezioni del tuo CV"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Deslize entre as abas para editar diferentes seções do seu CV"
+            "value" : "Salvo com sucesso"
           }
         }
       }
@@ -2733,7 +2241,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Editor de CV"
+            "value" : "Editor de currículo"
           }
         }
       }
@@ -2756,25 +2264,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cambios No Guardados"
+            "value" : "Cambios sin guardar"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modifications Non Sauvegardées"
+            "value" : "Modifications non enregistrées"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modifiche Non Salvate"
+            "value" : "Modifiche non salvate"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Alterações Não Salvas"
+            "value" : "Alterações não salvas"
           }
         }
       }
@@ -2785,7 +2293,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fügen Sie professionelle Zertifikate und Qualifikationen hinzu"
+            "value" : "Fügen Sie Ihre beruflichen Zertifikate und Qualifikationen hinzu"
           }
         },
         "en" : {
@@ -2797,312 +2305,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agregue certificaciones profesionales y calificaciones"
+            "value" : "Agrega tus certificaciones y cualificaciones profesionales"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajoutez des certifications professionnelles et qualifications"
+            "value" : "Ajoutez vos certifications et qualifications professionnelles"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiungi certificazioni professionali e qualifiche"
+            "value" : "Aggiungi le tue certificazioni e qualifiche professionali"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicione certificações profissionais e qualificações"
-          }
-        }
-      }
-    },
-    "empty.description_certifications" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fügen Sie berufliche Zertifizierungen und Leistungen hinzu"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add professional certifications and achievements"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agrega certificaciones profesionales y logros"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajoutez des certifications professionnelles et des réalisations"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiungi certificazioni professionali e risultati"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicione certificações profissionais e conquistas"
-          }
-        }
-      }
-    },
-    "empty.description_education" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fügen Sie Ihren Bildungshintergrund und Qualifikationen hinzu"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add your educational background and qualifications"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agrega tu formación académica y calificaciones"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajoutez votre formation et qualifications"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiungi la tua formazione e qualifiche"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicione sua formação educacional e qualificações"
-          }
-        }
-      }
-    },
-    "empty.description_experience" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fügen Sie Ihre Berufserfahrung hinzu, um Ihren beruflichen Hintergrund zu zeigen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add your work experience to showcase your professional background"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agrega tu experiencia laboral para mostrar tu trasfondo profesional"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajoutez votre expérience professionnelle pour mettre en valeur votre parcours"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiungi la tua esperienza lavorativa per mostrare il tuo background professionale"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicione sua experiência de trabalho para mostrar seu histórico profissional"
-          }
-        }
-      }
-    },
-    "empty.description_interests" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fügen Sie persönliche Interessen und Hobbys hinzu"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add personal interests and hobbies"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agrega intereses personales y pasatiempos"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajoutez des intérêts personnels et des passe-temps"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiungi interessi personali e hobby"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicione interesses pessoais e hobbies"
-          }
-        }
-      }
-    },
-    "empty.description_languages" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fügen Sie Sprachen hinzu, die Sie sprechen und Ihr Kompetenzniveau"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add languages you speak and your proficiency level"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agrega idiomas que hablas y tu nivel de competencia"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajoutez les langues que vous parlez et votre niveau de compétence"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiungi le lingue che parli e il tuo livello di competenza"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicione idiomas que você fala e seu nível de proficiência"
-          }
-        }
-      }
-    },
-    "empty.description_skills" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fügen Sie Ihre technischen und beruflichen Fähigkeiten hinzu"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add your technical and professional skills"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agrega tus habilidades técnicas y profesionales"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajoutez vos compétences techniques et professionnelles"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiungi le tue competenze tecniche e professionali"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicione suas habilidades técnicas e profissionais"
-          }
-        }
-      }
-    },
-    "empty.description_social_links" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fügen Sie professionelle Social-Media-Profile und Websites hinzu"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add professional social media profiles and websites"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agrega perfiles de redes sociales profesionales y sitios web"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajoutez des profils de médias sociaux professionnels et des sites web"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiungi profili social media professionali e siti web"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicione perfis de mídia social profissionais e sites"
+            "value" : "Adicione suas certificações e qualificações profissionais"
           }
         }
       }
@@ -3113,7 +2334,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fügen Sie Ihren Bildungshintergrund und Abschlüsse hinzu"
+            "value" : "Fügen Sie Ihre Ausbildung und Ihre Abschlüsse hinzu"
           }
         },
         "en" : {
@@ -3125,25 +2346,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agregue su formación académica y títulos"
+            "value" : "Agrega tu formación y tus títulos"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajoutez votre formation académique et diplômes"
+            "value" : "Ajoutez votre formation et vos diplômes"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiungi il tuo background educativo e le lauree"
+            "value" : "Aggiungi la tua formazione e i tuoi titoli di studio"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicione sua formação acadêmica e diplomas"
+            "value" : "Adicione sua formação e seus diplomas"
           }
         }
       }
@@ -3154,7 +2375,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fügen Sie Ihre Berufserfahrung und Positionen hinzu"
+            "value" : "Fügen Sie Ihre Berufserfahrung und Ihre Positionen hinzu"
           }
         },
         "en" : {
@@ -3166,25 +2387,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agregue su experiencia laboral y posiciones"
+            "value" : "Agrega tu experiencia laboral y tus puestos"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajoutez votre expérience professionnelle et postes"
+            "value" : "Ajoutez votre expérience professionnelle et vos postes"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiungi la tua esperienza lavorativa e posizioni"
+            "value" : "Aggiungi la tua esperienza lavorativa e i tuoi ruoli"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicione sua experiência profissional e cargos"
+            "value" : "Adicione sua experiência profissional e seus cargos"
           }
         }
       }
@@ -3195,7 +2416,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fügen Sie persönliche Interessen und Hobbys hinzu"
+            "value" : "Fügen Sie Ihre Interessen und Hobbys hinzu"
           }
         },
         "en" : {
@@ -3207,25 +2428,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agregue intereses personales y pasatiempos"
+            "value" : "Agrega tus intereses y aficiones"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajoutez des intérêts personnels et des passe-temps"
+            "value" : "Ajoutez vos centres d’intérêt et vos loisirs"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiungi interessi personali e hobby"
+            "value" : "Aggiungi i tuoi interessi e hobby"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicione interesses pessoais e hobbies"
+            "value" : "Adicione seus interesses e hobbies"
           }
         }
       }
@@ -3236,7 +2457,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fügen Sie Ihre Sprachkenntnisse und Sprachniveaus hinzu"
+            "value" : "Fügen Sie Ihre Sprachen und Ihr Niveau in jeder Sprache hinzu"
           }
         },
         "en" : {
@@ -3248,25 +2469,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agregue sus habilidades lingüísticas y niveles de dominio"
+            "value" : "Agrega tus idiomas y tu nivel en cada uno"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajoutez vos compétences linguistiques et niveaux de maîtrise"
+            "value" : "Ajoutez vos langues et votre niveau dans chacune"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiungi le tue competenze linguistiche e livelli di padronanza"
+            "value" : "Aggiungi le tue lingue e il tuo livello in ciascuna"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicione suas habilidades linguísticas e níveis de proficiência"
+            "value" : "Adicione seus idiomas e seu nível em cada um"
           }
         }
       }
@@ -3277,7 +2498,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keine Zertifizierungen Hinzugefügt"
+            "value" : "Noch keine Zertifikate"
           }
         },
         "en" : {
@@ -3289,25 +2510,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No Se Agregaron Certificaciones"
+            "value" : "Aún no hay certificaciones"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucune Certification Ajoutée"
+            "value" : "Aucune certification pour le moment"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nessuna Certificazione Aggiunta"
+            "value" : "Ancora nessuna certificazione"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nenhuma Certificação Adicionada"
+            "value" : "Ainda não há certificações"
           }
         }
       }
@@ -3441,7 +2662,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keine Bildung Hinzugefügt"
+            "value" : "Noch keine Ausbildung"
           }
         },
         "en" : {
@@ -3453,25 +2674,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No Se Agregó Educación"
+            "value" : "Aún no hay formación"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucune Éducation Ajoutée"
+            "value" : "Aucune formation pour le moment"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nessuna Istruzione Aggiunta"
+            "value" : "Ancora nessuna formazione"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nenhuma Educação Adicionada"
+            "value" : "Ainda não há formação"
           }
         }
       }
@@ -3482,7 +2703,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keine Erfahrung Hinzugefügt"
+            "value" : "Noch keine Berufserfahrung"
           }
         },
         "en" : {
@@ -3494,25 +2715,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No Se Agregó Experiencia"
+            "value" : "Aún no hay experiencia"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucune Expérience Ajoutée"
+            "value" : "Aucune expérience pour le moment"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nessuna Esperienza Aggiunta"
+            "value" : "Ancora nessuna esperienza"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nenhuma Experiência Adicionada"
+            "value" : "Ainda não há experiência"
           }
         }
       }
@@ -3523,7 +2744,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keine Interessen Hinzugefügt"
+            "value" : "Noch keine Interessen"
           }
         },
         "en" : {
@@ -3535,25 +2756,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No Se Agregaron Intereses"
+            "value" : "Aún no hay intereses"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucun Intérêt Ajouté"
+            "value" : "Aucun centre d’intérêt pour le moment"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nessun Interesse Aggiunto"
+            "value" : "Ancora nessun interesse"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nenhum Interesse Adicionado"
+            "value" : "Ainda não há interesses"
           }
         }
       }
@@ -3564,7 +2785,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keine Sprachen Hinzugefügt"
+            "value" : "Noch keine Sprachen"
           }
         },
         "en" : {
@@ -3576,25 +2797,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No Se Agregaron Idiomas"
+            "value" : "Aún no hay idiomas"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucune Langue Ajoutée"
+            "value" : "Aucune langue pour le moment"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nessuna Lingua Aggiunta"
+            "value" : "Ancora nessuna lingua"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nenhum Idioma Adicionado"
+            "value" : "Ainda não há idiomas"
           }
         }
       }
@@ -3605,7 +2826,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keine Fähigkeiten Hinzugefügt"
+            "value" : "Noch keine Fähigkeiten"
           }
         },
         "en" : {
@@ -3617,25 +2838,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No Se Agregaron Habilidades"
+            "value" : "Aún no hay competencias"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucune Compétence Ajoutée"
+            "value" : "Aucune compétence pour le moment"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nessuna Competenza Aggiunta"
+            "value" : "Ancora nessuna competenza"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nenhuma Habilidade Adicionada"
+            "value" : "Ainda não há competências"
           }
         }
       }
@@ -3646,7 +2867,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keine Social Links Hinzugefügt"
+            "value" : "Noch keine Profile"
           }
         },
         "en" : {
@@ -3658,25 +2879,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No Se Agregaron Enlaces Sociales"
+            "value" : "Aún no hay perfiles"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucun Lien Social Ajouté"
+            "value" : "Aucun profil pour le moment"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nessun Link Social Aggiunto"
+            "value" : "Ancora nessun profilo"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nenhum Link Social Adicionado"
+            "value" : "Ainda não há perfis"
           }
         }
       }
@@ -3687,7 +2908,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Versuchen Sie, Ihre Suchbegriffe oder Filter anzupassen."
+            "value" : "Passen Sie Ihre Suchbegriffe oder Filter an."
           }
         },
         "en" : {
@@ -3699,25 +2920,66 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Intenta ajustar tus términos de búsqueda o filtros."
+            "value" : "Prueba a cambiar los términos de búsqueda o los filtros."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Essayez d'ajuster vos termes de recherche ou vos filtres."
+            "value" : "Essayez de modifier vos termes de recherche ou vos filtres."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prova a regolare i tuoi termini di ricerca o filtri."
+            "value" : "Prova a modificare i termini di ricerca o i filtri."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tente ajustar seus termos de pesquisa ou filtros."
+            "value" : "Tente alterar os termos de pesquisa ou os filtros."
+          }
+        }
+      }
+    },
+    "empty.search_no_results_for" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Ergebnisse für „%@“. Versuchen Sie andere Suchbegriffe."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No results found for “%@”. Try different keywords."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay resultados para «%@». Prueba con otras palabras clave."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun résultat pour « %@ ». Essayez d’autres mots-clés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun risultato per “%@”. Prova con altre parole chiave."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum resultado para “%@”. Tente outras palavras-chave."
           }
         }
       }
@@ -3728,7 +2990,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keine Ergebnisse gefunden"
+            "value" : "Keine Ergebnisse"
           }
         },
         "en" : {
@@ -3740,25 +3002,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se encontraron resultados"
+            "value" : "Sin resultados"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucun résultat trouvé"
+            "value" : "Aucun résultat"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nessun risultato trovato"
+            "value" : "Nessun risultato"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nenhum resultado encontrado"
+            "value" : "Nenhum resultado"
           }
         }
       }
@@ -3769,7 +3031,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fügen Sie Ihre technischen und beruflichen Fähigkeiten hinzu"
+            "value" : "Fügen Sie Ihre fachlichen und beruflichen Fähigkeiten hinzu"
           }
         },
         "en" : {
@@ -3781,7 +3043,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agregue sus habilidades técnicas y profesionales"
+            "value" : "Agrega tus competencias técnicas y profesionales"
           }
         },
         "fr" : {
@@ -3799,7 +3061,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicione suas habilidades técnicas e profissionais"
+            "value" : "Adicione suas competências técnicas e profissionais"
           }
         }
       }
@@ -3810,7 +3072,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fügen Sie professionelle Profile und Social Media Links hinzu"
+            "value" : "Fügen Sie Ihre beruflichen Profile und Links zu sozialen Netzwerken hinzu"
           }
         },
         "en" : {
@@ -3822,25 +3084,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agregue perfiles profesionales y enlaces de redes sociales"
+            "value" : "Agrega tus perfiles profesionales y tus enlaces a redes sociales"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajoutez des profils professionnels et liens de réseaux sociaux"
+            "value" : "Ajoutez vos profils professionnels et vos liens vers les réseaux sociaux"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiungi profili professionali e collegamenti ai social media"
+            "value" : "Aggiungi i tuoi profili professionali e i link ai social network"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicione perfis profissionais e links de redes sociais"
+            "value" : "Adicione seus perfis profissionais e links de redes sociais"
           }
         }
       }
@@ -3863,19 +3125,19 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Por favor verifica tu conexión a internet e intenta de nuevo."
+            "value" : "Comprueba tu conexión a internet e inténtalo de nuevo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Veuillez vérifier votre connexion internet et réessayer."
+            "value" : "Vérifiez votre connexion internet et réessayez."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verifica la tua connessione internet e riprova."
+            "value" : "Controlla la connessione a internet e riprova."
           }
         },
         "pt" : {
@@ -3933,7 +3195,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fehler beim Dekodieren der Daten: %@"
+            "value" : "Fehler beim Lesen der Daten: %@"
           }
         },
         "en" : {
@@ -3945,25 +3207,66 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Error al decodificar datos: %@"
+            "value" : "No se pudieron leer los datos: %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Échec du décodage des données: %@"
+            "value" : "Impossible de lire les données : %@"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Impossibile decodificare i dati: %@"
+            "value" : "Impossibile leggere i dati: %@"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Falha ao decodificar dados: %@"
+            "value" : "Não foi possível ler os dados: %@"
+          }
+        }
+      }
+    },
+    "error.dependency_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die App konnte nicht gestartet werden: %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app could not start: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo iniciar la app: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’app n’a pas pu démarrer : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile avviare l’app: %@"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível iniciar o app: %@"
           }
         }
       }
@@ -3974,7 +3277,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fehler beim Kodieren der Daten: %@"
+            "value" : "Fehler beim Speichern der Daten: %@"
           }
         },
         "en" : {
@@ -3986,25 +3289,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Error al codificar datos: %@"
+            "value" : "No se pudieron guardar los datos: %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Échec de l'encodage des données: %@"
+            "value" : "Impossible d’enregistrer les données : %@"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Impossibile codificare i dati: %@"
+            "value" : "Impossibile salvare i dati: %@"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Falha ao codificar dados: %@"
+            "value" : "Não foi possível salvar os dados: %@"
           }
         }
       }
@@ -4033,7 +3336,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erreur du système de fichiers: %@"
+            "value" : "Erreur du système de fichiers : %@"
           }
         },
         "it" : {
@@ -4068,25 +3371,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Encontramos un error inesperado. Por favor intenta de nuevo."
+            "value" : "Se ha producido un error inesperado. Inténtalo de nuevo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nous avons rencontré une erreur inattendue. Veuillez réessayer."
+            "value" : "Une erreur inattendue s’est produite. Veuillez réessayer."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abbiamo riscontrato un errore imprevisto. Riprova."
+            "value" : "Si è verificato un errore imprevisto. Riprova."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Encontramos um erro inesperado. Por favor tente novamente."
+            "value" : "Ocorreu um erro inesperado. Tente novamente."
           }
         }
       }
@@ -4115,7 +3418,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quelque chose s'est mal passé"
+            "value" : "Une erreur s’est produite"
           }
         },
         "it" : {
@@ -4150,13 +3453,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Datos inválidos: %@"
+            "value" : "Datos no válidos: %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Données invalides: %@"
+            "value" : "Données non valides : %@"
           }
         },
         "it" : {
@@ -4197,7 +3500,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erreur réseau: %@"
+            "value" : "Erreur réseau : %@"
           }
         },
         "it" : {
@@ -4220,7 +3523,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ nicht gefunden"
+            "value" : "Nicht gefunden: %@"
           }
         },
         "en" : {
@@ -4232,25 +3535,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ no encontrado"
+            "value" : "No se encontró: %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ introuvable"
+            "value" : "Introuvable : %@"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ non trovato"
+            "value" : "Non trovato: %@"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ não encontrado"
+            "value" : "Não encontrado: %@"
           }
         }
       }
@@ -4261,7 +3564,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die angeforderte Ressource konnte nicht gefunden werden."
+            "value" : "Die angeforderte Ressource wurde nicht gefunden."
           }
         },
         "en" : {
@@ -4273,13 +3576,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se pudo encontrar el recurso solicitado."
+            "value" : "No se ha encontrado el recurso solicitado."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La ressource demandée n'a pas pu être trouvée."
+            "value" : "La ressource demandée est introuvable."
           }
         },
         "it" : {
@@ -4291,7 +3594,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O recurso solicitado não pôde ser encontrado."
+            "value" : "O recurso solicitado não foi encontrado."
           }
         }
       }
@@ -4320,7 +3623,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Non trouvé"
+            "value" : "Introuvable"
           }
         },
         "it" : {
@@ -4333,6 +3636,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Não encontrado"
+          }
+        }
+      }
+    },
+    "error.subject.cv" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lebenslauf"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Currículo"
           }
         }
       }
@@ -4355,13 +3699,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se produjo un error desconocido"
+            "value" : "Se ha producido un error desconocido"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Une erreur inconnue s'est produite"
+            "value" : "Une erreur inconnue s’est produite"
           }
         },
         "it" : {
@@ -4402,13 +3746,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erreur de validation: %@"
+            "value" : "Erreur de validation : %@"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Errore di validazione: %@"
+            "value" : "Errore di convalida: %@"
           }
         },
         "pt" : {
@@ -4724,7 +4068,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Añade tu nombre y tu correo electrónico al CV antes de exportarlo."
+            "value" : "Agrega tu nombre y tu correo electrónico al CV antes de exportarlo."
           }
         },
         "fr" : {
@@ -4736,13 +4080,13 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiungi il tuo nome e la tua email al CV prima di esportarlo."
+            "value" : "Aggiungi il tuo nome e la tua e-mail al CV prima di esportarlo."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adicione seu nome e seu e-mail ao CV antes de exportá-lo."
+            "value" : "Adicione seu nome e seu e-mail ao currículo antes de exportá-lo."
           }
         }
       }
@@ -4906,7 +4250,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seu CV precisa de %1$d páginas, mas o limite é %2$d. Reduza-o e tente novamente."
+            "value" : "Seu currículo precisa de %1$d páginas, mas o limite é %2$d. Reduza-o e tente novamente."
           }
         }
       }
@@ -4947,7 +4291,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ – CV"
+            "value" : "%@ – Currículo"
           }
         }
       }
@@ -5316,7 +4660,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Exportar CV"
+            "value" : "Exportar currículo"
           }
         }
       }
@@ -5409,7 +4753,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zertifikatsname"
+            "value" : "Name des Zertifikats"
           }
         },
         "en" : {
@@ -5421,25 +4765,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nombre de Certificación"
+            "value" : "Nombre de la certificación"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nom de Certification"
+            "value" : "Nom de la certification"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nome Certificazione"
+            "value" : "Nome della certificazione"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nome da Certificação"
+            "value" : "Nome da certificação"
           }
         }
       }
@@ -5491,7 +4835,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV Name"
+            "value" : "Name des Lebenslaufs"
           }
         },
         "en" : {
@@ -5521,7 +4865,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nome do CV"
+            "value" : "Nome do currículo"
           }
         }
       }
@@ -5544,7 +4888,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Título"
+            "value" : "Titulación"
           }
         },
         "fr" : {
@@ -5556,13 +4900,13 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Laurea"
+            "value" : "Titolo di studio"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Grau"
+            "value" : "Titulação"
           }
         }
       }
@@ -5649,6 +4993,170 @@
         }
       }
     },
+    "field.email" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "E-Mail"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Email"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Correo electrónico"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "E-mail"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "E-mail"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "E-mail"
+          }
+        }
+      }
+    },
+    "field.email.error_invalid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitte geben Sie eine gültige E-Mail-Adresse ein"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please enter a valid email address"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Introduce una dirección de correo válida"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez une adresse e-mail valide"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inserisci un indirizzo e-mail valido"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digite um endereço de e-mail válido"
+          }
+        }
+      }
+    },
+    "field.email.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird in Ihrem Lebenslauf für die berufliche Kontaktaufnahme angezeigt"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shown on your CV for professional contact"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se muestra en tu CV para el contacto profesional"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiché dans votre CV pour les contacts professionnels"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrata nel tuo CV per i contatti professionali"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aparece no seu currículo para contato profissional"
+          }
+        }
+      }
+    },
+    "field.email.placeholder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "E-Mail-Adresse eingeben"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter your email"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Introduce tu correo electrónico"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez votre e-mail"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inserisci la tua e-mail"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digite seu e-mail"
+          }
+        }
+      }
+    },
     "field.full_name" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5667,25 +5175,66 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nombre Completo"
+            "value" : "Nombre completo"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nom Complet"
+            "value" : "Nom complet"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nome Completo"
+            "value" : "Nome completo"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nome Completo"
+            "value" : "Nome completo"
+          }
+        }
+      }
+    },
+    "field.help.required" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pflichtfeld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Required field"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Campo obligatorio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Champ obligatoire"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Campo obbligatorio"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Campo obrigatório"
           }
         }
       }
@@ -5714,7 +5263,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Intérêt"
+            "value" : "Centre d’intérêt"
           }
         },
         "it" : {
@@ -5755,13 +5304,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Émetteur"
+            "value" : "Organisme émetteur"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Emittente"
+            "value" : "Ente emittente"
           }
         },
         "pt" : {
@@ -5778,7 +5327,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Berufsbezeichnung"
+            "value" : "Position"
           }
         },
         "en" : {
@@ -5790,25 +5339,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Título del Trabajo"
+            "value" : "Puesto"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Titre du Poste"
+            "value" : "Intitulé du poste"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Titolo di Lavoro"
+            "value" : "Ruolo"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Título do Cargo"
+            "value" : "Cargo"
           }
         }
       }
@@ -5872,25 +5421,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nivel de Idioma"
+            "value" : "Nivel de idioma"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Niveau de Langue"
+            "value" : "Niveau de langue"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Livello Linguistico"
+            "value" : "Livello linguistico"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nível de Idioma"
+            "value" : "Nível do idioma"
           }
         }
       }
@@ -5901,7 +5450,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stufe"
+            "value" : "Niveau"
           }
         },
         "en" : {
@@ -5942,7 +5491,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Standort"
+            "value" : "Ort"
           }
         },
         "en" : {
@@ -6018,6 +5567,129 @@
         }
       }
     },
+    "field.phone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Telefon"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phone"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teléfono"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Téléphone"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Telefono"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Telefone"
+          }
+        }
+      }
+    },
+    "field.phone.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit Landesvorwahl für internationale Kontakte"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Include country code for international contacts"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluye el prefijo del país para contactos internacionales"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indiquez l’indicatif du pays pour les contacts internationaux"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Includi il prefisso internazionale per i contatti dall’estero"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inclua o código do país para contatos internacionais"
+          }
+        }
+      }
+    },
+    "field.phone.placeholder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Telefonnummer eingeben"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter your phone number"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Introduce tu número de teléfono"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez votre numéro de téléphone"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inserisci il tuo numero di telefono"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digite seu número de telefone"
+          }
+        }
+      }
+    },
     "field.platform" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6077,25 +5749,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "URL del Portafolio"
+            "value" : "URL del portafolio"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "URL du Portfolio"
+            "value" : "URL du portfolio"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "URL del Portfolio"
+            "value" : "URL del portfolio"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "URL do Portfólio"
+            "value" : "URL do portfólio"
           }
         }
       }
@@ -6106,7 +5778,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Berufliche Zusammenfassung"
+            "value" : "Berufliches Kurzprofil"
           }
         },
         "en" : {
@@ -6118,25 +5790,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Resumen Profesional"
+            "value" : "Perfil profesional"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Résumé Professionnel"
+            "value" : "Profil professionnel"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Riepilogo Professionale"
+            "value" : "Profilo professionale"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Resumo Profissional"
+            "value" : "Perfil profissional"
           }
         }
       }
@@ -6147,7 +5819,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beschreiben Sie Ihre berufliche Erfahrung und Fähigkeiten..."
+            "value" : "Beschreiben Sie Ihre berufliche Erfahrung und Ihre Fähigkeiten..."
           }
         },
         "en" : {
@@ -6159,7 +5831,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Describa su experiencia profesional y habilidades..."
+            "value" : "Describe tu experiencia profesional y tus competencias..."
           }
         },
         "fr" : {
@@ -6177,7 +5849,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Descreva sua experiência profissional e habilidades..."
+            "value" : "Descreva sua experiência profissional e suas competências..."
           }
         }
       }
@@ -6188,7 +5860,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Berufliche Bezeichnung"
+            "value" : "Berufsbezeichnung"
           }
         },
         "en" : {
@@ -6200,25 +5872,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Título Profesional"
+            "value" : "Título profesional"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Titre Professionnel"
+            "value" : "Titre professionnel"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Titolo Professionale"
+            "value" : "Qualifica professionale"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Título Profissional"
+            "value" : "Título profissional"
           }
         }
       }
@@ -6229,7 +5901,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Schule"
+            "value" : "Bildungseinrichtung"
           }
         },
         "en" : {
@@ -6241,25 +5913,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Escuela"
+            "value" : "Centro de estudios"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "École"
+            "value" : "Établissement"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scuola"
+            "value" : "Istituto"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Escola"
+            "value" : "Instituição de ensino"
           }
         }
       }
@@ -6282,7 +5954,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Habilidad"
+            "value" : "Competencia"
           }
         },
         "fr" : {
@@ -6300,7 +5972,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Habilidade"
+            "value" : "Competência"
           }
         }
       }
@@ -6346,6 +6018,47 @@
         }
       }
     },
+    "field.url.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit https:// für Weblinks"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Include https:// for web links"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluye https:// en los enlaces web"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluez https:// dans les liens web"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Includi https:// nei link web"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inclua https:// nos links da web"
+          }
+        }
+      }
+    },
     "field.year" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6383,88 +6096,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ano"
-          }
-        }
-      }
-    },
-    "format.asterisk" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "*"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "*"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "*"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "*"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "*"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "*"
-          }
-        }
-      }
-    },
-    "format.period_space" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. %2$@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. %2$@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. %2$@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. %2$@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. %2$@"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. %2$@"
           }
         }
       }
@@ -6695,25 +6326,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "B2 - Intermedio Alto"
+            "value" : "B2 - Intermedio alto"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "B2 - Intermédiaire Supérieur"
+            "value" : "B2 - Intermédiaire supérieur"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "B2 - Intermedio Superiore"
+            "value" : "B2 - Intermedio superiore"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "B2 - Intermediário Superior"
+            "value" : "B2 - Intermediário superior"
           }
         }
       }
@@ -6765,7 +6396,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "C2 - Nahezu Muttersprachler"
+            "value" : "C2 - Annähernd muttersprachlich"
           }
         },
         "en" : {
@@ -6777,7 +6408,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "C2 - Competente"
+            "value" : "C2 - Dominio"
           }
         },
         "fr" : {
@@ -6818,13 +6449,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nativo"
+            "value" : "Lengua materna"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Langue Maternelle"
+            "value" : "Langue maternelle"
           }
         },
         "it" : {
@@ -6836,7 +6467,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nativo"
+            "value" : "Língua materna"
           }
         }
       }
@@ -6847,7 +6478,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "KI-CV-Erstellung"
+            "value" : "Lebenslauf mit KI erstellen"
           }
         },
         "en" : {
@@ -6888,7 +6519,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Meine CVs"
+            "value" : "Meine Lebensläufe"
           }
         },
         "en" : {
@@ -6900,25 +6531,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mis CVs"
+            "value" : "Mis CV"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mes CVs"
+            "value" : "Mes CV"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I Miei CV"
+            "value" : "I miei CV"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Meus CVs"
+            "value" : "Meus currículos"
           }
         }
       }
@@ -6929,7 +6560,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erstellen Sie Meinen Ersten Lebenslauf"
+            "value" : "Meinen ersten Lebenslauf erstellen"
           }
         },
         "en" : {
@@ -6964,669 +6595,13 @@
         }
       }
     },
-    "personal_info_cv_name" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CV Name"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CV Name"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nombre del CV"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nom du CV"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nome del CV"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nome do CV"
-          }
-        }
-      }
-    },
-    "personal_info_professional_summary_placeholder" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Beschreiben Sie Ihre berufliche Erfahrung und Fähigkeiten..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Describe your professional experience and skills..."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Describa su experiencia profesional y habilidades..."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Décrivez votre expérience professionnelle et vos compétences..."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descrivi la tua esperienza professionale e le tue competenze..."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descreva sua experiência profissional e habilidades..."
-          }
-        }
-      }
-    },
-    "personal_info_professional_summary_title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Berufliche Zusammenfassung"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Professional Summary"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resumen Profesional"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Résumé Professionnel"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Riepilogo Professionale"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resumo Profissional"
-          }
-        }
-      }
-    },
-    "personal.cv_details" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CV-Details"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CV Details"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Detalles del CV"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Détails du CV"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dettagli CV"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Detalhes do CV"
-          }
-        }
-      }
-    },
-    "personal.cv_name" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CV-Name"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CV Name"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nombre del CV"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nom du CV"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nome CV"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nome do CV"
-          }
-        }
-      }
-    },
-    "personal.full_name" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vollständiger Name"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Full Name"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nombre Completo"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nom Complet"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nome Completo"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nome Completo"
-          }
-        }
-      }
-    },
-    "personal.info.cv.name" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CV Name"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CV Name"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nombre del CV"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nom du CV"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nome del CV"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nome do CV"
-          }
-        }
-      }
-    },
-    "personal.info.professional.summary.placeholder" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Beschreiben Sie Ihre berufliche Erfahrung und Fähigkeiten..."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Describe your professional experience and skills..."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Describa su experiencia profesional y habilidades..."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Décrivez votre expérience professionnelle et vos compétences..."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descrivi la tua esperienza professionale e le tue competenze..."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descreva sua experiência profissional e habilidades..."
-          }
-        }
-      }
-    },
-    "personal.info.professional.summary.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Berufliche Zusammenfassung"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Professional Summary"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resumen Profesional"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Résumé Professionnel"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Riepilogo Professionale"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resumo Profissional"
-          }
-        }
-      }
-    },
-    "personal.location" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Standort"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Location"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ubicación"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lieu"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Luogo"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Localização"
-          }
-        }
-      }
-    },
-    "personal.portfolio_url" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Portfolio-URL"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Portfolio URL"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "URL de Portafolio"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "URL du Portfolio"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "URL del Portfolio"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "URL do Portfólio"
-          }
-        }
-      }
-    },
-    "personal.professional_summary_placeholder" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Beschreiben Sie Ihren beruflichen Hintergrund, Ihre wichtigsten Fähigkeiten und Ihre Karriereziele"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Describe your professional background, key skills, and career objectives"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Describe tu experiencia profesional, habilidades clave y objetivos profesionales"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Décrivez votre parcours professionnel, vos compétences clés et vos objectifs de carrière"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descrivi il tuo background professionale, le competenze chiave e gli obiettivi di carriera"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descreva sua experiência profissional, habilidades principais e objetivos de carreira"
-          }
-        }
-      }
-    },
-    "personal.professional_summary_title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Berufliche Zusammenfassung"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Professional Summary"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resumen Profesional"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Résumé Professionnel"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Riepilogo Professionale"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resumo Profissional"
-          }
-        }
-      }
-    },
-    "personal.professional_title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Berufliche Bezeichnung"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Professional Title"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Título Profesional"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Titre Professionnel"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qualifica Professionale"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Título Profissional"
-          }
-        }
-      }
-    },
-    "personal.section_title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Persönliche Informationen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Personal Information"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Información Personal"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Informations Personnelles"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Informazioni Personali"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Informações Pessoais"
-          }
-        }
-      }
-    },
-    "personal.summary_section_title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zusammenfassung"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Summary"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resumen"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Résumé"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Riepilogo"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resumo"
-          }
-        }
-      }
-    },
     "section.basics" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Grundlagen"
+            "value" : "Grunddaten"
           }
         },
         "en" : {
@@ -7638,7 +6613,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Básicos"
+            "value" : "Datos básicos"
           }
         },
         "fr" : {
@@ -7650,13 +6625,13 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Informazioni di base"
+            "value" : "Dati di base"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Básicos"
+            "value" : "Dados básicos"
           }
         }
       }
@@ -7667,7 +6642,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zertifizierungen"
+            "value" : "Zertifikate"
           }
         },
         "en" : {
@@ -7708,7 +6683,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV-Details"
+            "value" : "Angaben zum Lebenslauf"
           }
         },
         "en" : {
@@ -7720,7 +6695,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Detalles del CV"
+            "value" : "Datos del CV"
           }
         },
         "fr" : {
@@ -7738,7 +6713,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Detalhes do CV"
+            "value" : "Detalhes do currículo"
           }
         }
       }
@@ -7790,7 +6765,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bildung"
+            "value" : "Ausbildung"
           }
         },
         "en" : {
@@ -7802,25 +6777,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Educación"
+            "value" : "Formación"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Éducation"
+            "value" : "Formation"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Istruzione"
+            "value" : "Formazione"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Educação"
+            "value" : "Formação"
           }
         }
       }
@@ -7831,7 +6806,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erfahrung"
+            "value" : "Berufserfahrung"
           }
         },
         "en" : {
@@ -7890,7 +6865,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Intérêts"
+            "value" : "Centres d’intérêt"
           }
         },
         "it" : {
@@ -7954,7 +6929,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Persönliche Informationen"
+            "value" : "Persönliche Angaben"
           }
         },
         "en" : {
@@ -7966,25 +6941,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Información Personal"
+            "value" : "Información personal"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Informations Personnelles"
+            "value" : "Informations personnelles"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Informazioni Personali"
+            "value" : "Informazioni personali"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Informações Pessoais"
+            "value" : "Informações pessoais"
           }
         }
       }
@@ -8007,7 +6982,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Habilidades"
+            "value" : "Competencias"
           }
         },
         "fr" : {
@@ -8025,7 +7000,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Habilidades"
+            "value" : "Competências"
           }
         }
       }
@@ -8036,7 +7011,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Social Links"
+            "value" : "Social-Media-Profile"
           }
         },
         "en" : {
@@ -8048,25 +7023,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enlaces Sociales"
+            "value" : "Perfiles sociales"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Liens Sociaux"
+            "value" : "Profils sociaux"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Link Social"
+            "value" : "Profili social"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Links Sociais"
+            "value" : "Perfis sociais"
           }
         }
       }
@@ -8077,7 +7052,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zusammenfassung"
+            "value" : "Kurzprofil"
           }
         },
         "en" : {
@@ -8089,25 +7064,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Resumen"
+            "value" : "Perfil profesional"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Résumé"
+            "value" : "Profil professionnel"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Riassunto"
+            "value" : "Profilo professionale"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Resumo"
+            "value" : "Perfil profissional"
           }
         }
       }
@@ -8130,148 +7105,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Experiencia Laboral"
+            "value" : "Experiencia laboral"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Expérience Professionnelle"
+            "value" : "Expérience professionnelle"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esperienza Lavorativa"
+            "value" : "Esperienza lavorativa"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Experiência de Trabalho"
-          }
-        }
-      }
-    },
-    "template.at" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "bei"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "at"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "en"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "chez"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "presso"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "em"
-          }
-        }
-      }
-    },
-    "template.certifications" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zertifizierungen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certifications"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certificaciones"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certifications"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certificazioni"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certificações"
-          }
-        }
-      }
-    },
-    "template.contact" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kontakt"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contacto"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contatto"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contato"
+            "value" : "Experiência profissional"
           }
         }
       }
@@ -8282,7 +7134,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neu Erstellen"
+            "value" : "Neu erstellen"
           }
         },
         "en" : {
@@ -8323,7 +7175,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beginnen Sie mit einer leeren Leinwand, um Ihren Lebenslauf von Grund auf zu erstellen."
+            "value" : "Beginnen Sie mit einer leeren Seite, um Ihren Lebenslauf von Grund auf zu erstellen."
           }
         },
         "en" : {
@@ -8358,95 +7210,13 @@
         }
       }
     },
-    "template.default.name" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Beispielvorlage"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sample Template"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plantilla de Ejemplo"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modèle d'Exemple"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modello di Esempio"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modelo de Exemplo"
-          }
-        }
-      }
-    },
-    "template.education" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ausbildung"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Education"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Educación"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Formation"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Istruzione"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Educação"
-          }
-        }
-      }
-    },
     "template.empty.description" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beginnen Sie mit einer leeren Vorlage von vorne"
+            "value" : "Von Grund auf mit einer leeren Vorlage beginnen"
           }
         },
         "en" : {
@@ -8522,416 +7292,6 @@
         }
       }
     },
-    "template.interests" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Interessen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Interests"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intereses"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Centres d'Intérêt"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Interessi"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Interesses"
-          }
-        }
-      }
-    },
-    "template.languages" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sprachen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Languages"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Idiomas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Langues"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lingue"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Idiomas"
-          }
-        }
-      }
-    },
-    "template.present" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Heute"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Present"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Presente"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Présent"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Presente"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Presente"
-          }
-        }
-      }
-    },
-    "template.proficiency" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kenntnisstand"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Proficiency"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nivel de Competencia"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Niveau de Compétence"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Livello di Competenza"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nível de Proficiência"
-          }
-        }
-      }
-    },
-    "template.projects" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Projekte"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Projects"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Proyectos"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Projets"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Progetti"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Projetos"
-          }
-        }
-      }
-    },
-    "template.skills" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fähigkeiten"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skills"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Habilidades"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compétences"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Competenze"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Competências"
-          }
-        }
-      }
-    },
-    "template.social_links" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Online-Profile"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Online Profiles"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perfiles en Línea"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profils en Ligne"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profili Online"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perfis Online"
-          }
-        }
-      }
-    },
-    "template.summary" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zusammenfassung"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Summary"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resumen"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Résumé"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Riepilogo"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resumo"
-          }
-        }
-      }
-    },
-    "template.tags" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Professionell • Modern"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Professional • Modern"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profesional • Moderno"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Professionnel • Moderne"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Professionale • Moderno"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profissional • Moderno"
-          }
-        }
-      }
-    },
-    "template.work_experience" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Berufserfahrung"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Work Experience"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Experiencia Laboral"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Expérience Professionnelle"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esperienza Lavorativa"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Experiência Profissional"
-          }
-        }
-      }
-    },
     "welcome.description" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8979,7 +7339,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erstellen Sie Ihren Perfekten Lebenslauf"
+            "value" : "Erstellen Sie Ihren perfekten Lebenslauf"
           }
         },
         "en" : {

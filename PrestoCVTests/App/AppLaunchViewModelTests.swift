@@ -127,8 +127,9 @@ struct AppLaunchViewModelTests {
             Issue.record("Expected the failed phase")
             return
         }
-        #expect(message.contains("StorageService"), "The message must name what could not be built")
         #expect(message.contains("disk full"), "The message must carry the underlying reason")
+        #expect(!message.contains("StorageService"), "The message is for the user, not the name of a class")
+        #expect(!message.contains("error.dependency_failed"), "The message must be translated, not show its catalog key")
     }
 
     @Test("Retry asks for a new container and recovers when it builds")

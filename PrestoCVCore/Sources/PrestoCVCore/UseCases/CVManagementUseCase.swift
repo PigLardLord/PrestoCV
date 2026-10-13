@@ -58,7 +58,7 @@ public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
     
     public func duplicateCV(id: UUID) async throws -> CVModel {
         guard let existingCV = try await cvRepository.getCV(by: id) else {
-            throw AppError.notFound("CV with id \(id)")
+            throw AppError.notFound("error.subject.cv".localized)
         }
         
         // Create a copy with a new ID and modified name

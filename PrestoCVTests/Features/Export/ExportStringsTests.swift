@@ -16,7 +16,7 @@ struct ExportStringsTests {
         "export.color.modern": ["de"],
         "export.font.modern": ["de"],
         "export.font_preview_sample": ["de", "es", "fr", "it", "pt"],
-        "export.file_name": ["es", "fr", "it", "pt"]
+        "export.file_name": ["es", "fr", "it"]
     ]
 
     // MARK: - Reading the project

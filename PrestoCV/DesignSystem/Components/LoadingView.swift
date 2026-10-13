@@ -93,7 +93,7 @@ struct LoadingView_Previews: PreviewProvider {
                 .padding()
             
             // Fullscreen style
-            LoadingView.fullscreen(message: "cv.creating".asLoclizedKey)
+            LoadingView.fullscreen(message: "common.loading".asLoclizedKey)
                 .previewDisplayName("Fullscreen")
             
             // Compact style

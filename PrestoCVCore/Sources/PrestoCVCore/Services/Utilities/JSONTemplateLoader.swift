@@ -21,7 +21,7 @@ actor JSONTemplateLoader: JSONTemplateLoaderProtocol {
             let data = try Data(contentsOf: url)
             return try decoder.decode(CVModel.self, from: data)
         } catch {
-            throw AppError.decodingError("Failed to decode \(url.lastPathComponent): \(error.localizedDescription)")
+            throw AppError.decodingError("\(url.lastPathComponent): \(error.localizedDescription)")
         }
     }
     

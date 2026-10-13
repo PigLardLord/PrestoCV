@@ -7,8 +7,8 @@ public enum DependencyError: Error, LocalizedError {
     
     public var errorDescription: String? {
         switch self {
-        case .serviceCreationFailed(let serviceName, let underlyingError):
-            return "Failed to create \(serviceName): \(underlyingError.localizedDescription)"
+        case .serviceCreationFailed(_, let underlyingError):
+            return String(format: String(localized: "error.dependency_failed"), underlyingError.localizedDescription)
         }
     }
 }
