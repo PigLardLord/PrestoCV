@@ -6,6 +6,7 @@ final class CVListViewModel: ObservableObject {
     
     // MARK: - Published Properties
     @Published var viewState: ViewState<[CVModel]> = .idle
+    @Published private(set) var unreadableCount = 0
     
     // MARK: - Private Properties
     private let cvManagementUseCase: CVManagementUseCaseProtocol
@@ -23,6 +24,12 @@ final class CVListViewModel: ObservableObject {
         viewState.errorMessage ?? ""
     }
     
+    /// Tells the user that some stored CVs could not be opened; nil when every stored CV was.
+    var unreadableNotice: String? {
+        guard unreadableCount > 0 else { return nil }
+        return String(localized: "cv.list.unreadable_notice \(unreadableCount)")
+    }
+    
     // MARK: - Initialization
     init(cvManagementUseCase: CVManagementUseCaseProtocol) {
         self.cvManagementUseCase = cvManagementUseCase
@@ -33,8 +40,18 @@ final class CVListViewModel: ObservableObject {
         viewState = .loading
         
         do {
-            let loadedCVs = try await cvManagementUseCase.getAllCVs()
-            viewState = .loaded(loadedCVs)
+            show(try await cvManagementUseCase.getCVListing())
+        } catch {
+            unreadableCount = 0
+            viewState = .error(error.localizedAppErrorDescription)
+        }
+    }
+    
+    /// The user has seen the notice about the CVs that could not be opened: record it, so that it goes away.
+    func dismissUnreadableNotice() async {
+        do {
+            try await cvManagementUseCase.acknowledgeUnreadableCVs()
+            show(try await cvManagementUseCase.getCVListing())
         } catch {
             viewState = .error(error.localizedAppErrorDescription)
         }
@@ -68,6 +85,11 @@ final class CVListViewModel: ObservableObject {
     
     func clearError() {
         viewState = viewState.clearingError()
+    }
+    
+    private func show(_ listing: CVListing) {
+        unreadableCount = listing.unreadableCount
+        viewState = .loaded(listing.cvs)
     }
     
     // MARK: - View Action Methods (Synchronous wrappers)

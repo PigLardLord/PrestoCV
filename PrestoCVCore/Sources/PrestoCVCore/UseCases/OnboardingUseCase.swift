@@ -22,16 +22,7 @@ public final class OnboardingUseCase: OnboardingUseCaseProtocol, Sendable {
     // MARK: - Public Protocol Implementation
     
     public func checkOnboardingRequired() async -> OnboardingState {
-        let hasExistingCVs = await onboardingRepository.hasExistingCVs()
-        let onboardingState = await onboardingRepository.getOnboardingState()
-        
-        // If user has existing CVs, they're returning
-        if hasExistingCVs {
-            return .returning
-        }
-        
-        // Otherwise, return the actual onboarding state
-        return onboardingState
+        return await onboardingRepository.getOnboardingState()
     }
     
     public func createFirstCV(from template: CVModel) async throws -> CVModel {

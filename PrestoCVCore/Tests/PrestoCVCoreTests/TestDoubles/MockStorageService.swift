@@ -6,6 +6,28 @@ import Foundation
 public final class MockStorageService: StorageServiceProtocol, @unchecked Sendable {
     private let queue = DispatchQueue(label: "MockStorageService", qos: .userInteractive)
     private var _storage: [String: Data] = [:]
+    private var _listingError: Error?
+    private var _listingCount = 0
+    private var _unreadableCount = 0
+    private var _acknowledgeCount = 0
+    
+    /// How many files `loadAllReporting` says it could not read.
+    public var unreadableCount: Int {
+        get { queue.sync { _unreadableCount } }
+        set { queue.sync { _unreadableCount = newValue } }
+    }
+    
+    /// How many times `acknowledgeQuarantined` was called.
+    public var acknowledgeCount: Int { queue.sync { _acknowledgeCount } }
+    
+    /// How many times the storage was listed, by `loadAll` or `getAllIdentifiers`.
+    public var listingCount: Int { queue.sync { _listingCount } }
+    
+    /// When set, `loadAll` and `getAllIdentifiers` throw it, as a storage that cannot be listed does.
+    public var listingError: Error? {
+        get { queue.sync { _listingError } }
+        set { queue.sync { _listingError = newValue } }
+    }
     
     private var storage: [String: Data] {
         get {
@@ -45,6 +67,15 @@ public final class MockStorageService: StorageServiceProtocol, @unchecked Sendab
         }
     }
     
+    public func save<T: Codable & Sendable>(to identifier: String, updating transform: @Sendable (T?) -> T) async throws {
+        let encoder = makeEncoder()
+        let decoder = makeDecoder()
+        try queue.sync {
+            let stored = _storage[identifier].flatMap { try? decoder.decode(T.self, from: $0) }
+            _storage[identifier] = try encoder.encode(transform(stored))
+        }
+    }
+    
     public func load<T: Codable & Sendable>(_ type: T.Type, from identifier: String) async throws -> T? {
         return withStorage { storage in
             guard let data = storage[identifier] else { return nil }
@@ -54,6 +85,8 @@ public final class MockStorageService: StorageServiceProtocol, @unchecked Sendab
     }
     
     public func loadAll<T: Codable & Sendable>(_ type: T.Type) async throws -> [T] {
+        recordListing()
+        if let listingError { throw listingError }
         return withStorage { storage in
             var objects: [T] = []
             let decoder = makeDecoder()
@@ -63,6 +96,26 @@ public final class MockStorageService: StorageServiceProtocol, @unchecked Sendab
                 }
             }
             return objects
+        }
+    }
+    
+    public func loadIdentified<T: Codable & Sendable & StorageIdentified>(_ type: T.Type, from identifier: String) async throws -> T? {
+        guard let object = try await load(type, from: identifier), object.storageIdentifier == identifier else {
+            return nil
+        }
+        return object
+    }
+    
+    public func loadAllReporting<T: Codable & Sendable & StorageIdentified>(_ type: T.Type) async throws -> StorageLoadReport<T> {
+        let objects = try await loadAll(type)
+        let belonging = objects.filter { object in withStorage { $0[object.storageIdentifier] != nil } }
+        return StorageLoadReport(items: belonging, unreadableCount: unreadableCount + objects.count - belonging.count)
+    }
+    
+    public func acknowledgeQuarantined() async throws {
+        queue.sync {
+            _acknowledgeCount += 1
+            _unreadableCount = 0
         }
     }
     
@@ -79,9 +132,15 @@ public final class MockStorageService: StorageServiceProtocol, @unchecked Sendab
     }
     
     public func getAllIdentifiers() async throws -> [String] {
+        recordListing()
+        if let listingError { throw listingError }
         return withStorage { storage in
             return Array(storage.keys)
         }
+    }
+    
+    private func recordListing() {
+        queue.sync { _listingCount += 1 }
     }
     
     // Test helper methods
@@ -131,21 +190,9 @@ public final class MockParallelSearchService: ParallelSearchServiceProtocol, @un
 }
 
 public final class MockBundleResourceService: BundleResourceServiceProtocol, @unchecked Sendable {
-    public func getResourcePaths(ofType type: String, inDirectory directory: String?) async -> [String] {
-        // Return empty array for tests
-        return []
-    }
-    
     public func getResourceURL(forResource name: String, withExtension ext: String) async -> URL? {
         // Return nil for tests
         return nil
-    }
-    
-    public func filterPaths(_ paths: [String], excluding excludedNames: Set<String>) async -> [String] {
-        return paths.filter { path in
-            let fileName = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
-            return !excludedNames.contains(fileName)
-        }
     }
 }
 

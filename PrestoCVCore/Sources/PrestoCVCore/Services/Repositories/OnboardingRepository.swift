@@ -9,12 +9,15 @@ public final class OnboardingRepository: OnboardingRepositoryProtocol, Sendable 
         self.cvRepository = cvRepository
     }
     
-    public func hasExistingCVs() async -> Bool {
-        return await cvRepository.cvExists()
+    public func hasExistingCVs() async throws -> Bool {
+        return try await cvRepository.cvExists()
     }
     
     public func getOnboardingState() async -> OnboardingState {
-        let hasExistingCVs = await self.hasExistingCVs()
-        return hasExistingCVs ? .returning : .firstTime
+        do {
+            return try await hasExistingCVs() ? .returning : .firstTime
+        } catch {
+            return .error(AppError.from(error))
+        }
     }
 }

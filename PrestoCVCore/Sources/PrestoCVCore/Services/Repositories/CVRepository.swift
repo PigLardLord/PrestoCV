@@ -4,84 +4,75 @@ import Foundation
 
 public final class CVRepository: CVRepositoryProtocol, Sendable {
     private let storageService: StorageServiceProtocol
-    private let parallelSearchService: ParallelSearchServiceProtocol
-    
+    private let now: @Sendable () -> Date
+
     // MARK: - Initialization
-    
+
+    /// - Parameter now: The clock that stamps the CVs when they are saved.
     public init(
         storageService: StorageServiceProtocol,
-        parallelSearchService: ParallelSearchServiceProtocol
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.storageService = storageService
-        self.parallelSearchService = parallelSearchService
+        self.now = now
     }
-    
+
     // MARK: - Public Protocol Implementation
-    
+
     public func getAllCVs() async throws -> [CVModel] {
-        return try await storageService.loadAll(CVModel.self)
+        return try await getCVListing().cvs
     }
-    
-    public func getCV(by id: UUID) async throws -> CVModel? {
-        // First try the standard identifier pattern for efficiency
-        let standardIdentifier = "cv_\(id.uuidString)"
-        if let cv = try await storageService.load(CVModel.self, from: standardIdentifier) {
-            return cv
-        }
-        
-        // Fall back to searching all identifiers if standard pattern doesn't work
-        // This handles legacy data or non-standard naming
-        let identifiers = try await storageService.getAllIdentifiers()
-        
-        // Delegate parallel search to dedicated service
-        return try await parallelSearchService.findFirst(
-            in: identifiers,
-            loader: loadCVFromIdentifier,
-            matcher: createCVIdMatcher(for: id)
+
+    public func getCVListing() async throws -> CVListing {
+        let report = try await storageService.loadAllReporting(StoredCV.self)
+        return CVListing(
+            cvs: report.items.sorted(by: StoredCV.isListedBefore).map(\.cv),
+            unreadableCount: report.unreadableCount
         )
     }
-    
+
+    public func getCV(by id: UUID) async throws -> CVModel? {
+        return try await storageService.loadIdentified(StoredCV.self, from: StoredCV.identifier(for: id))?.cv
+    }
+
     public func saveCV(_ cv: CVModel) async throws -> CVModel {
-        let identifier = "cv_\(cv.id.uuidString)"
-        try await storageService.save(cv, to: identifier)
+        let now = self.now
+        // The storage runs this between reading the stored CV and writing the new one, so the clock is read in
+        // the order the saves are applied, and a creation time is never replaced by a later save.
+        try await storageService.save(to: StoredCV.identifier(for: cv.id), updating: { (stored: StoredCV?) in
+            let savedAt = Self.wholeSeconds(now())
+            let createdAt = stored?.createdAt ?? savedAt
+            // The wall clock can move backwards; an update is never dated before the creation.
+            return StoredCV(cv: cv, createdAt: createdAt, updatedAt: max(savedAt, createdAt))
+        })
         return cv
     }
-    
+
     public func deleteCV(id: UUID) async throws {
-        let identifier = "cv_\(id.uuidString)"
-        try await storageService.delete(identifier: identifier)
+        try await storageService.delete(identifier: StoredCV.identifier(for: id))
+    }
+
+    public func acknowledgeUnreadableCVs() async throws {
+        try await storageService.acknowledgeQuarantined()
     }
     
-    public func cvExists() async -> Bool {
-        return !(await isEmpty())
+    public func cvExists() async throws -> Bool {
+        // A store whose every file is unusable still holds the user's CVs: it is not a first run.
+        let listing = try await getCVListing()
+        return !listing.cvs.isEmpty || listing.unreadableCount > 0
     }
-    
-    public func getCVsCount() async -> Int {
-        let cvs = try? await getAllCVs()
-        return cvs?.count ?? 0
+
+    public func getCVsCount() async throws -> Int {
+        return try await getAllCVs().count
     }
 }
 
 // MARK: - Private Helper Methods
 
 extension CVRepository {
-    
-    // MARK: Data Loading
-    
-    private func loadCVFromIdentifier(_ identifier: String) async throws -> CVModel? {
-        return try await storageService.load(CVModel.self, from: identifier)
-    }
-    
-    private func isEmpty() async -> Bool {
-        let cvs = try? await getAllCVs()
-        return cvs?.isEmpty ?? true
-    }
-    
-    // MARK: Function Factories
-    
-    private func createCVIdMatcher(for targetId: UUID) -> @Sendable (CVModel) -> Bool {
-        return { cv in
-            cv.id == targetId
-        }
+
+    /// A time in whole seconds, which is what the file keeps: the value saved is the value read back.
+    private static func wholeSeconds(_ date: Date) -> Date {
+        return Date(timeIntervalSince1970: date.timeIntervalSince1970.rounded(.down))
     }
 }

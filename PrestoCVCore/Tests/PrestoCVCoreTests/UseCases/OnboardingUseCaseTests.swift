@@ -10,7 +10,7 @@ struct OnboardingUseCaseTests {
     @Test("OnboardingUseCase initializes with required dependencies")
     func useCaseInitialization() {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -32,7 +32,7 @@ struct OnboardingUseCaseTests {
     @Test("CheckOnboardingRequired returns firstTime when no CVs exist")
     func checkOnboardingRequiredReturnsFirstTimeWhenNoCVs() async {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -53,7 +53,7 @@ struct OnboardingUseCaseTests {
     @Test("CheckOnboardingRequired returns returning when CVs exist")
     func checkOnboardingRequiredReturnsReturningWhenCVsExist() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -78,7 +78,7 @@ struct OnboardingUseCaseTests {
     @Test("CheckOnboardingRequired delegates correctly to onboarding repository")
     func checkOnboardingRequiredDelegatesToRepository() async {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -98,12 +98,47 @@ struct OnboardingUseCaseTests {
         #expect(useCaseState == repositoryState)
     }
     
+    @Test("CheckOnboardingRequired lists the stored CVs once")
+    func checkOnboardingRequiredListsStorageOnce() async throws {
+        let mockStorage = MockStorageService()
+        let cvRepository = CVRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
+        let useCase = OnboardingUseCase(
+            onboardingRepository: OnboardingRepository(cvRepository: cvRepository),
+            sampleRepository: sampleRepository,
+            cvManagementUseCase: CVManagementUseCase(cvRepository: cvRepository, sampleRepository: sampleRepository)
+        )
+        _ = try await cvRepository.saveCV(CVTestDataBuilder.minimalCV().build())
+        let listingsBefore = mockStorage.listingCount
+        
+        _ = await useCase.checkOnboardingRequired()
+        
+        #expect(mockStorage.listingCount - listingsBefore == 1)
+    }
+    
+    @Test("CheckOnboardingRequired returns the error when the stored CVs cannot be listed")
+    func checkOnboardingRequiredReturnsStorageError() async {
+        let mockStorage = MockStorageService()
+        mockStorage.listingError = AppError.fileSystemError("disk")
+        let cvRepository = CVRepository(storageService: mockStorage)
+        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
+        let useCase = OnboardingUseCase(
+            onboardingRepository: OnboardingRepository(cvRepository: cvRepository),
+            sampleRepository: sampleRepository,
+            cvManagementUseCase: CVManagementUseCase(cvRepository: cvRepository, sampleRepository: sampleRepository)
+        )
+        
+        let state = await useCase.checkOnboardingRequired()
+        
+        #expect(state == .error(.fileSystemError("disk")))
+    }
+    
     // MARK: - CreateFirstCV Tests
     
     @Test("CreateFirstCV creates new CV from template")
     func createFirstCVCreatesNewCVFromTemplate() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -132,7 +167,7 @@ struct OnboardingUseCaseTests {
     @Test("CreateFirstCV saves CV to repository")
     func createFirstCVSavesCVToRepository() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -159,7 +194,7 @@ struct OnboardingUseCaseTests {
     @Test("CreateFirstCV returns the saved CV")
     func createFirstCVReturnsTheSavedCV() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -186,7 +221,7 @@ struct OnboardingUseCaseTests {
     @Test("CreateFirstCV creates CV with all template fields copied")
     func createFirstCVCopiesAllTemplateFields() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -234,7 +269,7 @@ struct OnboardingUseCaseTests {
     @Test("CreateFirstCV handles empty template correctly")
     func createFirstCVHandlesEmptyTemplate() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -267,7 +302,7 @@ struct OnboardingUseCaseTests {
     @Test("CreateFirstCV changes onboarding state from firstTime to returning")
     func createFirstCVChangesOnboardingState() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -297,7 +332,7 @@ struct OnboardingUseCaseTests {
     @Test("OnboardingUseCase workflow: complete first-time user flow")
     func onboardingUseCaseCompleteFirstTimeUserFlow() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -334,7 +369,7 @@ struct OnboardingUseCaseTests {
         #expect(finalState == .returning)
         
         // 7. Verify CV count increased
-        let cvCount = await cvRepository.getCVsCount()
+        let cvCount = try await cvRepository.getCVsCount()
         #expect(cvCount == 1)
     }
     
@@ -343,7 +378,7 @@ struct OnboardingUseCaseTests {
     @Test("CreateFirstCV propagates repository save errors")
     func createFirstCVPropagatesRepositorySaveErrors() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -372,7 +407,7 @@ struct OnboardingUseCaseTests {
     @Test("OnboardingUseCase handles concurrent operations correctly")
     func onboardingUseCaseHandlesConcurrentOperations() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -398,7 +433,7 @@ struct OnboardingUseCaseTests {
     @Test("OnboardingUseCase handles concurrent CV creation attempts")
     func onboardingUseCaseHandlesConcurrentCVCreation() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -434,7 +469,7 @@ struct OnboardingUseCaseTests {
         #expect(cv2Retrieved != nil)
         
         // Total count should be 2
-        let totalCVs = await cvRepository.getCVsCount()
+        let totalCVs = try await cvRepository.getCVsCount()
         #expect(totalCVs == 2)
     }
     
@@ -443,7 +478,7 @@ struct OnboardingUseCaseTests {
     @Test("OnboardingUseCase handles multiple createFirstCV calls correctly")
     func onboardingUseCaseHandlesMultipleCreateFirstCVCalls() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         let cvManagementUseCase = CVManagementUseCase(
@@ -475,7 +510,7 @@ struct OnboardingUseCaseTests {
         #expect(cv3.name == template.name)
         
         // All should be saved
-        let count = await cvRepository.getCVsCount()
+        let count = try await cvRepository.getCVsCount()
         #expect(count == 3)
         
         // State should be returning after first CV

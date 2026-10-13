@@ -20,6 +20,13 @@ struct CVListView: View {
                 emptyContent: { emptyStateView }
             )
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let notice = viewModel.unreadableNotice {
+                InlineNotice(message: notice, actionTitle: "common.ok".localized) {
+                    Task { await viewModel.dismissUnreadableNotice() }
+                }
+            }
+        }
         .navigationTitle("navigation.my_cvs".localized)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {

@@ -5,6 +5,10 @@ import Foundation
 // for users to create their own CVs.
 
 public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
+    /// The sample CVs the app ships, in the order they are offered. They are listed by name because the bundle
+    /// holds other JSON files that are not CVs in this format, which a scan for `*.json` would pick up as blank CVs.
+    static let bundledSampleNames = ["technical_cv", "business_cv", "creative_cv", "academic_cv", "healthcare_cv"]
+    
     private let storageService: StorageServiceProtocol
     private let categoryService: TemplateCategoryServiceProtocol
     private let bundleResourceService: BundleResourceServiceProtocol
@@ -34,8 +38,8 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
     }
     
     public func getAllSamples() async throws -> [CVModel] {
-        let validTemplatePaths = await getValidTemplatePaths()
-        let loadedSamples = await loadSamplesFromPaths(validTemplatePaths)
+        let samplePaths = await getBundledSamplePaths()
+        let loadedSamples = await loadSamplesFromPaths(samplePaths)
         
         return try await ensureAtLeastOneTemplate(samples: loadedSamples)
     }
@@ -56,14 +60,14 @@ extension SampleCVRepository {
     
     // MARK: Template Path Management
     
-    private func getValidTemplatePaths() async -> [String] {
-        let allPaths = await bundleResourceService.getResourcePaths(ofType: "json", inDirectory: nil)
-        return await bundleResourceService.filterPaths(allPaths, excluding: Set(["default"]))
-    }
-    
-    private func getSearchableTemplatePaths() async -> [String] {
-        let allPaths = await bundleResourceService.getResourcePaths(ofType: "json", inDirectory: nil)
-        return await bundleResourceService.filterPaths(allPaths, excluding: Set(["default"]))
+    private func getBundledSamplePaths() async -> [String] {
+        var paths: [String] = []
+        for name in Self.bundledSampleNames {
+            if let url = await bundleResourceService.getResourceURL(forResource: name, withExtension: "json") {
+                paths.append(url.path)
+            }
+        }
+        return paths
     }
     
     // MARK: Template Loading
@@ -96,7 +100,8 @@ extension SampleCVRepository {
     }
     
     private func loadSampleByExactName(_ name: String) async throws -> CVModel? {
-        guard let url = await bundleResourceService.getResourceURL(forResource: name, withExtension: "json") else {
+        guard Self.bundledSampleNames.contains(name),
+              let url = await bundleResourceService.getResourceURL(forResource: name, withExtension: "json") else {
             return nil
         }
         
@@ -104,8 +109,8 @@ extension SampleCVRepository {
     }
     
     private func loadSampleByCategoryMatch(_ name: String) async throws -> CVModel? {
-        let searchablePaths = await getSearchableTemplatePaths()
-        return try await searchForCategoryMatch(in: searchablePaths, categoryName: name)
+        let samplePaths = await getBundledSamplePaths()
+        return try await searchForCategoryMatch(in: samplePaths, categoryName: name)
     }
     
     // MARK: Category Matching

@@ -5,6 +5,22 @@ import Foundation
 @Suite("FileStorageService Tests")
 struct FileStorageServiceTests {
     
+    /// File permissions do not stop the superuser, so tests that rely on them cannot run as root.
+    private static let permissionsApply = geteuid() != 0
+    
+    /// Writes a valid CV file that nobody may read, as a file is before the first unlock after boot.
+    private func writeUnreadableCV(named name: String, in directory: URL, cv: CVModel = CVTestDataBuilder.minimalCV().build()) throws -> URL {
+        let url = directory.appendingPathComponent("\(name).json")
+        let data = try JSONEncoder().encode(cv)
+        try data.write(to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: url.path)
+        return url
+    }
+    
+    private func makeReadable(_ url: URL) {
+        try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
+    }
+    
     // MARK: - Initialization Tests
     
     @Test("FileStorageService initializes with valid directory")
@@ -71,6 +87,54 @@ struct FileStorageServiceTests {
         #expect(loadedCV?.name == "Second CV")
     }
     
+    // MARK: - Write Safety Tests
+    
+    @Test("Write options are atomic and keep the file protected until the first unlock")
+    func writeOptionsAreAtomicAndProtected() {
+        #expect(FileStorageService.writeOptions.contains(.atomic))
+        #expect(FileStorageService.writeOptions.contains(.completeFileProtectionUntilFirstUserAuthentication))
+    }
+    
+    @Test("Save leaves exactly one file and no temporary leftovers")
+    func saveLeavesNoTemporaryFiles() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_atomic_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        for version in 1...3 {
+            let cv = CVTestDataBuilder.minimalCV().withName("Version \(version)").build()
+            try await service.save(cv, to: "atomic_test")
+        }
+        
+        let contents = try FileManager.default.contentsOfDirectory(atPath: tempDir.path)
+        #expect(contents == ["atomic_test.json"])
+    }
+    
+    @Test("A save that fails to encode keeps the previous file untouched")
+    func failedEncodeKeepsPreviousFile() async throws {
+        struct EncodeFailure: Error {}
+        struct Unencodable: Codable, Sendable {
+            init() {}
+            init(from decoder: Decoder) throws {}
+            func encode(to encoder: Encoder) throws { throw EncodeFailure() }
+        }
+        
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_encode_failure_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        let original = CVTestDataBuilder.minimalCV().withName("Original").build()
+        try await service.save(original, to: "keep")
+        
+        await #expect(throws: (any Error).self) {
+            try await service.save(Unencodable(), to: "keep")
+        }
+        
+        let kept = try await service.load(CVModel.self, from: "keep")
+        #expect(kept?.name == "Original")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: tempDir.path) == ["keep.json"])
+    }
+    
     // MARK: - Load Operation Tests
     
     @Test("Load operation retrieves stored object")
@@ -100,7 +164,7 @@ struct FileStorageServiceTests {
         #expect(result == nil)
     }
     
-    @Test("Load operation handles corrupted JSON gracefully")
+    @Test("Load operation reports corrupted JSON as a decoding error")
     func loadCorruptedJSON() async throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_corrupted_\(UUID().uuidString)")
         let service = try FileStorageService(baseDirectory: tempDir)
@@ -110,8 +174,29 @@ struct FileStorageServiceTests {
         let fileURL = tempDir.appendingPathComponent("corrupted.json")
         try "invalid json {".data(using: .utf8)?.write(to: fileURL)
         
-        await #expect(throws: DecodingError.self) {
+        await #expect {
             _ = try await service.load(CVModel.self, from: "corrupted")
+        } throws: { error in
+            guard case AppError.decodingError = error else { return false }
+            return true
+        }
+        #expect(FileManager.default.fileExists(atPath: fileURL.path))
+    }
+    
+    @Test("Load operation reports an unreadable file as a file system error", .enabled(if: permissionsApply))
+    func loadUnreadableFile() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_load_unreadable_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        let blocked = try writeUnreadableCV(named: "blocked", in: tempDir)
+        defer { makeReadable(blocked) }
+        
+        await #expect {
+            _ = try await service.load(CVModel.self, from: "blocked")
+        } throws: { error in
+            guard case AppError.fileSystemError = error else { return false }
+            return true
         }
     }
     
@@ -148,9 +233,9 @@ struct FileStorageServiceTests {
         #expect(result.isEmpty)
     }
     
-    @Test("LoadAll operation skips invalid files and continues loading")
-    func loadAllSkipsInvalidFiles() async throws {
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_skip_invalid_\(UUID().uuidString)")
+    @Test("LoadAll operation quarantines corrupt files and continues loading")
+    func loadAllQuarantinesCorruptFiles() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_quarantine_\(UUID().uuidString)")
         let service = try FileStorageService(baseDirectory: tempDir)
         defer { try? FileManager.default.removeItem(at: tempDir) }
         
@@ -168,9 +253,246 @@ struct FileStorageServiceTests {
         
         let allCVs = try await service.loadAll(CVModel.self)
         
-        // Should only return the valid CV, skipping the invalid JSON and ignoring non-JSON files
         #expect(allCVs.count == 1)
         #expect(allCVs.first?.name == validCV.name)
+        
+        // The corrupt file is set aside, not deleted; the other files are untouched
+        let quarantined = tempDir.appendingPathComponent("Quarantine/invalid.json")
+        #expect(!FileManager.default.fileExists(atPath: invalidFileURL.path))
+        #expect(FileManager.default.fileExists(atPath: quarantined.path))
+        #expect(try String(contentsOf: quarantined, encoding: .utf8) == "invalid json")
+        #expect(FileManager.default.fileExists(atPath: textFileURL.path))
+        #expect(await service.exists(identifier: "valid"))
+    }
+    
+    @Test("LoadAllReporting counts the corrupt files")
+    func loadAllReportingCountsCorruptFiles() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_report_corrupt_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let validCV = CVTestDataBuilder.minimalCV().build()
+        try await service.save(StoredCV(cv: validCV), to: StoredCV.identifier(for: validCV.id))
+        try Data("invalid json".utf8).write(to: tempDir.appendingPathComponent("broken_one.json"))
+        try Data("{".utf8).write(to: tempDir.appendingPathComponent("broken_two.json"))
+        
+        let report = try await service.loadAllReporting(StoredCV.self)
+        
+        #expect(report.items.map(\.cv.id) == [validCV.id])
+        #expect(report.unreadableCount == 2)
+    }
+    
+    @Test("LoadAllReporting counts an unreadable file every time until it can be read", .enabled(if: permissionsApply))
+    func loadAllReportingCountsUnreadableFiles() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_report_unreadable_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let cv = CVTestDataBuilder.minimalCV().build()
+        let blocked = try writeUnreadableCV(named: StoredCV.identifier(for: cv.id), in: tempDir, cv: cv)
+        defer { makeReadable(blocked) }
+        
+        #expect(try await service.loadAllReporting(StoredCV.self).unreadableCount == 1)
+        #expect(try await service.loadAllReporting(StoredCV.self).unreadableCount == 1)
+        
+        makeReadable(blocked)
+        let report = try await service.loadAllReporting(StoredCV.self)
+        #expect(report.unreadableCount == 0)
+        #expect(report.items.count == 1)
+    }
+    
+    @Test("LoadAllReporting reports no unreadable files for a healthy storage")
+    func loadAllReportingCountsNothingWhenHealthy() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_report_healthy_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let cv = CVTestDataBuilder.minimalCV().build()
+        try await service.save(StoredCV(cv: cv), to: StoredCV.identifier(for: cv.id))
+        
+        let report = try await service.loadAllReporting(StoredCV.self)
+        
+        #expect(report.items.count == 1)
+        #expect(report.unreadableCount == 0)
+    }
+    
+    @Test("LoadAllReporting still reports a file that an earlier load set aside")
+    func loadAllReportingReportsFilesSetAsideByAnotherLoad() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_report_other_load_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        try Data("invalid json".utf8).write(to: tempDir.appendingPathComponent("broken.json"))
+        
+        _ = try await service.loadAll(CVModel.self)
+        
+        #expect(try await service.loadAllReporting(StoredCV.self).unreadableCount == 1)
+        #expect(try await service.loadAllReporting(StoredCV.self).unreadableCount == 1)
+    }
+    
+    @Test("AcknowledgeQuarantined keeps the files and stops them being reported")
+    func acknowledgeQuarantinedKeepsTheFiles() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_acknowledge_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        try Data("first".utf8).write(to: tempDir.appendingPathComponent("broken.json"))
+        _ = try await service.loadAllReporting(StoredCV.self)
+        
+        try await service.acknowledgeQuarantined()
+        try await service.acknowledgeQuarantined()
+        
+        #expect(try await service.loadAllReporting(StoredCV.self).unreadableCount == 0)
+        let acknowledged = tempDir.appendingPathComponent("Quarantine/acknowledged")
+        #expect(try String(contentsOf: acknowledged.appendingPathComponent("broken.json"), encoding: .utf8) == "first")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: tempDir.appendingPathComponent("Quarantine").path) == ["acknowledged"])
+    }
+    
+    @Test("AcknowledgeQuarantined keeps a second file with the same name")
+    func acknowledgeQuarantinedKeepsEveryFile() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_acknowledge_names_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        for content in ["first", "second"] {
+            try Data(content.utf8).write(to: tempDir.appendingPathComponent("broken.json"))
+            _ = try await service.loadAllReporting(StoredCV.self)
+            try await service.acknowledgeQuarantined()
+        }
+        
+        let acknowledged = tempDir.appendingPathComponent("Quarantine/acknowledged")
+        #expect(try String(contentsOf: acknowledged.appendingPathComponent("broken.json"), encoding: .utf8) == "first")
+        #expect(try String(contentsOf: acknowledged.appendingPathComponent("1~broken.json"), encoding: .utf8) == "second")
+    }
+    
+    @Test("AcknowledgeQuarantined does nothing when nothing was set aside")
+    func acknowledgeQuarantinedWithNothingSetAside() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_acknowledge_none_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        try await service.acknowledgeQuarantined()
+        
+        #expect(!FileManager.default.fileExists(atPath: tempDir.appendingPathComponent("Quarantine").path))
+    }
+    
+    @Test("LoadAll operation lists a quarantined file only once")
+    func loadAllDoesNotListQuarantinedFilesAgain() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_quarantine_once_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        try "invalid json".data(using: .utf8)?.write(to: tempDir.appendingPathComponent("invalid.json"))
+        
+        _ = try await service.loadAll(CVModel.self)
+        let second = try await service.loadAll(CVModel.self)
+        
+        #expect(second.isEmpty)
+        #expect(try await service.getAllIdentifiers().isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: tempDir.appendingPathComponent("Quarantine").path) == ["invalid.json"])
+    }
+    
+    @Test("LoadAll operation keeps a second corrupt file with the same name")
+    func loadAllKeepsEveryQuarantinedFile() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_quarantine_names_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        for content in ["first", "second"] {
+            try content.data(using: .utf8)?.write(to: tempDir.appendingPathComponent("invalid.json"))
+            _ = try await service.loadAll(CVModel.self)
+        }
+        
+        let quarantine = tempDir.appendingPathComponent("Quarantine")
+        #expect(try String(contentsOf: quarantine.appendingPathComponent("invalid.json"), encoding: .utf8) == "first")
+        #expect(try String(contentsOf: quarantine.appendingPathComponent("1~invalid.json"), encoding: .utf8) == "second")
+    }
+    
+    @Test("LoadAll operation leaves an unreadable file in place and does not quarantine it", .enabled(if: permissionsApply))
+    func loadAllKeepsUnreadableFiles() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_unreadable_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        let cv = CVTestDataBuilder.minimalCV().build()
+        try await service.save(cv, to: "valid")
+        let blocked = try writeUnreadableCV(named: "blocked", in: tempDir)
+        defer { makeReadable(blocked) }
+        
+        let allCVs = try await service.loadAll(CVModel.self)
+        
+        #expect(allCVs.map(\.id) == [cv.id])
+        #expect(FileManager.default.fileExists(atPath: blocked.path))
+        #expect(!FileManager.default.fileExists(atPath: tempDir.appendingPathComponent("Quarantine").path))
+        
+        // Once the file can be read again, it is loaded
+        makeReadable(blocked)
+        #expect(try await service.loadAll(CVModel.self).count == 2)
+    }
+    
+    @Test("LoadAll operation fails with a file system error when the storage cannot be listed")
+    func loadAllThrowsWhenStorageCannotBeListed() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_unlistable_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        try FileManager.default.removeItem(at: tempDir)
+        
+        await #expect {
+            _ = try await service.loadAll(CVModel.self)
+        } throws: { error in
+            guard case AppError.fileSystemError = error else { return false }
+            return true
+        }
+        await #expect {
+            _ = try await service.getAllIdentifiers()
+        } throws: { error in
+            guard case AppError.fileSystemError = error else { return false }
+            return true
+        }
+    }
+    
+    @Test("LoadAll operation returns files in a stable order")
+    func loadAllIsOrderedByFileName() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_order_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        for name in ["c", "a", "d", "b"] {
+            try await service.save(CVTestDataBuilder.minimalCV().withName(name).build(), to: "cv_\(name)")
+        }
+        
+        #expect(try await service.loadAll(CVModel.self).map(\.name) == ["a", "b", "c", "d"])
+        #expect(try await service.getAllIdentifiers() == ["cv_a", "cv_b", "cv_c", "cv_d"])
+    }
+    
+    // MARK: - Save Error Tests
+    
+    @Test("Save operation reports an encoding failure as an encoding error")
+    func saveMapsEncodingFailure() async throws {
+        struct EncodeFailure: Error {}
+        struct Unencodable: Codable, Sendable {
+            init() {}
+            init(from decoder: Decoder) throws {}
+            func encode(to encoder: Encoder) throws { throw EncodeFailure() }
+        }
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_save_encoding_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        
+        await #expect {
+            try await service.save(Unencodable(), to: "unencodable")
+        } throws: { error in
+            guard case AppError.encodingError = error else { return false }
+            return true
+        }
+    }
+    
+    @Test("Save operation reports a write failure as a file system error")
+    func saveMapsWriteFailure() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_save_write_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        try FileManager.default.removeItem(at: tempDir)
+        
+        await #expect {
+            try await service.save(CVTestDataBuilder.minimalCV().build(), to: "lost")
+        } throws: { error in
+            guard case AppError.fileSystemError = error else { return false }
+            return true
+        }
     }
     
     // MARK: - Delete Operation Tests
@@ -200,6 +522,27 @@ struct FileStorageServiceTests {
         
         // Should not throw when deleting non-existent file
         try await service.delete(identifier: "non_existent")
+    }
+    
+    @Test("Delete operation reports a removal failure as a file system error", .enabled(if: permissionsApply))
+    func deleteMapsRemovalFailure() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("test_delete_failure_\(UUID().uuidString)")
+        let service = try FileStorageService(baseDirectory: tempDir)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tempDir.path)
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+        
+        try await service.save(CVTestDataBuilder.minimalCV().build(), to: "locked")
+        // A directory that cannot be modified refuses the removal of its files
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: tempDir.path)
+        
+        await #expect {
+            try await service.delete(identifier: "locked")
+        } throws: { error in
+            guard case AppError.fileSystemError = error else { return false }
+            return true
+        }
     }
     
     // MARK: - Exists Operation Tests

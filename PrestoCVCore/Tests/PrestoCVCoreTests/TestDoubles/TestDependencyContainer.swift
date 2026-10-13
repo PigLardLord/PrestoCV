@@ -11,10 +11,7 @@ public final class TestDependencyContainer: DependencyContainerProtocol, @unchec
     private let mockCategoryService = TemplateCategoryService()
     
     private lazy var cvRepository: CVRepositoryProtocol = {
-        return CVRepository(
-            storageService: mockStorageService,
-            parallelSearchService: mockParallelSearchService
-        )
+        return CVRepository(storageService: mockStorageService)
     }()
     
     private lazy var sampleRepository: SampleCVRepositoryProtocol = {

@@ -10,7 +10,7 @@ struct OnboardingRepositoryTests {
     @Test("OnboardingRepository initializes with CV repository")
     func repositoryInitialization() {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
         #expect(type(of: onboardingRepository) == OnboardingRepository.self)
@@ -19,39 +19,50 @@ struct OnboardingRepositoryTests {
     // MARK: - HasExistingCVs Tests
     
     @Test("HasExistingCVs returns false when no CVs exist")
-    func hasExistingCVsReturnsFalseWhenEmpty() async {
+    func hasExistingCVsReturnsFalseWhenEmpty() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
-        let hasExisting = await onboardingRepository.hasExistingCVs()
+        let hasExisting = try await onboardingRepository.hasExistingCVs()
         #expect(hasExisting == false)
     }
     
     @Test("HasExistingCVs returns true when CVs exist")
     func hasExistingCVsReturnsTrueWhenCVsExist() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
         // Add a CV to the repository
         let cv = CVTestDataBuilder.minimalCV().build()
         _ = try await cvRepository.saveCV(cv)
         
-        let hasExisting = await onboardingRepository.hasExistingCVs()
+        let hasExisting = try await onboardingRepository.hasExistingCVs()
         #expect(hasExisting == true)
     }
     
-    @Test("HasExistingCVs returns false when CV repository errors")
-    func hasExistingCVsHandlesCVRepositoryErrors() async {
-        // Create a repository that will fail on cvExists
+    @Test("HasExistingCVs throws when the stored CVs cannot be listed")
+    func hasExistingCVsThrowsWhenStorageFails() async {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        mockStorage.listingError = AppError.fileSystemError("disk")
+        let cvRepository = CVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
-        // With clean mock storage, cvExists should return false without errors
-        let hasExisting = await onboardingRepository.hasExistingCVs()
-        #expect(hasExisting == false)
+        await #expect(throws: AppError.fileSystemError("disk")) {
+            _ = try await onboardingRepository.hasExistingCVs()
+        }
+    }
+    
+    @Test("GetOnboardingState returns the error when the stored CVs cannot be listed")
+    func getOnboardingStateReturnsErrorWhenStorageFails() async {
+        let mockStorage = MockStorageService()
+        mockStorage.listingError = AppError.fileSystemError("disk")
+        let cvRepository = CVRepository(storageService: mockStorage)
+        let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
+        
+        let state = await onboardingRepository.getOnboardingState()
+        #expect(state == .error(.fileSystemError("disk")))
     }
     
     // MARK: - GetOnboardingState Tests
@@ -59,7 +70,7 @@ struct OnboardingRepositoryTests {
     @Test("GetOnboardingState returns firstTime when no CVs exist")
     func getOnboardingStateReturnsFirstTimeWhenNoCVs() async {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
         let state = await onboardingRepository.getOnboardingState()
@@ -69,7 +80,7 @@ struct OnboardingRepositoryTests {
     @Test("GetOnboardingState returns returning when CVs exist")
     func getOnboardingStateReturnsReturningWhenCVsExist() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
         // Add a CV to make the user a "returning" user
@@ -83,7 +94,7 @@ struct OnboardingRepositoryTests {
     @Test("GetOnboardingState transitions correctly as CVs are added")
     func getOnboardingStateTransitionsCorrectly() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
         // Initially should be first time
@@ -118,12 +129,12 @@ struct OnboardingRepositoryTests {
     @Test("OnboardingRepository reflects CV repository state changes immediately")
     func onboardingRepositoryReflectsCVRepositoryChanges() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
         // Start with no CVs
         #expect(await onboardingRepository.getOnboardingState() == .firstTime)
-        #expect(await onboardingRepository.hasExistingCVs() == false)
+        #expect(try await onboardingRepository.hasExistingCVs() == false)
         
         // Add CV through CV repository
         let cv1 = CVTestDataBuilder.minimalCV().withName("First CV").build()
@@ -131,7 +142,7 @@ struct OnboardingRepositoryTests {
         
         // Onboarding repository should immediately reflect the change
         #expect(await onboardingRepository.getOnboardingState() == .returning)
-        #expect(await onboardingRepository.hasExistingCVs() == true)
+        #expect(try await onboardingRepository.hasExistingCVs() == true)
         
         // Add another CV
         let cv2 = CVTestDataBuilder.minimalCV().withName("Second CV").build()
@@ -139,21 +150,21 @@ struct OnboardingRepositoryTests {
         
         // Should still be returning (not changed from returning to anything else)
         #expect(await onboardingRepository.getOnboardingState() == .returning)
-        #expect(await onboardingRepository.hasExistingCVs() == true)
+        #expect(try await onboardingRepository.hasExistingCVs() == true)
         
         // Delete one CV
         try await cvRepository.deleteCV(id: cv1.id)
         
         // Should still be returning because cv2 still exists
         #expect(await onboardingRepository.getOnboardingState() == .returning)
-        #expect(await onboardingRepository.hasExistingCVs() == true)
+        #expect(try await onboardingRepository.hasExistingCVs() == true)
         
         // Delete the last CV
         try await cvRepository.deleteCV(id: cv2.id)
         
         // Should go back to first time
         #expect(await onboardingRepository.getOnboardingState() == .firstTime)
-        #expect(await onboardingRepository.hasExistingCVs() == false)
+        #expect(try await onboardingRepository.hasExistingCVs() == false)
     }
     
     // MARK: - Concurrency Tests
@@ -161,7 +172,7 @@ struct OnboardingRepositoryTests {
     @Test("OnboardingRepository handles concurrent operations correctly")
     func onboardingRepositoryHandlesConcurrentOperations() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
         // Perform multiple concurrent state checks
@@ -170,7 +181,7 @@ struct OnboardingRepositoryTests {
         async let hasExisting1 = onboardingRepository.hasExistingCVs()
         async let hasExisting2 = onboardingRepository.hasExistingCVs()
         
-        let results = await (state1, state2, hasExisting1, hasExisting2)
+        let results = try await (state1, state2, hasExisting1, hasExisting2)
         
         // All should return consistent results for empty state
         #expect(results.0 == .firstTime)
@@ -182,14 +193,14 @@ struct OnboardingRepositoryTests {
     @Test("OnboardingRepository state checks remain consistent during CV operations")
     func onboardingRepositoryConsistentDuringCVOperations() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
         let cv = CVTestDataBuilder.minimalCV().build()
         
         // Initial state should be firstTime
         let initialState = await onboardingRepository.getOnboardingState()
-        let initialExists = await onboardingRepository.hasExistingCVs()
+        let initialExists = try await onboardingRepository.hasExistingCVs()
         #expect(initialState == .firstTime)
         #expect(initialExists == false)
         
@@ -198,7 +209,7 @@ struct OnboardingRepositoryTests {
         
         // After save completes, check state - should be consistent
         let finalState = await onboardingRepository.getOnboardingState()
-        let finalExists = await onboardingRepository.hasExistingCVs()
+        let finalExists = try await onboardingRepository.hasExistingCVs()
         
         #expect(finalState == .returning)
         #expect(finalExists == true)
@@ -206,7 +217,7 @@ struct OnboardingRepositoryTests {
         // Multiple sequential checks should remain consistent
         for _ in 0..<3 {
             let state = await onboardingRepository.getOnboardingState()
-            let exists = await onboardingRepository.hasExistingCVs()
+            let exists = try await onboardingRepository.hasExistingCVs()
             #expect(state == .returning)
             #expect(exists == true)
         }
@@ -217,7 +228,7 @@ struct OnboardingRepositoryTests {
     @Test("OnboardingRepository handles repository with many CVs")
     func onboardingRepositoryHandlesManyCV() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
         // Add many CVs
@@ -231,22 +242,22 @@ struct OnboardingRepositoryTests {
         let state = await onboardingRepository.getOnboardingState()
         #expect(state == .returning)
         
-        let hasExisting = await onboardingRepository.hasExistingCVs()
+        let hasExisting = try await onboardingRepository.hasExistingCVs()
         #expect(hasExisting == true)
     }
     
     @Test("OnboardingRepository delegates correctly to CV repository")
     func onboardingRepositoryDelegatesToCVRepository() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
         // Test that the onboarding repository is truly delegating to the CV repository
         // by verifying behavior through the CV repository interface
         
         // Direct CV repository check
-        let directCVExists = await cvRepository.cvExists()
-        let onboardingHasExisting = await onboardingRepository.hasExistingCVs()
+        let directCVExists = try await cvRepository.cvExists()
+        let onboardingHasExisting = try await onboardingRepository.hasExistingCVs()
         #expect(directCVExists == onboardingHasExisting)
         
         // Add CV through CV repository
@@ -254,8 +265,8 @@ struct OnboardingRepositoryTests {
         _ = try await cvRepository.saveCV(cv)
         
         // Both should reflect the same state
-        let directCVExistsAfter = await cvRepository.cvExists()
-        let onboardingHasExistingAfter = await onboardingRepository.hasExistingCVs()
+        let directCVExistsAfter = try await cvRepository.cvExists()
+        let onboardingHasExistingAfter = try await onboardingRepository.hasExistingCVs()
         #expect(directCVExistsAfter == onboardingHasExistingAfter)
         #expect(onboardingHasExistingAfter == true)
         
@@ -269,7 +280,7 @@ struct OnboardingRepositoryTests {
     @Test("OnboardingRepository state logic is correct")
     func onboardingRepositoryStateLogicIsCorrect() async throws {
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let onboardingRepository = OnboardingRepository(cvRepository: cvRepository)
         
         // Test the core business logic:
@@ -277,7 +288,7 @@ struct OnboardingRepositoryTests {
         // hasExistingCVs() == true → getOnboardingState() == .returning
         
         // Empty state
-        let emptyHasExisting = await onboardingRepository.hasExistingCVs()
+        let emptyHasExisting = try await onboardingRepository.hasExistingCVs()
         let emptyState = await onboardingRepository.getOnboardingState()
         #expect(emptyHasExisting == false)
         #expect(emptyState == .firstTime)
@@ -287,7 +298,7 @@ struct OnboardingRepositoryTests {
         _ = try await cvRepository.saveCV(cv)
         
         // Non-empty state
-        let nonEmptyHasExisting = await onboardingRepository.hasExistingCVs()
+        let nonEmptyHasExisting = try await onboardingRepository.hasExistingCVs()
         let nonEmptyState = await onboardingRepository.getOnboardingState()
         #expect(nonEmptyHasExisting == true)
         #expect(nonEmptyState == .returning)

@@ -45,28 +45,14 @@ public protocol ParallelSearchServiceProtocol: Sendable {
     ) async throws -> [Item] where Source: Sendable, Item: Sendable
 }
 
-/// Protocol for accessing bundle resources and filtering paths
+/// Protocol for accessing bundle resources
 public protocol BundleResourceServiceProtocol: Sendable {
-    /// Retrieves resource paths of a specific type from the bundle
-    /// - Parameters:
-    ///   - type: The file extension type to search for
-    ///   - directory: Optional directory within the bundle to search in
-    /// - Returns: Array of file paths matching the criteria
-    func getResourcePaths(ofType type: String, inDirectory directory: String?) async -> [String]
-    
     /// Gets the URL for a specific resource in the bundle
     /// - Parameters:
     ///   - name: The name of the resource file
     ///   - ext: The file extension
     /// - Returns: URL of the resource if found, nil otherwise
     func getResourceURL(forResource name: String, withExtension ext: String) async -> URL?
-    
-    /// Filters a list of paths by excluding files with specific names
-    /// - Parameters:
-    ///   - paths: Array of file paths to filter
-    ///   - excludedNames: Set of file names to exclude from results
-    /// - Returns: Filtered array of paths
-    func filterPaths(_ paths: [String], excluding excludedNames: Set<String>) async -> [String]
 }
 
 /// Protocol for loading CV templates from JSON files

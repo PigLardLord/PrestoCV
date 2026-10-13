@@ -5,6 +5,15 @@ import Foundation
 @Suite("DependencyContainer Tests")
 struct DependencyContainerTests {
     
+    private func makeTemporaryStorageDirectory() -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("test_container_\(UUID().uuidString)")
+    }
+    
+    private func makeIsolatedContainer() -> DependencyContainer {
+        let directory = makeTemporaryStorageDirectory()
+        return DependencyContainer(storageDirectory: { directory })
+    }
+    
     // MARK: - Container Initialization Tests
     
     @Test("DependencyContainer initializes without errors")
@@ -61,7 +70,7 @@ struct DependencyContainerTests {
     
     @Test("Real DependencyContainer creates OnboardingUseCase successfully")
     func realContainerCreatesOnboardingUseCase() throws {
-        let container = DependencyContainer()
+        let container = makeIsolatedContainer()
         let useCase = try container.makeOnboardingUseCase()
         
         #expect(useCase is OnboardingUseCase)
@@ -69,7 +78,7 @@ struct DependencyContainerTests {
     
     @Test("Real DependencyContainer creates CVManagementUseCase successfully")  
     func realContainerCreatesCVManagementUseCase() throws {
-        let container = DependencyContainer()
+        let container = makeIsolatedContainer()
         let useCase = try container.makeCVManagementUseCase()
         
         #expect(useCase is CVManagementUseCase)
@@ -77,7 +86,7 @@ struct DependencyContainerTests {
     
     @Test("Real DependencyContainer creates SampleCVRepository successfully")
     func realContainerCreatesSampleCVRepository() throws {
-        let container = DependencyContainer()
+        let container = makeIsolatedContainer()
         let repository = try container.makeSampleCVRepository()
         
         #expect(repository is SampleCVRepository)
@@ -85,7 +94,7 @@ struct DependencyContainerTests {
     
     @Test("Real DependencyContainer creates TemplateCategoryService successfully")
     func realContainerCreatesTemplateCategoryService() throws {
-        let container = DependencyContainer()
+        let container = makeIsolatedContainer()
         let service = try container.makeTemplateCategoryService()
         
         #expect(service is TemplateCategoryService)
@@ -93,7 +102,7 @@ struct DependencyContainerTests {
     
     @Test("Real DependencyContainer maintains service consistency")
     func realContainerMaintainsServiceConsistency() throws {
-        let container = DependencyContainer()
+        let container = makeIsolatedContainer()
         
         // Create multiple instances to verify they work consistently
         let useCase1 = try container.makeOnboardingUseCase()
@@ -106,5 +115,46 @@ struct DependencyContainerTests {
         #expect(useCase2 is CVManagementUseCase)
         #expect(repository is SampleCVRepository)
         #expect(service is TemplateCategoryService)
+    }
+    
+    // MARK: - Storage Location Tests
+    
+    @Test("Default storage directory is PrestoCV/CVs under Application Support")
+    func defaultStorageDirectoryIsInApplicationSupport() throws {
+        let directory = try DependencyContainer.defaultStorageDirectory()
+        let applicationSupport = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: false
+        )
+        
+        #expect(directory == applicationSupport.appendingPathComponent("PrestoCV/CVs", isDirectory: true))
+    }
+    
+    @Test("Container stores CVs in the directory it was given")
+    func containerStoresCVsInGivenDirectory() async throws {
+        let directory = makeTemporaryStorageDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let container = DependencyContainer(storageDirectory: { directory })
+        
+        let useCase = try container.makeCVManagementUseCase()
+        let created = try await useCase.createCV(from: CVTestDataBuilder.minimalCV().build())
+        
+        let fileURL = directory.appendingPathComponent("cv_\(created.id.uuidString).json")
+        #expect(FileManager.default.fileExists(atPath: fileURL.path))
+    }
+    
+    @Test("A storage directory that cannot be resolved fails with serviceCreationFailed")
+    func unresolvableStorageDirectoryFailsServiceCreation() {
+        struct NoStorageDirectory: Error {}
+        let container = DependencyContainer(storageDirectory: { throw NoStorageDirectory() })
+        
+        #expect {
+            try container.makeCVManagementUseCase()
+        } throws: { error in
+            guard case DependencyError.serviceCreationFailed(let service, let underlying) = error else { return false }
+            return service == "StorageService" && underlying is NoStorageDirectory
+        }
     }
 }

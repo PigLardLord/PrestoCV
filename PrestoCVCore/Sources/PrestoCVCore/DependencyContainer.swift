@@ -19,12 +19,13 @@ public final class DependencyContainer: DependencyContainerProtocol {
     
     // MARK: - Properties
     
+    private let storageDirectory: @Sendable () throws -> URL
+
+    /// The one storage of this container. It is created on first use and shared by every repository, because a
+    /// storage serialises the operations on its directory and a second one would bypass that.
     private lazy var storageServiceResult: Result<StorageServiceProtocol, Error> = {
         do {
-            // Get iOS Documents directory for CV storage
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-            let cvDirectory = documentsPath.appendingPathComponent("CVs")
-            let service = try FileStorageService(baseDirectory: cvDirectory)
+            let service = try FileStorageService(baseDirectory: try storageDirectory())
             return .success(service)
         } catch {
             return .failure(error)
@@ -33,7 +34,19 @@ public final class DependencyContainer: DependencyContainerProtocol {
     
     // MARK: - Initialization
     
-    public init() {}
+    /// - Parameter storageDirectory: Resolves the directory that holds the CV files. It is called on the first
+    ///   use of the storage, and a failure surfaces as `DependencyError.serviceCreationFailed`.
+    public init(storageDirectory: @escaping @Sendable () throws -> URL = DependencyContainer.defaultStorageDirectory) {
+        self.storageDirectory = storageDirectory
+    }
+
+    /// `Application Support/PrestoCV/CVs`: the CVs are the app's own data, not documents the user browses.
+    public static func defaultStorageDirectory() throws -> URL {
+        try FileManager.default
+            .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            .appendingPathComponent("PrestoCV", isDirectory: true)
+            .appendingPathComponent("CVs", isDirectory: true)
+    }
     
     // MARK: - Public Protocol Implementation
     
@@ -82,12 +95,7 @@ extension DependencyContainer {
     }
     
     private func getCVRepository() throws -> CVRepositoryProtocol {
-        let storageService = try getStorageService()
-        let parallelSearchService = getParallelSearchService()
-        return CVRepository(
-            storageService: storageService,
-            parallelSearchService: parallelSearchService
-        )
+        return CVRepository(storageService: try getStorageService())
     }
     
     private func getOnboardingRepository() throws -> OnboardingRepositoryProtocol {

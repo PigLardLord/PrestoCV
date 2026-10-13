@@ -204,7 +204,7 @@ struct IntegrationTests {
     func dataPersistenceIntegration() async throws {
         // Use same mock storage across all components to test persistence
         let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage, parallelSearchService: MockParallelSearchService())
+        let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(
             storageService: mockStorage,
             categoryService: TemplateCategoryService(),

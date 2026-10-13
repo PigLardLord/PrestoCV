@@ -34,6 +34,14 @@ public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
         return try await cvRepository.getAllCVs()
     }
     
+    public func getCVListing() async throws -> CVListing {
+        return try await cvRepository.getCVListing()
+    }
+    
+    public func acknowledgeUnreadableCVs() async throws {
+        try await cvRepository.acknowledgeUnreadableCVs()
+    }
+    
     public func createCV(from template: CVModel) async throws -> CVModel {
         // Create a new CV with a new ID based on the template
         let newCV = template.copy()
