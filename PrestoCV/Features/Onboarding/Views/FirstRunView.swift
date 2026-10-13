@@ -3,7 +3,11 @@ import PrestoCVCore
 
 /// What the user sees before having any CV: it fills the empty state of the CV list.
 struct FirstRunView: View {
+    @ObservedObject var viewModel: OnboardingViewModel
     @EnvironmentObject var router: AppRouter
+    @State private var showingExamples = false
+    /// The draft the user picked. The editor opens once the sheet is gone, because a screen pushed while a sheet is leaving is lost.
+    @State private var pendingDraft: CVModel?
     
     var body: some View {
         ScrollView {
@@ -13,6 +17,15 @@ struct FirstRunView: View {
                 actionSection
             }
             .padding(DesignTokens.Spacing.xl)
+        }
+        .task {
+            await viewModel.loadSamples()
+        }
+        .sheet(isPresented: $showingExamples, onDismiss: openPendingDraft) {
+            ExampleSelectionView(samples: viewModel.samples) { sample in
+                pendingDraft = viewModel.makeDraft(from: sample)
+                showingExamples = false
+            }
         }
     }
     
@@ -47,21 +60,41 @@ struct FirstRunView: View {
     }
     
     private var actionSection: some View {
-        PrimaryButton(
-            title: "onboarding.create.button".localized,
-            icon: "plus.circle.fill"
-        ) {
-            router.navigateToEditorWithTemplate(CVModel())
+        VStack(spacing: DesignTokens.Spacing.lg) {
+            PrimaryButton(
+                title: "onboarding.create.button".localized,
+                icon: "plus.circle.fill"
+            ) {
+                router.navigateToEditorWithTemplate(CVModel())
+            }
+            
+            if !viewModel.samples.isEmpty {
+                SecondaryButton.text(title: "onboarding.start_from_example".localized) {
+                    showingExamples = true
+                }
+            }
         }
         .padding(.horizontal, DesignTokens.Spacing.md)
+    }
+    
+    private func openPendingDraft() {
+        guard let draft = pendingDraft else { return }
+        pendingDraft = nil
+        router.navigateToEditorWithTemplate(draft)
     }
 }
 
 // MARK: - Previews
 
-struct FirstRunView_Previews: PreviewProvider {
-    static var previews: some View {
-        FirstRunView()
-            .environmentObject(AppRouter())
-    }
+#if DEBUG
+#Preview {
+    let container = DependencyContainer()
+    let viewModel = OnboardingViewModel(
+        onboardingUseCase: try! container.makeOnboardingUseCase(),
+        sampleRepository: try! container.makeSampleCVRepository()
+    )
+    
+    return FirstRunView(viewModel: viewModel)
+        .environmentObject(AppRouter())
 }
+#endif

@@ -6,7 +6,7 @@
     "location": "San Francisco, CA",
     "email": "alex.morgan@example.com",
     "phone": "+1 (555) 123-4567",
-    "portfolio": "https://alex-morgan.dev",
+    "portfolio": "https://example.com",
     "profile": "Senior Software Engineer with 8+ years of experience in building scalable distributed systems and cloud-native applications. Expertise in microservices architecture, DevOps practices, and leading engineering teams. Passionate about clean code, system design, and mentoring junior developers."
   },
   "relevant_experience": [
@@ -87,15 +87,15 @@
   "social": [
     {
       "platform": "GitHub",
-      "url": "https://github.com/alexmorgan"
+      "url": "https://example.com/github"
     },
     {
       "platform": "LinkedIn",
-      "url": "https://linkedin.com/in/alexmorgan"
+      "url": "https://example.com/linkedin"
     },
     {
       "platform": "Portfolio",
-      "url": "https://alex-morgan.dev"
+      "url": "https://example.com"
     }
   ]
 }

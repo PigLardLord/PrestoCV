@@ -8,6 +8,8 @@ struct CVListView<EmptyState: View>: View {
     @State private var exportTarget: CVModel?
     @State private var deleteTarget: CVModel?
     @State private var showDeleteConfirmation = false
+    @State private var renameTarget: CVModel?
+    @State private var renameText = ""
     private let emptyState: EmptyState
 
     init(viewModel: CVListViewModel, @ViewBuilder emptyState: () -> EmptyState) {
@@ -28,9 +30,16 @@ struct CVListView<EmptyState: View>: View {
             )
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if let notice = viewModel.unreadableNotice {
-                InlineNotice(message: notice, actionTitle: "common.ok".localized) {
-                    Task { await viewModel.dismissUnreadableNotice() }
+            VStack(spacing: 0) {
+                if let notice = viewModel.staleNotice {
+                    InlineNotice(message: notice, actionTitle: "common.retry".localized) {
+                        Task { await viewModel.loadCVs() }
+                    }
+                }
+                if let notice = viewModel.unreadableNotice {
+                    InlineNotice(message: notice, actionTitle: "common.ok".localized) {
+                        Task { await viewModel.dismissUnreadableNotice() }
+                    }
                 }
             }
         }
@@ -57,21 +66,39 @@ struct CVListView<EmptyState: View>: View {
         .confirmationDialog(
             String(localized: "cv.delete.confirmation.title"),
             isPresented: $showDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            if let target = deleteTarget {
-                Button(String(localized: "common.delete"), role: .destructive) {
-                    Task { await viewModel.deleteCV(withId: target.id) }
-                    showDeleteConfirmation = false
-                    deleteTarget = nil
-                }
-                Button(String(localized: "common.cancel"), role: .cancel) {
-                    showDeleteConfirmation = false
-                    deleteTarget = nil
-                }
+            titleVisibility: .visible,
+            presenting: deleteTarget
+        ) { target in
+            Button(String(localized: "common.delete"), role: .destructive) {
+                Task { await viewModel.deleteCV(withId: target.id) }
+                showDeleteConfirmation = false
+                deleteTarget = nil
             }
+            Button(String(localized: "common.cancel"), role: .cancel) {
+                showDeleteConfirmation = false
+                deleteTarget = nil
+            }
+        } message: { target in
+            Text("cv.delete.confirmation.message_named".localizedWithArgs(target.listTitle))
+        }
+        .alert(
+            "cv.rename.title".localized,
+            isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } }),
+            presenting: renameTarget
+        ) { target in
+            TextField("field.cv_name".localized, text: $renameText)
+            Button("cv.action.rename".localized) {
+                Task { await viewModel.renameCV(id: target.id, to: renameText) }
+            }
+            Button("common.cancel".localized, role: .cancel) { }
+        }
+        .alert(
+            "common.error".localized,
+            isPresented: Binding(get: { viewModel.actionError != nil }, set: { if !$0 { viewModel.actionError = nil } })
+        ) {
+            Button("common.ok".localized) { }
         } message: {
-            Text(String(localized: "cv.delete.confirmation.message"))
+            Text(viewModel.actionError ?? "")
         }
     }
     
@@ -83,6 +110,13 @@ struct CVListView<EmptyState: View>: View {
                 cv: cv,
                 onTap: {
                     router.navigate(to: .cvEditor(cvId: cv.id.uuidString))
+                },
+                onDuplicate: {
+                    Task { await viewModel.duplicateCV(withId: cv.id) }
+                },
+                onRename: {
+                    renameText = cv.name
+                    renameTarget = cv
                 },
                 onExport: {
                     exportTarget = cv
@@ -101,12 +135,14 @@ struct CVListView<EmptyState: View>: View {
 private struct CVRowView: View {
     let cv: CVModel
     let onTap: () -> Void
+    let onDuplicate: () -> Void
+    let onRename: () -> Void
     let onExport: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
         NavigationRow(
-            title: cv.name.isEmpty ? "cv.untitled".localized : cv.name,
+            title: cv.listTitle,
             subtitle: cv.personalInfo.title.isEmpty ? nil : cv.personalInfo.title,
             caption: cv.personalInfo.location.isEmpty ? nil : cv.personalInfo.location,
             action: onTap
@@ -122,6 +158,26 @@ private struct CVRowView: View {
             }
             .tint(DesignTokens.Colors.accent)
         }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button(action: onDuplicate) {
+                Label("cv.action.duplicate".localized, systemImage: "plus.square.on.square")
+            }
+            .tint(DesignTokens.Colors.accent)
+        }
+        .contextMenu {
+            Button(action: onDuplicate) {
+                Label("cv.action.duplicate".localized, systemImage: "plus.square.on.square")
+            }
+            Button(action: onRename) {
+                Label("cv.action.rename".localized, systemImage: "pencil")
+            }
+            Button(action: onExport) {
+                Label(String(localized: "export.swipe.action"), systemImage: "square.and.arrow.up")
+            }
+            Button(role: .destructive, action: onDelete) {
+                Label(String(localized: "common.delete"), systemImage: "trash")
+            }
+        }
     }
 }
 
@@ -131,7 +187,7 @@ struct CVListView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
             CVListView(viewModel: createMockViewModel()) {
-                FirstRunView()
+                Text("navigation.my_cvs".localized)
             }
         }
         .environmentObject(AppRouter())

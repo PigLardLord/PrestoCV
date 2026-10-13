@@ -4,9 +4,9 @@
     "name": "Dr. Sarah Johnson",
     "title": "Associate Professor of Computer Science",
     "location": "Cambridge, MA",
-    "email": "s.johnson@university.edu",
+    "email": "s.johnson@example.com",
     "phone": "+1 (555) 246-8101",
-    "portfolio": "https://sarahjohnson.academic.edu",
+    "portfolio": "https://example.com",
     "profile": "Tenured associate professor with 10+ years of experience in artificial intelligence research and education. Published extensively in top-tier conferences and journals with over 50 peer-reviewed publications. Principal investigator on $3M in research grants. Dedicated to mentoring graduate students and advancing the field through innovative research."
   },
   "relevant_experience": [
@@ -88,19 +88,19 @@
   "social": [
     {
       "platform": "Google Scholar",
-      "url": "https://scholar.google.com/citations?user=sarahjohnson"
+      "url": "https://example.com/scholar"
     },
     {
       "platform": "Academic Website",
-      "url": "https://sarahjohnson.academic.edu"
+      "url": "https://example.com"
     },
     {
       "platform": "LinkedIn",
-      "url": "https://linkedin.com/in/sarahjohnsonacademic"
+      "url": "https://example.com/linkedin"
     },
     {
       "platform": "ORCID",
-      "url": "https://orcid.org/0000-0000-0000-0000"
+      "url": "https://example.com/orcid"
     }
   ]
 }

@@ -616,47 +616,6 @@
         }
       }
     },
-    "action.copy" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kopie"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copy"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copia"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copie"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copia"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cópia"
-          }
-        }
-      }
-    },
     "action.copy_suffix" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1518,43 +1477,125 @@
         }
       }
     },
-    "cv.delete.confirmation.message" : {
+    "cv.action.duplicate" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Möchten Sie diesen Lebenslauf wirklich löschen? Dies kann nicht rückgängig gemacht werden."
+            "value" : "Duplizieren"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Are you sure you want to delete this CV? This action cannot be undone."
+            "value" : "Duplicate"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "¿Seguro que quieres eliminar este CV? Esta acción no se puede deshacer."
+            "value" : "Duplicar"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Voulez-vous vraiment supprimer ce CV ? Cette action est irréversible."
+            "value" : "Dupliquer"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vuoi davvero eliminare questo CV? Questa azione non può essere annullata."
+            "value" : "Duplica"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tem certeza de que quer excluir este currículo? Esta ação não pode ser desfeita."
+            "value" : "Duplicar"
+          }
+        }
+      }
+    },
+    "cv.action.rename" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Umbenennen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renombrar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rinomina"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear"
+          }
+        }
+      }
+    },
+    "cv.delete.confirmation.message_named" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ wird gelöscht. Dies kann nicht rückgängig gemacht werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” will be deleted. This action cannot be undone."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» se eliminará. Esta acción no se puede deshacer."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » sera supprimé. Cette action est irréversible."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” verrà eliminato. Questa azione non può essere annullata."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” será excluído. Esta ação não pode ser desfeita."
           }
         }
       }
@@ -1596,6 +1637,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Excluir currículo"
+          }
+        }
+      }
+    },
+    "cv.list.stale_notice" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ihre Änderung wurde gespeichert, aber die Liste konnte nicht aktualisiert werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your change was saved, but the list could not be refreshed."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu cambio se guardó, pero no se pudo actualizar la lista."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre modification a été enregistrée, mais la liste n’a pas pu être actualisée."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La modifica è stata salvata, ma non è stato possibile aggiornare l’elenco."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua alteração foi salva, mas não foi possível atualizar a lista."
           }
         }
       }
@@ -1791,6 +1873,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Novo currículo"
+          }
+        }
+      }
+    },
+    "cv.rename.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lebenslauf umbenennen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename CV"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renombrar CV"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer le CV"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rinomina CV"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear currículo"
           }
         }
       }
@@ -6595,6 +6718,88 @@
         }
       }
     },
+    "onboarding.examples.footer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name und Kontaktdaten bleiben leer, damit Sie sie selbst eintragen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Names and contact details are left blank for you to fill in."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El nombre y los datos de contacto quedan en blanco para que los completes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nom et les coordonnées restent vides, à vous de les remplir."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome e recapiti restano vuoti: li compili tu."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O nome e os dados de contato ficam em branco para você preencher."
+          }
+        }
+      }
+    },
+    "onboarding.start_from_example" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit einem Beispiel beginnen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start from an example"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empezar con un ejemplo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commencer avec un exemple"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parti da un esempio"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Começar com um exemplo"
+          }
+        }
+      }
+    },
     "section.basics" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7298,37 +7503,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erstellen Sie mühelos schöne, professionelle Lebensläufe. Wählen Sie aus Vorlagen oder erstellen Sie von Grund auf neu."
+            "value" : "Schreiben Sie Ihren Lebenslauf, behalten Sie ihn auf Ihrem Gerät und exportieren Sie ihn als PDF. Beginnen Sie mit einer leeren Seite oder mit einem Beispiel."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Build beautiful, professional CVs with ease. Choose from templates or create from scratch."
+            "value" : "Write your CV, keep it on your device and export it as a PDF. Start from a blank page or from an example."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crea CVs hermosos y profesionales con facilidad. Elige entre plantillas o crea desde cero."
+            "value" : "Escribe tu CV, guárdalo en tu dispositivo y expórtalo como PDF. Empieza con una página en blanco o con un ejemplo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Créez de beaux CV professionnels en toute simplicité. Choisissez parmi les modèles ou créez à partir de zéro."
+            "value" : "Rédigez votre CV, gardez-le sur votre appareil et exportez-le en PDF. Commencez avec une page blanche ou avec un exemple."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crea CV belli e professionali con facilità. Scegli tra i modelli o crea da zero."
+            "value" : "Scrivi il tuo CV, tienilo sul tuo dispositivo ed esportalo in PDF. Parti da una pagina bianca o da un esempio."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crie CVs bonitos e profissionais com facilidade. Escolha entre modelos ou crie do zero."
+            "value" : "Escreva seu currículo, mantenha-o no seu dispositivo e exporte-o em PDF. Comece com uma página em branco ou com um exemplo."
           }
         }
       }

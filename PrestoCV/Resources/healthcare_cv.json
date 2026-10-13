@@ -4,7 +4,7 @@
     "name": "Dr. Michael Thompson",
     "title": "Senior Emergency Medicine Physician",
     "location": "Boston, MA",
-    "email": "m.thompson@hospital.edu",
+    "email": "m.thompson@example.com",
     "phone": "+1 (555) 357-9123",
     "portfolio": "",
     "profile": "Board-certified emergency medicine physician with 10+ years of experience providing critical care in high-volume trauma centers. Expert in emergency procedures, crisis management, and medical education. Committed to patient safety, quality improvement, and training the next generation of emergency physicians."
@@ -95,11 +95,11 @@
   "social": [
     {
       "platform": "LinkedIn",
-      "url": "https://linkedin.com/in/dr-michael-thompson"
+      "url": "https://example.com/linkedin"
     },
     {
       "platform": "Professional Society",
-      "url": "https://www.acep.org/michael-thompson"
+      "url": "https://example.com/society"
     }
   ]
 }

@@ -29,6 +29,8 @@ struct NavigationCard<Content: View>: View {
                         .foregroundColor(DesignTokens.Colors.secondary)
                 }
             }
+            // A plain button only takes taps on what it draws, so the gap between the text and the chevron was dead
+            .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
     }

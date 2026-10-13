@@ -498,8 +498,8 @@ struct CVManagementUseCaseTests {
         #expect(duplicatedCV.name == "My Professional CV action.copy_suffix")
     }
     
-    @Test("DuplicateCV handles empty name correctly")
-    func duplicateCVHandlesEmptyName() async throws {
+    @Test("DuplicateCV names a copy of an unnamed CV after the name the list shows, Untitled CV", arguments: ["", "   "])
+    func duplicateCVHandlesEmptyName(name: String) async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
@@ -509,12 +509,13 @@ struct CVManagementUseCaseTests {
             sampleRepository: sampleRepository
         )
         
-        let originalCV = CVTestDataBuilder.minimalCV().withName("").build()
+        let originalCV = CVTestDataBuilder.minimalCV().withName(name).build()
         _ = try await cvRepository.saveCV(originalCV)
         
         let duplicatedCV = try await useCase.duplicateCV(id: originalCV.id)
         
-        #expect(duplicatedCV.name == "action.copy")
+        // The package has no string catalog, so a text is its key
+        #expect(duplicatedCV.name == "cv.untitled action.copy_suffix")
     }
     
     @Test("DuplicateCV throws error for non-existent CV")

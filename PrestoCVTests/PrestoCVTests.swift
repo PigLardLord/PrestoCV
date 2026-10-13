@@ -31,29 +31,25 @@ final class MockOnboardingUseCase: OnboardingUseCaseProtocol {
 
 @MainActor
 final class MockSampleCVRepository: SampleCVRepositoryProtocol {
-    var getDefaultSampleResult: Result<CVModel, Error> = .success(CVModel(name: "Default Template"))
+    var samples: [CVModel] = []
+    var getAllSamplesError: Error?
     
-    private(set) var getDefaultSampleCalled = false
+    private(set) var getAllSamplesCallCount = 0
     
     func getDefaultSample() async throws -> CVModel {
-        getDefaultSampleCalled = true
-        switch getDefaultSampleResult {
-        case .success(let template):
-            return template
-        case .failure(let error):
-            throw error
-        }
+        CVModel(name: "Default Template")
     }
     
     func getAllSamples() async throws -> [CVModel] {
-        return [try await getDefaultSample()]
+        getAllSamplesCallCount += 1
+        if let getAllSamplesError {
+            throw getAllSamplesError
+        }
+        return samples
     }
     
     func getSample(by name: String) async throws -> CVModel? {
-        if name == "default" {
-            return try await getDefaultSample()
-        }
-        return nil
+        nil
     }
 }
 
@@ -63,31 +59,50 @@ final class MockSampleCVRepository: SampleCVRepositoryProtocol {
 @Suite("OnboardingViewModel Tests")
 struct OnboardingViewModelTests {
     
-    @Test("ViewModel initializes with loading state")
-    func viewModelInitializesWithLoadingState() {
-        let mockOnboardingUseCase = MockOnboardingUseCase()
-        let mockSampleRepository = MockSampleCVRepository()
-        
-        let viewModel = OnboardingViewModel(
-            onboardingUseCase: mockOnboardingUseCase,
-            sampleRepository: mockSampleRepository
+    private func makeViewModel(
+        onboardingUseCase: MockOnboardingUseCase? = nil,
+        sampleRepository: MockSampleCVRepository? = nil
+    ) -> OnboardingViewModel {
+        OnboardingViewModel(
+            onboardingUseCase: onboardingUseCase ?? MockOnboardingUseCase(),
+            sampleRepository: sampleRepository ?? MockSampleCVRepository()
         )
+    }
+    
+    private func makeSample() -> CVModel {
+        CVModel(
+            name: "Senior Software Engineer - TechFlow Inc. Application",
+            personalInfo: PersonalInfo(
+                name: "Alex Morgan",
+                title: "Senior Software Engineer",
+                location: "San Francisco, CA",
+                email: "alex.morgan@example.com",
+                phone: "+1 (555) 123-4567",
+                portfolio: "https://example.com",
+                profile: "Senior engineer with 8+ years of experience."
+            ),
+            relevant_experience: [Experience(title: "Senior Software Engineer", company: "TechFlow Inc.")],
+            education: [Education(degree: "BSc Computer Science", school: "State University")],
+            skills: [Skill(name: "Swift", level: 5)],
+            languages: [Language(name: "English")],
+            interests: ["Chess"],
+            social: [Social(platform: "GitHub", url: "https://example.com/github")]
+        )
+    }
+    
+    @Test("ViewModel initializes with loading state and no samples")
+    func viewModelInitializesWithLoadingState() {
+        let viewModel = makeViewModel()
         
         #expect(viewModel.onboardingState == .loading)
-        #expect(viewModel.isCreatingCV == false)
-        #expect(viewModel.errorMessage.isEmpty)
+        #expect(viewModel.samples.isEmpty)
     }
     
     @Test("checkOnboardingStatus updates state to firstTime")
     func checkOnboardingStatusUpdatesStateToFirstTime() async {
         let mockOnboardingUseCase = MockOnboardingUseCase()
-        let mockSampleRepository = MockSampleCVRepository()
         mockOnboardingUseCase.checkOnboardingRequiredResult = .firstTime
-        
-        let viewModel = OnboardingViewModel(
-            onboardingUseCase: mockOnboardingUseCase,
-            sampleRepository: mockSampleRepository
-        )
+        let viewModel = makeViewModel(onboardingUseCase: mockOnboardingUseCase)
         
         await viewModel.checkOnboardingStatus()
         
@@ -98,13 +113,8 @@ struct OnboardingViewModelTests {
     @Test("checkOnboardingStatus updates state to returning")
     func checkOnboardingStatusUpdatesStateToReturning() async {
         let mockOnboardingUseCase = MockOnboardingUseCase()
-        let mockSampleRepository = MockSampleCVRepository()
         mockOnboardingUseCase.checkOnboardingRequiredResult = .returning
-        
-        let viewModel = OnboardingViewModel(
-            onboardingUseCase: mockOnboardingUseCase,
-            sampleRepository: mockSampleRepository
-        )
+        let viewModel = makeViewModel(onboardingUseCase: mockOnboardingUseCase)
         
         await viewModel.checkOnboardingStatus()
         
@@ -112,83 +122,101 @@ struct OnboardingViewModelTests {
         #expect(mockOnboardingUseCase.checkOnboardingRequiredCalled)
     }
     
-    @Test("createFirstCV succeeds and updates state")
-    func createFirstCVSucceedsAndUpdatesState() async {
-        let mockOnboardingUseCase = MockOnboardingUseCase()
-        let mockSampleRepository = MockSampleCVRepository()
+    // MARK: - Samples
+    
+    @Test("loadSamples publishes the samples of the repository")
+    func loadSamplesPublishesTheSamples() async {
+        let sampleRepository = MockSampleCVRepository()
+        sampleRepository.samples = [makeSample(), CVModel(name: "Second")]
+        let viewModel = makeViewModel(sampleRepository: sampleRepository)
         
-        let viewModel = OnboardingViewModel(
-            onboardingUseCase: mockOnboardingUseCase,
-            sampleRepository: mockSampleRepository
-        )
-        viewModel.onboardingState = .firstTime
+        await viewModel.loadSamples()
         
-        await viewModel.createFirstCV()
-        
-        #expect(viewModel.onboardingState == .returning)
-        #expect(viewModel.isCreatingCV == false)
-        #expect(viewModel.errorMessage.isEmpty)
-        #expect(mockSampleRepository.getDefaultSampleCalled)
-        #expect(mockOnboardingUseCase.createFirstCVCalled)
+        #expect(viewModel.samples.map(\.name) == ["Senior Software Engineer - TechFlow Inc. Application", "Second"])
     }
     
-    @Test("createFirstCV handles template error")
-    func createFirstCVHandlesTemplateError() async {
-        let mockOnboardingUseCase = MockOnboardingUseCase()
-        let mockSampleRepository = MockSampleCVRepository()
-        mockSampleRepository.getDefaultSampleResult = .failure(AppError.notFound("Template"))
+    @Test("loadSamples reads the samples once, however often the first-run view appears")
+    func loadSamplesReadsOnce() async {
+        let sampleRepository = MockSampleCVRepository()
+        sampleRepository.samples = [makeSample()]
+        let viewModel = makeViewModel(sampleRepository: sampleRepository)
         
-        let viewModel = OnboardingViewModel(
-            onboardingUseCase: mockOnboardingUseCase,
-            sampleRepository: mockSampleRepository
-        )
-        viewModel.onboardingState = .firstTime
+        await viewModel.loadSamples()
+        await viewModel.loadSamples()
         
-        await viewModel.createFirstCV()
-        
-        #expect(viewModel.onboardingState == .firstTime) // Should remain unchanged
-        #expect(viewModel.isCreatingCV == false)
-        #expect(!viewModel.errorMessage.isEmpty)
-        #expect(mockSampleRepository.getDefaultSampleCalled)
-        #expect(!mockOnboardingUseCase.createFirstCVCalled)
+        #expect(sampleRepository.getAllSamplesCallCount == 1)
+        #expect(viewModel.samples.count == 1)
     }
     
-    @Test("createFirstCV handles use case error")
-    func createFirstCVHandlesUseCaseError() async {
-        let mockOnboardingUseCase = MockOnboardingUseCase()
-        let mockSampleRepository = MockSampleCVRepository()
-        mockOnboardingUseCase.createFirstCVResult = .failure(AppError.fileSystemError("Test error"))
+    @Test("loadSamples leaves no samples when they cannot be loaded, and a later call tries again")
+    func loadSamplesFailureLeavesNoSamples() async {
+        let sampleRepository = MockSampleCVRepository()
+        sampleRepository.getAllSamplesError = AppError.fileSystemError("unreadable")
+        let viewModel = makeViewModel(sampleRepository: sampleRepository)
         
-        let viewModel = OnboardingViewModel(
-            onboardingUseCase: mockOnboardingUseCase,
-            sampleRepository: mockSampleRepository
-        )
-        viewModel.onboardingState = .firstTime
+        await viewModel.loadSamples()
+        #expect(viewModel.samples.isEmpty)
         
-        await viewModel.createFirstCV()
-        
-        #expect(viewModel.onboardingState == .firstTime) // Should remain unchanged
-        #expect(viewModel.isCreatingCV == false)
-        #expect(!viewModel.errorMessage.isEmpty)
-        #expect(mockSampleRepository.getDefaultSampleCalled)
-        #expect(mockOnboardingUseCase.createFirstCVCalled)
+        sampleRepository.getAllSamplesError = nil
+        sampleRepository.samples = [makeSample()]
+        await viewModel.loadSamples()
+        #expect(viewModel.samples.count == 1)
+        #expect(sampleRepository.getAllSamplesCallCount == 2)
     }
     
-    @Test("createFirstCV does nothing when not in firstTime state")
-    func createFirstCVDoesNothingWhenNotInFirstTimeState() async {
-        let mockOnboardingUseCase = MockOnboardingUseCase()
-        let mockSampleRepository = MockSampleCVRepository()
+    // MARK: - Drafts
+    
+    @Test("A draft has a new identity and no name of its own")
+    func draftHasNewIdentityAndNoName() {
+        let sample = makeSample()
+        let draft = makeViewModel().makeDraft(from: sample)
         
-        let viewModel = OnboardingViewModel(
-            onboardingUseCase: mockOnboardingUseCase,
-            sampleRepository: mockSampleRepository
-        )
-        viewModel.onboardingState = .returning
+        #expect(draft.id != sample.id)
+        #expect(draft.name.isEmpty, "The list shows an unnamed CV as Untitled CV")
+    }
+    
+    @Test("A draft leaves the details of the person of the sample blank")
+    func draftClearsTheIdentityFields() {
+        let draft = makeViewModel().makeDraft(from: makeSample())
         
-        await viewModel.createFirstCV()
+        #expect(draft.personalInfo.name.isEmpty)
+        #expect(draft.personalInfo.email.isEmpty)
+        #expect(draft.personalInfo.phone.isEmpty)
+        #expect(draft.personalInfo.location.isEmpty)
+        #expect(draft.personalInfo.portfolio.isEmpty)
+        #expect(draft.social.map(\.url) == [""], "The links are cleared")
+        #expect(draft.social.map(\.platform) == ["GitHub"], "The platforms stay as a hint")
+    }
+    
+    @Test("A draft keeps the content of the sample")
+    func draftKeepsTheContent() {
+        let sample = makeSample()
+        let draft = makeViewModel().makeDraft(from: sample)
         
-        #expect(viewModel.onboardingState == .returning)
-        #expect(!mockSampleRepository.getDefaultSampleCalled)
-        #expect(!mockOnboardingUseCase.createFirstCVCalled)
+        #expect(draft.personalInfo.title == sample.personalInfo.title)
+        #expect(draft.personalInfo.profile == sample.personalInfo.profile)
+        #expect(draft.relevant_experience == sample.relevant_experience)
+        #expect(draft.education == sample.education)
+        #expect(draft.skills == sample.skills)
+        #expect(draft.languages == sample.languages)
+        #expect(draft.interests == sample.interests)
+    }
+    
+    @Test("Making a draft stores nothing")
+    func draftIsNotPersisted() {
+        let onboardingUseCase = MockOnboardingUseCase()
+        let viewModel = makeViewModel(onboardingUseCase: onboardingUseCase)
+        
+        _ = viewModel.makeDraft(from: makeSample())
+        
+        #expect(!onboardingUseCase.createFirstCVCalled, "Nothing is stored until the user saves the CV in the editor")
+    }
+    
+    @Test("Two drafts from the same sample are different CVs")
+    func draftsHaveDistinctIds() {
+        let sample = makeSample()
+        let viewModel = makeViewModel()
+        
+        #expect(viewModel.makeDraft(from: sample).id != viewModel.makeDraft(from: sample).id)
     }
 }

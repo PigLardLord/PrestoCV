@@ -40,7 +40,7 @@ struct AppRootView: View {
     
     private var listView: some View {
         CVListView(viewModel: cvListViewModel) {
-            FirstRunView()
+            FirstRunView(viewModel: onboardingViewModel)
         }
     }
     

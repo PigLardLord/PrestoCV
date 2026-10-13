@@ -5,41 +5,6 @@ import Foundation
 
 // MARK: - Test Doubles
 
-private actor InMemoryCVRepository: CVRepositoryProtocol {
-    private var storedCVs: [UUID: CVModel] = [:]
-
-    func getAllCVs() async throws -> [CVModel] {
-        storedCVs.values.sorted { $0.id.uuidString < $1.id.uuidString }
-    }
-
-    func getCVListing() async throws -> CVListing {
-        CVListing(cvs: try await getAllCVs())
-    }
-
-    func acknowledgeUnreadableCVs() async throws {}
-
-    func getCV(by id: UUID) async throws -> CVModel? {
-        storedCVs[id]
-    }
-
-    func saveCV(_ cv: CVModel) async throws -> CVModel {
-        storedCVs[cv.id] = cv
-        return cv
-    }
-
-    func deleteCV(id: UUID) async throws {
-        storedCVs.removeValue(forKey: id)
-    }
-
-    func cvExists() async throws -> Bool {
-        !storedCVs.isEmpty
-    }
-
-    func getCVsCount() async throws -> Int {
-        storedCVs.count
-    }
-}
-
 private struct UnusedSampleCVRepository: SampleCVRepositoryProtocol {
     func getDefaultSample() async throws -> CVModel { CVModel() }
     func getAllSamples() async throws -> [CVModel] { [] }

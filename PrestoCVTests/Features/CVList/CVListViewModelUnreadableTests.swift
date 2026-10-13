@@ -111,16 +111,20 @@ struct CVListViewModelUnreadableTests {
         #expect(viewModel.cvs == [cv])
     }
     
-    @Test("A dismissal that fails shows the error")
-    func failedDismissalShowsTheError() async {
-        let useCase = StubListingUseCase(listing: .success(CVListing(cvs: [], unreadableCount: 1)))
-        useCase.acknowledgeResult = .failure(.fileSystemError("disk"))
+    @Test("A dismissal that fails reports the error and keeps the list and the notice")
+    func failedDismissalReportsTheError() async {
+        let cv = CVModel(name: "Opened")
+        let useCase = StubListingUseCase(listing: .success(CVListing(cvs: [cv], unreadableCount: 1)))
+        useCase.acknowledgeResult = .failure(.unknown("disk"))
         let viewModel = CVListViewModel(cvManagementUseCase: useCase)
         await viewModel.loadCVs()
         
         await viewModel.dismissUnreadableNotice()
         
-        #expect(viewModel.errorMessage.contains("disk"))
+        #expect(viewModel.actionError?.contains("disk") == true)
+        #expect(viewModel.cvs == [cv], "The list stays on screen")
+        #expect(viewModel.unreadableNotice != nil)
+        #expect(viewModel.errorMessage.isEmpty)
     }
     
     @Test("A listing that fails shows the error and no notice")

@@ -78,12 +78,14 @@ extension CVManagementUseCase {
     
     // MARK: Name Generation
     
-    /// Creates a name modifier function that appends localized copy suffix to existing names or returns localized copy text for empty names
+    /// Names a duplicate after the CV it copies, followed by the localized copy suffix, as "<name> (Copy)".
+    /// A CV without a name is called by the name the list shows for it, "Untitled CV", so the copy is "Untitled CV (Copy)".
     /// - Parameter name: The original name to modify
-    /// - Returns: The modified name with localized copy indicator
+    /// - Returns: The name of the duplicate
     private func createCopyNameModifier(_ name: String) -> String {
-        let copyText = "action.copy".localized
+        let hasName = !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let originalName = hasName ? name : "cv.untitled".localized
         let copySuffix = "action.copy_suffix".localized
-        return name.isEmpty ? copyText : "\(name) \(copySuffix)"
+        return "\(originalName) \(copySuffix)"
     }
 }

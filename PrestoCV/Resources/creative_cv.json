@@ -6,7 +6,7 @@
     "location": "Brooklyn, NY",
     "email": "maya.chen@example.com",
     "phone": "+1 (555) 987-6543",
-    "portfolio": "https://mayachen.design",
+    "portfolio": "https://example.com",
     "profile": "Creative designer with 7+ years of experience crafting intuitive digital experiences for startups and Fortune 500 companies. Specialized in user-centered design, design systems, and cross-platform experiences. Passionate about accessibility and creating beautiful, functional interfaces that solve real user problems."
   },
   "relevant_experience": [
@@ -89,19 +89,19 @@
   "social": [
     {
       "platform": "Portfolio",
-      "url": "https://mayachen.design"
+      "url": "https://example.com"
     },
     {
       "platform": "Dribbble",
-      "url": "https://dribbble.com/mayachen"
+      "url": "https://example.com/dribbble"
     },
     {
       "platform": "LinkedIn",
-      "url": "https://linkedin.com/in/mayachen"
+      "url": "https://example.com/linkedin"
     },
     {
       "platform": "Behance",
-      "url": "https://behance.net/mayachen"
+      "url": "https://example.com/behance"
     }
   ]
 }
