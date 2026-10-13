@@ -4271,7 +4271,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preview & export"
+            "value" : "Vorschau & Export"
           }
         },
         "en" : {
@@ -4283,25 +4283,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preview & export"
+            "value" : "Vista previa y exportación"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preview & export"
+            "value" : "Aperçu et export"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preview & export"
+            "value" : "Anteprima ed esportazione"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preview & export"
+            "value" : "Pré-visualização e exportação"
           }
         }
       }
@@ -4312,7 +4312,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Creative"
+            "value" : "Kreativ"
           }
         },
         "en" : {
@@ -4324,25 +4324,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Creative"
+            "value" : "Creativa"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Creative"
+            "value" : "Créative"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Creative"
+            "value" : "Creativa"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Creative"
+            "value" : "Criativa"
           }
         }
       }
@@ -4365,25 +4365,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Minimal"
+            "value" : "Minimalista"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Minimal"
+            "value" : "Minimaliste"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Minimal"
+            "value" : "Minimale"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Minimal"
+            "value" : "Minimalista"
           }
         }
       }
@@ -4406,25 +4406,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modern"
+            "value" : "Moderna"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modern"
+            "value" : "Moderne"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modern"
+            "value" : "Moderna"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modern"
+            "value" : "Moderna"
           }
         }
       }
@@ -4435,7 +4435,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Professional"
+            "value" : "Professionell"
           }
         },
         "en" : {
@@ -4447,151 +4447,66 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Professional"
+            "value" : "Profesional"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Professional"
+            "value" : "Professionnelle"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Professional"
+            "value" : "Professionale"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Professional"
-          }
-        }
-      }
-    },
-    "export.color.section" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Color palette"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Color palette"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Color palette"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Color palette"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Color palette"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Color palette"
+            "value" : "Profissional"
           }
         }
       }
     },
     "export.colors.tab" : {
-
-    },
-    "export.customization.subtitle" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adjust colors and typography before exporting."
+            "value" : "Farben"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adjust colors and typography before exporting."
+            "value" : "Colors"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adjust colors and typography before exporting."
+            "value" : "Colores"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adjust colors and typography before exporting."
+            "value" : "Couleurs"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adjust colors and typography before exporting."
+            "value" : "Colori"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Adjust colors and typography before exporting."
-          }
-        }
-      }
-    },
-    "export.customization.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fine-tune appearance"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fine-tune appearance"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fine-tune appearance"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fine-tune appearance"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fine-tune appearance"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fine-tune appearance"
+            "value" : "Cores"
           }
         }
       }
@@ -4674,47 +4589,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Adicione seu nome e seu e-mail ao CV antes de exportá-lo."
-          }
-        }
-      }
-    },
-    "export.error.no_template" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select a template before exporting."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select a template before exporting."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select a template before exporting."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select a template before exporting."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select a template before exporting."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select a template before exporting."
           }
         }
       }
@@ -5012,7 +4886,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Classic"
+            "value" : "Klassisch"
           }
         },
         "en" : {
@@ -5024,25 +4898,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Classic"
+            "value" : "Clásica"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Classic"
+            "value" : "Classique"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Classic"
+            "value" : "Classico"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Classic"
+            "value" : "Clássica"
           }
         }
       }
@@ -5065,66 +4939,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modern"
+            "value" : "Moderna"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modern"
+            "value" : "Moderne"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modern"
+            "value" : "Moderno"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modern"
-          }
-        }
-      }
-    },
-    "export.font.section" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Typography"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Typography"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Typography"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Typography"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Typography"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Typography"
+            "value" : "Moderna"
           }
         }
       }
@@ -5135,7 +4968,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Serif"
+            "value" : "Serifen"
           }
         },
         "en" : {
@@ -5147,31 +4980,69 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Serif"
+            "value" : "Con serifa"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Serif"
+            "value" : "Avec empattements"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Serif"
+            "value" : "Con grazie"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Serif"
+            "value" : "Serifada"
           }
         }
       }
     },
     "export.fonts.tab" : {
-
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schriften"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fonts"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fuentes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Polices"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caratteri"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fontes"
+          }
+        }
+      }
     },
     "export.loading" : {
       "extractionState" : "manual",
@@ -5179,7 +5050,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparing your PDF…"
+            "value" : "PDF wird vorbereitet …"
           }
         },
         "en" : {
@@ -5191,271 +5062,66 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparing your PDF…"
+            "value" : "Preparando tu PDF…"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparing your PDF…"
+            "value" : "Préparation de votre PDF…"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparing your PDF…"
+            "value" : "Preparazione del PDF…"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparing your PDF…"
+            "value" : "Preparando seu PDF…"
           }
         }
       }
     },
-    "export.preview_error" : {
+    "export.share" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dokumentvorschau nicht möglich"
+            "value" : "PDF teilen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unable to preview document"
+            "value" : "Share PDF"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se puede previsualizar el documento"
+            "value" : "Compartir PDF"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Impossible de prévisualiser le document"
+            "value" : "Partager le PDF"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Impossibile visualizzare l'anteprima del documento"
+            "value" : "Condividi PDF"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não é possível visualizar o documento"
-          }
-        }
-      }
-    },
-    "export.preview.live_subtitle" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Überprüfen Sie die HTML-Ansicht, bevor Sie als PDF exportieren."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Review the HTML rendition before exporting to PDF."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revise la versión HTML antes de exportar a PDF."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vérifiez le rendu HTML avant l’export PDF."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Controlla il rendering HTML prima di esportare in PDF."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revise a versão HTML antes de exportar para PDF."
-          }
-        }
-      }
-    },
-    "export.preview.live_title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vorschau"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Preview"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vista previa"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aperçu"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anteprima"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pré-visualização"
-          }
-        }
-      }
-    },
-    "export.preview.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The PDF opens in Quick Look so you can share or save it."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The PDF opens in Quick Look so you can share or save it."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The PDF opens in Quick Look so you can share or save it."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The PDF opens in Quick Look so you can share or save it."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The PDF opens in Quick Look so you can share or save it."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The PDF opens in Quick Look so you can share or save it."
-          }
-        }
-      }
-    },
-    "export.preview.no_content" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keine Vorschau für diese Auswahl verfügbar."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Preview unavailable for this selection."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vista previa no disponible para esta selección."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucune prévisualisation disponible pour cette sélection."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anteprima non disponibile per questa selezione."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pré-visualização indisponível para esta seleção."
-          }
-        }
-      }
-    },
-    "export.preview.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Preview and share"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Preview and share"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Preview and share"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Preview and share"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Preview and share"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Preview and share"
+            "value" : "Compartilhar PDF"
           }
         }
       }
@@ -5466,7 +5132,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Export CV"
+            "value" : "Lebenslauf exportieren"
           }
         },
         "en" : {
@@ -5478,25 +5144,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Export CV"
+            "value" : "Exportar CV"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Export CV"
+            "value" : "Exporter le CV"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Export CV"
+            "value" : "Esporta CV"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Export CV"
+            "value" : "Exportar CV"
           }
         }
       }
@@ -5507,7 +5173,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Export"
+            "value" : "Exportieren"
           }
         },
         "en" : {
@@ -5519,110 +5185,66 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Export"
+            "value" : "Exportar"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Export"
+            "value" : "Exporter"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Export"
+            "value" : "Esporta"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Export"
-          }
-        }
-      }
-    },
-    "export.templates.subtitle" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select the layout you want to use for this PDF."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select the layout you want to use for this PDF."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select the layout you want to use for this PDF."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select the layout you want to use for this PDF."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select the layout you want to use for this PDF."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select the layout you want to use for this PDF."
+            "value" : "Exportar"
           }
         }
       }
     },
     "export.templates.tab" : {
-
-    },
-    "export.templates.title" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose a template"
+            "value" : "Vorlagen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose a template"
+            "value" : "Templates"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose a template"
+            "value" : "Plantillas"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose a template"
+            "value" : "Modèles"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose a template"
+            "value" : "Modelli"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose a template"
+            "value" : "Modelos"
           }
         }
       }

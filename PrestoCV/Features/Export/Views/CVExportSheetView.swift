@@ -6,24 +6,14 @@ import CVPDFExporter
 
 struct CVExportSheetView: View {
     let cv: CVModel
-    @StateObject private var viewModel: CVExportSheetViewModel
-    @ObservedObject var previewCoordinator: HTMLPreviewCoordinator
+    @StateObject private var viewModel = CVExportSheetViewModel()
+    @StateObject private var previewCoordinator = HTMLPreviewCoordinator()
 
     @Environment(\.dismiss) private var dismiss
     @State private var loadingTemplates = true
-    
-    // Convenience initializer with default dependencies
+
     init(cv: CVModel) {
         self.cv = cv
-        self._viewModel = StateObject(wrappedValue: CVExportSheetViewModel())
-        self.previewCoordinator = HTMLPreviewCoordinator()
-    }
-    
-    // Main initializer with injected dependencies
-    init(cv: CVModel, viewModel: CVExportSheetViewModel, previewCoordinator: HTMLPreviewCoordinator) {
-        self.cv = cv
-        self._viewModel = StateObject(wrappedValue: viewModel)
-        self.previewCoordinator = previewCoordinator
     }
 
     var body: some View {
@@ -35,6 +25,14 @@ struct CVExportSheetView: View {
                     // Preview section takes up remaining space with A4 aspect ratio
                     previewSection
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    if let blocker = viewModel.shareBlocker {
+                        Label(blocker, systemImage: "info.circle")
+                            .typography(.footnote)
+                            .foregroundColor(DesignTokens.Colors.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, DesignTokens.Spacing.lg)
+                    }
 
                     // Fixed height section for options with native TabView
                     TabView {
@@ -67,14 +65,12 @@ struct CVExportSheetView: View {
                 }
 
                 ToolbarItem(placement: .primaryAction) {
-                    nativeExportButton
+                    shareButton
                 }
             }
             .overlay {
                 if loadingTemplates {
                     LoadingView.fullscreen()
-                } else if viewModel.isExporting {
-                    LoadingView.fullscreen(message: String(localized: "export.loading").asLoclizedKey)
                 }
             }
             .alert(String(localized: "common.error"), isPresented: Binding(
@@ -86,22 +82,15 @@ struct CVExportSheetView: View {
                 Text(viewModel.errorMessage ?? "")
             })
             .task {
+                // Loading the templates sets the selection, which starts the first preview
                 await viewModel.loadTemplates()
-                await viewModel.refreshPreview(for: cv)
                 loadingTemplates = false
             }
-            .sheet(item: $viewModel.previewItem) { item in
-                DocumentPreview(url: item.url)
-                    .onDisappear { viewModel.handlePreviewDismiss() }
+            .onChange(of: viewModel.selection) {
+                viewModel.requestPreview(for: cv)
             }
-            .onChange(of: viewModel.selectedTemplateId) {
-                Task { await viewModel.refreshPreview(for: cv) }
-            }
-            .onChange(of: viewModel.selectedColorPalette) {
-                Task { await viewModel.refreshPreview(for: cv) }
-            }
-            .onChange(of: viewModel.selectedFontScheme) {
-                Task { await viewModel.refreshPreview(for: cv) }
+            .onDisappear {
+                viewModel.stop()
             }
         }
     }
@@ -126,10 +115,8 @@ struct CVExportSheetView: View {
                     .task(id: html) {
                         do {
                             try await previewCoordinator.load(html: html)
-                        } catch is CancellationError {
-                            // Ignore
                         } catch {
-                            viewModel.errorMessage = error.localizedDescription
+                            viewModel.reportPreviewLoadFailure(error)
                         }
                     }
             } else if viewModel.isPreviewLoading || loadingTemplates {
@@ -291,31 +278,25 @@ struct CVExportSheetView: View {
         }
     }
 
-    private var nativeExportButton: some View {
-        Button(action: {
-            Task {
-                await viewModel.export(cv: cv)
+    /// The PDF is rendered once the preview has settled, so sharing it is one tap; until then the button waits.
+    @ViewBuilder
+    private var shareButton: some View {
+        if let pdf = viewModel.sharePDF {
+            ShareLink(item: pdf.url, preview: SharePreview(pdf.fileName)) {
+                Label("export.share".localized, systemImage: "square.and.arrow.up")
+                    .labelStyle(.titleAndIcon)
             }
-        }) {
-            if viewModel.isExporting {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: DesignTokens.Colors.accent))
-                    .scaleEffect(0.8)
-            } else {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundColor(isExportDisabled ? DesignTokens.Colors.secondary : DesignTokens.Colors.accent)
+            .foregroundColor(DesignTokens.Colors.accent)
+        } else if viewModel.isPreviewLoading || viewModel.isPreparingPDF {
+            ProgressView()
+                .accessibilityLabel(Text("export.loading".localized))
+        } else {
+            Button {} label: {
+                Label("export.share".localized, systemImage: "square.and.arrow.up")
+                    .labelStyle(.titleAndIcon)
             }
+            .disabled(true)
         }
-        .disabled(isExportDisabled)
-    }
-    
-    private var isExportDisabled: Bool {
-        viewModel.selectedTemplateId == nil ||
-        viewModel.previewHTML == nil ||
-        previewCoordinator.isLoading ||
-        viewModel.isPreviewLoading ||
-        viewModel.isExporting
     }
 
     private var fallbackTemplatePreview: some View {

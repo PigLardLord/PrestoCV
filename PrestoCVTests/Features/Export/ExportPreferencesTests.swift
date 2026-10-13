@@ -116,7 +116,8 @@ struct CVExportSheetViewModelPreferencesTests {
         let service = MockCVExportService()
         await service.setAvailableTemplatesResult(.success(templates))
         let store = InMemoryExportPreferencesStore(stored: stored)
-        return (CVExportSheetViewModel(exportService: service, preferencesStore: store), store, service)
+        let viewModel = CVExportSheetViewModel(exportService: service, preferencesStore: store, previewDebounce: .zero)
+        return (viewModel, store, service)
     }
 
     @Test("loadTemplates preselects the template chosen last time")
@@ -173,47 +174,47 @@ struct CVExportSheetViewModelPreferencesTests {
         #expect(viewModel.selectedTemplateId == "modern")
     }
 
-    @Test("a successful export stores the template, palette and font")
-    func exportStoresTheChoice() async {
+    @Test("a rendered PDF stores the template, palette and font")
+    func renderedPDFStoresTheChoice() async {
         let (viewModel, store, _) = await makeViewModel(templates: [Self.template("modern")])
         viewModel.selectedTemplateId = "modern"
         viewModel.selectedColorPalette = .creative
         viewModel.selectedFontScheme = .serif
 
-        await viewModel.export(cv: CVModel(name: "Test CV"))
+        await viewModel.requestPreview(for: CVModel.exportable).value
 
         #expect(store.stored == ExportPreferences(templateId: "modern", colorPalette: .creative, fontScheme: .serif))
     }
 
-    @Test("a failed export does not store the choice")
-    func failedExportStoresNothing() async {
+    @Test("a failed PDF does not store the choice")
+    func failedPDFStoresNothing() async {
         let (viewModel, store, service) = await makeViewModel(templates: [Self.template("modern")])
         await service.setExportResult(.failure(AppError.unknown("Export error")))
         viewModel.selectedTemplateId = "modern"
 
-        await viewModel.export(cv: CVModel(name: "Test CV"))
+        await viewModel.requestPreview(for: CVModel.exportable).value
 
         #expect(store.saveCount == 0)
     }
 
-    @Test("an export without a template stores nothing")
-    func exportWithoutTemplateStoresNothing() async {
+    @Test("without a template nothing is stored")
+    func noTemplateStoresNothing() async {
         let (viewModel, store, _) = await makeViewModel(templates: [])
 
-        await viewModel.export(cv: CVModel(name: "Test CV"))
+        await viewModel.requestPreview(for: CVModel.exportable).value
 
         #expect(store.saveCount == 0)
     }
 
-    @Test("an export still succeeds when the choice cannot be stored")
-    func exportSucceedsWhenStoringFails() async {
+    @Test("the PDF is still offered when the choice cannot be stored")
+    func pdfIsOfferedWhenStoringFails() async {
         let (viewModel, store, _) = await makeViewModel(templates: [Self.template("modern")])
         store.saveError = CocoaError(.fileWriteOutOfSpace)
         viewModel.selectedTemplateId = "modern"
 
-        await viewModel.export(cv: CVModel(name: "Test CV"))
+        await viewModel.requestPreview(for: CVModel.exportable).value
 
-        #expect(viewModel.previewItem != nil)
+        #expect(viewModel.sharePDF != nil)
         #expect(viewModel.errorMessage == nil)
     }
 }

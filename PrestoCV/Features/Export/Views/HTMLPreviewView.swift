@@ -35,6 +35,8 @@ final class HTMLPreviewCoordinator: NSObject, ObservableObject {
         self.webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
 
+        // The page is shown on white paper, as it prints: in a dark interface its default text would be white on white
+        webView.overrideUserInterfaceStyle = .light
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
@@ -60,30 +62,8 @@ final class HTMLPreviewCoordinator: NSObject, ObservableObject {
             contentWorld: .page
         )
 
-        #if DEBUG
-        await dumpRenderedHTML()
-        #endif
-
         _ = try? await webView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.applyScale();")
     }
-
-    #if DEBUG
-    private func dumpRenderedHTML() async {
-        do {
-            let html = try await webView.evaluateJavaScript("document.documentElement.outerHTML") as? String
-            guard let html else {
-                print("[PreviewDump] Failed to capture HTML: unexpected result type")
-                return
-            }
-            
-            print("\n[PreviewDump] BEGIN HTML\n\(html)\n[PreviewDump] END HTML\n")
-            UIPasteboard.general.string = html
-            print("[PreviewDump] Copied HTML to pasteboard.")
-        } catch {
-            print("[PreviewDump] Failed to capture HTML: \(error)")
-        }
-    }
-    #endif
 }
 
 extension HTMLPreviewCoordinator: WKNavigationDelegate {
@@ -110,12 +90,7 @@ struct HTMLPreviewView: UIViewRepresentable {
         coordinator.webView
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) {
-        Task {
-            #if DEBUG
-            _ = try? await uiView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.reset();")
-            #endif
-            _ = try? await uiView.evaluateJavaScript("window.__cvPreview && window.__cvPreview.applyScale();")
-        }
-    }
+    /// The scale is applied when a document has loaded and when the web view is resized, by the page's own script;
+    /// SwiftUI updates of this view have nothing to do.
+    func updateUIView(_ uiView: WKWebView, context: Context) {}
 }
