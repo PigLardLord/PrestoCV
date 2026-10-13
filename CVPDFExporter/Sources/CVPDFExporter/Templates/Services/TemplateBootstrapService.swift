@@ -7,22 +7,30 @@ public final class TemplateBootstrapService: @unchecked Sendable {
 
     private let installUseCase: InstallTemplateUseCase
     private let registryManager: TemplateRegistryManager
+    private let bundledPackagesDirectory: URL?
 
     // MARK: - Initialization
 
-    public init(installUseCase: InstallTemplateUseCase, registryManager: TemplateRegistryManager) {
+    /// - Parameter bundledPackagesDirectory: Directory that holds the .mcvt packages to install;
+    ///   the module bundle's Templates/Bundled directory when nil
+    public init(
+        installUseCase: InstallTemplateUseCase,
+        registryManager: TemplateRegistryManager,
+        bundledPackagesDirectory: URL? = nil
+    ) {
         self.installUseCase = installUseCase
         self.registryManager = registryManager
+        self.bundledPackagesDirectory = bundledPackagesDirectory
     }
 
     /// Convenience initializer with default dependencies
+    /// - Throws: if the registry or the templates directory cannot be located
     public convenience init() throws {
         let registryManager = try TemplateRegistryManager()
-        let templatesDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first!
-            .appendingPathComponent("PrestoCV/Templates")
-
-        let repository = try FileTemplateRepository(templatesDirectory: templatesDir, registryManager: registryManager)
+        let repository = FileTemplateRepository(
+            templatesDirectory: try TemplateStorageLocation.templatesDirectory(),
+            registryManager: registryManager
+        )
         let installUseCase = InstallTemplateUseCase(repository: repository)
 
         self.init(installUseCase: installUseCase, registryManager: registryManager)
@@ -47,8 +55,7 @@ public final class TemplateBootstrapService: @unchecked Sendable {
                 if let existingEntry = try await registryManager.getTemplate(id: package.manifest.id) {
                     // Compare versions
                     if shouldUpdate(existing: existingEntry.version, new: package.manifest.version) {
-                        // Update: Install will overwrite
-                        try await installUseCase.execute(package: package)
+                        try await installUseCase.execute(package: package, replacingExisting: true)
                     }
                     // Otherwise skip - already installed with same or newer version
                 } else {
@@ -68,7 +75,8 @@ public final class TemplateBootstrapService: @unchecked Sendable {
     /// Gets all bundled .mcvt template files from module bundle
     private func getBundledTemplateURLs() throws -> [URL] {
         // Look for .mcvt files in Resources/Templates/Bundled/
-        guard let bundledDir = Bundle.module.url(forResource: "Bundled", withExtension: nil, subdirectory: "Templates") else {
+        guard let bundledDir = bundledPackagesDirectory
+            ?? Bundle.module.url(forResource: "Bundled", withExtension: nil, subdirectory: "Templates") else {
             // No bundled templates directory - return empty array
             return []
         }
@@ -84,7 +92,28 @@ public final class TemplateBootstrapService: @unchecked Sendable {
             options: [.skipsHiddenFiles]
         )
 
-        return contents.filter { $0.pathExtension == "mcvt" }
+        return contents
+            .filter { $0.pathExtension == "mcvt" }
+            .sorted(by: listsBefore)
+    }
+
+    /// Bundled templates in the order the export sheet shows them
+    private static let displayOrder = ["professional", "modern", "minimal"]
+
+    /// The bundled templates come first in `displayOrder`; any other package follows, by file name.
+    /// The file system gives no order, and the first template is the one the export sheet preselects.
+    private func listsBefore(_ lhs: URL, _ rhs: URL) -> Bool {
+        let lhsRank = displayRank(of: lhs)
+        let rhsRank = displayRank(of: rhs)
+        if lhsRank != rhsRank {
+            return lhsRank < rhsRank
+        }
+        return lhs.lastPathComponent < rhs.lastPathComponent
+    }
+
+    private func displayRank(of url: URL) -> Int {
+        let templateId = url.deletingPathExtension().lastPathComponent
+        return Self.displayOrder.firstIndex(of: templateId) ?? Self.displayOrder.count
     }
 
     /// Loads a template package from a bundle URL

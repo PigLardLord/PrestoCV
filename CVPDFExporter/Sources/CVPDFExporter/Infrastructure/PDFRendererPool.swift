@@ -39,7 +39,7 @@ public actor PDFRendererPool {
 
         // Create new renderer if under limit
         if totalCreated < maxPoolSize {
-            let renderer = PDFRendererFactory.createRenderer(configuration: configuration)
+            let renderer = await PDFRendererFactory.createRenderer(configuration: configuration)
             activeRenderers.insert(ObjectIdentifier(renderer))
             totalCreated += 1
             logger.debug("Created new renderer (total: \(self.totalCreated))")

@@ -35,6 +35,8 @@ Container for .mcvt package contents.
 - `manifest`: TemplateManifest
 - `cssContent`: Required CSS styles
 - `htmlContent`: Optional custom HTML (uses base template if nil)
+- `previewImageBase64`: Optional base64 PNG preview, at the top level of the file. Older packages keep it in the
+  manifest; `embeddedPreviewBase64` returns whichever the package has
 
 **Validation**:
 - Manifest must be valid
@@ -57,8 +59,10 @@ func installTemplate(_ package: TemplatePackage) async throws
 
 Provides built-in templates (Professional, Modern, Minimal).
 - Read-only (installation throws error)
-- Templates loaded at initialization
-- No file I/O during operation
+- Delegates to a `FileTemplateRepository` in Application Support (`PrestoCV/Templates`), whose registry
+  `TemplateBootstrapService` fills at launch; a template is listed only once it is registered
+- If that storage cannot be opened, the error is thrown when templates are requested, not when the repository is created
+- `loadTemplate(id:)` (async, from `TemplateRepositoryProtocol`) throws `TemplateError.templateNotFound` for an unknown id
 
 #### FileTemplateRepository
 **Location**: `Sources/CVPDFExporter/Templates/Repository/FileTemplateRepository.swift`
@@ -70,8 +74,11 @@ Manages .mcvt packages from file system.
 - Auto-creates directory if missing
 - Decodes JSON-encoded packages
 - Gracefully skips corrupted files
-- Generates base HTML for CSS-only packages
+- Composes the page of each package (`TemplatePackage.composedHTML`)
 - Thread-safe operations
+- `installTemplate` writes the package, caches its preview image as `<id>_preview.png` in the registry's directory
+  and upserts the registry entry, replacing an installed version; the entry is written last. The entry's
+  `previewPath` is relative to that directory and `TemplateRegistryManager.previewURL(for:)` resolves it
 
 **Directory Structure**:
 ```
@@ -80,6 +87,15 @@ Manages .mcvt packages from file system.
   ├── creative-bold.mcvt
   └── minimal-clean.mcvt
 ```
+
+#### TemplateBootstrapService
+**Location**: `Sources/CVPDFExporter/Templates/Services/TemplateBootstrapService.swift`
+
+Installs the packages in the module's `Resources/Templates/Bundled` at app launch (`syncBundledTemplates()`).
+- Installs a package that is not registered, and replaces an installed one only when its version is higher
+- Processes professional, modern and minimal in that order, then any other package by file name, so the template the
+  export sheet preselects does not depend on the file system
+- A package that cannot be installed is logged and skipped; the others are still installed
 
 ### 3. Use Case Layer
 

@@ -23,6 +23,8 @@ actor MockCVExportService: CVExportServiceProtocol {
     private(set) var availableTemplatesCalled = false
     private(set) var generatePreviewHTMLCalled = false
     private(set) var exportCalled = false
+    private(set) var lastExportOptions: ExportOptions?
+    private(set) var lastExportTemplateId: String?
     private(set) var cleanupTempFileCalled = false
 
     // Simulate async delays for testing loading states
@@ -88,9 +90,11 @@ actor MockCVExportService: CVExportServiceProtocol {
     func export(
         cv: CVModel,
         templateId: String,
-        customization: CustomizationOptions
+        options: ExportOptions
     ) async throws -> URL {
         exportCalled = true
+        lastExportOptions = options
+        lastExportTemplateId = templateId
         if let delay = exportDelay {
             try? await Task.sleep(for: delay)
         }
@@ -121,7 +125,7 @@ struct CVExportSheetViewModelTests {
         let mockService = MockCVExportService()
         await mockService.setGeneratePreviewHTMLDelay(.milliseconds(100))
 
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         viewModel.selectedTemplateId = "modern"
 
         let mockCV = CVModel(name: "Test CV")
@@ -146,7 +150,7 @@ struct CVExportSheetViewModelTests {
     func isPreviewLoadingBecomesfalseAfterCompletion() async {
         // Given
         let mockService = MockCVExportService()
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         viewModel.selectedTemplateId = "modern"
 
         let mockCV = CVModel(name: "Test CV")
@@ -166,7 +170,7 @@ struct CVExportSheetViewModelTests {
         let mockService = MockCVExportService()
         await mockService.setGeneratePreviewHTMLResult(.failure(AppError.unknown("Test error")))
 
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         viewModel.selectedTemplateId = "modern"
 
         let mockCV = CVModel(name: "Test CV")
@@ -186,7 +190,7 @@ struct CVExportSheetViewModelTests {
         let mockService = MockCVExportService()
         await mockService.setExportDelay(.milliseconds(100))
 
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         viewModel.selectedTemplateId = "modern"
 
         let mockCV = CVModel(name: "Test CV")
@@ -211,7 +215,7 @@ struct CVExportSheetViewModelTests {
     func isExportingBecomesfalseAfterCompletion() async {
         // Given
         let mockService = MockCVExportService()
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         viewModel.selectedTemplateId = "modern"
 
         let mockCV = CVModel(name: "Test CV")
@@ -231,7 +235,7 @@ struct CVExportSheetViewModelTests {
         let mockService = MockCVExportService()
         await mockService.setExportResult(.failure(AppError.unknown("Export error")))
 
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         viewModel.selectedTemplateId = "modern"
 
         let mockCV = CVModel(name: "Test CV")
@@ -251,7 +255,7 @@ struct CVExportSheetViewModelTests {
     func loadTemplatesPopulatesArray() async {
         // Given
         let mockService = MockCVExportService()
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
 
         // When
         await viewModel.loadTemplates()
@@ -269,7 +273,7 @@ struct CVExportSheetViewModelTests {
         let mockService = MockCVExportService()
         await mockService.setAvailableTemplatesResult(.failure(AppError.unknown("Template error")))
 
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
 
         // When
         await viewModel.loadTemplates()
@@ -279,13 +283,43 @@ struct CVExportSheetViewModelTests {
         #expect(viewModel.errorMessage != nil)
     }
 
+    @Test("loadTemplates tells the user when no template is installed")
+    func loadTemplatesReportsEmptyList() async {
+        // Given
+        let mockService = MockCVExportService()
+        await mockService.setAvailableTemplatesResult(.success([]))
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
+
+        // When
+        await viewModel.loadTemplates()
+
+        // Then
+        #expect(viewModel.templates.isEmpty)
+        #expect(viewModel.selectedTemplateId == nil)
+        #expect(viewModel.errorMessage == String(localized: "export.error.no_templates"))
+    }
+
+    @Test("loadTemplates shows a message the user can act on, not the error's own text")
+    func loadTemplatesShowsLocalizedMessage() async {
+        // Given
+        let mockService = MockCVExportService()
+        await mockService.setAvailableTemplatesResult(.failure(AppError.unknown("Registry corrupted at 0x1F")))
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
+
+        // When
+        await viewModel.loadTemplates()
+
+        // Then
+        #expect(viewModel.errorMessage == String(localized: "export.error.no_templates"))
+    }
+
     // MARK: - Preview Refresh Tests
 
     @Test("refreshPreview generates HTML with valid template")
     func refreshPreviewGeneratesHTML() async {
         // Given
         let mockService = MockCVExportService()
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         viewModel.selectedTemplateId = "modern"
 
         let mockCV = CVModel(name: "Test CV")
@@ -304,7 +338,7 @@ struct CVExportSheetViewModelTests {
     func refreshPreviewClearsHTMLWithoutTemplate() async {
         // Given
         let mockService = MockCVExportService()
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         viewModel.previewHTML = "existing html"
         viewModel.selectedTemplateId = nil
 
@@ -323,7 +357,7 @@ struct CVExportSheetViewModelTests {
     func refreshPreviewUpdatesOptions() async {
         // Given
         let mockService = MockCVExportService()
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         viewModel.selectedTemplateId = "modern"
         viewModel.selectedColorPalette = .creative
         viewModel.selectedFontScheme = .serif
@@ -341,11 +375,72 @@ struct CVExportSheetViewModelTests {
 
     // MARK: - Export Tests
 
+    @Test("refreshPreview shows a message the user can act on, not the error's own text")
+    func refreshPreviewShowsLocalizedMessage() async {
+        // Given
+        let mockService = MockCVExportService()
+        await mockService.setGeneratePreviewHTMLResult(.failure(AppError.unknown("Template engine exploded")))
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
+        viewModel.selectedTemplateId = "modern"
+
+        // When
+        await viewModel.refreshPreview(for: CVModel(name: "Test CV"))
+
+        // Then
+        #expect(viewModel.errorMessage == String(localized: "export.error.preview_failed"))
+    }
+
+    @Test("export tells the user how many pages the CV needs when it is too long")
+    func exportShowsTooManyPagesMessage() async {
+        // Given
+        let mockService = MockCVExportService()
+        await mockService.setExportResult(.failure(PDFExportError.tooManyPages(count: 12, limit: 10)))
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
+        viewModel.selectedTemplateId = "modern"
+
+        // When
+        await viewModel.export(cv: CVModel(name: "Test CV"))
+
+        // Then
+        #expect(viewModel.errorMessage == String(format: String(localized: "export.error.too_many_pages"), 12, 10))
+        #expect(viewModel.previewItem == nil)
+    }
+
+    @Test("export tells the user to add a name and email when the CV has none")
+    func exportShowsMissingNameAndEmailMessage() async {
+        // Given
+        let mockService = MockCVExportService()
+        await mockService.setExportResult(.failure(PDFExportError.invalidContent("Document must have an email")))
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
+        viewModel.selectedTemplateId = "modern"
+
+        // When
+        await viewModel.export(cv: CVModel(name: "Test CV"))
+
+        // Then
+        #expect(viewModel.errorMessage == String(localized: "export.error.missing_name_email"))
+    }
+
+    @Test("a failed export shows a message that does not repeat the error's own text")
+    func exportShowsGenericMessageForUnknownErrors() async {
+        // Given
+        let mockService = MockCVExportService()
+        await mockService.setExportResult(.failure(AppError.unknown("Export error 0x7")))
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
+        viewModel.selectedTemplateId = "modern"
+
+        // When
+        await viewModel.export(cv: CVModel(name: "Test CV"))
+
+        // Then
+        #expect(viewModel.errorMessage == String(localized: "export.error.failed"))
+    }
+
     @Test("export creates preview item with valid template")
     func exportCreatesPreviewItem() async {
         // Given
         let mockService = MockCVExportService()
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         viewModel.selectedTemplateId = "modern"
 
         let mockCV = CVModel(name: "Test CV")
@@ -363,7 +458,7 @@ struct CVExportSheetViewModelTests {
     func exportShowsErrorWithoutTemplate() async {
         // Given
         let mockService = MockCVExportService()
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         viewModel.selectedTemplateId = nil
 
         let mockCV = CVModel(name: "Test CV")
@@ -383,7 +478,7 @@ struct CVExportSheetViewModelTests {
     func dismissErrorClearsMessage() {
         // Given
         let mockService = MockCVExportService()
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         viewModel.errorMessage = "Test error"
 
         // When
@@ -397,7 +492,7 @@ struct CVExportSheetViewModelTests {
     func handlePreviewDismissCleanup() async {
         // Given
         let mockService = MockCVExportService()
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         let testURL = URL(fileURLWithPath: "/tmp/test.pdf")
         viewModel.previewItem = CVExportSheetViewModel.ExportPreviewItem(url: testURL)
 
@@ -418,7 +513,7 @@ struct CVExportSheetViewModelTests {
     func aspectRatioUsesPreviewOptions() async {
         // Given
         let mockService = MockCVExportService()
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         viewModel.selectedTemplateId = "modern"
 
         let mockCV = CVModel(name: "Test CV")
@@ -436,7 +531,7 @@ struct CVExportSheetViewModelTests {
     func aspectRatioUsesCurrentOptions() {
         // Given
         let mockService = MockCVExportService()
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
 
         // When
         let ratio = viewModel.aspectRatio
@@ -452,7 +547,7 @@ struct CVExportSheetViewModelTests {
     func currentExportOptionsIncludesCustomizations() {
         // Given
         let mockService = MockCVExportService()
-        let viewModel = CVExportSheetViewModel(exportService: mockService)
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
         viewModel.selectedTemplateId = "modern"
         viewModel.selectedColorPalette = .minimal
         viewModel.selectedFontScheme = .modern
@@ -465,6 +560,51 @@ struct CVExportSheetViewModelTests {
         #expect(options.customization.colorPalette == .minimal)
         #expect(options.customization.fontScheme == .modern)
         // Note: Don't test PageSize and EdgeInsets equality as they don't conform to Equatable
-        #expect(options.maxPages == 10)
+        #expect(options.maxPages == CVExportSheetViewModel.maxPages)
+    }
+
+    // MARK: - One set of options for preview and export
+
+    @Test("export passes the options of the preview to the service")
+    func exportPassesTheSameOptionsAsThePreview() async {
+        // Given
+        let mockService = MockCVExportService()
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
+        viewModel.selectedTemplateId = "modern"
+        viewModel.selectedColorPalette = .creative
+        viewModel.selectedFontScheme = .serif
+        let mockCV = CVModel(name: "Test CV")
+
+        // When
+        await viewModel.refreshPreview(for: mockCV)
+        await viewModel.export(cv: mockCV)
+
+        // Then
+        let previewOptions = viewModel.previewOptions
+        let exportOptions = await mockService.lastExportOptions
+        #expect(exportOptions?.maxPages == CVExportSheetViewModel.maxPages)
+        #expect(exportOptions?.maxPages == previewOptions?.maxPages)
+        #expect(exportOptions?.templateId == "modern")
+        #expect(exportOptions?.customization == previewOptions?.customization)
+        #expect(exportOptions?.customization == CustomizationOptions(colorPalette: .creative, fontScheme: .serif))
+        #expect(exportOptions?.pageSize.width == previewOptions?.pageSize.width)
+        #expect(exportOptions?.pageSize.height == previewOptions?.pageSize.height)
+        #expect(await mockService.lastExportTemplateId == "modern")
+    }
+
+    @Test("the export allows more pages than the exporter's own default")
+    func exportAllowsMoreThanTheDefaultPageLimit() async {
+        // Given
+        let mockService = MockCVExportService()
+        let viewModel = CVExportSheetViewModel(exportService: mockService, preferencesStore: InMemoryExportPreferencesStore())
+        viewModel.selectedTemplateId = "modern"
+
+        // When
+        await viewModel.export(cv: CVModel(name: "Test CV"))
+
+        // Then
+        let maxPages = await mockService.lastExportOptions?.maxPages
+        #expect(maxPages == 10)
+        #expect(maxPages != ExportOptions.default.maxPages)
     }
 }

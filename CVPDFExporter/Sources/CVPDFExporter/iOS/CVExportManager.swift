@@ -72,7 +72,7 @@ public final class CVExportManager: NSObject {
             logger.debug("CV document created for: \(cvDocument.personalInfo.name)")
 
             // Load template
-            let template = try templateRepository.loadTemplate(id: templateId)
+            let template = try await templateRepository.loadTemplate(id: templateId)
             logger.debug("Template loaded: \(template.name)")
 
             // Configure export options with tight margins to match reference PDF
@@ -127,7 +127,7 @@ public final class CVExportManager: NSObject {
         let cvDocument = adapter.convertToCV(from: cvData)
 
         // Load template
-        let template = try templateRepository.loadTemplate(id: templateId)
+        let template = try await templateRepository.loadTemplate(id: templateId)
 
         // Configure export options with tight margins to match reference PDF
         // 0.5in = 36pt, 0.6in = 43.2pt
@@ -148,8 +148,8 @@ public final class CVExportManager: NSObject {
     }
 
     /// Gets available templates
-    public func getAvailableTemplates() -> [Template] {
-        return templateRepository.availableTemplates()
+    public func getAvailableTemplates() async throws -> [Template] {
+        return try await templateRepository.getTemplates()
     }
 
     // MARK: - Private Methods

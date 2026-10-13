@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Font Scheme
 
 /// Available font schemes for PDF export
-public enum FontScheme: String, CaseIterable, Sendable {
+public enum FontScheme: String, CaseIterable, Sendable, Codable {
     case classic = "classic"
     case modern = "modern"
     case serif = "serif"

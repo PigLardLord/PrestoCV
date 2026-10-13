@@ -325,4 +325,80 @@ struct TemplatePackageTests {
         let decoded = try decoder.decode(TemplatePackage.self, from: data)
         #expect(decoded.manifest.previewImageBase64 == base64Preview)
     }
+
+    // MARK: - Top-level preview image
+
+    @Test("TemplatePackage decodes the preview image kept at the top level of the file")
+    func templatePackageDecodesTopLevelPreview() throws {
+        // Given - the shape of the bundled .mcvt files
+        let json = """
+        {
+            "manifest": {
+                "id": "bundled",
+                "name": "Bundled Template",
+                "description": "Preview at the top level",
+                "author": "Test Author",
+                "version": "1.0.0",
+                "previewImage": "preview.png",
+                "price": 0.0
+            },
+            "cssContent": "body { color: blue; }",
+            "htmlContent": null,
+            "previewImageBase64": "iVBORw0KGgo="
+        }
+        """.data(using: .utf8)!
+
+        // When
+        let package = try JSONDecoder().decode(TemplatePackage.self, from: json)
+
+        // Then
+        #expect(package.previewImageBase64 == "iVBORw0KGgo=")
+        #expect(package.manifest.previewImageBase64 == nil)
+        #expect(package.embeddedPreviewBase64 == "iVBORw0KGgo=")
+    }
+
+    @Test("TemplatePackage encodes the top-level preview image and decodes it again")
+    func templatePackageRoundTripsTopLevelPreview() throws {
+        // Given
+        let package = TemplatePackageFixtures.makePackage(
+            id: "round-trip", name: "Round Trip", preview: TemplatePackageFixtures.makePNG(variant: 3)
+        )
+
+        // When
+        let decoded = try JSONDecoder().decode(TemplatePackage.self, from: JSONEncoder().encode(package))
+
+        // Then
+        #expect(decoded == package)
+        #expect(decoded.previewImageBase64 == package.previewImageBase64)
+    }
+
+    @Test("TemplatePackage falls back to the preview kept in the manifest")
+    func templatePackageFallsBackToManifestPreview() {
+        // Given
+        let manifest = TemplateManifest(
+            id: "old",
+            name: "Old",
+            description: "Preview in the manifest",
+            author: "Test Author",
+            version: "1.0.0",
+            previewImage: "preview.png",
+            previewImageBase64: "manifestPreview",
+            price: 0.0
+        )
+
+        // When
+        let withoutTopLevel = TemplatePackage(manifest: manifest, cssContent: "body {}")
+        let withTopLevel = TemplatePackage(manifest: manifest, cssContent: "body {}", previewImageBase64: "topLevelPreview")
+
+        // Then
+        #expect(withoutTopLevel.embeddedPreviewBase64 == "manifestPreview")
+        #expect(withTopLevel.embeddedPreviewBase64 == "topLevelPreview")
+    }
+
+    @Test("TemplatePackage without any preview has none embedded")
+    func templatePackageWithoutPreview() {
+        let package = TemplatePackageFixtures.makePackage(id: "plain", name: "Plain")
+
+        #expect(package.embeddedPreviewBase64 == nil)
+    }
 }

@@ -18,6 +18,9 @@ public enum PDFExportError: LocalizedError {
     case invalidContent(String)
     case templateError(String)
 
+    /// The CV needs more pages than the export allows
+    case tooManyPages(count: Int, limit: Int)
+
     public var errorDescription: String? {
         switch self {
         case .renderingFailed(let reason):
@@ -26,6 +29,8 @@ public enum PDFExportError: LocalizedError {
             return "Invalid content: \(reason)"
         case .templateError(let reason):
             return "Template error: \(reason)"
+        case .tooManyPages(let count, let limit):
+            return "The CV needs \(count) pages; the limit is \(limit)"
         }
     }
 }

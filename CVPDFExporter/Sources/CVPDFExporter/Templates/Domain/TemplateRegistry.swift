@@ -31,7 +31,7 @@ public struct TemplateEntry: Codable, Equatable, Sendable, Identifiable {
     /// Installation timestamp
     public let installedAt: Date
 
-    /// Relative path to the preview image (e.g., "TemplateCache/professional_preview.png")
+    /// Path of the preview image, relative to the registry's storage directory (e.g., "professional_preview.png")
     public let previewPath: String
 
     public init(

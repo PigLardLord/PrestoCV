@@ -8,14 +8,15 @@ public final class MockDependencyContainer {
 
     private let templateRepository: BundledTemplateRepository
     private let templateCache: TemplateCache
-    private let exportRepository: MockExportRepository
+    private let exportRepository: NullExportRepository
 
     // MARK: - Initialization
 
-    public init() {
-        self.templateRepository = BundledTemplateRepository()
+    /// - Parameter templateRepository: where the templates come from; tests give it a temporary storage
+    public init(templateRepository: BundledTemplateRepository) {
+        self.templateRepository = templateRepository
         self.templateCache = TemplateCache()
-        self.exportRepository = MockExportRepository()
+        self.exportRepository = NullExportRepository()
     }
 
     // MARK: - Factory Methods (Public API)
@@ -89,7 +90,7 @@ final class TestMockPDFRenderer: PDFRendererProtocol, @unchecked Sendable {
     var renderCallCount = 0
     var lastHtmlRendered: String?
     var shouldFail = false
-    var mockData = Data("Mock PDF Content".utf8)
+    var mockData = TestPDFDocument.data(pageCount: 1)
 
     func renderToPDF(html: String, options: ExportOptions) async throws -> Data {
         renderCallCount += 1

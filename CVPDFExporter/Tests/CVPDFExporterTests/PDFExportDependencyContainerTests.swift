@@ -22,6 +22,7 @@ final class PDFExportDependencyContainerTests: XCTestCase {
         XCTAssertNotNil(sut)
     }
 
+    @MainActor
     func test_makeExportUseCase_returnsConfiguredUseCase() {
         // When
         let useCase = sut.makeExportUseCase()
@@ -74,6 +75,7 @@ final class PDFExportDependencyContainerTests: XCTestCase {
         XCTAssertNotNil(engine2)
     }
 
+    @MainActor
     func test_makePDFRenderer_returnsAppropriateRenderer() {
         // When
         let renderer = sut.makePDFRenderer()
@@ -81,7 +83,7 @@ final class PDFExportDependencyContainerTests: XCTestCase {
         // Then
         XCTAssertNotNil(renderer)
         #if canImport(UIKit)
-        XCTAssertTrue(renderer is EnhancedWKWebViewPDFRenderer || renderer is WKWebViewPDFRenderer)
+        XCTAssertTrue(renderer is EnhancedWKWebViewPDFRenderer)
         #elseif canImport(AppKit)
         XCTAssertTrue(renderer is ProperMacOSPDFRenderer || renderer is MacOSPDFRenderer)
         #else

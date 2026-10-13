@@ -1,21 +1,16 @@
 import Foundation
 import CryptoKit
+import PDFKit
 
 /// Result of PDF export operation
 public struct PDFExportResult: Sendable {
     public let pdfData: Data
     public let pageCount: Int
-    public let wasContentTruncated: Bool
     public let fileSize: Int64
 
-    public init(
-        pdfData: Data,
-        pageCount: Int,
-        wasContentTruncated: Bool = false
-    ) {
+    public init(pdfData: Data, pageCount: Int) {
         self.pdfData = pdfData
         self.pageCount = pageCount
-        self.wasContentTruncated = wasContentTruncated
         self.fileSize = Int64(pdfData.count)
     }
 }
@@ -45,8 +40,8 @@ public actor PDFExportUseCase {
     ///   - document: CV document to export
     ///   - template: Template to use for rendering
     ///   - options: Export configuration options
-    /// - Returns: PDF export result
-    /// - Throws: PDFExportError if export fails
+    /// - Returns: PDF export result, with the number of pages the PDF really has
+    /// - Throws: PDFExportError if export fails, or `tooManyPages` if the PDF is longer than `options.maxPages`
     public func execute(
         document: CVDocument,
         template: Template,
@@ -61,8 +56,7 @@ public actor PDFExportUseCase {
             if let cachedData = await repository.getCachedPDF(key: cacheKey) {
                 return PDFExportResult(
                     pdfData: cachedData,
-                    pageCount: estimatePageCount(dataSize: cachedData.count),
-                    wasContentTruncated: false
+                    pageCount: try checkedPageCount(of: cachedData, limit: options.maxPages)
                 )
             }
         }
@@ -77,29 +71,15 @@ public actor PDFExportUseCase {
         // Render PDF
         let pdfData = try await renderer.renderToPDF(html: html, options: options)
 
-        // Check page limit
-        let pageCount = estimatePageCount(dataSize: pdfData.count)
-        let wasContentTruncated = pageCount > options.maxPages
-
-        // Enforce page limit if needed
-        let finalPDFData: Data
-        let finalPageCount: Int
-        if wasContentTruncated {
-            // In real implementation, would truncate content here
-            finalPDFData = pdfData
-            finalPageCount = min(pageCount, options.maxPages)
-        } else {
-            finalPDFData = pdfData
-            finalPageCount = pageCount
-        }
+        let pageCount = try checkedPageCount(of: pdfData, limit: options.maxPages)
 
         // Save to history
         let historyEntry = ExportHistoryEntry(
             cvId: generateDocumentId(document),
             cvName: document.personalInfo.name,
             templateId: template.id,
-            fileSize: Int64(finalPDFData.count),
-            pageCount: finalPageCount
+            fileSize: Int64(pdfData.count),
+            pageCount: pageCount
         )
         try await repository.saveExportHistory(historyEntry)
 
@@ -107,17 +87,13 @@ public actor PDFExportUseCase {
         if enableCaching {
             let cacheKey = generateCacheKey(document: document, template: template, options: options)
             try await repository.cachePDF(
-                data: finalPDFData,
+                data: pdfData,
                 key: cacheKey,
                 ttl: 3600 // 1 hour TTL
             )
         }
 
-        return PDFExportResult(
-            pdfData: finalPDFData,
-            pageCount: finalPageCount,
-            wasContentTruncated: wasContentTruncated
-        )
+        return PDFExportResult(pdfData: pdfData, pageCount: pageCount)
     }
 
     // MARK: - Private Methods
@@ -131,10 +107,15 @@ public actor PDFExportUseCase {
         }
     }
 
-    private func estimatePageCount(dataSize: Int) -> Int {
-        // Rough estimate: ~1KB per page for our mock data
-        // In production, this would be more sophisticated
-        max(1, dataSize / 1024)
+    /// The number of pages the PDF has, read from the document itself
+    private func checkedPageCount(of pdfData: Data, limit: Int) throws -> Int {
+        guard let document = PDFDocument(data: pdfData), document.pageCount > 0 else {
+            throw PDFExportError.renderingFailed("The renderer did not produce a readable PDF")
+        }
+        guard document.pageCount <= limit else {
+            throw PDFExportError.tooManyPages(count: document.pageCount, limit: limit)
+        }
+        return document.pageCount
     }
 
     private func generateCacheKey(

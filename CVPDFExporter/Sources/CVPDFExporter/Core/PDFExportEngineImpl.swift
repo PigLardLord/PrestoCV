@@ -9,15 +9,20 @@ public final class PDFExportEngineImpl: PDFExportEngine, Sendable {
 
     private let renderer: HTMLToPDFRenderer
     private let adapter: PrestoCVCoreAdapter
-    private let templateRepository: TemplateRepository
+    private let templateRepository: TemplateRepositoryProtocol
     private let templateEngine: TemplateEngine
 
     /// Initialize with an injected renderer
-    /// - Parameter renderer: Platform-specific PDF renderer implementation
-    public init(renderer: HTMLToPDFRenderer) {
+    /// - Parameters:
+    ///   - renderer: Platform-specific PDF renderer implementation
+    ///   - templateRepository: Where the templates come from; the installed bundled templates by default
+    public init(
+        renderer: HTMLToPDFRenderer,
+        templateRepository: TemplateRepositoryProtocol = BundledTemplateRepository()
+    ) {
         self.renderer = renderer
         self.adapter = PrestoCVCoreAdapter()
-        self.templateRepository = BundledTemplateRepository()
+        self.templateRepository = templateRepository
         self.templateEngine = MustacheTemplateEngine()
     }
 
@@ -29,7 +34,7 @@ public final class PDFExportEngineImpl: PDFExportEngine, Sendable {
         let templateId = options.templateId ?? "professional"
 
         do {
-            let template = try templateRepository.loadTemplate(id: templateId)
+            let template = try await templateRepository.loadTemplate(id: templateId)
             let html = try await templateEngine.render(
                 template: template,
                 data: document,

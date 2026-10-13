@@ -5,8 +5,6 @@ import XCTest
 /// Tests the full flow: bundled .mcvt files → registry → file repository → templates
 final class TemplateBootstrapServiceIntegrationTests: XCTestCase {
 
-    static let knownIssue = "Installed templates are never registered: https://github.com/PigLardLord/PrestoCV-archive/issues/1"
-
     var tempDir: URL!
     var templatesDir: URL!
     var registryManager: TemplateRegistryManager!
@@ -70,8 +68,6 @@ final class TemplateBootstrapServiceIntegrationTests: XCTestCase {
             XCTAssertTrue(FileManager.default.fileExists(atPath: packageURL.path), "\(id).mcvt should be installed")
         }
 
-        XCTExpectFailure(Self.knownIssue)
-
         // And: The registry lists them
         let templates = try await registryManager.getAllTemplates()
         XCTAssertEqual(templates.count, 3, "Registry should list the bundled templates")
@@ -83,8 +79,6 @@ final class TemplateBootstrapServiceIntegrationTests: XCTestCase {
 
         // When: Template is installed
         try await repository.installTemplate(package)
-
-        XCTExpectFailure(Self.knownIssue)
 
         // Then: Template should be in registry
         let entry = try await registryManager.getTemplate(id: "test-template")
@@ -100,8 +94,6 @@ final class TemplateBootstrapServiceIntegrationTests: XCTestCase {
     }
 
     func testBootstrapUpdatesExistingTemplate() async throws {
-        XCTExpectFailure(Self.knownIssue)
-
         // Given: An existing template with version 1.0.0
         let oldPackage = createTestPackage(id: "test-template", version: "1.0.0")
         try await repository.installTemplate(oldPackage)
@@ -124,8 +116,6 @@ final class TemplateBootstrapServiceIntegrationTests: XCTestCase {
         let newPackage = createTestPackage(id: "test-template", version: "2.0.0")
         try await repository.installTemplate(newPackage)
 
-        XCTExpectFailure(Self.knownIssue)
-
         // When: An older version 1.0.0 is encountered
         // Simulate version check (bootstrap service would skip this)
         let entry = try await registryManager.getTemplate(id: "test-template")
@@ -141,12 +131,10 @@ final class TemplateBootstrapServiceIntegrationTests: XCTestCase {
         let package = createTestPackage(id: "test-template", version: "1.0.0")
         try await repository.installTemplate(package)
 
-        XCTExpectFailure(Self.knownIssue)
-
-        // Get preview path from registry
+        // Get the preview location from the registry
         let entry = try await registryManager.getTemplate(id: "test-template")
-        let previewPath = try XCTUnwrap(entry?.previewPath, "Preview should be cached")
-        let previewURL = tempDir.appendingPathComponent(previewPath)
+        let registeredEntry = try XCTUnwrap(entry, "Template should be registered")
+        let previewURL = registryManager.previewURL(for: registeredEntry)
 
         // Then: Preview file should exist
         XCTAssertTrue(
@@ -165,8 +153,6 @@ final class TemplateBootstrapServiceIntegrationTests: XCTestCase {
         try await repository.installTemplate(professional)
         try await repository.installTemplate(modern)
         try await repository.installTemplate(minimal)
-
-        XCTExpectFailure(Self.knownIssue)
 
         // Then: All templates should be in registry
         let entries = try await registryManager.getAllTemplates()
@@ -213,8 +199,6 @@ final class TemplateBootstrapServiceIntegrationTests: XCTestCase {
         // Given: Templates installed via FileTemplateRepository
         let package = createTestPackage(id: "test-template", version: "1.0.0")
         try await repository.installTemplate(package)
-
-        XCTExpectFailure(Self.knownIssue)
 
         // When: BundledTemplateRepository is created with same registry
         let bundledRepo = BundledTemplateRepository(fileRepository: repository)

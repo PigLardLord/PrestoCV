@@ -17,7 +17,7 @@ struct RenderCVDemo {
             // 2. Load and render template
             print("\n🎨 Loading template...")
             let templateRepository = BundledTemplateRepository()
-            let template = try templateRepository.loadTemplate(id: "modern")
+            let template = try await templateRepository.loadTemplate(id: "modern")
             let templateEngine = MustacheTemplateEngine()
             print("✅ Template loaded: \(template.name)")
 
@@ -42,7 +42,7 @@ struct RenderCVDemo {
 
             // 5. Render to PDF
             print("\n📄 Rendering PDF...")
-            let renderer = PDFRendererFactory.createRenderer()
+            let renderer = await PDFRendererFactory.createRenderer()
             print("Using renderer: \(type(of: renderer))")
 
             let options = ExportOptions(

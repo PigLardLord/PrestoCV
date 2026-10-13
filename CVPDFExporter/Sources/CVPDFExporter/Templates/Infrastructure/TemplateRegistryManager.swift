@@ -123,6 +123,19 @@ public actor TemplateRegistryManager: TemplateRegistryProtocol {
         try await saveRegistry(registry)
     }
 
+    // MARK: - Upsert Template
+
+    public func upsertTemplate(_ entry: TemplateEntry) async throws {
+        var registry = try await loadRegistry()
+
+        // A new entry goes last, so templates keep the order in which they were installed
+        if !registry.updateEntry(entry) {
+            registry.addEntry(entry)
+        }
+
+        try await saveRegistry(registry)
+    }
+
     // MARK: - Remove Template
 
     public func removeTemplate(id: String) async throws {
@@ -161,6 +174,18 @@ public actor TemplateRegistryManager: TemplateRegistryProtocol {
         return try await loadRegistry()
     }
 
+    // MARK: - Preview Files
+
+    /// Name of the cached preview file of a template, inside the storage directory
+    public nonisolated func previewFileName(forTemplateId templateId: String) -> String {
+        "\(templateId)_preview.png"
+    }
+
+    /// Location of the cached preview image an entry points to
+    public nonisolated func previewURL(for entry: TemplateEntry) -> URL {
+        storageDirectory.appendingPathComponent(entry.previewPath)
+    }
+
     // MARK: - Extract Preview
 
     public func extractPreview(from base64: String, templateId: String) async throws -> URL {
@@ -181,8 +206,7 @@ public actor TemplateRegistryManager: TemplateRegistryProtocol {
         }
 
         // Create preview file path
-        let previewFileName = "\(templateId)_preview.png"
-        let previewPath = storageDirectory.appendingPathComponent(previewFileName)
+        let previewPath = storageDirectory.appendingPathComponent(previewFileName(forTemplateId: templateId))
 
         // Write PNG data to file
         do {

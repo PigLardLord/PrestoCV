@@ -5,13 +5,13 @@ import Foundation
 @Suite("ExportViewModel Tests")
 struct ExportViewModelTests {
 
-    static let knownIssue: Comment = "Bundled templates are never registered: https://github.com/PigLardLord/PrestoCV-archive/issues/1"
-
     @Test("Should initialize with default template")
     @MainActor
-    func test_init_selectsDefaultTemplate() async {
+    func test_init_selectsDefaultTemplate() async throws {
         // Given
-        let container = MockDependencyContainer()
+        let storage = try await TemplateTestStorage.withBundledTemplates()
+        defer { storage.cleanUp() }
+        let container = MockDependencyContainer(templateRepository: storage.repository)
         let viewModel = ExportViewModel(container: container)
 
         // Then
@@ -21,29 +21,31 @@ struct ExportViewModelTests {
         #expect(!viewModel.showPreview)
     }
 
-    @Test("Should load templates on initialization")
+    @Test("Should load the bundled templates")
     @MainActor
-    func test_init_loadsTemplates() async {
+    func test_init_loadsTemplates() async throws {
         // Given
-        let container = MockDependencyContainer()
+        let storage = try await TemplateTestStorage.withBundledTemplates()
+        defer { storage.cleanUp() }
+        let container = MockDependencyContainer(templateRepository: storage.repository)
         let viewModel = ExportViewModel(container: container)
 
-        // When - Give async initialization time to complete
-        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        // When
+        await viewModel.loadTemplates()
 
         // Then
-        withKnownIssue(Self.knownIssue) {
-            #expect(viewModel.templates.count > 0)
-            #expect(viewModel.templates.contains { $0.id == "professional" })
-            #expect(viewModel.templates.contains { $0.id == "modern" })
-        }
+        #expect(viewModel.templates.count > 0)
+        #expect(viewModel.templates.contains { $0.id == "professional" })
+        #expect(viewModel.templates.contains { $0.id == "modern" })
     }
 
     @Test("Should update customization options")
     @MainActor
-    func test_updateCustomization_updatesOptions() {
+    func test_updateCustomization_updatesOptions() async throws {
         // Given
-        let container = MockDependencyContainer()
+        let storage = try await TemplateTestStorage.withBundledTemplates()
+        defer { storage.cleanUp() }
+        let container = MockDependencyContainer(templateRepository: storage.repository)
         let viewModel = ExportViewModel(container: container)
 
         // When
@@ -59,9 +61,11 @@ struct ExportViewModelTests {
 
     @Test("Should handle template selection")
     @MainActor
-    func test_selectTemplate_updatesSelection() {
+    func test_selectTemplate_updatesSelection() async throws {
         // Given
-        let container = MockDependencyContainer()
+        let storage = try await TemplateTestStorage.withBundledTemplates()
+        defer { storage.cleanUp() }
+        let container = MockDependencyContainer(templateRepository: storage.repository)
         let viewModel = ExportViewModel(container: container)
 
         // When
@@ -75,28 +79,30 @@ struct ExportViewModelTests {
     @MainActor
     func test_exportToPDF_generatesData() async throws {
         // Given
-        let container = MockDependencyContainer()
+        let storage = try await TemplateTestStorage.withBundledTemplates()
+        defer { storage.cleanUp() }
+        let container = MockDependencyContainer(templateRepository: storage.repository)
         let viewModel = ExportViewModel(container: container)
         let document = createSampleCV()
 
         // Wait for templates to load
         await viewModel.loadTemplates()
 
-        await withKnownIssue(Self.knownIssue) {
-            // When
-            let pdfData = try await viewModel.exportToPDF(document: document)
+        // When
+        let pdfData = try await viewModel.exportToPDF(document: document)
 
-            // Then
-            #expect(!pdfData.isEmpty)
-            #expect(!viewModel.isExporting)
-        }
+        // Then
+        #expect(!pdfData.isEmpty)
+        #expect(!viewModel.isExporting)
     }
 
     @Test("Should handle export errors")
     @MainActor
-    func test_exportToPDF_handlesError() async {
+    func test_exportToPDF_handlesError() async throws {
         // Given
-        let container = MockDependencyContainer()
+        let storage = try await TemplateTestStorage.withBundledTemplates()
+        defer { storage.cleanUp() }
+        let container = MockDependencyContainer(templateRepository: storage.repository)
         let viewModel = ExportViewModel(container: container)
         let invalidDocument = CVDocument(
             personalInfo: PersonalInfo(name: "", email: "")
@@ -119,26 +125,28 @@ struct ExportViewModelTests {
     @MainActor
     func test_generatePreview_createsHTMLPreview() async throws {
         // Given
-        let container = MockDependencyContainer()
+        let storage = try await TemplateTestStorage.withBundledTemplates()
+        defer { storage.cleanUp() }
+        let container = MockDependencyContainer(templateRepository: storage.repository)
         let viewModel = ExportViewModel(container: container)
         let document = createSampleCV()
 
         // When
         viewModel.selectedTemplateId = "modern"
-        await withKnownIssue(Self.knownIssue) {
-            try await viewModel.generatePreview(document: document)
+        try await viewModel.generatePreview(document: document)
 
-            // Then
-            #expect(!viewModel.previewHTML.isEmpty)
-            #expect(viewModel.showPreview)
-        }
+        // Then
+        #expect(!viewModel.previewHTML.isEmpty)
+        #expect(viewModel.showPreview)
     }
 
     @Test("Should handle AI tailoring when available")
     @MainActor
     func test_tailorForJob_appliesSuggestions() async throws {
         // Given
-        let container = MockDependencyContainer()
+        let storage = try await TemplateTestStorage.withBundledTemplates()
+        defer { storage.cleanUp() }
+        let container = MockDependencyContainer(templateRepository: storage.repository)
         let viewModel = ExportViewModel(container: container)
         let document = createSampleCV()
         let jobDescription = "Senior iOS Developer with SwiftUI experience"
@@ -158,7 +166,9 @@ struct ExportViewModelTests {
     @MainActor
     func test_exportState_updatesCorrectly() async throws {
         // Given
-        let container = MockDependencyContainer()
+        let storage = try await TemplateTestStorage.withBundledTemplates()
+        defer { storage.cleanUp() }
+        let container = MockDependencyContainer(templateRepository: storage.repository)
         let viewModel = ExportViewModel(container: container)
         let document = createSampleCV()
 
@@ -168,20 +178,20 @@ struct ExportViewModelTests {
         // Then - Initial state
         #expect(!viewModel.isExporting)
 
-        await withKnownIssue(Self.knownIssue) {
-            // When - Export
-            _ = try await viewModel.exportToPDF(document: document)
+        // When - Export
+        _ = try await viewModel.exportToPDF(document: document)
 
-            // Then - After export
-            #expect(!viewModel.isExporting)
-        }
+        // Then - After export
+        #expect(!viewModel.isExporting)
     }
 
     @Test("Should validate document before export")
     @MainActor
-    func test_validateDocument_checksRequirements() {
+    func test_validateDocument_checksRequirements() async throws {
         // Given
-        let container = MockDependencyContainer()
+        let storage = try await TemplateTestStorage.withBundledTemplates()
+        defer { storage.cleanUp() }
+        let container = MockDependencyContainer(templateRepository: storage.repository)
         let viewModel = ExportViewModel(container: container)
 
         // When - Valid document

@@ -136,7 +136,7 @@ struct FileTemplateRepositoryTests {
         let storage = try FileRepositoryTestStorage()
         defer { storage.cleanUp() }
         let repository = storage.makeRepository()
-        let package = FileRepositoryTestStorage.makePackage(id: "new-template", name: "New Template")
+        let package = TemplatePackageFixtures.makePackage(id: "new-template", name: "New Template")
 
         // When
         try await repository.installTemplate(package)
@@ -152,7 +152,7 @@ struct FileTemplateRepositoryTests {
         let storage = try FileRepositoryTestStorage()
         defer { storage.cleanUp() }
         let repository = storage.makeRepository()
-        let invalidPackage = FileRepositoryTestStorage.makePackage(id: "", name: "Test") // Invalid empty ID
+        let invalidPackage = TemplatePackageFixtures.makePackage(id: "", name: "Test") // Invalid empty ID
 
         // When/Then
         await #expect(throws: TemplateRepositoryError.self) {
@@ -168,13 +168,136 @@ struct FileTemplateRepositoryTests {
         let repository = storage.makeRepository()
 
         // When
-        try await repository.installTemplate(FileRepositoryTestStorage.makePackage(id: "installed", name: "Installed"))
+        try await repository.installTemplate(TemplatePackageFixtures.makePackage(id: "installed", name: "Installed"))
 
         // Then
-        await withKnownIssue("Installed templates are never registered: https://github.com/PigLardLord/PrestoCV-archive/issues/1") {
-            let template = try await repository.getTemplate(id: "installed")
-            #expect(template?.id == "installed")
+        let template = try await repository.getTemplate(id: "installed")
+        #expect(template?.id == "installed")
+        #expect(try await repository.getTemplates().map(\.id) == ["installed"])
+    }
+
+    @Test("installTemplate registers the template as bundled with its version")
+    func installTemplateRegistersEntry() async throws {
+        // Given
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        let repository = storage.makeRepository()
+
+        // When
+        try await repository.installTemplate(TemplatePackageFixtures.makePackage(id: "registered", name: "Registered"))
+
+        // Then
+        let entry = try await storage.registryManager.getTemplate(id: "registered")
+        #expect(entry?.name == "Registered")
+        #expect(entry?.version == "1.0.0")
+        #expect(entry?.source == .bundled)
+        #expect(entry?.previewPath == "registered_preview.png")
+    }
+
+    @Test("installTemplate caches the package's top-level preview image")
+    func installTemplateCachesPreview() async throws {
+        // Given
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        let repository = storage.makeRepository()
+        let png = TemplatePackageFixtures.makePNG(variant: 1)
+        let package = TemplatePackageFixtures.makePackage(id: "with-preview", name: "With Preview", preview: png)
+
+        // When
+        try await repository.installTemplate(package)
+
+        // Then
+        let template = try await repository.getTemplate(id: "with-preview")
+        let thumbnailURL = try #require(template?.thumbnailURL)
+        #expect(thumbnailURL.lastPathComponent == "with-preview_preview.png")
+        #expect(try Data(contentsOf: thumbnailURL) == png)
+    }
+
+    @Test("installTemplate caches the preview kept in the manifest of older packages")
+    func installTemplateCachesManifestPreview() async throws {
+        // Given
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        let repository = storage.makeRepository()
+        let png = TemplatePackageFixtures.makePNG(variant: 2)
+        let manifest = TemplateManifest(
+            id: "old-format",
+            name: "Old Format",
+            description: "Test template",
+            author: "Test Author",
+            version: "1.0.0",
+            previewImage: "preview.png",
+            previewImageBase64: png.base64EncodedString(),
+            price: 0.0
+        )
+
+        // When
+        try await repository.installTemplate(TemplatePackage(manifest: manifest, cssContent: "body { margin: 0; }"))
+
+        // Then
+        let template = try await repository.getTemplate(id: "old-format")
+        #expect(try Data(contentsOf: try #require(template?.thumbnailURL)) == png)
+    }
+
+    @Test("installTemplate rejects a preview that is not a PNG image")
+    func installTemplateRejectsInvalidPreview() async throws {
+        // Given
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        let repository = storage.makeRepository()
+        let notAnImage = Data("not an image at all".utf8)
+        let package = TemplatePackageFixtures.makePackage(id: "broken", name: "Broken", preview: notAnImage)
+
+        // When/Then
+        await #expect(throws: TemplateRepositoryError.self) {
+            try await repository.installTemplate(package)
         }
+        #expect(try await repository.getTemplates().isEmpty)
+    }
+
+    @Test("installTemplate replaces an installed template with a newer version")
+    func installTemplateReplacesInstalledTemplate() async throws {
+        // Given
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        let repository = storage.makeRepository()
+        try await repository.installTemplate(TemplatePackageFixtures.makePackage(
+            id: "evolving", name: "Evolving", version: "1.0.0", css: "body { color: red; }",
+            preview: TemplatePackageFixtures.makePNG(variant: 1)
+        ))
+        let newPreview = TemplatePackageFixtures.makePNG(variant: 2)
+
+        // When
+        try await repository.installTemplate(TemplatePackageFixtures.makePackage(
+            id: "evolving", name: "Evolving", version: "1.1.0", css: "body { color: blue; }", preview: newPreview
+        ))
+
+        // Then: one entry, with the new version, package and preview
+        let entries = try await storage.registryManager.getAllTemplates()
+        #expect(entries.map(\.id) == ["evolving"])
+        #expect(entries.first?.version == "1.1.0")
+        let template = try #require(try await repository.getTemplate(id: "evolving"))
+        #expect(template.htmlContent.contains("color: blue;"))
+        #expect(try Data(contentsOf: try #require(template.thumbnailURL)) == newPreview)
+    }
+
+    @Test("templates are listed in the order they were installed")
+    func templatesKeepInstallationOrder() async throws {
+        // Given
+        let storage = try FileRepositoryTestStorage()
+        defer { storage.cleanUp() }
+        let repository = storage.makeRepository()
+
+        // When
+        for id in ["professional", "modern", "minimal"] {
+            try await repository.installTemplate(TemplatePackageFixtures.makePackage(id: id, name: id.capitalized))
+        }
+        try await repository.installTemplate(
+            TemplatePackageFixtures.makePackage(id: "modern", name: "Modern", version: "1.0.1")
+        )
+
+        // Then: updating a template does not move it
+        #expect(try await repository.getTemplates().map(\.id) == ["professional", "modern", "minimal"])
     }
 }
 
@@ -203,22 +326,9 @@ private struct FileRepositoryTestStorage {
         try? FileManager.default.removeItem(at: root)
     }
 
-    static func makePackage(id: String, name: String) -> TemplatePackage {
-        let manifest = TemplateManifest(
-            id: id,
-            name: name,
-            description: "Test template",
-            author: "Test Author",
-            version: "1.0.0",
-            previewImage: "preview.png",
-            price: 0.0
-        )
-        return TemplatePackage(manifest: manifest, cssContent: "body { margin: 0; }", htmlContent: nil)
-    }
-
     func writePackage(id: String, name: String) throws {
         try FileManager.default.createDirectory(at: templatesDirectory, withIntermediateDirectories: true)
-        let data = try JSONEncoder().encode(Self.makePackage(id: id, name: name))
+        let data = try JSONEncoder().encode(TemplatePackageFixtures.makePackage(id: id, name: name))
         try data.write(to: templatesDirectory.appendingPathComponent("\(id).mcvt"))
     }
 

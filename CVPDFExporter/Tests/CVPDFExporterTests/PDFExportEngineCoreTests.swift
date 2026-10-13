@@ -37,23 +37,16 @@ final class PDFExportEngineCoreTests: XCTestCase {
     }
 
     func testPDFExportEngineWithMockRenderer() async throws {
-        XCTExpectFailure("Bundled templates are never registered: https://github.com/PigLardLord/PrestoCV-archive/issues/1")
-
         // Given
+        let storage = try await TemplateTestStorage.withBundledTemplates()
+        defer { storage.cleanUp() }
         let mockRenderer = MockPDFRenderer()
-        let engine = PDFExportEngineFactory.create(with: mockRenderer)
+        let engine = PDFExportEngineImpl(renderer: mockRenderer, templateRepository: storage.repository)
         let document = createSampleDocument()
         let options = ExportOptions.default
 
         // When
-        // Recorded with XCTFail: an error thrown out of an async test escapes XCTExpectFailure
-        let pdfData: Data
-        do {
-            pdfData = try await engine.exportToPDF(document: document, options: options)
-        } catch {
-            XCTFail("Export failed: \(error)")
-            return
-        }
+        let pdfData = try await engine.exportToPDF(document: document, options: options)
 
         // Then
         XCTAssertFalse(pdfData.isEmpty)

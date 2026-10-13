@@ -249,6 +249,52 @@ struct InstallTemplateUseCaseTests {
         #expect(mockRepo.installedPackages.count == 1)
         #expect(mockRepo.installedPackages.first?.manifest.id == "template2")
     }
+
+    // MARK: - Replacing Installed Templates
+
+    @Test("Use case rejects a package whose ID is already installed")
+    func useCaseRejectsInstalledTemplateByDefault() async throws {
+        // Given
+        let mockRepo = MockInstallableRepository()
+        mockRepo.existingTemplates = [Template(id: "installed", name: "Installed", htmlContent: "<html></html>")]
+        let useCase = InstallTemplateUseCase(repository: mockRepo)
+        let package = TemplatePackageFixtures.makePackage(id: "installed", name: "Installed", version: "2.0.0")
+
+        // When/Then
+        await #expect(throws: TemplateInstallationError.self) {
+            try await useCase.execute(package: package)
+        }
+        #expect(mockRepo.installedPackages.isEmpty)
+    }
+
+    @Test("Use case replaces an installed template when asked to")
+    func useCaseReplacesInstalledTemplateWhenAsked() async throws {
+        // Given
+        let mockRepo = MockInstallableRepository()
+        mockRepo.existingTemplates = [Template(id: "installed", name: "Installed", htmlContent: "<html></html>")]
+        let useCase = InstallTemplateUseCase(repository: mockRepo)
+        let package = TemplatePackageFixtures.makePackage(id: "installed", name: "Installed", version: "2.0.0")
+
+        // When
+        try await useCase.execute(package: package, replacingExisting: true)
+
+        // Then
+        #expect(mockRepo.installedPackages.map(\.manifest.version) == ["2.0.0"])
+    }
+
+    @Test("Use case still validates the package when replacing")
+    func useCaseValidatesPackageWhenReplacing() async throws {
+        // Given
+        let mockRepo = MockInstallableRepository()
+        let useCase = InstallTemplateUseCase(repository: mockRepo)
+        let invalidPackage = TemplatePackageFixtures.makePackage(id: " ", name: "Invalid")
+
+        // When/Then
+        await #expect(throws: TemplateInstallationError.self) {
+            try await useCase.execute(package: invalidPackage, replacingExisting: true)
+        }
+        #expect(mockRepo.installedPackages.isEmpty)
+    }
 }
 
 // MARK: - Mock Repository for Installation Testing

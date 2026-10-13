@@ -3,27 +3,27 @@ import XCTest
 
 final class BundledTemplateRepositoryTests: XCTestCase {
 
-    static let knownIssue = "Bundled templates are never registered: https://github.com/PigLardLord/PrestoCV-archive/issues/1"
-
+    var storage: TemplateTestStorage!
     var sut: BundledTemplateRepository!
 
-    override func setUp() {
-        super.setUp()
-        sut = BundledTemplateRepository()
+    override func setUp() async throws {
+        try await super.setUp()
+        storage = try await TemplateTestStorage.withBundledTemplates()
+        sut = storage.repository
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
+        storage.cleanUp()
+        storage = nil
         sut = nil
-        super.tearDown()
+        try await super.tearDown()
     }
 
     // MARK: - Thumbnail URL Tests
 
-    func test_availableTemplates_allTemplatesHaveNonNilThumbnailURL() {
-        XCTExpectFailure(Self.knownIssue)
-
+    func test_availableTemplates_allTemplatesHaveNonNilThumbnailURL() async throws {
         // When
-        let templates = sut.availableTemplates()
+        let templates = try await sut.getTemplates()
 
         // Then
         XCTAssertFalse(templates.isEmpty, "Should have at least one template")
@@ -35,11 +35,9 @@ final class BundledTemplateRepositoryTests: XCTestCase {
         }
     }
 
-    func test_professionalTemplate_hasProfessionalPreviewPNG() throws {
-        XCTExpectFailure(Self.knownIssue)
-
+    func test_professionalTemplate_hasProfessionalPreviewPNG() async throws {
         // When
-        let template = try sut.loadTemplate(id: "professional")
+        let template = try await sut.loadTemplate(id: "professional")
 
         // Then
         XCTAssertNotNil(template.thumbnailURL, "Professional template should have thumbnailURL")
@@ -51,11 +49,9 @@ final class BundledTemplateRepositoryTests: XCTestCase {
         }
     }
 
-    func test_modernTemplate_hasModernPreviewPNG() throws {
-        XCTExpectFailure(Self.knownIssue)
-
+    func test_modernTemplate_hasModernPreviewPNG() async throws {
         // When
-        let template = try sut.loadTemplate(id: "modern")
+        let template = try await sut.loadTemplate(id: "modern")
 
         // Then
         XCTAssertNotNil(template.thumbnailURL, "Modern template should have thumbnailURL")
@@ -67,11 +63,9 @@ final class BundledTemplateRepositoryTests: XCTestCase {
         }
     }
 
-    func test_minimalTemplate_hasMinimalPreviewPNG() throws {
-        XCTExpectFailure(Self.knownIssue)
-
+    func test_minimalTemplate_hasMinimalPreviewPNG() async throws {
         // When
-        let template = try sut.loadTemplate(id: "minimal")
+        let template = try await sut.loadTemplate(id: "minimal")
 
         // Then
         XCTAssertNotNil(template.thumbnailURL, "Minimal template should have thumbnailURL")
@@ -83,9 +77,9 @@ final class BundledTemplateRepositoryTests: XCTestCase {
         }
     }
 
-    func test_thumbnailURLs_pointToValidBundleResources() throws {
+    func test_thumbnailURLs_pointToValidBundleResources() async throws {
         // When
-        let templates = sut.availableTemplates()
+        let templates = try await sut.getTemplates()
 
         // Then
         for template in templates {
@@ -102,9 +96,9 @@ final class BundledTemplateRepositoryTests: XCTestCase {
         }
     }
 
-    func test_thumbnailURLs_areImageFiles() throws {
+    func test_thumbnailURLs_areImageFiles() async throws {
         // When
-        let templates = sut.availableTemplates()
+        let templates = try await sut.getTemplates()
 
         // Then
         for template in templates {
@@ -123,11 +117,9 @@ final class BundledTemplateRepositoryTests: XCTestCase {
 
     // MARK: - Existing Functionality Tests
 
-    func test_availableTemplates_returnsExpectedTemplates() {
-        XCTExpectFailure(Self.knownIssue)
-
+    func test_availableTemplates_returnsExpectedTemplates() async throws {
         // When
-        let templates = sut.availableTemplates()
+        let templates = try await sut.getTemplates()
 
         // Then
         XCTAssertEqual(templates.count, 3, "Should have 3 bundled templates")
@@ -138,11 +130,17 @@ final class BundledTemplateRepositoryTests: XCTestCase {
         XCTAssertTrue(templateIds.contains("minimal"))
     }
 
-    func test_loadTemplate_existingId_returnsTemplate() throws {
-        XCTExpectFailure(Self.knownIssue)
-
+    func test_availableTemplates_listsProfessionalFirst() async throws {
         // When
-        let template = try sut.loadTemplate(id: "professional")
+        let templates = try await sut.getTemplates()
+
+        // Then: the export sheet preselects the first template
+        XCTAssertEqual(templates.map(\.id), ["professional", "modern", "minimal"])
+    }
+
+    func test_loadTemplate_existingId_returnsTemplate() async throws {
+        // When
+        let template = try await sut.loadTemplate(id: "professional")
 
         // Then
         XCTAssertEqual(template.id, "professional")
@@ -150,14 +148,40 @@ final class BundledTemplateRepositoryTests: XCTestCase {
         XCTAssertFalse(template.htmlContent.isEmpty)
     }
 
-    func test_loadTemplate_nonExistingId_throwsError() {
+    func test_loadTemplate_nonExistingId_throwsError() async {
         // When/Then
-        XCTAssertThrowsError(try sut.loadTemplate(id: "nonexistent")) { error in
-            if case TemplateError.templateNotFound(let id) = error {
-                XCTAssertEqual(id, "nonexistent")
-            } else {
-                XCTFail("Expected TemplateError.templateNotFound, got \(error)")
-            }
+        do {
+            _ = try await sut.loadTemplate(id: "nonexistent")
+            XCTFail("Expected TemplateError.templateNotFound")
+        } catch TemplateError.templateNotFound(let id) {
+            XCTAssertEqual(id, "nonexistent")
+        } catch {
+            XCTFail("Expected TemplateError.templateNotFound, got \(error)")
+        }
+    }
+
+    func test_installTemplate_isRejected() async {
+        // When/Then: the bundled repository is read-only
+        let package = TemplatePackage(
+            manifest: TemplateManifest(
+                id: "extra",
+                name: "Extra",
+                description: "Extra template",
+                author: "Test",
+                version: "1.0.0",
+                previewImage: "preview.png",
+                price: 0
+            ),
+            cssContent: "body { margin: 0; }"
+        )
+
+        do {
+            try await sut.installTemplate(package)
+            XCTFail("Expected the installation to be rejected")
+        } catch TemplateRepositoryError.ioError {
+            // Expected
+        } catch {
+            XCTFail("Expected TemplateRepositoryError.ioError, got \(error)")
         }
     }
 }

@@ -22,6 +22,15 @@ public protocol TemplateRepositoryProtocol: Sendable {
 
 // MARK: - Convenience Methods (Default Implementations)
 public extension TemplateRepositoryProtocol {
+    /// The template with the given ID
+    /// - Throws: TemplateError.templateNotFound if the repository has no such template
+    func loadTemplate(id: String) async throws -> Template {
+        guard let template = try await getTemplate(id: id) else {
+            throw TemplateError.templateNotFound(id)
+        }
+        return template
+    }
+
     /// Legacy method for backward compatibility
     func getAllTemplates() async throws -> [Template] {
         try await getTemplates()

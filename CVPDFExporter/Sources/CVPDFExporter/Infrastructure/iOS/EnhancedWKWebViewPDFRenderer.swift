@@ -13,12 +13,12 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
     private let logger = Logger(subsystem: "CVPDFExporter", category: "PDFRenderer")
     private var webView: WKWebView?
     private var loadContinuation: CheckedContinuation<Void, Error>?
-    private var javascriptContinuation: CheckedContinuation<String?, Error>?
+    private var loadTimeout: Task<Void, Never>?
     private let pageBreakManager: PageBreakManager
 
     // Configuration
-    private let javascriptTimeout: TimeInterval = 5.0
-    private let pageLoadTimeout: TimeInterval = 30.0
+    private let pageLoadTimeout: Duration = .seconds(30)
+    private let readinessTimeout: Duration = .seconds(5)
 
     // MARK: - Initialization
 
@@ -41,10 +41,12 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
             }
 
             try await loadHTML(enhancedHTML, in: webView)
-            try await awaitContentReadiness(in: webView)
-            try await adjustContentForPagination(in: webView, options: options)
+            await awaitContentReadiness(in: webView)
 
-            return try await generatePDF(from: webView, options: options)
+            return try generatePDFWithPrintRenderer(from: webView, options: options)
+        } catch let error as PDFExportError {
+            logger.error("PDF generation failed: \(error.localizedDescription)")
+            throw error
         } catch {
             logger.error("PDF generation failed: \(error.localizedDescription)")
             throw PDFExportError.renderingFailed(error.localizedDescription)
@@ -156,114 +158,59 @@ private extension EnhancedWKWebViewPDFRenderer {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             self.loadContinuation = continuation
 
-            // Start timeout timer
-            Task { [weak self] in
-                guard let self else { return }
-                try await Task.sleep(nanoseconds: UInt64(pageLoadTimeout * 1_000_000_000))
-                if let continuation = self.loadContinuation {
-                    continuation.resume(throwing: PDFExportError.renderingFailed("HTML load timed out"))
-                    self.loadContinuation = nil
+            // The timer ends together with the load, so it cannot fire into a later render
+            let timeout = self.pageLoadTimeout
+            self.loadTimeout = Task { @MainActor [weak self, timeout] in
+                do {
+                    try await Task.sleep(for: timeout)
+                } catch {
+                    return
                 }
+                self?.finishLoading(with: .failure(PDFExportError.renderingFailed("HTML load timed out")))
             }
 
             webView.loadHTMLString(html, baseURL: nil)
         }
     }
 
-    func awaitContentReadiness(in webView: WKWebView) async throws {
-        _ = try? await webView.callAsyncJavaScript(
-            PreviewReadinessScript.awaitReady,
-            arguments: [:],
-            in: nil,
-            contentWorld: .page
-        )
+    /// Ends the pending load, once: whichever of the navigation delegate and the timer comes first wins.
+    func finishLoading(with result: Result<Void, Error>) {
+        loadTimeout?.cancel()
+        loadTimeout = nil
+
+        guard let continuation = loadContinuation else { return }
+        loadContinuation = nil
+        continuation.resume(with: result)
     }
 
-    func adjustContentForPagination(in webView: WKWebView, options: ExportOptions) async throws {
-        // Inject pagination optimization script
-        let paginationScript = """
-            (function() {
-                // Avoid breaking inside certain elements
-                const elements = document.querySelectorAll('h1, h2, h3, h4, h5, h6, .cv-section, .cv-item');
-                elements.forEach(el => {
-                    el.style.pageBreakInside = 'avoid';
-                    el.style.breakInside = 'avoid';
-                });
+    /// Waits for the page to report that its fonts and images are ready, but not longer than `readinessTimeout`.
+    /// The web view is never put in a window, and a page that is not shown may not run its animation frames,
+    /// which the readiness script waits for; the PDF is then drawn without waiting any longer.
+    func awaitContentReadiness(in webView: WKWebView) async {
+        let gate = ReadinessGate()
+        let timeout = readinessTimeout
 
-                // Add page break before major sections (except first)
-                const sections = document.querySelectorAll('.cv-section:not(:first-child)');
-                sections.forEach(section => {
-                    const rect = section.getBoundingClientRect();
-                    const pageHeight = \(options.pageSize.height - options.margins.top - options.margins.bottom);
-
-                    // If section starts in bottom third of page, break before it
-                    if (rect.top % pageHeight > pageHeight * 0.67) {
-                        section.style.pageBreakBefore = 'always';
-                        section.style.breakBefore = 'page';
-                    }
-                });
-
-                return true;
-            })()
-        """
-
-        _ = try await evaluateJavaScript(paginationScript, in: webView)
-    }
-
-    func evaluateJavaScript(_ script: String, in webView: WKWebView) async throws -> String? {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String?, Error>) in
-            self.javascriptContinuation = continuation
-
-            // Start timeout timer
-            Task { [weak self] in
-                guard let self else { return }
-                try await Task.sleep(nanoseconds: UInt64(javascriptTimeout * 1_000_000_000))
-                if let continuation = self.javascriptContinuation {
-                    continuation.resume(throwing: PDFExportError.renderingFailed("JavaScript rendering timed out"))
-                    self.javascriptContinuation = nil
-                }
-            }
-
-            webView.evaluateJavaScript(script) { [weak self] result, error in
-                guard let self else { return }
-                guard let continuation = self.javascriptContinuation else { return }
-
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    self.javascriptContinuation = nil
-                    return
-                }
-
-                if let stringResult = result as? String {
-                    continuation.resume(returning: stringResult)
-                } else if let convertible = result {
-                    continuation.resume(returning: String(describing: convertible))
-                } else {
-                    continuation.resume(returning: nil)
-                }
-
-                self.javascriptContinuation = nil
-            }
+        let readiness = Task { @MainActor in
+            _ = try? await webView.callAsyncJavaScript(
+                PreviewReadinessScript.awaitReady,
+                arguments: [:],
+                in: nil,
+                contentWorld: .page
+            )
+            gate.open()
         }
-    }
-
-    func generatePDF(from webView: WKWebView, options: ExportOptions) async throws -> Data {
-        // Get accurate content size
-        let contentSizeScript = "JSON.stringify({width: document.body.scrollWidth, height: document.body.scrollHeight})"
-        let sizeResult = try await evaluateJavaScript(contentSizeScript, in: webView)
-
-        if let jsonString = sizeResult,
-           let data = jsonString.data(using: .utf8),
-           let size = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let height = size["height"] as? Double {
-            logger.debug("Estimated content height: \(height)")
+        let deadline = Task { @MainActor in
+            try? await Task.sleep(for: timeout)
+            gate.open()
         }
 
-        // Use UIPrintPageRenderer which properly handles A4 pagination with margins
-        // WKWebView.pdf() doesn't respect CSS @page rules reliably
-        return try generatePDFWithPrintRenderer(from: webView, options: options)
+        await gate.wait()
+        readiness.cancel()
+        deadline.cancel()
     }
 
+    /// Uses UIPrintPageRenderer, which paginates at the page size with margins;
+    /// WKWebView.pdf() does not respect CSS @page rules reliably.
     func generatePDFWithPrintRenderer(from webView: WKWebView, options: ExportOptions) throws -> Data {
         // Configure print formatter
         let printFormatter = webView.viewPrintFormatter()
@@ -287,36 +234,38 @@ private extension EnhancedWKWebViewPDFRenderer {
         // This ensures the content width matches the printable area
         printFormatter.maximumContentWidth = printableRect.width
 
-        let renderer = UIPrintPageRenderer()
+        let renderer = PagePrintRenderer(paperRect: paperRect, printableRect: printableRect)
         renderer.addPrintFormatter(printFormatter, startingAtPageAt: 0)
 
-        renderer.setValue(paperRect, forKey: "paperRect")
-        renderer.setValue(printableRect, forKey: "printableRect")
-
-        // Create PDF context with metadata
-        let pdfData = NSMutableData()
-        let pdfInfo: [String: Any] = [
-            kCGPDFContextCreator as String: "CVPDFExporter",
-            kCGPDFContextAuthor as String: "PrestoCV App",
-            kCGPDFContextTitle as String: "Curriculum Vitae"
-        ]
-
-        UIGraphicsBeginPDFContextToData(pdfData, paperRect, pdfInfo)
-
-        // Render pages with progress tracking
         let pageCount = renderer.numberOfPages
         logger.debug("Rendering \(pageCount) pages")
 
-        for pageIndex in 0..<min(pageCount, options.maxPages) {
+        guard pageCount > 0 else {
+            throw PDFExportError.renderingFailed("There is nothing to print")
+        }
+        guard pageCount <= options.maxPages else {
+            throw PDFExportError.tooManyPages(count: pageCount, limit: options.maxPages)
+        }
+        renderer.prepare(forDrawingPages: NSRange(location: 0, length: pageCount))
+
+        // Create PDF context with metadata
+        let pdfData = NSMutableData()
+        var pdfInfo: [String: Any] = [kCGPDFContextCreator as String: "PrestoCV"]
+        if let title = options.documentTitle {
+            pdfInfo[kCGPDFContextTitle as String] = title
+        }
+        if let author = options.documentAuthor {
+            pdfInfo[kCGPDFContextAuthor as String] = author
+        }
+
+        UIGraphicsBeginPDFContextToData(pdfData, paperRect, pdfInfo)
+
+        for pageIndex in 0..<pageCount {
             UIGraphicsBeginPDFPageWithInfo(paperRect, nil)
             renderer.drawPage(at: pageIndex, in: paperRect)
         }
 
         UIGraphicsEndPDFContext()
-
-        if pageCount > options.maxPages {
-            logger.warning("Content truncated: \(pageCount) pages reduced to \(options.maxPages)")
-        }
 
         return pdfData as Data
     }
@@ -328,20 +277,56 @@ extension EnhancedWKWebViewPDFRenderer: WKNavigationDelegate {
 
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         logger.debug("WebView finished loading")
-        loadContinuation?.resume()
-        loadContinuation = nil
+        finishLoading(with: .success(()))
     }
 
     public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         logger.error("WebView failed to load: \(error.localizedDescription)")
-        loadContinuation?.resume(throwing: error)
-        loadContinuation = nil
+        finishLoading(with: .failure(error))
     }
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         logger.error("WebView failed provisional navigation: \(error.localizedDescription)")
-        loadContinuation?.resume(throwing: error)
-        loadContinuation = nil
+        finishLoading(with: .failure(error))
+    }
+}
+
+// MARK: - Page Print Renderer
+
+/// A print renderer with a fixed paper and printable area, which `UIPrintPageRenderer` otherwise takes from a printer
+private final class PagePrintRenderer: UIPrintPageRenderer {
+
+    private let paper: CGRect
+    private let printable: CGRect
+
+    init(paperRect: CGRect, printableRect: CGRect) {
+        self.paper = paperRect
+        self.printable = printableRect
+        super.init()
+    }
+
+    override var paperRect: CGRect { paper }
+    override var printableRect: CGRect { printable }
+}
+
+// MARK: - Readiness Gate
+
+/// Lets a waiter continue as soon as either of two racing tasks opens it, and only once
+@MainActor
+private final class ReadinessGate {
+
+    private var isOpen = false
+    private var waiter: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        guard !isOpen else { return }
+        await withCheckedContinuation { waiter = $0 }
+    }
+
+    func open() {
+        isOpen = true
+        waiter?.resume()
+        waiter = nil
     }
 }
 

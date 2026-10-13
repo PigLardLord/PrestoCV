@@ -17,7 +17,7 @@ struct GenerateTemplatePreviews {
             // 1. Load all bundled templates
             print("\n📚 Loading bundled templates...")
             let repository = BundledTemplateRepository()
-            let templates = repository.availableTemplates()
+            let templates = try await repository.getTemplates()
             print("✅ Found \(templates.count) templates: \(templates.map { $0.name }.joined(separator: ", "))")
 
             // 2. Create sample CV data

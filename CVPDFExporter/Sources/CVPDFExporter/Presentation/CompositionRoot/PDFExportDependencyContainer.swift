@@ -8,19 +8,22 @@ public final class PDFExportDependencyContainer: @unchecked Sendable {
 
     private let templateRepository: BundledTemplateRepository
     private let templateCache: TemplateCache
-    private let exportRepository: MockExportRepository
+    private let exportRepository: NullExportRepository
 
     // MARK: - Initialization
 
-    public init() {
-        self.templateRepository = BundledTemplateRepository()
+    /// - Parameter templateRepository: Where the templates come from; the installed bundled templates by default
+    public init(templateRepository: BundledTemplateRepository = BundledTemplateRepository()) {
+        self.templateRepository = templateRepository
         self.templateCache = TemplateCache()
-        self.exportRepository = MockExportRepository()
+        self.exportRepository = NullExportRepository()
     }
 
     // MARK: - Factory Methods (Public API)
 
     /// Creates PDF export use case
+    /// The renderer is built on the main actor, where WebKit and UIKit live.
+    @MainActor
     public func makeExportUseCase() -> PDFExportUseCase {
         PDFExportUseCase(
             renderer: makePDFRenderer(),
@@ -65,6 +68,7 @@ public final class PDFExportDependencyContainer: @unchecked Sendable {
     }
 
     /// Creates platform-appropriate PDF renderer
+    @MainActor
     public func makePDFRenderer() -> PDFRendererProtocol {
         PDFRendererFactory.createRenderer()
     }
@@ -76,6 +80,7 @@ public final class PDFExportDependencyContainer: @unchecked Sendable {
 
     // MARK: - Private Factory Methods
 
+    @MainActor
     private func makePDFExportEngine() -> PDFExportEngine {
         // Create adapter to bridge PDFRendererProtocol to HTMLToPDFRenderer
         let pdfRenderer = PDFRendererFactory.createRenderer()
@@ -87,6 +92,7 @@ public final class PDFExportDependencyContainer: @unchecked Sendable {
 // MARK: - Container Protocol (for testability)
 
 public protocol DependencyContainerProtocol {
+    @MainActor
     func makeExportUseCase() -> PDFExportUseCase
     func makeTemplateSelectionUseCase() -> TemplateSelectionUseCase
     func makeTemplatePreviewUseCase() -> TemplatePreviewUseCase
@@ -111,41 +117,20 @@ final class PDFRendererAdapter: HTMLToPDFRenderer, @unchecked Sendable {
     }
 }
 
-// MARK: - Mock Export Repository
+// MARK: - Null Export Repository
 
-final class MockExportRepository: ExportRepositoryProtocol, @unchecked Sendable {
-    private var history: [ExportHistoryEntry] = []
-    private var cache: [String: (data: Data, expiry: Date)] = [:]
+/// An export repository that keeps nothing: the app neither lists past exports nor reuses cached PDFs,
+/// so there is nothing to remember, and no state that grows with every export.
+final class NullExportRepository: ExportRepositoryProtocol {
+    func saveExportHistory(_ entry: ExportHistoryEntry) async throws {}
 
-    func saveExportHistory(_ entry: ExportHistoryEntry) async throws {
-        history.insert(entry, at: 0)
-    }
+    func getExportHistory(limit: Int) async throws -> [ExportHistoryEntry] { [] }
 
-    func getExportHistory(limit: Int) async throws -> [ExportHistoryEntry] {
-        Array(history.prefix(limit))
-    }
+    func cachePDF(data: Data, key: String, ttl: TimeInterval) async throws {}
 
-    func cachePDF(data: Data, key: String, ttl: TimeInterval) async throws {
-        let expiry = Date().addingTimeInterval(ttl)
-        cache[key] = (data, expiry)
-    }
+    func getCachedPDF(key: String) async -> Data? { nil }
 
-    func getCachedPDF(key: String) async -> Data? {
-        guard let entry = cache[key] else { return nil }
-        if entry.expiry > Date() {
-            return entry.data
-        }
-        cache.removeValue(forKey: key)
-        return nil
-    }
+    func clearExpiredCache() async throws {}
 
-    func clearExpiredCache() async throws {
-        let now = Date()
-        cache = cache.filter { $0.value.expiry > now }
-    }
-
-    func clearAll() async throws {
-        history.removeAll()
-        cache.removeAll()
-    }
+    func clearAll() async throws {}
 }

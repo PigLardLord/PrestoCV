@@ -7,52 +7,45 @@ import Foundation
 @Suite("Template Engine")
 struct TemplateEngineTests {
 
-    static let knownIssue: Comment = "Bundled templates are never registered: https://github.com/PigLardLord/PrestoCV-archive/issues/1"
-
     // MARK: - Template Loading Tests
 
     @Test("Load bundled template")
-    func loadBundledTemplate() throws {
-        withKnownIssue(Self.knownIssue) {
-            // Given
-            let repository = BundledTemplateRepository()
+    func loadBundledTemplate() async throws {
+        // When
+        let template = try await TemplateTestStorage.loadBundledTemplate("professional")
 
-            // When
-            let template = try repository.loadTemplate(id: "professional")
-
-            // Then
-            #expect(template.id == "professional")
-            #expect(template.name == "Professional")
-            #expect(template.htmlContent.contains("<!DOCTYPE html>"))
-        }
+        // Then
+        #expect(template.id == "professional")
+        #expect(template.name == "Professional")
+        #expect(template.htmlContent.contains("<!DOCTYPE html>"))
     }
 
     @Test("Load non-existent template throws error")
-    func loadNonExistentTemplate() {
+    func loadNonExistentTemplate() async throws {
         // Given
-        let repository = BundledTemplateRepository()
+        let storage = try await TemplateTestStorage.withBundledTemplates()
+        defer { storage.cleanUp() }
 
         // When/Then
-        #expect(throws: TemplateError.self) {
-            _ = try repository.loadTemplate(id: "nonexistent")
+        await #expect(throws: TemplateError.self) {
+            _ = try await storage.repository.loadTemplate(id: "nonexistent")
         }
     }
 
     @Test("List available templates")
-    func listAvailableTemplates() {
+    func listAvailableTemplates() async throws {
         // Given
-        let repository = BundledTemplateRepository()
+        let storage = try await TemplateTestStorage.withBundledTemplates()
+        defer { storage.cleanUp() }
 
         // When
-        let available = repository.availableTemplates()
+        let available = try await storage.repository.getTemplates()
 
         // Then
-        withKnownIssue(Self.knownIssue) {
-            #expect(available.count >= 3)
-            #expect(available.contains { $0.id == "professional" })
-            #expect(available.contains { $0.id == "modern" })
-            #expect(available.contains { $0.id == "minimal" })
-        }
+        #expect(available.count >= 3)
+        #expect(available.contains { $0.id == "professional" })
+        #expect(available.contains { $0.id == "modern" })
+        #expect(available.contains { $0.id == "minimal" })
     }
 
     // MARK: - Mustache Rendering Tests

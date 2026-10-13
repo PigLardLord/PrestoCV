@@ -131,4 +131,38 @@ struct ExportOptionsTests {
         #expect(a4Options.pageSize.width != letterOptions.pageSize.width)
         #expect(a4Options.pageSize.height != letterOptions.pageSize.height)
     }
+
+    // MARK: - Document Info Tests
+
+    @Test("Document title and author are not set by default")
+    func documentInfoIsEmptyByDefault() {
+        let options = ExportOptions()
+
+        #expect(options.documentTitle == nil)
+        #expect(options.documentAuthor == nil)
+    }
+
+    @Test("withDocumentInfo sets the title and author and keeps everything else")
+    func withDocumentInfoKeepsOtherOptions() {
+        // Given
+        let options = ExportOptions(
+            pageSize: .letter,
+            margins: .uniform(36),
+            templateId: "modern",
+            customization: CustomizationOptions(colorPalette: .creative, fontScheme: .serif),
+            maxPages: 10
+        )
+
+        // When
+        let named = options.withDocumentInfo(title: "Ada Lovelace – CV", author: "Ada Lovelace")
+
+        // Then
+        #expect(named.documentTitle == "Ada Lovelace – CV")
+        #expect(named.documentAuthor == "Ada Lovelace")
+        #expect(named.pageSize.width == 612)
+        #expect(named.margins.left == 36)
+        #expect(named.templateId == "modern")
+        #expect(named.customization == CustomizationOptions(colorPalette: .creative, fontScheme: .serif))
+        #expect(named.maxPages == 10)
+    }
 }

@@ -15,7 +15,7 @@ struct TestExportApp {
     private static func run() async throws {
         let sampleDocument = SampleData.makeDocument()
         let repository = BundledTemplateRepository()
-        let template = try repository.loadTemplate(id: "modern")
+        let template = try await repository.loadTemplate(id: "modern")
         let templateEngine = MustacheTemplateEngine()
 
         let html = try await templateEngine.render(
@@ -24,7 +24,7 @@ struct TestExportApp {
             customization: CustomizationOptions(colorPalette: .professional, fontScheme: .modern)
         )
 
-        let renderer = PDFRendererFactory.createRenderer()
+        let renderer = await PDFRendererFactory.createRenderer()
         let pdfData = try await renderer.renderToPDF(html: html, options: .default)
 
         let exportURL = FileManager.default.temporaryDirectory

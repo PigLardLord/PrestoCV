@@ -15,14 +15,24 @@ public struct TemplatePackage: Codable, Equatable, Sendable {
     /// If provided, this HTML will be used instead
     public let htmlContent: String?
 
+    /// Base64-encoded PNG preview, embedded at the top level of the package file
+    public let previewImageBase64: String?
+
     public init(
         manifest: TemplateManifest,
         cssContent: String,
-        htmlContent: String? = nil
+        htmlContent: String? = nil,
+        previewImageBase64: String? = nil
     ) {
         self.manifest = manifest
         self.cssContent = cssContent
         self.htmlContent = htmlContent
+        self.previewImageBase64 = previewImageBase64
+    }
+
+    /// The embedded preview: the package's own, or the one older packages keep inside the manifest
+    public var embeddedPreviewBase64: String? {
+        previewImageBase64 ?? manifest.previewImageBase64
     }
 
     /// Validates the package has valid manifest and non-empty CSS

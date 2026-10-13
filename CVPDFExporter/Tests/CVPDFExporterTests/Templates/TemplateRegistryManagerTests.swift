@@ -402,4 +402,64 @@ struct TemplateRegistryManagerTests {
         let templates = try await manager.getAllTemplates()
         #expect(templates.count == 10)
     }
+
+    // MARK: - Upsert Tests
+
+    @Test("Upsert adds a template that is not registered yet")
+    func upsertAddsNewTemplate() async throws {
+        // Given
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let manager = TemplateRegistryManager(storageDirectory: tempDir)
+
+        // When
+        try await manager.upsertTemplate(Self.createTestEntry(id: "first"))
+
+        // Then
+        #expect(try await manager.getAllTemplates().map(\.id) == ["first"])
+    }
+
+    @Test("Upsert replaces the entry with the same ID and keeps its position")
+    func upsertReplacesEntryInPlace() async throws {
+        // Given
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let manager = TemplateRegistryManager(storageDirectory: tempDir)
+        for id in ["one", "two", "three"] {
+            try await manager.addTemplate(Self.createTestEntry(id: id))
+        }
+        let updated = TemplateEntry(
+            id: "two",
+            name: "Two, updated",
+            version: "1.1.0",
+            source: .bundled,
+            installedAt: Self.testDate,
+            previewPath: "two_preview.png"
+        )
+
+        // When
+        try await manager.upsertTemplate(updated)
+
+        // Then
+        let entries = try await manager.getAllTemplates()
+        #expect(entries.map(\.id) == ["one", "two", "three"])
+        #expect(entries[1] == updated)
+    }
+
+    @Test("Preview URL is the cached preview file inside the storage directory")
+    func previewURLPointsIntoStorageDirectory() async throws {
+        // Given
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let manager = TemplateRegistryManager(storageDirectory: tempDir)
+        let entry = Self.createTestEntry(id: "pictured")
+
+        // When
+        let url = manager.previewURL(for: entry)
+
+        // Then
+        #expect(url == tempDir.appendingPathComponent("pictured_preview.png"))
+        #expect(url.lastPathComponent == manager.previewFileName(forTemplateId: "pictured"))
+    }
 }

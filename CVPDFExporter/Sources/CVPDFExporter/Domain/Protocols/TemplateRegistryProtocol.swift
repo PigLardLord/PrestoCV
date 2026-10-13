@@ -18,6 +18,11 @@ public protocol TemplateRegistryProtocol: Sendable {
     /// - Throws: TemplateRegistryError if adding fails
     func addTemplate(_ entry: TemplateEntry) async throws
 
+    /// Adds a template entry, or replaces the entry that has the same ID
+    /// - Parameter entry: The template entry to store
+    /// - Throws: TemplateRegistryError if saving fails
+    func upsertTemplate(_ entry: TemplateEntry) async throws
+
     /// Removes a template entry from the registry
     /// - Parameter id: The template ID to remove
     /// - Throws: TemplateRegistryError if removal fails
@@ -47,6 +52,18 @@ public protocol TemplateRegistryProtocol: Sendable {
     /// - Returns: URL to the cached preview image file
     /// - Throws: TemplateRegistryError if extraction or caching fails
     func extractPreview(from base64: String, templateId: String) async throws -> URL
+}
+
+public extension TemplateRegistryProtocol {
+    /// Default for registries that only know how to add and remove: remove the old entry, then add the new one
+    func upsertTemplate(_ entry: TemplateEntry) async throws {
+        do {
+            try await removeTemplate(id: entry.id)
+        } catch TemplateRegistryError.templateNotFound {
+            // First installation of this template: nothing to replace
+        }
+        try await addTemplate(entry)
+    }
 }
 
 // MARK: - Template Registry Error

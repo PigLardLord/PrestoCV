@@ -21,14 +21,18 @@ public final class InstallTemplateUseCase: @unchecked Sendable {
     }
 
     /// Execute the use case to install a template package
-    /// - Parameter package: The template package to install
-    /// - Throws: TemplateInstallationError if validation fails or duplicate exists
-    public func execute(package: TemplatePackage) async throws {
+    /// - Parameters:
+    ///   - package: The template package to install
+    ///   - replacingExisting: Whether an installed template with the same ID is replaced (an update) or rejected
+    /// - Throws: TemplateInstallationError if validation fails or a duplicate exists and is not to be replaced
+    public func execute(package: TemplatePackage, replacingExisting: Bool = false) async throws {
         // Step 1: Validate the package
         try validatePackage(package)
 
         // Step 2: Check for duplicate template ID
-        try await checkForDuplicates(package: package)
+        if !replacingExisting {
+            try await checkForDuplicates(package: package)
+        }
 
         // Step 3: Delegate to repository for actual installation
         do {

@@ -76,12 +76,7 @@ struct AppRootView: View {
         case .cvList:
             CVListView(viewModel: cvListViewModel)
         case .templateSelection:
-            viewWithErrorHandling {
-                TemplateSelectionView(
-                    viewModel: try viewModelFactory.makeTemplateSelectionViewModel(),
-                    isAIGenerationAvailable: viewModelFactory.isAIGenerationAvailable()
-                )
-            }
+            TemplateSelectionView(isAIGenerationAvailable: viewModelFactory.isAIGenerationAvailable())
         case .aiGeneration:
             viewWithErrorHandling {
                 AIGenerationView(viewModel: try viewModelFactory.makeAIGenerationViewModel())

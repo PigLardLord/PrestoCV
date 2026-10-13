@@ -5,12 +5,11 @@ public enum PDFRendererFactory {
 
     /// Creates the best available PDF renderer for the current platform
     /// - Returns: A PDF renderer appropriate for the current platform
+    @MainActor
     public static func createRenderer() -> PDFRendererProtocol {
         #if canImport(UIKit) && canImport(WebKit)
         // iOS/iPadOS - Use enhanced WKWebView renderer
-        return MainActor.assumeIsolated {
-            EnhancedWKWebViewPDFRenderer()
-        }
+        return EnhancedWKWebViewPDFRenderer()
         #elseif canImport(AppKit) && canImport(WebKit)
         // macOS - Use proper macOS PDF renderer
         return ProperMacOSPDFRenderer()
@@ -23,6 +22,7 @@ public enum PDFRendererFactory {
     /// Creates a renderer with specific configuration
     /// - Parameter configuration: Renderer configuration options
     /// - Returns: A configured PDF renderer
+    @MainActor
     public static func createRenderer(configuration: RendererConfiguration) -> PDFRendererProtocol {
         let renderer = createRenderer()
 

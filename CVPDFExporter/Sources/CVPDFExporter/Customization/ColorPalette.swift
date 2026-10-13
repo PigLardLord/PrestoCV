@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Color Palette
 
 /// Available color palettes for PDF export
-public enum ColorPalette: String, CaseIterable, Sendable {
+public enum ColorPalette: String, CaseIterable, Sendable, Codable {
     case professional = "professional"
     case modern = "modern"
     case minimal = "minimal"

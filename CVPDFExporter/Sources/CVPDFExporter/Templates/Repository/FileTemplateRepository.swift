@@ -37,7 +37,7 @@ public final class FileTemplateRepository: TemplateRepositoryProtocol, @unchecke
                 let package = try loadPackage(from: packageURL)
 
                 // Convert to Template with preview URL from registry
-                let template = try convertToTemplate(package, previewPath: entry.previewPath)
+                let template = try convertToTemplate(package, previewURL: registryManager.previewURL(for: entry))
                 templates.append(template)
             } catch {
                 // Skip invalid packages and continue loading others
@@ -58,29 +58,34 @@ public final class FileTemplateRepository: TemplateRepositoryProtocol, @unchecke
         let packageURL = templatesDirectory.appendingPathComponent("\(entry.id).mcvt")
         do {
             let package = try loadPackage(from: packageURL)
-            return try convertToTemplate(package, previewPath: entry.previewPath)
+            return try convertToTemplate(package, previewURL: registryManager.previewURL(for: entry))
         } catch {
             return nil
         }
     }
 
+    /// Writes the package file, caches its preview and lists it in the registry, replacing an older installation.
+    /// Only registered templates are listed, so the registry entry is written last.
     public func installTemplate(_ package: TemplatePackage) async throws {
         // Validate package
         guard package.isValid else {
             throw TemplateRepositoryError.invalidPackage("Package validation failed: invalid manifest or empty CSS")
         }
 
-        // Create package URL based on manifest ID
-        let packageURL = templatesDirectory.appendingPathComponent("\(package.manifest.id).mcvt")
+        try writePackage(package)
+        let previewPath = try await cachePreview(of: package)
 
-        // Encode and write package
         do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(package)
-            try data.write(to: packageURL)
+            try await registryManager.upsertTemplate(TemplateEntry(
+                id: package.manifest.id,
+                name: package.manifest.name,
+                version: package.manifest.version,
+                source: .bundled,
+                installedAt: Date(),
+                previewPath: previewPath
+            ))
         } catch {
-            throw TemplateRepositoryError.ioError("Failed to write package to disk: \(error.localizedDescription)")
+            throw TemplateRepositoryError.ioError("Failed to register template: \(error.localizedDescription)")
         }
     }
 
@@ -102,6 +107,37 @@ public final class FileTemplateRepository: TemplateRepositoryProtocol, @unchecke
         }
     }
 
+    private func writePackage(_ package: TemplatePackage) throws {
+        let packageURL = templatesDirectory.appendingPathComponent("\(package.manifest.id).mcvt")
+
+        do {
+            try fileManager.createDirectory(at: templatesDirectory, withIntermediateDirectories: true)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let data = try encoder.encode(package)
+            try data.write(to: packageURL, options: .atomic)
+        } catch {
+            throw TemplateRepositoryError.ioError("Failed to write package to disk: \(error.localizedDescription)")
+        }
+    }
+
+    /// Caches the embedded preview image and returns its path for the registry entry.
+    /// A package without a preview gets the usual path, so that the UI falls back to its placeholder.
+    private func cachePreview(of package: TemplatePackage) async throws -> String {
+        let templateId = package.manifest.id
+
+        guard let previewBase64 = package.embeddedPreviewBase64 else {
+            return registryManager.previewFileName(forTemplateId: templateId)
+        }
+
+        do {
+            let previewURL = try await registryManager.extractPreview(from: previewBase64, templateId: templateId)
+            return previewURL.lastPathComponent
+        } catch {
+            throw TemplateRepositoryError.ioError("Failed to cache the preview of \(templateId): \(error.localizedDescription)")
+        }
+    }
+
     private func loadPackage(from url: URL) throws -> TemplatePackage {
         do {
             let data = try Data(contentsOf: url)
@@ -120,14 +156,8 @@ public final class FileTemplateRepository: TemplateRepositoryProtocol, @unchecke
         }
     }
 
-    private func convertToTemplate(_ package: TemplatePackage, previewPath: String) throws -> Template {
+    private func convertToTemplate(_ package: TemplatePackage, previewURL: URL) throws -> Template {
         let manifest = package.manifest
-
-        // Convert preview path to URL
-        // Preview path is relative to Application Support (e.g., "TemplateCache/professional_preview.png")
-        let previewURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first?
-            .appendingPathComponent(previewPath)
 
         return Template(
             id: manifest.id,

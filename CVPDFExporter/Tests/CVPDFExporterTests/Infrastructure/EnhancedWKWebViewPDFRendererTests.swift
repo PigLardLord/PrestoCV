@@ -2,12 +2,14 @@
 import Testing
 import Foundation
 import UIKit
+import PDFKit
 @testable import CVPDFExporter
 
 @Suite("Enhanced WKWebView PDF Renderer")
 struct EnhancedWKWebViewPDFRendererTests {
 
     @Test("Renderer is available on iOS")
+    @MainActor
     func test_isAvailable_onIOS() {
         // Given
         let renderer = EnhancedWKWebViewPDFRenderer()
@@ -17,6 +19,7 @@ struct EnhancedWKWebViewPDFRendererTests {
     }
 
     @Test("Renderer has correct max pages limit")
+    @MainActor
     func test_maxPages_returns100() {
         // Given
         let renderer = EnhancedWKWebViewPDFRenderer()
@@ -107,11 +110,46 @@ struct EnhancedWKWebViewPDFRendererTests {
 
         // Then
         #expect(pdfData.count > 0)
+        let mediaBox = PDFDocument(data: pdfData)?.page(at: 0)?.bounds(for: .mediaBox)
+        #expect(mediaBox?.width == 400)
+        #expect(mediaBox?.height == 600)
     }
 
-    @Test("Enforces page limit")
+    @Test("Stores the title and author of the options in the PDF")
     @MainActor
-    func test_renderToPDF_enforcesPageLimit() async throws {
+    func test_renderToPDF_storesTitleAndAuthor() async throws {
+        // Given
+        let renderer = EnhancedWKWebViewPDFRenderer()
+        let options = ExportOptions().withDocumentInfo(title: "Ada Lovelace – CV", author: "Ada Lovelace")
+
+        // When
+        let pdfData = try await renderer.renderToPDF(html: "<html><body><h1>Ada</h1></body></html>", options: options)
+
+        // Then
+        let attributes = PDFDocument(data: pdfData)?.documentAttributes
+        #expect(attributes?[PDFDocumentAttribute.titleAttribute] as? String == "Ada Lovelace – CV")
+        #expect(attributes?[PDFDocumentAttribute.authorAttribute] as? String == "Ada Lovelace")
+        #expect(attributes?[PDFDocumentAttribute.creatorAttribute] as? String == "PrestoCV")
+    }
+
+    @Test("Leaves the title and author out when the options have none")
+    @MainActor
+    func test_renderToPDF_withoutDocumentInfo() async throws {
+        // Given
+        let renderer = EnhancedWKWebViewPDFRenderer()
+
+        // When
+        let pdfData = try await renderer.renderToPDF(html: "<html><body><h1>Anon</h1></body></html>", options: ExportOptions())
+
+        // Then
+        let attributes = PDFDocument(data: pdfData)?.documentAttributes
+        #expect(attributes?[PDFDocumentAttribute.titleAttribute] == nil)
+        #expect(attributes?[PDFDocumentAttribute.authorAttribute] == nil)
+    }
+
+    @Test("Refuses a document longer than the page limit instead of cutting it")
+    @MainActor
+    func test_renderToPDF_refusesDocumentOverPageLimit() async throws {
         // Given
         let renderer = EnhancedWKWebViewPDFRenderer()
 
@@ -137,12 +175,83 @@ struct EnhancedWKWebViewPDFRendererTests {
 
         let options = ExportOptions(maxPages: 3)
 
+        // When/Then
+        do {
+            _ = try await renderer.renderToPDF(html: html, options: options)
+            Issue.record("Expected tooManyPages")
+        } catch PDFExportError.tooManyPages(let count, let limit) {
+            #expect(count > 3)
+            #expect(limit == 3)
+        }
+    }
+
+    @Test("Keeps every page when the limit allows them")
+    @MainActor
+    func test_renderToPDF_keepsAllPagesWithinLimit() async throws {
+        // Given
+        let renderer = EnhancedWKWebViewPDFRenderer()
+        let sections = (1...6).map { index in
+            """
+            <div style="page-break-before: always;"><h2>Section \(index)</h2><p>Short content</p></div>
+            """
+        }.joined()
+        let html = "<!DOCTYPE html><html><body>\(sections)</body></html>"
+
         // When
-        let pdfData = try await renderer.renderToPDF(html: html, options: options)
+        let pdfData = try await renderer.renderToPDF(html: html, options: ExportOptions(maxPages: 20))
+
+        // Then: nothing is dropped, and the document needs at least a page per section
+        let pageCount = try #require(PDFDocument(data: pdfData)?.pageCount)
+        #expect(pageCount >= 6)
+
+        // And: the page count the renderer reports in its error is the number of pages that fit the limit
+        do {
+            _ = try await renderer.renderToPDF(html: html, options: ExportOptions(maxPages: pageCount - 1))
+            Issue.record("Expected tooManyPages")
+        } catch PDFExportError.tooManyPages(let count, let limit) {
+            #expect(count == pageCount)
+            #expect(limit == pageCount - 1)
+        }
+    }
+
+    @Test("Stops waiting for a page that never reports it is ready", .timeLimit(.minutes(1)))
+    @MainActor
+    func test_renderToPDF_doesNotWaitForeverForReadiness() async throws {
+        // Given: the page defines the readiness promise before the renderer's own script, and never resolves it
+        let renderer = EnhancedWKWebViewPDFRenderer()
+        let html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <script>
+                    window.__cvPreview = { awaitReady: function() { return new Promise(function() {}); } };
+                </script>
+            </head>
+            <body><h1>Never ready</h1></body>
+            </html>
+        """
+
+        // When
+        let pdfData = try await renderer.renderToPDF(html: html, options: ExportOptions())
 
         // Then
-        #expect(pdfData.count > 0)
-        // Should have truncated to 3 pages max
+        #expect(isPDFData(pdfData))
+    }
+
+    @Test("Renders again after a render on the same renderer")
+    @MainActor
+    func test_renderToPDF_rendersTwiceInARow() async throws {
+        // Given
+        let renderer = EnhancedWKWebViewPDFRenderer()
+        let html = "<!DOCTYPE html><html><body><h1>Again</h1></body></html>"
+
+        // When
+        let first = try await renderer.renderToPDF(html: html, options: ExportOptions())
+        let second = try await renderer.renderToPDF(html: html, options: ExportOptions())
+
+        // Then
+        #expect(isPDFData(first))
+        #expect(isPDFData(second))
     }
 
     @Test("Handles JavaScript rendering")
@@ -211,8 +320,8 @@ struct EnhancedWKWebViewPDFRendererTests {
     func test_renderToPDF_withComplexCVDocument() async throws {
         // Given
         let renderer = EnhancedWKWebViewPDFRenderer()
-        let templateEngine = TemplateEngine()
-        let template = try await templateEngine.loadTemplate(named: "modern")
+        let templateEngine = MustacheTemplateEngine()
+        let template = try await TemplateTestStorage.loadBundledTemplate("modern")
 
         let document = createSampleCVDocument()
         let html = try await templateEngine.render(

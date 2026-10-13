@@ -15,7 +15,11 @@ final class CVExportSheetViewModel: ObservableObject {
     @Published var isPreviewLoading = false
     @Published private(set) var previewOptions: ExportOptions?
 
+    /// The longest CV the export accepts, for the preview and for the PDF alike
+    static let maxPages = 10
+
     private let exportService: any CVExportServiceProtocol
+    private let preferencesStore: any ExportPreferencesStore
 
     var aspectRatio: CGFloat {
         let options = previewOptions ?? currentExportOptions()
@@ -23,19 +27,25 @@ final class CVExportSheetViewModel: ObservableObject {
         return CGFloat(pageSize.width) / CGFloat(pageSize.height)
     }
 
-    init(exportService: (any CVExportServiceProtocol)? = nil) {
+    init(
+        exportService: (any CVExportServiceProtocol)? = nil,
+        preferencesStore: any ExportPreferencesStore = FileExportPreferencesStore()
+    ) {
         self.exportService = exportService ?? CVExportService()
+        self.preferencesStore = preferencesStore
     }
 
     func loadTemplates() async {
         do {
             let availableTemplates = try await exportService.availableTemplates()
             templates = availableTemplates
-            if selectedTemplateId == nil {
-                selectedTemplateId = availableTemplates.first?.id
+            if availableTemplates.isEmpty {
+                errorMessage = String(localized: "export.error.no_templates")
+            } else if selectedTemplateId == nil {
+                restoreLastChoice(among: availableTemplates)
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = ExportErrorMessage.message(for: error, during: .loadingTemplates)
         }
     }
 
@@ -61,7 +71,7 @@ final class CVExportSheetViewModel: ObservableObject {
             previewHTML = html
         } catch {
             previewOptions = nil
-            errorMessage = error.localizedDescription
+            errorMessage = ExportErrorMessage.message(for: error, during: .creatingPreview)
         }
     }
 
@@ -80,14 +90,38 @@ final class CVExportSheetViewModel: ObservableObject {
             let url = try await exportService.export(
                 cv: cv,
                 templateId: templateId,
-                customization: options.customization
+                options: options
             )
             previewItem = ExportPreviewItem(url: url)
+            rememberChoice(templateId: templateId, customization: options.customization)
         } catch is CancellationError {
             // User-initiated cancellation; no need to surface error
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = ExportErrorMessage.message(for: error, during: .exporting)
         }
+    }
+
+    /// Starts from what the user chose last time; a template that is no longer installed gives way to the first one.
+    private func restoreLastChoice(among availableTemplates: [Template]) {
+        let lastChoice = preferencesStore.load()
+        if let lastTemplateId = lastChoice.templateId,
+           availableTemplates.contains(where: { $0.id == lastTemplateId }) {
+            selectedTemplateId = lastTemplateId
+        } else {
+            selectedTemplateId = availableTemplates.first?.id
+        }
+        selectedColorPalette = lastChoice.colorPalette ?? selectedColorPalette
+        selectedFontScheme = lastChoice.fontScheme ?? selectedFontScheme
+    }
+
+    private func rememberChoice(templateId: String, customization: CustomizationOptions) {
+        let choice = ExportPreferences(
+            templateId: templateId,
+            colorPalette: customization.colorPalette,
+            fontScheme: customization.fontScheme
+        )
+        // The PDF is already made: failing to remember the choice must not turn the export into an error.
+        try? preferencesStore.save(choice)
     }
 
     func dismissError() {
@@ -120,7 +154,7 @@ final class CVExportSheetViewModel: ObservableObject {
                 colorPalette: selectedColorPalette,
                 fontScheme: selectedFontScheme
             ),
-            maxPages: 10
+            maxPages: Self.maxPages
         )
     }
 }

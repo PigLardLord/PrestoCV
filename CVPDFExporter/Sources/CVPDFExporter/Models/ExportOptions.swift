@@ -12,18 +12,41 @@ public struct ExportOptions: Sendable {
     public let customization: CustomizationOptions
     public let maxPages: Int
 
+    /// Title stored in the PDF's document properties, if any
+    public let documentTitle: String?
+
+    /// Author stored in the PDF's document properties, if any
+    public let documentAuthor: String?
+
     public init(
         pageSize: PageSize = .a4,
         margins: EdgeInsets = .default,
         templateId: String? = nil,
         customization: CustomizationOptions = CustomizationOptions(),
-        maxPages: Int = 4
+        maxPages: Int = 4,
+        documentTitle: String? = nil,
+        documentAuthor: String? = nil
     ) {
         self.pageSize = pageSize
         self.margins = margins
         self.templateId = templateId
         self.customization = customization
         self.maxPages = maxPages
+        self.documentTitle = documentTitle
+        self.documentAuthor = documentAuthor
+    }
+
+    /// The same options with the title and author the PDF should carry
+    public func withDocumentInfo(title: String?, author: String?) -> ExportOptions {
+        ExportOptions(
+            pageSize: pageSize,
+            margins: margins,
+            templateId: templateId,
+            customization: customization,
+            maxPages: maxPages,
+            documentTitle: title,
+            documentAuthor: author
+        )
     }
 
     public static let `default` = ExportOptions()
