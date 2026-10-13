@@ -1,0 +1,97 @@
+name: Release
+
+# Builds, tests, signs and uploads the app to TestFlight. A tag such as v1.0.0 starts it, or a manual run from the
+# Actions tab. Submitting a build for App Review stays a decision taken in App Store Connect.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    name: Test, archive and upload to TestFlight
+    # The owner's Mac. GitHub's hosted macOS images offer Xcode 27 only as a preview, and the project needs it.
+    runs-on: [self-hosted, macOS, prestocv-release]
+    timeout-minutes: 90
+    env:
+      DERIVED_DATA: ${{ github.workspace }}/../.prestocv-release/DerivedData
+      ARCHIVE: ${{ github.workspace }}/../.prestocv-release/PrestoCV.xcarchive
+      EXPORT: ${{ github.workspace }}/../.prestocv-release/export
+      # The build number grows with every run, so each upload is new to App Store Connect.
+      BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the signing configuration
+        env:
+          TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          missing=""
+          [ -n "$TEAM_ID" ] || missing="$missing APPLE_TEAM_ID(variable)"
+          [ -n "$KEY_ID" ] || missing="$missing ASC_KEY_ID"
+          [ -n "$ISSUER_ID" ] || missing="$missing ASC_ISSUER_ID"
+          [ -n "$PRIVATE_KEY" ] || missing="$missing ASC_PRIVATE_KEY"
+          if [ -n "$missing" ]; then echo "::error::Missing repository settings:$missing"; exit 1; fi
+
+      - name: Package tests
+        run: |
+          for package in PrestoCVCore CVPDFExporter CVGeneratorAI; do
+            swift test --package-path "$package"
+          done
+
+      - name: App tests on the iOS simulator
+        # PrestoCVUITests holds only Xcode's template launch tests, which take most of an hour and check nothing.
+        run: |
+          DEVICE="$(Tools/CI/test-simulator.sh)"
+          xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -derivedDataPath "$DERIVED_DATA" \
+            -destination "id=$DEVICE" -skip-testing:PrestoCVUITests CODE_SIGNING_ALLOWED=NO
+
+      - name: Write the App Store Connect key
+        env:
+          PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          KEY_PATH="$RUNNER_TEMP/asc-key.p8"
+          umask 077
+          printf '%s\n' "$PRIVATE_KEY" > "$KEY_PATH"
+          echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Archive
+        # Automatic signing through the App Store Connect key: Xcode creates or reuses the distribution certificate and
+        # the profile in the owner's team, so the Mac needs no signed-in Apple ID and no certificate in its keychain.
+        env:
+          TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          rm -rf "$ARCHIVE" "$EXPORT"
+          xcodebuild archive -project PrestoCV.xcodeproj -scheme PrestoCV -configuration Release \
+            -destination "generic/platform=iOS" -archivePath "$ARCHIVE" -derivedDataPath "$DERIVED_DATA" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID" \
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+
+      - name: Check the archive
+        run: Tools/Release/check-archive.sh "$ARCHIVE"
+
+      - name: Upload to TestFlight
+        env:
+          TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          sed "s/__TEAM_ID__/$TEAM_ID/" Tools/Release/ExportOptions.plist > "$RUNNER_TEMP/ExportOptions.plist"
+          xcodebuild -exportArchive -archivePath "$ARCHIVE" -exportPath "$EXPORT" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID"
+          echo "Uploaded build $BUILD_NUMBER. It appears in TestFlight once App Store Connect has processed it." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the App Store Connect key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/asc-key.p8" "$RUNNER_TEMP/ExportOptions.plist"

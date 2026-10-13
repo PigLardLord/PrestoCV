@@ -38,6 +38,17 @@ On Linux, the packages contain only the new targets. They build today and stay e
 - **Saved CVs.** Version 1 ships the legacy app (ADR 0022), so the CVs it saves in `Application Support/PrestoCV/CVs` are a released format. When the app switches to the new persistence (schema 1, ADR 0009), a one-time importer reads them. CVs saved by development builds before version 1, in `Documents`, are not migrated.
 - **Samples.** The sample CVs offered on first run are in `PrestoCV/Resources/Samples/`, in schema 1, read by `DirectorySampleCVSource` through the store's own reader. The legacy app still reads the old samples, `PrestoCV/Resources/*_cv.json`, until the switch; they go with the legacy code (#47).
 
+## Releasing
+
+The `Release` workflow (`.github/workflows/release.yml`) tests the app, archives it, signs it and uploads it to TestFlight. It runs on the owner's Mac, the self-hosted runner labelled `prestocv-release`, which has Xcode 27.
+
+- **Start it** with a tag (`git tag v1.0.0 && git push origin v1.0.0`) or a manual run from the Actions tab. The build number is the run number.
+- **Signing** uses an App Store Connect API key, so the Mac needs no signed-in Apple ID and no certificate in its keychain. Xcode creates the distribution certificate and the profile in the owner's team. The repository needs:
+  - the secrets `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_PRIVATE_KEY`, the contents of the `.p8` file of a team key with the Admin role;
+  - the variable `APPLE_TEAM_ID`.
+- **Before the upload**, `Tools/Release/check-archive.sh` checks the archive: bundle identifier, version, privacy manifest, encryption declaration, icon, and that no document type is declared.
+- **Submitting** a build for App Review stays a decision taken in App Store Connect.
+
 ## Contributing
 
 - **Conventions, reviews, commits and pull requests:** `AGENTS.md`.

@@ -93,7 +93,9 @@ jobs:
       - name: App tests on the iOS simulator
         run: |
           DEVICE="$(Tools/CI/test-simulator.sh)"
-          xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -derivedDataPath "$DERIVED_DATA" -destination "id=$DEVICE"
+          # PrestoCVUITests holds only Xcode's template launch tests, which take most of an hour and check nothing.
+          xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -derivedDataPath "$DERIVED_DATA" -destination "id=$DEVICE" \
+            -skip-testing:PrestoCVUITests
       - name: Exporter tests on the iOS simulator
         # The package scheme also builds the legacy targets, which do not build for iOS (ADR 0012); the shared
         # ExporterTests scheme holds the new test targets only. Simulator builds need no signing.
