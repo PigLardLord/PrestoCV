@@ -5,9 +5,13 @@ import PrestoCVCore
 struct CVListView<EmptyState: View>: View {
     @ObservedObject var viewModel: CVListViewModel
     @EnvironmentObject var router: AppRouter
+    @Environment(\.scenePhase) private var scenePhase
     @State private var exportTarget: CVModel?
     @State private var deleteTarget: CVModel?
+    @State private var rowFrames = ScreenFrames<UUID>()
     @State private var showDeleteConfirmation = false
+    /// Where the row that is being deleted is on the screen, for the confirmation to point at.
+    @State private var deleteAnchor: CGRect?
     @State private var renameTarget: CVModel?
     @State private var renameText = ""
     private let emptyState: EmptyState
@@ -57,17 +61,27 @@ struct CVListView<EmptyState: View>: View {
         .task {
             await viewModel.loadCVs()
         }
+        .task {
+            await viewModel.keepPresentationDateCurrent()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                viewModel.refreshPresentationDate()
+            }
+        }
         .refreshable {
             await viewModel.loadCVs()
         }
         .sheet(item: $exportTarget) { cv in
             CVExportSheetView(cv: cv)
         }
-        .confirmationDialog(
+        .anchoredConfirmationDialog(
             String(localized: "cv.delete.confirmation.title"),
             isPresented: $showDeleteConfirmation,
             titleVisibility: .visible,
-            presenting: deleteTarget
+            presenting: deleteTarget,
+            anchoredTo: deleteAnchor,
+            spanningWidth: true
         ) { target in
             Button(String(localized: "common.delete"), role: .destructive) {
                 Task { await viewModel.deleteCV(withId: target.id) }
@@ -108,6 +122,8 @@ struct CVListView<EmptyState: View>: View {
         DeletableList(items: viewModel.cvs) { cv in
             CVRowView(
                 cv: cv,
+                subtitle: viewModel.personLine(of: cv),
+                caption: viewModel.lastSavedLine(of: cv),
                 onTap: {
                     router.navigate(to: .cvEditor(cvId: cv.id.uuidString))
                 },
@@ -122,11 +138,14 @@ struct CVListView<EmptyState: View>: View {
                     exportTarget = cv
                 },
                 onDelete: {
+                    deleteAnchor = rowFrames.rect(for: cv.id)
                     deleteTarget = cv
                     showDeleteConfirmation = true
                 }
             )
+            .trackingScreenFrame(of: cv.id, in: rowFrames)
         }
+        .readableContentWidth()
     }
 }
 
@@ -134,6 +153,8 @@ struct CVListView<EmptyState: View>: View {
 
 private struct CVRowView: View {
     let cv: CVModel
+    let subtitle: String?
+    let caption: String?
     let onTap: () -> Void
     let onDuplicate: () -> Void
     let onRename: () -> Void
@@ -143,8 +164,8 @@ private struct CVRowView: View {
     var body: some View {
         NavigationRow(
             title: cv.listTitle,
-            subtitle: cv.personalInfo.title.isEmpty ? nil : cv.personalInfo.title,
-            caption: cv.personalInfo.location.isEmpty ? nil : cv.personalInfo.location,
+            subtitle: subtitle,
+            caption: caption,
             action: onTap
         )
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {

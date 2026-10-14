@@ -270,9 +270,15 @@ struct DeleteButton: View {
     /// What the button deletes, for VoiceOver.
     let label: String
     let action: () -> Void
+    @Environment(\.rowDeletionAnchor) private var deletionAnchor
+    @State private var frames = ScreenFrames<String>()
+    private let frameKey = "trash"
     
     var body: some View {
-        Button(action: action) {
+        Button {
+            deletionAnchor.rect = frames.rect(for: frameKey)
+            action()
+        } label: {
             Image(systemName: "trash")
                 .font(DesignTokens.IconSize.small.font)
                 .foregroundColor(DesignTokens.Colors.error)
@@ -283,6 +289,7 @@ struct DeleteButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.borderless)
+        .trackingScreenFrame(of: frameKey, in: frames)
         .accessibilityLabel("accessibility.delete_row".localizedWithArgs(label))
     }
 }
@@ -302,12 +309,15 @@ struct CVEmptyStateView: View {
                 .font(DesignTokens.Typography.subheadline.font)
                 .fontWeight(.medium)
                 .foregroundColor(DesignTokens.Colors.secondary)
+                .multilineTextAlignment(.center)
             
             Text(subtitle)
                 .font(DesignTokens.Typography.caption1.font)
                 .foregroundColor(DesignTokens.Colors.tertiary)
                 .multilineTextAlignment(.center)
         }
+        // The icon and the title centre in the width of the row, as the subtitle does
+        .frame(maxWidth: .infinity)
         .padding(.vertical, DesignTokens.Spacing.lg)
     }
 }

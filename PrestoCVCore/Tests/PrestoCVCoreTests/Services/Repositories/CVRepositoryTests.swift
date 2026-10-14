@@ -66,7 +66,46 @@ struct CVRepositoryTests {
         
         let listing = try await repository.getCVListing()
         
-        #expect(listing == CVListing(cvs: [cv], unreadableCount: 3))
+        #expect(listing.cvs == [cv])
+        #expect(listing.unreadableCount == 3)
+    }
+    
+    @Test("GetCVListing tells when each CV was last saved")
+    func getCVListingReportsWhenEachCVWasLastSaved() async throws {
+        let mockStorage = MockStorageService()
+        let clock = ManualClock()
+        let repository = CVRepository(storageService: mockStorage, now: { clock.now() })
+        let first = CVTestDataBuilder.minimalCV().withName("First").build()
+        let second = CVTestDataBuilder.minimalCV().withName("Second").build()
+        let firstSavedAt = clock.now()
+        _ = try await repository.saveCV(first)
+        clock.advance(by: 3_600)
+        let secondSavedAt = clock.now()
+        _ = try await repository.saveCV(second)
+        clock.advance(by: 60)
+        let firstSavedAgainAt = clock.now()
+        _ = try await repository.saveCV(first)
+        
+        let listing = try await repository.getCVListing()
+        
+        #expect(listing.lastSavedAt == [first.id: firstSavedAgainAt, second.id: secondSavedAt])
+        #expect(firstSavedAt < firstSavedAgainAt)
+    }
+    
+    @Test("GetCVListing has no time for a CV that was stored without one")
+    func getCVListingHasNoTimeForAnUnstampedCV() async throws {
+        let mockStorage = MockStorageService()
+        let repository = CVRepository(storageService: mockStorage)
+        let stamped = CVTestDataBuilder.minimalCV().withName("Stamped").build()
+        let unstamped = CVTestDataBuilder.minimalCV().withName("Unstamped").build()
+        _ = try await repository.saveCV(stamped)
+        try await mockStorage.save(StoredCV(cv: unstamped), to: StoredCV.identifier(for: unstamped.id))
+        
+        let listing = try await repository.getCVListing()
+        
+        #expect(Set(listing.cvs.map(\.id)) == [stamped.id, unstamped.id])
+        #expect(listing.lastSavedAt[stamped.id] != nil)
+        #expect(listing.lastSavedAt[unstamped.id] == nil)
     }
     
     @Test("CVExists is true when the only stored files are ones that could not be opened")

@@ -5,6 +5,7 @@ struct CVEditorView: View {
     @EnvironmentObject var router: AppRouter
     @StateObject private var viewModel: CVEditorViewModel
     @State private var showingExportSheet = false
+    @State private var deletionAnchor = RowDeletionAnchor()
 
     /// The view model is built once, when the screen first appears, and survives every re-render of the parent.
     init(viewModel: @autoclosure @escaping () -> CVEditorViewModel) {
@@ -62,11 +63,13 @@ struct CVEditorView: View {
         } message: {
             Text("dialog.save_success.message".asLoclizedKey)
         }
-        .confirmationDialog(
+        .environment(\.rowDeletionAnchor, deletionAnchor)
+        .anchoredConfirmationDialog(
             "editor.delete_row.title".localized,
             isPresented: isShowingDeleteConfirmation,
             titleVisibility: .visible,
-            presenting: viewModel.pendingDeletion
+            presenting: viewModel.pendingDeletion,
+            anchoredTo: deletionAnchor.rect
         ) { deletion in
             Button("common.delete".localized, role: .destructive) {
                 withAnimation(DesignTokens.Animations.standardEaseInOut) {
@@ -103,6 +106,7 @@ struct CVEditorView: View {
                     }
             }
             .background(DesignTokens.Colors.background)
+            .readableContentWidth()
             .scrollDismissesKeyboard(.interactively)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("editor.title".localized)
@@ -117,7 +121,9 @@ struct CVEditorView: View {
             ) {
                 showingExportSheet = true
             }
+            .frame(maxWidth: DesignTokens.Layout.readableContentWidth)
             .padding(DesignTokens.Spacing.lg)
+            .frame(maxWidth: .infinity)
             .background(DesignTokens.Colors.background)
         }
     }
@@ -127,6 +133,7 @@ struct CVEditorView: View {
             get: { viewModel.pendingDeletion != nil },
             set: { isShowing in
                 if !isShowing {
+                    deletionAnchor.rect = nil
                     viewModel.cancelDeletion()
                 }
             }

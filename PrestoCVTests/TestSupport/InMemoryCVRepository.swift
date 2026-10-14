@@ -17,6 +17,7 @@ actor InMemoryCVRepository: CVRepositoryProtocol {
     private(set) var saveCount = 0
     
     private var storedCVs: [UUID: CVModel] = [:]
+    private var lastSavedAt: [UUID: Date] = [:]
     private var failures: [Operation: Error] = [:]
     private var unreadableCount = 0
     private var listingsToHold = 0
@@ -37,6 +38,11 @@ actor InMemoryCVRepository: CVRepositoryProtocol {
     
     func setUnreadableCount(_ count: Int) {
         unreadableCount = count
+    }
+    
+    /// What the listing reports as the time the CV was last saved.
+    func setLastSaved(_ date: Date, for id: UUID) {
+        lastSavedAt[id] = date
     }
     
     /// The next `count` listings wait until `releaseOldestListing` lets them go.
@@ -94,6 +100,7 @@ actor InMemoryCVRepository: CVRepositoryProtocol {
     func deleteCV(id: UUID) async throws {
         try failIfNeeded(.delete)
         storedCVs.removeValue(forKey: id)
+        lastSavedAt.removeValue(forKey: id)
     }
     
     func cvExists() async throws -> Bool {
@@ -108,7 +115,7 @@ actor InMemoryCVRepository: CVRepositoryProtocol {
     
     private func listing() async throws -> CVListing {
         try failIfNeeded(.listing)
-        let seen = CVListing(cvs: sorted(Array(storedCVs.values)), unreadableCount: unreadableCount)
+        let seen = CVListing(cvs: sorted(Array(storedCVs.values)), lastSavedAt: lastSavedAt, unreadableCount: unreadableCount)
         guard listingsToHold > 0 else { return seen }
         
         listingsToHold -= 1

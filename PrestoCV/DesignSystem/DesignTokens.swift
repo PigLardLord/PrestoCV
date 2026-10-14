@@ -83,6 +83,15 @@ enum DesignTokens {
         static let minimumTapTarget: CGFloat = 44
     }
     
+    // MARK: - Layout
+    enum Layout {
+        /// The widest a column of text or form fields gets: on an iPad a row any wider is hard to read, and the
+        /// eye has far to travel from its label to its value. It is the width of the readable content guide of an iPad.
+        static let readableContentWidth: CGFloat = 672
+        /// The widest a button that stands alone on a screen gets, as in the first-run view.
+        static let standaloneButtonWidth: CGFloat = 400
+    }
+    
     // MARK: - Border Widths
     enum BorderWidth {
         static let thin: CGFloat = 1

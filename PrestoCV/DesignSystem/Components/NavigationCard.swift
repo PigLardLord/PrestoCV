@@ -80,6 +80,7 @@ struct NavigationRow: View {
         }
         .padding(.vertical, DesignTokens.Spacing.xxs)
         .accessibilityLabel("accessibility.navigate_to".localizedWithArgs(title))
+        .accessibilityValue([subtitle, caption].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", "))
         .accessibilityAddTraits(.isButton)
     }
 }

@@ -96,7 +96,10 @@ struct CVManagementUseCaseTests {
         
         let listing = try await useCase.getCVListing()
         
-        #expect(listing == CVListing(cvs: [cv], unreadableCount: 2))
+        #expect(listing == (try await cvRepository.getCVListing()))
+        #expect(listing.cvs == [cv])
+        #expect(listing.lastSavedAt[cv.id] != nil)
+        #expect(listing.unreadableCount == 2)
     }
     
     @Test("AcknowledgeUnreadableCVs delegates to CV repository")

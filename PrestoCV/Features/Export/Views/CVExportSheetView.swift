@@ -347,6 +347,7 @@ struct CVExportSheetView: View {
                     )
             }
             .buttonStyle(.plain)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
             .disabled(!isInteractive)
             .opacity(isInteractive ? 1 : DesignTokens.Opacity.medium)
         }

@@ -7,14 +7,25 @@ final class CVListViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var viewState: ViewState<[CVModel]> = .idle
     @Published private(set) var unreadableCount = 0
+    /// When each CV of the list was last saved, for the CVs that are known to have a time.
+    @Published private(set) var lastSavedAt: [UUID: Date] = [:]
+    /// The moment the times of the rows are told relative to. It is the clock of the list: it moves when the list
+    /// is read, once a minute while the list is shown, and when the app comes back to the foreground.
+    @Published private(set) var presentationDate: Date
     /// Why the last action on a CV failed. It is shown on top of the list, which stays as it was.
     @Published var actionError: String?
     /// True when a change went through but the list could not be read again afterwards, so that the rows shown
     /// are what the app knows of the change, not what was read from storage.
     @Published private(set) var isListStale = false
     
+    /// How often the times of the rows are told again while the list is shown: they are given in minutes at best.
+    static let tickInterval = Duration.seconds(60)
+    
     // MARK: - Private Properties
     private let cvManagementUseCase: CVManagementUseCaseProtocol
+    private let now: () -> Date
+    private let waitBetweenTicks: (Duration) async throws -> Void
+    private let calendar: () -> Calendar
     /// Counts the reads that were started and the changes that went through. A read publishes what it found only if
     /// nothing was counted since it started: a newer read, and the rows that a change was applied to, win over a
     /// read that began earlier and was overtaken, whenever that one finishes.
@@ -47,8 +58,56 @@ final class CVListViewModel: ObservableObject {
     }
     
     // MARK: - Initialization
-    init(cvManagementUseCase: CVManagementUseCaseProtocol) {
+    /// - Parameters:
+    ///   - now: The clock of the app.
+    ///   - calendar: What counts as a day when a save is told in days. It is asked for each time a text is made, so
+    ///     that a change of the time zone of the device moves the days with it.
+    ///   - sleep: How the clock of the list waits between two ticks.
+    init(
+        cvManagementUseCase: CVManagementUseCaseProtocol,
+        now: @escaping () -> Date = { Date() },
+        calendar: @escaping () -> Calendar = { .autoupdatingCurrent },
+        sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+    ) {
         self.cvManagementUseCase = cvManagementUseCase
+        self.now = now
+        self.waitBetweenTicks = sleep
+        self.presentationDate = now()
+        self.calendar = calendar
+    }
+    
+    // MARK: - Row Text
+    
+    /// The person a CV is about, for the line under its name: the name of the person and the job title, or the one
+    /// of them that is there. It tells apart CVs that have no name of their own. Nil when the CV has neither.
+    func personLine(of cv: CVModel) -> String? {
+        let parts = [cv.personalInfo.name, cv.personalInfo.title]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+    
+    /// When a CV was last saved, in words, for its row. Nil while that is not known.
+    func lastSavedLine(of cv: CVModel) -> String? {
+        lastSavedAt[cv.id].map { LastSavedDescription(calendar: calendar()).text(for: $0, relativeTo: presentationDate) }
+    }
+    
+    /// Moves the clock of the list to now, so that the times of the rows are told again. The list calls it when the
+    /// app comes back to the foreground, which can be days after the rows were last drawn.
+    func refreshPresentationDate() {
+        presentationDate = now()
+    }
+    
+    /// Keeps the clock of the list current, one tick a minute, until the task that runs it is cancelled.
+    func keepPresentationDateCurrent() async {
+        while !Task.isCancelled {
+            do {
+                try await waitBetweenTicks(Self.tickInterval)
+            } catch {
+                return
+            }
+            refreshPresentationDate()
+        }
     }
     
     // MARK: - Public Methods
@@ -144,16 +203,20 @@ final class CVListViewModel: ObservableObject {
         // What a read that started before this change found may be older than the change
         readSequence += 1
         hasUnconfirmedChange = true
+        refreshPresentationDate()
         
         guard var shownCVs = viewState.data else { return }
         switch change {
         case .added(let cv):
             shownCVs.insert(cv, at: 0)
+            lastSavedAt[cv.id] = now()
         case .replaced(let cv):
             shownCVs.removeAll { $0.id == cv.id }
             shownCVs.insert(cv, at: 0)
+            lastSavedAt[cv.id] = now()
         case .removed(let id):
             shownCVs.removeAll { $0.id == id }
+            lastSavedAt[id] = nil
         case .unreadableCVsAcknowledged:
             unreadableCount = 0
         }
@@ -175,6 +238,8 @@ final class CVListViewModel: ObservableObject {
     
     private func show(_ listing: CVListing) {
         unreadableCount = listing.unreadableCount
+        lastSavedAt = listing.lastSavedAt
+        refreshPresentationDate()
         hasUnconfirmedChange = false
         isListStale = false
         viewState = .loaded(listing.cvs)

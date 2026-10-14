@@ -27,6 +27,9 @@ public final class CVRepository: CVRepositoryProtocol, Sendable {
         let report = try await storageService.loadAllReporting(StoredCV.self)
         return CVListing(
             cvs: report.items.sorted(by: StoredCV.isListedBefore).map(\.cv),
+            lastSavedAt: Dictionary(uniqueKeysWithValues: report.items.compactMap { stored in
+                stored.updatedAt.map { (stored.cv.id, $0) }
+            }),
             unreadableCount: report.unreadableCount
         )
     }

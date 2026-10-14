@@ -17,6 +17,8 @@ struct FirstRunView: View {
                 actionSection
             }
             .padding(DesignTokens.Spacing.xl)
+            .frame(maxWidth: DesignTokens.Layout.readableContentWidth)
+            .frame(maxWidth: .infinity)
         }
         .task {
             await viewModel.loadSamples()
@@ -74,6 +76,7 @@ struct FirstRunView: View {
                 }
             }
         }
+        .frame(maxWidth: DesignTokens.Layout.standaloneButtonWidth)
         .padding(.horizontal, DesignTokens.Spacing.md)
     }
     

@@ -95,12 +95,13 @@ struct CVListViewTests {
 
         let content = try String(contentsOf: getCVListViewFilePath(), encoding: .utf8)
 
-        // Verify confirmationDialog still has proper destructive button
-        #expect(content.contains("confirmationDialog"), "CVListView should have a confirmationDialog for delete confirmation")
+        // The dialog is the anchored one, which is a confirmationDialog that points at the row on an iPad
+        let hasDialog = content.contains("anchoredConfirmationDialog(")
+        #expect(hasDialog, "CVListView should have a confirmation dialog for delete confirmation")
 
         // The confirmation dialog should have a destructive button
         // This is correct and doesn't cause the bug
-        let hasDestructiveInDialog = content.contains("role: .destructive") && content.contains("confirmationDialog")
+        let hasDestructiveInDialog = content.contains("role: .destructive") && hasDialog
 
         #expect(hasDestructiveInDialog, "Confirmation dialog should have a destructive button (role: .destructive)")
     }
