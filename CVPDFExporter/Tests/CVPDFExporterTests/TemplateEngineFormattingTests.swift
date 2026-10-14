@@ -154,7 +154,7 @@ struct TemplateEngineFormattingTests {
 
         let html = try await render("{{#hasSocialLinks}}{{#socialLinks}}[{{platform}}|{{url}}]{{/socialLinks}}{{/hasSocialLinks}}", sections: [social])
 
-        #expect(html == "[LinkedIn|https://linkedin.com/in/ada]")
+        #expect(html == "[LinkedIn|https://linkedin.com/<wbr>in/<wbr>ada]")
     }
 
     @Test("A custom section that is not the social section is not listed as social links")
@@ -164,6 +164,56 @@ struct TemplateEngineFormattingTests {
         let html = try await render("{{#hasSocialLinks}}yes{{/hasSocialLinks}}{{^hasSocialLinks}}no{{/hasSocialLinks}}", sections: [other])
 
         #expect(html == "no")
+    }
+
+    // MARK: - Web addresses
+
+    @Test("A web address can break after the slashes that follow a name, and never inside \"https://\"")
+    func webAddressBreaksAfterItsSlashes() async throws {
+        let info = PersonalInfo(name: "Ada", email: "ada@example.com", website: "https://ada.example.com/work/portfolio/2024")
+
+        let html = try await render("{{website}}", personalInfo: info)
+
+        #expect(html == "https://ada.example.com/<wbr>work/<wbr>portfolio/<wbr>2024")
+    }
+
+    @Test("A web address is escaped like any other text, and a trailing slash is left alone")
+    func webAddressIsEscaped() async throws {
+        let item = CVItem(title: "Certificate", url: "https://example.com/a?x=1&y=<2>/")
+        let certifications = CVSection(id: "certs", type: .certifications, title: "Certificates", items: [item])
+
+        let html = try await render("{{#certifications}}{{url}}{{/certifications}}", sections: [certifications])
+
+        #expect(html == "https://example.com/<wbr>a?x=1&amp;y=&lt;2&gt;/")
+    }
+
+    @Test("An item without an address has no address block")
+    func itemWithoutAddress() async throws {
+        let certifications = CVSection(id: "certs", type: .certifications, title: "Certificates", items: [CVItem(title: "ACLS")])
+
+        let html = try await render("{{#certifications}}[{{title}}{{#url}} {{url}}{{/url}}]{{/certifications}}", sections: [certifications])
+
+        #expect(html == "[ACLS]")
+    }
+
+    // MARK: - First entry of a section
+
+    @Test("The first entry of work, education and certifications is flagged, and only the first")
+    func firstEntryIsFlagged() async throws {
+        let sections = [
+            CVSection(id: "work", type: .work, title: "Work", items: [CVItem(title: "A"), CVItem(title: "B"), CVItem(title: "C")]),
+            CVSection(id: "education", type: .education, title: "Education", items: [CVItem(title: "D"), CVItem(title: "E")]),
+            CVSection(id: "certs", type: .certifications, title: "Certificates", items: [CVItem(title: "F"), CVItem(title: "G")])
+        ]
+        let template = """
+        {{#workExperience}}[{{#isFirst}}first {{/isFirst}}{{title}}]{{/workExperience}}\
+        {{#education}}[{{#isFirst}}first {{/isFirst}}{{degree}}]{{/education}}\
+        {{#certifications}}[{{#isFirst}}first {{/isFirst}}{{title}}]{{/certifications}}
+        """
+
+        let html = try await render(template, sections: sections)
+
+        #expect(html == "[first A][B][C][first D][E][first F][G]")
     }
 
     // MARK: - Style values

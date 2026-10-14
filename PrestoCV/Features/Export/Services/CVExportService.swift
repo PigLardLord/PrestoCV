@@ -5,7 +5,7 @@ import CVPDFExporter
 /// Protocol for PDF export operations
 protocol CVExportServiceProtocol: Actor {
     func availableTemplates() async throws -> [Template]
-    func export(cv: CVModel, templateId: String, options: ExportOptions) async throws -> URL
+    func export(cv: CVModel, templateId: String, options: ExportOptions) async throws -> ExportedPDF
     func cleanupTempFile(at url: URL) async
     func generatePreviewHTML(cv: CVModel, templateId: String, options: ExportOptions) async throws -> String
 }
@@ -42,7 +42,7 @@ actor CVExportService: CVExportServiceProtocol {
         cv: CVModel,
         templateId: String,
         options: ExportOptions
-    ) async throws -> URL {
+    ) async throws -> ExportedPDF {
         let document = adapter.convertToCV(from: cv)
         let template = try await templateRepository.loadTemplate(id: templateId)
 
@@ -61,7 +61,9 @@ actor CVExportService: CVExportServiceProtocol {
             options: documentOptions
         )
 
-        return try writePDF(result.pdfData, fileName: fileNames.fileName(personName: personName, cvName: cv.name))
+        let url = try writePDF(result.pdfData, fileName: fileNames.fileName(personName: personName, cvName: cv.name))
+        let thumbnail = await PDFThumbnail.pngData(from: result.pdfData)
+        return ExportedPDF(url: url, pageCount: result.pageCount, thumbnail: thumbnail)
     }
 
     /// Removes the exported file together with the folder made for it

@@ -9,13 +9,6 @@ struct ExportSelection: Equatable {
     var fontScheme: FontScheme
 }
 
-/// The PDF of the current selection, rendered and ready to share under the name the recipient will see.
-struct SharePDF: Equatable {
-    let url: URL
-
-    var fileName: String { url.lastPathComponent }
-}
-
 /// Drives the export sheet: the template, palette and font the user picks, the preview of that choice, and the PDF
 /// that is rendered once the preview has settled so that sharing it is a single tap.
 ///
@@ -32,13 +25,16 @@ final class CVExportSheetViewModel: ObservableObject {
     @Published private(set) var previewOptions: ExportOptions?
     @Published private(set) var isPreviewLoading = false
     @Published private(set) var isPreparingPDF = false
-    @Published private(set) var sharePDF: SharePDF?
+    @Published private(set) var sharePDF: ExportedPDF?
     /// Why no PDF is made for this CV, in words the user can act on; nil when the CV can be exported
     @Published private(set) var shareBlocker: String?
     @Published var errorMessage: String?
 
     /// The longest CV the export accepts, for the preview and for the PDF alike
     static let maxPages = 10
+
+    /// The white border of every page, in points (0.6 in); the 1 in default leaves too little room for text on A4
+    static let pageMargin: Double = 43
 
     private let exportService: any CVExportServiceProtocol
     private let preferencesStore: any ExportPreferencesStore
@@ -52,6 +48,12 @@ final class CVExportSheetViewModel: ObservableObject {
             colorPalette: selectedColorPalette,
             fontScheme: selectedFontScheme
         )
+    }
+
+    /// How many pages the PDF has, once it is rendered: the preview shows a page at a time, and a CV that is longer
+    /// than the page in view should not come as a surprise
+    var pageCountText: String? {
+        sharePDF.map { String(format: String(localized: "export.page_count"), $0.pageCount) }
     }
 
     var aspectRatio: CGFloat {
@@ -147,7 +149,7 @@ final class CVExportSheetViewModel: ObservableObject {
     func currentExportOptions() -> ExportOptions {
         ExportOptions(
             pageSize: .a4,
-            margins: .default,
+            margins: .uniform(Self.pageMargin),
             templateId: selectedTemplateId,
             customization: CustomizationOptions(
                 colorPalette: selectedColorPalette,
@@ -200,12 +202,12 @@ final class CVExportSheetViewModel: ObservableObject {
         generation requestGeneration: Int
     ) async {
         do {
-            let url = try await exportService.export(cv: cv, templateId: templateId, options: options)
+            let pdf = try await exportService.export(cv: cv, templateId: templateId, options: options)
             guard isCurrent(requestGeneration) else {
-                await exportService.cleanupTempFile(at: url)
+                await exportService.cleanupTempFile(at: pdf.url)
                 return
             }
-            sharePDF = SharePDF(url: url)
+            sharePDF = pdf
             isPreparingPDF = false
             rememberChoice(templateId: templateId, customization: options.customization)
         } catch {

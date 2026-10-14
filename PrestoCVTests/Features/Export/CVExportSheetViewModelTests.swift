@@ -6,6 +6,13 @@ import Foundation
 
 // MARK: - Mock CVExportService
 
+extension ExportedPDF {
+    /// A PDF the tests do not look into: one page, no thumbnail
+    init(testFile url: URL) {
+        self.init(url: url, pageCount: 1, thumbnail: nil)
+    }
+}
+
 /// A service whose answers the tests choose. A call can be held until the test lets it go, which keeps the tests
 /// free of sleeps; a held call ignores cancellation, like the real service, which cannot interrupt a render
 /// that is under way.
@@ -34,8 +41,8 @@ actor MockCVExportService: CVExportServiceProtocol {
     private var previewResponses: [Response<String>] = []
     private var defaultPreview = Response<String>(result: .success("<html><body>Preview</body></html>"))
 
-    private var exportResponses: [Response<URL>] = []
-    private var defaultExport = Response<URL>(result: .success(URL(fileURLWithPath: "/tmp/test.pdf")))
+    private var exportResponses: [Response<ExportedPDF>] = []
+    private var defaultExport = Response<ExportedPDF>(result: .success(ExportedPDF(testFile: URL(fileURLWithPath: "/tmp/test.pdf"))))
 
     private var heldCalls: [Call: [CheckedContinuation<Void, Never>]] = [:]
     private var waiters: [(call: Call, count: Int, continuation: CheckedContinuation<Void, Never>)] = []
@@ -62,7 +69,11 @@ actor MockCVExportService: CVExportServiceProtocol {
     }
 
     func setExportResult(_ result: Result<URL, Error>) {
-        defaultExport.result = result
+        defaultExport.result = result.map(ExportedPDF.init(testFile:))
+    }
+
+    func setExportedPDF(_ pdf: ExportedPDF) {
+        defaultExport.result = .success(pdf)
     }
 
     /// The next call of `generatePreviewHTML` gets this answer, after the test lets it go if it is held;
@@ -73,7 +84,7 @@ actor MockCVExportService: CVExportServiceProtocol {
 
     /// The next call of `export` gets this answer, after the test lets it go if it is held; later calls get the default
     func enqueueExport(_ result: Result<URL, Error>, held: Bool = false) {
-        exportResponses.append(Response(isHeld: held, result: result))
+        exportResponses.append(Response(isHeld: held, result: result.map(ExportedPDF.init(testFile:))))
     }
 
     // MARK: Holding calls
@@ -131,7 +142,7 @@ actor MockCVExportService: CVExportServiceProtocol {
         cv: CVModel,
         templateId: String,
         options: ExportOptions
-    ) async throws -> URL {
+    ) async throws -> ExportedPDF {
         exportCallCount += 1
         lastExportOptions = options
         lastExportTemplateId = templateId
@@ -418,6 +429,41 @@ struct CVExportSheetViewModelTests {
 
     // MARK: - The PDF to share
 
+    @Test("the PDF is kept with its page count and the picture of its first page")
+    func pdfKeepsPageCountAndThumbnail() async {
+        let mockService = MockCVExportService()
+        let thumbnail = Data([0x89, 0x50, 0x4E, 0x47])
+        await mockService.setExportedPDF(ExportedPDF(url: URL(fileURLWithPath: "/tmp/three.pdf"), pageCount: 3, thumbnail: thumbnail))
+        let viewModel = makeViewModel(mockService)
+
+        await viewModel.requestPreview(for: cv).value
+
+        #expect(viewModel.sharePDF?.pageCount == 3)
+        #expect(viewModel.sharePDF?.thumbnail == thumbnail)
+    }
+
+    @Test("the page count is told once the PDF is rendered, and not before")
+    func pageCountTextFollowsThePDF() async {
+        let mockService = MockCVExportService()
+        await mockService.setExportedPDF(ExportedPDF(url: URL(fileURLWithPath: "/tmp/three.pdf"), pageCount: 3, thumbnail: nil))
+        let viewModel = makeViewModel(mockService)
+        #expect(viewModel.pageCountText == nil)
+
+        await viewModel.requestPreview(for: cv).value
+
+        #expect(viewModel.pageCountText == String(format: String(localized: "export.page_count"), 3))
+    }
+
+    @Test("the pages have the same white border on every side")
+    func pagesHaveAUniformBorder() {
+        let margins = makeViewModel(MockCVExportService()).currentExportOptions().margins
+
+        #expect(margins.top == CVExportSheetViewModel.pageMargin)
+        #expect(margins.left == margins.top)
+        #expect(margins.bottom == margins.top)
+        #expect(margins.right == margins.top)
+    }
+
     @Test("the PDF is rendered after the preview, with the same options")
     func pdfIsRenderedWithThePreviewOptions() async {
         let mockService = MockCVExportService()
@@ -427,7 +473,7 @@ struct CVExportSheetViewModelTests {
 
         await viewModel.requestPreview(for: cv).value
 
-        #expect(viewModel.sharePDF == SharePDF(url: URL(fileURLWithPath: "/tmp/test.pdf")))
+        #expect(viewModel.sharePDF == ExportedPDF(testFile: URL(fileURLWithPath: "/tmp/test.pdf")))
         #expect(viewModel.sharePDF?.fileName == "test.pdf")
         #expect(!viewModel.isPreparingPDF)
         let exportOptions = await mockService.lastExportOptions

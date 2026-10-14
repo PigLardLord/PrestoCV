@@ -1,56 +1,10 @@
 import Testing
 import Foundation
 import PDFKit
+import UIKit
 @testable import PrestoCV
 @testable import PrestoCVCore
 @testable import CVPDFExporter
-
-// MARK: - Test Storage
-
-/// The bundled templates, installed the way the app does at launch but into a temporary folder,
-/// so that no test touches the real Application Support.
-private struct TemporaryExportEnvironment {
-    let root: URL
-    let repository: BundledTemplateRepository
-
-    /// Where exported PDFs are written
-    var exportsDirectory: URL { root.appendingPathComponent("Exports", isDirectory: true) }
-
-    static func make() async throws -> TemporaryExportEnvironment {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CVExportServiceTests_\(UUID().uuidString)", isDirectory: true)
-        let registryDirectory = root.appendingPathComponent("Registry", isDirectory: true)
-        try FileManager.default.createDirectory(at: registryDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(
-            at: root.appendingPathComponent("Exports", isDirectory: true),
-            withIntermediateDirectories: true
-        )
-
-        let registryManager = TemplateRegistryManager(storageDirectory: registryDirectory)
-        let fileRepository = FileTemplateRepository(
-            templatesDirectory: root.appendingPathComponent("Templates", isDirectory: true),
-            registryManager: registryManager
-        )
-        try await TemplateBootstrapService(
-            installUseCase: InstallTemplateUseCase(repository: fileRepository),
-            registryManager: registryManager
-        ).syncBundledTemplates()
-
-        return TemporaryExportEnvironment(root: root, repository: BundledTemplateRepository(fileRepository: fileRepository))
-    }
-
-    func makeService() -> CVExportService {
-        CVExportService(
-            container: PDFExportDependencyContainer(templateRepository: repository),
-            fileNames: ExportFileName(titlePattern: "%@ – CV"),
-            temporaryDirectory: exportsDirectory
-        )
-    }
-
-    func cleanUp() {
-        try? FileManager.default.removeItem(at: root)
-    }
-}
 
 // MARK: - CVExportService Tests
 
@@ -71,18 +25,18 @@ struct CVExportServiceTests {
           arguments: ["professional", "modern", "minimal"])
     func exportsReadablePDF(templateId: String) async throws {
         // Given
-        let environment = try await TemporaryExportEnvironment.make()
+        let environment = try await ExportTestEnvironment.make()
         defer { environment.cleanUp() }
 
         // When
-        let url = try await environment.makeService().export(
+        let exported = try await environment.makeService().export(
             cv: Self.cv,
             templateId: templateId,
             options: options(templateId: templateId)
         )
 
         // Then
-        let document = try #require(PDFDocument(url: url))
+        let document = try #require(PDFDocument(url: exported.url))
         #expect(document.pageCount >= 1)
         #expect(document.pageCount <= CVExportSheetViewModel.maxPages)
         // A template may set its text in capitals, and a long line wraps: compare words, ignoring case
@@ -92,11 +46,35 @@ struct CVExportServiceTests {
         #expect(words.localizedCaseInsensitiveContains("DesignForward Agency"))
     }
 
+    @Test("the export reports the page count of the PDF and a picture of its first page",
+          .timeLimit(.minutes(2)),
+          arguments: ["professional", "modern", "minimal"])
+    func reportsPageCountAndThumbnail(templateId: String) async throws {
+        // Given
+        let environment = try await ExportTestEnvironment.make()
+        defer { environment.cleanUp() }
+
+        // When
+        let exported = try await environment.makeService().export(
+            cv: Self.cv,
+            templateId: templateId,
+            options: options(templateId: templateId)
+        )
+
+        // Then
+        let document = try #require(PDFDocument(url: exported.url))
+        #expect(exported.pageCount == document.pageCount)
+        let thumbnail = try #require(exported.thumbnail.flatMap(UIImage.init(data:)))
+        #expect(max(thumbnail.size.width, thumbnail.size.height) * thumbnail.scale == PDFThumbnail.longerSide)
+        let page = try #require(document.page(at: 0)).bounds(for: .mediaBox)
+        #expect(abs(thumbnail.size.width / thumbnail.size.height - page.width / page.height) < 0.01)
+    }
+
     @Test("the PDF is named after the person, in a folder of its own, with the title and author set",
           .timeLimit(.minutes(2)))
     func namesTheFileAndSetsDocumentProperties() async throws {
         // Given
-        let environment = try await TemporaryExportEnvironment.make()
+        let environment = try await ExportTestEnvironment.make()
         defer { environment.cleanUp() }
 
         // When
@@ -104,7 +82,7 @@ struct CVExportServiceTests {
             cv: Self.cv,
             templateId: "professional",
             options: options(templateId: "professional")
-        )
+        ).url
 
         // Then
         #expect(url.lastPathComponent == "Maya Chen – CV.pdf")
@@ -120,13 +98,13 @@ struct CVExportServiceTests {
     @Test("two exports of the same CV do not overwrite each other", .timeLimit(.minutes(2)))
     func exportsGetFoldersOfTheirOwn() async throws {
         // Given
-        let environment = try await TemporaryExportEnvironment.make()
+        let environment = try await ExportTestEnvironment.make()
         defer { environment.cleanUp() }
         let service = environment.makeService()
 
         // When
-        let first = try await service.export(cv: Self.cv, templateId: "modern", options: options(templateId: "modern"))
-        let second = try await service.export(cv: Self.cv, templateId: "modern", options: options(templateId: "modern"))
+        let first = try await service.export(cv: Self.cv, templateId: "modern", options: options(templateId: "modern")).url
+        let second = try await service.export(cv: Self.cv, templateId: "modern", options: options(templateId: "modern")).url
 
         // Then
         #expect(first != second)
@@ -138,7 +116,7 @@ struct CVExportServiceTests {
     @Test("a CV that needs more pages than allowed is refused, not cut", .timeLimit(.minutes(2)))
     func refusesCVOverThePageLimit() async throws {
         // Given
-        let environment = try await TemporaryExportEnvironment.make()
+        let environment = try await ExportTestEnvironment.make()
         defer { environment.cleanUp() }
 
         // When/Then
@@ -159,7 +137,7 @@ struct CVExportServiceTests {
     @Test("an unknown template is reported as not found", .timeLimit(.minutes(2)))
     func unknownTemplateIsNotFound() async throws {
         // Given
-        let environment = try await TemporaryExportEnvironment.make()
+        let environment = try await ExportTestEnvironment.make()
         defer { environment.cleanUp() }
 
         // When/Then
@@ -177,10 +155,10 @@ struct CVExportServiceTests {
     @Test("cleanup removes the exported file together with its folder", .timeLimit(.minutes(2)))
     func cleanupRemovesTheExportFolder() async throws {
         // Given
-        let environment = try await TemporaryExportEnvironment.make()
+        let environment = try await ExportTestEnvironment.make()
         defer { environment.cleanUp() }
         let service = environment.makeService()
-        let url = try await service.export(cv: Self.cv, templateId: "minimal", options: options(templateId: "minimal"))
+        let url = try await service.export(cv: Self.cv, templateId: "minimal", options: options(templateId: "minimal")).url
 
         // When
         await service.cleanupTempFile(at: url)
@@ -194,7 +172,7 @@ struct CVExportServiceTests {
     @Test("cleanup of a file that is not in an export folder removes only that file")
     func cleanupLeavesOtherFilesAlone() async throws {
         // Given
-        let environment = try await TemporaryExportEnvironment.make()
+        let environment = try await ExportTestEnvironment.make()
         defer { environment.cleanUp() }
         let strayFile = environment.exportsDirectory.appendingPathComponent("stray.pdf")
         let neighbour = environment.exportsDirectory.appendingPathComponent("neighbour.pdf")

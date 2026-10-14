@@ -7,15 +7,6 @@ import Foundation
 @Suite("Page Break Manager")
 struct PageBreakManagerTests {
 
-    @Test("Page break manager initializes correctly")
-    func pageBreakManagerInitializes() {
-        // Given/When
-        let manager = PageBreakManager()
-
-        // Then
-        #expect(manager.maxPages == 4)
-    }
-
     @Test("Insert page break CSS into HTML")
     func insertPageBreakCSS() {
         // Given
@@ -35,7 +26,6 @@ struct PageBreakManagerTests {
         // Then
         #expect(result.contains("page-break"))
         #expect(result.contains("@media print"))
-        #expect(result.contains("page-break-inside: avoid"))
     }
 
     @Test("Page break CSS respects existing styles")
@@ -80,23 +70,8 @@ struct PageBreakManagerTests {
         #expect(result.contains("page-break"))
     }
 
-    @Test("Configure maximum pages")
-    func configureMaximumPages() {
-        // Given
-        let manager = PageBreakManager(maxPages: 6)
-
-        // Then
-        #expect(manager.maxPages == 6)
-
-        // When
-        let defaultManager = PageBreakManager()
-
-        // Then
-        #expect(defaultManager.maxPages == 4)
-    }
-
-    @Test("Ensure critical elements avoid page breaks")
-    func ensureCriticalElementsAvoidBreaks() {
+    @Test("Headings are not cut across two pages")
+    func headingsAreNotCut() {
         // Given
         let manager = PageBreakManager()
         let html = "<html><body>Content</body></html>"
@@ -105,13 +80,37 @@ struct PageBreakManagerTests {
         let result = manager.insertPageBreaks(in: html)
 
         // Then
-        // Headers should not break after
-        #expect(result.contains("page-break-after: avoid"))
-        // Items should not break inside
-        #expect(result.contains(".item"))
+        #expect(result.contains("h1, h2, h3, h4, h5, h6"))
         #expect(result.contains("page-break-inside: avoid"))
-        // Sections should not break inside
-        #expect(result.contains(".section"))
+    }
+
+    @Test("Sections and entries are left free to break across pages")
+    func sectionsAndEntriesAreNotForcedTogether() {
+        // Given
+        let manager = PageBreakManager()
+        let html = "<html><body>Content</body></html>"
+
+        // When
+        let result = manager.insertPageBreaks(in: html)
+
+        // Then
+        #expect(!result.contains(".item"))
+        #expect(!result.contains(".section"))
+        #expect(!result.contains(".skills-group"))
+    }
+
+    @Test("Blocks marked avoid-break stay whole")
+    func avoidBreakBlocksStayWhole() {
+        // Given
+        let manager = PageBreakManager()
+        let html = "<html><body>Content</body></html>"
+
+        // When
+        let result = manager.insertPageBreaks(in: html)
+
+        // Then
+        #expect(result.contains(".avoid-break"))
+        #expect(result.contains("page-break-inside: avoid"))
     }
 
     @Test("Page break manager is thread safe")

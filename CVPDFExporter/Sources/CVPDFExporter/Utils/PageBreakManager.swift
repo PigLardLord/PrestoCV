@@ -2,27 +2,24 @@ import Foundation
 
 // MARK: - Page Break Manager
 
-/// Manages page breaks in HTML for PDF generation
-/// Sprint 4: Smart page break management
+/// Manages page breaks in HTML for PDF generation.
+///
+/// The injected rules do not force sections or entries to stay whole: a design that wants a block kept
+/// together says so itself. Forcing it here made every design leave pages half empty.
+/// The print renderer does not keep a heading with the text after it (`break-after: avoid` has no effect), so a
+/// design that wants this makes the heading part of the first lines of the entry that follows it.
 public final class PageBreakManager: Sendable {
 
-    /// Maximum number of pages for CV (default: 4)
-    public let maxPages: Int
-
-    /// Initialize with maximum page limit
-    public init(maxPages: Int = 4) {
-        self.maxPages = maxPages
-    }
+    public init() {}
 
     /// Insert page break CSS and rules into HTML
     public func insertPageBreaks(in html: String) -> String {
         // Empty HTML returns as-is
         guard !html.isEmpty else { return html }
 
-        // Page break CSS rules
         let pageBreakCSS = """
 
-        /* Page Break Management - Sprint 4 */
+        /* Page break management */
         @media print {
             /* Force page breaks */
             .page-break {
@@ -30,56 +27,23 @@ public final class PageBreakManager: Sendable {
                 break-after: always;
             }
 
-            /* Avoid breaking inside these elements */
-            .avoid-break,
-            .item,
-            .section,
-            .skills-group {
+            /* Blocks a design marks as unbreakable */
+            .avoid-break {
                 page-break-inside: avoid;
                 break-inside: avoid;
             }
 
-            /* Headers should not be orphaned */
+            /* A heading is not cut across two pages */
             h1, h2, h3, h4, h5, h6 {
-                page-break-after: avoid;
-                break-after: avoid;
                 page-break-inside: avoid;
                 break-inside: avoid;
             }
 
-            /* Keep headers with their content */
-            h2 {
-                page-break-after: avoid;
-                break-after: avoid;
-            }
-
-            /* Items should stay together */
-            .item {
-                page-break-inside: avoid;
-                break-inside: avoid;
-                orphans: 3;
-                widows: 3;
-            }
-
-            /* Sections should preferably stay together */
-            .section {
-                page-break-inside: avoid;
-                break-inside: avoid;
-            }
-
-            /* Ensure minimum content on pages */
+            /* Never leave a single line alone at the top or bottom of a page */
             p, li, div {
                 orphans: 2;
                 widows: 2;
             }
-
-            /* Page size and margins */
-            @page {
-                orphans: 3;
-                widows: 3;
-            }
-
-            /* Max pages: \(maxPages) */
         }
 
         """

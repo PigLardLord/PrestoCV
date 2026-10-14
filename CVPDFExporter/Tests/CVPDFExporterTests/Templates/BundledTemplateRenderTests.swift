@@ -142,7 +142,8 @@ struct BundledTemplateRenderTests {
     private static func body(of html: String) throws -> String {
         let start = try #require(html.range(of: "<body"))
         let end = try #require(html.range(of: "</body>"))
-        return String(html[start.lowerBound..<end.upperBound])
+        // The places where an address may break are not text
+        return String(html[start.lowerBound..<end.upperBound]).replacingOccurrences(of: "<wbr>", with: "")
     }
 
     private static func occurrences(of text: String, in html: String) -> Int {

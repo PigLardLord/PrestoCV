@@ -100,27 +100,27 @@ struct BaseHTMLTemplate {
                 <div class="primary-column">
                     {{#hasWorkExperience}}
                     <section class="experience-section">
-                        <h3 class="section-title">
-                            <span class="title-accent"></span>
-                            <span class="section-title-text">{{i18n_work_experience}}</span>
-                        </h3>
                         <div class="experience-content">
                             {{#workExperience}}
-                            <div class="job-entry">
-                                <div class="job-header">
-                                    <span class="job-title">{{title}}</span>
-                                    {{#company}}
-                                    <span class="job-company"> @ {{company}}</span>
-                                    {{/company}}
-                                </div>
+                            <div class="job-entry{{#isFirst}} job-entry-first{{/isFirst}}">
+                                {{#isFirst}}
+                                <span class="section-title-inline">
+                                    <span class="title-accent"></span>
+                                    <span class="section-title-text">{{i18n_work_experience}}</span>
+                                </span>
+                                {{/isFirst}}
+                                <span class="job-title">{{title}}</span>
+                                {{#company}}
+                                <span class="job-company"> @ {{company}}</span>
+                                {{/company}}
                                 {{#period}}
-                                <div class="job-period">{{period}}</div>
+                                <br><span class="job-period">{{period}}</span>
                                 {{/period}}
                                 {{#location}}
-                                <div class="job-location">{{location}}</div>
+                                <br><span class="job-location">{{location}}</span>
                                 {{/location}}
                                 {{#description}}
-                                <div class="job-description">{{description}}</div>
+                                <br><span class="job-description">{{description}}</span>
                                 {{/description}}
                             </div>
                             {{/workExperience}}
@@ -130,11 +130,14 @@ struct BaseHTMLTemplate {
 
                     {{#hasCertifications}}
                     <section class="certifications-section">
-                        <h3 class="section-title">
-                            <span class="title-accent"></span>
-                            <span class="section-title-text">{{i18n_certifications}}</span>
-                        </h3>
                         {{#certifications}}
+                        {{#isFirst}}
+                        <div class="title-and-first-card">
+                            <h3 class="section-title">
+                                <span class="title-accent"></span>
+                                <span class="section-title-text">{{i18n_certifications}}</span>
+                            </h3>
+                        {{/isFirst}}
                         <div class="cert-entry">
                             <span class="cert-title">{{title}}</span>
                             {{#issuer}}
@@ -150,6 +153,9 @@ struct BaseHTMLTemplate {
                             <span class="cert-description">{{description}}</span>
                             {{/description}}
                         </div>
+                        {{#isFirst}}
+                        </div>
+                        {{/isFirst}}
                         {{/certifications}}
                     </section>
                     {{/hasCertifications}}
@@ -159,12 +165,15 @@ struct BaseHTMLTemplate {
                 <div class="secondary-column">
                     {{#hasEducation}}
                     <section class="education-section">
-                        <h3 class="section-title">
-                            <span class="title-accent"></span>
-                            <span class="section-title-text">{{i18n_education}}</span>
-                        </h3>
                         <div class="education-content">
                             {{#education}}
+                            {{#isFirst}}
+                            <div class="title-and-first-card">
+                                <h3 class="section-title">
+                                    <span class="title-accent"></span>
+                                    <span class="section-title-text">{{i18n_education}}</span>
+                                </h3>
+                            {{/isFirst}}
                             <div class="edu-entry">
                                 <div class="edu-degree">{{degree}}</div>
                                 {{#school}}
@@ -177,6 +186,9 @@ struct BaseHTMLTemplate {
                                 <div class="edu-description">{{description}}</div>
                                 {{/description}}
                             </div>
+                            {{#isFirst}}
+                            </div>
+                            {{/isFirst}}
                             {{/education}}
                         </div>
                     </section>

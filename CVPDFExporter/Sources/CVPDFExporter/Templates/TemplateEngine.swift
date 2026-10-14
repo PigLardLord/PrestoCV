@@ -19,6 +19,17 @@ private struct StyleValue {
     }
 }
 
+/// A web address from the CV. It goes into the page as HTML, with a place to break the line after each slash that
+/// follows a name: the print renderer does not break an address there by itself, and would otherwise cut a long
+/// one in the middle of a word.
+private struct LinkValue {
+    let address: String
+
+    init(_ address: String) {
+        self.address = address
+    }
+}
+
 // MARK: - Mustache Template Engine
 
 /// Template engine implementation using Mustache-style templates
@@ -51,7 +62,7 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
         context["email"] = document.personalInfo.email
         context["phone"] = document.personalInfo.phone ?? ""
         context["location"] = document.personalInfo.location ?? ""
-        context["website"] = document.personalInfo.website ?? ""
+        context["website"] = document.personalInfo.website.map(LinkValue.init) ?? ""
         context["summary"] = document.personalInfo.summary ?? ""
         context["title"] = document.personalInfo.title ?? ""
 
@@ -65,7 +76,7 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
         // Work Experience
         let workSections = document.sections.filter { $0.type == .work }
         if !workSections.isEmpty {
-            var workItems: [[String: String]] = []
+            var workItems: [[String: Any]] = []
             for section in workSections {
                 for item in section.items {
                     workItems.append([
@@ -79,7 +90,7 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                     ])
                 }
             }
-            context["workExperience"] = workItems
+            context["workExperience"] = flaggingFirstEntry(workItems)
             context["hasWorkExperience"] = !workItems.isEmpty
         } else {
             context["hasWorkExperience"] = false
@@ -88,7 +99,7 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
         // Education
         let educationSections = document.sections.filter { $0.type == .education }
         if !educationSections.isEmpty {
-            var educationItems: [[String: String]] = []
+            var educationItems: [[String: Any]] = []
             for section in educationSections {
                 for item in section.items {
                     educationItems.append([
@@ -101,7 +112,7 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                     ])
                 }
             }
-            context["education"] = educationItems
+            context["education"] = flaggingFirstEntry(educationItems)
             context["hasEducation"] = !educationItems.isEmpty
         } else {
             context["hasEducation"] = false
@@ -147,19 +158,22 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
         // Certifications
         let certSections = document.sections.filter { $0.type == .certifications }
         if !certSections.isEmpty {
-            var certItems: [[String: String]] = []
+            var certItems: [[String: Any]] = []
             for section in certSections {
                 for item in section.items {
-                    certItems.append([
+                    var certificate: [String: Any] = [
                         "title": item.title,
                         "issuer": item.subtitle ?? "",
                         "description": item.description ?? "",
-                        "date": item.startDate ?? "",
-                        "url": item.url ?? ""
-                    ])
+                        "date": item.startDate ?? ""
+                    ]
+                    if let url = item.url, !url.isEmpty {
+                        certificate["url"] = LinkValue(url)
+                    }
+                    certItems.append(certificate)
                 }
             }
-            context["certifications"] = certItems
+            context["certifications"] = flaggingFirstEntry(certItems)
             context["hasCertifications"] = !certItems.isEmpty
         } else {
             context["hasCertifications"] = false
@@ -199,13 +213,14 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
         }
 
         // Social Links / Online Profiles
-        var socialItems: [[String: String]] = []
+        var socialItems: [[String: Any]] = []
         for section in document.sections where section.id == CVSection.socialID {
             for item in section.items {
-                socialItems.append([
-                    "platform": item.title,
-                    "url": item.url ?? item.subtitle ?? ""
-                ])
+                var link: [String: Any] = ["platform": item.title]
+                if let url = item.url ?? item.subtitle, !url.isEmpty {
+                    link["url"] = LinkValue(url)
+                }
+                socialItems.append(link)
             }
         }
         context["hasSocialLinks"] = !socialItems.isEmpty
@@ -227,6 +242,14 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
         context["fontSize"] = StyleValue(fonts.size)
 
         return context
+    }
+
+    /// Marks the first entry of a section with `isFirst`, so that a design can print the title of the section as the
+    /// first line of that entry: the two then stay on the same page
+    private func flaggingFirstEntry(_ entries: [[String: Any]]) -> [[String: Any]] {
+        guard var first = entries.first else { return entries }
+        first["isFirst"] = "true"
+        return [first] + entries.dropFirst()
     }
 
     /// The period as the person wrote it, or the start and end dates joined when there is none
@@ -371,6 +394,8 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
                 result = result.replacingOccurrences(of: "{{\(key)}}", with: escapeHTML(stringValue))
             } else if let styleValue = value as? StyleValue {
                 result = result.replacingOccurrences(of: "{{\(key)}}", with: styleValue.css)
+            } else if let link = value as? LinkValue {
+                result = result.replacingOccurrences(of: "{{\(key)}}", with: breakableHTML(for: link.address))
             } else if !(value is [Any]) {
                 // Only replace non-array values
                 result = result.replacingOccurrences(of: "{{\(key)}}", with: String(describing: value))
@@ -400,6 +425,22 @@ public final class MustacheTemplateEngine: TemplateEngine, @unchecked Sendable {
             .replacingOccurrences(of: "'", with: "&#39;")
             .replacingOccurrences(of: "{", with: "&#123;")
             .replacingOccurrences(of: "}", with: "&#125;")
+    }
+
+    /// The address escaped, with a `<wbr>` after each slash that has a name before it and a name after it,
+    /// so that "https://" stays whole
+    private func breakableHTML(for address: String) -> String {
+        let characters = Array(address)
+        var html = ""
+        for (index, character) in characters.enumerated() {
+            html += escapeHTML(String(character))
+            let hasNameBefore = index > 0 && characters[index - 1] != "/" && characters[index - 1] != ":"
+            let hasNameAfter = index + 1 < characters.count && characters[index + 1] != "/"
+            if character == "/", hasNameBefore, hasNameAfter {
+                html += "<wbr>"
+            }
+        }
+        return html
     }
 
     private static let maxSkillLevel = 5

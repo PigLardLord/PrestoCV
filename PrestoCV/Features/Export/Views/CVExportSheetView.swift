@@ -23,8 +23,12 @@ struct CVExportSheetView: View {
 
                 VStack(spacing: DesignTokens.Spacing.lg) {
                     // Preview section takes up remaining space with A4 aspect ratio
-                    previewSection
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    VStack(spacing: DesignTokens.Spacing.sm) {
+                        previewSection
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                        pageCountLabel
+                    }
 
                     if let blocker = viewModel.shareBlocker {
                         Label(blocker, systemImage: "info.circle")
@@ -101,6 +105,13 @@ struct CVExportSheetView: View {
             if let html = viewModel.previewHTML {
                 HTMLPreviewView(coordinator: previewCoordinator)
                     .aspectRatio(viewModel.aspectRatio, contentMode: .fit)
+                    .accessibilityHidden(viewModel.sharePDF != nil)
+                    .overlay {
+                        // Once the PDF is rendered, its pages replace the first page of the preview
+                        if let pdf = viewModel.sharePDF {
+                            PDFPreviewView(url: pdf.url)
+                        }
+                    }
                     .padding(8) // Add padding around WebView for the white border
                     .background(Color.white) // White background for the margin simulation
                     .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg))
@@ -136,6 +147,17 @@ struct CVExportSheetView: View {
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)
         .animation(DesignTokens.Animations.fastEaseInOut, value: viewModel.previewHTML)
+    }
+
+    /// How many pages the PDF has, under the preview and not over a page of it. The line is there while the PDF is
+    /// still rendering, so that the preview does not move when the count appears.
+    private var pageCountLabel: some View {
+        Text(viewModel.pageCountText ?? " ")
+            .font(DesignTokens.Typography.footnote.font)
+            .foregroundColor(DesignTokens.Colors.primary)
+            // The sheet's own background, stated, so that the contrast of the text can be measured against it
+            .background(DesignTokens.Colors.background)
+            .accessibilityHidden(viewModel.pageCountText == nil)
     }
 
     private var templateCarousel: some View {
@@ -282,21 +304,36 @@ struct CVExportSheetView: View {
     @ViewBuilder
     private var shareButton: some View {
         if let pdf = viewModel.sharePDF {
-            ShareLink(item: pdf.url, preview: SharePreview(pdf.fileName)) {
-                Label("export.share".localized, systemImage: "square.and.arrow.up")
-                    .labelStyle(.titleAndIcon)
-            }
-            .foregroundColor(DesignTokens.Colors.accent)
+            shareLink(for: pdf)
+                .foregroundColor(DesignTokens.Colors.accent)
         } else if viewModel.isPreviewLoading || viewModel.isPreparingPDF {
             ProgressView()
                 .accessibilityLabel(Text("export.loading".localized))
         } else {
             Button {} label: {
-                Label("export.share".localized, systemImage: "square.and.arrow.up")
-                    .labelStyle(.titleAndIcon)
+                shareLabel
             }
             .disabled(true)
         }
+    }
+
+    /// The share sheet shows the first page next to the file name, where it would otherwise show a generic icon
+    @ViewBuilder
+    private func shareLink(for pdf: ExportedPDF) -> some View {
+        if let thumbnail = pdf.thumbnail.flatMap(UIImage.init(data:)) {
+            ShareLink(item: pdf.url, preview: SharePreview(pdf.fileName, image: Image(uiImage: thumbnail))) {
+                shareLabel
+            }
+        } else {
+            ShareLink(item: pdf.url, preview: SharePreview(pdf.fileName)) {
+                shareLabel
+            }
+        }
+    }
+
+    private var shareLabel: some View {
+        Label("export.share".localized, systemImage: "square.and.arrow.up")
+            .labelStyle(.titleAndIcon)
     }
 
     private var fallbackTemplatePreview: some View {

@@ -176,6 +176,29 @@ template-name.mcvt (JSON file)
 4. **Data Binding**: TemplateEngine injects CV data into the template. Text from the CV is escaped, braces included, so it is never read as a template tag
 5. **PDF Generation**: HTMLToPDFRenderer converts to PDF
 
+### Page breaks
+
+The iOS renderer paginates with `UIPrintPageRenderer`, which keeps a block whole for `break-inside: avoid` and keeps the first and the last lines of a block together for `orphans` and `widows`, but does not honour `break-after: avoid`: a title would stay alone at the foot of a page. The bundled designs therefore:
+
+- print each entry of work experience, education and certifications as one block of inline content, whose first lines stay together (`orphans: 3`, `widows: 3`) and flow over the page break; a long entry is cut, a short one is not;
+- print the title of such a section as the first line of its first entry. The engine flags that entry with `isFirst`: `{{#isFirst}}<span class="section-title">…</span>{{/isFirst}}`;
+- keep a small section (skills, languages, interests, social links) whole with `break-inside: avoid`, and a certificate;
+- space blocks with a margin above each block that follows another, never below, so that the end of the CV has no margin to push an empty page out;
+- let a web address break after its slashes: the engine puts a `<wbr>` after each slash that follows a name, and the designs use `overflow-wrap: anywhere` for an address longer than its column.
+
+`PageBreakManager` adds forced breaks (`.page-break`) and `.avoid-break`, and nothing that makes a section or an entry unbreakable.
+
+### Regenerating the thumbnails
+
+The template carousel of the export sheet shows the `previewImageBase64` of each bundled package. It is the first page of the PDF of the example CV (`SampleCVData.complete`) that the real renderer makes with the options of the export sheet, one pixel per point (595 × 842). Regenerate it whenever the look of a design changes:
+
+```
+xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -destination '<an iOS simulator>' \
+  -only-testing:PrestoCVTests/BundledDesignThumbnails TEST_RUNNER_PRESTOCV_REGENERATE_THUMBNAILS=1
+```
+
+Without the variable the test is skipped. With it, each design is rendered and its `previewImageBase64` is rewritten in `CVPDFExporter/Resources/Templates/Bundled/<design>.mcvt`, the rest of the file untouched (the path comes from the test's own location, so the checkout that was built is the one that changes). Then raise the `version` of the designs whose thumbnail changed: an installed copy is only replaced by a newer version. `BundledThumbnailTests` checks that every thumbnail is a PNG of 595 × 842 pixels.
+
 ## Testing Strategy
 
 ### Test Coverage
