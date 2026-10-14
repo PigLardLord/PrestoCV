@@ -3,6 +3,24 @@ import PrestoCVCore
 
 // MARK: - Shared Row Components
 
+/// Lays its children side by side, and one above the other at the largest text sizes, where a row would cut them off.
+struct AdaptiveStack<Content: View>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let spacing: CGFloat
+    /// Receives whether the children are stacked
+    @ViewBuilder let content: (_ isStacked: Bool) -> Content
+    
+    var body: some View {
+        let isStacked = dynamicTypeSize.isAccessibilitySize
+        let layout = isStacked
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: spacing))
+            : AnyLayout(HStackLayout(spacing: spacing))
+        layout {
+            content(isStacked)
+        }
+    }
+}
+
 struct ExperienceRowView: View {
     @Binding var experience: Experience
     let onDelete: () -> Void
@@ -12,11 +30,11 @@ struct ExperienceRowView: View {
             // Title and Delete button
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                    TextField("field.job_title".localized, text: $experience.title)
+                    GrowingTextField("field.job_title".localized, text: $experience.title)
                         .font(.headline)
                         .foregroundColor(DesignTokens.Colors.primary)
                     
-                    TextField("field.company".localized, text: $experience.company)
+                    GrowingTextField("field.company".localized, text: $experience.company)
                         .font(.subheadline)
                         .foregroundColor(DesignTokens.Colors.secondary)
                 }
@@ -27,20 +45,31 @@ struct ExperienceRowView: View {
             }
             
             // Location and Period
-            HStack {
-                TextField("field.location".localized, text: $experience.location)
+            AdaptiveStack(spacing: DesignTokens.Spacing.sm) { isStacked in
+                GrowingTextField("field.location".localized, text: $experience.location)
                     .font(.caption)
                     .foregroundColor(DesignTokens.Colors.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 
-                Spacer()
-                
-                TextField("field.period".localized, text: $experience.period)
+                GrowingTextField("field.period".localized, text: $experience.period)
                     .font(.caption)
                     .foregroundColor(DesignTokens.Colors.tertiary)
-                    .multilineTextAlignment(.trailing)
+                    .multilineTextAlignment(isStacked ? .leading : .trailing)
+                    .frame(maxWidth: .infinity, alignment: isStacked ? .leading : .trailing)
             }
             
-            // Description
+            RowDescriptionEditor(text: $experience.description)
+        }
+        .padding(.vertical, DesignTokens.Spacing.sm)
+    }
+}
+
+/// The description box of a row. It is always there, so a description can be typed, cleared and typed again.
+struct RowDescriptionEditor: View {
+    @Binding var text: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
             Divider()
                 .padding(.vertical, DesignTokens.Spacing.xxs)
             
@@ -48,13 +77,13 @@ struct ExperienceRowView: View {
                 .font(.caption2)
                 .foregroundColor(DesignTokens.Colors.tertiary)
             
-            TextEditor(text: $experience.description)
+            TextEditor(text: $text)
                 .font(.body)
                 .frame(minHeight: DesignTokens.InputSize.textEditorMinHeight)
                 .scrollContentBackground(.hidden)
                 .background(Color.clear)
+                .accessibilityLabel("field.description".localized)
         }
-        .padding(.vertical, DesignTokens.Spacing.sm)
     }
 }
 
@@ -65,7 +94,7 @@ struct SkillRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
             HStack {
-                TextField("field.skill".localized, text: $skill.name)
+                GrowingTextField("field.skill".localized, text: $skill.name)
                     .font(DesignTokens.Typography.subheadline.font)
                 Spacer()
                 DeleteButton(label: skill.displayName, action: onDelete)
@@ -89,15 +118,15 @@ struct EducationRowView: View {
             // Degree and Delete button
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                    TextField("field.degree".localized, text: $education.degree)
+                    GrowingTextField("field.degree".localized, text: $education.degree)
                         .font(.headline)
                         .foregroundColor(DesignTokens.Colors.primary)
                     
-                    TextField("field.school".localized, text: $education.school)
+                    GrowingTextField("field.school".localized, text: $education.school)
                         .font(.subheadline)
                         .foregroundColor(DesignTokens.Colors.secondary)
                     
-                    TextField("field.period".localized, text: $education.period)
+                    GrowingTextField("field.period".localized, text: $education.period)
                         .font(.caption)
                         .foregroundColor(DesignTokens.Colors.tertiary)
                 }
@@ -107,21 +136,7 @@ struct EducationRowView: View {
                 DeleteButton(label: education.displayName, action: onDelete)
             }
             
-            // Description
-            if !education.description.isEmpty {
-                Divider()
-                    .padding(.vertical, DesignTokens.Spacing.xxs)
-                
-                Text("field.description".localized)
-                    .font(.caption2)
-                    .foregroundColor(DesignTokens.Colors.tertiary)
-                
-                TextEditor(text: $education.description)
-                    .font(.body)
-                    .frame(minHeight: DesignTokens.InputSize.textEditorMinHeight)
-                    .scrollContentBackground(.hidden)
-                    .background(Color.clear)
-            }
+            RowDescriptionEditor(text: $education.description)
         }
         .padding(.vertical, DesignTokens.Spacing.sm)
     }
@@ -134,7 +149,7 @@ struct LanguageRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
             HStack {
-                TextField("field.language".localized, text: $language.name)
+                GrowingTextField("field.language".localized, text: $language.name)
                     .font(DesignTokens.Typography.body.font)
                 
                 Spacer()
@@ -142,23 +157,16 @@ struct LanguageRowView: View {
                 DeleteButton(label: language.displayName, action: onDelete)
             }
             
-            HStack {
-                Text("field.level".localized)
-                    .font(DesignTokens.Typography.callout.font)
-                    .foregroundColor(DesignTokens.Colors.secondary)
-                
-                Spacer()
-                
-                Picker("field.language_level", selection: $language.level) {
-                    ForEach(LanguageProficiencyLevel.allCases, id: \.self) { level in
-                        Text(level.localizationKey.localized)
-                            .tag(level)
-                    }
+            // The picker names itself: one "Level" label, not a second one beside it
+            Picker("field.level", selection: $language.level) {
+                ForEach(LanguageProficiencyLevel.allCases, id: \.self) { level in
+                    Text(level.localizationKey.localized)
+                        .tag(level)
                 }
-                .pickerStyle(MenuPickerStyle())
-                .font(DesignTokens.Typography.callout.font)
-                .tint(DesignTokens.Colors.accent)
             }
+            .pickerStyle(MenuPickerStyle())
+            .font(DesignTokens.Typography.callout.font)
+            .tint(DesignTokens.Colors.accent)
         }
         .padding(.vertical, DesignTokens.Spacing.xs)
     }
@@ -171,18 +179,18 @@ struct CertificationRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
             HStack {
-                TextField("field.certification_name".localized, text: $certification.name)
+                GrowingTextField("field.certification_name".localized, text: $certification.name)
                     .font(DesignTokens.Typography.subheadline.font)
                     .fontWeight(.semibold)
                 Spacer()
                 DeleteButton(label: certification.displayName, action: onDelete)
             }
             
-            TextField("field.issuer".localized, text: $certification.issuer)
+            GrowingTextField("field.issuer".localized, text: $certification.issuer)
                 .font(DesignTokens.Typography.body.font)
                 .foregroundColor(DesignTokens.Colors.secondary)
             
-            HStack {
+            AdaptiveStack(spacing: DesignTokens.Spacing.sm) { _ in
                 TextField("field.year".localized, text: Binding(
                     get: { String(certification.year) },
                     set: { newValue in
@@ -191,15 +199,14 @@ struct CertificationRowView: View {
                 ))
                 .keyboardType(.numberPad)
                 .font(DesignTokens.Typography.callout.font)
-                .frame(maxWidth: DesignTokens.InputSize.textFieldWidth)
+                .frame(maxWidth: DesignTokens.InputSize.textFieldWidth, alignment: .leading)
                 
-                Spacer()
-                
-                TextField("field.url".localized, text: $certification.url)
+                GrowingTextField("field.url".localized, text: $certification.url)
                     .textContentType(.URL)
                     .keyboardType(.URL)
                     .font(DesignTokens.Typography.callout.font)
                     .foregroundColor(DesignTokens.Colors.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
@@ -229,15 +236,18 @@ struct SocialLinkRowView: View {
     
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
-            TextField("field.platform".localized, text: $social.platform)
-                .font(DesignTokens.Typography.body.font)
-                .frame(maxWidth: DesignTokens.InputSize.textFieldMaxWidth)
-            
-            TextField("field.url".localized, text: $social.url)
-                .textContentType(.URL)
-                .keyboardType(.URL)
-                .font(DesignTokens.Typography.callout.font)
-                .foregroundColor(DesignTokens.Colors.accent)
+            AdaptiveStack(spacing: DesignTokens.Spacing.md) { isStacked in
+                GrowingTextField("field.platform".localized, text: $social.platform)
+                    .font(DesignTokens.Typography.body.font)
+                    .frame(maxWidth: isStacked ? .infinity : DesignTokens.InputSize.textFieldMaxWidth, alignment: .leading)
+                
+                GrowingTextField("field.url".localized, text: $social.url)
+                    .textContentType(.URL)
+                    .keyboardType(.URL)
+                    .font(DesignTokens.Typography.callout.font)
+                    .foregroundColor(DesignTokens.Colors.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             
             DeleteButton(label: social.displayName, action: onDelete)
         }
@@ -251,7 +261,7 @@ struct InterestRowView: View {
     
     var body: some View {
         HStack {
-            TextField("field.interest".localized, text: $interest)
+            GrowingTextField("field.interest".localized, text: $interest)
                 .font(DesignTokens.Typography.body.font)
             
             Spacer()

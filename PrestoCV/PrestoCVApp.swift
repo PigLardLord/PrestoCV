@@ -11,9 +11,11 @@ import CVPDFExporter
 
 @main
 struct PrestoCVApp: App {
+    private let storageDirectory = LaunchEnvironment.storageDirectory()
+
     var body: some Scene {
         WindowGroup {
-            AppLaunchView(makeDependencyContainer: { DependencyContainer() })
+            AppLaunchView(makeDependencyContainer: { [storageDirectory] in DependencyContainer(storageDirectory: storageDirectory) })
         }
     }
 }

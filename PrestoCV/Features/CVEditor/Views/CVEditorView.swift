@@ -6,6 +6,7 @@ struct CVEditorView: View {
     @StateObject private var viewModel: CVEditorViewModel
     @State private var showingExportSheet = false
     @State private var deletionAnchor = RowDeletionAnchor()
+    @StateObject private var keyboard = KeyboardVisibility()
 
     /// The view model is built once, when the screen first appears, and survives every re-render of the parent.
     init(viewModel: @autoclosure @escaping () -> CVEditorViewModel) {
@@ -20,7 +21,7 @@ struct CVEditorView: View {
         ) { _ in
             editorView
         }
-        .navigationTitle(viewModel.cv.name.isEmpty ? "editor.new_cv".localized : viewModel.cv.name)
+        .navigationTitle(viewModel.screenTitle)
         .navigationBarTitleDisplayMode(.inline)
         // Back and the edge swipe would leave without the discard confirmation that Cancel asks for
         .navigationBarBackButtonHidden(true)
@@ -91,16 +92,22 @@ struct CVEditorView: View {
         VStack(spacing: 0) {
             TabView {
                 PersonalInfoSection(cv: $viewModel.cv, documentLanguage: $viewModel.documentLanguageSelection)
+                    .keyboardDoneButton()
+                    .hidesTabBar(while: keyboard.isVisible)
                     .tabItem {
                         Label("section.basics".localized, systemImage: "person.circle")
                     }
 
                 ExperienceSection(viewModel: viewModel)
+                    .keyboardDoneButton()
+                    .hidesTabBar(while: keyboard.isVisible)
                     .tabItem {
                         Label("section.experience".localized, systemImage: "briefcase")
                     }
 
                 DetailsSection(viewModel: viewModel)
+                    .keyboardDoneButton()
+                    .hidesTabBar(while: keyboard.isVisible)
                     .tabItem {
                         Label("section.details".localized, systemImage: "list.bullet.circle")
                     }
@@ -112,19 +119,24 @@ struct CVEditorView: View {
             .accessibilityLabel("editor.title".localized)
             .accessibilityHint("accessibility.editor_hint".localized)
 
-            Divider()
+            // The tab bar and the export button give the space back to the form while someone types
+            if !keyboard.isVisible {
+                Divider()
 
-            PrimaryButton.large(
-                title: String(localized: "export.button.title"),
-                icon: "square.and.arrow.up",
-                isDisabled: !viewModel.hasMeaningfulContent
-            ) {
-                showingExportSheet = true
+                PrimaryButton.large(
+                    title: String(localized: "export.button.title"),
+                    icon: "square.and.arrow.up",
+                    isDisabled: !viewModel.hasMeaningfulContent
+                ) {
+                    showingExportSheet = true
+                }
+                // The button keeps a readable size at the largest text sizes instead of taking a fifth of the screen
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                .frame(maxWidth: DesignTokens.Layout.readableContentWidth)
+                .padding(DesignTokens.Spacing.lg)
+                .frame(maxWidth: .infinity)
+                .background(DesignTokens.Colors.background)
             }
-            .frame(maxWidth: DesignTokens.Layout.readableContentWidth)
-            .padding(DesignTokens.Spacing.lg)
-            .frame(maxWidth: .infinity)
-            .background(DesignTokens.Colors.background)
         }
     }
     

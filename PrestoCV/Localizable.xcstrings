@@ -2129,37 +2129,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ihr Lebenslauf wurde gespeichert."
+            "value" : "Ihr Lebenslauf ist auf diesem Gerät gespeichert."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your CV has been saved successfully."
+            "value" : "Your CV is saved on this device."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tu CV se ha guardado correctamente."
+            "value" : "Tu CV está guardado en este dispositivo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Votre CV a bien été enregistré."
+            "value" : "Votre CV est enregistré sur cet appareil."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il tuo CV è stato salvato."
+            "value" : "Il tuo CV è salvato su questo dispositivo."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seu currículo foi salvo."
+            "value" : "Seu currículo está salvo neste dispositivo."
           }
         }
       }
@@ -2375,37 +2375,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erfolgreich gespeichert"
+            "value" : "Gespeichert"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Saved Successfully"
+            "value" : "Saved"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guardado correctamente"
+            "value" : "Guardado"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enregistré avec succès"
+            "value" : "Enregistré"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Salvato con successo"
+            "value" : "Salvato"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Salvo com sucesso"
+            "value" : "Salvo"
           }
         }
       }
@@ -5604,47 +5604,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Idioma"
-          }
-        }
-      }
-    },
-    "field.language_level" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sprachniveau"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Language Level"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nivel de idioma"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Niveau de langue"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Livello linguistico"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nível do idioma"
           }
         }
       }

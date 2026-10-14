@@ -61,22 +61,21 @@ struct NavigationRow: View {
                 Text(title)
                     .typography(.headline)
                     .foregroundColor(DesignTokens.Colors.primary)
-                    .lineLimit(1)
                 
                 if let subtitle = subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .typography(.subheadline)
                         .foregroundColor(DesignTokens.Colors.secondary)
-                        .lineLimit(1)
                 }
                 
                 if let caption = caption, !caption.isEmpty {
                     Text(caption)
                         .typography(.caption1)
                         .foregroundColor(DesignTokens.Colors.secondary)
-                        .lineLimit(1)
                 }
             }
+            // The row grows with its text instead of cutting it off
+            .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, DesignTokens.Spacing.xxs)
         .accessibilityLabel("accessibility.navigate_to".localizedWithArgs(title))

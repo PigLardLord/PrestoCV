@@ -26,6 +26,16 @@ final class CVEditorViewModel: ObservableObject {
         saveError ?? ""
     }
     
+    /// The title of the screen: the name of the CV. A CV that was never stored is "New CV" until it is named.
+    /// A stored CV without a name shows the name of the person, or "Untitled CV" when it has neither.
+    var screenTitle: String {
+        let cvName = cv.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard cvName.isEmpty else { return cvName }
+        guard savedSnapshot != nil else { return "editor.new_cv".localized }
+        let personName = cv.personalInfo.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return personName.isEmpty ? "cv.untitled".localized : personName
+    }
+    
     /// Determines if the CV has meaningful content beyond just the name
     var hasMeaningfulContent: Bool {
         // Check if any essential fields have content

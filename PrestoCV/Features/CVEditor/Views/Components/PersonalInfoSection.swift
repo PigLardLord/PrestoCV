@@ -4,6 +4,25 @@ import PrestoCVCore
 struct PersonalInfoSection: View {
     @Binding var cv: CVModel
     @Binding var documentLanguage: DocumentLanguage?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    
+    /// E-mail and phone side by side where the screen is wide, one above the other where it is not, so that
+    /// neither is cut off.
+    private var contactFields: some View {
+        let layout = horizontalSizeClass == .regular
+            ? AnyLayout(HStackLayout(alignment: .top, spacing: DesignTokens.Spacing.sm))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: DesignTokens.Spacing.sm))
+        return layout {
+            LabeledTextField.email(
+                text: $cv.personalInfo.email,
+                isRequired: true
+            )
+            
+            LabeledTextField.phone(
+                text: $cv.personalInfo.phone
+            )
+        }
+    }
     
     var body: some View {
         Form {
@@ -33,16 +52,7 @@ struct PersonalInfoSection: View {
                     
                     LabeledTextField(label: "field.location".localized, text: $cv.personalInfo.location)
                     
-                    HStack(alignment: .top, spacing: DesignTokens.Spacing.sm) {
-                        LabeledTextField.email(
-                            text: $cv.personalInfo.email,
-                            isRequired: true
-                        )
-                        
-                        LabeledTextField.phone(
-                            text: $cv.personalInfo.phone
-                        )
-                    }
+                    contactFields
                     
                     LabeledTextField.url(
                         label: "field.portfolio_url".localized,

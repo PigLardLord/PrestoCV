@@ -1,46 +1,51 @@
 import SwiftUI
 
-/// A reusable input component that handles both secure and regular text fields with styling
+/// A reusable input component that handles both secure and regular text fields with styling.
+///
+/// The focus has one source of truth: the `FocusState` that the caller owns and `.focused` binds to the field.
+/// Nothing in the field writes it back from an editing callback; on iOS 27 two writers took the focus from each
+/// other in a loop, and the app ran at 100% CPU as soon as a second field was tapped.
 struct FieldInput: View {
     @Binding var text: String
+    let accessibilityLabel: String
     let placeholder: String
     let isSecure: Bool
     let keyboardType: UIKeyboardType
     let textContentType: UITextContentType?
     let validationState: FieldLabel.ValidationState
     @FocusState.Binding var isFocused: Bool
-    let onEditingChanged: ((Bool) -> Void)?
     let onCommit: (() -> Void)?
     
     init(
         text: Binding<String>,
+        accessibilityLabel: String = "",
         placeholder: String = "",
         isSecure: Bool = false,
         keyboardType: UIKeyboardType = .default,
         textContentType: UITextContentType? = nil,
         validationState: FieldLabel.ValidationState = .none,
         isFocused: FocusState<Bool>.Binding,
-        onEditingChanged: ((Bool) -> Void)? = nil,
         onCommit: (() -> Void)? = nil
     ) {
         self._text = text
+        self.accessibilityLabel = accessibilityLabel
         self.placeholder = placeholder
         self.isSecure = isSecure
         self.keyboardType = keyboardType
         self.textContentType = textContentType
         self.validationState = validationState
         self._isFocused = isFocused
-        self.onEditingChanged = onEditingChanged
         self.onCommit = onCommit
     }
     
     var body: some View {
         InputField(
             text: $text,
+            accessibilityLabel: accessibilityLabel,
             placeholder: placeholder,
             isSecure: isSecure,
             isFocused: $isFocused,
-            onEditingChanged: onEditingChanged
+            onCommit: onCommit
         )
         .padding(.horizontal, DesignTokens.Spacing.sm)
         .padding(.vertical, DesignTokens.Spacing.xs)
@@ -53,9 +58,6 @@ struct FieldInput: View {
         )
         .keyboardType(keyboardType)
         .textContentType(textContentType)
-        .onSubmit {
-            onCommit?()
-        }
     }
     
     private var borderColor: Color {
@@ -83,21 +85,29 @@ struct FieldInput: View {
 /// Internal component that handles the actual text field rendering
 private struct InputField: View {
     @Binding var text: String
+    let accessibilityLabel: String
     let placeholder: String
     let isSecure: Bool
     @FocusState.Binding var isFocused: Bool
-    let onEditingChanged: ((Bool) -> Void)?
+    let onCommit: (() -> Void)?
+    
+    private var label: String {
+        accessibilityLabel.isEmpty ? placeholder : accessibilityLabel
+    }
     
     var body: some View {
+        field
+            .focused($isFocused)
+            .accessibilityLabel(label)
+    }
+    
+    @ViewBuilder
+    private var field: some View {
         if isSecure {
             SecureField(placeholder, text: $text)
-                .focused($isFocused)
+                .onSubmit { onCommit?() }
         } else {
-            TextField(placeholder, text: $text, onEditingChanged: { editing in
-                isFocused = editing
-                onEditingChanged?(editing)
-            })
-            .focused($isFocused)
+            GrowingTextField(placeholder, text: $text, accessibilityLabel: label, onReturn: onCommit)
         }
     }
 }

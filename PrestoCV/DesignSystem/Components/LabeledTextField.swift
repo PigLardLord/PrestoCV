@@ -13,7 +13,6 @@ struct LabeledTextField: View {
     var validationState: ValidationState = .none
     var errorMessage: String? = nil
     var helpText: String? = nil
-    var onEditingChanged: ((Bool) -> Void)? = nil
     var onCommit: (() -> Void)? = nil
     
     @FocusState private var isFocused: Bool
@@ -31,13 +30,13 @@ struct LabeledTextField: View {
             
             FieldInput(
                 text: $text,
+                accessibilityLabel: label,
                 placeholder: placeholder,
                 isSecure: isSecure,
                 keyboardType: keyboardType,
                 textContentType: textContentType,
                 validationState: validationState,
                 isFocused: $isFocused,
-                onEditingChanged: onEditingChanged,
                 onCommit: onCommit
             )
             
