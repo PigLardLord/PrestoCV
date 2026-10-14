@@ -18,6 +18,7 @@ The current app and packages are the legacy code the migration replaces, one con
 | `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). |
 | `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The current packages (legacy, being replaced). |
 | `Tools/ArchitectureCheck/` | The checker that enforces the rules, and its pre-commit hook. |
+| `ci_scripts/`, `TestPlans/`, `docs/release/` | The Xcode Cloud side of the releases: its build scripts, the test plans, and the settings of its workflows. |
 | `Prototypes/ADRValidation/` | The throwaway prototype that validated the ADRs. It is outside the app's build; its README says how to run it. |
 
 ## Building and testing
@@ -27,9 +28,12 @@ You need Xcode 27, which reads the project in its JSON format (`PrestoCV.xcodepr
 ```bash
 xcodebuild -project PrestoCV.xcodeproj -scheme PrestoCV -configuration Debug build
 xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
+xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -testPlan CI -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
 swift test --package-path PrestoCVCore
 Tools/ArchitectureCheck/check.sh
 ```
+
+The scheme has two test plans. `PrestoCV`, the default, runs every test: the app's, the exporter package's simulator tests, and `PrestoCVUITests`. `CI` leaves out `PrestoCVUITests`, Xcode's template launch tests, which take most of an hour and check nothing.
 
 On Linux, the packages contain only the new targets. They build today and stay empty until the migration fills them; the architecture checker and the prototype also build and test there. The legacy targets are declared only on Apple hosts (ADR 0012).
 
@@ -40,14 +44,14 @@ On Linux, the packages contain only the new targets. They build today and stay e
 
 ## Releasing
 
-The `Release` workflow (`.github/workflows/release.yml`) tests the app, archives it, signs it and uploads it to TestFlight. It runs on the owner's Mac, the self-hosted runner labelled `prestocv-release`, which has Xcode 27.
+Xcode Cloud tests version 1, archives it, signs it and uploads it to TestFlight ([ADR 0024](docs/architecture/adr/0024-run-apple-ci-and-releases-on-xcode-cloud.md)). It runs three workflows:
+- **Pull Request:** a pull request to `main` runs the `CI` test plan on an iPhone and an iPad simulator. GitHub shows the result in the pull request.
+- **Main:** a merge to `main` tests, archives and uploads a build to TestFlight for the internal testers.
+- **Release:** a GitHub Release with a tag such as `v1.2.3`, or a push to a branch such as `release/1.2.3`, tests that commit, archives version 1.2.3 and uploads it to TestFlight.
 
-- **Start it** with a tag (`git tag v1.0.0 && git push origin v1.0.0`) or a manual run from the Actions tab. The build number is the run number.
-- **Signing** uses an App Store Connect API key, so the Mac needs no signed-in Apple ID and no certificate in its keychain. Xcode creates the distribution certificate and the profile in the owner's team. The repository needs:
-  - the secrets `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_PRIVATE_KEY`, the contents of the `.p8` file of a team key with the Admin role;
-  - the variable `APPLE_TEAM_ID`.
-- **Before the upload**, `Tools/Release/check-archive.sh` checks the archive: bundle identifier, version, privacy manifest, encryption declaration, icon, and that no document type is declared.
-- **Submitting** a build for App Review stays a decision taken in App Store Connect.
+Nothing submits a build for App Review: the owner does it in App Store Connect, with Add for Review.
+
+The repository side is `ci_scripts/` (it sets an archive's version from its tag or branch, checks the archive with `Tools/Release/check-archive.sh` before the upload, and runs the architecture check, the package tests and the package builds), `TestPlans/`, and the `DEVELOPMENT_TEAM` of the project. Xcode Cloud signs the build itself, so the repository holds no key and no secret. `docs/release/xcode-cloud.md` has the exact settings of the three workflows, the one-time setup, and the steps to cut a release.
 
 ## Contributing
 

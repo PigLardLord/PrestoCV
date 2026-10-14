@@ -115,7 +115,7 @@ The current code is not refactored in place. The new structure is built next to 
 6. **AI Drafting.** Port with its own draft model, availability port, validation on every path (#16, #17, #18, #35).
 7. **Delete the old code** and close the issues the refactor made obsolete.
 
-Each step lands behind green CI on iOS, macOS and Linux. On Linux only the new targets exist ([ADR 0012](adr/0012-legacy-targets-during-migration.md)).
+Each step lands behind green CI on iOS, macOS and Linux. On Linux only the new targets exist ([ADR 0012](adr/0012-legacy-targets-during-migration.md)). The Linux checks run on GitHub Actions and the Apple checks on Xcode Cloud ([ADR 0024](adr/0024-run-apple-ci-and-releases-on-xcode-cloud.md)).
 
 ### Porting from the validation prototype
 

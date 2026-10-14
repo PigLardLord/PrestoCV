@@ -23,5 +23,6 @@ Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected*
 | [0011](0011-typed-html-builder.md) | Generate document HTML with a typed builder; designs are allow-listed CSS only | Accepted |
 | [0012](0012-legacy-targets-during-migration.md) | Keep legacy targets out of Linux builds and out of the rules until deleted | Accepted |
 | [0022](0022-ship-legacy-app-as-v1.md) | Ship the legacy app, fixed, as version 1 | Accepted |
+| [0024](0024-run-apple-ci-and-releases-on-xcode-cloud.md) | Run the Apple CI and the releases on Xcode Cloud | Accepted |
 
 New ADRs copy [template.md](template.md).

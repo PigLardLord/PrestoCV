@@ -1,0 +1,54 @@
+{
+  "configurations" : [
+    {
+      "id" : "9F3D2B64-7A1C-4E85-B0D3-2E6A8C4F1B97",
+      "name" : "Configuration 1",
+      "options" : {}
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:PrestoCV.xcodeproj",
+      "identifier" : "23E2E8A327562C01000F2E5D",
+      "name" : "PrestoCV"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:PrestoCV.xcodeproj",
+        "identifier" : "23E2E8B327562C02000F2E5D",
+        "name" : "PrestoCVTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CVPDFExporter",
+        "identifier" : "CVDesignCatalogTests",
+        "name" : "CVDesignCatalogTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CVPDFExporter",
+        "identifier" : "CVDesignCatalogFileStoreTests",
+        "name" : "CVDesignCatalogFileStoreTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CVPDFExporter",
+        "identifier" : "CVRenderingTests",
+        "name" : "CVRenderingTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CVPDFExporter",
+        "identifier" : "CVRenderingWebKitSupportTests",
+        "name" : "CVRenderingWebKitSupportTests"
+      }
+    }
+  ],
+  "version" : 1
+}
