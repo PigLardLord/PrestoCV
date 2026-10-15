@@ -1,15 +1,17 @@
 import Foundation
+import os
 
 actor JSONTemplateLoader: JSONTemplateLoaderProtocol {
     
     private let decoder = JSONDecoder()
+    private let logger = Logger(subsystem: "com.PigLardLord.prestocv", category: "templates")
     
     func loadTemplate(from path: String) async -> CVModel? {
         let url = URL(fileURLWithPath: path)
         
         guard let data = try? Data(contentsOf: url),
               let cv = try? decoder.decode(CVModel.self, from: data) else {
-            print("Failed to load template from \(url.lastPathComponent)")
+            logger.error("Failed to load template from \(url.lastPathComponent, privacy: .public)")
             return nil
         }
         

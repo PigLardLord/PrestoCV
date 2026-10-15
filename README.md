@@ -44,7 +44,7 @@ On Linux, the packages contain only the new targets. They build today and stay e
 ## Development data
 
 - **Saved CVs.** Version 1 ships the legacy app (ADR 0022), so the CVs it saves in `Application Support/PrestoCV/CVs` are a released format. When the app switches to the new persistence (schema 1, ADR 0009), a one-time importer reads them. CVs saved by development builds before version 1, in `Documents`, are not migrated.
-- **Samples.** The sample CVs offered on first run are in `PrestoCV/Resources/Samples/`, in schema 1, read by `DirectorySampleCVSource` through the store's own reader. The legacy app still reads the old samples, `PrestoCV/Resources/*_cv.json`, until the switch; they go with the legacy code (#47).
+- **Samples.** Version 1 offers the five legacy samples on first run: `PrestoCV/Resources/<name>_cv.json` in English and `<name>_cv.<language>.json` in German, Spanish, French, Italian and Portuguese. The app reads the set of the language it is shown in, and the English one where there is none. They go with the legacy code (#47). The schema 1 samples in `PrestoCV/Resources/Samples/`, read by `DirectorySampleCVSource` through the store's own reader, are for the switch: the app target leaves them out until then, so version 1 does not ship them.
 
 ## Releasing
 

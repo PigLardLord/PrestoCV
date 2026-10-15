@@ -1,0 +1,94 @@
+{
+  "name": "Leiter Operations – Bewerbung bei Global Manufacturing Corp",
+  "personalInfo": {
+    "name": "James Rodriguez",
+    "title": "Leiter Operations",
+    "location": "Chicago, IL",
+    "email": "james.rodriguez@example.com",
+    "phone": "+1 (555) 456-7890",
+    "portfolio": "",
+    "profile": "Ergebnisorientierte Führungskraft im Betriebsmanagement mit über 12 Jahren Erfahrung in der Steigerung von Effizienz und Wachstum in Fortune-500-Unternehmen. Expertise in Prozessoptimierung, strategischer Planung und bereichsübergreifender Führung. Nachgewiesene Erfolge bei zweistelligen Verbesserungen der Betriebskennzahlen und in der Leitung von Teams mit über 100 Mitarbeitenden."
+  },
+  "relevant_experience": [
+    {
+      "title": "Leiter Operations",
+      "company": "Global Manufacturing Corp",
+      "location": "Chicago, IL",
+      "period": "Januar 2020 – heute",
+      "description": "Verantwortung für den Betrieb an 5 Standorten mit 2 Mrd. US-Dollar Jahresumsatz. • Einführung von Lean-Manufacturing-Prinzipien und Senkung der Kosten um 18 % • Leitung einer Initiative zur digitalen Transformation, die die Effizienz der Lieferkette um 30 % steigerte • Ergebnisverantwortung für den Betriebsbereich bei durchgehend übertroffenen Zielvorgaben"
+    },
+    {
+      "title": "Betriebsleiter",
+      "company": "SupplyChain Solutions Inc",
+      "location": "Dallas, TX",
+      "period": "März 2016 – Dezember 2019",
+      "description": "Leitung eines Logistiknetzwerks mit über 500 Kunden im ganzen Land. • Expansion in 3 neue Märkte und Umsatzsteigerung um 45 % • Entwicklung eines Dashboards mit Leistungskennzahlen, das Entscheidungen um 40 % beschleunigte • Verhandlung von Lieferantenverträgen mit Einsparungen von 2,5 Mio. US-Dollar pro Jahr"
+    },
+    {
+      "title": "Business-Analyst",
+      "company": "Consulting Partners LLC",
+      "location": "Boston, MA",
+      "period": "Juni 2013 – Februar 2016",
+      "description": "Operative Beratung für mittelgroße Unternehmen. • Prozessaufnahme und Effizienzanalysen für über 25 Kunden • Entwicklung von ROI-Modellen für Initiativen zur Verbesserung der Abläufe • Moderation von Führungskräfte-Workshops zu Change-Management und Strategie"
+    }
+  ],
+  "education": [
+    {
+      "degree": "MBA",
+      "school": "Northwestern University - Kellogg School of Management",
+      "period": "2012",
+      "description": "Vertiefung in Operations Management und Strategie. Aufnahme in die Dean's List. Leitung eines Beratungsprojekts für einen Fortune-500-Kunden."
+    },
+    {
+      "degree": "B.Sc. Wirtschaftsingenieurwesen",
+      "school": "Georgia Institute of Technology",
+      "period": "2009",
+      "description": "Schwerpunkt auf Systemoptimierung und Qualitätsmanagement. Abschluss mit Auszeichnung. Vorsitz der Studierendenvereinigung für Wirtschaftsingenieurwesen."
+    }
+  ],
+  "skills": [
+    { "name": "Strategische Planung", "level": 5 },
+    { "name": "Prozessoptimierung", "level": 5 },
+    { "name": "Projektmanagement", "level": 5 },
+    { "name": "Budgetverantwortung", "level": 5 },
+    { "name": "Teamführung", "level": 5 },
+    { "name": "Lieferkettenmanagement", "level": 4 },
+    { "name": "Datenanalyse", "level": 4 },
+    { "name": "Change-Management", "level": 4 },
+    { "name": "Lean Six Sigma", "level": 4 },
+    { "name": "Finanzmodellierung", "level": 3 }
+  ],
+  "languages": [
+    { "name": "Englisch", "level": "Native" },
+    { "name": "Spanisch", "level": "C1" }
+  ],
+  "certifications": [
+    {
+      "name": "Six Sigma Black Belt",
+      "issuer": "American Society for Quality",
+      "year": 2018,
+      "url": "https://asq.org/",
+      "description": "Fortgeschrittene Zertifizierung in Methoden der Prozessverbesserung und statistischen Analyse."
+    },
+    {
+      "name": "Project Management Professional (PMP)",
+      "issuer": "Project Management Institute",
+      "year": 2015,
+      "url": "https://www.pmi.org/",
+      "description": "Zertifizierung, die Wissen und Erfahrung im Projektmanagement bestätigt."
+    }
+  ],
+  "interests": [
+    "Führungskräfteentwicklung",
+    "Mentoring",
+    "Golf",
+    "Lesen (Wirtschaft und Geschichte)",
+    "Ehrenamtliches Engagement"
+  ],
+  "social": [
+    {
+      "platform": "LinkedIn",
+      "url": "https://example.com/linkedin"
+    }
+  ]
+}

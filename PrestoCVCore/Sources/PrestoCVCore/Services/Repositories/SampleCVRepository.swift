@@ -14,21 +14,26 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
     private let bundleResourceService: BundleResourceServiceProtocol
     private let templateLoader: JSONTemplateLoaderProtocol
     private let parallelSearchService: ParallelSearchServiceProtocol
+    private let languages: [String]
     
     // MARK: - Initialization
     
+    /// - Parameter languages: The languages to read the samples in, the most wanted first. The default is the
+    ///   language the app is shown in. A sample with no version in any of them is read in English.
     public init(
         storageService: StorageServiceProtocol,
         categoryService: TemplateCategoryServiceProtocol,
         bundleResourceService: BundleResourceServiceProtocol,
         templateLoader: JSONTemplateLoaderProtocol,
-        parallelSearchService: ParallelSearchServiceProtocol
+        parallelSearchService: ParallelSearchServiceProtocol,
+        languages: [String] = Bundle.main.preferredLocalizations
     ) {
         self.storageService = storageService
         self.categoryService = categoryService
         self.bundleResourceService = bundleResourceService
         self.templateLoader = templateLoader
         self.parallelSearchService = parallelSearchService
+        self.languages = languages
     }
     
     // MARK: - Public Protocol Implementation
@@ -63,11 +68,23 @@ extension SampleCVRepository {
     private func getBundledSamplePaths() async -> [String] {
         var paths: [String] = []
         for name in Self.bundledSampleNames {
-            if let url = await bundleResourceService.getResourceURL(forResource: name, withExtension: "json") {
+            if let url = await sampleURL(named: name) {
                 paths.append(url.path)
             }
         }
         return paths
+    }
+    
+    /// The file of a sample in the first language that has one, and the English file when none does. A sample is
+    /// `technical_cv.json` in English and `technical_cv.de.json` in German: the bundle flattens its folders, so the
+    /// language is part of the file name.
+    private func sampleURL(named name: String) async -> URL? {
+        for language in languages {
+            if let url = await bundleResourceService.getResourceURL(forResource: "\(name).\(language)", withExtension: "json") {
+                return url
+            }
+        }
+        return await bundleResourceService.getResourceURL(forResource: name, withExtension: "json")
     }
     
     // MARK: Template Loading
@@ -101,7 +118,7 @@ extension SampleCVRepository {
     
     private func loadSampleByExactName(_ name: String) async throws -> CVModel? {
         guard Self.bundledSampleNames.contains(name),
-              let url = await bundleResourceService.getResourceURL(forResource: name, withExtension: "json") else {
+              let url = await sampleURL(named: name) else {
             return nil
         }
         

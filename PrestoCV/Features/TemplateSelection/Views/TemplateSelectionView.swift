@@ -1,14 +1,20 @@
 import SwiftUI
 import PrestoCVCore
 
-/// The "New CV" screen: start from a blank CV or, where available, from an AI draft.
+/// The "New CV" screen: start from a blank CV or, where the device can run it, from an AI draft.
 /// Choosing the design of the PDF happens in the export sheet.
 struct TemplateSelectionView: View {
     @EnvironmentObject var router: AppRouter
-    let isAIGenerationAvailable: Bool
+    @StateObject private var viewModel: TemplateSelectionViewModel
+    @Environment(\.scenePhase) private var scenePhase
 
-    init(isAIGenerationAvailable: Bool = false) {
-        self.isAIGenerationAvailable = isAIGenerationAvailable
+    /// The cards show a wide picture. A square one fills the screen of an iPad, and on an iPhone it pushes the second
+    /// card, and the sentence that says why it is dimmed, out of sight.
+    private let previewAspectRatio: CGFloat = 2.4
+
+    /// The view model is built once, when the screen first appears, and survives every re-render of the parent.
+    init(viewModel: @autoclosure @escaping () -> TemplateSelectionViewModel) {
+        self._viewModel = StateObject(wrappedValue: viewModel())
     }
 
     var body: some View {
@@ -26,15 +32,24 @@ struct TemplateSelectionView: View {
                 ) {
                     createNewCard
 
-                    if isAIGenerationAvailable {
-                        aiGenerationCard
-                    }
+                    aiGenerationEntry
                 }
             }
             .padding(DesignTokens.Spacing.md)
         }
-        .navigationTitle("cv.new".localized)
-        .navigationBarTitleDisplayMode(.large)
+        .readableContentWidth()
+        .screenTitle("cv.new".localized, large: true)
+        // Turning Apple Intelligence on happens in Settings: the card is read again on the way back
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                viewModel.refreshAIAvailability()
+            }
+        }
+        // While the model downloads, the card turns on by itself when it is ready. The task starts again when the
+        // entry changes, and ends with the screen.
+        .task(id: viewModel.aiEntry) {
+            await viewModel.followAIAvailability()
+        }
     }
 
     // MARK: - View Components
@@ -49,7 +64,7 @@ struct TemplateSelectionView: View {
                     // Empty template preview
                     RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
                         .fill(DesignTokens.Colors.backgroundSecondary)
-                        .aspectRatio(1.0, contentMode: .fit)
+                        .aspectRatio(previewAspectRatio, contentMode: .fit)
                         .overlay(
                             Image(systemName: "plus.rectangle.on.rectangle")
                                 .font(DesignTokens.IconSize.hero.font)
@@ -72,6 +87,32 @@ struct TemplateSelectionView: View {
         .buttonStyle(PlainButtonStyle())
     }
 
+    @ViewBuilder
+    private var aiGenerationEntry: some View {
+        switch viewModel.aiEntry {
+        case .available:
+            aiGenerationCard
+        case .disabled(let explanation):
+            disabledAIGenerationCard(explanation)
+        case .hidden:
+            EmptyView()
+        }
+    }
+
+    /// The AI card, dimmed and disabled, with the sentence that says what to do before it can be used
+    private func disabledAIGenerationCard(_ explanation: AIEntry.Explanation) -> some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+            aiGenerationCard
+                .disabled(true)
+                .opacity(DesignTokens.Opacity.subtle)
+                .accessibilityHint(explanation.key.localized)
+
+            Text(explanation.key.localized)
+                .typography(.caption1)
+                .foregroundColor(DesignTokens.Colors.secondary)
+        }
+    }
+
     private var aiGenerationCard: some View {
         Button(action: {
             router.navigate(to: .aiGeneration)
@@ -90,7 +131,7 @@ struct TemplateSelectionView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .aspectRatio(1.0, contentMode: .fit)
+                        .aspectRatio(previewAspectRatio, contentMode: .fit)
                         .overlay(
                             Image(systemName: "sparkles")
                                 .font(DesignTokens.IconSize.hero.font)
@@ -126,7 +167,7 @@ struct TemplateSelectionView: View {
 struct TemplateSelectionView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            TemplateSelectionView(isAIGenerationAvailable: true)
+            TemplateSelectionView(viewModel: TemplateSelectionViewModel(aiAvailability: { .available }))
         }
         .environmentObject(AppRouter())
     }

@@ -32,6 +32,18 @@
       "target-membership": [
         "PrestoCV",
       ],
+      "membership-exceptions": [
+        {
+          "target": "PrestoCV",
+          "exclusions": [
+            "Resources/Samples/academic.cv.json",
+            "Resources/Samples/business.cv.json",
+            "Resources/Samples/creative.cv.json",
+            "Resources/Samples/healthcare.cv.json",
+            "Resources/Samples/technical.cv.json",
+          ],
+        },
+      ],
     },
     { "kind": "folder", "path": "PrestoCVTests", "target-membership": [ "PrestoCVTests" ] },
     { "kind": "folder", "path": "PrestoCVUITests", "target-membership": [ "PrestoCVUITests" ] },

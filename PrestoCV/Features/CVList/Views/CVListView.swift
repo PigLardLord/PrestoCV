@@ -47,8 +47,7 @@ struct CVListView<EmptyState: View>: View {
                 }
             }
         }
-        .navigationTitle("navigation.my_cvs".localized)
-        .navigationBarTitleDisplayMode(.large)
+        .screenTitle("navigation.my_cvs".localized, large: true)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {

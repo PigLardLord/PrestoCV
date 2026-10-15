@@ -10,7 +10,12 @@ struct CVExportSheetView: View {
     @StateObject private var previewCoordinator = HTMLPreviewCoordinator()
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var loadingTemplates = true
+    /// The room for the designs, fonts and colours grows with the text, so that their names are not cut, until the
+    /// preview above them would be left with too little.
+    @ScaledMetric(relativeTo: .footnote) private var optionsHeight: CGFloat = 300
+    private let largestOptionsHeight: CGFloat = 420
 
     init(cv: CVModel) {
         self.cv = cv
@@ -35,6 +40,10 @@ struct CVExportSheetView: View {
                             .typography(.footnote)
                             .foregroundColor(DesignTokens.Colors.secondary)
                             .multilineTextAlignment(.center)
+                            // The sentence says why the PDF cannot be shared: it is shown whole, and the preview
+                            // gives up the room. Its size stops short of the largest, so that the preview stays.
+                            .fixedSize(horizontal: false, vertical: true)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility2)
                             .padding(.horizontal, DesignTokens.Spacing.lg)
                     }
 
@@ -55,16 +64,17 @@ struct CVExportSheetView: View {
                                 Label(String(localized: "export.colors.tab"), systemImage: "paintpalette")
                             }
                     }
-                    .frame(height: 300)
+                    .frame(height: min(optionsHeight, largestOptionsHeight))
                 }
                 .padding(.top, DesignTokens.Spacing.lg)
                 .ignoresSafeArea(edges: .bottom)
             }
-            .navigationTitle(String(localized: "export.sheet.title"))
-            .navigationBarTitleDisplayMode(.inline)
+            .screenTitle(String(localized: "export.sheet.title"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "common.cancel")) { dismiss() }
+                    BarButton(title: String(localized: "common.cancel"), systemImage: "xmark", screenTextSize: dynamicTypeSize) {
+                        dismiss()
+                    }
                         .foregroundColor(DesignTokens.Colors.accent)
                 }
 
@@ -215,10 +225,10 @@ struct CVExportSheetView: View {
                                     fallbackTemplatePreview
                                 }
 
-                                Text(template.name)
+                                WholeWordsText(template.name)
                                     .typography(.footnote)
                                     .foregroundColor(DesignTokens.Colors.primary)
-                                    .lineLimit(1)
+                                    .lineLimit(2)
                             }
                         }
                         .accessibilityLabel(Text(template.name))
@@ -246,10 +256,10 @@ struct CVExportSheetView: View {
                                 .font(scheme.previewBodyFont)
                                 .foregroundColor(DesignTokens.Colors.secondary)
 
-                            Text(scheme.localizedName)
+                            WholeWordsText(scheme.localizedName)
                                 .typography(.footnote)
                                 .foregroundColor(DesignTokens.Colors.primary)
-                                .lineLimit(1)
+                                .lineLimit(2)
                         }
                     }
                     .accessibilityLabel(Text(scheme.localizedName))
@@ -286,10 +296,10 @@ struct CVExportSheetView: View {
                                 }
                             }
 
-                            Text(palette.localizedName)
+                            WholeWordsText(palette.localizedName)
                                 .typography(.footnote)
                                 .foregroundColor(DesignTokens.Colors.primary)
-                                .lineLimit(1)
+                                .lineLimit(2)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
@@ -352,19 +362,22 @@ struct CVExportSheetView: View {
         let isInteractive: Bool
         let action: () -> Void
         let content: Content
-        let width: CGFloat
+
+        /// An item grows with the text, as far as it still leaves the next one in view: its name is shown whole
+        @ScaledMetric(relativeTo: .footnote) private var width: CGFloat = 150
+        @ScaledMetric(relativeTo: .footnote) private var height: CGFloat = 160
+        private let largestWidth: CGFloat = 300
+        private let largestHeight: CGFloat = 220
 
         init(
             isSelected: Bool,
             isInteractive: Bool = true,
-            width: CGFloat = 150,
             action: @escaping () -> Void,
             @ViewBuilder content: () -> Content
         ) {
             self.isSelected = isSelected
             self.isInteractive = isInteractive
             self.action = action
-            self.width = width
             self.content = content()
         }
 
@@ -373,7 +386,7 @@ struct CVExportSheetView: View {
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                     .padding(DesignTokens.Spacing.md)
-                    .frame(width: width, height: 160, alignment: .leading)
+                    .frame(width: min(width, largestWidth), height: min(height, largestHeight), alignment: .leading)
                     .background(
                         RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
                             .fill(DesignTokens.Colors.backgroundSecondary)

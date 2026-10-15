@@ -1,0 +1,107 @@
+{
+  "name": "Designer UX/UI senior – Candidature chez DesignForward Agency",
+  "personalInfo": {
+    "name": "Maya Chen",
+    "title": "Designer UX/UI senior",
+    "location": "Brooklyn, NY",
+    "email": "maya.chen@example.com",
+    "phone": "+1 (555) 987-6543",
+    "portfolio": "https://example.com",
+    "profile": "Designer créatif avec plus de 7 ans d'expérience dans la conception d'expériences numériques intuitives pour des start-up et des entreprises du Fortune 500. Spécialisation en conception centrée sur l'utilisateur, systèmes de design et expériences multiplateformes. Passion pour l'accessibilité et pour la création d'interfaces belles et fonctionnelles qui résolvent de vrais problèmes d'utilisation."
+  },
+  "relevant_experience": [
+    {
+      "title": "Designer UX/UI senior",
+      "company": "DesignForward Agency",
+      "location": "New York, NY",
+      "period": "avril 2021 – aujourd'hui",
+      "description": "Direction du design d'une plateforme fintech utilisée par plus de 2 millions de clients. • Création d'un système de design complet adopté par plus de 15 équipes produit • Hausse de 35 % de l'engagement des utilisateurs grâce à l'optimisation de l'UX et aux tests A/B • Management d'une équipe de 4 designers et mise en place d'un processus de revue de design"
+    },
+    {
+      "title": "Product designer",
+      "company": "EcoTech Solutions",
+      "location": "Brooklyn, NY",
+      "period": "août 2018 – mars 2021",
+      "description": "Conception d'une plateforme technologique durable pour la surveillance de l'environnement. • Pilotage de l'ensemble du processus de design, de la recherche utilisateur à la mise en œuvre finale • Création de prototypes interactifs qui ont amélioré de 50 % l'alignement des parties prenantes • Collaboration avec l'équipe d'ingénierie pour garantir la faisabilité et la qualité du design"
+    },
+    {
+      "title": "Designer junior",
+      "company": "PixelPerfect Studio",
+      "location": "Chicago, IL",
+      "period": "juin 2016 – juillet 2018",
+      "description": "Création d'éléments visuels et de mises en page pour des campagnes marketing. • Conception d'identités de marque pour plus de 20 clients de secteurs variés • Réalisation de wireframes et de prototypes pour des applications mobiles et web • Participation à des tests utilisateurs et intégration des retours dans les maquettes"
+    }
+  ],
+  "education": [
+    {
+      "degree": "Master of Fine Arts (MFA) en design graphique",
+      "school": "Rhode Island School of Design",
+      "period": "2016",
+      "description": "Accent sur le design d'interaction numérique et le motion design. Projet de mémoire sur le design inclusif pour l'accessibilité."
+    },
+    {
+      "degree": "Bachelor of Fine Arts (BFA) en communication visuelle",
+      "school": "School of the Art Institute of Chicago",
+      "period": "2014",
+      "description": "Accent sur la typographie et le design d'expérience utilisateur. Diplôme obtenu avec distinction. Direction de l'équipe de design du projet de fin d'études."
+    }
+  ],
+  "skills": [
+    { "name": "Figma", "level": 5 },
+    { "name": "Adobe Creative Suite", "level": 5 },
+    { "name": "Sketch", "level": 4 },
+    { "name": "Prototypage", "level": 5 },
+    { "name": "Recherche utilisateur", "level": 4 },
+    { "name": "Systèmes de design", "level": 5 },
+    { "name": "Accessibilité", "level": 4 },
+    { "name": "Illustration", "level": 3 },
+    { "name": "Motion design", "level": 3 },
+    { "name": "Identité de marque", "level": 5 }
+  ],
+  "languages": [
+    { "name": "Anglais", "level": "Native" },
+    { "name": "Mandarin", "level": "C1" },
+    { "name": "Français", "level": "A2" }
+  ],
+  "certifications": [
+    {
+      "name": "Nielsen Norman Group UX Certification",
+      "issuer": "NN/g",
+      "year": 2022,
+      "url": "https://www.nngroup.com/training/",
+      "description": "Certification avancée en utilisabilité et en principes d'expérience utilisateur."
+    },
+    {
+      "name": "Google UX Design Certificate",
+      "issuer": "Google",
+      "year": 2019,
+      "url": "https://grow.google/certificates/ux-design/",
+      "description": "Formation complète aux processus et aux méthodes du design UX."
+    }
+  ],
+  "interests": [
+    "Typographie",
+    "Art numérique",
+    "Photographie",
+    "Voyages",
+    "Design durable"
+  ],
+  "social": [
+    {
+      "platform": "Portfolio",
+      "url": "https://example.com"
+    },
+    {
+      "platform": "Dribbble",
+      "url": "https://example.com/dribbble"
+    },
+    {
+      "platform": "LinkedIn",
+      "url": "https://example.com/linkedin"
+    },
+    {
+      "platform": "Behance",
+      "url": "https://example.com/behance"
+    }
+  ]
+}

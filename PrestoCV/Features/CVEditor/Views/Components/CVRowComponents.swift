@@ -157,16 +157,22 @@ struct LanguageRowView: View {
                 DeleteButton(label: language.displayName, action: onDelete)
             }
             
-            // The picker names itself: one "Level" label, not a second one beside it
-            Picker("field.level", selection: $language.level) {
-                ForEach(LanguageProficiencyLevel.allCases, id: \.self) { level in
-                    Text(level.localizationKey.localized)
-                        .tag(level)
+            // The picker names itself: one "Level" label, not a second one beside it. Every level fits beside the
+            // chevrons of the menu without breaking a word, so the rows of all languages share one size.
+            WholeWordsFit(
+                fitting: LanguageProficiencyLevel.allCases.map { $0.localizationKey.localized },
+                beside: Image(systemName: "chevron.up.chevron.down")
+            ) {
+                Picker("field.level", selection: $language.level) {
+                    ForEach(LanguageProficiencyLevel.allCases, id: \.self) { level in
+                        Text(level.localizationKey.localized)
+                            .tag(level)
+                    }
                 }
+                .pickerStyle(MenuPickerStyle())
+                .tint(DesignTokens.Colors.accent)
             }
-            .pickerStyle(MenuPickerStyle())
             .font(DesignTokens.Typography.callout.font)
-            .tint(DesignTokens.Colors.accent)
         }
         .padding(.vertical, DesignTokens.Spacing.xs)
     }
@@ -200,6 +206,7 @@ struct CertificationRowView: View {
                 .keyboardType(.numberPad)
                 .font(DesignTokens.Typography.callout.font)
                 .frame(maxWidth: DesignTokens.InputSize.textFieldWidth, alignment: .leading)
+                .accessibilityLabel("field.year".localized)
                 
                 GrowingTextField("field.url".localized, text: $certification.url)
                     .textContentType(.URL)
@@ -315,7 +322,7 @@ struct CVEmptyStateView: View {
                 .font(DesignTokens.IconSize.large.font)
                 .foregroundColor(DesignTokens.Colors.tertiary)
             
-            Text(title)
+            WholeWordsText(title)
                 .font(DesignTokens.Typography.subheadline.font)
                 .fontWeight(.medium)
                 .foregroundColor(DesignTokens.Colors.secondary)
@@ -339,10 +346,14 @@ struct AddButton: View {
     
     var body: some View {
         Button(action: action) {
-            Label(title, systemImage: icon)
-                .font(DesignTokens.Typography.callout.font)
-                .fontWeight(.medium)
-                .foregroundColor(DesignTokens.Colors.accent)
+            Label {
+                WholeWordsText(title)
+            } icon: {
+                Image(systemName: icon)
+            }
+            .font(DesignTokens.Typography.callout.font)
+            .fontWeight(.medium)
+            .foregroundColor(DesignTokens.Colors.accent)
         }
         .padding(.vertical, DesignTokens.Spacing.sm)
     }

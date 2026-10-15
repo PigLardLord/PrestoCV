@@ -1,0 +1,94 @@
+{
+  "name": "Diretor de operações – Candidatura à Global Manufacturing Corp",
+  "personalInfo": {
+    "name": "James Rodriguez",
+    "title": "Diretor de operações",
+    "location": "Chicago, IL",
+    "email": "james.rodriguez@example.com",
+    "phone": "+1 (555) 456-7890",
+    "portfolio": "",
+    "profile": "Executivo de operações orientado a resultados, com mais de 12 anos de experiência em eficiência organizacional e crescimento em empresas da Fortune 500. Especialista em otimização de processos, planejamento estratégico e liderança multifuncional. Histórico comprovado de melhorias de dois dígitos nos indicadores operacionais e na liderança de equipes com mais de 100 funcionários."
+  },
+  "relevant_experience": [
+    {
+      "title": "Diretor de operações",
+      "company": "Global Manufacturing Corp",
+      "location": "Chicago, IL",
+      "period": "janeiro de 2020 – atual",
+      "description": "Supervisão das operações de 5 unidades, com receita anual de US$ 2 bilhões. • Implementação de princípios de manufatura enxuta, com redução de 18% nos custos • Liderança de uma iniciativa de transformação digital que aumentou em 30% a eficiência da cadeia de suprimentos • Gestão do resultado (P&L) da divisão de operações, superando consistentemente as metas"
+    },
+    {
+      "title": "Gerente de operações",
+      "company": "SupplyChain Solutions Inc",
+      "location": "Dallas, TX",
+      "period": "março de 2016 – dezembro de 2019",
+      "description": "Gestão de uma rede logística que atendia mais de 500 clientes em todo o país. • Expansão das operações para 3 novos mercados, com aumento de 45% na receita • Criação de um painel de indicadores-chave que acelerou em 40% a tomada de decisões • Negociação de contratos com fornecedores, com economia de US$ 2,5 milhões por ano"
+    },
+    {
+      "title": "Analista de negócios",
+      "company": "Consulting Partners LLC",
+      "location": "Boston, MA",
+      "period": "junho de 2013 – fevereiro de 2016",
+      "description": "Consultoria operacional para clientes de médio porte. • Mapeamento de processos e análise de eficiência para mais de 25 clientes • Desenvolvimento de modelos de ROI para iniciativas de melhoria operacional • Facilitação de workshops executivos sobre gestão de mudanças e estratégia"
+    }
+  ],
+  "education": [
+    {
+      "degree": "MBA",
+      "school": "Northwestern University - Kellogg School of Management",
+      "period": "2012",
+      "description": "Especialização em gestão de operações e estratégia. Quadro de honra do reitor (Dean's List). Liderança de um projeto de consultoria para um cliente da Fortune 500."
+    },
+    {
+      "degree": "Bacharelado em Engenharia Industrial",
+      "school": "Georgia Institute of Technology",
+      "period": "2009",
+      "description": "Foco em otimização de sistemas e gestão da qualidade. Formatura com honras. Presidente da associação de estudantes de Engenharia Industrial."
+    }
+  ],
+  "skills": [
+    { "name": "Planejamento estratégico", "level": 5 },
+    { "name": "Otimização de processos", "level": 5 },
+    { "name": "Gerenciamento de projetos", "level": 5 },
+    { "name": "Gestão orçamentária", "level": 5 },
+    { "name": "Liderança de equipes", "level": 5 },
+    { "name": "Cadeia de suprimentos", "level": 4 },
+    { "name": "Análise de dados", "level": 4 },
+    { "name": "Gestão de mudanças", "level": 4 },
+    { "name": "Lean Six Sigma", "level": 4 },
+    { "name": "Modelagem financeira", "level": 3 }
+  ],
+  "languages": [
+    { "name": "Inglês", "level": "Native" },
+    { "name": "Espanhol", "level": "C1" }
+  ],
+  "certifications": [
+    {
+      "name": "Six Sigma Black Belt",
+      "issuer": "American Society for Quality",
+      "year": 2018,
+      "url": "https://asq.org/",
+      "description": "Certificação avançada em metodologias de melhoria de processos e análise estatística."
+    },
+    {
+      "name": "Project Management Professional (PMP)",
+      "issuer": "Project Management Institute",
+      "year": 2015,
+      "url": "https://www.pmi.org/",
+      "description": "Certificação que comprova conhecimentos e experiência em gerenciamento de projetos."
+    }
+  ],
+  "interests": [
+    "Desenvolvimento de liderança",
+    "Mentoria",
+    "Golfe",
+    "Leitura (negócios e história)",
+    "Trabalho voluntário"
+  ],
+  "social": [
+    {
+      "platform": "LinkedIn",
+      "url": "https://example.com/linkedin"
+    }
+  ]
+}

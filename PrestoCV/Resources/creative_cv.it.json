@@ -1,0 +1,107 @@
+{
+  "name": "UX/UI designer senior – Candidatura per DesignForward Agency",
+  "personalInfo": {
+    "name": "Maya Chen",
+    "title": "UX/UI designer senior",
+    "location": "Brooklyn, NY",
+    "email": "maya.chen@example.com",
+    "phone": "+1 (555) 987-6543",
+    "portfolio": "https://example.com",
+    "profile": "Designer creativo con oltre 7 anni di esperienza nella realizzazione di esperienze digitali intuitive per startup e aziende Fortune 500. Specializzazione in design centrato sull'utente, design system ed esperienze multipiattaforma. Passione per l'accessibilità e per la creazione di interfacce belle e funzionali che risolvono problemi reali degli utenti."
+  },
+  "relevant_experience": [
+    {
+      "title": "UX/UI designer senior",
+      "company": "DesignForward Agency",
+      "location": "New York, NY",
+      "period": "aprile 2021 – oggi",
+      "description": "Guida del design di una piattaforma fintech usata da oltre 2 milioni di clienti. • Creazione di un design system completo adottato da oltre 15 team di prodotto • Aumento del coinvolgimento degli utenti del 35% grazie all'ottimizzazione della UX e ai test A/B • Gestione di un team di 4 designer e introduzione di un processo di design review"
+    },
+    {
+      "title": "Product designer",
+      "company": "EcoTech Solutions",
+      "location": "Brooklyn, NY",
+      "period": "agosto 2018 – marzo 2021",
+      "description": "Progettazione di una piattaforma tecnologica sostenibile per il monitoraggio ambientale. • Guida dell'intero processo di design, dalla ricerca sugli utenti all'implementazione finale • Creazione di prototipi interattivi che hanno migliorato del 50% l'allineamento con gli stakeholder • Collaborazione con il team di ingegneria per garantire fattibilità e qualità del design"
+    },
+    {
+      "title": "Designer junior",
+      "company": "PixelPerfect Studio",
+      "location": "Chicago, IL",
+      "period": "giugno 2016 – luglio 2018",
+      "description": "Creazione di elementi visivi e impaginazioni per campagne di marketing. • Progettazione di identità di marca per oltre 20 clienti di settori diversi • Realizzazione di wireframe e prototipi per applicazioni mobile e web • Partecipazione a sessioni di test con gli utenti e integrazione dei feedback nei progetti"
+    }
+  ],
+  "education": [
+    {
+      "degree": "Laurea magistrale (MFA) in Graphic Design",
+      "school": "Rhode Island School of Design",
+      "period": "2016",
+      "description": "Focus su interaction design digitale e motion graphics. Tesi sul design inclusivo per l'accessibilità."
+    },
+    {
+      "degree": "Laurea triennale (BFA) in Comunicazione Visiva",
+      "school": "School of the Art Institute of Chicago",
+      "period": "2014",
+      "description": "Particolare attenzione a tipografia e user experience design. Laurea con distinzione. Guida del team di design per il progetto finale."
+    }
+  ],
+  "skills": [
+    { "name": "Figma", "level": 5 },
+    { "name": "Adobe Creative Suite", "level": 5 },
+    { "name": "Sketch", "level": 4 },
+    { "name": "Prototipazione", "level": 5 },
+    { "name": "Ricerca sugli utenti", "level": 4 },
+    { "name": "Design system", "level": 5 },
+    { "name": "Accessibilità", "level": 4 },
+    { "name": "Illustrazione", "level": 3 },
+    { "name": "Motion design", "level": 3 },
+    { "name": "Identità di marca", "level": 5 }
+  ],
+  "languages": [
+    { "name": "Inglese", "level": "Native" },
+    { "name": "Mandarino", "level": "C1" },
+    { "name": "Francese", "level": "A2" }
+  ],
+  "certifications": [
+    {
+      "name": "Nielsen Norman Group UX Certification",
+      "issuer": "NN/g",
+      "year": 2022,
+      "url": "https://www.nngroup.com/training/",
+      "description": "Certificazione avanzata in usabilità e principi di user experience."
+    },
+    {
+      "name": "Google UX Design Certificate",
+      "issuer": "Google",
+      "year": 2019,
+      "url": "https://grow.google/certificates/ux-design/",
+      "description": "Formazione completa sui processi e sulle metodologie del design UX."
+    }
+  ],
+  "interests": [
+    "Tipografia",
+    "Arte digitale",
+    "Fotografia",
+    "Viaggi",
+    "Design sostenibile"
+  ],
+  "social": [
+    {
+      "platform": "Portfolio",
+      "url": "https://example.com"
+    },
+    {
+      "platform": "Dribbble",
+      "url": "https://example.com/dribbble"
+    },
+    {
+      "platform": "LinkedIn",
+      "url": "https://example.com/linkedin"
+    },
+    {
+      "platform": "Behance",
+      "url": "https://example.com/behance"
+    }
+  ]
+}

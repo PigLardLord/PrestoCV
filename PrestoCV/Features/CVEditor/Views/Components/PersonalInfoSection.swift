@@ -32,11 +32,13 @@ struct PersonalInfoSection: View {
                     .font(DesignTokens.Typography.headline.font)
                     .fontWeight(DesignTokens.Typography.headline.fontWeight)
 
-                Picker("field.document_language", selection: $documentLanguage) {
+                Picker(selection: $documentLanguage) {
                     Text("language.automatic").tag(DocumentLanguage?.none)
                     ForEach(DocumentLanguage.allCases) { language in
                         Text(language.nativeName).tag(Optional(language))
                     }
+                } label: {
+                    WholeWordsText("field.document_language".localized)
                 }
             } header: {
                 SectionHeader(title: "section.cv_details".localized)
@@ -106,7 +108,7 @@ struct SectionHeader: View {
     let title: String
     
     var body: some View {
-        Text(title)
+        WholeWordsText(title)
             .font(DesignTokens.Typography.title3.font)
             .fontWeight(DesignTokens.Typography.title3.fontWeight)
             .foregroundColor(DesignTokens.Typography.title3.color)

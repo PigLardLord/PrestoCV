@@ -7,6 +7,7 @@ struct ExampleSelectionView: View {
     let onSelect: (CVModel) -> Void
     
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     
     var body: some View {
         NavigationStack {
@@ -23,11 +24,10 @@ struct ExampleSelectionView: View {
                     Text("onboarding.examples.footer".localized)
                 }
             }
-            .navigationTitle("onboarding.start_from_example".localized)
-            .navigationBarTitleDisplayMode(.inline)
+            .screenTitle("onboarding.start_from_example".localized)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("common.cancel".localized) {
+                    BarButton(title: "common.cancel".localized, systemImage: "xmark", screenTextSize: dynamicTypeSize) {
                         dismiss()
                     }
                 }

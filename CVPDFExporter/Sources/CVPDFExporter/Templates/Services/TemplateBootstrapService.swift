@@ -1,4 +1,5 @@
 import Foundation
+import os.log
 
 /// Service responsible for bootstrapping bundled templates on app launch
 /// Loads .mcvt packages from Bundle.module and installs them using InstallTemplateUseCase
@@ -8,6 +9,7 @@ public final class TemplateBootstrapService: @unchecked Sendable {
     private let installUseCase: InstallTemplateUseCase
     private let registryManager: TemplateRegistryManager
     private let bundledPackagesDirectory: URL?
+    private let logger = Logger(subsystem: "CVPDFExporter", category: "TemplateBootstrap")
 
     // MARK: - Initialization
 
@@ -64,7 +66,7 @@ public final class TemplateBootstrapService: @unchecked Sendable {
                 }
             } catch {
                 // Log error but continue with other templates
-                print("⚠️ Failed to sync bundled template at \(templateURL.lastPathComponent): \(error)")
+                logger.error("Failed to sync bundled template at \(templateURL.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 continue
             }
         }

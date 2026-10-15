@@ -7,6 +7,12 @@ struct CVEditorView: View {
     @State private var showingExportSheet = false
     @State private var deletionAnchor = RowDeletionAnchor()
     @StateObject private var keyboard = KeyboardVisibility()
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var chrome: EditorChrome {
+        EditorChrome(verticalSizeClass: verticalSizeClass, dynamicTypeSize: dynamicTypeSize)
+    }
 
     /// The view model is built once, when the screen first appears, and survives every re-render of the parent.
     init(viewModel: @autoclosure @escaping () -> CVEditorViewModel) {
@@ -21,22 +27,39 @@ struct CVEditorView: View {
         ) { _ in
             editorView
         }
-        .navigationTitle(viewModel.screenTitle)
-        .navigationBarTitleDisplayMode(.inline)
+        .screenTitle(viewModel.screenTitle)
         // Back and the edge swipe would leave without the discard confirmation that Cancel asks for
         .navigationBarBackButtonHidden(true)
         .toolbar {
             // Leading: Cancel button with confirmation if unsaved changes
             ToolbarItem(placement: .navigationBarLeading) {
-                Button("common.cancel".localized, action: handleCancelTap)
-                    .foregroundColor(DesignTokens.Colors.accent)
+                BarButton(
+                    title: "common.cancel".localized, systemImage: "xmark", screenTextSize: dynamicTypeSize,
+                    action: handleCancelTap
+                )
+                .foregroundColor(DesignTokens.Colors.accent)
             }
             
+            if chrome.exportsFromNavigationBar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    BarButton(
+                        title: "export.button.title".localized, systemImage: "square.and.arrow.up",
+                        screenTextSize: dynamicTypeSize
+                    ) {
+                        showingExportSheet = true
+                    }
+                    .disabled(!viewModel.hasMeaningfulContent)
+                }
+            }
+
             // Trailing: Save button with smart state and visual indicator
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: DesignTokens.Spacing.xs) {
                     UnsavedChangesIndicator.warning(isVisible: viewModel.hasUnsavedChanges)
-                    Button("common.save".localized, action: handleSaveTap)
+                    BarButton(
+                        title: "common.save".localized, systemImage: "checkmark", screenTextSize: dynamicTypeSize,
+                        action: handleSaveTap
+                    )
                     .disabled(!viewModel.isSaveButtonEnabled)
                     .foregroundColor(viewModel.saveButtonColor)
                     .fontWeight(.semibold)
@@ -112,6 +135,7 @@ struct CVEditorView: View {
                         Label("section.details".localized, systemImage: "list.bullet.circle")
                     }
             }
+            .tabBarMinimizeBehavior(chrome.minimizesTabBar ? .onScrollDown : .never)
             .background(DesignTokens.Colors.background)
             .readableContentWidth()
             .scrollDismissesKeyboard(.interactively)
@@ -120,7 +144,7 @@ struct CVEditorView: View {
             .accessibilityHint("accessibility.editor_hint".localized)
 
             // The tab bar and the export button give the space back to the form while someone types
-            if !keyboard.isVisible {
+            if !keyboard.isVisible && !chrome.exportsFromNavigationBar {
                 Divider()
 
                 PrimaryButton.large(

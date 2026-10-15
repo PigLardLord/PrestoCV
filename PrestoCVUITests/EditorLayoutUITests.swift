@@ -10,6 +10,10 @@ final class EditorLayoutUITests: XCTestCase {
         executionTimeAllowance = 240
     }
 
+    override func tearDownWithError() throws {
+        XCUIDevice.shared.orientation = .portrait
+    }
+
     private func launch(contentSize: String? = nil) {
         app = XCUIApplication()
         app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage"]
@@ -44,6 +48,25 @@ final class EditorLayoutUITests: XCTestCase {
         XCTAssertLessThanOrEqual(export.frame.height, app.frame.height * 0.12, "The export button should keep a readable, bounded size")
     }
 
+    /// In landscape the tab bar and the export button below the form used to leave it about one row: on an iPhone
+    /// the export button goes up into the navigation bar.
+    func testTheExportButtonMovesIntoTheNavigationBarInLandscape() throws {
+        launch()
+        let export = app.buttons["Preview & export"]
+        XCTAssertTrue(export.waitForExistence(timeout: 10), "The editor should offer to preview and export")
+        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let barExport = app.navigationBars.buttons["Preview & export"]
+        XCTAssertTrue(barExport.waitForExistence(timeout: 10), "In landscape the navigation bar should offer to export")
+        let exportButtons = app.buttons.matching(NSPredicate(format: "label == 'Preview & export'"))
+        XCTAssertEqual(exportButtons.count, 1, "The export button should not stay below the form as well")
+
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertTrue(waitUntil(barExport, exists: false), "In portrait the export button should leave the navigation bar")
+        XCTAssertTrue(export.waitForExistence(timeout: 10), "In portrait the export button should be back below the form")
+    }
+
     /// At the largest text size an address needs several lines, and a field that keeps to one would cut it off.
     func testAFieldGrowsToShowALongEntryAtTheLargestTextSize() throws {
         launch(contentSize: "UICTContentSizeCategoryAccessibilityXXXL")
@@ -58,5 +81,10 @@ final class EditorLayoutUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 0.5)
         }
         XCTAssertGreaterThan(email.frame.height, heightBefore, "The email field should grow to show the whole address")
+    }
+
+    private func waitUntil(_ element: XCUIElement, exists: Bool, timeout: TimeInterval = 10) -> Bool {
+        let condition = expectation(for: NSPredicate(format: "exists == %@", NSNumber(value: exists)), evaluatedWith: element)
+        return XCTWaiter().wait(for: [condition], timeout: timeout) == .completed
     }
 }

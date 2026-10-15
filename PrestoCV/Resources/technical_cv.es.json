@@ -1,0 +1,101 @@
+{
+  "name": "Ingeniero de software sénior – Candidatura a TechFlow Inc.",
+  "personalInfo": {
+    "name": "Alex Morgan",
+    "title": "Ingeniero de software sénior",
+    "location": "San Francisco, CA",
+    "email": "alex.morgan@example.com",
+    "phone": "+1 (555) 123-4567",
+    "portfolio": "https://example.com",
+    "profile": "Ingeniero de software sénior con más de 8 años de experiencia en la creación de sistemas distribuidos escalables y aplicaciones nativas de la nube. Experiencia en arquitectura de microservicios, prácticas de DevOps y dirección de equipos de ingeniería. Pasión por el código limpio, el diseño de sistemas y la mentoría de desarrolladores junior."
+  },
+  "relevant_experience": [
+    {
+      "title": "Ingeniero de software sénior",
+      "company": "TechFlow Inc.",
+      "location": "San Francisco, CA",
+      "period": "marzo de 2020 – actualidad",
+      "description": "Dirección del desarrollo de una plataforma de microservicios con más de 10 millones de usuarios. • Diseño e implementación de un sistema basado en eventos que procesa más de 100.000 eventos por segundo • Reducción de la latencia del sistema en un 40 % mediante estrategias de caché y optimización de bases de datos • Mentoría de 5 ingenieros junior y definición de estándares de código para todos los equipos"
+    },
+    {
+      "title": "Ingeniero de software",
+      "company": "DataSphere Solutions",
+      "location": "Seattle, WA",
+      "period": "junio de 2017 – febrero de 2020",
+      "description": "Desarrollo de canalizaciones de procesamiento de datos para una plataforma de análisis financiero. • Creación de una solución de streaming de datos en tiempo real con Apache Kafka y Spark • Mejora de la precisión de los datos hasta el 99,9 % mediante marcos de validación • Colaboración con el equipo de producto para entregar funcionalidades un 30 % más rápido con metodologías ágiles"
+    },
+    {
+      "title": "Desarrollador junior",
+      "company": "StartUp Ventures",
+      "location": "Austin, TX",
+      "period": "enero de 2016 – mayo de 2017",
+      "description": "Desarrollo full-stack del MVP de un producto SaaS. • Implementación de API RESTful con Node.js y Express • Desarrollo de una interfaz adaptable con React y Redux • Participación en revisiones de código y colaboración en la documentación técnica"
+    }
+  ],
+  "education": [
+    {
+      "degree": "Máster en Ciencias de la Computación",
+      "school": "Stanford University",
+      "period": "2015",
+      "description": "Especialización en sistemas distribuidos y aprendizaje automático. Proyecto final sobre la optimización de la orquestación de contenedores en entornos de nube."
+    },
+    {
+      "degree": "Grado en Ingeniería de Software",
+      "school": "University of Texas at Austin",
+      "period": "2013",
+      "description": "Enfoque en arquitectura de software y patrones de diseño. Graduación con honores. Desarrollador principal del proyecto de fin de grado: un sistema de notificaciones para el campus."
+    }
+  ],
+  "skills": [
+    { "name": "JavaScript", "level": 5 },
+    { "name": "Python", "level": 5 },
+    { "name": "React", "level": 4 },
+    { "name": "Node.js", "level": 5 },
+    { "name": "AWS", "level": 4 },
+    { "name": "Docker", "level": 4 },
+    { "name": "Kubernetes", "level": 3 },
+    { "name": "SQL", "level": 5 },
+    { "name": "MongoDB", "level": 4 },
+    { "name": "Diseño de sistemas", "level": 5 }
+  ],
+  "languages": [
+    { "name": "Inglés", "level": "Native" },
+    { "name": "Español", "level": "B1" }
+  ],
+  "certifications": [
+    {
+      "name": "AWS Certified Solutions Architect",
+      "issuer": "Amazon Web Services",
+      "year": 2021,
+      "url": "https://aws.amazon.com/certification/",
+      "description": "Acredita la capacidad de diseñar e implementar sistemas escalables, de alta disponibilidad y tolerantes a fallos en AWS."
+    },
+    {
+      "name": "Certified Kubernetes Administrator",
+      "issuer": "Cloud Native Computing Foundation",
+      "year": 2020,
+      "url": "https://www.cncf.io/certification/cka/",
+      "description": "Demuestra competencias en la configuración, el despliegue y la gestión de clústeres de Kubernetes."
+    }
+  ],
+  "interests": [
+    "Contribuciones a proyectos de código abierto",
+    "Blog sobre tecnología",
+    "Ciclismo de montaña",
+    "Fotografía"
+  ],
+  "social": [
+    {
+      "platform": "GitHub",
+      "url": "https://example.com/github"
+    },
+    {
+      "platform": "LinkedIn",
+      "url": "https://example.com/linkedin"
+    },
+    {
+      "platform": "Portfolio",
+      "url": "https://example.com"
+    }
+  ]
+}

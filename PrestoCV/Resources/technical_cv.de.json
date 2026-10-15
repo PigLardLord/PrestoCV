@@ -1,0 +1,101 @@
+{
+  "name": "Senior-Softwareentwickler – Bewerbung bei TechFlow Inc.",
+  "personalInfo": {
+    "name": "Alex Morgan",
+    "title": "Senior-Softwareentwickler",
+    "location": "San Francisco, CA",
+    "email": "alex.morgan@example.com",
+    "phone": "+1 (555) 123-4567",
+    "portfolio": "https://example.com",
+    "profile": "Senior-Softwareentwickler mit über 8 Jahren Erfahrung im Aufbau skalierbarer verteilter Systeme und Cloud-nativer Anwendungen. Fachkenntnisse in Microservices-Architektur und DevOps-Praktiken sowie in der Leitung von Entwicklungsteams. Leidenschaft für sauberen Code, Systemdesign und die Förderung von Nachwuchsentwicklern."
+  },
+  "relevant_experience": [
+    {
+      "title": "Senior-Softwareentwickler",
+      "company": "TechFlow Inc.",
+      "location": "San Francisco, CA",
+      "period": "März 2020 – heute",
+      "description": "Leitung der Entwicklung einer Microservices-Plattform für über 10 Mio. Nutzer. • Entwurf und Umsetzung eines ereignisgesteuerten Systems mit über 100.000 Ereignissen pro Sekunde • Senkung der Systemlatenz um 40 % durch Caching-Strategien und Datenbankoptimierung • Betreuung von 5 Nachwuchsentwicklern und Einführung teamübergreifender Programmierstandards"
+    },
+    {
+      "title": "Softwareentwickler",
+      "company": "DataSphere Solutions",
+      "location": "Seattle, WA",
+      "period": "Juni 2017 – Februar 2020",
+      "description": "Entwicklung von Datenverarbeitungs-Pipelines für eine Plattform zur Finanzanalyse. • Aufbau einer Echtzeit-Datenstreaming-Lösung mit Apache Kafka und Spark • Steigerung der Datengenauigkeit auf 99,9 % durch Validierungs-Frameworks • Zusammenarbeit mit dem Produktteam: Features dank agiler Methoden 30 % schneller geliefert"
+    },
+    {
+      "title": "Nachwuchsentwickler",
+      "company": "StartUp Ventures",
+      "location": "Austin, TX",
+      "period": "Januar 2016 – Mai 2017",
+      "description": "Full-Stack-Entwicklung für den MVP eines SaaS-Produkts. • Umsetzung von RESTful-APIs mit Node.js und Express • Entwicklung einer responsiven Benutzeroberfläche mit React und Redux • Teilnahme an Code-Reviews und Mitarbeit an der technischen Dokumentation"
+    }
+  ],
+  "education": [
+    {
+      "degree": "M.Sc. Informatik",
+      "school": "Stanford University",
+      "period": "2015",
+      "description": "Schwerpunkte: Verteilte Systeme und Maschinelles Lernen. Abschlussarbeit zur Optimierung der Container-Orchestrierung in Cloud-Umgebungen."
+    },
+    {
+      "degree": "B.Sc. Softwaretechnik",
+      "school": "University of Texas at Austin",
+      "period": "2013",
+      "description": "Schwerpunkt auf Softwarearchitektur und Entwurfsmustern. Abschluss mit Auszeichnung. Leitender Entwickler des Abschlussprojekts, eines Benachrichtigungssystems für den Campus."
+    }
+  ],
+  "skills": [
+    { "name": "JavaScript", "level": 5 },
+    { "name": "Python", "level": 5 },
+    { "name": "React", "level": 4 },
+    { "name": "Node.js", "level": 5 },
+    { "name": "AWS", "level": 4 },
+    { "name": "Docker", "level": 4 },
+    { "name": "Kubernetes", "level": 3 },
+    { "name": "SQL", "level": 5 },
+    { "name": "MongoDB", "level": 4 },
+    { "name": "Systemdesign", "level": 5 }
+  ],
+  "languages": [
+    { "name": "Englisch", "level": "Native" },
+    { "name": "Spanisch", "level": "B1" }
+  ],
+  "certifications": [
+    {
+      "name": "AWS Certified Solutions Architect",
+      "issuer": "Amazon Web Services",
+      "year": 2021,
+      "url": "https://aws.amazon.com/certification/",
+      "description": "Bestätigt die Fähigkeit, skalierbare, hochverfügbare und fehlertolerante Systeme auf AWS zu entwerfen und bereitzustellen."
+    },
+    {
+      "name": "Certified Kubernetes Administrator",
+      "issuer": "Cloud Native Computing Foundation",
+      "year": 2020,
+      "url": "https://www.cncf.io/certification/cka/",
+      "description": "Weist Kenntnisse in der Konfiguration, Bereitstellung und Verwaltung von Kubernetes-Clustern nach."
+    }
+  ],
+  "interests": [
+    "Open-Source-Beiträge",
+    "Tech-Blogging",
+    "Mountainbiken",
+    "Fotografie"
+  ],
+  "social": [
+    {
+      "platform": "GitHub",
+      "url": "https://example.com/github"
+    },
+    {
+      "platform": "LinkedIn",
+      "url": "https://example.com/linkedin"
+    },
+    {
+      "platform": "Portfolio",
+      "url": "https://example.com"
+    }
+  ]
+}

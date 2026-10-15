@@ -42,7 +42,7 @@ struct FieldLabel: View {
     
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.xxs) {
-            Text(text)
+            WholeWordsText(text)
                 .font(DesignTokens.Typography.footnote.font)
                 .foregroundColor(labelColor)
             

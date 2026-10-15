@@ -739,6 +739,211 @@
         }
       }
     },
+    "ai.error.busy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence ist gerade beschäftigt. Bitte versuchen Sie es gleich noch einmal."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence is busy right now. Please try again in a moment."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence está ocupado ahora mismo. Inténtalo de nuevo en un momento."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence est occupé pour le moment. Réessayez dans un instant."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence è occupato in questo momento. Riprova tra un attimo."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Apple Intelligence está ocupado agora. Tente novamente em instantes."
+          }
+        }
+      }
+    },
+    "ai.error.empty_description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beschreiben Sie zuerst Ihren beruflichen Werdegang."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Describe your professional background first."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Primero describe tu trayectoria profesional."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décrivez d'abord votre parcours professionnel."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descrivi prima il tuo percorso professionale."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descreva primeiro sua trajetória profissional."
+          }
+        }
+      }
+    },
+    "ai.error.empty_result" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus Ihrer Beschreibung ließ sich nichts erstellen. Ergänzen Sie mehr zu Ihren Stellen, Ihrer Ausbildung oder Ihren Fähigkeiten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing could be drafted from your description. Add more about your jobs, studies or skills."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo crear nada a partir de tu descripción. Añade más sobre tus trabajos, estudios o habilidades."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n'a pu être rédigé à partir de votre description. Ajoutez des détails sur vos emplois, vos études ou vos compétences."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stato possibile ricavare nulla dalla tua descrizione. Aggiungi altro su lavori, studi o competenze."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível criar nada a partir da sua descrição. Acrescente mais sobre seus trabalhos, estudos ou habilidades."
+          }
+        }
+      }
+    },
+    "ai.error.failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus Ihrer Beschreibung konnte kein Entwurf erstellt werden. Bitte versuchen Sie es erneut oder ergänzen Sie mehr Details."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't write a draft from your description. Please try again, or add more detail."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo crear un borrador a partir de tu descripción. Inténtalo de nuevo o añade más detalles."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de rédiger un brouillon à partir de votre description. Réessayez ou ajoutez plus de détails."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stato possibile scrivere una bozza dalla tua descrizione. Riprova o aggiungi più dettagli."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível escrever um rascunho a partir da sua descrição. Tente novamente ou acrescente mais detalhes."
+          }
+        }
+      }
+    },
+    "ai.error.too_long" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Beschreibung ist zu lang. Bitte kürzen Sie sie und versuchen Sie es erneut."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That description is too long. Please shorten it and try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esa descripción es demasiado larga. Acórtala e inténtalo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette description est trop longue. Raccourcissez-la et réessayez."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La descrizione è troppo lunga. Accorciala e riprova."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essa descrição é muito longa. Encurte-a e tente novamente."
+          }
+        }
+      }
+    },
     "ai.generation.button_title" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1003,25 +1208,148 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tu Trayectoria Profesional"
+            "value" : "Tu trayectoria profesional"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Votre Parcours Professionnel"
+            "value" : "Votre parcours professionnel"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il Tuo Background Professionale"
+            "value" : "Il tuo percorso professionale"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sua Trajetória Profissional"
+            "value" : "Sua trajetória profissional"
+          }
+        }
+      }
+    },
+    "ai.unavailable.model_not_ready" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Apple-Intelligence-Modell wird noch geladen. Versuchen Sie es später noch einmal."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Apple Intelligence model is still downloading. Try again later."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El modelo de Apple Intelligence aún se está descargando. Inténtalo de nuevo más tarde."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le modèle d'Apple Intelligence est encore en cours de téléchargement. Réessayez plus tard."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il modello di Apple Intelligence è ancora in download. Riprova più tardi."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O modelo do Apple Intelligence ainda está sendo baixado. Tente novamente mais tarde."
+          }
+        }
+      }
+    },
+    "ai.unavailable.not_enabled" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence ist ausgeschaltet. Öffnen Sie dafür die Einstellungen, tippen Sie auf „Apple Intelligence & Siri“ und schalten Sie Apple Intelligence ein."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence is turned off. To use this, open Settings, tap Apple Intelligence & Siri, and turn on Apple Intelligence."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence está desactivado. Para usarlo, abre Ajustes, toca Apple Intelligence y Siri y activa Apple Intelligence."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence est désactivé. Pour l'utiliser, ouvrez Réglages, touchez Apple Intelligence et Siri, puis activez Apple Intelligence."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence è disattivato. Per usarlo, apri Impostazioni, tocca Apple Intelligence e Siri e attiva Apple Intelligence."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Apple Intelligence está desativado. Para usá-lo, abra Ajustes, toque em Apple Intelligence e Siri e ative o Apple Intelligence."
+          }
+        }
+      }
+    },
+    "ai.unavailable.unknown" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die KI-Erstellung ist derzeit nicht verfügbar."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI drafting isn't available right now."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La creación con IA no está disponible en este momento."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La rédaction par IA n'est pas disponible pour le moment."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La creazione con IA non è disponibile al momento."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A criação com IA não está disponível no momento."
           }
         }
       }
@@ -1773,13 +2101,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld CV konnte nicht geöffnet werden"
+                  "value" : "%lld Lebenslauf konnte nicht geöffnet werden"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld CVs konnten nicht geöffnet werden"
+                  "value" : "%lld Lebensläufe konnten nicht geöffnet werden"
                 }
               }
             }
@@ -6777,25 +7105,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crear Mi Primer CV"
+            "value" : "Crear mi primer CV"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Créer Mon Premier CV"
+            "value" : "Créer mon premier CV"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crea Il Mio Primo CV"
+            "value" : "Crea il mio primo CV"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Criar Meu Primeiro CV"
+            "value" : "Criar meu primeiro CV"
           }
         }
       }
@@ -7433,25 +7761,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crear Nuevo"
+            "value" : "Crear un CV nuevo"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Créer Nouveau"
+            "value" : "Créer un nouveau CV"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crea Nuovo"
+            "value" : "Crea un nuovo CV"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Criar Novo"
+            "value" : "Criar um novo CV"
           }
         }
       }
@@ -7556,25 +7884,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV Vacío"
+            "value" : "CV vacío"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV Vide"
+            "value" : "CV vide"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV Vuoto"
+            "value" : "CV vuoto"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV Vazio"
+            "value" : "CV vazio"
           }
         }
       }
@@ -7638,25 +7966,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crea Tu CV Perfecto"
+            "value" : "Crea tu CV perfecto"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Créez Votre CV Parfait"
+            "value" : "Créez votre CV parfait"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crea Il Tuo CV Perfetto"
+            "value" : "Crea il tuo CV perfetto"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crie Seu CV Perfeito"
+            "value" : "Crie seu CV perfeito"
           }
         }
       }

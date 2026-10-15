@@ -50,7 +50,7 @@ struct AppRootView: View {
         case .onboarding, .cvList:
             listView
         case .templateSelection:
-            TemplateSelectionView(isAIGenerationAvailable: viewModelFactory.isAIGenerationAvailable())
+            TemplateSelectionView(viewModel: viewModelFactory.makeTemplateSelectionViewModel())
         case .aiGeneration:
             viewWithErrorHandling {
                 AIGenerationView(viewModel: try viewModelFactory.makeAIGenerationViewModel())

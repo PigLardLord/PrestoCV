@@ -13,13 +13,41 @@ public final class FoundationModelsService: CVGenerationService {
 
     @available(iOS 26, macOS 26, *)
     public func isAvailable() async -> Bool {
+        return availability() == .available
+    }
+
+    /// Whether the on-device model can run now and, when it cannot, why
+    @available(iOS 26, macOS 26, *)
+    public func availability() -> AIAvailability {
         #if canImport(FoundationModels)
-        // Check if Apple Intelligence and the language model are available
-        return SystemLanguageModel.default.isAvailable
+        return Self.map(SystemLanguageModel.default.availability)
         #else
-        return false
+        return .unavailable(.deviceNotEligible)
         #endif
     }
+
+    #if canImport(FoundationModels)
+    /// Translates the framework's availability, keeping any reason a later OS adds as `.unknown`
+    nonisolated static func map(_ availability: SystemLanguageModel.Availability) -> AIAvailability {
+        switch availability {
+        case .available:
+            return .available
+        case .unavailable(let reason):
+            switch reason {
+            case .deviceNotEligible:
+                return .unavailable(.deviceNotEligible)
+            case .appleIntelligenceNotEnabled:
+                return .unavailable(.appleIntelligenceNotEnabled)
+            case .modelNotReady:
+                return .unavailable(.modelNotReady)
+            @unknown default:
+                return .unavailable(.unknown)
+            }
+        @unknown default:
+            return .unavailable(.unknown)
+        }
+    }
+    #endif
 
     @available(iOS 26, macOS 26, *)
     public func generateCV(from request: CVGenerationRequest) async throws -> CVGenerationResult {
@@ -199,7 +227,7 @@ public final class FoundationModelsService: CVGenerationService {
                 #if DEBUG
                 print("⚠️ Context window exceeded: \(context.debugDescription)")
                 #endif
-                throw CVGenerationError.unknown("Content too large for on-device model. Please provide a shorter description or fewer details.")
+                throw CVGenerationError.descriptionTooLong
             default:
                 #if DEBUG
                 print("🔍 DEBUG: Generation error: \(error)")
@@ -305,7 +333,7 @@ public final class FoundationModelsService: CVGenerationService {
                         #if DEBUG
                         print("⚠️ Context window exceeded: \(context.debugDescription)")
                         #endif
-                        continuation.finish(throwing: CVGenerationError.unknown("Content too large for on-device model. Please provide a shorter description or fewer details."))
+                        continuation.finish(throwing: CVGenerationError.descriptionTooLong)
                     default:
                         continuation.finish(throwing: CVGenerationError.unknown("Failed to generate CV: \(error.localizedDescription)"))
                     }

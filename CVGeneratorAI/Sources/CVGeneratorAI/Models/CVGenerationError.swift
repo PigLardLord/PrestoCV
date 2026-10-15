@@ -8,6 +8,9 @@ public enum CVGenerationError: Error, Equatable, Sendable {
     /// Invalid or empty user prompt
     case invalidPrompt
 
+    /// The description is too long for the on-device model
+    case descriptionTooLong
+
     /// AI service returned invalid response
     case invalidResponse
 
@@ -31,6 +34,8 @@ extension CVGenerationError: LocalizedError {
             return "AI service is not available on this device"
         case .invalidPrompt:
             return "Please provide a valid description of your background"
+        case .descriptionTooLong:
+            return "Content too large for on-device model. Please provide a shorter description or fewer details."
         case .invalidResponse:
             return "Unable to generate CV from the provided information"
         case .rateLimitExceeded:

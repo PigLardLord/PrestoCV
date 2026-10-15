@@ -1,0 +1,107 @@
+{
+  "name": "Senior UX/UI-Designer – Bewerbung bei DesignForward Agency",
+  "personalInfo": {
+    "name": "Maya Chen",
+    "title": "Senior UX/UI-Designer",
+    "location": "Brooklyn, NY",
+    "email": "maya.chen@example.com",
+    "phone": "+1 (555) 987-6543",
+    "portfolio": "https://example.com",
+    "profile": "Kreativer Designer mit über 7 Jahren Erfahrung in der Gestaltung intuitiver digitaler Erlebnisse für Start-ups und Fortune-500-Unternehmen. Spezialisiert auf nutzerzentriertes Design, Designsysteme und plattformübergreifende Erlebnisse. Leidenschaft für Barrierefreiheit und für schöne, funktionale Oberflächen, die echte Probleme der Nutzer lösen."
+  },
+  "relevant_experience": [
+    {
+      "title": "Senior UX/UI-Designer",
+      "company": "DesignForward Agency",
+      "location": "New York, NY",
+      "period": "April 2021 – heute",
+      "description": "Designleitung für eine Fintech-Plattform mit über 2 Mio. Kunden. • Entwicklung eines umfassenden Designsystems, das von über 15 Produktteams übernommen wurde • Steigerung der Nutzerbindung um 35 % durch UX-Optimierung und A/B-Tests • Führung eines Teams von 4 Designern und Einführung eines Design-Review-Prozesses"
+    },
+    {
+      "title": "Produktdesigner",
+      "company": "EcoTech Solutions",
+      "location": "Brooklyn, NY",
+      "period": "August 2018 – März 2021",
+      "description": "Gestaltung einer nachhaltigen Technologieplattform zur Umweltüberwachung. • Leitung des gesamten Designprozesses, von der Nutzerforschung bis zur Umsetzung • Entwicklung interaktiver Prototypen, die die Abstimmung mit den Stakeholdern um 50 % verbesserten • Zusammenarbeit mit dem Entwicklungsteam, um Machbarkeit und Qualität des Designs sicherzustellen"
+    },
+    {
+      "title": "Junior-Designer",
+      "company": "PixelPerfect Studio",
+      "location": "Chicago, IL",
+      "period": "Juni 2016 – Juli 2018",
+      "description": "Erstellung von visuellen Materialien und Layouts für Marketingkampagnen. • Entwicklung von Markenidentitäten für über 20 Kunden aus verschiedenen Branchen • Erstellung von Wireframes und Prototypen für Mobil- und Webanwendungen • Teilnahme an Usability-Tests und Einarbeitung des Feedbacks in die Entwürfe"
+    }
+  ],
+  "education": [
+    {
+      "degree": "M.F.A. Grafikdesign",
+      "school": "Rhode Island School of Design",
+      "period": "2016",
+      "description": "Schwerpunkt auf digitalem Interaktionsdesign und Motion Graphics. Abschlussarbeit zu inklusivem Design für Barrierefreiheit."
+    },
+    {
+      "degree": "B.F.A. Visuelle Kommunikation",
+      "school": "School of the Art Institute of Chicago",
+      "period": "2014",
+      "description": "Schwerpunkt auf Typografie und User-Experience-Design. Abschluss mit Auszeichnung. Leitung des Designteams beim Abschlussprojekt."
+    }
+  ],
+  "skills": [
+    { "name": "Figma", "level": 5 },
+    { "name": "Adobe Creative Suite", "level": 5 },
+    { "name": "Sketch", "level": 4 },
+    { "name": "Prototyping", "level": 5 },
+    { "name": "Nutzerforschung", "level": 4 },
+    { "name": "Designsysteme", "level": 5 },
+    { "name": "Barrierefreiheit", "level": 4 },
+    { "name": "Illustration", "level": 3 },
+    { "name": "Motion Design", "level": 3 },
+    { "name": "Markenidentität", "level": 5 }
+  ],
+  "languages": [
+    { "name": "Englisch", "level": "Native" },
+    { "name": "Mandarin", "level": "C1" },
+    { "name": "Französisch", "level": "A2" }
+  ],
+  "certifications": [
+    {
+      "name": "Nielsen Norman Group UX Certification",
+      "issuer": "NN/g",
+      "year": 2022,
+      "url": "https://www.nngroup.com/training/",
+      "description": "Fortgeschrittene Zertifizierung in Usability und den Grundsätzen der User Experience."
+    },
+    {
+      "name": "Google UX Design Certificate",
+      "issuer": "Google",
+      "year": 2019,
+      "url": "https://grow.google/certificates/ux-design/",
+      "description": "Umfassende Ausbildung in UX-Designprozessen und -Methoden."
+    }
+  ],
+  "interests": [
+    "Typografie",
+    "Digitale Kunst",
+    "Fotografie",
+    "Reisen",
+    "Nachhaltiges Design"
+  ],
+  "social": [
+    {
+      "platform": "Portfolio",
+      "url": "https://example.com"
+    },
+    {
+      "platform": "Dribbble",
+      "url": "https://example.com/dribbble"
+    },
+    {
+      "platform": "LinkedIn",
+      "url": "https://example.com/linkedin"
+    },
+    {
+      "platform": "Behance",
+      "url": "https://example.com/behance"
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "name": "Professore associato – Candidatura per il Dipartimento di Informatica del MIT",
+  "personalInfo": {
+    "name": "Dr. Sarah Johnson",
+    "title": "Professore associato di Informatica",
+    "location": "Cambridge, MA",
+    "email": "s.johnson@example.com",
+    "phone": "+1 (555) 246-8101",
+    "portfolio": "https://example.com",
+    "profile": "Professore associato di ruolo con oltre 10 anni di esperienza nella ricerca e nella didattica sull'intelligenza artificiale. Numerose pubblicazioni nelle principali conferenze e riviste, con oltre 50 articoli sottoposti a revisione tra pari. Responsabile scientifico di finanziamenti per la ricerca pari a 3 milioni di dollari. Impegno nel seguire gli studenti di laurea magistrale e di dottorato e nel far avanzare la disciplina con una ricerca innovativa."
+  },
+  "relevant_experience": [
+    {
+      "title": "Professore associato",
+      "company": "MIT, Dipartimento di Informatica",
+      "location": "Cambridge, MA",
+      "period": "agosto 2019 – oggi",
+      "description": "Guida di un gruppo di ricerca sulle applicazioni del machine learning alla sanità. • Ottenimento di 1,8 milioni di dollari di finanziamenti federali da NSF e NIH • Supervisione di 8 dottorandi e 15 studenti di laurea magistrale fino al conseguimento del titolo • Oltre 25 articoli pubblicati nelle principali conferenze di IA (NeurIPS, ICML, AAAI)"
+    },
+    {
+      "title": "Professore assistente",
+      "company": "Stanford University",
+      "location": "Stanford, CA",
+      "period": "settembre 2015 – luglio 2019",
+      "description": "Avvio di un programma di ricerca su deep learning e visione artificiale. • NSF CAREER Award (500.000 dollari) per una ricerca innovativa • Insegnamento di corsi di laurea e di laurea magistrale su IA e machine learning • Creazione di collaborazioni interdisciplinari con la facoltà di medicina e i dipartimenti di ingegneria"
+    },
+    {
+      "title": "Ricercatore post-doc",
+      "company": "Google Research",
+      "location": "Mountain View, CA",
+      "period": "giugno 2013 – agosto 2015",
+      "description": "Ricerca avanzata nell'elaborazione del linguaggio naturale e nei grandi modelli linguistici. • Coautore di 12 articoli durante il periodo post-doc • Sviluppo di nuovi algoritmi di sintesi automatica dei testi, integrati nei prodotti Google • Collaborazione con ricercatori dell'industria su applicazioni pratiche dell'IA"
+    }
+  ],
+  "education": [
+    {
+      "degree": "Dottorato di ricerca (Ph.D.) in Informatica",
+      "school": "Carnegie Mellon University",
+      "period": "2013",
+      "description": "Tesi di dottorato: «Algoritmi scalabili per il machine learning multimodale». Relatore: Dr. Andrew Moore. Premio per la miglior tesi di dottorato."
+    },
+    {
+      "degree": "Laurea magistrale in Intelligenza Artificiale",
+      "school": "University of Edinburgh",
+      "period": "2009",
+      "description": "Specializzazione in machine learning e reti neurali. Tesi sulle applicazioni del deep reinforcement learning."
+    },
+    {
+      "degree": "Laurea triennale in Informatica",
+      "school": "University of California, Berkeley",
+      "period": "2007",
+      "description": "Laurea summa cum laude. Indirizzo secondario in Matematica. Tesi sulla teoria della complessità computazionale."
+    }
+  ],
+  "skills": [
+    { "name": "Machine learning", "level": 5 },
+    { "name": "Python", "level": 5 },
+    { "name": "Metodologia della ricerca", "level": 5 },
+    { "name": "Analisi statistica", "level": 5 },
+    { "name": "Scrittura accademica", "level": 5 },
+    { "name": "Stesura di progetti di finanziamento", "level": 4 },
+    { "name": "TensorFlow/PyTorch", "level": 5 },
+    { "name": "Data science", "level": 4 },
+    { "name": "Public speaking", "level": 4 },
+    { "name": "Didattica", "level": 5 }
+  ],
+  "languages": [
+    { "name": "Inglese", "level": "Native" },
+    { "name": "Tedesco", "level": "B2" },
+    { "name": "Mandarino", "level": "A2" }
+  ],
+  "certifications": [
+    {
+      "name": "Google Professional Machine Learning Engineer",
+      "issuer": "Google Cloud",
+      "year": 2021,
+      "url": "https://cloud.google.com/certification/machine-learning-engineer",
+      "description": "Certificazione che attesta la competenza nella progettazione, nello sviluppo e nella messa in produzione di modelli di machine learning."
+    }
+  ],
+  "interests": [
+    "Etica dell'IA",
+    "Scienza aperta",
+    "Comunicazione scientifica",
+    "Musica classica",
+    "Escursionismo"
+  ],
+  "social": [
+    {
+      "platform": "Google Scholar",
+      "url": "https://example.com/scholar"
+    },
+    {
+      "platform": "Sito web accademico",
+      "url": "https://example.com"
+    },
+    {
+      "platform": "LinkedIn",
+      "url": "https://example.com/linkedin"
+    },
+    {
+      "platform": "ORCID",
+      "url": "https://example.com/orcid"
+    }
+  ]
+}

@@ -26,7 +26,7 @@ final class AIGenerationViewModel: ObservableObject {
 
     func generateCV() async {
         guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorMessage = "Please provide a description of your professional background"
+            errorMessage = AIGenerationErrorMessage.text(for: CVGenerationError.invalidPrompt)
             return
         }
 
@@ -47,10 +47,8 @@ final class AIGenerationViewModel: ObservableObject {
 
             generatedCVId = cvModel.id.uuidString
 
-        } catch let error as CVGenerationError {
-            errorMessage = error.errorDescription ?? "Failed to generate CV"
         } catch {
-            errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
+            errorMessage = AIGenerationErrorMessage.text(for: error)
         }
 
         isGenerating = false
@@ -64,7 +62,7 @@ final class AIGenerationViewModel: ObservableObject {
     @available(iOS 26, macOS 26, *)
     func generateCVWithStreaming() async {
         guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorMessage = "Please provide a description of your professional background"
+            errorMessage = AIGenerationErrorMessage.text(for: CVGenerationError.invalidPrompt)
             return
         }
 
@@ -98,10 +96,8 @@ final class AIGenerationViewModel: ObservableObject {
                 throw CVGenerationError.invalidResponse
             }
 
-        } catch let error as CVGenerationError {
-            errorMessage = error.errorDescription ?? "Failed to generate CV"
         } catch {
-            errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
+            errorMessage = AIGenerationErrorMessage.text(for: error)
         }
 
         isGenerating = false

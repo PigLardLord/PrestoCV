@@ -1,0 +1,106 @@
+{
+  "name": "Professor associado – Candidatura ao Departamento de Ciência da Computação do MIT",
+  "personalInfo": {
+    "name": "Dr. Sarah Johnson",
+    "title": "Professor associado de Ciência da Computação",
+    "location": "Cambridge, MA",
+    "email": "s.johnson@example.com",
+    "phone": "+1 (555) 246-8101",
+    "portfolio": "https://example.com",
+    "profile": "Professor associado efetivo, com mais de 10 anos de experiência em pesquisa e ensino de inteligência artificial. Ampla produção científica em conferências e periódicos de primeira linha, com mais de 50 publicações revisadas por pares. Pesquisador principal de projetos com US$ 3 milhões em financiamento. Dedicado à orientação de estudantes de pós-graduação e ao avanço da área por meio de pesquisa inovadora."
+  },
+  "relevant_experience": [
+    {
+      "title": "Professor associado",
+      "company": "MIT, Departamento de Ciência da Computação",
+      "location": "Cambridge, MA",
+      "period": "agosto de 2019 – atual",
+      "description": "Liderança de um grupo de pesquisa sobre aplicações de aprendizado de máquina na saúde. • Obtenção de US$ 1,8 milhão em financiamento federal da NSF e dos NIH • Orientação de 8 doutorandos e 15 mestrandos até a conclusão do curso • Mais de 25 artigos publicados nas principais conferências de IA (NeurIPS, ICML, AAAI)"
+    },
+    {
+      "title": "Professor assistente",
+      "company": "Stanford University",
+      "location": "Stanford, CA",
+      "period": "setembro de 2015 – julho de 2019",
+      "description": "Criação de um programa de pesquisa em aprendizado profundo e visão computacional. • NSF CAREER Award (US$ 500 mil) por pesquisa inovadora • Aulas de graduação e pós-graduação sobre IA e aprendizado de máquina • Construção de colaborações interdisciplinares com a faculdade de medicina e os departamentos de engenharia"
+    },
+    {
+      "title": "Pesquisador de pós-doutorado",
+      "company": "Google Research",
+      "location": "Mountain View, CA",
+      "period": "junho de 2013 – agosto de 2015",
+      "description": "Pesquisa avançada em processamento de linguagem natural e grandes modelos de linguagem. • Coautoria de 12 artigos durante o pós-doutorado • Desenvolvimento de novos algoritmos de sumarização de textos, usados em produtos do Google • Colaboração com pesquisadores da indústria em aplicações práticas de IA"
+    }
+  ],
+  "education": [
+    {
+      "degree": "Doutorado (Ph.D.) em Ciência da Computação",
+      "school": "Carnegie Mellon University",
+      "period": "2013",
+      "description": "Tese: “Algoritmos escaláveis para aprendizado de máquina multimodal”. Orientador: Dr. Andrew Moore. Prêmio de tese de destaque."
+    },
+    {
+      "degree": "Mestrado em Inteligência Artificial",
+      "school": "University of Edinburgh",
+      "period": "2009",
+      "description": "Especialização em aprendizado de máquina e redes neurais. Dissertação sobre aplicações de aprendizado por reforço profundo."
+    },
+    {
+      "degree": "Bacharelado em Ciência da Computação",
+      "school": "University of California, Berkeley",
+      "period": "2007",
+      "description": "Formatura summa cum laude. Habilitação secundária em Matemática. Trabalho de conclusão de curso sobre teoria da complexidade computacional."
+    }
+  ],
+  "skills": [
+    { "name": "Aprendizado de máquina", "level": 5 },
+    { "name": "Python", "level": 5 },
+    { "name": "Metodologia de pesquisa", "level": 5 },
+    { "name": "Análise estatística", "level": 5 },
+    { "name": "Escrita acadêmica", "level": 5 },
+    { "name": "Elaboração de propostas de financiamento", "level": 4 },
+    { "name": "TensorFlow/PyTorch", "level": 5 },
+    { "name": "Ciência de dados", "level": 4 },
+    { "name": "Oratória", "level": 4 },
+    { "name": "Docência", "level": 5 }
+  ],
+  "languages": [
+    { "name": "Inglês", "level": "Native" },
+    { "name": "Alemão", "level": "B2" },
+    { "name": "Mandarim", "level": "A2" }
+  ],
+  "certifications": [
+    {
+      "name": "Google Professional Machine Learning Engineer",
+      "issuer": "Google Cloud",
+      "year": 2021,
+      "url": "https://cloud.google.com/certification/machine-learning-engineer",
+      "description": "Certificação que comprova a competência para projetar, criar e colocar em produção modelos de aprendizado de máquina."
+    }
+  ],
+  "interests": [
+    "Ética em IA",
+    "Ciência aberta",
+    "Divulgação científica",
+    "Música clássica",
+    "Trilhas"
+  ],
+  "social": [
+    {
+      "platform": "Google Scholar",
+      "url": "https://example.com/scholar"
+    },
+    {
+      "platform": "Site acadêmico",
+      "url": "https://example.com"
+    },
+    {
+      "platform": "LinkedIn",
+      "url": "https://example.com/linkedin"
+    },
+    {
+      "platform": "ORCID",
+      "url": "https://example.com/orcid"
+    }
+  ]
+}

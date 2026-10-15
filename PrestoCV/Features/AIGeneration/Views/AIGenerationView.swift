@@ -23,8 +23,7 @@ struct AIGenerationView: View {
             }
             .padding(DesignTokens.Spacing.md)
         }
-        .navigationTitle("navigation.ai_generation".localized)
-        .navigationBarTitleDisplayMode(.large)
+        .screenTitle("navigation.ai_generation".localized, large: true)
         .overlay(
             viewModel.isGenerating ? LoadingView.fullscreen(message: "ai.generation.loading_message".asLoclizedKey) : nil
         )

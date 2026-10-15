@@ -147,6 +147,12 @@ struct LocalizationCatalogTests {
     /// Keys that the code builds from other values, so that no literal names them.
     fileprivate static let dynamicKeyPrefixes = ["language.level."]
 
+    /// Names that keep their capital letter inside a sentence: Apple Intelligence, Siri and the Settings app.
+    fileprivate static let properNames: Set<String> = ["Apple", "Intelligence", "Siri", "Ajustes", "Réglages", "Impostazioni"]
+
+    /// Keys whose text is the name of a person in every language.
+    fileprivate static let personNames: Set<String> = ["export.font_preview_name"]
+
     // MARK: Defects
 
     /// What is wrong with a key, before any exemption.
@@ -174,6 +180,24 @@ struct LocalizationCatalogTests {
             defects.append(.unused)
         }
         return defects
+    }
+
+    /// The words of a text that start with a capital letter as in an English title: inside a sentence, and neither
+    /// an abbreviation nor a proper name. "Crea Tu CV Perfecto" has "Tu" and "Perfecto".
+    fileprivate static func titleCaseWords(in text: String) throws -> [String] {
+        let sentenceBreaks: Set<Character> = [".", "!", "?", ":", "-", "–", "—", "(", "«", "“", "\""]
+        let words = try NSRegularExpression(pattern: #"\S+"#)
+        var titleCase: [String] = []
+        for match in words.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            guard let range = Range(match.range, in: text), range.lowerBound > text.startIndex else { continue }
+            let before = text[..<range.lowerBound].trimmingCharacters(in: .whitespaces)
+            if let last = before.last, sentenceBreaks.contains(last) || last.isNewline { continue }
+            let word = text[range].trimmingCharacters(in: .punctuationCharacters)
+            guard let first = word.first, first.isUppercase else { continue }
+            let isAbbreviation = word.filter(\.isUppercase).count > 1 || word.contains(where: \.isNumber)
+            if !isAbbreviation && !properNames.contains(word) { titleCase.append(word) }
+        }
+        return titleCase
     }
 
     private static func formatSpecifiers(of texts: [String]) -> [String] {
@@ -267,6 +291,46 @@ struct LocalizationCatalogTests {
         }
 
         #expect(mismatched.isEmpty, "Keys whose placeholders differ from English: \(mismatched)")
+    }
+
+    @Test("Spanish, French, Italian and Portuguese texts are written in sentence case, not in English title case")
+    func noEnglishTitleCase() throws {
+        let catalog = try LocalizationCatalog.load()
+        var titleCase: [String] = []
+        for key in catalog.keys where !Self.personNames.contains(key) {
+            for language in ["es", "fr", "it", "pt"] {
+                for text in catalog.texts(of: key, in: language) ?? [] {
+                    if try !Self.titleCaseWords(in: text).isEmpty {
+                        titleCase.append("\(key) (\(language)): \(text)")
+                    }
+                }
+            }
+        }
+
+        #expect(titleCase.isEmpty, "Texts with capitals of an English title: \(titleCase)")
+    }
+
+    @Test("The German texts call a CV a Lebenslauf, as the rest of the German app does")
+    func germanTextsSayLebenslauf() throws {
+        let catalog = try LocalizationCatalog.load()
+        let cv = try NSRegularExpression(pattern: #"\bCVs?\b"#)
+
+        let english = catalog.keys.filter { key in
+            (catalog.texts(of: key, in: "de") ?? []).contains { text in
+                cv.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+            }
+        }
+
+        #expect(english.isEmpty, "German texts that say CV: \(english)")
+    }
+
+    @Test("A capital letter is expected at the start of a sentence, in an abbreviation and in a proper name")
+    func titleCaseWordsSkipsLegitimateCapitals() throws {
+        #expect(try Self.titleCaseWords(in: "Crea Tu CV Perfecto") == ["Tu", "Perfecto"])
+        #expect(try Self.titleCaseWords(in: "Crea tu CV perfecto").isEmpty)
+        #expect(try Self.titleCaseWords(in: "Impossibile creare il PDF. Riprova.").isEmpty)
+        #expect(try Self.titleCaseWords(in: "C1 - Avanzado").isEmpty)
+        #expect(try Self.titleCaseWords(in: "O Apple Intelligence está desativado. Abra Ajustes.").isEmpty)
     }
 
     @Test("Every key of the catalog is used by the code")
