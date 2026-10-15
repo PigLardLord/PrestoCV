@@ -287,6 +287,16 @@ struct LocalizationCatalogTests {
         }
     }
 
+    @Test("The product is called PrestoCV in every language")
+    func productIsCalledPrestoCV() throws {
+        let catalog = try LocalizationCatalog.load()
+
+        for language in LocalizationCatalog.languages {
+            let welcome = catalog.texts(of: "welcome.title", in: language) ?? []
+            #expect(welcome.count == 1 && welcome[0].contains("PrestoCV"), "welcome.title does not name PrestoCV in \(language)")
+        }
+    }
+
     @Test("No exemption outlives its defect")
     func exemptionsAreStillNeeded() throws {
         let catalog = try LocalizationCatalog.load()

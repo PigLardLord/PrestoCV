@@ -34,6 +34,13 @@ struct AppStoreMetadataTests {
         #expect(declared == false)
     }
 
+    @Test("The app is called PrestoCV under its icon and in Settings")
+    func appIsCalledPrestoCVOnTheDevice() {
+        let displayName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+
+        #expect(displayName == "PrestoCV")
+    }
+
     // MARK: - Helpers
 
     private func privacyManifest() throws -> [String: Any] {

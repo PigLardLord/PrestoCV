@@ -116,4 +116,4 @@ This package is designed to be framework-agnostic. To integrate with your app:
 
 ## License
 
-Part of PrestoCV application.
+Part of the PrestoCV app.

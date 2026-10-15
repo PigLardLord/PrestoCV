@@ -75,7 +75,7 @@ Check once that a failing test stops a build: open a pull request that breaks on
 
 1. In Xcode 27, open Settings → Accounts and add your Apple ID (the account of the Apple Developer Program) and your GitHub account.
 2. Clone `PigLardLord/PrestoCV` and open `PrestoCV.xcodeproj`.
-3. Check that `DEVELOPMENT_TEAM` in `PrestoCV.xcodeproj/project.xcproj` is your Team ID, and that the app record for `com.PigLardLord.prestocv` exists in App Store Connect (My Apps → +).
+3. Check that `DEVELOPMENT_TEAM` in `PrestoCV.xcodeproj/project.xcproj` is your Team ID, and that the app record "PrestoCV: AI Resume Builder" for `com.PigLardLord.prestocv` exists in App Store Connect (My Apps → +).
 4. Choose Product → Xcode Cloud → Create Workflow, and choose the `PrestoCV` product.
 5. When Xcode asks for access to the source code, grant it: it opens GitHub, where you install the Xcode Cloud app for `PigLardLord/PrestoCV` only.
 6. Set the first workflow to the settings above, then add the other two (the workflow list is in the Report navigator, Cloud tab, and in App Store Connect under Xcode Cloud).
