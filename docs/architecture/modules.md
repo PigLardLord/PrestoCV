@@ -133,6 +133,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - A clicked link, which only happens in the preview, may open a connection to its host before the navigation is cancelled (a WebKit preconnect). Nothing is sent over it. A document's links and a refresh make no connection at all; tests record both.
 - Every file is wrapped in `#if canImport(WebKit)`.
 - **`CVRenderingWebKitSupportTests`** check each of these on iOS and macOS. Each network test has a control without the rules, which shows that the test can see a request.
+- The control of the `file:` test cannot show a load on macOS 27: there WebKit itself blocks a `file:` image in a page loaded from a string under a `file:` base URL. The rules are proven against `file:` on the releases that load it (iOS 26 and 27, macOS 26); the test records which.
 - On iOS the exporter's tests run through the shared `ExporterTests` scheme, which holds the new test targets only: the package scheme also builds the legacy targets, which do not build for iOS.
 
 **`CVRenderingIOS`, `CVRenderingMacOS`**

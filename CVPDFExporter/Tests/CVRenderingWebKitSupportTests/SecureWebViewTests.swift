@@ -181,6 +181,18 @@ struct SecureWebViewTests {
         }
     }
 
+    /// Whether a web view without the rules loads a file: image into a page loaded from a string under a file: base URL.
+    /// Recorded on iOS 26.5, iOS 27.0, macOS 26.6 and macOS 27.0: it loads on all of them but macOS 27, where WebKit does
+    /// not grant such a page read access to its base URL's directory, and so blocks the image before the rules do. The
+    /// rules are proven against file: on the releases that still load it. A blob: image loads without the rules on all
+    /// four. If WebKit changes either, the control fails and the page's value changes with it.
+    static var fileLoadedWithoutRules: Bool {
+        #if os(macOS)
+        if #available(macOS 27, *) { return false }
+        #endif
+        return true
+    }
+
     @Test("file: and blob: URLs are blocked by the rules; without them, they load")
     func fileAndBlob() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("web-view-\(UUID().uuidString)", isDirectory: true)
@@ -188,15 +200,22 @@ struct SecureWebViewTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let png = dir.appendingPathComponent("p.png")
         try #require(Data(base64Encoded: onePixelPNG)).write(to: png)
-        let pages: [(kind: String, html: String, baseURL: URL?)] = [
-            ("file", "<p>Loaded</p><img id=\"i\" src=\"\(png.absoluteString)\">", dir),   // the base URL grants file access
-            ("blob", "<p>Loaded</p><img id=\"i\"><script>const b = new Blob([Uint8Array.from(atob('\(onePixelPNG)'), c => c.charCodeAt(0))], {type: 'image/png'}); document.getElementById('i').src = URL.createObjectURL(b);</script>", nil),
+        let pages: [(kind: String, html: String, baseURL: URL?, loadedWithoutRules: Bool)] = [
+            ("file", "<p>Loaded</p><img id=\"i\" src=\"\(png.absoluteString)\">", dir, Self.fileLoadedWithoutRules),   // the base URL grants file access, but not on macOS 27
+            ("blob", "<p>Loaded</p><img id=\"i\"><script>const b = new Blob([Uint8Array.from(atob('\(onePixelPNG)'), c => c.charCodeAt(0))], {type: 'image/png'}); document.getElementById('i').src = URL.createObjectURL(b);</script>", nil, true),
         ]
         for page in pages {
             for setup in [Setup.rulesOnly, .control] {
                 let (view, _) = try await load(page.html, as: setup, baseURL: page.baseURL)
                 let width = try await DocumentReadiness.evaluate("return String(document.getElementById('i').naturalWidth)", in: view, timeout: .seconds(5))
-                #expect(width == (setup == .rulesOnly ? "0" : "1"), "\(page.kind), \(setup)")
+                switch setup {
+                case .production, .rulesOnly:
+                    #expect(width == "0", "\(page.kind), \(setup): the rules let it load")
+                case .control where page.loadedWithoutRules:
+                    #expect(width == "1", "\(page.kind): the control did not load it, so the test could not see a load")
+                case .control:
+                    #expect(width == "0", "\(page.kind): WebKit now loads this without the rules; mark it as loaded")
+                }
             }
         }
     }
