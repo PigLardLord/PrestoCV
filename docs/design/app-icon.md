@@ -8,7 +8,7 @@ The icon shows a speech bubble and a CV page: the person describes themselves, a
 
 | Layer (back to front) | File | Fill | In `icon.json` |
 |---|---|---|---|
-| Background | none | Mint `#00C8B3` | `fill`: Icon Composer's automatic gradient from Mint |
+| Background | none | Mint `#00C8B3`; dark appearance `#0A403B` | `fill-specializations`: Icon Composer's automatic gradient from Mint, and from a deep teal in the dark appearance |
 | 1 Bubble | `Assets/1_Bubble.svg` | Mint, dark variant `#00DAC3` | glass, opacity 0.55, translucent group |
 | 2 Document | `Assets/2_Document.svg` | white | glass, opacity 0.4, translucent group with the fold |
 | 3 Fold | `Assets/3_Fold.svg` | `#E6FFFB` | glass, opacity 0.85 |
@@ -26,7 +26,7 @@ These come from Apple's Human Interface Guidelines, App icons, and from "Creatin
 - **Layers.** Flat, opaque vector shapes with crisp edges, named with a number from back to front, in at most four groups. There are no own highlights, shadows, glows, blurs or bevels: the system adds them.
 - **Where the effects live.** The background, the opacity of each layer and the Liquid Glass settings live in `icon.json`, not in the SVGs.
 - **Shapes.** Few, filled, overlapping shapes. No text, no hairlines, and no sharp corners: the spark's tips are rounded by a stroke of its own colour.
-- **Appearances.** The dark, clear and tinted appearances keep the same shapes. They are left to Icon Composer's automatic variants; customise them there if a check shows a problem.
+- **Appearances.** The dark, clear and tinted appearances keep the same shapes. The dark appearance has its own background, a deep teal (`#0A403B`) from Mint's hue, so the white page and the gold spark stand out on a dark Home Screen. The clear and tinted appearances are left to Icon Composer's automatic variants; customise them there if a check shows a problem.
 
 ## Changing the icon
 
