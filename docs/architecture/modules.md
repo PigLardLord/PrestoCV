@@ -154,7 +154,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - `MinimalPDFInspector`.
 - **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test, in-flight cancellation and the content-completeness test for every bundled design.
 
-**Separate package `CVPDFExporterExamples`** holds the demos and the template viewer. The library package contains no executables (R14).
+**Separate package `CVPDFExporterExamples`** holds the demos. The library package contains no executables (R14).
 
 ---
 

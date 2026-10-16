@@ -38,7 +38,7 @@ case "$ACTION" in
     step "$ROOT/Tools/ArchitectureCheck/selftest.sh"
     # PrestoCVApp has no tests until step 5 (#88); building it checks its targets and cross-package dependencies.
     step swift build --package-path "$ROOT/PrestoCVApp"
-    # The demos and the template viewer, apart from the library (R14); they use the legacy exporter, Apple hosts only.
+    # The exporter's demos, apart from the library (R14); they use the legacy exporter, Apple hosts only.
     step swift build --package-path "$ROOT/CVPDFExporterExamples"
     ;;
   *)
