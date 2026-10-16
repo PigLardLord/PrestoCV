@@ -83,6 +83,30 @@ final class EditorLayoutUITests: XCTestCase {
         XCTAssertGreaterThan(email.frame.height, heightBefore, "The email field should grow to show the whole address")
     }
 
+    /// The row of the document language used to run half a screen below its text, at the normal text size, and to
+    /// push the personal details under the tab bar.
+    func testTheDocumentLanguageRowTakesOnlyTheRoomOfItsText() throws {
+        launch()
+        assertTheDocumentLanguageIsFollowedByThePersonalDetails(within: 60)
+    }
+
+    /// At the large sizes the label may shrink to keep its words whole, and the row still ends below its text.
+    func testTheDocumentLanguageRowTakesOnlyTheRoomOfItsTextAtALargeTextSize() throws {
+        launch(contentSize: "UICTContentSizeCategoryAccessibilityXL")
+        assertTheDocumentLanguageIsFollowedByThePersonalDetails(within: 130)
+    }
+
+    /// Between the label of the document language and the heading of the personal details there is no more than the
+    /// end of a row and the space between two sections.
+    private func assertTheDocumentLanguageIsFollowedByThePersonalDetails(within points: CGFloat) {
+        let language = app.staticTexts["Document language"]
+        let personal = app.staticTexts["Personal Information"]
+        XCTAssertTrue(language.waitForExistence(timeout: 10), "The editor should ask for the document language")
+        XCTAssertTrue(personal.waitForExistence(timeout: 10), "The personal details should follow the CV details")
+        let gap = personal.frame.minY - language.frame.maxY
+        XCTAssertLessThanOrEqual(gap, points, "The document language row should take only the room of its text")
+    }
+
     private func waitUntil(_ element: XCUIElement, exists: Bool, timeout: TimeInterval = 10) -> Bool {
         let condition = expectation(for: NSPredicate(format: "exists == %@", NSNumber(value: exists)), evaluatedWith: element)
         return XCTWaiter().wait(for: [condition], timeout: timeout) == .completed

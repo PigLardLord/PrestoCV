@@ -41,24 +41,46 @@ struct WholeWordsFit<Content: View, Accessory: View>: View {
     }
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            ForEach(WordFit.sizes(upTo: dynamicTypeSize), id: \.self) { size in
-                ZStack(alignment: .topLeading) {
-                    // The widest word, with the accessory, is the width this size needs; the content asks for none
-                    ForEach(words.indices, id: \.self) { index in
-                        HStack {
-                            Text(words[index])
-                            accessory
+        OpenWidthAsUnlimited {
+            ViewThatFits(in: .horizontal) {
+                ForEach(WordFit.sizes(upTo: dynamicTypeSize), id: \.self) { size in
+                    ZStack(alignment: .topLeading) {
+                        // The widest word, with the accessory, is the width this size needs; the content asks for none
+                        ForEach(words.indices, id: \.self) { index in
+                            HStack {
+                                Text(words[index])
+                                accessory
+                            }
+                            .hidden()
+                            .accessibilityHidden(true)
                         }
-                        .hidden()
-                        .accessibilityHidden(true)
+                        content
+                            .frame(idealWidth: 0, alignment: .leading)
                     }
-                    content
-                        .frame(idealWidth: 0, alignment: .leading)
+                    .dynamicTypeSize(size)
                 }
-                .dynamicTypeSize(size)
             }
         }
+    }
+}
+
+/// Gives its content unlimited room where its parent leaves the width open, as a parent does when it asks for the
+/// ideal size, such as a form row sizing the label of a picker.
+///
+/// Inside, each size of `WholeWordsFit` asks for the width of its widest word alone, so that `ViewThatFits` compares
+/// only that with the line. Measured so, the content has no width, breaks after each letter and is as tall as half
+/// the screen: a parent must never see that size. With unlimited room the content takes its own size, on one line.
+private struct OpenWidthAsUnlimited: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        subviews.first?.sizeThatFits(Self.room(in: proposal)) ?? .zero
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, proposal: Self.room(in: proposal))
+    }
+
+    private static func room(in proposal: ProposedViewSize) -> ProposedViewSize {
+        ProposedViewSize(width: proposal.width ?? .infinity, height: proposal.height)
     }
 }
 

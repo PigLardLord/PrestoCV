@@ -31,6 +31,7 @@ struct PersonalInfoSection: View {
                 TextField("field.cv_name", text: $cv.name)
                     .font(DesignTokens.Typography.headline.font)
                     .fontWeight(DesignTokens.Typography.headline.fontWeight)
+                    .accessibilityLabel("field.cv_name".localized)
 
                 Picker(selection: $documentLanguage) {
                     Text("language.automatic").tag(DocumentLanguage?.none)
