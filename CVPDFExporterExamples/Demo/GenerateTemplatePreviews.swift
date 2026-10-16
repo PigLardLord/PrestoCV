@@ -16,8 +16,7 @@ struct GenerateTemplatePreviews {
         do {
             // 1. Load all bundled templates
             print("\n📚 Loading bundled templates...")
-            let repository = BundledTemplateRepository()
-            let templates = try await repository.getTemplates()
+            let templates = try await loadBundledTemplates()
             print("✅ Found \(templates.count) templates: \(templates.map { $0.name }.joined(separator: ", "))")
 
             // 2. Create sample CV data
@@ -54,6 +53,8 @@ struct GenerateTemplatePreviews {
                 attributes: nil
             )
 
+            var failedTemplates: [String] = []
+
             for template in templates {
                 print("\n🎨 Generating preview for: \(template.name)")
 
@@ -87,46 +88,59 @@ struct GenerateTemplatePreviews {
                     print("  ✅ Preview saved: \(template.id)_preview.png (\(String(format: "%.1f", sizeKB)) KB)")
                 } else {
                     print("  ❌ Failed to generate preview for \(template.name)")
+                    failedTemplates.append(template.id)
                 }
             }
 
-            // 6. Generate default template preview (copy of professional)
-            print("\n🎨 Generating default template preview...")
-            if let professionalPath = templates.first(where: { $0.id == "professional" }) {
-                let customization = colorSchemes["professional"] ?? CustomizationOptions()
-                let html = try await templateEngine.render(
-                    template: professionalPath,
-                    data: cvDocument,
-                    customization: customization
-                )
-
-                let defaultOutputPath = "\(outputDir)/default_template_preview.png"
-                let success = try await generatePNGPreview(
-                    html: html,
-                    outputPath: defaultOutputPath
-                )
-
-                if success {
-                    print("  ✅ Default preview saved: default_template_preview.png")
-                }
-            }
-
-            // 7. Summary
+            // 6. Summary
             print("\n" + String(repeating: "=", count: 50))
-            print("✨ Preview generation complete!")
             print("\nGenerated files in:")
             print("  \(outputDir)")
             print("\nPreviews created:")
-            for template in templates {
+            for template in templates where !failedTemplates.contains(template.id) {
                 print("  • \(template.id)_preview.png")
             }
-            print("  • default_template_preview.png")
+
+            guard failedTemplates.isEmpty else {
+                print("\n❌ No preview for: \(failedTemplates.joined(separator: ", "))")
+                exit(1)
+            }
+            print("\n✨ Preview generation complete!")
 
         } catch {
             print("\n❌ Error: \(error)")
             print("   \(error.localizedDescription)")
             exit(1)
         }
+    }
+
+    /// The exporter's bundled templates, installed by `TemplateBootstrapService` as the app installs them at launch, but
+    /// into a registry in a temporary folder: the demo needs no app launch and leaves Application Support alone.
+    /// A template is a value, so the folder is removed on return; only the templates' `thumbnailURL` pointed into it.
+    private static func loadBundledTemplates() async throws -> [Template] {
+        let fileManager = FileManager.default
+        let storage = fileManager.temporaryDirectory
+            .appendingPathComponent("CVPDFExporterDemo-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fileManager.removeItem(at: storage) }
+
+        let registryDirectory = storage.appendingPathComponent("Registry", isDirectory: true)
+        try fileManager.createDirectory(at: registryDirectory, withIntermediateDirectories: true)
+        let registryManager = TemplateRegistryManager(storageDirectory: registryDirectory)
+        let fileRepository = FileTemplateRepository(
+            templatesDirectory: storage.appendingPathComponent("Templates", isDirectory: true),
+            registryManager: registryManager
+        )
+        try await TemplateBootstrapService(
+            installUseCase: InstallTemplateUseCase(repository: fileRepository),
+            registryManager: registryManager
+        ).syncBundledTemplates()
+
+        // The bootstrap logs a package it cannot install and goes on, so an empty registry is the only sign of it here
+        let templates = try await BundledTemplateRepository(fileRepository: fileRepository).getTemplates()
+        guard !templates.isEmpty else {
+            throw PreviewGenerationError.noBundledTemplates
+        }
+        return templates
     }
 
     /// The folder the previews go to: the first command-line argument, or else the exporter's template resources in
@@ -148,6 +162,17 @@ struct GenerateTemplatePreviews {
     private static func generatePNGPreview(html: String, outputPath: String) async throws -> Bool {
         let generator = PreviewSnapshotGenerator()
         return try await generator.snapshot(html: html, outputPath: outputPath)
+    }
+}
+
+private enum PreviewGenerationError: LocalizedError {
+    case noBundledTemplates
+
+    var errorDescription: String? {
+        switch self {
+        case .noBundledTemplates:
+            return "No bundled template could be installed"
+        }
     }
 }
 
