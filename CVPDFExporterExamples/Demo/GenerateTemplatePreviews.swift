@@ -14,21 +14,7 @@ struct GenerateTemplatePreviews {
         print(String(repeating: "=", count: 50))
 
         do {
-            // 1. Load all bundled templates
-            print("\n📚 Loading bundled templates...")
-            let repository = BundledTemplateRepository()
-            let templates = try await repository.getTemplates()
-            print("✅ Found \(templates.count) templates: \(templates.map { $0.name }.joined(separator: ", "))")
-
-            // 2. Create sample CV data
-            print("\n📝 Creating sample CV data...")
-            let cvDocument = SampleCVData.complete
-            print("✅ Sample CV ready: \(cvDocument.personalInfo.name)")
-
-            // 3. Set up template engine
-            let templateEngine = MustacheTemplateEngine()
-
-            // 4. Define color schemes for each template
+            // 1. Define color schemes for each template: the templates listed here must all be installed
             let colorSchemes: [String: CustomizationOptions] = [
                 "professional": CustomizationOptions(
                     colorPalette: .professional,
@@ -44,6 +30,19 @@ struct GenerateTemplatePreviews {
                 )
             ]
 
+            // 2. Load all bundled templates
+            print("\n📚 Loading bundled templates...")
+            let templates = try await loadBundledTemplates(expecting: Set(colorSchemes.keys))
+            print("✅ Found \(templates.count) templates: \(templates.map { $0.name }.joined(separator: ", "))")
+
+            // 3. Create sample CV data
+            print("\n📝 Creating sample CV data...")
+            let cvDocument = SampleCVData.complete
+            print("✅ Sample CV ready: \(cvDocument.personalInfo.name)")
+
+            // 4. Set up template engine
+            let templateEngine = MustacheTemplateEngine()
+
             // 5. Generate preview for each template
             let outputDir = outputDirectory()
 
@@ -53,6 +52,9 @@ struct GenerateTemplatePreviews {
                 withIntermediateDirectories: true,
                 attributes: nil
             )
+
+            var generatedFiles: [String] = []
+            var failedTemplates: [String] = []
 
             for template in templates {
                 print("\n🎨 Generating preview for: \(template.name)")
@@ -70,7 +72,8 @@ struct GenerateTemplatePreviews {
                 print("  ✅ HTML rendered (\(html.count) bytes)")
 
                 // Generate PNG preview
-                let outputPath = "\(outputDir)/\(template.id)_preview.png"
+                let fileName = "\(template.id)_preview.png"
+                let outputPath = "\(outputDir)/\(fileName)"
                 print("  📸 Creating PNG snapshot...")
 
                 let success = try await generatePNGPreview(
@@ -84,49 +87,67 @@ struct GenerateTemplatePreviews {
                     let fileSize = attributes[.size] as? Int ?? 0
                     let sizeKB = Double(fileSize) / 1024.0
 
-                    print("  ✅ Preview saved: \(template.id)_preview.png (\(String(format: "%.1f", sizeKB)) KB)")
+                    print("  ✅ Preview saved: \(fileName) (\(String(format: "%.1f", sizeKB)) KB)")
+                    generatedFiles.append(fileName)
                 } else {
                     print("  ❌ Failed to generate preview for \(template.name)")
+                    failedTemplates.append(template.id)
                 }
             }
 
-            // 6. Generate default template preview (copy of professional)
-            print("\n🎨 Generating default template preview...")
-            if let professionalPath = templates.first(where: { $0.id == "professional" }) {
-                let customization = colorSchemes["professional"] ?? CustomizationOptions()
-                let html = try await templateEngine.render(
-                    template: professionalPath,
-                    data: cvDocument,
-                    customization: customization
-                )
-
-                let defaultOutputPath = "\(outputDir)/default_template_preview.png"
-                let success = try await generatePNGPreview(
-                    html: html,
-                    outputPath: defaultOutputPath
-                )
-
-                if success {
-                    print("  ✅ Default preview saved: default_template_preview.png")
-                }
-            }
-
-            // 7. Summary
+            // 6. Summary
             print("\n" + String(repeating: "=", count: 50))
-            print("✨ Preview generation complete!")
             print("\nGenerated files in:")
             print("  \(outputDir)")
             print("\nPreviews created:")
-            for template in templates {
-                print("  • \(template.id)_preview.png")
+            for fileName in generatedFiles {
+                print("  • \(fileName)")
             }
-            print("  • default_template_preview.png")
+
+            guard failedTemplates.isEmpty else {
+                print("\n❌ No preview for: \(failedTemplates.joined(separator: ", "))")
+                exit(1)
+            }
+            print("\n✨ Preview generation complete!")
 
         } catch {
             print("\n❌ Error: \(error)")
             print("   \(error.localizedDescription)")
             exit(1)
         }
+    }
+
+    /// The exporter's bundled templates, installed by `TemplateBootstrapService` as the app installs them at launch,
+    /// but into a registry in a temporary folder: the demo needs no app launch and leaves Application Support alone.
+    /// A template is a value, so the folder is removed on return; only the templates' `thumbnailURL`s point into it,
+    /// and the demo does not read them.
+    /// - Parameter expectedIds: The templates that must be among them
+    /// - Throws: `PreviewGenerationError.missingTemplates` when one of `expectedIds` was not installed
+    private static func loadBundledTemplates(expecting expectedIds: Set<String>) async throws -> [Template] {
+        let fileManager = FileManager.default
+        let storage = fileManager.temporaryDirectory
+            .appendingPathComponent("CVPDFExporterDemo-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fileManager.removeItem(at: storage) }
+
+        let registryDirectory = storage.appendingPathComponent("Registry", isDirectory: true)
+        try fileManager.createDirectory(at: registryDirectory, withIntermediateDirectories: true)
+        let registryManager = TemplateRegistryManager(storageDirectory: registryDirectory)
+        let fileRepository = FileTemplateRepository(
+            templatesDirectory: storage.appendingPathComponent("Templates", isDirectory: true),
+            registryManager: registryManager
+        )
+        try await TemplateBootstrapService(
+            installUseCase: InstallTemplateUseCase(repository: fileRepository),
+            registryManager: registryManager
+        ).syncBundledTemplates()
+
+        // The bootstrap only logs a package it cannot install, and the repository skips one it cannot read
+        let templates = try await BundledTemplateRepository(fileRepository: fileRepository).getTemplates()
+        let missingIds = expectedIds.subtracting(templates.map(\.id))
+        guard missingIds.isEmpty else {
+            throw PreviewGenerationError.missingTemplates(missingIds.sorted())
+        }
+        return templates
     }
 
     /// The folder the previews go to: the first command-line argument, or else the exporter's template resources in
@@ -148,6 +169,20 @@ struct GenerateTemplatePreviews {
     private static func generatePNGPreview(html: String, outputPath: String) async throws -> Bool {
         let generator = PreviewSnapshotGenerator()
         return try await generator.snapshot(html: html, outputPath: outputPath)
+    }
+}
+
+private enum PreviewGenerationError: LocalizedError {
+    case missingTemplates([String])
+
+    var errorDescription: String? {
+        switch self {
+        case .missingTemplates(let ids):
+            return "Bundled templates not installed: \(ids.joined(separator: ", ")). "
+                + "Either the package is missing from CVPDFExporter/Resources/Templates/Bundled, "
+                + "or the bootstrap logged why it failed: "
+                + "log show --last 10m --predicate 'subsystem == \"CVPDFExporter\"'"
+        }
     }
 }
 

@@ -281,7 +281,8 @@ swift test --show-code-coverage
 # Run tests on Linux (Docker)
 docker run --rm -v "$PWD":/app -w /app swift:latest swift test
 
-# Run demo app: it writes the bundled templates' preview images to Resources/Templates,
+# Run demo app (macOS only): it installs the bundled templates into a temporary registry, the way
+# the app does at launch, and writes one <id>_preview.png per template to Resources/Templates,
 # or to the folder given as its argument
 swift run --package-path ../CVPDFExporterExamples CVPDFExporterDemo [output folder]
 
