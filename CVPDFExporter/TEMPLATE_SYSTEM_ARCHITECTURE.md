@@ -188,6 +188,14 @@ The iOS renderer paginates with `UIPrintPageRenderer`, which keeps a block whole
 
 `PageBreakManager` adds forced breaks (`.page-break`) and `.avoid-break`, and nothing that makes a section or an entry unbreakable.
 
+### A short CV on one page
+
+A short CV often runs a few lines over one page, and its last sections, kept whole, would then be alone on a second page. `OnePageFit` says when the iOS renderer prints such a CV on one page instead:
+
+- the renderer paginates the CV as its design lays it out. When that takes two pages, it sets the class `fit-one-page` on the root element and paginates again, and keeps that print when it takes one page; otherwise it clears the class and prints the two pages as before. A CV of one page, or of three or more, is paginated once;
+- each bundled design says how it tightens, with rules under `html.fit-one-page`: it closes up the space between its blocks and between its lines, and keeps its fonts, its widths and the page margins. The bounds keep the page easy to read: Professional and Minimal take back about a fifth of a page, Modern, which is compact already, less. A CV that runs further over keeps its two pages;
+- a design without such rules is always printed as it lays itself out.
+
 ### Regenerating the thumbnails
 
 The template carousel of the export sheet shows the `previewImageBase64` of each bundled package. It is the first page of the PDF of the example CV (`SampleCVData.complete`) that the real renderer makes with the options of the export sheet, one pixel per point (595 × 842). Regenerate it whenever the look of a design changes:

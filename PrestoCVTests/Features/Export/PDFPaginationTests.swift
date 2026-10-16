@@ -17,7 +17,8 @@ struct PDFPaginationTests {
     static let designs = ["professional", "modern", "minimal"]
 
     /// The number of pages of each planted CV, by design. A CV is planted so that its last page is neither almost
-    /// empty nor almost full, which keeps these numbers the same on every version of the system.
+    /// empty nor almost full, which keeps these numbers the same on every version of the system. A CV of two pages
+    /// also runs over by more than the tightening of `OnePageFit` takes back, and is printed with its design's spacing.
     static let expectedPages: [String: [String: Int]] = [
         "short-en": ["professional": 2, "modern": 1, "minimal": 2],
         "short-it": ["professional": 2, "modern": 1, "minimal": 2],

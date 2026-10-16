@@ -15,6 +15,7 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
     private var loadContinuation: CheckedContinuation<Void, Error>?
     private var loadTimeout: Task<Void, Never>?
     private let pageBreakManager: PageBreakManager
+    private let onePageFit: OnePageFit
 
     // Configuration
     private let pageLoadTimeout: Duration = .seconds(30)
@@ -24,6 +25,7 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
 
     public override init() {
         self.pageBreakManager = PageBreakManager()
+        self.onePageFit = OnePageFit()
         super.init()
     }
 
@@ -43,7 +45,8 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
             try await loadHTML(enhancedHTML, in: webView)
             await awaitContentReadiness(in: webView)
 
-            return try generatePDFWithPrintRenderer(from: webView, options: options)
+            let renderer = try await paginate(webView, options: options)
+            return try generatePDF(with: renderer, options: options)
         } catch let error as PDFExportError {
             logger.error("PDF generation failed: \(error.localizedDescription)")
             throw error
@@ -209,9 +212,36 @@ private extension EnhancedWKWebViewPDFRenderer {
         deadline.cancel()
     }
 
+    /// The pages of the CV as its design lays them out, or with the design's spacing tightened when that brings a CV
+    /// of two pages onto one (`OnePageFit`)
+    func paginate(_ webView: WKWebView, options: ExportOptions) async throws -> PagePrintRenderer {
+        let renderer = makePrintRenderer(for: webView, options: options)
+        guard onePageFit.triesTightening(pageCount: renderer.numberOfPages) else { return renderer }
+
+        try await setTightened(true, in: webView)
+        let tightened = makePrintRenderer(for: webView, options: options)
+        if onePageFit.keepsTightened(pageCount: tightened.numberOfPages) {
+            return tightened
+        }
+
+        try await setTightened(false, in: webView)
+        return makePrintRenderer(for: webView, options: options)
+    }
+
+    /// Sets or clears the class under which the design tightens its spacing, on the root element of the page
+    func setTightened(_ tightened: Bool, in webView: WKWebView) async throws {
+        _ = try await webView.callAsyncJavaScript(
+            "document.documentElement.classList.toggle(className, tightened);",
+            arguments: ["className": OnePageFit.className, "tightened": tightened],
+            in: nil,
+            contentWorld: .page
+        )
+    }
+
     /// Uses UIPrintPageRenderer, which paginates at the page size with margins;
     /// WKWebView.pdf() does not respect CSS @page rules reliably.
-    func generatePDFWithPrintRenderer(from webView: WKWebView, options: ExportOptions) throws -> Data {
+    /// The renderer lays out the page as it is when it is made, so it is made again after the page changes.
+    func makePrintRenderer(for webView: WKWebView, options: ExportOptions) -> PagePrintRenderer {
         // Configure print formatter
         let printFormatter = webView.viewPrintFormatter()
 
@@ -236,7 +266,11 @@ private extension EnhancedWKWebViewPDFRenderer {
 
         let renderer = PagePrintRenderer(paperRect: paperRect, printableRect: printableRect)
         renderer.addPrintFormatter(printFormatter, startingAtPageAt: 0)
+        return renderer
+    }
 
+    func generatePDF(with renderer: PagePrintRenderer, options: ExportOptions) throws -> Data {
+        let paperRect = renderer.paperRect
         let pageCount = renderer.numberOfPages
         logger.debug("Rendering \(pageCount) pages")
 
