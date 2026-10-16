@@ -45,7 +45,7 @@ struct GenerateTemplatePreviews {
             ]
 
             // 5. Generate preview for each template
-            let outputDir = "/Users/dev/PrestoCV/CVPDFExporter/Resources/Templates"
+            let outputDir = outputDirectory()
 
             // Ensure output directory exists
             try FileManager.default.createDirectory(
@@ -127,6 +127,21 @@ struct GenerateTemplatePreviews {
             print("   \(error.localizedDescription)")
             exit(1)
         }
+    }
+
+    /// The folder the previews go to: the first command-line argument, or else the exporter's template resources in
+    /// this repository (`CVPDFExporter/Resources/Templates`), found from where this source file is.
+    private static func outputDirectory() -> String {
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.count > 1 {
+            return arguments[1]
+        }
+        return URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()  // Demo
+            .deletingLastPathComponent()  // CVPDFExporterExamples
+            .deletingLastPathComponent()  // the repository root
+            .appendingPathComponent("CVPDFExporter/Resources/Templates")
+            .path
     }
 
     /// Generate a PNG preview from HTML using WKWebView snapshot
