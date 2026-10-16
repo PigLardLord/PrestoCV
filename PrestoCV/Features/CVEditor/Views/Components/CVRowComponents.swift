@@ -353,8 +353,11 @@ struct AddButton: View {
             }
             .font(DesignTokens.Typography.callout.font)
             .fontWeight(.medium)
-            .foregroundColor(DesignTokens.Colors.accent)
+            .padding(.vertical, DesignTokens.Spacing.sm)
+            // The whole row still takes the tap, as it did when the form drew the button
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, DesignTokens.Spacing.sm)
+        .buttonStyle(AccentTextButtonStyle())
     }
 }

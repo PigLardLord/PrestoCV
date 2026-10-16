@@ -176,13 +176,13 @@ private struct CVRowView: View {
             Button(action: onExport) {
                 Label(String(localized: "export.swipe.action"), systemImage: "square.and.arrow.up")
             }
-            .tint(DesignTokens.Colors.accent)
+            .tint(DesignTokens.Colors.swipeActionTint)
         }
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
             Button(action: onDuplicate) {
                 Label("cv.action.duplicate".localized, systemImage: "plus.square.on.square")
             }
-            .tint(DesignTokens.Colors.accent)
+            .tint(DesignTokens.Colors.swipeActionTint)
         }
         .contextMenu {
             Button(action: onDuplicate) {

@@ -44,56 +44,15 @@ struct SecondaryButton: View {
                     Image(systemName: icon)
                         .font(style.textStyle.font)
                 }
+                // The font of the style only: the colour of the title is the button's own
                 Text(title)
-                    .typography(style.textStyle)
+                    .font(style.textStyle.font)
             }
             .padding(style.padding)
         }
-        .buttonStyle(SecondaryButtonStyle(style: style))
+        .buttonStyle(AccentTextButtonStyle())
         .accessibilityLabel(title)
         .accessibilityAddTraits(.isButton)
-    }
-}
-
-// MARK: - Button Style Implementation
-
-private struct SecondaryButtonStyle: ButtonStyle {
-    let style: SecondaryButton.Style
-    
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundColor(foregroundColor)
-            .background(backgroundColor)
-            .cornerRadius(cornerRadius)
-            .opacity(configuration.isPressed ? 0.8 : 1.0)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-    }
-    
-    private var foregroundColor: Color {
-        switch style {
-        case .text, .compact:
-            return DesignTokens.Colors.secondaryButtonForeground
-        case .outlined:
-            return DesignTokens.Colors.accent
-        }
-    }
-    
-    private var backgroundColor: Color {
-        switch style {
-        case .text, .compact:
-            return .clear
-        case .outlined:
-            return .clear
-        }
-    }
-    
-    private var cornerRadius: CGFloat {
-        switch style {
-        case .text, .compact:
-            return 0
-        case .outlined:
-            return DesignTokens.CornerRadius.md
-        }
     }
 }
 

@@ -396,7 +396,7 @@ struct CVExportSheetView: View {
                             .stroke(isSelected ? DesignTokens.Colors.accent : Color.clear, lineWidth: 2)
                     )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(CardButtonStyle())
             .accessibilityAddTraits(isSelected ? .isSelected : [])
             .disabled(!isInteractive)
             .opacity(isInteractive ? 1 : DesignTokens.Opacity.medium)

@@ -139,12 +139,18 @@ enum DesignTokens {
         static let backgroundInverse = Color(UIColor.label)
         
         // Accent colors
-        static let accent = Color.blue
-        static let accentSecondary = Color.purple
+        /// The brand's Mint: the AccentColor of the asset catalog, which the system gives its own controls too. The
+        /// asset itself, not `Color.accentColor`, which is the default blue wherever the environment lacks the app's accent.
+        static let accent = Color(.accent)
+        /// Text and symbols on a fill of the accent (OnAccentColor in the asset catalog): white on the deep Mint of
+        /// the light appearance, near-black on the bright Mint of the dark one.
+        static let onAccent = Color(.onAccent)
+        /// The accent of a pressed button (AccentPressedColor in the asset catalog): a darker Mint in the light
+        /// appearance and a lighter one in the dark, opaque, so that a press shows without losing contrast.
+        static let accentPressed = Color(.accentPressed)
         static let success = Color.green
         static let warning = Color.orange
         static let error = Color.red
-        static let info = Color.blue
         
         // Semantic colors
         static let border = Color.gray.opacity(0.3)
@@ -154,13 +160,16 @@ enum DesignTokens {
         
         // Button colors
         static let primaryButtonBackground = accent
-        static let primaryButtonForeground = Color.white
+        static let primaryButtonForeground = onAccent
+        static let primaryButtonPressedBackground = accentPressed
         static let secondaryButtonBackground = Color.clear
-        static let secondaryButtonForeground = accent
         static let destructiveButtonBackground = error
         static let destructiveButtonForeground = Color.white
         static let disabledButtonBackground = Color.gray.opacity(0.3)
         static let disabledButtonForeground = Color.gray
+        /// The fill of a swipe action (SwipeActionColor in the asset catalog). The system draws the symbol of a swipe
+        /// action in white whatever the fill, so the fill is the deep Mint of the light appearance in the dark one too.
+        static let swipeActionTint = Color(.swipeAction)
         
         // Tag colors
         static let tagBackground = backgroundSecondary

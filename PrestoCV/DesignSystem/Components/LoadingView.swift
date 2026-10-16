@@ -106,9 +106,9 @@ struct LoadingView_Previews: PreviewProvider {
                 LoadingView.button()
                 Text("common.processing".asLoclizedKey)
             }
-            .foregroundColor(.white)
+            .foregroundColor(DesignTokens.Colors.primaryButtonForeground)
             .padding()
-            .background(DesignTokens.Colors.accent)
+            .background(DesignTokens.Colors.primaryButtonBackground)
             .cornerRadius(DesignTokens.CornerRadius.md)
             .previewDisplayName("Button Style")
             

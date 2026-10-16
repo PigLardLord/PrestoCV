@@ -16,9 +16,13 @@ struct InlineNotice: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             
             if let actionTitle, let action {
-                Button(actionTitle, action: action)
-                    .font(DesignTokens.Typography.caption1.font)
-                    .buttonStyle(.bordered)
+                Button(action: action) {
+                    Text(actionTitle)
+                        .font(DesignTokens.Typography.caption1.font)
+                        .padding(.horizontal, DesignTokens.Spacing.sm)
+                        .padding(.vertical, DesignTokens.Spacing.xxs)
+                }
+                .buttonStyle(PrimaryButtonStyle(isDisabled: false))
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.md)

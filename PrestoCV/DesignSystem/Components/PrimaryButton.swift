@@ -67,34 +67,61 @@ struct PrimaryButton: View {
                         .font(size.textStyle.font)
                 }
                 
+                // The font of the style only: the colour of the title is the button's own
                 Text(title)
-                    .typography(size.textStyle)
+                    .font(size.textStyle.font)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, size.verticalPadding)
             .padding(.horizontal, size.horizontalPadding)
-            .foregroundColor(foregroundColor)
-            .background(backgroundColor)
-            .cornerRadius(DesignTokens.CornerRadius.md)
-            .opacity(isDisabled ? 0.6 : 1.0)
         }
+        .buttonStyle(PrimaryButtonStyle(isDisabled: isDisabled))
         .disabled(isDisabled || isLoading)
         .accessibilityLabel(title)
         .accessibilityAddTraits(.isButton)
     }
-    
-    private var foregroundColor: Color {
-        return DesignTokens.Colors.primaryButtonForeground
+}
+
+// MARK: - Look
+
+extension PrimaryButton {
+    /// What a primary button draws: its label colour, its fill and its opacity. A pressed button takes the pressed
+    /// accent, opaque, so that its label keeps its contrast; a disabled one is greyed out.
+    struct Look {
+        let foreground: Color
+        let background: Color
+        let opacity: Double
+
+        init(isDisabled: Bool, isPressed: Bool) {
+            if isDisabled {
+                foreground = DesignTokens.Colors.disabledButtonForeground
+                background = DesignTokens.Colors.disabledButtonBackground
+                opacity = 0.6
+            } else {
+                foreground = DesignTokens.Colors.primaryButtonForeground
+                background = isPressed
+                    ? DesignTokens.Colors.primaryButtonPressedBackground
+                    : DesignTokens.Colors.primaryButtonBackground
+                opacity = 1
+            }
+        }
     }
-    
-    private var backgroundColor: Color {
-        if isDisabled {
-            return DesignTokens.Colors.disabledButtonBackground
-        }
-        if isLoading {
-            return DesignTokens.Colors.primaryButtonBackground.opacity(0.8)
-        }
-        return DesignTokens.Colors.primaryButtonBackground
+}
+
+// MARK: - Button Style
+
+/// Draws any label as a primary button (see `PrimaryButton.Look`), instead of the system's press, which fades the
+/// label and its fill.
+struct PrimaryButtonStyle: ButtonStyle {
+    let isDisabled: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        let look = PrimaryButton.Look(isDisabled: isDisabled, isPressed: configuration.isPressed)
+        return configuration.label
+            .foregroundColor(look.foreground)
+            .background(look.background)
+            .cornerRadius(DesignTokens.CornerRadius.md)
+            .opacity(look.opacity)
     }
 }
 

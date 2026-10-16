@@ -84,7 +84,7 @@ struct TemplateSelectionView: View {
                 }
             }
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(CardButtonStyle())
     }
 
     @ViewBuilder
@@ -157,7 +157,7 @@ struct TemplateSelectionView: View {
                 }
             }
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(CardButtonStyle())
     }
 
 }

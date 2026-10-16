@@ -111,11 +111,8 @@ struct AIGenerationView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(DesignTokens.Spacing.md)
-            .background(DesignTokens.Colors.accent)
-            .foregroundColor(.white)
-            .cornerRadius(DesignTokens.CornerRadius.md)
         }
+        .buttonStyle(PrimaryButtonStyle(isDisabled: viewModel.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
         .disabled(viewModel.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isGenerating)
-        .opacity(viewModel.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1.0)
     }
 }
