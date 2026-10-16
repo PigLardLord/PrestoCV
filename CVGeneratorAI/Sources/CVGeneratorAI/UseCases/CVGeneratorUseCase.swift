@@ -1,53 +1,45 @@
 import Foundation
 
-/// Use case for generating CVs with validation
+/// Use case for generating CVs: it checks the request, asks the service, removes whatever the
+/// description does not support and checks the answer.
 @MainActor
 public final class CVGeneratorUseCase {
     private let service: CVGenerationService
     private let validator: CVValidator
+    private let sanitizer: CVDataSanitizer
 
     public init(
         service: CVGenerationService,
-        validator: CVValidator = DefaultCVValidator()
+        validator: CVValidator = DefaultCVValidator(),
+        sanitizer: CVDataSanitizer = CVDataSanitizer()
     ) {
         self.service = service
         self.validator = validator
+        self.sanitizer = sanitizer
     }
 
-    /// Check if CV generation is available
-    public func isAvailable() async -> Bool {
-        return await service.isAvailable()
+    /// Whether CV generation can run now, and the reason when it cannot
+    public func availability() -> AIAvailability {
+        service.availability()
     }
 
     /// Generate and validate a CV from user input
     /// - Parameter request: The generation request
-    /// - Returns: Validated CV generation result
-    /// - Throws: CVGenerationError if generation or validation fails
-    public func generateCV(from request: CVGenerationRequest) async throws -> CVGenerationResult {
-        // Validate request
+    /// - Returns: CV data limited to what the description supports
+    /// - Throws: CVGenerationError if the service is unavailable, or generation or validation fails;
+    ///   CancellationError if the task was cancelled
+    public func generateCV(from request: CVGenerationRequest) async throws -> CVData {
+        if case .unavailable(let reason) = service.availability() {
+            throw CVGenerationError.unavailable(reason)
+        }
+
         try validator.validateRequest(request)
 
-        // Generate CV
-        let result = try await service.generateCV(from: request)
+        let generated = try await service.generateCV(from: request)
+        let cvData = sanitizer.sanitize(generated, against: request.userPrompt)
 
-        // Validate generated CV
-        try validator.validateCVData(result.cvData)
+        try validator.validateCVData(cvData)
 
-        return result
+        return cvData
     }
-
-    #if canImport(FoundationModels)
-    /// Generate CV with streaming support for real-time UI updates
-    /// - Parameter request: The generation request
-    /// - Returns: AsyncThrowingStream of partially generated CV data
-    /// - Note: Request validation is performed before streaming begins
-    @available(iOS 26, macOS 26, *)
-    public func generateCVStream(from request: CVGenerationRequest) throws -> AsyncThrowingStream<CVData.PartiallyGenerated, Error> {
-        // Validate request upfront
-        try validator.validateRequest(request)
-
-        // Return the service's stream directly
-        return service.generateCVStream(from: request)
-    }
-    #endif
 }

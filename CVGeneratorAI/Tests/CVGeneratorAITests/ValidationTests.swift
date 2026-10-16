@@ -8,172 +8,123 @@ struct DefaultCVValidatorTests {
 
     // MARK: - Request Validation Tests
 
-    @Test("Valid request passes validation")
+    @Test("A description within the limits passes validation")
     func validRequest() throws {
-        let request = CVGenerationRequest(
-            userPrompt: "I am a software engineer with 5 years of experience",
-            personalInfo: PersonalInfo(name: "Test", email: "test@example.com")
-        )
+        let request = CVGenerationRequest(userPrompt: "I am a software engineer with 5 years of experience")
 
         try validator.validateRequest(request)
-        // Should not throw
     }
 
-    @Test("Empty prompt fails validation")
-    func emptyPrompt() {
-        let request = CVGenerationRequest(userPrompt: "   ")
-
-        do {
-            try validator.validateRequest(request)
-            Issue.record("Should have thrown invalidPrompt")
-        } catch CVGenerationError.invalidPrompt {
-            // Expected error
-        } catch {
-            Issue.record("Unexpected error: \(error)")
+    @Test("An empty or blank description is too short", arguments: ["", "   ", "\n\n"])
+    func blankPrompt(prompt: String) {
+        #expect(throws: CVGenerationError.descriptionTooShort) {
+            try validator.validateRequest(CVGenerationRequest(userPrompt: prompt))
         }
     }
 
-    @Test("Short prompt fails validation")
+    @Test("A description under 10 characters is too short")
     func shortPrompt() {
-        let request = CVGenerationRequest(userPrompt: "Test")
-
-        do {
-            try validator.validateRequest(request)
-            Issue.record("Should have thrown validationFailed")
-        } catch CVGenerationError.validationFailed(let message) {
-            #expect(message.contains("at least 10 characters"))
-        } catch {
-            Issue.record("Unexpected error: \(error)")
+        #expect(throws: CVGenerationError.descriptionTooShort) {
+            try validator.validateRequest(CVGenerationRequest(userPrompt: "Nurse, 5y"))
         }
     }
 
-    @Test("Invalid personal info in request fails")
-    func invalidPersonalInfoInRequest() {
-        let personalInfo = PersonalInfo(name: "", email: "test@example.com")
-        let request = CVGenerationRequest(
-            userPrompt: "Valid prompt here with enough characters",
-            personalInfo: personalInfo
-        )
+    @Test("The shortest and longest allowed descriptions pass")
+    func boundaryLengthsPass() throws {
+        let shortest = String(repeating: "a", count: CVGenerationLimits.minimumDescriptionLength)
+        let longest = String(repeating: "a", count: CVGenerationLimits.maximumDescriptionLength)
 
-        do {
-            try validator.validateRequest(request)
-            Issue.record("Should have thrown validationFailed")
-        } catch CVGenerationError.validationFailed(let message) {
-            #expect(message.contains("Name"))
-        } catch {
-            Issue.record("Unexpected error: \(error)")
+        try validator.validateRequest(CVGenerationRequest(userPrompt: shortest))
+        try validator.validateRequest(CVGenerationRequest(userPrompt: longest))
+    }
+
+    @Test("A description over 2,000 characters is too long")
+    func longPrompt() {
+        let prompt = String(repeating: "a", count: CVGenerationLimits.maximumDescriptionLength + 1)
+
+        #expect(throws: CVGenerationError.descriptionTooLong) {
+            try validator.validateRequest(CVGenerationRequest(userPrompt: prompt))
+        }
+    }
+
+    @Test("Surrounding whitespace does not count towards the length")
+    func whitespaceIsNotCounted() {
+        let padded = "   short   "
+
+        #expect(throws: CVGenerationError.descriptionTooShort) {
+            try validator.validateRequest(CVGenerationRequest(userPrompt: padded))
         }
     }
 
     // MARK: - CV Data Validation Tests
 
-    @Test("Valid CV data passes validation")
-    func validCVData() throws {
-        let personalInfo = PersonalInfo(name: "John Doe", email: "john@example.com")
-        let experience = Experience(
-            title: "Engineer",
-            company: "Tech Corp",
-            startDate: "2020",
-            description: "Building things"
-        )
-        let cvData = CVData(personalInfo: personalInfo, experience: [experience])
+    @Test("A CV without a name or an email is valid")
+    func missingNameAndEmailAreValid() throws {
+        let cvData = CVData(experience: [Experience(title: "Nurse")])
 
         try validator.validateCVData(cvData)
-        // Should not throw
     }
 
-    @Test("CV with empty name fails")
-    func emptyName() {
-        let personalInfo = PersonalInfo(name: "   ", email: "test@example.com")
-        let cvData = CVData(personalInfo: personalInfo)
+    @Test("A CV with a well-formed email is valid")
+    func wellFormedEmailIsValid() throws {
+        let cvData = CVData(personalInfo: PersonalInfo(email: "john@example.com"))
 
-        do {
-            try validator.validateCVData(cvData)
-            Issue.record("Should have thrown validationFailed")
-        } catch CVGenerationError.validationFailed(let message) {
-            #expect(message.contains("Name"))
-        } catch {
-            Issue.record("Unexpected error: \(error)")
-        }
+        try validator.validateCVData(cvData)
     }
 
-    @Test("CV with invalid email fails")
-    func invalidEmail() {
-        let personalInfo = PersonalInfo(name: "Test", email: "notanemail")
-        let experience = Experience(
-            title: "Engineer",
-            company: "Company",
-            startDate: "2020",
-            description: "Work"
+    @Test("A blank email is treated as absent")
+    func blankEmailIsAbsent() throws {
+        let cvData = CVData(
+            personalInfo: PersonalInfo(email: "  "),
+            skills: [Skill(name: "Swift")]
         )
-        let cvData = CVData(personalInfo: personalInfo, experience: [experience])
 
-        do {
+        try validator.validateCVData(cvData)
+    }
+
+    @Test("A malformed email fails")
+    func malformedEmail() {
+        let cvData = CVData(
+            personalInfo: PersonalInfo(email: "notanemail"),
+            skills: [Skill(name: "Swift")]
+        )
+
+        #expect(throws: CVGenerationError.generationFailed) {
             try validator.validateCVData(cvData)
-            Issue.record("Should have thrown validationFailed")
-        } catch CVGenerationError.validationFailed(let message) {
-            #expect(message.contains("email"))
-        } catch {
-            Issue.record("Unexpected error: \(error)")
         }
     }
 
-    @Test("CV without content fails")
+    @Test("A CV with nothing in it is an empty result")
     func noContent() {
-        let personalInfo = PersonalInfo(name: "Test", email: "test@example.com")
-        let cvData = CVData(personalInfo: personalInfo)
-
-        do {
-            try validator.validateCVData(cvData)
-            Issue.record("Should have thrown validationFailed")
-        } catch CVGenerationError.validationFailed(let message) {
-            #expect(message.contains("at least one section"))
-        } catch {
-            Issue.record("Unexpected error: \(error)")
+        #expect(throws: CVGenerationError.emptyResult) {
+            try validator.validateCVData(CVData())
         }
     }
 
-    @Test("Experience with empty title fails")
-    func experienceEmptyTitle() {
-        let personalInfo = PersonalInfo(name: "Test", email: "test@example.com")
-        let experience = Experience(
-            title: "   ",
-            company: "Company",
-            startDate: "2020",
-            description: "Work"
-        )
-        let cvData = CVData(personalInfo: personalInfo, experience: [experience])
+    @Test("Blank personal fields do not count as content")
+    func blankFieldsAreNoContent() {
+        let cvData = CVData(personalInfo: PersonalInfo(name: " ", title: ""), summary: "  ")
 
-        do {
+        #expect(throws: CVGenerationError.emptyResult) {
             try validator.validateCVData(cvData)
-            Issue.record("Should have thrown validationFailed")
-        } catch CVGenerationError.validationFailed(let message) {
-            #expect(message.contains("title"))
-        } catch {
-            Issue.record("Unexpected error: \(error)")
         }
     }
 
-    @Test("Education with empty degree fails")
-    func educationEmptyDegree() {
-        let personalInfo = PersonalInfo(name: "Test", email: "test@example.com")
-        let education = Education(
-            degree: "",
-            institution: "University",
-            startDate: "2015",
-            endDate: "2019"
-        )
-        let cvData = CVData(personalInfo: personalInfo, education: [education])
+    @Test("Any single section is enough content")
+    func anySectionIsContent() throws {
+        let cvs = [
+            CVData(personalInfo: PersonalInfo(name: "Mario Rossi")),
+            CVData(summary: "A nurse."),
+            CVData(experience: [Experience(company: "Hospital")]),
+            CVData(education: [Education(degree: "Nursing")]),
+            CVData(skills: [Skill(name: "Care")]),
+            CVData(languages: [Language(name: "Italian")]),
+            CVData(certifications: [Certification(name: "BLS")]),
+            CVData(interests: ["Chess"]),
+        ]
 
-        do {
+        for cvData in cvs {
             try validator.validateCVData(cvData)
-            Issue.record("Should have thrown validationFailed")
-        } catch CVGenerationError.validationFailed(let message) {
-            #expect(message.contains("Degree"))
-        } catch {
-            Issue.record("Unexpected error: \(error)")
         }
     }
 }
-
-// CVGeneratorUseCase tests will be re-added after migration to guided generation

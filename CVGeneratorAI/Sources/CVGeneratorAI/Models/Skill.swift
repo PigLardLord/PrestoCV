@@ -14,28 +14,18 @@ public enum SkillLevel: String, Codable, CaseIterable, Sendable {
 /// Skill entry
 @Generable
 public struct Skill: Codable, Equatable, Sendable {
-    @Guide(description: "Name of the skill or technology (e.g., 'Swift', 'SwiftUI', 'Git')")
+    @Guide(description: "Name of the skill, as the person wrote it")
     public let name: String
 
-    @Guide(description: "Proficiency level for this skill")
-    public let level: SkillLevel
-
-    @Guide(description: "Category like 'Programming Languages', 'Frameworks', 'Tools', 'Architecture'")
-    public let category: String?
-
-    @Guide(description: "Years of experience with this skill (optional)")
-    public let yearsOfExperience: Int?
+    @Guide(description: "Level, only if the person described one; otherwise null")
+    public let level: SkillLevel?
 
     public init(
         name: String,
-        level: SkillLevel,
-        category: String? = nil,
-        yearsOfExperience: Int? = nil
+        level: SkillLevel? = nil
     ) {
         self.name = name
         self.level = level
-        self.category = category
-        self.yearsOfExperience = yearsOfExperience
     }
 }
 #endif

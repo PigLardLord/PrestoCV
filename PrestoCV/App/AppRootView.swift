@@ -32,7 +32,7 @@ struct AppRootView: View {
                 }
             }
             .navigationDestination(for: Route.self) { route in
-                destinationView(for: route)
+                destinationView(for: router.destination(for: route))
             }
         }
         .environmentObject(router)
@@ -45,39 +45,23 @@ struct AppRootView: View {
     }
     
     @ViewBuilder
-    private func destinationView(for route: Route) -> some View {
-        switch route {
-        case .onboarding, .cvList:
+    private func destinationView(for destination: RouteDestination) -> some View {
+        switch destination {
+        case .list:
             listView
         case .templateSelection:
             TemplateSelectionView(viewModel: viewModelFactory.makeTemplateSelectionViewModel())
         case .aiGeneration:
-            viewWithErrorHandling {
-                AIGenerationView(viewModel: try viewModelFactory.makeAIGenerationViewModel())
-            }
+            AIGenerationView(viewModel: viewModelFactory.makeAIGenerationViewModel())
         case .cvEditor(let cvId):
             CVEditorView(
                 viewModel: CVEditorViewModel(
                     cvId: cvId,
                     initialCV: router.initialCVForEditor,
                     cvManagementUseCase: cvManagementUseCase
-                )
+                ),
+                notice: router.editorNotice
             )
-        }
-    }
-    
-    @ViewBuilder
-    private func viewWithErrorHandling<Content: View>(content: () throws -> Content) -> some View {
-        Group {
-            if let view = try? content() {
-                view
-            } else {
-                ErrorView.generic(
-                    onRetry: {
-                        router.navigateBack()
-                    }
-                )
-            }
         }
     }
 }

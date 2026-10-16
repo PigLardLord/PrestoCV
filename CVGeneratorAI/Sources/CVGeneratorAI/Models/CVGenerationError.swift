@@ -1,51 +1,35 @@
 import Foundation
 
-/// Errors that can occur during CV generation
+/// Why generating a CV failed.
+///
+/// Cases say what happened, not what to tell the person; the app maps each one to its own
+/// localised text. Cancellation is never an error: it surfaces as `CancellationError`.
 public enum CVGenerationError: Error, Equatable, Sendable {
-    /// AI service is not available
-    case serviceUnavailable
+    /// The model cannot run now, for the given reason
+    case unavailable(AIAvailability.Reason)
 
-    /// Invalid or empty user prompt
-    case invalidPrompt
+    /// The description is too short to draft anything from
+    case descriptionTooShort
 
-    /// The description is too long for the on-device model
+    /// The description is longer than the limit, or than the model can take
     case descriptionTooLong
 
-    /// AI service returned invalid response
-    case invalidResponse
+    /// The model declined the text
+    case contentNotAllowed
 
-    /// Rate limit exceeded
-    case rateLimitExceeded
+    /// The model does not support the language of the description
+    case unsupportedLanguage
 
-    /// Generation timeout
-    case timeout
+    /// The model is serving another request
+    case busy
 
-    /// Validation failed for generated CV
-    case validationFailed(String)
+    /// The model answered the description, but its answer could not be used
+    case generationFailed
 
-    /// Unknown error
-    case unknown(String)
-}
+    /// A system service failed around the model, or the framework failed in a way this version does not know: the
+    /// description is not the cause
+    case serviceFailed
 
-extension CVGenerationError: LocalizedError {
-    public var errorDescription: String? {
-        switch self {
-        case .serviceUnavailable:
-            return "AI service is not available on this device"
-        case .invalidPrompt:
-            return "Please provide a valid description of your background"
-        case .descriptionTooLong:
-            return "Content too large for on-device model. Please provide a shorter description or fewer details."
-        case .invalidResponse:
-            return "Unable to generate CV from the provided information"
-        case .rateLimitExceeded:
-            return "Too many requests. Please try again later"
-        case .timeout:
-            return "CV generation timed out. Please try again"
-        case .validationFailed(let message):
-            return "Generated CV validation failed: \(message)"
-        case .unknown(let message):
-            return "An error occurred: \(message)"
-        }
-    }
+    /// The model answered, but nothing usable was left once the unsupported parts were removed
+    case emptyResult
 }

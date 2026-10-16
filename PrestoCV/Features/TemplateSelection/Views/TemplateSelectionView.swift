@@ -39,6 +39,10 @@ struct TemplateSelectionView: View {
         }
         .readableContentWidth()
         .screenTitle("cv.new".localized, large: true)
+        // The screen may have been away: the card is read again whenever it comes back into view
+        .task {
+            viewModel.refreshAIAvailability()
+        }
         // Turning Apple Intelligence on happens in Settings: the card is read again on the way back
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {

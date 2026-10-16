@@ -42,6 +42,9 @@ final class CVEditorViewModel: ObservableObject {
         !cv.personalInfo.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         !cv.personalInfo.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         !cv.personalInfo.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !cv.personalInfo.phone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !cv.personalInfo.location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !cv.personalInfo.portfolio.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         !cv.personalInfo.profile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         !cv.skills.isEmpty ||
         !cv.relevant_experience.isEmpty ||

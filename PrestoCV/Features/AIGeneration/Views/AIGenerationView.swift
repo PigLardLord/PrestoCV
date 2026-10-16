@@ -6,8 +6,9 @@ struct AIGenerationView: View {
     @StateObject private var viewModel: AIGenerationViewModel
     @FocusState private var isTextEditorFocused: Bool
 
-    init(viewModel: AIGenerationViewModel) {
-        self._viewModel = StateObject(wrappedValue: viewModel)
+    /// The view model is built once, when the screen first appears, and survives every re-render of the parent.
+    init(viewModel: @autoclosure @escaping () -> AIGenerationViewModel) {
+        self._viewModel = StateObject(wrappedValue: viewModel())
     }
 
     var body: some View {
@@ -23,10 +24,14 @@ struct AIGenerationView: View {
             }
             .padding(DesignTokens.Spacing.md)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .keyboardDoneButton()
         .screenTitle("navigation.ai_generation".localized, large: true)
-        .overlay(
-            viewModel.isGenerating ? LoadingView.fullscreen(message: "ai.generation.loading_message".asLoclizedKey) : nil
-        )
+        .overlay {
+            if viewModel.isGenerating {
+                GeneratingOverlay(onCancel: viewModel.cancel)
+            }
+        }
         .alert("common.error".localized, isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
             Button("common.ok".localized) {
                 viewModel.clearError()
@@ -34,10 +39,13 @@ struct AIGenerationView: View {
         } message: {
             Text(viewModel.errorMessage)
         }
-        .onChange(of: viewModel.generatedCVId) { _, cvId in
-            if let cvId = cvId {
-                router.replace(with: .cvEditor(cvId: cvId))
+        .onChange(of: viewModel.draft) { _, draft in
+            if let draft {
+                router.navigateToEditorWithAIDraft(draft)
             }
+        }
+        .onDisappear {
+            viewModel.cancel()
         }
     }
 
@@ -65,7 +73,9 @@ struct AIGenerationView: View {
                 .typography(.headline)
                 .foregroundColor(DesignTokens.Colors.primary)
 
+            // A text editor has no label of its own: VoiceOver names it by the title above it
             TextEditor(text: $viewModel.prompt)
+                .accessibilityLabel("ai.generation.prompt_section_title".localized)
                 .frame(minHeight: 200)
                 .padding(DesignTokens.Spacing.sm)
                 .background(DesignTokens.Colors.backgroundSecondary)
@@ -76,9 +86,17 @@ struct AIGenerationView: View {
                         .stroke(isTextEditorFocused ? DesignTokens.Colors.accent : Color.clear, lineWidth: 2)
                 )
 
-            Text("ai.generation.prompt_instructions".localized)
-                .typography(.caption1)
-                .foregroundColor(DesignTokens.Colors.secondary)
+            HStack(alignment: .top) {
+                Text("ai.generation.prompt_instructions".localized)
+                    .typography(.caption1)
+                    .foregroundColor(DesignTokens.Colors.secondary)
+
+                Spacer()
+
+                Text("ai.generation.character_count".localizedWithArgs(viewModel.characterCount, viewModel.characterLimit))
+                    .typography(.caption1)
+                    .foregroundColor(viewModel.isOverCharacterLimit ? DesignTokens.Colors.error : DesignTokens.Colors.secondary)
+            }
         }
     }
 
@@ -89,30 +107,54 @@ struct AIGenerationView: View {
                 .foregroundColor(DesignTokens.Colors.primary)
 
             CardView(padding: DesignTokens.Spacing.sm) {
-                Text("""
-                I'm John Doe, email john@example.com, phone +1 234 567 890, from San Francisco. I'm a senior software engineer with 8 years of experience at Tech Corp building scalable web applications. I have expertise in Python, JavaScript, React, and AWS. I graduated from MIT with a Computer Science degree in 2015. My native language is English and I'm fluent in Spanish.
-                """)
-                .typography(.caption1)
-                .foregroundColor(DesignTokens.Colors.secondary)
+                Text("ai.generation.example_text".localized)
+                    .typography(.caption1)
+                    .foregroundColor(DesignTokens.Colors.secondary)
             }
         }
     }
 
     private var generateButton: some View {
-        Button(action: {
-            isTextEditorFocused = false
-            Task {
-                await viewModel.generateCV()
+        VStack(spacing: DesignTokens.Spacing.sm) {
+            Button(action: {
+                isTextEditorFocused = false
+                viewModel.startGenerating()
+            }) {
+                HStack {
+                    Image(systemName: "sparkles")
+                    Text("ai.generation.button_title".localized)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(DesignTokens.Spacing.md)
             }
-        }) {
-            HStack {
-                Image(systemName: "sparkles")
-                Text("ai.generation.button_title".localized)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(DesignTokens.Spacing.md)
+            .buttonStyle(PrimaryButtonStyle(isDisabled: !viewModel.canGenerate))
+            .disabled(!viewModel.canGenerate)
+
+            Label("ai.generation.privacy_note".localized, systemImage: "lock.shield")
+                .typography(.caption1)
+                .foregroundColor(DesignTokens.Colors.secondary)
         }
-        .buttonStyle(PrimaryButtonStyle(isDisabled: viewModel.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
-        .disabled(viewModel.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isGenerating)
+    }
+}
+
+// MARK: - Generating Overlay
+
+/// Covers the screen while the model works, and lets the person stop it.
+private struct GeneratingOverlay: View {
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(spacing: DesignTokens.Spacing.md) {
+            LoadingView(message: "ai.generation.loading_message".asLoclizedKey)
+
+            Text("ai.generation.time_note".localized)
+                .typography(.caption1)
+                .foregroundColor(DesignTokens.Colors.secondary)
+
+            SecondaryButton(title: "common.cancel".localized, action: onCancel)
+        }
+        .padding(DesignTokens.Spacing.xl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(DesignTokens.Colors.background)
     }
 }

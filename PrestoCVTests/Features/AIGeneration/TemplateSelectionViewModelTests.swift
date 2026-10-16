@@ -33,8 +33,11 @@ struct TemplateSelectionViewModelTests {
         }
     }
 
+    /// A view model of a release that ships AI drafting, so that the tests do not depend on the release switch.
     private func makeViewModel(_ availability: Availability, pauses: Pauses) -> TemplateSelectionViewModel {
-        TemplateSelectionViewModel(aiAvailability: { availability.read() }, pause: { try await pauses.pause() })
+        TemplateSelectionViewModel(
+            aiAvailability: { availability.read() }, pause: { try await pauses.pause() }, isAIShipped: true
+        )
     }
 
     private func makeViewModel(_ availability: Availability) -> TemplateSelectionViewModel {
@@ -126,7 +129,7 @@ struct TemplateSelectionViewModelTests {
         let viewModel = TemplateSelectionViewModel(aiAvailability: { availability.read() }, pause: {
             try await pauses.pause()
             try await Task.sleep(for: .seconds(3600))
-        })
+        }, isAIShipped: true)
 
         let screen = Task { await viewModel.followAIAvailability() }
         while pauses.count == 0 { await Task.yield() }
@@ -146,5 +149,28 @@ struct TemplateSelectionViewModelTests {
         viewModel.refreshAIAvailability()
 
         #expect(viewModel.aiEntry == .hidden)
+    }
+
+    @Test("A release that does not ship AI drafting has no entry whatever the availability, and does not follow it",
+          .timeLimit(.minutes(1)),
+          arguments: [
+              AIAvailability.available,
+              .unavailable(.deviceNotEligible),
+              .unavailable(.appleIntelligenceNotEnabled),
+              .unavailable(.modelNotReady),
+              .unavailable(.unknown),
+          ])
+    func notShippedHasNoEntry(availability start: AIAvailability) async {
+        let availability = Availability(start)
+        let pauses = Pauses()
+        let viewModel = TemplateSelectionViewModel(
+            aiAvailability: { availability.read() }, pause: { try await pauses.pause() }, isAIShipped: false
+        )
+
+        viewModel.refreshAIAvailability()
+        await viewModel.followAIAvailability()
+
+        #expect(viewModel.aiEntry == .hidden)
+        #expect(pauses.count == 0, "Nothing to wait for: the entry stays hidden")
     }
 }

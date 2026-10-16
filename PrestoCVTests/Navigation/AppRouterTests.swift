@@ -80,7 +80,7 @@ struct AppRouterTests {
     @Test("navigateToRoot from deeply nested navigation returns to root")
     func navigateToRootFromDeeplyNested() {
         // Given - Multiple navigation levels
-        let router = AppRouter()
+        let router = AppRouter(isAIShipped: true)
         router.navigate(to: .templateSelection)
         router.navigate(to: .aiGeneration)
         router.navigate(to: .cvEditor(cvId: nil))
@@ -156,6 +156,52 @@ struct AppRouterTests {
         #expect(router.navigationPath.count == 1, "Should add editor to path")
     }
 
+    // MARK: - Navigate To Editor With AI Draft Tests
+
+    @Test("navigateToEditorWithAIDraft opens an unsaved CV with the AI notice")
+    func navigateToEditorWithAIDraftSetsDraftAndNotice() {
+        // Given
+        let router = AppRouter()
+        let draft = CVModel(name: "Drafted by AI")
+
+        // When
+        router.navigateToEditorWithAIDraft(draft)
+
+        // Then
+        #expect(router.initialCVForEditor == draft, "The draft should be handed to the editor")
+        #expect(router.editorNotice == .aiDraft, "The editor should be told the CV came from AI")
+        #expect(router.navigationPath.count == 1, "Should add editor to path")
+        #expect(router.currentRoute == .cvEditor(cvId: nil), "The draft opens as a new CV, not a saved one")
+    }
+
+    @Test("navigateToEditorWithTemplate clears the notice of an earlier AI draft")
+    func navigateToEditorWithTemplateClearsNotice() {
+        // Given
+        let router = AppRouter()
+        router.navigateToEditorWithAIDraft(CVModel(name: "Drafted by AI"))
+        router.navigateToRoot()
+
+        // When
+        router.navigateToEditorWithTemplate(CVModel(name: "Template"))
+
+        // Then
+        #expect(router.editorNotice == nil, "A template must not show the AI notice")
+    }
+
+    @Test("opening an existing CV clears the AI notice")
+    func navigateToExistingCVClearsNotice() {
+        // Given
+        let router = AppRouter()
+        router.navigateToEditorWithAIDraft(CVModel(name: "Drafted by AI"))
+        router.navigateToRoot()
+
+        // When
+        router.navigate(to: .cvEditor(cvId: UUID().uuidString))
+
+        // Then
+        #expect(router.editorNotice == nil, "A saved CV must not show the AI notice")
+    }
+
     // MARK: - Navigation Path State Tests
 
     @Test("navigate appends route to path")
@@ -174,7 +220,7 @@ struct AppRouterTests {
     @Test("multiple navigate calls build up path")
     func multipleNavigateBuildPath() {
         // Given
-        let router = AppRouter()
+        let router = AppRouter(isAIShipped: true)
 
         // When
         router.navigate(to: .templateSelection)
@@ -185,20 +231,61 @@ struct AppRouterTests {
         #expect(router.navigationPath.count == 3, "Each navigate should add to path")
     }
 
-    @Test("replace clears path and sets new route")
-    func replaceClearsPathAndSetsRoute() {
+    // MARK: - AI Drafting Release Switch
+
+    @Test("With AI drafting not shipped, navigating to it leaves the path and the route unchanged")
+    func aiRouteIsRefusedWhenNotShipped() {
         // Given
-        let router = AppRouter()
+        let router = AppRouter(isAIShipped: false)
         router.navigate(to: .templateSelection)
-        router.navigate(to: .cvEditor(cvId: nil))
-        #expect(router.navigationPath.count == 2)
 
         // When
-        router.replace(with: .cvList)
+        router.navigate(to: .aiGeneration)
 
         // Then
-        #expect(router.navigationPath.count == 0, "Replace should clear navigation path")
-        #expect(router.currentRoute == .cvList, "Current route should be updated")
+        #expect(router.navigationPath.count == 1, "The AI route must not be appended")
+        #expect(router.currentRoute == .templateSelection)
+    }
+
+    @Test("With AI drafting not shipped, a path given the AI route directly does not open the generation screen")
+    func aiRouteInsertedDirectlyShowsTheList() {
+        // Given
+        let router = AppRouter(isAIShipped: false)
+
+        // When - The route reaches the path without navigate(to:)
+        router.navigationPath.append(Route.aiGeneration)
+
+        // Then
+        #expect(router.destination(for: .aiGeneration) == .list)
+    }
+
+    @Test("With AI drafting not shipped, the other routes navigate as before")
+    func otherRoutesNavigateWhenNotShipped() {
+        // Given
+        let router = AppRouter(isAIShipped: false)
+
+        // When
+        router.navigate(to: .templateSelection)
+        router.navigateToEditorWithTemplate(CVModel())
+
+        // Then
+        #expect(router.navigationPath.count == 2)
+        #expect(router.currentRoute == .cvEditor(cvId: nil))
+    }
+
+    @Test("With AI drafting shipped, navigating to it opens the generation screen as before")
+    func aiRouteNavigatesWhenShipped() {
+        // Given
+        let router = AppRouter(isAIShipped: true)
+        router.navigate(to: .templateSelection)
+
+        // When
+        router.navigate(to: .aiGeneration)
+
+        // Then
+        #expect(router.navigationPath.count == 2)
+        #expect(router.currentRoute == .aiGeneration)
+        #expect(router.destination(for: .aiGeneration) == .aiGeneration)
     }
 
     // MARK: - Integration: Cancel Flow Tests

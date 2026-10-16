@@ -121,7 +121,7 @@ struct LocalizationCatalogTests {
 
     /// Texts that read the same in every language: symbols, abbreviations, formats.
     fileprivate static let sameInEveryLanguage: Set<String> = [
-        "%@. %@", "common.ok", "export.font_preview_sample", "field.url", "format.required_indicator",
+        "%@. %@", "ai.generation.character_count", "common.ok", "export.font_preview_sample", "field.url", "format.required_indicator",
     ]
 
     /// Words that happen to be written the same in English and in these languages.
@@ -139,10 +139,7 @@ struct LocalizationCatalogTests {
 
     /// Keys that a branch that has not landed yet is still rewriting or removing. An entry without a defect left
     /// fails `exemptionsAreStillNeeded`, so each one has to go as soon as its branch has landed.
-    fileprivate static let pendingKeys: Set<String> = [
-        // The example text of the AI screen, which the AI branch (fix/v1-ai) replaces with `ai.generation.example_text`
-        "I'm John Doe, email john@example.com, phone +1 234 567 890, from San Francisco. I'm a senior software engineer with 8 years of experience at Tech Corp building scalable web applications. I have expertise in Python, JavaScript, React, and AWS. I graduated from MIT with a Computer Science degree in 2015. My native language is English and I'm fluent in Spanish.",
-    ]
+    fileprivate static let pendingKeys: Set<String> = []
 
     /// Keys that the code builds from other values, so that no literal names them.
     fileprivate static let dynamicKeyPrefixes = ["language.level."]
@@ -152,6 +149,18 @@ struct LocalizationCatalogTests {
 
     /// Keys whose text is the name of a person in every language.
     fileprivate static let personNames: Set<String> = ["export.font_preview_name"]
+
+    /// Proper names that the text of one key keeps capitalised inside a sentence: the person, the city, the school and
+    /// the degree of the example description on the AI screen.
+    fileprivate static let properNamesOfKey: [String: Set<String>] = [
+        "ai.generation.example_text": [
+            "Maria", "Rossi", "Don", "Milani", "Bologna", "Bolonia", "Bologne", "Bolonha",
+            "Ciencias", "Educación", "Universidad", "Scienze", "Formazione", "Ciências", "Educação", "Universidade",
+        ],
+    ]
+
+    /// The languages whose texts are written in sentence case.
+    fileprivate static let sentenceCaseLanguages = ["es", "fr", "it", "pt"]
 
     // MARK: Defects
 
@@ -298,9 +307,10 @@ struct LocalizationCatalogTests {
         let catalog = try LocalizationCatalog.load()
         var titleCase: [String] = []
         for key in catalog.keys where !Self.personNames.contains(key) {
-            for language in ["es", "fr", "it", "pt"] {
+            let names = Self.properNamesOfKey[key] ?? []
+            for language in Self.sentenceCaseLanguages {
                 for text in catalog.texts(of: key, in: language) ?? [] {
-                    if try !Self.titleCaseWords(in: text).isEmpty {
+                    if try !Self.titleCaseWords(in: text).allSatisfy(names.contains) {
                         titleCase.append("\(key) (\(language)): \(text)")
                     }
                 }
@@ -378,6 +388,12 @@ struct LocalizationCatalogTests {
             for language in languages {
                 #expect(catalog.texts(of: key, in: language) == catalog.texts(of: key, in: "en"), "\(key) differs in \(language): remove it from sameInSomeLanguages")
             }
+        }
+        for (key, names) in Self.properNamesOfKey {
+            let capitalised = try Set(Self.sentenceCaseLanguages.flatMap { language in
+                try (catalog.texts(of: key, in: language) ?? []).flatMap(Self.titleCaseWords(in:))
+            })
+            #expect(names.isSubset(of: capitalised), "\(key) no longer capitalises \(names.subtracting(capitalised)): remove it from properNamesOfKey")
         }
     }
 

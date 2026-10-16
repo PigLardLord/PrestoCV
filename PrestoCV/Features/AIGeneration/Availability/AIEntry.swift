@@ -6,7 +6,8 @@ enum AIEntry: Equatable {
     case available
     /// The card is there but cannot be used yet, with a sentence that says what to do.
     case disabled(Explanation)
-    /// No card: this device cannot run the model, or it said why in words this version does not know.
+    /// No card: this device cannot run the model, it said why in words this version does not know, or the release does not
+    /// ship AI drafting (`AIFeature.isShipped`).
     case hidden
 
     enum Explanation: Equatable {
@@ -22,7 +23,11 @@ enum AIEntry: Equatable {
         }
     }
 
-    init(availability: AIAvailability) {
+    init(availability: AIAvailability, isShipped: Bool = AIFeature.isShipped) {
+        guard isShipped else {
+            self = .hidden
+            return
+        }
         switch availability {
         case .available:
             self = .available

@@ -17,15 +17,15 @@ public enum LanguageProficiency: String, Codable, CaseIterable, Sendable {
 /// Language proficiency entry
 @Generable
 public struct Language: Codable, Equatable, Sendable {
-    @Guide(description: "Language name (e.g., 'English', 'Spanish', 'Mandarin')")
+    @Guide(description: "Language name, as the person wrote it")
     public let name: String
 
-    @Guide(description: "CEFR proficiency level or Native")
-    public let proficiency: LanguageProficiency
+    @Guide(description: "CEFR level or Native, only if the person described one; otherwise null")
+    public let proficiency: LanguageProficiency?
 
     public init(
         name: String,
-        proficiency: LanguageProficiency
+        proficiency: LanguageProficiency? = nil
     ) {
         self.name = name
         self.proficiency = proficiency

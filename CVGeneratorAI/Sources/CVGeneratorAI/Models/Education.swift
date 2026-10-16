@@ -5,49 +5,33 @@ import FoundationModels
 /// Education entry
 @Generable
 public struct Education: Codable, Equatable, Sendable {
+    @Guide(description: "Degree or course exactly as written, only if the person said it; otherwise null")
+    public let degree: String?
 
-    @Guide(description: "Degree type and field (e.g., 'Bachelor of Science in Computer Science', 'Master of Business Administration')")
-    public let degree: String
+    @Guide(description: "School or university exactly as written, only if the person said it; otherwise null")
+    public let institution: String?
 
-    @Guide(description: "EXACT institution name - extract exactly as mentioned by user")
-    public let institution: String
+    @Guide(description: "Start date exactly as written, only if the person said it; otherwise null")
+    public let startDate: String?
 
-    @Guide(description: "Location (city, country) if mentioned")
-    public let location: String?
-
-    @Guide(description: "Start year (e.g., '2015')")
-    public let startDate: String
-
-    @Guide(description: "End year (e.g., '2019') or null if still studying")
+    @Guide(description: "End date exactly as written; null if the person did not say it or is still studying")
     public let endDate: String?
 
-    @Guide(description: "GPA if mentioned (e.g., '3.8/4.0', 'Summa Cum Laude')")
-    public let gpa: String?
-
-    @Guide(description: "Additional details about the program")
+    @Guide(description: "Extra details the person gave about the studies; otherwise null")
     public let description: String?
 
-    @Guide(description: "Academic achievements, honors, awards")
-    public let achievements: [String]
-
     public init(
-        degree: String,
-        institution: String,
-        location: String? = nil,
-        startDate: String,
+        degree: String? = nil,
+        institution: String? = nil,
+        startDate: String? = nil,
         endDate: String? = nil,
-        gpa: String? = nil,
-        description: String? = nil,
-        achievements: [String] = []
+        description: String? = nil
     ) {
         self.degree = degree
         self.institution = institution
-        self.location = location
         self.startDate = startDate
         self.endDate = endDate
-        self.gpa = gpa
         self.description = description
-        self.achievements = achievements
     }
 }
 #endif

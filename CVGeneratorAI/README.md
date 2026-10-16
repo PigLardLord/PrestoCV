@@ -1,118 +1,95 @@
 # CVGeneratorAI
 
-AI-powered CV generation using Apple's FoundationModels.
+Drafts the fields of a CV from a person's own description, on the device, with Apple's FoundationModels.
 
-## Overview
+This is the legacy generator that the app ships in v1 (ADR 0012). The `CVDrafting` targets
+are its planned replacement and are still empty.
 
-CVGeneratorAI is a Swift Package that provides tools to generate professional CVs from natural language descriptions. It uses protocol-based architecture to support different AI backends.
+## What it does
 
-## Features
+- **Only what the person said.** The model fills a small schema (`CVData`) in which every detail is optional. The
+  instructions forbid inventing anything, and `CVDataSanitizer` enforces it afterwards by checking every retained
+  field against the description. The rules are conservative by construction: a token that could be read two ways is
+  not accepted.
+  - Contact details (email, link, phone) must be whole tokens of the description. A token is a run between white
+    space, brackets and quotes, without the punctuation that ends a sentence; an address is never taken out of a
+    larger token. They may differ only in case, in a link's scheme, `www.` and trailing slash (its query and
+    fragment count), and in a phone's separators and `+` or `00` prefix.
+  - Names (people, employers, schools, titles, places, certifications, skills, interests) must occur in it as a
+    contiguous phrase of whole words, ignoring case and accents. An entry with nothing identifying left is dropped.
+  - Prose (summary, descriptions, achievements) keeps only the sentences that state no contact detail or number the
+    description lacks. Numbers are compared with their separators and with every Unicode digit read as 0-9, so `35`,
+    `3.5` and `1.000` are three numbers, and `1.000` and `1,000` are one.
+  - A skill level or language level stays only if the description states it for that item, by a CEFR code or a level
+    word in the same sentence, with no negation or hedge in it ("not fluent", "a bit", "hardly"). A skill is
+    otherwise unrated and a language is left out.
+  - What an entry says beyond its name (title or degree, dates, figures, place, certification issuer and link, and
+    whether a job is current) must come from a clause of the description that names the entry's employer or school.
+    A clause ends at a comma, a semicolon or a conjunction (a conjunction inside the name of an employer does not end
+    it). Nothing else is read: not capitals, not prepositions, not the sentence the clause stands in, and not the fact
+    that the description names one employer only. So an employer the draft leaves out, however it is written ("Beta
+    trained 9 nurses." or "...and beta employed me"), can neither take the facts of the entries before it nor lend its
+    own. The one carry-over is a lead-in: a first clause that says nothing but a time for the present ("Currently,",
+    "Since 2019,") belongs to the clause after it. The entry is found through its employer or school, because a title
+    is shared: when another entry has the same employer, by employer and title together; with no employer, by its
+    title, and only if that occurs once. A clause that names two employers of the draft backs neither, and a job's text
+    that names another employer of the draft is dropped. A fact in a clause that does not name the employer is dropped,
+    which thins a draft: the figure after "where", the years in "Before that, from 2012 to 2016,", the year after "and
+    graduated", and the title stated only about the person.
+  - A level is stated in the clause of its item (or in the next one, when that starts with the level), whether or not
+    the draft has the neighbouring items.
+  - A job stays current only if a clause naming its employer says it goes on now (or "since" with a year, when the sentence
+    holds exactly one).
+  - Repeated entries are dropped.
+- **On device.** The request, the description and the answer never leave the device.
+- **Typed outcomes.** Failures are `CVGenerationError` cases that the app explains in the person's language;
+  cancellation is `CancellationError`, never an error case. Availability is an `AIAvailability` value with the reason
+  when the model cannot run (device not eligible, Apple Intelligence off, model not ready).
 
-- **Protocol-Based Architecture**: Clean abstraction allows switching between AI implementations
-- **Comprehensive Validation**: Input and output validation ensures data quality
-- **Type-Safe Models**: All models are Codable, Equatable, and Sendable
-- **Well-Tested**: 28 comprehensive tests covering models, services, validation, and use cases
-- **SOLID Principles**: Clean architecture with clear separation of concerns
-
-## Architecture
+## Layout
 
 ```
 CVGeneratorAI/
-├── Models/              # Domain models (CVData, Experience, Education, etc.)
-├── Protocols/           # Service abstractions
-├── Services/            # Service implementations (FoundationModels, Mock)
-├── Validation/          # Input/output validation
-└── UseCases/            # Business logic orchestration
+├── Models/        # CVData and its parts, CVGenerationRequest, CVGenerationError, AIAvailability, limits
+├── Prompt/        # CVPrompt: the fixed instructions and the prompt built from a request
+├── Protocols/     # CVGenerationService
+├── Services/      # FoundationModelsService, the only implementation
+├── Validation/    # CVValidator (request and answer rules) and CVDataSanitizer
+└── UseCases/      # CVGeneratorUseCase: check, generate, sanitize, check
 ```
 
 ## Usage
 
-### Basic Usage
-
 ```swift
 import CVGeneratorAI
 
-// Create service (Mock for development, FoundationModels for production)
-let service = MockCVGenerationService()
+let useCase = CVGeneratorUseCase(service: FoundationModelsService())
 
-// Create use case
-let useCase = CVGeneratorUseCase(service: service)
+guard case .available = useCase.availability() else { return }
 
-// Check availability
-let available = await useCase.isAvailable()
-
-// Create request
 let request = CVGenerationRequest(
-    userPrompt: "I am a software engineer with 5 years of experience...",
-    personalInfo: PersonalInfo(name: "John Doe", email: "john@example.com"),
-    preferences: GenerationPreferences(
-        targetRole: "iOS Developer",
-        experienceLevel: .senior,
-        tone: .professional
-    )
+    userPrompt: "I'm Maria Rossi, a primary school teacher from Bologna. Since 2016 I teach at Scuola Don Milani.",
+    fallbackLanguageCode: "it"
 )
-
-// Generate CV
-let result = try await useCase.generateCV(from: request)
-print(result.cvData)
+let cvData = try await useCase.generateCV(from: request)
 ```
 
-### Using FoundationModels (iOS 18.2+)
-
-```swift
-if #available(iOS 18.2, *) {
-    let service = FoundationModelsService()
-    let useCase = CVGeneratorUseCase(service: service)
-    // ... use case as above
-}
-```
-
-## Models
-
-- **CVData**: Complete CV structure with all sections
-- **PersonalInfo**: Contact and personal details
-- **Experience**: Work experience entries
-- **Education**: Educational background
-- **Skill**: Skills with proficiency levels
-- **Language**: Language proficiency (CEFR-based)
-- **Certification**: Professional certifications
-- **Project**: Projects and achievements
+`fallbackLanguageCode` is the app's language: the CV is written in the language of the description, and in this one
+only when that language is unclear.
 
 ## Testing
-
-Run tests with:
 
 ```bash
 swift test
 ```
 
-Current test coverage: 28 tests covering:
-- Model initialization and encoding
-- Service behavior (mock and availability)
-- Validation (request and CV data)
-- Use case orchestration
-- Error handling
+The package builds only on Apple platforms. Tests use `FakeCVGenerationService`; the mapping of the framework's
+availability and errors (`FoundationModelsServiceTests`) needs macOS 26 with the FoundationModels framework.
 
 ## Requirements
 
-- iOS 18.0+ / macOS 15.0+
-- Swift 6.0+
-- FoundationModels (for production AI service)
-
-## Integration
-
-This package is designed to be framework-agnostic. To integrate with your app:
-
-1. Add CVGeneratorAI as a dependency
-2. Create an adapter to convert between CVGeneratorAI models and your app's models
-3. Use CVGeneratorUseCase in your app's use case layer
-
-## Status
-
-✅ Phase 1: Foundation & Core Models
-✅ Phase 2: Service Layer & Testing
-✅ Phase 3: Use Cases & Validation
-🔄 Phase 4: Main App Integration (pending)
+- iOS 26 / macOS 26 with Apple Intelligence for generation
+- Swift 6 language mode
 
 ## License
 

@@ -18,84 +18,47 @@ public struct DefaultCVValidator: CVValidator {
     public init() {}
 
     public func validateRequest(_ request: CVGenerationRequest) throws {
-        // Validate prompt is not empty
-        let trimmedPrompt = request.userPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedPrompt.isEmpty else {
-            throw CVGenerationError.invalidPrompt
-        }
+        let length = request.userPrompt.trimmingCharacters(in: .whitespacesAndNewlines).count
 
-        // Validate prompt has minimum length
-        guard trimmedPrompt.count >= 10 else {
-            throw CVGenerationError.validationFailed("Please provide a more detailed description (at least 10 characters)")
+        guard length >= CVGenerationLimits.minimumDescriptionLength else {
+            throw CVGenerationError.descriptionTooShort
         }
-
-        // Validate personal info if provided
-        if let personalInfo = request.personalInfo {
-            try validatePersonalInfo(personalInfo)
+        guard length <= CVGenerationLimits.maximumDescriptionLength else {
+            throw CVGenerationError.descriptionTooLong
         }
     }
 
+    /// A CV is valid when it holds something; a missing name or email is fine, a malformed email is not.
     public func validateCVData(_ cvData: CVData) throws {
-        // Validate personal info
-        try validatePersonalInfo(cvData.personalInfo)
-
-        // Validate that CV has at least some content
-        let hasContent = !cvData.experience.isEmpty ||
-                        !cvData.education.isEmpty ||
-                        !cvData.skills.isEmpty
-
-        guard hasContent else {
-            throw CVGenerationError.validationFailed("Generated CV must contain at least one section (experience, education, or skills)")
+        guard hasContent(cvData) else {
+            throw CVGenerationError.emptyResult
         }
 
-        // Validate individual sections
-        for experience in cvData.experience {
-            try validateExperience(experience)
-        }
-
-        for education in cvData.education {
-            try validateEducation(education)
+        if let email = cvData.personalInfo.email.trimmedNonEmpty, !isPlausibleEmail(email) {
+            throw CVGenerationError.generationFailed
         }
     }
 
     // MARK: - Private Validation Helpers
 
-    private func validatePersonalInfo(_ personalInfo: PersonalInfo) throws {
-        guard !personalInfo.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw CVGenerationError.validationFailed("Name cannot be empty")
-        }
+    private func hasContent(_ cvData: CVData) -> Bool {
+        let info = cvData.personalInfo
+        let personalFields = [
+            info.name, info.email, info.phone, info.location,
+            info.website, info.linkedin, info.github, info.title,
+            cvData.summary,
+        ]
 
-        guard !personalInfo.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw CVGenerationError.validationFailed("Email cannot be empty")
-        }
-
-        // Basic email validation
-        guard personalInfo.email.contains("@") && personalInfo.email.contains(".") else {
-            throw CVGenerationError.validationFailed("Invalid email format")
-        }
+        return personalFields.contains { $0.trimmedNonEmpty != nil }
+            || !cvData.experience.isEmpty
+            || !cvData.education.isEmpty
+            || !cvData.skills.isEmpty
+            || !cvData.languages.isEmpty
+            || !cvData.certifications.isEmpty
+            || !cvData.interests.isEmpty
     }
 
-    private func validateExperience(_ experience: Experience) throws {
-        guard !experience.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw CVGenerationError.validationFailed("Experience title cannot be empty")
-        }
-
-        guard !experience.company.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw CVGenerationError.validationFailed("Company name cannot be empty")
-        }
-
-        guard !experience.startDate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw CVGenerationError.validationFailed("Experience start date cannot be empty")
-        }
-    }
-
-    private func validateEducation(_ education: Education) throws {
-        guard !education.degree.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw CVGenerationError.validationFailed("Degree cannot be empty")
-        }
-
-        guard !education.institution.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw CVGenerationError.validationFailed("Institution name cannot be empty")
-        }
+    private func isPlausibleEmail(_ email: String) -> Bool {
+        email.contains("@") && email.contains(".")
     }
 }

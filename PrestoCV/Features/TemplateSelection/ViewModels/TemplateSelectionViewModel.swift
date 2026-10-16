@@ -17,6 +17,7 @@ final class TemplateSelectionViewModel: ObservableObject {
     // MARK: - Private Properties
     private let aiAvailability: AIAvailabilityProvider
     private let pause: AIAvailabilityPause
+    private let isAIShipped: Bool
 
     /// How long the screen waits before it reads again whether the model has finished downloading.
     nonisolated static let downloadCheckInterval: Duration = .seconds(5)
@@ -24,18 +25,20 @@ final class TemplateSelectionViewModel: ObservableObject {
     // MARK: - Initialization
     init(
         aiAvailability: @escaping AIAvailabilityProvider,
-        pause: @escaping AIAvailabilityPause = { try await Task.sleep(for: TemplateSelectionViewModel.downloadCheckInterval) }
+        pause: @escaping AIAvailabilityPause = { try await Task.sleep(for: TemplateSelectionViewModel.downloadCheckInterval) },
+        isAIShipped: Bool = AIFeature.isShipped
     ) {
         self.aiAvailability = aiAvailability
         self.pause = pause
-        self.aiEntry = AIEntry(availability: aiAvailability())
+        self.isAIShipped = isAIShipped
+        self.aiEntry = AIEntry(availability: aiAvailability(), isShipped: isAIShipped)
     }
 
     // MARK: - Public Methods
 
     /// Reads whether AI drafting can run again, for example after the person turned Apple Intelligence on in Settings.
     func refreshAIAvailability() {
-        aiEntry = AIEntry(availability: aiAvailability())
+        aiEntry = AIEntry(availability: aiAvailability(), isShipped: isAIShipped)
     }
 
     /// Reads the availability again after each pause for as long as the model is still downloading, so that the card

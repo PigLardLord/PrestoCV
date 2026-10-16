@@ -693,7 +693,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Descreva sua trajetória e deixe a IA criar seu CV"
+            "value" : "Descreva sua trajetória e deixe a IA criar seu currículo"
           }
         }
       }
@@ -734,7 +734,48 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geração de CV com IA"
+            "value" : "Geração de currículo com IA"
+          }
+        }
+      }
+    },
+    "ai.draft.cv_name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lebenslauf von %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV of %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV de %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV de %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV di %@"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Currículo de %@"
           }
         }
       }
@@ -780,43 +821,43 @@
         }
       }
     },
-    "ai.error.empty_description" : {
+    "ai.error.content_not_allowed" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beschreiben Sie zuerst Ihren beruflichen Werdegang."
+            "value" : "Apple Intelligence kann aus diesem Text nichts erstellen. Bitte ändern Sie Ihre Beschreibung und versuchen Sie es erneut."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Describe your professional background first."
+            "value" : "Apple Intelligence can't write from this text. Please change your description and try again."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Primero describe tu trayectoria profesional."
+            "value" : "Apple Intelligence no puede crear nada a partir de este texto. Cambia tu descripción e inténtalo de nuevo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Décrivez d'abord votre parcours professionnel."
+            "value" : "Apple Intelligence ne peut rien rédiger à partir de ce texte. Modifiez votre description et réessayez."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Descrivi prima il tuo percorso professionale."
+            "value" : "Apple Intelligence non può scrivere a partire da questo testo. Modifica la descrizione e riprova."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Descreva primeiro sua trajetória profissional."
+            "value" : "O Apple Intelligence não consegue escrever a partir deste texto. Altere sua descrição e tente novamente."
           }
         }
       }
@@ -944,6 +985,88 @@
         }
       }
     },
+    "ai.error.too_short" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitte schreiben Sie etwas mehr über Ihren Werdegang, mindestens 10 Zeichen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please write a little more about your background, at least 10 characters."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribe un poco más sobre tu trayectoria, al menos 10 caracteres."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrivez un peu plus sur votre parcours, au moins 10 caractères."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scrivi qualcosa in più sul tuo percorso, almeno 10 caratteri."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escreva um pouco mais sobre sua trajetória, pelo menos 10 caracteres."
+          }
+        }
+      }
+    },
+    "ai.error.unsupported_language" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence unterstützt die Sprache Ihrer Beschreibung nicht. Versuchen Sie, sie in einer anderen Sprache zu schreiben."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence doesn't support the language of your description. Try writing it in another language."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence no admite el idioma de tu descripción. Prueba a escribirla en otro idioma."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence ne prend pas en charge la langue de votre description. Essayez de l'écrire dans une autre langue."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence non supporta la lingua della tua descrizione. Prova a scriverla in un'altra lingua."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Apple Intelligence não oferece suporte ao idioma da sua descrição. Tente escrevê-la em outro idioma."
+          }
+        }
+      }
+    },
     "ai.generation.button_title" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -968,19 +1091,60 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Générer le CV avec IA"
+            "value" : "Générer le CV avec l'IA"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Genera CV con IA"
+            "value" : "Genera il CV con l'IA"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gerar CV com IA"
+            "value" : "Gerar currículo com IA"
+          }
+        }
+      }
+    },
+    "ai.generation.character_count" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d / %2$d"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d / %2$d"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d / %2$d"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d / %2$d"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d / %2$d"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d / %2$d"
           }
         }
       }
@@ -1026,43 +1190,84 @@
         }
       }
     },
+    "ai.generation.example_text" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich bin Maria Rossi, Grundschullehrerin aus Bologna. Seit 2016 unterrichte ich an der Schule Don Milani, wo ich 3 neue Lehrkräfte eingearbeitet habe. Davor habe ich von 2012 bis 2016 als Betreuerin in einer Kinderkrippe gearbeitet. Ich habe Erziehungswissenschaften an der Universität Bologna studiert und 2012 meinen Abschluss gemacht. Ich spreche Italienisch (Muttersprache) und Englisch (B2). In meiner Freizeit mag ich Schach und Wandern."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'm Maria Rossi, a primary school teacher from Bologna. Since 2016 I have taught at the Don Milani school, where I trained 3 new teachers. Before that, from 2012 to 2016, I worked as an assistant in a nursery. I studied Education Sciences at the University of Bologna and graduated in 2012. I speak Italian (native) and English (B2). In my free time I like chess and hiking."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soy Maria Rossi, maestra de primaria en Bolonia. Desde 2016 enseño en la escuela Don Milani, donde formé a 3 nuevos maestros. Antes, de 2012 a 2016, trabajé como auxiliar en una guardería. Estudié Ciencias de la Educación en la Universidad de Bolonia y me gradué en 2012. Hablo italiano (nativo) e inglés (B2). En mi tiempo libre me gustan el ajedrez y el senderismo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je suis Maria Rossi, institutrice dans une école primaire de Bologne. Depuis 2016, j'enseigne à l'école Don Milani, où j'ai formé 3 nouveaux enseignants. Avant, de 2012 à 2016, j'ai travaillé comme assistante dans une crèche. J'ai étudié les sciences de l'éducation à l'université de Bologne et j'ai obtenu mon diplôme en 2012. Je parle italien (langue maternelle) et anglais (B2). Pendant mon temps libre, j'aime les échecs et la randonnée."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sono Maria Rossi, insegnante di scuola primaria a Bologna. Dal 2016 insegno alla scuola Don Milani, dove ho formato 3 nuovi insegnanti. Prima, dal 2012 al 2016, ho lavorato come assistente in un asilo nido. Ho studiato Scienze della Formazione all'Università di Bologna e mi sono laureata nel 2012. Parlo italiano (madrelingua) e inglese (B2). Nel tempo libero mi piacciono gli scacchi e le escursioni."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sou Maria Rossi, professora do ensino fundamental em Bolonha. Desde 2016 leciono na escola Don Milani, onde formei 3 novos professores. Antes, de 2012 a 2016, trabalhei como auxiliar em uma creche. Estudei Ciências da Educação na Universidade de Bolonha e me formei em 2012. Falo italiano (nativo) e inglês (B2). No meu tempo livre, gosto de xadrez e de caminhadas."
+          }
+        }
+      }
+    },
     "ai.generation.header_subtitle" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beschreiben Sie Ihren beruflichen Werdegang im Detail und die KI erstellt einen professionellen Lebenslauf für Sie."
+            "value" : "Beschreiben Sie Ihren Werdegang mit eigenen Worten. Die KI erstellt Ihren Lebenslauf auf diesem Gerät, und Sie prüfen alles, bevor Sie speichern."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Describe your professional background in detail, and AI will create a production-quality CV for you."
+            "value" : "Describe your background in your own words. AI drafts your CV on this device, and you check everything before saving."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Describe tu trayectoria profesional en detalle y la IA creará un CV de calidad profesional para ti."
+            "value" : "Describe tu trayectoria con tus propias palabras. La IA redacta tu CV en este dispositivo y tú lo revisas todo antes de guardar."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Décrivez votre parcours professionnel en détail et l'IA créera un CV de qualité professionnelle pour vous."
+            "value" : "Décrivez votre parcours avec vos propres mots. L'IA rédige votre CV sur cet appareil et vous vérifiez tout avant d'enregistrer."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Descrivi il tuo background professionale in dettaglio e l'IA creerà un CV di qualità professionale per te."
+            "value" : "Descrivi il tuo percorso con parole tue. L'IA scrive il tuo CV su questo dispositivo e tu controlli tutto prima di salvare."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Descreva sua trajetória profissional em detalhes e a IA criará um CV de qualidade profissional para você."
+            "value" : "Descreva sua trajetória com suas próprias palavras. A IA escreve seu currículo neste dispositivo e você confere tudo antes de salvar."
           }
         }
       }
@@ -1097,13 +1302,13 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Generazione CV basata su IA"
+            "value" : "Generazione del CV basata sull'IA"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geração de CV com IA"
+            "value" : "Geração de currículo com IA"
           }
         }
       }
@@ -1132,19 +1337,60 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Génération de votre CV par IA..."
+            "value" : "Génération de votre CV par l'IA..."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Generazione del tuo CV con IA..."
+            "value" : "Generazione del tuo CV con l'IA..."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gerando seu CV com IA..."
+            "value" : "Gerando seu currículo com IA..."
+          }
+        }
+      }
+    },
+    "ai.generation.privacy_note" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ihre Beschreibung wird auf diesem Gerät von Apple Intelligence verarbeitet. Sie wird nirgendwohin gesendet."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your description is processed on this device by Apple Intelligence. It isn't sent anywhere."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu descripción se procesa en este dispositivo con Apple Intelligence. No se envía a ningún sitio."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre description est traitée sur cet appareil par Apple Intelligence. Elle n'est envoyée nulle part."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La tua descrizione viene elaborata su questo dispositivo da Apple Intelligence. Non viene inviata da nessuna parte."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua descrição é processada neste dispositivo pelo Apple Intelligence. Ela não é enviada para lugar nenhum."
           }
         }
       }
@@ -1155,37 +1401,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enthalten: Name, E-Mail, Erfahrung, Ausbildung, Fähigkeiten, Erfolge, Sprachen, usw."
+            "value" : "Nennen Sie, was in Ihren Lebenslauf soll: Name, Kontaktdaten, Stationen, Ausbildung, Fähigkeiten, Sprachen. Was Sie weglassen, bleibt leer."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Include: name, email, experience, education, skills, achievements, languages, etc."
+            "value" : "Mention what you want on your CV: name, contact details, jobs, studies, skills, languages. Anything you leave out stays blank."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Incluye: nombre, email, experiencia, educación, habilidades, logros, idiomas, etc."
+            "value" : "Menciona lo que quieres en tu CV: nombre, datos de contacto, trabajos, estudios, habilidades, idiomas. Lo que no incluyas queda en blanco."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Incluez : nom, email, expérience, formation, compétences, réalisations, langues, etc."
+            "value" : "Indiquez ce que vous voulez dans votre CV : nom, coordonnées, emplois, études, compétences, langues. Ce que vous omettez reste vide."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Includi: nome, email, esperienza, istruzione, competenze, risultati, lingue, ecc."
+            "value" : "Indica cosa vuoi nel tuo CV: nome, contatti, lavori, studi, competenze, lingue. Ciò che non indichi resta vuoto."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inclua: nome, email, experiência, educação, habilidades, conquistas, idiomas, etc."
+            "value" : "Mencione o que você quer no seu currículo: nome, contatos, trabalhos, estudos, habilidades, idiomas. O que você deixar de fora fica em branco."
           }
         }
       }
@@ -1227,6 +1473,88 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sua trajetória profissional"
+          }
+        }
+      }
+    },
+    "ai.generation.time_note" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das kann bis zu einer Minute dauern."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can take up to a minute."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esto puede tardar hasta un minuto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cela peut prendre jusqu'à une minute."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Può richiedere fino a un minuto."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Isso pode levar até um minuto."
+          }
+        }
+      }
+    },
+    "ai.unavailable.device_not_eligible" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Gerät unterstützt Apple Intelligence nicht."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device doesn't support Apple Intelligence."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este dispositivo no es compatible con Apple Intelligence."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n'est pas compatible avec Apple Intelligence."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo dispositivo non supporta Apple Intelligence."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este dispositivo não é compatível com o Apple Intelligence."
           }
         }
       }
@@ -2693,6 +3021,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Novo currículo"
+          }
+        }
+      }
+    },
+    "editor.notice.ai_draft" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entwurf, von der KI aus Ihrer Beschreibung erstellt. Prüfen Sie jedes Feld und speichern Sie dann. Was Sie nicht erwähnt haben, bleibt leer."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Draft written by AI from your description. Check every field, then save. Anything you didn't mention is left blank."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrador escrito por la IA a partir de tu descripción. Revisa cada campo y luego guarda. Lo que no mencionaste queda en blanco."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brouillon rédigé par l'IA à partir de votre description. Vérifiez chaque champ, puis enregistrez. Ce que vous n'avez pas mentionné reste vide."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bozza scritta dall'IA a partire dalla tua descrizione. Controlla ogni campo, poi salva. Ciò che non hai indicato resta vuoto."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rascunho escrito pela IA a partir da sua descrição. Confira cada campo e depois salve. O que você não mencionou fica em branco."
           }
         }
       }
@@ -6674,9 +7043,6 @@
         }
       }
     },
-    "I'm John Doe, email john@example.com, phone +1 234 567 890, from San Francisco. I'm a senior software engineer with 8 years of experience at Tech Corp building scalable web applications. I have expertise in Python, JavaScript, React, and AWS. I graduated from MIT with a Computer Science degree in 2015. My native language is English and I'm fluent in Spanish." : {
-
-    },
     "language.automatic" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7903,6 +8269,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CV vazio"
+          }
+        }
+      }
+    },
+    "template.present" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heute"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Present"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualidad"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aujourd'hui"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Presente"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atual"
           }
         }
       }

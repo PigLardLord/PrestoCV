@@ -4,6 +4,7 @@ import PrestoCVCore
 struct CVEditorView: View {
     @EnvironmentObject var router: AppRouter
     @StateObject private var viewModel: CVEditorViewModel
+    private let notice: EditorNotice?
     @State private var showingExportSheet = false
     @State private var deletionAnchor = RowDeletionAnchor()
     @StateObject private var keyboard = KeyboardVisibility()
@@ -15,8 +16,9 @@ struct CVEditorView: View {
     }
 
     /// The view model is built once, when the screen first appears, and survives every re-render of the parent.
-    init(viewModel: @autoclosure @escaping () -> CVEditorViewModel) {
+    init(viewModel: @autoclosure @escaping () -> CVEditorViewModel, notice: EditorNotice? = nil) {
         self._viewModel = StateObject(wrappedValue: viewModel())
+        self.notice = notice
     }
     
     var body: some View {
@@ -113,6 +115,10 @@ struct CVEditorView: View {
     
     private var editorView: some View {
         VStack(spacing: 0) {
+            if let notice {
+                EditorNoticeBanner(notice: notice)
+            }
+
             TabView {
                 PersonalInfoSection(cv: $viewModel.cv, documentLanguage: $viewModel.documentLanguageSelection)
                     .keyboardDoneButton()

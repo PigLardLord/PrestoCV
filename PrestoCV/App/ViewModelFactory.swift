@@ -19,15 +19,48 @@ final class ViewModelFactory {
     
     @MainActor
     func makeTemplateSelectionViewModel() -> TemplateSelectionViewModel {
-        let service = FoundationModelsService()
-        return TemplateSelectionViewModel(aiAvailability: { service.availability() })
+        return TemplateSelectionViewModel(aiAvailability: makeAIAvailabilityProvider())
     }
 
     @MainActor
-    func makeAIGenerationViewModel() throws -> AIGenerationViewModel {
+    func makeAIGenerationViewModel() -> AIGenerationViewModel {
         return AIGenerationViewModel(
-            cvGenerationUseCase: CVGeneratorUseCase(service: FoundationModelsService()),
-            cvManagementUseCase: try dependencyContainer.makeCVManagementUseCase()
+            cvGenerationUseCase: makeCVGeneratorUseCase(),
+            mapper: AIDraftMapper(
+                labels: makeAIDraftLabels(),
+                languageOfText: DescriptionLanguageDetector.languageTag(of:)
+            ),
+            appLanguageCode: Bundle.main.preferredLocalizations.first
+        )
+    }
+
+    // MARK: - Private Composition Root
+
+    @MainActor
+    private func makeAIAvailabilityProvider() -> AIAvailabilityProvider {
+        #if DEBUG
+        if let forced = AIAvailabilityOverride.current() {
+            return { forced }
+        }
+        #endif
+
+        let useCase = makeCVGeneratorUseCase()
+        return { useCase.availability() }
+    }
+
+    @MainActor
+    private func makeCVGeneratorUseCase() -> CVGeneratorUseCase {
+        return CVGeneratorUseCase(
+            service: FoundationModelsService(),
+            sanitizer: CVDataSanitizer(languageOfText: DescriptionLanguageDetector.languageTag(of:))
+        )
+    }
+
+    private func makeAIDraftLabels() -> AIDraftLabels {
+        return AIDraftLabels(
+            present: String(localized: "template.present"),
+            untitled: String(localized: "editor.new_cv"),
+            cvNameFormat: String(localized: "ai.draft.cv_name")
         )
     }
 }

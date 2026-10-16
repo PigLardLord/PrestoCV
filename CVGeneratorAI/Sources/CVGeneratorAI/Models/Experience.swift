@@ -2,46 +2,45 @@
 import Foundation
 import FoundationModels
 
+/// Work experience entry
+///
+/// Title and employer are always written, because the model leaves out jobs it is not made to name. Whatever the
+/// description does not support is removed afterwards; the other details are null (or an empty list) when not said.
 @Generable
 public struct Experience: Codable, Equatable, Sendable {
-    @Guide(description: "Job title (e.g., 'Senior iOS Developer', 'Lead Engineer')")
+    @Guide(description: "Job title, written as the person wrote it")
     public let title: String
 
-    @Guide(description: "EXACT company name - extract exactly as mentioned by user")
+    @Guide(description: "Employer, written as the person wrote it")
     public let company: String
 
-    @Guide(description: "Location (city, country) if mentioned")
+    @Guide(description: "City or country of the job, only if the person said it; otherwise null")
     public let location: String?
 
-    @Guide(description: "Start date in format like 'August 2018', '2018', or 'Jan 2020'")
-    public let startDate: String
+    @Guide(description: "Start date exactly as written, only if the person said it; otherwise null")
+    public let startDate: String?
 
-    @Guide(description: "End date or null if current position")
+    @Guide(description: "End date exactly as written; null if the person did not say it or still works there")
     public let endDate: String?
 
-    @Guide(description: "Is this a current position?")
+    @Guide(description: "True only if the person says they still work there")
     public let current: Bool
 
-    @Guide(description: "Brief role description (1-2 sentences)")
-    public let description: String
+    @Guide(description: "One or two sentences about the role, using only what the person said; otherwise null")
+    public let description: String?
 
-    @Guide(description: "Concise achievements with metrics. Start with strong action verbs.")
-    @Guide(.count(2...5))
+    @Guide(description: "Things the person said they achieved, in their own words; empty if none were mentioned")
     public let achievements: [String]
 
-    @Guide(description: "Specific technologies used (e.g., 'Swift', 'SwiftUI', 'Combine')")
-    public let technologies: [String]
-
     public init(
-        title: String,
-        company: String,
+        title: String = "",
+        company: String = "",
         location: String? = nil,
-        startDate: String,
+        startDate: String? = nil,
         endDate: String? = nil,
         current: Bool = false,
-        description: String,
-        achievements: [String] = [],
-        technologies: [String] = []
+        description: String? = nil,
+        achievements: [String] = []
     ) {
         self.title = title
         self.company = company
@@ -51,7 +50,6 @@ public struct Experience: Codable, Equatable, Sendable {
         self.current = current
         self.description = description
         self.achievements = achievements
-        self.technologies = technologies
     }
 }
 #endif
