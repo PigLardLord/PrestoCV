@@ -7453,6 +7453,47 @@
         }
       }
     },
+    "onboarding.ai.button" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meinen Lebenslauf mit KI entwerfen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Draft My CV with AI"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redactar mi CV con IA"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rédiger mon CV avec l'IA"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scrivi il mio CV con l'IA"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escrever meu currículo com IA"
+          }
+        }
+      }
+    },
     "onboarding.create.button" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8156,37 +8197,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beginnen Sie mit einer leeren Seite, um Ihren Lebenslauf von Grund auf zu erstellen."
+            "value" : "Wählen Sie, wie Sie beginnen möchten. Sie können später alles ändern."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Start with a blank canvas to create your CV from scratch."
+            "value" : "Choose how to start. You can change everything later."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Comienza con un lienzo en blanco para crear tu CV desde cero."
+            "value" : "Elige cómo empezar. Podrás cambiarlo todo más adelante."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Commencez avec une toile vierge pour créer votre CV à partir de zéro."
+            "value" : "Choisissez comment commencer. Vous pourrez tout modifier ensuite."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inizia con una tela bianca per creare il tuo CV da zero."
+            "value" : "Scegli come iniziare. Potrai modificare tutto in seguito."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Comece com uma tela em branco para criar seu CV do zero."
+            "value" : "Escolha como começar. Você pode alterar tudo depois."
           }
         }
       }
@@ -8273,6 +8314,88 @@
         }
       }
     },
+    "template.example.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passen Sie einen Beispiel-Lebenslauf an Ihre Erfahrung an"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adapt a sample CV to your own experience"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adapta un CV de ejemplo a tu experiencia"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adaptez un exemple de CV à votre parcours"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adatta un CV di esempio alla tua esperienza"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adapte um currículo de exemplo à sua experiência"
+          }
+        }
+      }
+    },
+    "template.example.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beispiel-Lebenslauf"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Example CV"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV de ejemplo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exemple de CV"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV di esempio"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Currículo de exemplo"
+          }
+        }
+      }
+    },
     "template.present" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8351,6 +8474,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Escreva seu currículo, mantenha-o no seu dispositivo e exporte-o em PDF. Comece com uma página em branco ou com um exemplo."
+          }
+        }
+      }
+    },
+    "welcome.description.ai" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beschreiben Sie sich in ein paar Sätzen, und die KI entwirft Ihren Lebenslauf auf diesem Gerät. Oder beginnen Sie mit einer leeren Seite oder mit einem Beispiel."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Describe yourself in a few sentences and AI drafts your CV on this device. Or start from a blank page or from an example."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descríbete en unas pocas frases y la IA redacta tu CV en este dispositivo. O empieza con una página en blanco o con un ejemplo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décrivez-vous en quelques phrases et l'IA rédige votre CV sur cet appareil. Ou commencez avec une page blanche ou avec un exemple."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descriviti in poche frasi e l'IA scrive una bozza del tuo CV su questo dispositivo. Oppure parti da una pagina bianca o da un esempio."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descreva-se em poucas frases e a IA escreve seu currículo neste dispositivo. Ou comece com uma página em branco ou com um exemplo."
           }
         }
       }

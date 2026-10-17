@@ -52,6 +52,24 @@ final class AIGenerationUITests: XCTestCase {
         XCTAssertTrue(generate.isEnabled, "Generate should be on for the description just typed")
     }
 
+    /// Going back from the AI screen used to throw the description away.
+    func testTheDescriptionIsStillThereAfterGoingBack() throws {
+        openTheAIScreen()
+        let description = app.textViews.matching(NSPredicate(format: "label == %@", "Your Professional Background")).firstMatch
+        XCTAssertTrue(description.waitForExistence(timeout: 10), "The AI screen should have a description to type into")
+        let typed = "I have been a nurse at San Camillo hospital in Rome since 2015."
+        description.tap()
+        description.typeText(typed)
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let card = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "AI CV Generation")).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "Back should return to the New CV screen")
+        card.tap()
+
+        XCTAssertTrue(description.waitForExistence(timeout: 10), "The AI screen should open again")
+        XCTAssertEqual(description.value as? String, typed, "The description should be as it was left")
+    }
+
     private func waitUntil(_ element: XCUIElement, exists: Bool, timeout: TimeInterval = 10) -> Bool {
         let condition = expectation(for: NSPredicate(format: "exists == %@", NSNumber(value: exists)), evaluatedWith: element)
         return XCTWaiter().wait(for: [condition], timeout: timeout) == .completed

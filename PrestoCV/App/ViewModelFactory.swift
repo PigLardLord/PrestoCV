@@ -4,22 +4,23 @@ import CVGeneratorAI
 
 final class ViewModelFactory {
     private let dependencyContainer: PrestoCVCore.DependencyContainerProtocol
+    private let sampleRepository: SampleCVRepositoryProtocol
+    /// The description typed on the AI screen, kept until a draft is made from it.
+    private let aiDescriptionSession = AIDescriptionSession()
     
-    init(dependencyContainer: PrestoCVCore.DependencyContainerProtocol) {
+    init(dependencyContainer: PrestoCVCore.DependencyContainerProtocol) throws {
         self.dependencyContainer = dependencyContainer
+        self.sampleRepository = try dependencyContainer.makeSampleCVRepository()
     }
     
     @MainActor
     func makeOnboardingViewModel() throws -> OnboardingViewModel {
-        return OnboardingViewModel(
-            onboardingUseCase: try dependencyContainer.makeOnboardingUseCase(),
-            sampleRepository: try dependencyContainer.makeSampleCVRepository()
-        )
+        return OnboardingViewModel(onboardingUseCase: try dependencyContainer.makeOnboardingUseCase())
     }
     
     @MainActor
-    func makeTemplateSelectionViewModel() -> TemplateSelectionViewModel {
-        return TemplateSelectionViewModel(aiAvailability: makeAIAvailabilityProvider())
+    func makeNewCVChoicesViewModel() -> NewCVChoicesViewModel {
+        return NewCVChoicesViewModel(aiAvailability: makeAIAvailabilityProvider(), sampleRepository: sampleRepository)
     }
 
     @MainActor
@@ -30,7 +31,8 @@ final class ViewModelFactory {
                 labels: makeAIDraftLabels(),
                 languageOfText: DescriptionLanguageDetector.languageTag(of:)
             ),
-            appLanguageCode: Bundle.main.preferredLocalizations.first
+            appLanguageCode: Bundle.main.preferredLocalizations.first,
+            session: aiDescriptionSession
         )
     }
 

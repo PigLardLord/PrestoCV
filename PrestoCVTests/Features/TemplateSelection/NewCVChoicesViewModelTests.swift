@@ -1,10 +1,11 @@
 import Testing
 import CVGeneratorAI
 @testable import PrestoCV
+@testable import PrestoCVCore
 
 @MainActor
-@Suite("TemplateSelectionViewModel Tests - the AI card follows what the device can run now")
-struct TemplateSelectionViewModelTests {
+@Suite("NewCVChoicesViewModel Tests - the AI card follows what the device can run now")
+struct NewCVChoicesViewModelTests {
 
     /// An availability that a test can change between two reads, as turning Apple Intelligence on does.
     private final class Availability {
@@ -34,13 +35,16 @@ struct TemplateSelectionViewModelTests {
     }
 
     /// A view model of a release that ships AI drafting, so that the tests do not depend on the release switch.
-    private func makeViewModel(_ availability: Availability, pauses: Pauses) -> TemplateSelectionViewModel {
-        TemplateSelectionViewModel(
-            aiAvailability: { availability.read() }, pause: { try await pauses.pause() }, isAIShipped: true
+    private func makeViewModel(_ availability: Availability, pauses: Pauses) -> NewCVChoicesViewModel {
+        NewCVChoicesViewModel(
+            aiAvailability: { availability.read() },
+            sampleRepository: MockSampleCVRepository(),
+            pause: { try await pauses.pause() },
+            isAIShipped: true
         )
     }
 
-    private func makeViewModel(_ availability: Availability) -> TemplateSelectionViewModel {
+    private func makeViewModel(_ availability: Availability) -> NewCVChoicesViewModel {
         makeViewModel(availability, pauses: Pauses())
     }
 
@@ -126,7 +130,7 @@ struct TemplateSelectionViewModelTests {
         let availability = Availability(.unavailable(.modelNotReady))
         let pauses = Pauses()
         // The first pause is long: only the cancellation ends it
-        let viewModel = TemplateSelectionViewModel(aiAvailability: { availability.read() }, pause: {
+        let viewModel = NewCVChoicesViewModel(aiAvailability: { availability.read() }, sampleRepository: MockSampleCVRepository(), pause: {
             try await pauses.pause()
             try await Task.sleep(for: .seconds(3600))
         }, isAIShipped: true)
@@ -163,8 +167,11 @@ struct TemplateSelectionViewModelTests {
     func notShippedHasNoEntry(availability start: AIAvailability) async {
         let availability = Availability(start)
         let pauses = Pauses()
-        let viewModel = TemplateSelectionViewModel(
-            aiAvailability: { availability.read() }, pause: { try await pauses.pause() }, isAIShipped: false
+        let viewModel = NewCVChoicesViewModel(
+            aiAvailability: { availability.read() },
+            sampleRepository: MockSampleCVRepository(),
+            pause: { try await pauses.pause() },
+            isAIShipped: false
         )
 
         viewModel.refreshAIAvailability()
@@ -172,5 +179,121 @@ struct TemplateSelectionViewModelTests {
 
         #expect(viewModel.aiEntry == .hidden)
         #expect(pauses.count == 0, "Nothing to wait for: the entry stays hidden")
+    }
+
+    // MARK: - Examples
+
+    private func makeViewModel(sampleRepository: MockSampleCVRepository) -> NewCVChoicesViewModel {
+        NewCVChoicesViewModel(aiAvailability: { .available }, sampleRepository: sampleRepository, isAIShipped: true)
+    }
+
+    private func makeSample() -> CVModel {
+        CVModel(
+            name: "Senior Software Engineer - TechFlow Inc. Application",
+            personalInfo: PersonalInfo(
+                name: "Alex Morgan",
+                title: "Senior Software Engineer",
+                location: "San Francisco, CA",
+                email: "alex.morgan@example.com",
+                phone: "+1 (555) 123-4567",
+                portfolio: "https://example.com",
+                profile: "Senior engineer with 8+ years of experience."
+            ),
+            relevant_experience: [Experience(title: "Senior Software Engineer", company: "TechFlow Inc.")],
+            education: [Education(degree: "BSc Computer Science", school: "State University")],
+            skills: [Skill(name: "Swift", level: 5)],
+            languages: [Language(name: "English")],
+            interests: ["Chess"],
+            social: [Social(platform: "GitHub", url: "https://example.com/github")]
+        )
+    }
+
+    @Test("There are no samples until they are loaded")
+    func noSamplesAtStart() {
+        #expect(makeViewModel(sampleRepository: MockSampleCVRepository()).samples.isEmpty)
+    }
+
+    @Test("loadSamples publishes the samples of the repository")
+    func loadSamplesPublishesTheSamples() async {
+        let sampleRepository = MockSampleCVRepository()
+        sampleRepository.samples = [makeSample(), CVModel(name: "Second")]
+        let viewModel = makeViewModel(sampleRepository: sampleRepository)
+
+        await viewModel.loadSamples()
+
+        #expect(viewModel.samples.map(\.name) == ["Senior Software Engineer - TechFlow Inc. Application", "Second"])
+    }
+
+    @Test("loadSamples reads the samples once, however often the screen appears")
+    func loadSamplesReadsOnce() async {
+        let sampleRepository = MockSampleCVRepository()
+        sampleRepository.samples = [makeSample()]
+        let viewModel = makeViewModel(sampleRepository: sampleRepository)
+
+        await viewModel.loadSamples()
+        await viewModel.loadSamples()
+
+        #expect(sampleRepository.getAllSamplesCallCount == 1)
+        #expect(viewModel.samples.count == 1)
+    }
+
+    @Test("loadSamples leaves no samples when they cannot be loaded, and a later call tries again")
+    func loadSamplesFailureLeavesNoSamples() async {
+        let sampleRepository = MockSampleCVRepository()
+        sampleRepository.getAllSamplesError = AppError.fileSystemError("unreadable")
+        let viewModel = makeViewModel(sampleRepository: sampleRepository)
+
+        await viewModel.loadSamples()
+        #expect(viewModel.samples.isEmpty)
+
+        sampleRepository.getAllSamplesError = nil
+        sampleRepository.samples = [makeSample()]
+        await viewModel.loadSamples()
+        #expect(viewModel.samples.count == 1)
+        #expect(sampleRepository.getAllSamplesCallCount == 2)
+    }
+
+    @Test("A draft has a new identity and no name of its own")
+    func draftHasNewIdentityAndNoName() {
+        let sample = makeSample()
+        let draft = makeViewModel(sampleRepository: MockSampleCVRepository()).makeDraft(from: sample)
+
+        #expect(draft.id != sample.id)
+        #expect(draft.name.isEmpty, "The list shows an unnamed CV as Untitled CV")
+    }
+
+    @Test("A draft leaves the details of the person of the sample blank")
+    func draftClearsTheIdentityFields() {
+        let draft = makeViewModel(sampleRepository: MockSampleCVRepository()).makeDraft(from: makeSample())
+
+        #expect(draft.personalInfo.name.isEmpty)
+        #expect(draft.personalInfo.email.isEmpty)
+        #expect(draft.personalInfo.phone.isEmpty)
+        #expect(draft.personalInfo.location.isEmpty)
+        #expect(draft.personalInfo.portfolio.isEmpty)
+        #expect(draft.social.map(\.url) == [""], "The links are cleared")
+        #expect(draft.social.map(\.platform) == ["GitHub"], "The platforms stay as a hint")
+    }
+
+    @Test("A draft keeps the content of the sample")
+    func draftKeepsTheContent() {
+        let sample = makeSample()
+        let draft = makeViewModel(sampleRepository: MockSampleCVRepository()).makeDraft(from: sample)
+
+        #expect(draft.personalInfo.title == sample.personalInfo.title)
+        #expect(draft.personalInfo.profile == sample.personalInfo.profile)
+        #expect(draft.relevant_experience == sample.relevant_experience)
+        #expect(draft.education == sample.education)
+        #expect(draft.skills == sample.skills)
+        #expect(draft.languages == sample.languages)
+        #expect(draft.interests == sample.interests)
+    }
+
+    @Test("Two drafts from the same sample are different CVs")
+    func draftsHaveDistinctIds() {
+        let sample = makeSample()
+        let viewModel = makeViewModel(sampleRepository: MockSampleCVRepository())
+
+        #expect(viewModel.makeDraft(from: sample).id != viewModel.makeDraft(from: sample).id)
     }
 }

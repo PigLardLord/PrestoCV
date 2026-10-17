@@ -4,7 +4,11 @@ import CVGeneratorAI
 
 @MainActor
 final class AIGenerationViewModel: ObservableObject {
-    @Published var prompt: String = ""
+    /// The description, kept in the session as it is typed, so that it survives leaving the screen until a draft is
+    /// made from it.
+    @Published var prompt: String {
+        didSet { session?.text = prompt }
+    }
     @Published private(set) var isGenerating: Bool = false
     @Published private(set) var errorMessage: String = ""
     /// The generated CV, unsaved: the editor opens it for review and saves it only on request.
@@ -16,6 +20,9 @@ final class AIGenerationViewModel: ObservableObject {
     private let cvGenerationUseCase: CVGeneratorUseCase
     private let mapper: AIDraftMapper
     private let appLanguageCode: String?
+    /// Where the description of this creation is kept, until a draft is made from it. The screen then lets go of it for
+    /// good: its own text stays, to adjust and generate again, but nothing it does reaches the next creation.
+    private var session: AIDescriptionSession?
 
     /// The generation allowed to report its outcome. It is set before its task runs and cleared by `cancel()`,
     /// so a cancelled generation, even one that returns later, finds it changed and stays silent.
@@ -27,10 +34,12 @@ final class AIGenerationViewModel: ObservableObject {
         let request: CVGenerationRequest
     }
 
-    init(cvGenerationUseCase: CVGeneratorUseCase, mapper: AIDraftMapper, appLanguageCode: String?) {
+    init(cvGenerationUseCase: CVGeneratorUseCase, mapper: AIDraftMapper, appLanguageCode: String?, session: AIDescriptionSession) {
         self.cvGenerationUseCase = cvGenerationUseCase
         self.mapper = mapper
         self.appLanguageCode = appLanguageCode
+        self.session = session
+        self.prompt = session.text
     }
 
     // MARK: - Description
@@ -76,6 +85,9 @@ final class AIGenerationViewModel: ObservableObject {
             let cvData = try await cvGenerationUseCase.generateCV(from: generation.request)
             guard mayAct(generation) else { return finish(generation) }
             draft = mapper.map(cvData, writtenIn: generation.request.userPrompt)
+            // The draft goes to the editor and this creation is complete: the next one starts with an empty description
+            session?.text = ""
+            session = nil
         } catch is CancellationError {
             // Neither an error nor a draft; cancel() has already reset the screen.
         } catch {

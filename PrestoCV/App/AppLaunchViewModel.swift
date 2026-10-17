@@ -73,7 +73,7 @@ final class AppLaunchViewModel: ObservableObject {
     // MARK: - Private Methods
     private static func compose(from container: PrestoCVCore.DependencyContainerProtocol) -> Phase {
         do {
-            let viewModelFactory = ViewModelFactory(dependencyContainer: container)
+            let viewModelFactory = try ViewModelFactory(dependencyContainer: container)
             let cvManagementUseCase = try container.makeCVManagementUseCase()
             return .ready(
                 RootDependencies(

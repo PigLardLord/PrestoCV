@@ -1,13 +1,17 @@
 import SwiftUI
 import PrestoCVCore
 
-/// What the user sees before having any CV: it fills the empty state of the CV list.
+/// What the user sees before having any CV: it fills the empty state of the CV list. Where the device can run it, the
+/// AI draft leads; a blank CV and the examples follow.
 struct FirstRunView: View {
-    @ObservedObject var viewModel: OnboardingViewModel
+    @StateObject private var viewModel: NewCVChoicesViewModel
     @EnvironmentObject var router: AppRouter
     @State private var showingExamples = false
-    /// The draft the user picked. The editor opens once the sheet is gone, because a screen pushed while a sheet is leaving is lost.
-    @State private var pendingDraft: CVModel?
+    
+    /// The view model is built once, when the view first appears, and survives every re-render of the list.
+    init(viewModel: @autoclosure @escaping () -> NewCVChoicesViewModel) {
+        self._viewModel = StateObject(wrappedValue: viewModel())
+    }
     
     var body: some View {
         ScrollView {
@@ -23,11 +27,9 @@ struct FirstRunView: View {
         .task {
             await viewModel.loadSamples()
         }
-        .sheet(isPresented: $showingExamples, onDismiss: openPendingDraft) {
-            ExampleSelectionView(samples: viewModel.samples) { sample in
-                pendingDraft = viewModel.makeDraft(from: sample)
-                showingExamples = false
-            }
+        .followingAIAvailability(of: viewModel)
+        .exampleSelection(isPresented: $showingExamples, from: viewModel) { draft in
+            router.navigateToEditorWithTemplate(draft)
         }
     }
     
@@ -53,7 +55,8 @@ struct FirstRunView: View {
                 .foregroundColor(DesignTokens.Colors.primary)
                 .multilineTextAlignment(.center)
             
-            Text("welcome.description".localized)
+            // The welcome promises the AI draft only where the device can make it
+            Text(viewModel.offersAI ? "welcome.description.ai".localized : "welcome.description".localized)
                 .typography(.body)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)
@@ -61,29 +64,60 @@ struct FirstRunView: View {
         }
     }
     
+    /// The choices in the order of the view model. The one that leads is the primary button.
     private var actionSection: some View {
         VStack(spacing: DesignTokens.Spacing.lg) {
-            PrimaryButton(
-                title: "onboarding.create.button".localized,
-                icon: "plus.circle.fill"
-            ) {
-                router.navigateToEditorWithTemplate(CVModel())
-            }
-            
-            if !viewModel.samples.isEmpty {
-                SecondaryButton.text(title: "onboarding.start_from_example".localized) {
-                    showingExamples = true
-                }
+            ForEach(viewModel.choices, id: \.self) { choice in
+                action(for: choice, leads: choice == viewModel.choices.first)
             }
         }
         .frame(maxWidth: DesignTokens.Layout.standaloneButtonWidth)
         .padding(.horizontal, DesignTokens.Spacing.md)
     }
     
-    private func openPendingDraft() {
-        guard let draft = pendingDraft else { return }
-        pendingDraft = nil
-        router.navigateToEditorWithTemplate(draft)
+    @ViewBuilder
+    private func action(for choice: NewCVChoice, leads: Bool) -> some View {
+        switch choice {
+        case .aiDraft:
+            PrimaryButton(title: "onboarding.ai.button".localized, icon: "sparkles", action: openAIDraft)
+        case .aiDraftUnavailable(let explanation):
+            unavailableAIDraft(explanation)
+        case .blank:
+            if leads {
+                PrimaryButton(title: "onboarding.create.button".localized, icon: "plus.circle.fill", action: openBlankCV)
+            } else {
+                SecondaryButton.text(title: "onboarding.create.button".localized, action: openBlankCV)
+            }
+        case .example:
+            SecondaryButton.text(title: "onboarding.start_from_example".localized) {
+                showingExamples = true
+            }
+        }
+    }
+    
+    /// The AI draft, dimmed and off, with the sentence that says what to do before it can be used
+    private func unavailableAIDraft(_ explanation: AIEntry.Explanation) -> some View {
+        VStack(spacing: DesignTokens.Spacing.xs) {
+            SecondaryButton.text(title: "onboarding.ai.button".localized, icon: "sparkles", action: openAIDraft)
+                .disabled(true)
+                .opacity(DesignTokens.Opacity.subtle)
+                .accessibilityHint(explanation.key.localized)
+            
+            Text(explanation.key.localized)
+                .typography(.caption1)
+                .foregroundColor(DesignTokens.Colors.secondary)
+                .multilineTextAlignment(.center)
+        }
+    }
+    
+    // MARK: - Actions
+    
+    private func openAIDraft() {
+        router.navigate(to: .aiGeneration)
+    }
+    
+    private func openBlankCV() {
+        router.navigateToEditorWithTemplate(CVModel())
     }
 }
 
@@ -92,8 +126,8 @@ struct FirstRunView: View {
 #if DEBUG
 #Preview {
     let container = DependencyContainer()
-    let viewModel = OnboardingViewModel(
-        onboardingUseCase: try! container.makeOnboardingUseCase(),
+    let viewModel = NewCVChoicesViewModel(
+        aiAvailability: { .available },
         sampleRepository: try! container.makeSampleCVRepository()
     )
     

@@ -23,12 +23,117 @@ struct AIGenerationViewModelTests {
     private let labels = AIDraftLabels(present: "Oggi", untitled: "Nuovo CV", cvNameFormat: "CV di %@")
     private let validPrompt = "I am John Doe, an engineer at Tech Corp since 2020. I speak Italian (native) and French."
 
-    private func makeViewModel(appLanguageCode: String? = "it") -> AIGenerationViewModel {
+    private func makeViewModel(appLanguageCode: String? = "it", session: AIDescriptionSession = AIDescriptionSession()) -> AIGenerationViewModel {
         AIGenerationViewModel(
             cvGenerationUseCase: CVGeneratorUseCase(service: service),
             mapper: AIDraftMapper(labels: labels, languageOfText: { _ in "pt-PT" }),
-            appLanguageCode: appLanguageCode
+            appLanguageCode: appLanguageCode,
+            session: session
         )
+    }
+
+    // MARK: - Keeping the description
+
+    @Test("The description typed before leaving the screen is there when the screen opens again")
+    func descriptionSurvivesLeavingTheScreen() {
+        let session = AIDescriptionSession()
+        let left = makeViewModel(session: session)
+        left.prompt = validPrompt
+
+        let reopened = makeViewModel(session: session)
+
+        #expect(reopened.prompt == validPrompt)
+        #expect(reopened.canGenerate, "Generate is on again for the description that was kept")
+    }
+
+    @Test("A description cleared before leaving stays cleared")
+    func clearedDescriptionStaysCleared() {
+        let session = AIDescriptionSession()
+        let first = makeViewModel(session: session)
+        first.prompt = validPrompt
+        first.prompt = ""
+
+        #expect(makeViewModel(session: session).prompt.isEmpty)
+    }
+
+    @Test("A new session starts with an empty description")
+    func newSessionStartsEmpty() {
+        #expect(makeViewModel().prompt.isEmpty)
+    }
+
+    @Test("Once a draft is made and handed to the editor, the next AI screen starts empty")
+    func madeDraftLeavesTheNextScreenEmpty() async {
+        let session = AIDescriptionSession()
+        let finished = makeViewModel(session: session)
+        finished.prompt = validPrompt
+
+        await finished.generateCV()
+
+        #expect(finished.draft != nil)
+        #expect(finished.prompt == validPrompt, "The screen the draft came from still shows its description")
+        let next = makeViewModel(session: session)
+        #expect(next.prompt.isEmpty, "One CV's description does not carry into the next creation")
+        #expect(!next.canGenerate)
+    }
+
+    @Test("After a draft, editing the screen it came from does not reach the next creation")
+    func editsAfterADraftStayOnTheirScreen() async {
+        let session = AIDescriptionSession()
+        let finished = makeViewModel(session: session)
+        finished.prompt = validPrompt
+        await finished.generateCV()
+        #expect(finished.draft != nil)
+
+        finished.prompt = validPrompt + " I also speak Spanish."
+
+        #expect(makeViewModel(session: session).prompt.isEmpty, "The edit stays on the screen it was made on")
+    }
+
+    @Test("A screen that made a draft and generates again leaves the description of a new creation alone")
+    func regeneratingAfterADraftLeavesTheSessionAlone() async {
+        let session = AIDescriptionSession()
+        let finished = makeViewModel(session: session)
+        finished.prompt = validPrompt
+        await finished.generateCV()
+        let newCreation = makeViewModel(session: session)
+        let otherPrompt = "I am Anna Bianchi, a nurse in Turin since 2019. I speak Italian (native) and English."
+        newCreation.prompt = otherPrompt
+
+        finished.prompt = validPrompt + " I also speak Spanish."
+        await finished.generateCV()
+
+        #expect(finished.draft != nil)
+        #expect(makeViewModel(session: session).prompt == otherPrompt)
+    }
+
+    @Test("A failed generation keeps the description, so that the person can try again")
+    func failedGenerationKeepsTheDescription() async {
+        service.generateResult = .failure(CVGenerationError.busy)
+        let session = AIDescriptionSession()
+        let failed = makeViewModel(session: session)
+        failed.prompt = validPrompt
+
+        await failed.generateCV()
+
+        #expect(failed.draft == nil)
+        #expect(makeViewModel(session: session).prompt == validPrompt)
+    }
+
+    @Test("A cancelled generation keeps the description")
+    func cancelledGenerationKeepsTheDescription() async {
+        service.holdsGeneration = true
+        let session = AIDescriptionSession()
+        let cancelled = makeViewModel(session: session)
+        cancelled.prompt = validPrompt
+
+        cancelled.startGenerating()
+        await service.waitUntilGenerationsAreHeld()
+        let generation = cancelled.generationTask
+        cancelled.cancel()
+        await generation?.value
+
+        #expect(cancelled.draft == nil)
+        #expect(makeViewModel(session: session).prompt == validPrompt)
     }
 
     // MARK: - Generating

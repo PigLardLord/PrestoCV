@@ -40,7 +40,7 @@ struct AppRootView: View {
     
     private var listView: some View {
         CVListView(viewModel: cvListViewModel) {
-            FirstRunView(viewModel: onboardingViewModel)
+            FirstRunView(viewModel: viewModelFactory.makeNewCVChoicesViewModel())
         }
     }
     
@@ -50,7 +50,7 @@ struct AppRootView: View {
         case .list:
             listView
         case .templateSelection:
-            TemplateSelectionView(viewModel: viewModelFactory.makeTemplateSelectionViewModel())
+            TemplateSelectionView(viewModel: viewModelFactory.makeNewCVChoicesViewModel())
         case .aiGeneration:
             AIGenerationView(viewModel: viewModelFactory.makeAIGenerationViewModel())
         case .cvEditor(let cvId):

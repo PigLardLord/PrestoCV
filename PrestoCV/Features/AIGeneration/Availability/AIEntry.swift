@@ -1,20 +1,20 @@
 import CVGeneratorAI
 
-/// What the "New CV" screen offers for AI drafting, given whether the device can run the model now.
+/// What the first run and the "New CV" screen offer for AI drafting, given whether the device can run the model now.
 enum AIEntry: Equatable {
-    /// The card works.
+    /// The AI draft works.
     case available
-    /// The card is there but cannot be used yet, with a sentence that says what to do.
+    /// The AI draft is there but cannot be used yet, with a sentence that says what to do.
     case disabled(Explanation)
-    /// No card: this device cannot run the model, it said why in words this version does not know, or the release does not
-    /// ship AI drafting (`AIFeature.isShipped`).
+    /// No AI draft: this device cannot run the model, it said why in words this version does not know, or the release
+    /// does not ship AI drafting (`AIFeature.isShipped`).
     case hidden
 
-    enum Explanation: Equatable {
+    enum Explanation: Hashable {
         case turnOnAppleIntelligence
         case modelStillDownloading
 
-        /// Catalog key of the sentence shown under the disabled card.
+        /// Catalog key of the sentence shown under the disabled AI draft.
         var key: String {
             switch self {
             case .turnOnAppleIntelligence: return "ai.unavailable.not_enabled"
