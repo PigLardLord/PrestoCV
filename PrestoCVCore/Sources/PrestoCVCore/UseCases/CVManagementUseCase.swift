@@ -48,6 +48,10 @@ public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
         return try await cvRepository.saveCV(newCV)
     }
     
+    public func storeNewCV(_ cv: CVModel) async throws -> CVModel {
+        return try await cvRepository.saveCV(cv)
+    }
+    
     public func updateCV(_ cv: CVModel) async throws -> CVModel {
         return try await cvRepository.saveCV(cv)
     }

@@ -50,6 +50,25 @@ public protocol CVRepositoryProtocol: Sendable {
     func getCVsCount() async throws -> Int
 }
 
+/// Keeps the edits that the editor has not saved yet, one set per editing.
+public protocol UnsavedEditsRepositoryProtocol: Sendable {
+    /// Keeps `edits`, replacing what was kept for the same editing.
+    /// - Throws: AppError if they cannot be written
+    func keep(_ edits: UnsavedEdits) async throws
+    
+    /// Everything that is kept, in no particular order. Kept edits that cannot be read are left out.
+    /// - Throws: AppError if the kept edits cannot be listed
+    func allKept() async throws -> [UnsavedEdits]
+    
+    /// The edits kept for an editing, if there are any.
+    /// - Throws: AppError if they cannot be read
+    func kept(editing id: UUID) async throws -> UnsavedEdits?
+    
+    /// Removes the edits kept for an editing. Removing edits that are not kept is not an error.
+    /// - Throws: AppError if they cannot be removed
+    func discard(editing id: UUID) async throws
+}
+
 /// Protocol for managing user onboarding state
 public protocol OnboardingRepositoryProtocol: Sendable {
     /// Checks if the user has any existing CVs, including CVs that could not be opened

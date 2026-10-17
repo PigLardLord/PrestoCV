@@ -6,13 +6,17 @@ struct AppRootView: View {
     @StateObject private var router = AppRouter()
     @ObservedObject private var onboardingViewModel: OnboardingViewModel
     @ObservedObject private var cvListViewModel: CVListViewModel
+    @ObservedObject private var unsavedEditsOffer: UnsavedEditsOfferViewModel
     private let cvManagementUseCase: CVManagementUseCaseProtocol
+    private let unsavedEditsUseCase: UnsavedEditsUseCaseProtocol?
     private let viewModelFactory: ViewModelFactory
     
     init(dependencies: RootDependencies) {
         self.onboardingViewModel = dependencies.onboardingViewModel
         self.cvListViewModel = dependencies.cvListViewModel
+        self.unsavedEditsOffer = dependencies.unsavedEditsOfferViewModel
         self.cvManagementUseCase = dependencies.cvManagementUseCase
+        self.unsavedEditsUseCase = dependencies.unsavedEditsUseCase
         self.viewModelFactory = dependencies.viewModelFactory
     }
     
@@ -34,8 +38,43 @@ struct AppRootView: View {
             .navigationDestination(for: Route.self) { route in
                 destinationView(for: router.destination(for: route))
             }
+            // At launch, and each time the root shows again, edits an earlier run left unsaved are offered
+            .task {
+                await unsavedEditsOffer.checkForEditsToRestore()
+            }
+            .alert(
+                "unsaved_edits.restore.title".localized,
+                isPresented: $unsavedEditsOffer.isShowingOffer,
+                presenting: unsavedEditsOffer.offer
+            ) { _ in
+                Button(restoreActionTitle, action: restoreUnsavedEdits)
+                    .keyboardShortcut(.defaultAction)
+                Button("common.discard".localized, role: .destructive) {
+                    Task { await unsavedEditsOffer.discard() }
+                }
+            } message: { _ in
+                Text(unsavedEditsOffer.message ?? "")
+            }
+        }
+        // Apart from the offer: the two alerts follow one another
+        .alert("unsaved_edits.unavailable.title".localized, isPresented: $unsavedEditsOffer.isShowingNoLongerAvailable) {
+            Button("common.ok".localized) { }
+        } message: {
+            Text("unsaved_edits.unavailable.message".localized)
         }
         .environmentObject(router)
+    }
+    
+    private var restoreActionTitle: String {
+        unsavedEditsOffer.restoresAsCopy ? "unsaved_edits.restore.as_copy".localized : "unsaved_edits.restore.action".localized
+    }
+    
+    private func restoreUnsavedEdits() {
+        Task {
+            if let restored = await unsavedEditsOffer.restore() {
+                router.navigateToEditor(restoring: restored)
+            }
+        }
     }
     
     private var listView: some View {
@@ -58,7 +97,16 @@ struct AppRootView: View {
                 viewModel: CVEditorViewModel(
                     cvId: cvId,
                     initialCV: router.initialCVForEditor,
-                    cvManagementUseCase: cvManagementUseCase
+                    restoring: router.restoringEdits,
+                    cvManagementUseCase: cvManagementUseCase,
+                    // Restored edits go on being kept as the editing they belong to, with the claim the window took
+                    unsavedEdits: unsavedEditsUseCase.map {
+                        UnsavedEditsKeeper(
+                            editing: router.restoringEdits?.id ?? UUID(),
+                            claim: router.restored?.takeClaim(),
+                            useCase: $0
+                        )
+                    }
                 ),
                 notice: router.editorNotice
             )

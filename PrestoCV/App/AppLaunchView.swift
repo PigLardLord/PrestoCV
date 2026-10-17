@@ -5,9 +5,12 @@ import PrestoCVCore
 struct AppLaunchView: View {
     @StateObject private var viewModel: AppLaunchViewModel
 
-    init(makeDependencyContainer: @escaping @MainActor () -> DependencyContainerProtocol) {
+    init(
+        makeDependencyContainer: @escaping @MainActor () -> DependencyContainerProtocol,
+        makeUnsavedEdits: @escaping @MainActor () throws -> UnsavedEditsUseCaseProtocol
+    ) {
         self._viewModel = StateObject(
-            wrappedValue: AppLaunchViewModel(makeDependencyContainer: makeDependencyContainer)
+            wrappedValue: AppLaunchViewModel(makeDependencyContainer: makeDependencyContainer, makeUnsavedEdits: makeUnsavedEdits)
         )
     }
 

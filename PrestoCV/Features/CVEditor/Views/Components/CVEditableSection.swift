@@ -12,6 +12,7 @@ struct CVEditableSection<Item, RowContent: View>: View {
     let rowContent: (Binding<Item>, @escaping () -> Void) -> RowContent
     let onAdd: () -> Void
     let onRemove: (Int) -> Void
+    @State private var newRowFocus = NewRowFocus()
     
     init(
         title: String,
@@ -45,6 +46,7 @@ struct CVEditableSection<Item, RowContent: View>: View {
                 rowContent: rowContent,
                 onRemove: onRemove
             )
+            .environment(\.newRowFocus, newRowFocus)
             
             AddButton(
                 title: addButtonTitle,
@@ -56,7 +58,9 @@ struct CVEditableSection<Item, RowContent: View>: View {
         }
     }
     
+    /// Adds a row, whose first field then takes the keyboard focus.
     private func animatedAdd() {
+        newRowFocus.request(row: items.count)
         withAnimation(DesignTokens.Animations.standardEaseInOut) {
             onAdd()
         }

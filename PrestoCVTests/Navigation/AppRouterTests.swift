@@ -363,6 +363,56 @@ struct AppRouterTests {
         #expect(router.navigationPath.count == 0)
     }
 
+    // MARK: - Restoring Unsaved Edits
+
+    private func keptEdits(over base: CVModel?) -> UnsavedEdits {
+        UnsavedEdits(id: UUID(), cv: CVModel(name: "Kept"), base: base, keptAt: Date())
+    }
+
+    private func restored(_ edits: UnsavedEdits) -> RestoredUnsavedEdits {
+        RestoredUnsavedEdits(edits: edits, claim: nil, useCase: nil)
+    }
+
+    @Test("Restoring edits opens the editor with them, which reads the CV stored under their id itself")
+    func restoringEditsOpensTheEditorWithThem() {
+        let router = AppRouter()
+        let edits = keptEdits(over: CVModel(name: "Stored"))
+
+        router.navigateToEditor(restoring: restored(edits))
+
+        #expect(router.currentRoute == .cvEditor(cvId: nil))
+        #expect(router.restoringEdits == edits)
+        #expect(router.navigationPath.count == 1)
+    }
+
+    @Test("Restored edits open without the notice of an AI draft")
+    func restoredEditsOpenWithoutTheAINotice() {
+        let router = AppRouter()
+        router.navigateToEditorWithAIDraft(CVModel(name: "Draft"))
+        router.navigateToRoot()
+        let edits = keptEdits(over: nil)
+
+        router.navigateToEditor(restoring: restored(edits))
+
+        #expect(router.restoringEdits == edits)
+        #expect(router.editorNotice == nil, "Restored edits are the person's own, not a draft to check")
+    }
+
+    @Test("Opening any other editor afterwards forgets the restored edits")
+    func otherEditorsForgetTheRestoredEdits() {
+        let router = AppRouter()
+        router.navigateToEditor(restoring: restored(keptEdits(over: CVModel(name: "Stored"))))
+        router.navigateToRoot()
+
+        router.navigate(to: .cvEditor(cvId: UUID().uuidString))
+        #expect(router.restoringEdits == nil, "A CV opened from the list shows what is stored")
+
+        router.navigateToRoot()
+        router.navigateToEditor(restoring: restored(keptEdits(over: nil)))
+        router.navigateToEditorWithTemplate(CVModel(name: "Template"))
+        #expect(router.restoringEdits == nil, "A new CV from a template starts from the template")
+    }
+
     @Test("initialCVForEditor can be updated multiple times")
     func initialCVForEditorCanBeUpdated() {
         // Given

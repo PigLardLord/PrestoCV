@@ -20,7 +20,10 @@ func installBundledTemplates() async {
 struct RootDependencies {
     let onboardingViewModel: OnboardingViewModel
     let cvListViewModel: CVListViewModel
+    let unsavedEditsOfferViewModel: UnsavedEditsOfferViewModel
     let cvManagementUseCase: CVManagementUseCaseProtocol
+    /// Nil when the unsaved edits cannot be kept on this device: the app works without them.
+    let unsavedEditsUseCase: UnsavedEditsUseCaseProtocol?
     let viewModelFactory: ViewModelFactory
 }
 
@@ -41,16 +44,20 @@ final class AppLaunchViewModel: ObservableObject {
 
     // MARK: - Private Properties
     private let makeDependencyContainer: @MainActor () -> PrestoCVCore.DependencyContainerProtocol
+    private let makeUnsavedEdits: @MainActor () throws -> UnsavedEditsUseCaseProtocol
     private let bootstrapTemplates: @Sendable () async -> Void
 
     // MARK: - Initialization
+    /// - Parameter makeUnsavedEdits: Gives the unsaved edits of the app, which every window shares.
     init(
         makeDependencyContainer: @escaping @MainActor () -> PrestoCVCore.DependencyContainerProtocol,
+        makeUnsavedEdits: @escaping @MainActor () throws -> UnsavedEditsUseCaseProtocol,
         bootstrapTemplates: @escaping @Sendable () async -> Void = { await installBundledTemplates() }
     ) {
         self.makeDependencyContainer = makeDependencyContainer
+        self.makeUnsavedEdits = makeUnsavedEdits
         self.bootstrapTemplates = bootstrapTemplates
-        self.phase = Self.compose(from: makeDependencyContainer())
+        self.phase = Self.compose(from: makeDependencyContainer(), unsavedEdits: makeUnsavedEdits)
     }
 
     // MARK: - Public Methods
@@ -67,24 +74,43 @@ final class AppLaunchViewModel: ObservableObject {
     }
 
     func retry() {
-        phase = Self.compose(from: makeDependencyContainer())
+        phase = Self.compose(from: makeDependencyContainer(), unsavedEdits: makeUnsavedEdits)
     }
 
     // MARK: - Private Methods
-    private static func compose(from container: PrestoCVCore.DependencyContainerProtocol) -> Phase {
+    private static func compose(
+        from container: PrestoCVCore.DependencyContainerProtocol,
+        unsavedEdits makeUnsavedEdits: @MainActor () throws -> UnsavedEditsUseCaseProtocol
+    ) -> Phase {
         do {
             let viewModelFactory = try ViewModelFactory(dependencyContainer: container)
             let cvManagementUseCase = try container.makeCVManagementUseCase()
+            let unsavedEditsUseCase = unsavedEditsIfAvailable(from: makeUnsavedEdits)
             return .ready(
                 RootDependencies(
                     onboardingViewModel: try viewModelFactory.makeOnboardingViewModel(),
                     cvListViewModel: CVListViewModel(cvManagementUseCase: cvManagementUseCase),
+                    unsavedEditsOfferViewModel: UnsavedEditsOfferViewModel(useCase: unsavedEditsUseCase, cvs: cvManagementUseCase),
                     cvManagementUseCase: cvManagementUseCase,
+                    unsavedEditsUseCase: unsavedEditsUseCase,
                     viewModelFactory: viewModelFactory
                 )
             )
         } catch {
             return .failed(message: error.localizedAppErrorDescription)
+        }
+    }
+
+    /// The unsaved edits of the app, or nil when they cannot be kept, as when their folder cannot be made. Keeping
+    /// them is a safety net: the CVs and the editor work without it, so the launch goes on.
+    private static func unsavedEditsIfAvailable(
+        from makeUnsavedEdits: @MainActor () throws -> UnsavedEditsUseCaseProtocol
+    ) -> UnsavedEditsUseCaseProtocol? {
+        do {
+            return try makeUnsavedEdits()
+        } catch {
+            launchLogger.error("Unsaved edits will not be kept: \(error.localizedDescription, privacy: .public)")
+            return nil
         }
     }
 }

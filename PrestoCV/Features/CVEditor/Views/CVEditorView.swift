@@ -10,6 +10,7 @@ struct CVEditorView: View {
     @StateObject private var keyboard = KeyboardVisibility()
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.scenePhase) private var scenePhase
 
     private var chrome: EditorChrome {
         EditorChrome(verticalSizeClass: verticalSizeClass, dynamicTypeSize: dynamicTypeSize)
@@ -33,10 +34,10 @@ struct CVEditorView: View {
         // Back and the edge swipe would leave without the discard confirmation that Cancel asks for
         .navigationBarBackButtonHidden(true)
         .toolbar {
-            // Leading: Cancel button with confirmation if unsaved changes
+            // Leading: Cancel, with confirmation if there are unsaved changes, or Done once everything is saved
             ToolbarItem(placement: .navigationBarLeading) {
                 BarButton(
-                    title: "common.cancel".localized, systemImage: "xmark", screenTextSize: dynamicTypeSize,
+                    title: exitTitle, systemImage: "xmark", screenTextSize: dynamicTypeSize,
                     action: handleCancelTap
                 )
                 .foregroundColor(DesignTokens.Colors.accent)
@@ -72,6 +73,17 @@ struct CVEditorView: View {
             // Load CV data when the view appears
             await viewModel.loadCV()
         }
+        .onChange(of: scenePhase) { _, phase in
+            // On its way to the background the app can be ended by iOS at any moment: what is not saved is kept now
+            if phase != .active {
+                Task { await viewModel.keepUnsavedEdits() }
+            }
+        }
+        .onChange(of: viewModel.showsSavedConfirmation) { _, isShown in
+            if isShown {
+                AccessibilityNotification.Announcement("editor.saved".localized).post()
+            }
+        }
         .alert("common.error".localized, isPresented: .constant(viewModel.isShowingError)) {
             Button("common.ok".localized, action: viewModel.clearError)
         } message: {
@@ -82,12 +94,6 @@ struct CVEditorView: View {
             Button("editor.keep_editing".localized, role: .cancel) { }
         } message: {
             Text("dialog.discard_changes.message".asLoclizedKey)
-        }
-        .alert("editor.save_success".localized, isPresented: $viewModel.showingSaveConfirmation) {
-            Button("editor.continue_editing".localized, action: viewModel.dismissSaveConfirmation)
-            Button("common.done".localized, action: handleSaveConfirmationDone)
-        } message: {
-            Text("dialog.save_success.message".asLoclizedKey)
         }
         .environment(\.rowDeletionAnchor, deletionAnchor)
         .anchoredConfirmationDialog(
@@ -121,6 +127,7 @@ struct CVEditorView: View {
                 EditorNoticeBanner(notice: notice)
             }
 
+            // Each tab shows the confirmation of a save itself, below the tab bar that iPad shows at the top
             TabView {
                 PersonalInfoSection(
                     cv: $viewModel.cv,
@@ -130,6 +137,7 @@ struct CVEditorView: View {
                 )
                     .keyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
+                    .savedConfirmation(isShown: viewModel.showsSavedConfirmation)
                     .tabItem {
                         Label("section.basics".localized, systemImage: "person.circle")
                     }
@@ -137,6 +145,7 @@ struct CVEditorView: View {
                 ExperienceSection(viewModel: viewModel)
                     .keyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
+                    .savedConfirmation(isShown: viewModel.showsSavedConfirmation)
                     .tabItem {
                         Label("section.experience".localized, systemImage: "briefcase")
                     }
@@ -144,6 +153,7 @@ struct CVEditorView: View {
                 DetailsSection(viewModel: viewModel)
                     .keyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
+                    .savedConfirmation(isShown: viewModel.showsSavedConfirmation)
                     .tabItem {
                         Label("section.details".localized, systemImage: "list.bullet.circle")
                     }
@@ -174,6 +184,13 @@ struct CVEditorView: View {
                 .frame(maxWidth: .infinity)
                 .background(DesignTokens.Colors.background)
             }
+        }
+    }
+    
+    private var exitTitle: String {
+        switch viewModel.exit {
+        case .cancel: return "common.cancel".localized
+        case .done: return "common.done".localized
         }
     }
     
@@ -211,10 +228,6 @@ struct CVEditorView: View {
     private func handleDiscardChanges() {
         viewModel.confirmCancel()
         router.navigateToRoot()
-    }
-    
-    private func handleSaveConfirmationDone() {
-        leaveEditorUnlessEditsWouldBeLost()
     }
 }
 

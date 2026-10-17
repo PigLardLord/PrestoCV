@@ -24,7 +24,8 @@ struct PersonalInfoSection: View {
             )
             
             LabeledTextField.phone(
-                text: $cv.personalInfo.phone
+                text: $cv.personalInfo.phone,
+                lacksDigits: cv.personalInfo.phoneLacksDigits
             )
         }
     }

@@ -31,6 +31,7 @@ struct ExperienceRowView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                     GrowingTextField("field.job_title".localized, text: $experience.title)
+                        .firstFieldOfRow()
                         .font(.headline)
                         .foregroundColor(DesignTokens.Colors.primary)
                     
@@ -95,6 +96,7 @@ struct SkillRowView: View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
             HStack {
                 GrowingTextField("field.skill".localized, text: $skill.name)
+                    .firstFieldOfRow()
                     .font(DesignTokens.Typography.subheadline.font)
                 Spacer()
                 DeleteButton(label: skill.displayName, action: onDelete)
@@ -119,6 +121,7 @@ struct EducationRowView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
                     GrowingTextField("field.degree".localized, text: $education.degree)
+                        .firstFieldOfRow()
                         .font(.headline)
                         .foregroundColor(DesignTokens.Colors.primary)
                     
@@ -150,6 +153,7 @@ struct LanguageRowView: View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
             HStack {
                 GrowingTextField("field.language".localized, text: $language.name)
+                    .firstFieldOfRow()
                     .font(DesignTokens.Typography.body.font)
                 
                 Spacer()
@@ -186,6 +190,7 @@ struct CertificationRowView: View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
             HStack {
                 GrowingTextField("field.certification_name".localized, text: $certification.name)
+                    .firstFieldOfRow()
                     .font(DesignTokens.Typography.subheadline.font)
                     .fontWeight(.semibold)
                 Spacer()
@@ -197,16 +202,11 @@ struct CertificationRowView: View {
                 .foregroundColor(DesignTokens.Colors.secondary)
             
             AdaptiveStack(spacing: DesignTokens.Spacing.sm) { _ in
-                TextField("field.year".localized, text: Binding(
-                    get: { String(certification.year) },
-                    set: { newValue in
-                        certification.year = Int(newValue) ?? 0
-                    }
-                ))
-                .keyboardType(.numberPad)
-                .font(DesignTokens.Typography.callout.font)
-                .frame(maxWidth: DesignTokens.InputSize.textFieldWidth, alignment: .leading)
-                .accessibilityLabel("field.year".localized)
+                TextField("field.year".localized, text: $certification.yearText)
+                    .keyboardType(.numberPad)
+                    .font(DesignTokens.Typography.callout.font)
+                    .frame(maxWidth: DesignTokens.InputSize.textFieldWidth, alignment: .leading)
+                    .accessibilityLabel("field.year".localized)
                 
                 GrowingTextField("field.url".localized, text: $certification.url)
                     .textContentType(.URL)
@@ -245,6 +245,7 @@ struct SocialLinkRowView: View {
         HStack(spacing: DesignTokens.Spacing.md) {
             AdaptiveStack(spacing: DesignTokens.Spacing.md) { isStacked in
                 GrowingTextField("field.platform".localized, text: $social.platform)
+                    .firstFieldOfRow()
                     .font(DesignTokens.Typography.body.font)
                     .frame(maxWidth: isStacked ? .infinity : DesignTokens.InputSize.textFieldMaxWidth, alignment: .leading)
                 
@@ -269,6 +270,7 @@ struct InterestRowView: View {
     var body: some View {
         HStack {
             GrowingTextField("field.interest".localized, text: $interest)
+                .firstFieldOfRow()
                 .font(DesignTokens.Typography.body.font)
             
             Spacer()

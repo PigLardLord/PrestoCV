@@ -145,6 +145,19 @@ struct DependencyContainerTests {
         #expect(FileManager.default.fileExists(atPath: fileURL.path))
     }
     
+    @Test("Default unsaved edits directory is PrestoCV/UnsavedEdits under Application Support, beside the CVs")
+    func defaultUnsavedEditsDirectoryIsInApplicationSupport() throws {
+        let directory = try DependencyContainer.defaultUnsavedEditsDirectory()
+        let applicationSupport = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: false
+        )
+        
+        #expect(directory == applicationSupport.appendingPathComponent("PrestoCV/UnsavedEdits", isDirectory: true))
+    }
+    
     @Test("A storage directory that cannot be resolved fails with serviceCreationFailed")
     func unresolvableStorageDirectoryFailsServiceCreation() {
         struct NoStorageDirectory: Error {}

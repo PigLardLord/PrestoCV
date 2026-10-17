@@ -47,6 +47,14 @@ public final class DependencyContainer: DependencyContainerProtocol {
             .appendingPathComponent("PrestoCV", isDirectory: true)
             .appendingPathComponent("CVs", isDirectory: true)
     }
+
+    /// `Application Support/PrestoCV/UnsavedEdits`, beside the CVs.
+    public static func defaultUnsavedEditsDirectory() throws -> URL {
+        try FileManager.default
+            .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            .appendingPathComponent("PrestoCV", isDirectory: true)
+            .appendingPathComponent("UnsavedEdits", isDirectory: true)
+    }
     
     // MARK: - Public Protocol Implementation
     

@@ -79,11 +79,14 @@ extension LabeledTextField {
         )
     }
     
+    /// - Parameter lacksDigits: The field holds text without a digit: it is marked with a warning, and its help
+    ///   says that this is not a phone number. The warning does not stop anything.
     static func phone(
         label: String = "field.phone".localized,
         text: Binding<String>,
         placeholder: String = "field.phone.placeholder".localized,
         isRequired: Bool = false,
+        lacksDigits: Bool = false,
         onCommit: (() -> Void)? = nil
     ) -> LabeledTextField {
         LabeledTextField(
@@ -93,7 +96,8 @@ extension LabeledTextField {
             keyboardType: .phonePad,
             textContentType: .telephoneNumber,
             isRequired: isRequired,
-            helpText: "field.phone.help".localized,
+            validationState: lacksDigits ? .warning : .none,
+            helpText: lacksDigits ? "field.phone.no_digits".localized : "field.phone.help".localized,
             onCommit: onCommit
         )
     }

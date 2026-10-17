@@ -17,6 +17,11 @@ class PrestoCVUITestsLaunchTests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// The configurations include landscape: the tests that run next start in portrait, as on a device held upright.
+    override func tearDownWithError() throws {
+        XCUIDevice.shared.orientation = .portrait
+    }
+
     func testLaunch() throws {
         let app = XCUIApplication()
         app.launch()

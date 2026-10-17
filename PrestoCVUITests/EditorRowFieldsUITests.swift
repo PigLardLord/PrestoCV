@@ -31,6 +31,27 @@ final class EditorRowFieldsUITests: XCTestCase {
         addExperience.tap()
     }
 
+    /// Closes the keyboard that the first field of a new row opens, with the Done button above it.
+    private func closeTheKeyboard() {
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "The new row should open the keyboard")
+        app.toolbars.buttons["Done"].tap()
+        let closed = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: keyboard)
+        XCTAssertEqual(XCTWaiter().wait(for: [closed], timeout: 10), .completed, "Done should close the keyboard")
+    }
+
+    /// A new row used to wait for a tap on its first field before anything could be typed into it.
+    func testANewRowTakesTheKeyboardFocusOnItsFirstField() throws {
+        launchAndAddAnExperience()
+        let title = app.textFields["Job Title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10), "A new experience should have a job title to type into")
+        let focused = expectation(for: NSPredicate(format: "hasKeyboardFocus == true"), evaluatedWith: title)
+        XCTAssertEqual(XCTWaiter().wait(for: [focused], timeout: 10), .completed, "The job title of a new experience should take the focus")
+
+        app.typeText("Ward Nurse")
+        XCTAssertEqual(title.value as? String, "Ward Nurse", "What is typed right after adding the row should go into it")
+    }
+
     func testReturnEndsTheEntryOfARowFieldInsteadOfAddingALine() throws {
         launchAndAddAnExperience()
         let title = app.textFields["Job Title"]
@@ -46,6 +67,8 @@ final class EditorRowFieldsUITests: XCTestCase {
     /// Side by side, a long place and a long period would cut each other off at the largest text sizes.
     func testLocationAndPeriodAreStackedAtTheLargestTextSize() throws {
         launchAndAddAnExperience(contentSize: "UICTContentSizeCategoryAccessibilityXXXL")
+        // The form scrolls to the new row while its keyboard comes up: the places are read with the form still
+        closeTheKeyboard()
         let location = app.textFields["Location"]
         let period = app.textFields["Period"]
         app.scrollTo(location)
@@ -65,5 +88,22 @@ final class EditorRowFieldsUITests: XCTestCase {
         let year = app.textFields["Year"]
         XCTAssertTrue(year.waitForExistence(timeout: 10), "A new certification should have a year to type into")
         XCTAssertEqual(year.label, "Year", "The year field should be announced by its name")
+    }
+
+    /// A year that is not set used to show "0", and typing a year after it gave "02020".
+    func testANewCertificationHasAnEmptyYearThatTakesTheYearAsTyped() throws {
+        launchAndCreateACV()
+        app.buttons["Details"].firstMatch.tap()
+
+        let addCertification = app.buttons["Add Certification"]
+        app.scrollTo(addCertification)
+        addCertification.tap()
+        let year = app.textFields["Year"]
+        XCTAssertTrue(year.waitForExistence(timeout: 10), "A new certification should have a year to type into")
+        XCTAssertEqual(year.value as? String, "Year", "An empty year should show its placeholder, not 0")
+
+        year.tap()
+        year.typeText("2020")
+        XCTAssertEqual(year.value as? String, "2020", "The year should read as typed")
     }
 }

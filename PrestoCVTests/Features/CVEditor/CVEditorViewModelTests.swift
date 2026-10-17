@@ -67,6 +67,17 @@ actor MockCVManagementUseCase: CVManagementUseCaseProtocol {
         }
     }
 
+    /// A new CV the editor stores keeps the id it got when its editing began; it counts as a creation.
+    func storeNewCV(_ model: CVModel) async throws -> CVModel {
+        createCVCallCount += 1
+        if case .failure(let error) = createCVResult {
+            throw error
+        }
+        createdCVs.append(model)
+        storedCVs[model.id] = model
+        return model
+    }
+
     func updateCV(_ model: CVModel) async throws -> CVModel {
         updateCVCallCount += 1
         if let updateCVError {
@@ -163,6 +174,13 @@ actor GatedCVManagementUseCase: CVManagementUseCaseProtocol {
         createdCVs.append(created)
         await holdIfFirstCall(of: .create, callCount: createCVCallCount)
         return created
+    }
+
+    func storeNewCV(_ cv: CVModel) async throws -> CVModel {
+        createCVCallCount += 1
+        createdCVs.append(cv)
+        await holdIfFirstCall(of: .create, callCount: createCVCallCount)
+        return cv
     }
 
     func updateCV(_ cv: CVModel) async throws -> CVModel {
@@ -534,7 +552,7 @@ struct CVEditorViewModelTests {
         #expect(await !mockUseCase.updateCVCalled, "updateCV should not be called when there are no changes")
     }
 
-    @Test("Existing CV without changes - no save confirmation dialog")
+    @Test("Existing CV without changes - no save confirmation")
     func existingCVWithoutChanges_NoSaveConfirmation() async {
         // Given
         let mockUseCase = MockCVManagementUseCase()
@@ -554,8 +572,8 @@ struct CVEditorViewModelTests {
         await viewModel.loadCV()
         await viewModel.handleSaveButtonTap()
 
-        // Then - Confirmation dialog should NOT be shown
-        #expect(viewModel.showingSaveConfirmation == false, "Save confirmation should not be shown without changes")
+        // Then - Confirmation should NOT be shown
+        #expect(viewModel.showsSavedConfirmation == false, "Save confirmation should not be shown without changes")
     }
 
     @Test("Existing CV with changes - save button is enabled")
@@ -609,7 +627,7 @@ struct CVEditorViewModelTests {
         #expect(await mockUseCase.updateCVCalled, "updateCV should be called when there are changes")
     }
 
-    @Test("Existing CV with changes - save confirmation dialog is shown")
+    @Test("Existing CV with changes - save confirmation is shown")
     func existingCVWithChanges_SaveConfirmationShown() async {
         // Given
         let mockUseCase = MockCVManagementUseCase()
@@ -630,8 +648,8 @@ struct CVEditorViewModelTests {
         viewModel.cv.personalInfo.phone = "+1234567890"
         await viewModel.handleSaveButtonTap()
 
-        // Then - Confirmation dialog SHOULD be shown
-        #expect(viewModel.showingSaveConfirmation == true, "Save confirmation should be shown with changes")
+        // Then - Confirmation SHOULD be shown
+        #expect(viewModel.showsSavedConfirmation == true, "Save confirmation should be shown with changes")
     }
 
     @Test("After saving - no unsaved changes and save button disabled")
@@ -822,7 +840,7 @@ struct CVEditorViewModelTests {
         #expect(viewModel.hasUnsavedChanges == false)
     }
 
-    @Test("A save that returns after edits were made offers no success dialog, and leaving asks first")
+    @Test("A save that returns after edits were made confirms nothing, and leaving asks first")
     func editsDuringCreateOfferNoSuccessDialog() async {
         let gatedUseCase = GatedCVManagementUseCase(gating: .create)
         let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: gatedUseCase)
@@ -834,7 +852,7 @@ struct CVEditorViewModelTests {
         await gatedUseCase.openGate()
         await saving.value
 
-        #expect(viewModel.showingSaveConfirmation == false, "Done in the success dialog would drop the edit made during the save")
+        #expect(viewModel.showsSavedConfirmation == false, "Saying the CV is saved would hide the edit made during the save")
         #expect(viewModel.hasUnsavedChanges == true)
         #expect(viewModel.isSaveButtonEnabled == true, "Save stays available for what was not stored")
         #expect(viewModel.requestLeaving() == false, "Leaving must ask first")
@@ -844,11 +862,11 @@ struct CVEditorViewModelTests {
         await viewModel.handleSaveButtonTap()
 
         #expect(await gatedUseCase.updatedCVs.last?.personalInfo.email == "john@example.com", "Saving again stores the edit")
-        #expect(viewModel.showingSaveConfirmation == true, "The success dialog is offered once the form is clean")
+        #expect(viewModel.showsSavedConfirmation == true, "The confirmation is shown once the form is clean")
         #expect(viewModel.requestLeaving() == true)
     }
 
-    @Test("Updating a stored CV that is edited meanwhile offers no success dialog, and leaving asks first")
+    @Test("Updating a stored CV that is edited meanwhile confirms nothing, and leaving asks first")
     func editsDuringUpdateOfferNoSuccessDialog() async {
         let storedCV = CVModel(id: UUID(), name: "Stored CV", personalInfo: PersonalInfo(name: "Jane Doe"))
         let gatedUseCase = GatedCVManagementUseCase(gating: .update, storedCV: storedCV)
@@ -862,7 +880,7 @@ struct CVEditorViewModelTests {
         await gatedUseCase.openGate()
         await saving.value
 
-        #expect(viewModel.showingSaveConfirmation == false)
+        #expect(viewModel.showsSavedConfirmation == false)
         #expect(viewModel.isSaveButtonEnabled == true)
         #expect(viewModel.requestLeaving() == false)
         #expect(viewModel.showingCancelConfirmation == true)
@@ -871,10 +889,10 @@ struct CVEditorViewModelTests {
         await viewModel.handleSaveButtonTap()
 
         #expect(await gatedUseCase.updatedCVs.last?.skills.map(\.name) == ["Swift"], "Saving again stores the edit")
-        #expect(viewModel.showingSaveConfirmation == true)
+        #expect(viewModel.showsSavedConfirmation == true)
     }
 
-    @Test("A save with no edits meanwhile offers the success dialog and Done leaves without asking")
+    @Test("A save with no edits meanwhile confirms it and Done leaves without asking")
     func cleanSaveOffersSuccessDialogAndLeaves() async {
         let mockUseCase = MockCVManagementUseCase()
         let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: mockUseCase)
@@ -882,7 +900,7 @@ struct CVEditorViewModelTests {
 
         await viewModel.handleSaveButtonTap()
 
-        #expect(viewModel.showingSaveConfirmation == true)
+        #expect(viewModel.showsSavedConfirmation == true)
         #expect(viewModel.requestLeaving() == true)
         #expect(viewModel.showingCancelConfirmation == false)
     }
@@ -922,7 +940,7 @@ struct CVEditorViewModelTests {
         #expect(viewModel.hasUnsavedChanges == true)
         #expect(viewModel.isSaving == false)
         #expect(viewModel.viewState.isLoaded)
-        #expect(viewModel.showingSaveConfirmation == false)
+        #expect(viewModel.showsSavedConfirmation == false)
     }
 
     @Test("After a failed create the next save creates the CV")

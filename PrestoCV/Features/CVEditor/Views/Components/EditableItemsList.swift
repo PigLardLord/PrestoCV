@@ -16,6 +16,7 @@ struct EditableItemsList<Item, RowContent: View>: View {
                     Binding(element: index, of: $items),
                     { animatedRemove(at: index) }
                 )
+                .environment(\.rowIndex, index)
             }
         }
         .onDelete(perform: animatedDelete)
