@@ -4,7 +4,12 @@ import PrestoCVCore
 struct PersonalInfoSection: View {
     @Binding var cv: CVModel
     @Binding var documentLanguage: DocumentLanguage?
+    /// The automatic choice with the language it stands for: "Automatic (English)"
+    let automaticLanguageTitle: String
+    /// The language chosen, or what automatic stands for
+    let documentLanguageTitle: String
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     
     /// E-mail and phone side by side where the screen is wide, one above the other where it is not, so that
     /// neither is cut off.
@@ -33,14 +38,7 @@ struct PersonalInfoSection: View {
                     .fontWeight(DesignTokens.Typography.headline.fontWeight)
                     .accessibilityLabel("field.cv_name".localized)
 
-                Picker(selection: $documentLanguage) {
-                    Text("language.automatic").tag(DocumentLanguage?.none)
-                    ForEach(DocumentLanguage.allCases) { language in
-                        Text(language.nativeName).tag(Optional(language))
-                    }
-                } label: {
-                    WholeWordsText("field.document_language".localized)
-                }
+                documentLanguageRow
             } header: {
                 SectionHeader(title: "section.cv_details".localized)
             }
@@ -74,6 +72,47 @@ struct PersonalInfoSection: View {
             }
         }
         .scrollDismissesKeyboard(.interactively)
+    }
+}
+
+// MARK: - Document Language
+
+private extension PersonalInfoSection {
+    /// The label, and the language in a menu: beside it, or under it at the accessibility sizes. The system's menu
+    /// picker cuts a value longer than its line in the middle ("Auto…nglish)"); this one makes it smaller instead.
+    var documentLanguageRow: some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: DesignTokens.Spacing.xs))
+            : AnyLayout(HStackLayout(spacing: DesignTokens.Spacing.sm))
+        return layout {
+            WholeWordsText("field.document_language".localized)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Menu {
+                Picker(selection: $documentLanguage) {
+                    Text(automaticLanguageTitle).tag(DocumentLanguage?.none)
+                    ForEach(DocumentLanguage.allCases) { language in
+                        Text(language.nativeName).tag(Optional(language))
+                    }
+                } label: {
+                    Text("field.document_language".localized)
+                }
+                .pickerStyle(.inline)
+            } label: {
+                HStack(spacing: DesignTokens.Spacing.xxs) {
+                    Text(documentLanguageTitle)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .imageScale(.small)
+                }
+                .foregroundColor(DesignTokens.Colors.secondary)
+            }
+            // The language takes its room first, as the system's picker does; the label wraps into what is left
+            .layoutPriority(1)
+            .accessibilityLabel("field.document_language".localized)
+            .accessibilityValue(documentLanguageTitle)
+        }
     }
 }
 
@@ -118,5 +157,10 @@ struct SectionHeader: View {
 }
 
 #Preview {
-    PersonalInfoSection(cv: .constant(CVModel()), documentLanguage: .constant(nil))
+    PersonalInfoSection(
+        cv: .constant(CVModel()),
+        documentLanguage: .constant(nil),
+        automaticLanguageTitle: "Automatic (English)",
+        documentLanguageTitle: "Automatic (English)"
+    )
 }

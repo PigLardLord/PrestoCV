@@ -32,6 +32,10 @@ final class CVListViewModel: ObservableObject {
     private var readSequence = 0
     /// A change went through and no read of the list has confirmed it yet.
     private var hasUnconfirmedChange = false
+    /// The CVs whose document language is being saved.
+    private var documentLanguageSaves: Set<UUID> = []
+    /// The language last chosen for a CV and not yet being saved; nil is automatic.
+    private var pendingDocumentLanguages: [UUID: DocumentLanguage?] = [:]
     
     // MARK: - Computed Properties
     var cvs: [CVModel] {
@@ -171,6 +175,28 @@ final class CVListViewModel: ObservableObject {
             return .replaced(try await self.cvManagementUseCase.updateCV(cv))
         }
     }
+
+    /// Sets the language of a CV's PDF, as chosen in its export sheet; nil is automatic. The CV is read again before it
+    /// is saved, so that nothing but its language changes.
+    ///
+    /// The saves of one CV run one after the other. A choice made while one is being saved waits, and replaces any
+    /// choice still waiting, so that the latest choice is always the one stored last: the language the sheet shows.
+    func setDocumentLanguage(_ language: DocumentLanguage?, ofCVWithId id: UUID) async {
+        pendingDocumentLanguages.updateValue(language, forKey: id)
+        // A save is under way: it saves this choice when it is done
+        guard documentLanguageSaves.insert(id).inserted else { return }
+        defer { documentLanguageSaves.remove(id) }
+
+        while let wanted = pendingDocumentLanguages.removeValue(forKey: id) {
+            await perform {
+                guard var cv = try await self.cvManagementUseCase.getCV(by: id) else {
+                    throw AppError.notFound("error.subject.cv".localized)
+                }
+                cv.documentLanguage = wanted?.rawValue
+                return .replaced(try await self.cvManagementUseCase.updateCV(cv))
+            }
+        }
+    }
     
     // MARK: - Private Methods
     
@@ -178,7 +204,7 @@ final class CVListViewModel: ObservableObject {
     private enum CommittedChange {
         /// A copy of a CV. The store lists the CV saved last first, so it goes to the top.
         case added(CVModel)
-        /// A CV saved under a new name, which makes it the one saved last.
+        /// A CV saved with a change, such as a new name, which makes it the one saved last.
         case replaced(CVModel)
         case removed(UUID)
         case unreadableCVsAcknowledged

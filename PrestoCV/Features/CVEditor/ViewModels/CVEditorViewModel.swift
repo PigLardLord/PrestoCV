@@ -15,6 +15,7 @@ final class CVEditorViewModel: ObservableObject {
     
     // MARK: - Private Properties
     private let cvManagementUseCase: CVManagementUseCaseProtocol
+    let documentLanguageDetector: DocumentLanguageDetector
     private let cvId: String?
     /// The CV as last read from or written to storage; nil until the first load or save.
     private var savedSnapshot: CVModel?
@@ -134,10 +135,12 @@ final class CVEditorViewModel: ObservableObject {
     init(
         cvId: String?,
         initialCV: CVModel? = nil,
-        cvManagementUseCase: CVManagementUseCaseProtocol
+        cvManagementUseCase: CVManagementUseCaseProtocol,
+        documentLanguageDetector: DocumentLanguageDetector = .onDevice
     ) {
         self.cvId = cvId
         self.cvManagementUseCase = cvManagementUseCase
+        self.documentLanguageDetector = documentLanguageDetector
 
         // For new CVs, initialize with provided template or empty CV
         if cvId == nil {

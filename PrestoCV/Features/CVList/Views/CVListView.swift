@@ -72,7 +72,9 @@ struct CVListView<EmptyState: View>: View {
             await viewModel.loadCVs()
         }
         .sheet(item: $exportTarget) { cv in
-            CVExportSheetView(cv: cv)
+            CVExportSheetView(cv: cv) { language in
+                Task { await viewModel.setDocumentLanguage(language, ofCVWithId: cv.id) }
+            }
         }
         .anchoredConfirmationDialog(
             String(localized: "cv.delete.confirmation.title"),

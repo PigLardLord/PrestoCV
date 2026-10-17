@@ -39,8 +39,6 @@ struct ButtonPressTests {
     static let systemOwned: [(path: String, call: String, reason: String)] = [
         ("PrestoCV/DesignSystem/Components/BarButton.swift", "BarButtonContent.resolve",
          "the button of a navigation bar, drawn by the bar on Liquid Glass; BarButton goes only in toolbars, as a test checks"),
-        ("PrestoCV/Features/Export/Views/CVExportSheetView.swift", "shareLabel",
-         "the share button while the PDF is not ready, an item of the export sheet's toolbar: ToolbarItem { shareButton }"),
         ("PrestoCV/Features/Onboarding/Views/ExampleSelectionView.swift", "row(for: sample)",
          "a row of a List: its label sets its own colours, primary and secondary, in row(for:), and the list draws the press as the row's highlight"),
     ]

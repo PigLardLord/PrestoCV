@@ -46,7 +46,9 @@ struct ExportTestEnvironment {
     /// The options of the export sheet for a design
     @MainActor
     func exportOptions(for design: String) -> ExportOptions {
-        let viewModel = CVExportSheetViewModel(exportService: makeService(), preferencesStore: InMemoryExportPreferencesStore(), previewDebounce: .zero)
+        let viewModel = CVExportSheetViewModel(
+            cv: CVModel(), exportService: makeService(), preferencesStore: InMemoryExportPreferencesStore(), previewDebounce: .zero
+        )
         viewModel.selectedTemplateId = design
         return viewModel.currentExportOptions()
     }

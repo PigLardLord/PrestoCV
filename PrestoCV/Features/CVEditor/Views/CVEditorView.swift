@@ -107,7 +107,9 @@ struct CVEditorView: View {
             Text("editor.delete_row.message".localizedWithArgs(deletion.rowName))
         }
         .sheet(isPresented: $showingExportSheet) {
-            CVExportSheetView(cv: viewModel.cv)
+            CVExportSheetView(cv: viewModel.cv) { language in
+                viewModel.documentLanguageSelection = language
+            }
         }
     }
     
@@ -120,7 +122,12 @@ struct CVEditorView: View {
             }
 
             TabView {
-                PersonalInfoSection(cv: $viewModel.cv, documentLanguage: $viewModel.documentLanguageSelection)
+                PersonalInfoSection(
+                    cv: $viewModel.cv,
+                    documentLanguage: $viewModel.documentLanguageSelection,
+                    automaticLanguageTitle: viewModel.automaticDocumentLanguageTitle,
+                    documentLanguageTitle: viewModel.documentLanguageTitle
+                )
                     .keyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
                     .tabItem {

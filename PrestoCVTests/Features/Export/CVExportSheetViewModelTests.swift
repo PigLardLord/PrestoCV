@@ -52,6 +52,8 @@ actor MockCVExportService: CVExportServiceProtocol {
     private(set) var exportCallCount = 0
     private(set) var lastExportOptions: ExportOptions?
     private(set) var lastExportTemplateId: String?
+    private(set) var lastPreviewCV: CVModel?
+    private(set) var lastExportCV: CVModel?
     private(set) var cleanedUpURLs: [URL] = []
 
     var generatePreviewHTMLCalled: Bool { generatePreviewHTMLCallCount > 0 }
@@ -131,6 +133,7 @@ actor MockCVExportService: CVExportServiceProtocol {
         options: ExportOptions
     ) async throws -> String {
         generatePreviewHTMLCallCount += 1
+        lastPreviewCV = cv
         let response = previewResponses.isEmpty ? defaultPreview : previewResponses.removeFirst()
         if response.isHeld {
             await hold(.preview)
@@ -144,6 +147,7 @@ actor MockCVExportService: CVExportServiceProtocol {
         options: ExportOptions
     ) async throws -> ExportedPDF {
         exportCallCount += 1
+        lastExportCV = cv
         lastExportOptions = options
         lastExportTemplateId = templateId
         let response = exportResponses.isEmpty ? defaultExport : exportResponses.removeFirst()
@@ -180,7 +184,7 @@ struct CVExportSheetViewModelTests {
         debounce: Duration = .zero,
         store: InMemoryExportPreferencesStore = InMemoryExportPreferencesStore()
     ) -> CVExportSheetViewModel {
-        let viewModel = CVExportSheetViewModel(exportService: service, preferencesStore: store, previewDebounce: debounce)
+        let viewModel = CVExportSheetViewModel(cv: cv, exportService: service, preferencesStore: store, previewDebounce: debounce)
         viewModel.selectedTemplateId = template
         return viewModel
     }

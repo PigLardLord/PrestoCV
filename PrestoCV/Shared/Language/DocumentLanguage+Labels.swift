@@ -1,0 +1,15 @@
+import Foundation
+import PrestoCVCore
+
+extension DocumentLanguage {
+    /// "Automatic (English)": the automatic choice with the language it stands for, named as the choices next to it are
+    var automaticTitle: String {
+        String(format: String(localized: "language.automatic"), nativeName)
+    }
+
+    /// The name of the language in the language the app is shown in: "inglese" in Italian, "Englisch" in German
+    var nameInAppLanguage: String {
+        let appLanguage = Locale(identifier: Bundle.main.preferredLocalizations.first ?? DocumentLanguage.english.rawValue)
+        return appLanguage.localizedString(forLanguageCode: rawValue) ?? nativeName
+    }
+}
