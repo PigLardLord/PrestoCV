@@ -4,7 +4,7 @@ A SwiftUI app for iOS and macOS. You write your CV once and export it as a PDF i
 
 ## Name
 
-The app is called PrestoCV on the App Store ("PrestoCV: AI Resume Builder"), under the bundle identifier `com.PigLardLord.prestocv`. Everything the user, the store or the signing sees says PrestoCV: the display name, the localized texts, the PDF metadata and the icon. So do the internal names: the targets, the schemes, the Swift modules and types, the folders and the project file (`PrestoCV.xcodeproj`), and the data folder `Application Support/PrestoCV`.
+The app is called PrestoCV on the App Store ("PrestoCV: CV & Resume Maker"), under the bundle identifier `com.PigLardLord.prestocv`. Everything the user, the store or the signing sees says PrestoCV: the display name, the localized texts, the PDF metadata and the icon. So do the internal names: the targets, the schemes, the Swift modules and types, the folders and the project file (`PrestoCV.xcodeproj`), and the data folder `Application Support/PrestoCV`.
 
 ## Status
 
