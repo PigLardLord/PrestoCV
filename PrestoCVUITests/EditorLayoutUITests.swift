@@ -96,15 +96,20 @@ final class EditorLayoutUITests: XCTestCase {
         assertTheDocumentLanguageIsFollowedByThePersonalDetails(within: 130)
     }
 
-    /// Between the label of the document language and the heading of the personal details there is no more than the
-    /// end of a row and the space between two sections.
+    /// Besides the menu, the row of the document language holds no more than its label and its margins, and the
+    /// heading of the personal details follows it. The label is not in the tree, because the menu says it to
+    /// VoiceOver and the row is a single element: what the row holds is measured around the menu as it is drawn.
     private func assertTheDocumentLanguageIsFollowedByThePersonalDetails(within points: CGFloat) {
-        let language = app.staticTexts["Document language"]
+        let row = app.buttons["Document language"]
         let personal = app.staticTexts["Personal Information"]
-        XCTAssertTrue(language.waitForExistence(timeout: 10), "The editor should ask for the document language")
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "The editor should ask for the document language")
         XCTAssertTrue(personal.waitForExistence(timeout: 10), "The personal details should follow the CV details")
-        let gap = personal.frame.minY - language.frame.maxY
-        XCTAssertLessThanOrEqual(gap, points, "The document language row should take only the room of its text")
+        let menu = row.buttons.firstMatch
+        XCTAssertTrue(menu.exists, "The document language row should show its menu")
+        let besidesTheMenu = row.frame.height - menu.frame.height
+        XCTAssertLessThanOrEqual(besidesTheMenu, points, "The document language row should take only the room of its text")
+        let gap = personal.frame.minY - row.frame.maxY
+        XCTAssertLessThanOrEqual(gap, points, "The personal details should follow the document language row")
     }
 
     private func waitUntil(_ element: XCUIElement, exists: Bool, timeout: TimeInterval = 10) -> Bool {

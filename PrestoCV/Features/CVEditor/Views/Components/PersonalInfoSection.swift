@@ -88,6 +88,10 @@ private extension PersonalInfoSection {
         return layout {
             WholeWordsText("field.document_language".localized)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                // The label is for the eye only: the menu says it, with the language, so that VoiceOver reads the
+                // row once, in one stop, as it read the system's picker. The text has no accessibility element at
+                // all: hidden, it would still be in the tree that UI tests search.
+                .accessibilityRepresentation { EmptyView() }
 
             Menu {
                 Picker(selection: $documentLanguage) {
@@ -113,6 +117,9 @@ private extension PersonalInfoSection {
             .layoutPriority(1)
             .accessibilityLabel("field.document_language".localized)
             .accessibilityValue(documentLanguageTitle)
+            // The form makes the menu the element of the whole row, and the middle of the row can be the label or
+            // the space before the menu: activating the row lands on the menu instead
+            .accessibilityActivationPoint(.center)
         }
     }
 }
