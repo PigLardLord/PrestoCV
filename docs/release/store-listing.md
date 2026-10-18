@@ -21,7 +21,7 @@ The texts of PrestoCV's App Store product page for version 1.0, one section per 
 | Marketing URL | `https://prestocv.app` (already set). |
 | Privacy Policy URL | `https://prestocv.app/privacy.html`, in every localization (already set). |
 | Sign-in required (App Review Information) | No |
-| Screenshots | iPhone and iPad sets. The captions of each locale name the iPhone; in the iPad set, "iPhone" becomes "iPad", and the rest of the sentence stays as it is in every language. |
+| Screenshots | iPhone and iPad sets. Each caption is a title and a line below it, written `Title | Line below`: the title says what the person gets, the line says how. The captions of each locale name the iPhone; in the iPad set, "iPhone" becomes "iPad", and the rest of the sentence stays as it is in every language. |
 
 ## Localizations
 
@@ -39,20 +39,20 @@ The texts of PrestoCV's App Store product page for version 1.0, one section per 
 
 ## Character counts
 
-Characters are Unicode characters; keywords are counted in UTF-8 bytes, which is Apple's limit for them. Captions are counted one by one; the column shows the longest.
+Characters are Unicode characters; keywords are counted in UTF-8 bytes, which is Apple's limit for them. Captions are counted one by one, the title and the line below apart; the column shows the longest of each (title limit 30, line limit 80, set by the checker so that they fit the screenshot).
 
 <!-- counts:start -->
-| Locale | Name (30) | Subtitle (30) | Keywords (100 bytes) | Promotional text (170) | Description (4000) | Captions (longest) | What's New (4000) |
+| Locale | Name (30) | Subtitle (30) | Keywords (100 bytes) | Promotional text (170) | Description (4000) | Captions (longest title / line) | What's New (4000) |
 |---|---|---|---|---|---|---|---|
-| en-US | 27 | 29 | 98 | 158 | 2354 | 71 (6 captions) | 184 |
-| en-GB | 27 | 29 | 98 | 158 | 2345 | 71 (6 captions) | 184 |
-| de-DE | 30 | 30 | 96 | 170 | 2763 | 72 (6 captions) | 230 |
-| it | 24 | 29 | 99 | 161 | 2538 | 68 (6 captions) | 209 |
-| es-ES | 28 | 26 | 93 | 169 | 2595 | 71 (6 captions) | 213 |
-| es-MX | 28 | 26 | 97 | 168 | 2569 | 71 (6 captions) | 210 |
-| fr-FR | 25 | 28 | 91 | 169 | 2722 | 73 (6 captions) | 220 |
-| pt-PT | 30 | 29 | 94 | 162 | 2641 | 75 (6 captions) | 215 |
-| pt-BR | 28 | 29 | 95 | 165 | 2586 | 72 (6 captions) | 205 |
+| en-US | 27 | 29 | 98 | 166 | 2354 | 23 / 63 (6 captions) | 184 |
+| en-GB | 27 | 29 | 98 | 166 | 2345 | 23 / 63 (6 captions) | 184 |
+| de-DE | 30 | 30 | 96 | 163 | 2763 | 26 / 72 (6 captions) | 230 |
+| it | 24 | 29 | 99 | 170 | 2538 | 23 / 62 (6 captions) | 209 |
+| es-ES | 28 | 26 | 93 | 163 | 2595 | 25 / 64 (6 captions) | 213 |
+| es-MX | 28 | 26 | 97 | 162 | 2569 | 25 / 64 (6 captions) | 210 |
+| fr-FR | 25 | 28 | 91 | 168 | 2722 | 25 / 73 (6 captions) | 220 |
+| pt-PT | 30 | 29 | 94 | 168 | 2641 | 27 / 61 (6 captions) | 215 |
+| pt-BR | 28 | 29 | 95 | 162 | 2586 | 27 / 61 (6 captions) | 205 |
 
 Notes for App Review: 3370 characters (4000).
 <!-- counts:end -->
@@ -111,7 +111,7 @@ builder,creator,curriculum,vitae,job,application,template,pdf,career,generator,o
 ### Promotional text
 
 ```text
-Describe your career in your own words. On devices with Apple Intelligence, PrestoCV turns them into a first draft, written on the device. No account, no ads.
+Tell your story in your own words, and on supported devices Apple Intelligence drafts your CV on the device. Pick a design, export a polished PDF. No account, no ads.
 ```
 
 ### Description
@@ -153,12 +153,12 @@ No account, no ads, no tracking, no data collected. PrestoCV never sends your CV
 ### Screenshot captions
 
 ```text
-No subscription. No account. Your CV stays on your iPhone.
-Describe your career. Apple Intelligence drafts your CV on your iPhone.
-Built from your words: anything you didn't write stays blank.
-Start from a blank CV or from one of five examples.
-Three designs, three font styles, four color palettes.
-Send or save your PDF, with headings in your CV's language.
+Your CV, on your terms. | No account. No subscription. Your CV stays on your iPhone.
+Just tell your story. | Apple Intelligence turns it into a first draft, on your iPhone.
+Built from your words. | Anything you didn't write stays blank.
+Start in seconds. | From a blank CV or one of five examples.
+Look the part. | Three designs, three font styles, four color palettes.
+Ready to send. | A polished PDF, with headings in your CV's language.
 ```
 
 ### What's New
@@ -190,7 +190,7 @@ builder,creator,curriculum,vitae,job,application,template,pdf,career,generator,o
 ### Promotional text
 
 ```text
-Describe your career in your own words. On devices with Apple Intelligence, PrestoCV turns them into a first draft, written on the device. No account, no ads.
+Tell your story in your own words, and on supported devices Apple Intelligence drafts your CV on the device. Pick a design, export a polished PDF. No account, no ads.
 ```
 
 ### Description
@@ -232,12 +232,12 @@ No account, no ads, no tracking, no data collected. PrestoCV never sends your CV
 ### Screenshot captions
 
 ```text
-No subscription. No account. Your CV stays on your iPhone.
-Describe your career. Apple Intelligence drafts your CV on your iPhone.
-Built from your words: anything you didn't write stays blank.
-Start from a blank CV or from one of five examples.
-Three designs, three font styles, four colour palettes.
-Send or save your PDF, with headings in your CV's language.
+Your CV, on your terms. | No account. No subscription. Your CV stays on your iPhone.
+Just tell your story. | Apple Intelligence turns it into a first draft, on your iPhone.
+Built from your words. | Anything you didn't write stays blank.
+Start in seconds. | From a blank CV or one of five examples.
+Look the part. | Three designs, three font styles, four colour palettes.
+Ready to send. | A polished PDF, with headings in your CV's language.
 ```
 
 ### What's New
@@ -269,7 +269,7 @@ Bewerbung,Vorlage,Muster,Beispiel,Curriculum,Vitae,Job,Karriere,PDF,Generator,Au
 ### Promotional text
 
 ```text
-Beschreiben Sie Ihren Werdegang in eigenen Worten. Auf Geräten mit Apple Intelligence entsteht daraus ein erster Entwurf – direkt auf dem Gerät. Ohne Konto, ohne Werbung.
+Erzählen Sie Ihren Werdegang in eigenen Worten: Auf unterstützten Geräten entwirft Apple Intelligence Ihren Lebenslauf direkt dort. Design wählen, PDF exportieren.
 ```
 
 ### Description
@@ -311,12 +311,12 @@ Kein Konto, keine Werbung, kein Tracking, keine Datenerhebung. PrestoCV sendet I
 ### Screenshot captions
 
 ```text
-Kein Abo. Kein Konto. Ihr Lebenslauf bleibt auf Ihrem iPhone.
-Apple Intelligence entwirft Ihren Lebenslauf auf Ihrem iPhone.
-Aus Ihren Worten: Was Sie nicht schreiben, bleibt leer.
-Mit einem leeren Lebenslauf oder einem von fünf Beispielen starten.
-Drei Designs, drei Schriftstile, vier Farbpaletten.
-PDF senden oder speichern. Überschriften in der Sprache des Lebenslaufs.
+Ihr Lebenslauf. Nur Ihrer. | Kein Konto, kein Abo. Ihr Lebenslauf bleibt auf Ihrem iPhone.
+Erzählen Sie einfach. | Apple Intelligence macht daraus einen ersten Entwurf – auf Ihrem iPhone.
+Aus Ihren Worten. | Was Sie nicht schreiben, bleibt leer.
+Sofort loslegen. | Mit einem leeren Lebenslauf oder einem von fünf Beispielen.
+Ein starker Auftritt. | Drei Designs, drei Schriftstile, vier Farbpaletten.
+Bereit zum Versenden. | Ein sauberes PDF, mit Überschriften in der Sprache des Lebenslaufs.
 ```
 
 ### What's New
@@ -348,7 +348,7 @@ vitae,lavoro,candidatura,modello,esempio,pdf,carriera,compilare,generatore,impie
 ### Promotional text
 
 ```text
-Descrivi il tuo percorso con parole tue: sui dispositivi con Apple Intelligence, PrestoCV ne scrive una prima bozza sul dispositivo. Senza account né pubblicità.
+Racconta il tuo percorso con parole tue: sui dispositivi compatibili, Apple Intelligence ne fa una bozza sul dispositivo. Scegli un design, esporta il PDF. Senza account.
 ```
 
 ### Description
@@ -390,12 +390,12 @@ Nessun account, nessuna pubblicità, nessun tracciamento, nessun dato raccolto. 
 ### Screenshot captions
 
 ```text
-Nessun abbonamento. Nessun account. Il tuo CV resta sul tuo iPhone.
-Racconta chi sei: Apple Intelligence scrive la bozza sul tuo iPhone.
-Dalle tue parole: ciò che non scrivi resta vuoto.
-Parti da un CV vuoto o da uno dei cinque esempi.
-Tre design, tre stili di carattere, quattro palette di colori.
-Invia o salva il PDF, con i titoli nella lingua del tuo CV.
+Il tuo CV, solo tuo. | Nessun account, nessun abbonamento. Resta sul tuo iPhone.
+Racconta la tua storia. | Apple Intelligence ne scrive una prima bozza, sul tuo iPhone.
+Dalle tue parole. | Ciò che non scrivi resta vuoto.
+Parti subito. | Da un CV vuoto o da uno dei cinque esempi.
+Fai bella figura. | Tre design, tre stili di carattere, quattro palette di colori.
+Pronto da inviare. | Un PDF curato, con i titoli nella lingua del tuo CV.
 ```
 
 ### What's New
@@ -427,7 +427,7 @@ vitae,empleo,trabajo,plantilla,modelo,ejemplo,pdf,hacer,generador,carrera,candid
 ### Promotional text
 
 ```text
-Describe tu trayectoria con tus palabras y, en dispositivos con Apple Intelligence, PrestoCV redacta un primer borrador en el propio dispositivo. Sin cuenta ni anuncios.
+Cuenta tu trayectoria con tus palabras: en los dispositivos compatibles, Apple Intelligence redacta tu CV allí mismo. Elige un diseño y exporta el PDF. Sin cuenta.
 ```
 
 ### Description
@@ -469,12 +469,12 @@ Sin cuenta, sin anuncios, sin rastreo y sin recopilación de datos. PrestoCV nun
 ### Screenshot captions
 
 ```text
-Sin suscripción. Sin cuenta. Tu CV se queda en tu iPhone.
-Describe tu trayectoria: Apple Intelligence redacta tu CV en tu iPhone.
-A partir de tus palabras: lo que no escribas queda en blanco.
-Empieza con un CV vacío o con uno de los cinco ejemplos.
-Tres diseños, tres estilos de fuente, cuatro paletas de colores.
-Envía o guarda tu PDF, con los títulos en el idioma de tu CV.
+Tu CV, solo tuyo. | Sin cuenta ni suscripción. Tu CV se queda en tu iPhone.
+Cuenta tu historia. | Apple Intelligence redacta un primer borrador en tu iPhone.
+A partir de tus palabras. | Lo que no escribas queda en blanco.
+Empieza ya. | Con un CV vacío o con uno de los cinco ejemplos.
+Causa buena impresión. | Tres diseños, tres estilos de fuente, cuatro paletas de colores.
+Listo para enviar. | Un PDF cuidado, con los títulos en el idioma de tu CV.
 ```
 
 ### What's New
@@ -506,7 +506,7 @@ vitae,empleo,trabajo,plantilla,formato,ejemplo,pdf,hacer,solicitud,hoja de vida,
 ### Promotional text
 
 ```text
-Describe tu trayectoria con tus palabras y, en dispositivos con Apple Intelligence, PrestoCV redacta un primer borrador en el mismo dispositivo. Sin cuenta ni anuncios.
+Cuenta tu trayectoria con tus palabras: en los dispositivos compatibles, Apple Intelligence redacta tu CV ahí mismo. Elige un diseño y exporta el PDF. Sin cuenta.
 ```
 
 ### Description
@@ -548,12 +548,12 @@ Sin cuenta, sin anuncios, sin rastreo y sin recopilación de datos. PrestoCV nun
 ### Screenshot captions
 
 ```text
-Sin suscripción. Sin cuenta. Tu CV se queda en tu iPhone.
-Describe tu trayectoria: Apple Intelligence redacta tu CV en tu iPhone.
-A partir de tus palabras: lo que no escribas queda en blanco.
-Empieza con un CV vacío o con uno de los cinco ejemplos.
-Tres diseños, tres estilos de fuente, cuatro paletas de colores.
-Envía o guarda tu PDF, con los títulos en el idioma de tu CV.
+Tu CV, solo tuyo. | Sin cuenta ni suscripción. Tu CV se queda en tu iPhone.
+Cuenta tu historia. | Apple Intelligence redacta un primer borrador en tu iPhone.
+A partir de tus palabras. | Lo que no escribas queda en blanco.
+Empieza ya. | Con un CV vacío o con uno de los cinco ejemplos.
+Causa buena impresión. | Tres diseños, tres estilos de fuente, cuatro paletas de colores.
+Listo para enviar. | Un PDF cuidado, con los títulos en el idioma de tu CV.
 ```
 
 ### What's New
@@ -585,7 +585,7 @@ curriculum,vitae,créer,faire,modèle,exemple,emploi,travail,candidature,pdf,sta
 ### Promotional text
 
 ```text
-Décrivez votre parcours avec vos mots : sur les appareils dotés d'Apple Intelligence, PrestoCV en rédige un premier brouillon sur l'appareil même. Sans compte, sans pub.
+Racontez votre parcours avec vos mots : sur les appareils compatibles, Apple Intelligence rédige votre CV sur place. Choisissez un design, exportez le PDF. Sans compte.
 ```
 
 ### Description
@@ -627,12 +627,12 @@ Pas de compte, pas de publicité, pas de pistage, aucune donnée collectée. Pre
 ### Screenshot captions
 
 ```text
-Sans abonnement. Sans compte. Votre CV reste sur votre iPhone.
-Décrivez-vous : Apple Intelligence rédige votre CV sur votre iPhone.
-À partir de vos mots : ce que vous n'écrivez pas reste vide.
-Partez d'un CV vide ou de l'un des cinq exemples.
-Trois mises en page, trois styles de police, quatre palettes de couleurs.
-Envoyez ou enregistrez le PDF, avec des titres dans la langue du CV.
+Votre CV, rien qu'à vous. | Sans compte ni abonnement. Votre CV reste sur votre iPhone.
+Racontez votre parcours. | Apple Intelligence en rédige un premier brouillon, sur votre iPhone.
+À partir de vos mots. | Ce que vous n'écrivez pas reste vide.
+Lancez-vous. | Partez d'un CV vide ou de l'un des cinq exemples.
+Faites bonne impression. | Trois mises en page, trois styles de police, quatre palettes de couleurs.
+Prêt à envoyer. | Un PDF soigné, avec des titres dans la langue du CV.
 ```
 
 ### What's New
@@ -664,7 +664,7 @@ curriculum,vitae,emprego,trabalho,modelo,exemplo,pdf,candidatura,carreira,criar,
 ### Promotional text
 
 ```text
-Descreva o seu percurso por palavras suas: nos dispositivos com Apple Intelligence, o PrestoCV escreve um rascunho no próprio dispositivo. Sem conta nem anúncios.
+Conte o seu percurso por palavras suas: nos dispositivos compatíveis, o Apple Intelligence escreve o rascunho no próprio dispositivo. Escolha um design e exporte o PDF.
 ```
 
 ### Description
@@ -706,12 +706,12 @@ Sem conta, sem anúncios, sem rastreio e sem recolha de dados. O PrestoCV nunca 
 ### Screenshot captions
 
 ```text
-Sem subscrição. Sem conta. O seu currículo fica no seu iPhone.
-Descreva o seu percurso: o Apple Intelligence faz o rascunho no seu iPhone.
-A partir das suas palavras: o que não escrever fica em branco.
-Comece por um currículo vazio ou por um dos cinco exemplos.
-Três designs, três estilos de letra, quatro paletas de cores.
-Envie ou guarde o PDF, com os títulos na língua do seu currículo.
+O seu currículo, só seu. | Sem conta nem subscrição. O seu currículo fica no seu iPhone.
+Conte a sua história. | O Apple Intelligence faz um primeiro rascunho, no seu iPhone.
+A partir das suas palavras. | O que não escrever fica em branco.
+Comece já. | Com um currículo vazio ou com um dos cinco exemplos.
+Cause boa impressão. | Três designs, três estilos de letra, quatro paletas de cores.
+Pronto a enviar. | Um PDF cuidado, com os títulos na língua do seu currículo.
 ```
 
 ### What's New
@@ -743,7 +743,7 @@ curriculum,vitae,emprego,trabalho,modelo,exemplo,pdf,vaga,criar,fazer,gerador,es
 ### Promotional text
 
 ```text
-Descreva sua trajetória com suas palavras: nos aparelhos com Apple Intelligence, o PrestoCV escreve um primeiro rascunho no próprio aparelho. Sem conta nem anúncios.
+Conte sua trajetória com suas palavras: nos aparelhos compatíveis, o Apple Intelligence escreve o rascunho no próprio aparelho. Escolha um design e exporte o PDF.
 ```
 
 ### Description
@@ -785,12 +785,12 @@ Sem conta, sem anúncios, sem rastreamento e sem coleta de dados. O PrestoCV nun
 ### Screenshot captions
 
 ```text
-Sem assinatura. Sem conta. Seu currículo fica no seu iPhone.
-Conte sua trajetória: o Apple Intelligence faz o rascunho no seu iPhone.
-A partir das suas palavras: o que você não escrever fica em branco.
-Comece com um currículo em branco ou com um dos cinco exemplos.
-Três designs, três estilos de fonte, quatro paletas de cores.
-Envie ou salve o PDF, com os títulos no idioma do seu currículo.
+Seu currículo, só seu. | Sem conta nem assinatura. Seu currículo fica no seu iPhone.
+Conte sua história. | O Apple Intelligence faz um primeiro rascunho, no seu iPhone.
+A partir das suas palavras. | O que você não escrever fica em branco.
+Comece já. | Com um currículo em branco ou com um dos cinco exemplos.
+Cause uma boa impressão. | Três designs, três estilos de fonte, quatro paletas de cores.
+Pronto para enviar. | Um PDF caprichado, com os títulos no idioma do seu currículo.
 ```
 
 ### What's New
