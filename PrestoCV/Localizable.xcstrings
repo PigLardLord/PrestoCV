@@ -2368,7 +2368,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modificato adesso"
+            "value" : "Modificato ora"
           }
         },
         "pt" : {
@@ -2662,7 +2662,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lebenslauf ohne Titel"
+            "value" : "Ohne Titel"
           }
         },
         "en" : {
@@ -2908,7 +2908,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neuer Lebenslauf"
+            "value" : "Lebenslauf"
           }
         },
         "en" : {
@@ -6499,7 +6499,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Luogo"
+            "value" : "Città"
           }
         },
         "pt" : {
@@ -7500,7 +7500,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lebenslauf mit KI erstellen"
+            "value" : "Lebenslauf mit KI"
           }
         },
         "en" : {
@@ -7512,25 +7512,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Generación de CV con IA"
+            "value" : "CV con IA"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Génération de CV par IA"
+            "value" : "CV avec l'IA"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Generazione CV con IA"
+            "value" : "CV con l'IA"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geração de CV com IA"
+            "value" : "Currículo com IA"
           }
         }
       }
@@ -7653,7 +7653,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Criar meu primeiro CV"
+            "value" : "Criar meu primeiro currículo"
           }
         }
       }
@@ -8982,7 +8982,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create Your Perfect Resume"
+            "value" : "Create Your Perfect CV"
           }
         },
         "es" : {
@@ -9006,7 +9006,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crie seu CV perfeito"
+            "value" : "Crie seu currículo perfeito"
           }
         }
       }
@@ -9029,25 +9029,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bienvenido a PrestoCV"
+            "value" : "Te damos la bienvenida a PrestoCV"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bienvenue sur PrestoCV"
+            "value" : "Bienvenue dans PrestoCV"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Benvenuto su PrestoCV"
+            "value" : "Ti diamo il benvenuto in PrestoCV"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bem-vindo ao PrestoCV"
+            "value" : "Boas-vindas ao PrestoCV"
           }
         }
       }

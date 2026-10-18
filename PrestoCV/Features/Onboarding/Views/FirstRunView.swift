@@ -2,11 +2,14 @@ import SwiftUI
 import PrestoCVCore
 
 /// What the user sees before having any CV: it fills the empty state of the CV list. Where the device can run it, the
-/// AI draft leads; a blank CV and the examples follow.
+/// AI draft leads; a blank CV and the examples follow. At the accessibility sizes and in landscape on an iPhone the
+/// ways to start come before the welcome (see `FirstRunLayout`).
 struct FirstRunView: View {
     @StateObject private var viewModel: NewCVChoicesViewModel
     @EnvironmentObject var router: AppRouter
     @State private var showingExamples = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     
     /// The view model is built once, when the view first appears, and survives every re-render of the list.
     init(viewModel: @autoclosure @escaping () -> NewCVChoicesViewModel) {
@@ -16,9 +19,16 @@ struct FirstRunView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: DesignTokens.Spacing.xxl) {
-                headerSection
-                contentSection
-                actionSection
+                switch FirstRunLayout.resolve(dynamicTypeSize: dynamicTypeSize, verticalSizeClass: verticalSizeClass) {
+                case .welcomeFirst:
+                    headerSection
+                    contentSection
+                    actionSection
+                case .actionsFirst:
+                    actionSection
+                    headerSection
+                    contentSection
+                }
             }
             .padding(DesignTokens.Spacing.xl)
             .frame(maxWidth: DesignTokens.Layout.readableContentWidth)

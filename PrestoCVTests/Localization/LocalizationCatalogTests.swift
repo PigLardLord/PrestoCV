@@ -371,6 +371,28 @@ struct LocalizationCatalogTests {
         }
     }
 
+    @Test("The welcome speaks to everyone, not to a man or to a woman")
+    func welcomeIsGenderNeutral() throws {
+        let catalog = try LocalizationCatalog.load()
+        // A welcome that opens with the adjective agrees with the person: "Benvenuto", "Bienvenida". The noun inside
+        // a sentence speaks to everyone ("Ti diamo il benvenuto", "Te damos la bienvenida"), and so does the French
+        // "Bienvenue" that opens one, where "Bienvenu" is the adjective of a man.
+        let gendered = [
+            "es": #"^Bienvenid[oa]s?\b"#,
+            "fr": #"^Bienvenus?\b"#,
+            "it": #"^Benvenut[oaie]\b"#,
+            "pt": #"^Bem-vind[oa]s?\b"#,
+        ]
+
+        for (language, pattern) in gendered {
+            let form = try NSRegularExpression(pattern: pattern)
+            for text in catalog.texts(of: "welcome.title", in: language) ?? [] {
+                let match = form.firstMatch(in: text, range: NSRange(text.startIndex..., in: text))
+                #expect(match == nil, "welcome.title speaks to a man or to a woman in \(language): \(text)")
+            }
+        }
+    }
+
     @Test("No exemption outlives its defect")
     func exemptionsAreStillNeeded() throws {
         let catalog = try LocalizationCatalog.load()
