@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1443
+    static let rowsWhenWritten = 1449
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -479,6 +479,7 @@ enum GroundingRows {
         rows += bareNamesBeforeAVerblessContact()
         rows += namesInAFragmentBeforeAContact()
         rows += hobbiesAreNoSkills()
+        rows += skillsTheDescriptionClaims()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3236,8 +3237,9 @@ enum GroundingRows {
     // MARK: A hobby is no skill (#202)
 
     /// The model lists the hobbies of the app's example (chess, hiking) as skills too: a skill claims an ability that the person
-    /// never claimed, so a skill whose name is an interest of the same draft goes, whatever its case or accents. The interest stays,
-    /// and so does a skill that only holds an interest's name.
+    /// never claimed, so a skill whose name is an interest of the same draft, whatever its case or accents, goes when the description
+    /// mentions it only as leisure ("In my free time I like chess and hiking"). The interest stays, and so does a skill that only holds
+    /// an interest's name.
     private static func hobbiesAreNoSkills() -> [GroundingRow] {
         typealias Variant = (language: String, interests: [String], skills: [String])
         var variants: [Variant] = []
@@ -3260,6 +3262,39 @@ enum GroundingRows {
                         "chess coaching is a skill the person claims, though it holds the interest chess: it stays",
                         "My skills include chess coaching and first aid. In my free time I like chess.",
                         CVData(skills: [Skill(name: "chess coaching"), Skill(name: "first aid")], interests: ["chess"]), .unchanged))
+        return rows
+    }
+
+    /// A skill that is also an interest of the draft stays when the description mentions it anywhere but in a clause of leisure: as an
+    /// ability ("proficient in Python"), in a job's clause ("where I do portrait photography") or in a list of skills. An interest that
+    /// the description never states as one removes no skill.
+    private static func skillsTheDescriptionClaims() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        rows.append(row("a-skill-the-person-claims-stays-though-it-is-an-interest",
+                        "Python is an ability the person claims (proficient, its level) before it is a pastime: the skill and its level stay",
+                        "I am proficient in Python and enjoy Python programming.",
+                        CVData(skills: [Skill(name: "Python", level: .advanced)], interests: ["Python"]), .unchanged))
+        rows.append(row("a-skill-of-the-job-stays-though-it-is-a-hobby-en",
+                        "photography is the person's work at Studio Luce as well as a hobby: the skill stays",
+                        "I work as a photographer at Studio Luce, where I do portrait photography. In my free time I like photography and hiking.",
+                        CVData(experience: [job("photographer", "Studio Luce")], skills: [Skill(name: "photography")],
+                               interests: ["photography", "hiking"]), .unchanged))
+        rows.append(row("a-skill-of-the-job-stays-though-it-is-a-hobby-it",
+                        "fotografia is the person's work at Studio Luce as well as a hobby: the skill stays",
+                        "Sono fotografa presso lo Studio Luce, dove faccio fotografia di ritratto. Nel tempo libero mi piacciono la fotografia e le escursioni.",
+                        CVData(skills: [Skill(name: "fotografia")], interests: ["fotografia", "escursioni"]), .unchanged, language: "it"))
+        rows.append(row("a-skill-of-the-job-stays-though-it-is-a-hobby-fr",
+                        "photographie is the person's work at Studio Luce as well as a hobby: the skill stays",
+                        "Je suis photographe au Studio Luce, où je fais de la photographie de portrait. Pendant mon temps libre, j'aime la photographie et la randonnée.",
+                        CVData(skills: [Skill(name: "photographie")], interests: ["photographie", "randonnée"]), .unchanged, language: "fr"))
+        rows.append(row("a-skill-in-a-list-of-skills-stays-though-it-is-a-hobby",
+                        "chess stands in the list of skills as well as among the pastimes: the skill stays",
+                        "My skills include chess and first aid. In my free time I like chess and hiking.",
+                        CVData(skills: [Skill(name: "chess"), Skill(name: "first aid")], interests: ["chess", "hiking"]), .unchanged))
+        rows.append(row("an-interest-the-description-does-not-state-removes-no-skill",
+                        "the model makes ECG monitoring an interest too, though the description states no interest: the skill stays",
+                        "I am good at ECG monitoring.",
+                        CVData(skills: [Skill(name: "ECG monitoring")], interests: ["ECG monitoring"]), .unchanged))
         return rows
     }
 
