@@ -1,0 +1,42 @@
+import Foundation
+
+/// The words that a kept name of an entry does without (#202). Each rule only takes words out of a quote, so what is left is a
+/// quote too, and none changes what the description backs.
+enum EntryWording {
+    /// The indefinite articles of each language, as `DescriptionText.normalized` writes them.
+    private static let articlesByLanguage: [Vocabulary.Language: Set<String>] = [
+        .english: ["a", "an"],
+        .italian: ["un", "una", "uno"],
+        .german: ["ein", "eine", "einer", "einem", "einen", "eines"],
+        .spanish: ["un", "una"],
+        .french: ["un", "une"],
+        .portuguese: ["um", "uma"],
+    ]
+
+    private static let everyArticle: Set<String> = articlesByLanguage.values.reduce(into: []) { $0.formUnion($1) }
+
+    /// The indefinite articles that a language elides before a vowel, with their apostrophe: Italian "un'azienda".
+    private static let elidedArticlesByLanguage: [Vocabulary.Language: [String]] = [.italian: ["un'", "un\u{2019}"]]
+
+    private static let everyElidedArticle: [String] = elidedArticlesByLanguage.values.flatMap { $0 }
+
+    /// The name of an employer or a school without its leading indefinite article ("a nursery", "una guardería", "un'azienda", "einer
+    /// Kinderkrippe"), in the language of the description, or in any of the six when it is not known: a CV names the place. An article
+    /// written with a capital stays, as part of a name ("UNA Hotels", "A Plus Consulting"), and so does a name that is nothing else.
+    static func withoutLeadingArticle(_ name: String, in language: Vocabulary.Language?) -> String {
+        let articles = language.map { articlesByLanguage[$0] ?? [] } ?? everyArticle
+        let elided = language.map { elidedArticlesByLanguage[$0] ?? [] } ?? everyElidedArticle
+        if let rest = name.droppingPrefix(elided), rest.first?.isLetter == true {
+            return rest
+        }
+        guard let space = name.firstIndex(where: \.isWhitespace), articles.contains(String(name[..<space])) else { return name }
+        return String(name[space...]).trimmedNonEmpty ?? name
+    }
+}
+
+private extension String {
+    /// The text after the first of `prefixes` it starts with, in the same case; nil when it starts with none.
+    func droppingPrefix(_ prefixes: [String]) -> String? {
+        prefixes.lazy.compactMap { prefix in self.hasPrefix(prefix) ? String(self.dropFirst(prefix.count)) : nil }.first
+    }
+}

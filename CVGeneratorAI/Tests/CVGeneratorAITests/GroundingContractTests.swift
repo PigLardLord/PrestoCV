@@ -416,12 +416,12 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1415
+    static let rowsWhenWritten = 1435
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
     static let notImplementedYet: Set<String> = [
-        "first-run-on-the-real-model-example-en", "first-run-on-the-real-model-example-es", "first-run-on-the-real-model-example-fr",
+        "first-run-on-the-real-model-example-fr",
     ]
 
     /// Rows whose desired output the sanitiser does not give, and whose leak the owner accepts as a residual risk (ADR 0023,
@@ -487,6 +487,7 @@ enum GroundingRows {
         rows += omittedEmployersInManyWords()
         rows += titlesOfOthers()
         rows += schoolsAndCertifications()
+        rows += entryNamesWithoutAnArticle()
         rows += faithfulExamples()
         rows += theAppExampleKeepsEveryFact()
         rows += realModelProbes()
@@ -3690,6 +3691,53 @@ enum GroundingRows {
                         "I studied Nursing at Alpha University in 2010. I studied Law at Beta University in 2015.",
                         CVData(education: [study("Law", at: "Alpha University")]),
                         .exactly(CVData(education: [study(at: "Alpha University")]))))
+        return rows
+    }
+
+    // MARK: An employer or a school keeps no leading indefinite article (#202)
+
+    /// The model copies the article of "in a nursery" into the employer: a CV names the place, so a leading indefinite article goes,
+    /// in each language, and what is left is the same quote without it. An article written with a capital is part of a name ("UNA
+    /// Hotels", "A Plus Consulting"), and a name that is no quote stays no quote.
+    private static func entryNamesWithoutAnArticle() -> [GroundingRow] {
+        typealias Variant = (id: String, language: String, description: String, written: String, kept: String)
+        var variants: [Variant] = []
+        variants.append(("a-en", "en", "I worked as an assistant in a nursery.", "a nursery", "nursery"))
+        variants.append(("an-en", "en", "I worked at an orphanage.", "an orphanage", "orphanage"))
+        variants.append(("un-it", "it", "Ho lavorato come assistente in un asilo nido.", "un asilo nido", "asilo nido"))
+        variants.append(("una-it", "it", "Ho lavorato in una scuola.", "una scuola", "scuola"))
+        variants.append(("uno-it", "it", "Ho lavorato in uno studio legale.", "uno studio legale", "studio legale"))
+        variants.append(("un-elided-it", "it", "Ho lavorato in un'azienda agricola.", "un'azienda agricola", "azienda agricola"))
+        variants.append(("einer-de", "de", "Ich habe in einer Kinderkrippe gearbeitet.", "einer Kinderkrippe", "Kinderkrippe"))
+        variants.append(("einem-de", "de", "Ich habe in einem Krankenhaus gearbeitet.", "einem Krankenhaus", "Krankenhaus"))
+        variants.append(("ein-de", "de", "Ich habe für ein Pflegeheim gearbeitet.", "ein Pflegeheim", "Pflegeheim"))
+        variants.append(("una-es", "es", "Trabajé como auxiliar en una guardería.", "una guardería", "guardería"))
+        variants.append(("un-es", "es", "Trabajé en un hospital.", "un hospital", "hospital"))
+        variants.append(("une-fr", "fr", "J'ai travaillé comme assistante dans une crèche.", "une crèche", "crèche"))
+        variants.append(("un-fr", "fr", "J'ai travaillé dans un hôpital.", "un hôpital", "hôpital"))
+        variants.append(("uma-pt", "pt", "Trabalhei como auxiliar em uma creche.", "uma creche", "creche"))
+        variants.append(("um-pt", "pt", "Trabalhei em um hospital.", "um hospital", "hospital"))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("an-employer-keeps-no-leading-article-\(v.id)", "the article of the employer goes; the rest is the same quote",
+                            v.description, CVData(experience: [job("", v.written)]), .exactly(CVData(experience: [job("", v.kept)])),
+                            language: v.language))
+        }
+        rows.append(row("a-school-keeps-no-leading-article-en", "the article of the school goes; the degree and the rest of the school stay",
+                        "I studied Nursing at a community college.", CVData(education: [study("Nursing", at: "a community college")]),
+                        .exactly(CVData(education: [study("Nursing", at: "community college")]))))
+        rows.append(row("a-school-keeps-no-leading-article-it", "the article of the school goes; the degree and the rest of the school stay",
+                        "Ho studiato Ragioneria in un istituto tecnico.", CVData(education: [study("Ragioneria", at: "un istituto tecnico")]),
+                        .exactly(CVData(education: [study("Ragioneria", at: "istituto tecnico")])), language: "it"))
+        rows.append(row("a-capitalised-article-is-part-of-a-name-it", "UNA Hotels is a name: its article stays",
+                        "Dal 2016 lavoro presso UNA Hotels.", CVData(experience: [job("", "UNA Hotels", from: "2016", current: true)]),
+                        .unchanged, language: "it"))
+        rows.append(row("a-capitalised-article-is-part-of-a-name-en", "A Plus Consulting is a name: its article stays",
+                        "Since 2016 I have worked at A Plus Consulting.",
+                        CVData(experience: [job("", "A Plus Consulting", from: "2016", current: true)]), .unchanged))
+        rows.append(row("an-employer-that-is-no-quote-stays-no-quote", "the description says the nursery: a nursery is no quote, and nursery is not made one",
+                        "I worked at the nursery.", CVData(experience: [job("", "a nursery")]), .exactly(CVData())))
         return rows
     }
 

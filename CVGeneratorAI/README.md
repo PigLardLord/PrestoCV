@@ -46,6 +46,8 @@ are its planned replacement and are still empty.
     English "per shift" no Italian "per", German "seit Mai" no Italian "mai" (never). A word of another language that the
     description's language does not have keeps its meaning.
   - A skill that is also one of the draft's interests ("chess", "hiking") is a hobby, and is dropped; the interest stays.
+  - An employer or a school loses a leading indefinite article written in lower case ("a nursery" is "nursery"); an article
+    with a capital is part of a name ("UNA Hotels").
 - **The order of a CV.** The use case lists the jobs that go on now first, then the others by their latest year (the end,
   else the start), the newest first, as the grounded draft gives the years. A job with no year keeps its place among the
   others, and so do jobs of the same year.
