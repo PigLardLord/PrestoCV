@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1513
+    static let rowsWhenWritten = 1531
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -483,6 +483,7 @@ enum GroundingRows {
         rows += hobbiesOfThePersonAlone()
         rows += factsTheDescriptionWithdraws()
         rows += wishesInAPhrase()
+        rows += personalFieldsOfAClaim()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3419,6 +3420,42 @@ enum GroundingRows {
                         "I'd used Swift for years.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
         rows.append(row("wurde-without-gern-is-a-claim", "ich wurde geschult is a fact: the skill stays",
                         "Ich wurde in Python geschult.", CVData(skills: [Skill(name: "Python")]), .unchanged, language: "de"))
+        return rows
+    }
+
+    /// The person's headline title and place count only in a clause that claims them (#202), like a skill: "I would like to work as a
+    /// nurse in Turin" gives neither nurse nor Turin. The name stays wherever the person gives it.
+    private static func personalFieldsOfAClaim() -> [GroundingRow] {
+        typealias Variant = (language: String, wished: String, claimed: String, title: String, wishedTitle: String, place: String)
+        var variants: [Variant] = []
+        variants.append(("en", "I'm Maria Rossi, a teacher. I would like to work as a nurse in Turin.",
+                         "I'm Maria Rossi. I work as a nurse in Turin.", "teacher", "nurse", "Turin"))
+        variants.append(("it", "Sono Maria Rossi, insegnante. Vorrei lavorare come infermiera a Torino.",
+                         "Sono Maria Rossi. Lavoro come infermiera a Torino.", "insegnante", "infermiera", "Torino"))
+        variants.append(("de", "Ich bin Maria Rossi, Lehrerin. Ich möchte als Krankenschwester in Turin arbeiten.",
+                         "Ich bin Maria Rossi. Ich arbeite als Krankenschwester in Turin.", "Lehrerin", "Krankenschwester", "Turin"))
+        variants.append(("es", "Soy Maria Rossi, maestra. Quiero trabajar como enfermera en Turín.",
+                         "Soy Maria Rossi. Trabajo como enfermera en Turín.", "maestra", "enfermera", "Turín"))
+        variants.append(("fr", "Je suis Maria Rossi, enseignante. Je voudrais travailler comme infirmière à Turin.",
+                         "Je suis Maria Rossi. Je travaille comme infirmière à Turin.", "enseignante", "infirmière", "Turin"))
+        variants.append(("pt", "Sou Maria Rossi, professora. Quero trabalhar como enfermeira em Turim.",
+                         "Sou Maria Rossi. Trabalho como enfermeira em Turim.", "professora", "enfermeira", "Turim"))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-wished-place-is-not-the-persons-\(v.language)",
+                            "the title is the person's; the place stands only in a wish: the name and the title stay, the place goes",
+                            v.wished, CVData(personalInfo: person(name: "Maria Rossi", location: v.place, title: v.title)),
+                            .exactly(CVData(personalInfo: person(name: "Maria Rossi", title: v.title))), language: v.language))
+            rows.append(row("a-wished-title-is-not-the-persons-\(v.language)",
+                            "the title and the place stand only in a wish: the name stays, the title and the place go",
+                            v.wished, CVData(personalInfo: person(name: "Maria Rossi", location: v.place, title: v.wishedTitle)),
+                            .exactly(CVData(personalInfo: person(name: "Maria Rossi"))), language: v.language))
+            rows.append(row("a-claimed-title-and-place-stay-\(v.language)",
+                            "the person works as a nurse in the place: the name, the title and the place stay",
+                            v.claimed, CVData(personalInfo: person(name: "Maria Rossi", location: v.place, title: v.wishedTitle)),
+                            .unchanged, language: v.language))
+        }
         return rows
     }
 

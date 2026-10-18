@@ -24,8 +24,8 @@ import Foundation
 ///   contact, only as a label ("Email: ..."), the person's possession of the field ("My email is ..."), a verb of contacting whose
 ///   object is the person ("You can reach me at ...") or the person as reachable ("I can be reached at ...") gives it, with no other
 ///   person named ("I can put you in touch with the recruiter at ..." gives none), and never from the references on;
-/// - a language, a skill and an interest are kept only as a clause that claims them gives them: one that denies, wishes or supposes
-///   ("I have never used Python", "I would like to learn Spanish") gives none;
+/// - a language, a skill, an interest and the person's headline title and place are kept only as a clause that claims them gives
+///   them: one that denies, wishes or supposes ("I have never used Python", "I would like to work as a nurse in Turin") gives none;
 /// - prose in another language than the description's is dropped, when a language detector is given;
 /// - a description in English or German is grounded only with the device's lexical class of its language (`LexicalClasses`): without
 ///   it, nothing is grounded and `CVGenerationError.languageDataUnavailable` says which language data the device needs.
@@ -83,7 +83,7 @@ public struct CVDataSanitizer: Sendable {
         let interests = unique(cvData.interests.compactMap(claimed.named)) { $0 }
 
         return CVData(
-            personalInfo: sanitize(cvData.personalInfo, jobTitles: jobTitles, spoken, contacts: entries.contacts(in: source)),
+            personalInfo: sanitize(cvData.personalInfo, jobTitles: jobTitles, spoken, claimed: claimed, contacts: entries.contacts(in: source)),
             summary: source.grounded(cvData.summary, quoting: entries.summaryQuotes, allowsNumbers: false),
             experience: sanitize(entries.jobs, source, entries),
             education: sanitize(entries.studies, source, entries),
@@ -99,8 +99,14 @@ public struct CVDataSanitizer: Sendable {
     /// The name must not be a title: for "I'm a nurse" the model writes "Nurse" as the name, and the description does
     /// contain the word.
     ///
-    /// - Parameter contacts: What the email, the phone and the links are looked up in, when it is not `source`.
-    private func sanitize(_ info: PersonalInfo, jobTitles: [String], _ source: DescriptionText, contacts: DescriptionText? = nil) -> PersonalInfo {
+    /// - Parameters:
+    ///   - claimed: What the headline title and the place are looked up in, when it is not `source`: the clauses that claim them,
+    ///     so "I would like to work as a nurse in Turin" gives neither.
+    ///   - contacts: What the email, the phone and the links are looked up in, when it is not `source`.
+    private func sanitize(
+        _ info: PersonalInfo, jobTitles: [String], _ source: DescriptionText, claimed: DescriptionText? = nil, contacts: DescriptionText? = nil
+    ) -> PersonalInfo {
+        let claimed = claimed ?? source
         let contacts = contacts ?? source
         let titles = ([info.title] + jobTitles.map { Optional($0) }).compactMap { $0.presentValue }.map { DescriptionText.normalized($0) }
         let name = source.named(info.name).flatMap { titles.contains(DescriptionText.normalized($0)) ? nil : $0 }
@@ -109,11 +115,11 @@ public struct CVDataSanitizer: Sendable {
             name: name,
             email: contacts.supportedEmail(info.email),
             phone: contacts.supportedPhone(info.phone),
-            location: source.named(info.location),
+            location: claimed.named(info.location),
             website: contacts.supportedLink(info.website),
             linkedin: contacts.supportedLink(info.linkedin),
             github: contacts.supportedLink(info.github),
-            title: source.named(info.title)
+            title: claimed.named(info.title)
         )
     }
 

@@ -45,11 +45,11 @@ are its planned replacement and are still empty.
     of the six languages, and another word in the description's, is that other word: French "j'ai" holds no Italian "ai",
     English "per shift" no Italian "per", German "seit Mai" no Italian "mai" (never). A word of another language that the
     description's language does not have keeps its meaning.
-  - Skills, interests and languages count only in a clause of the person that claims them. A clause that denies, doubts,
-    wishes or supposes ("I have never used Python", "I would like to learn Spanish", "I'd like to", "Ich würde gern", "Sogno
-    di", "If I had time, I would play chess") claims nothing, and so does a clause that depends on it; "can", "mostly" and
-    "partly" still claim ("I can speak French"), and a negation beside a word of level denies only the level ("I am not an
-    expert in Swift" keeps Swift).
+  - Skills, interests, languages and the person's headline title and place count only in a clause of the person that claims
+    them. A clause that denies, doubts, wishes or supposes ("I have never used Python", "I would like to work as a nurse in
+    Turin", "I'd like to", "Ich würde gern", "Sogno di", "If I had time, I would play chess") claims nothing, and so does a
+    clause that depends on it; "can", "mostly" and "partly" still claim ("I can speak French"), and a negation beside a word
+    of level denies only the level ("I am not an expert in Swift" keeps Swift).
   - A skill that is also one of the draft's interests, and that the person mentions only as leisure ("In my free time I like
     chess and hiking"), is a hobby, and is dropped; the interest stays. A skill the person claims anywhere else ("proficient
     in Python", a job's clause, a list of skills) stays. Another person's clause ("My sister teaches chess") counts for
