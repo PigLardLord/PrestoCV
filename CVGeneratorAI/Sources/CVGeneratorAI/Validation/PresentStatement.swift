@@ -9,8 +9,10 @@ enum PresentStatement {
     ///   - text: The clause, with the clauses of nothing but time next to it, as `DescriptionText.normalized` writes it.
     ///   - sentenceYears: How many different years the sentence writes in the clauses that count for the entry: those that back an
     ///     entry or join this one.
-    static func holds(in text: String, sentenceYears: Int) -> Bool {
-        guard distinctYears(in: text) < 2, !DescriptionText.hedgesOrNegates(text), !DescriptionText.containsAny(StatementWords.ends, in: text) else { return false }
+    ///   - language: The language of the description, when it is known: a hedge of another language may be a word of it ("Mai").
+    static func holds(in text: String, sentenceYears: Int, language: Vocabulary.Language? = nil) -> Bool {
+        guard distinctYears(in: text) < 2, !DescriptionText.hedgesOrNegates(text, language: language),
+              !DescriptionText.containsAny(StatementWords.ends, in: text) else { return false }
 
         if DescriptionText.containsAny(StatementWords.presents, in: text) {
             return true

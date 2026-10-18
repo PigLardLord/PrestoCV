@@ -110,13 +110,30 @@ enum Vocabulary {
         }
     }
 
-    /// Words that mean something else in another language, so that they are explained only when the description is in one of
-    /// the languages named: Portuguese "no" is "in the", but English and Spanish "no" is a negation, and Italian "mai" is "never"
-    /// where German and French "mai" is a month.
+    /// Words that mean one thing in the languages named and another in the rest. In a description in one of the languages named
+    /// they are words of their own: explained when a list of that language holds them, and no word of negation, doubt, wish, future,
+    /// condition or hedge. In a description in another language, or in one whose language is not known, they are the other
+    /// languages' words. Portuguese "no" is "in the", where English and Spanish "no" is a negation; German and French "mai" is a
+    /// month, where Italian "mai" is "never"; English "fast" is quick, where German "fast" is "almost"; Italian "casi" are cases,
+    /// where Spanish "casi" is "almost"; Spanish and French "se" is "oneself", where Italian and Portuguese "se" is "if".
     private static let onlyIn: [String: Set<Language>] = [
         "no": [.portuguese],
         "mai": [.german, .french],
+        "fast": [.english],
+        "falls": [.english],
+        "plan": [.spanish, .french],
+        "plans": [.french],
+        "casi": [.italian],
+        "sera": [.italian],
+        "se": [.spanish, .french],
+        "si": [.italian, .portuguese],
     ]
+
+    /// Whether `word` is, in a description in `language`, a word of that language of its own, and not the word another language
+    /// writes the same (`onlyIn`): German "Mai" is a month, and no Italian "mai".
+    static func isOwnWord(_ word: String, in language: Language?) -> Bool {
+        language.map { onlyIn[word]?.contains($0) == true } ?? false
+    }
 
     private static let everyWord: Set<String> = union { $0.all }
 
@@ -177,12 +194,13 @@ enum Vocabulary {
     ]
 
     /// Which of the words are words of negation, doubt or degree, wish or intention, future or condition (`Words.modality`), and
-    /// "n't" for a "t" after "don", "isn", "can"... Portuguese "no" is "in the", and German and French "mai" is a month.
+    /// "n't" for a "t" after "don", "isn", "can"... A word that the description's language has of its own is none (`isOwnWord`):
+    /// Portuguese "no" is "in the", German and French "mai" is a month, English "fast" is quick.
     static func modality(in words: [Word], language: Language? = nil) -> Set<String> {
         var found = Set<String>()
         for (index, word) in words.enumerated() {
             if everyModalityWord.contains(word.folded) {
-                if !(language.map { onlyIn[word.folded]?.contains($0) } == true) { found.insert(word.folded) }
+                if !isOwnWord(word.folded, in: language) { found.insert(word.folded) }
             } else if word.folded == "t", index > 0, beforeNT.contains(words[index - 1].folded) {
                 found.insert("n't")
             }
