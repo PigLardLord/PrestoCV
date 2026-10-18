@@ -88,3 +88,25 @@ Check once that a failing test stops a build: open a pull request that breaks on
 2. Xcode Cloud starts the `Release` workflow. Follow it in Xcode (Report navigator, Cloud tab) or in App Store Connect under Xcode Cloud. If the build fails with a message from `ci_pre_xcodebuild`, the tag or branch does not name a version: fix the name and start again.
 3. Wait for the build in TestFlight. App Store Connect has to process it first, which takes a few minutes. Install it on a device and test it.
 4. In App Store Connect, open the app's version 1.2.3 (create it with + if it does not exist), choose the build, and click Add for Review, then submit it to App Review. The texts of the product page and the notes for App Review are in [store-listing.md](store-listing.md).
+
+## Reproducing a test build on a Mac
+
+When the Test action fails while building, run the build Xcode Cloud runs, on a Mac with Xcode 27, from the repository root:
+
+```bash
+xcodebuild build-for-testing -scheme PrestoCV -project PrestoCV.xcodeproj \
+  -destination 'platform=iOS Simulator,id=<iPhone 17 Pro>' -destination 'platform=iOS Simulator,id=<iPad Pro 13-inch (M5)>' \
+  -testPlan CI -derivedDataPath <empty directory> \
+  CODE_SIGN_IDENTITY=- AD_HOC_CODE_SIGNING_ALLOWED=YES COMPILER_INDEX_STORE_ENABLE=NO
+```
+
+`xcrun simctl list devices available` gives the ids. Take the simulators of the latest iOS runtime; if it has none of that model, create one with `xcrun simctl create "iPhone 17 Pro" "iPhone 17 Pro" <runtime id>`, the runtime id from `xcrun simctl list runtimes`. To run the tests as well, use `test` instead of `build-for-testing`.
+
+| Argument | Why |
+|---|---|
+| `build-for-testing`, `-testPlan CI`, both destinations | They build what the Test action builds: the app, the plan's test bundles and every package target they use, for the iPhone and the iPad. |
+| `-derivedDataPath` | An empty directory, as on Xcode Cloud, so nothing built earlier hides a failure. |
+| `CODE_SIGN_IDENTITY=-`, `AD_HOC_CODE_SIGNING_ALLOWED=YES` | Ad hoc signing, as Xcode Cloud signs a test build, whatever the project's or the Mac's signing settings. |
+| `COMPILER_INDEX_STORE_ENABLE=NO` | No index, as on Xcode Cloud. The build is faster. |
+
+Ad hoc signing matters because it signs every bundle the plan builds: the app, the test bundles and the resource bundle of each package target, and `codesign` checks the layout of each one. The package tests cannot show a layout that `codesign` rejects in an iOS bundle ([R15](../architecture/rules.md#r15-resource-bundles-have-a-layout-every-platform-can-sign)): on macOS, `swift test` makes deep bundles, with the resources under `Contents/Resources`, and on Linux nothing is signed. Only the signed iOS build shows it, as `CodeSign …/CVPDFExporter_CVRendering.bundle` followed by `bundle format unrecognized, invalid, or unsuitable` (#240). Xcode 27.1 also signs a simulator build ad hoc when the two settings are left out, so that build fails the same way; passing them keeps the build the same as Xcode Cloud's whatever the Mac's settings.
