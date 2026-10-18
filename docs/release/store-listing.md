@@ -17,8 +17,9 @@ The texts of PrestoCV's App Store product page for version 1.0, one section per 
 | Secondary category | Productivity (already set) |
 | Age rating | 4+ (already set) |
 | App Privacy | Data Not Collected (already set) |
-| Support URL | `https://piglardlord.github.io/prestocv-site/`, **pending publication**: it returns 404 on 2026-10-18. Apple requires the support page to show contact information. |
-| Privacy Policy URL | `https://piglardlord.github.io/prestocv-site/privacy.html`, **pending publication**: it returns 404 on 2026-10-18. |
+| Support URL | `https://prestocv.app` (already set). Apple requires the support page to show contact information: it gives `support@prestocv.app`, which must deliver to the owner before the app is submitted. |
+| Marketing URL | `https://prestocv.app` (already set). |
+| Privacy Policy URL | `https://prestocv.app/privacy.html`, in every localization (already set). |
 | Sign-in required (App Review Information) | No |
 | Screenshots | iPhone and iPad sets. The captions of each locale name the iPhone; in the iPad set, "iPhone" becomes "iPad", and the rest of the sentence stays as it is in every language. |
 
