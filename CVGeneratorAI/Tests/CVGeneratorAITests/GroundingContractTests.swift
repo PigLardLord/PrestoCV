@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1407
+    static let rowsWhenWritten = 1408
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -452,6 +452,7 @@ enum GroundingRows {
         rows += employerPrepositionsOfTheDescriptionsLanguage()
         rows += wordsOfAnotherLanguageStateNothing()
         rows += titlesInANeutralClause()
+        rows += aWordOfStudyingInTheClauseOfATitle()
         rows += negationInProse()
         rows += orderInProse()
         rows += oneClauseOfProse()
@@ -1460,6 +1461,17 @@ enum GroundingRows {
                             .exactly(CVData(experience: [current("")])), language: v.language))
         }
         return rows
+    }
+
+    /// "Ensino fundamental" (primary school) is a word of studying (#202): the clause of the person's title holds only explained
+    /// words, so the job's shorter title, quoted there, stays.
+    private static func aWordOfStudyingInTheClauseOfATitle() -> [GroundingRow] {
+        [row("a-word-of-studying-in-the-clause-of-a-title-pt",
+             "fundamental, of ensino fundamental, is a word of studying: the clause of the title is explained, and professora stays",
+             "Sou Maria Rossi, professora do ensino fundamental em Bolonha. Desde 2016 leciono na escola Don Milani.",
+             CVData(personalInfo: person(name: "Maria Rossi", location: "Bolonha"),
+                    experience: [job("professora", "escola Don Milani", from: "2016", current: true)]),
+             .unchanged, language: "pt")]
     }
 
     // MARK: Prose is explained clause by clause (d)
