@@ -65,10 +65,15 @@ for t in config.targets where !FileManager.default.fileExists(atPath: root.appen
     problems.append("target \(t.name): path \(t.path) does not exist")
 }
 var files: [String] = []
-if let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isSymbolicLinkKey]) {
+if let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isSymbolicLinkKey, .isDirectoryKey]) {
     for case let url as URL in e {
         let rel = url.standardizedFileURL.path.replacingOccurrences(of: root.path + "/", with: "")
-        if rel.hasPrefix(".git") || rel.contains("/.build") || rel.hasPrefix(".build") { e.skipDescendants(); continue }
+        if rel.hasPrefix(".git") || rel.contains("/.build") || rel.hasPrefix(".build") {
+            // Only a directory's descendants are skipped: on Darwin, skipDescendants() after a file, such as .gitignore,
+            // skips the next directory instead, and that directory's files would go unchecked.
+            if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true { e.skipDescendants() }
+            continue
+        }
         if (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
             problems.append("symbolic link in the source tree: \(rel)"); continue
         }

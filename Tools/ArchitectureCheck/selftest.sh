@@ -281,6 +281,11 @@ expect "an exception citing a missing ADR is an error" 1 "does not exist"
 # --- inventory
 setup; src 'let x = 1'; mkdir -p "$ROOT/Sources/Stray"; echo 'let s = 1' > "$ROOT/Sources/Stray/S.swift"
 expect "a file outside every target is an error" 1 "unmapped file"
+# On Darwin, skipDescendants() after a file skips the next directory: .gitignore hid PrestoCVTests on a Mac (#246). On
+# APFS, .buildinfo is listed before Nested, so a folder that holds only the two shows it on every Mac.
+setup; src 'let x = 1'; mkdir -p "$ROOT/Sources/Pure/Generated/Nested"; touch "$ROOT/Sources/Pure/Generated/.buildinfo"
+echo 'let d = Date()' > "$ROOT/Sources/Pure/Generated/Nested/N.swift"
+expect "inventory: the folder after a skipped file is still checked" 1 "Sources/Pure/Generated/Nested/N.swift:1: R2 wallClock"
 setup; src 'let x = 1'; ln -s "$ROOT/Sources/Other" "$ROOT/Sources/Pure/Linked"
 expect "a symbolic link in the source tree is an error" 1 "symbolic link"
 setup; src 'let x = 1'
