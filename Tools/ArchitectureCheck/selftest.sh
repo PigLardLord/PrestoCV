@@ -19,11 +19,11 @@ P
   cat > "$ROOT/rules.json" <<'J'
 {"rules":{"R1":["exportedImport"],"R2":["wallClock","randomIdentity","ambientEnvironment","localization","printing"],
   "R4":["singleton","infrastructureConstruction"],"R7":["swallowedError"],"R9":["escapeHatch"],"R11":["platformCondition"],
-  "R14":["testDouble"],"R9m":["swift5Mode","unsafeFlags"]},
+  "R14":["testDouble"],"R9m":["swift5Mode","unsafeFlags"],"R15":["bundleLayout"]},
  "infrastructureTypes":["FileStore"],
  "targets":[{"name":"Pure","path":"Sources/Pure","allowedImports":["Foundation"],"rules":["R1","R2","R4","R7","R9","R11","R14"]},
             {"name":"Other","path":"Sources/Other","allowedImports":["Foundation"],"rules":[]},
-            {"name":"Manifest","path":"Package.swift","kind":"manifest","allowedImports":["PackageDescription"],"rules":["R9m"]}]}
+            {"name":"Manifest","path":"Package.swift","kind":"manifest","allowedImports":["PackageDescription"],"rules":["R9m","R15"]}]}
 J
   echo '[]' > "$ROOT/baseline.json"
 }
@@ -217,6 +217,23 @@ expect "packages: a Swift 5 mode for one platform fails even when another settin
 legacy_only; printf '%s\n' '// swift-tools-version: 6.0' 'import PackageDescription' 'let five = "5"' \
   'let package = Package(name: "F", targets: [.target(name: "Pure", swiftSettings: [.swiftLanguageMode(.version(five))]), .target(name: "Other"), .target(name: "Old")])' > "$ROOT/Package.swift"
 expect "packages: an effective Swift 5 mode on a legacy target of this package is fine" 0 "" --packages .
+# A copied directory lands at the root of the resource bundle under its last path component. A name the bundle's own
+# structure uses fails codesign or loses the files (R15, #240); .process flattens a directory, so its name never lands there.
+for res in '.copy("Resources")' '.copy("Contents")' '.copy("resources")' '.copy("Assets/_CodeSignature")' '.copy("MacOS")' \
+           '.copy("Resources/")' '.copy("./Resources")' 'Resource.copy("Resources")' '.copy(#"Resources"#)' '.copy(folder)'; do
+  manifest_case "manifest: resources: [$res] is refused" 1 "R15 bundleLayout" '// swift-tools-version: 6.0' 'import PackageDescription' \
+    'let folder = "Headings"' "let package = Package(name: \"F\", targets: [.target(name: \"Pure\", resources: [$res]), .target(name: \"Other\")])"
+done
+for res in '.copy("Resources/Headings")' '.copy("../../Resources/Templates")' '.copy("Designs")' '.process("Resources")'; do
+  manifest_case "manifest: resources: [$res] is fine" 0 "" '// swift-tools-version: 6.0' 'import PackageDescription' \
+    "let package = Package(name: \"F\", targets: [.target(name: \"Pure\", resources: [$res]), .target(name: \"Other\")])"
+done
+manifest_case "manifest: a copied Resources in an Apple-only branch is refused on every host" 1 "Package.swift:5: R15 bundleLayout" \
+  '// swift-tools-version: 6.0' 'import PackageDescription' 'var targets: [Target] = [.target(name: "Pure"), .target(name: "Other")]' \
+  '#if !os(Linux)' 'targets[0] = .target(name: "Pure", resources: [.copy("Resources")])' '#endif' 'let package = Package(name: "F", targets: targets)'
+legacy_setup; printf '%s\n' '// swift-tools-version: 6.0' 'import PackageDescription' \
+  'let package = Package(name: "F", targets: [.target(name: "Pure"), .target(name: "Other"), .target(name: "Old", resources: [.copy("Resources")])])' > "$ROOT/Package.swift"
+expect "manifest: a legacy target's copied Resources is refused too, since its bundle is signed in the same build" 1 "R15 bundleLayout"
 # --- baseline: occurrences, stability, monotonicity
 setup; src 'func a() { fatalError("x") }'
 "$CHECK" "$ROOT" --rules "$ROOT/rules.json" --baseline "$ROOT/baseline.json" --adr-dir "$ROOT/adr" --write-baseline >/dev/null

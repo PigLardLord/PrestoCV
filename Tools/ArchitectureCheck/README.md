@@ -33,6 +33,7 @@ chmod +x .githooks/pre-commit.d/architecture-check
 - **A permanent exception:** an entry in `exceptions` that cites an ADR.
 - **A temporary one:** a baseline entry. The baseline may only shrink.
 - **Legacy targets** are exempt until they are deleted (ADR 0012).
+- **The resource layout (R15) is checked in legacy declarations too:** a legacy target's bundle is signed in the same build as the others.
 - **`Prototypes/` is excluded.**
 - **Module qualifiers do not hide a name:** `Swift.fatalError` and `Foundation.Date()` are checked like `fatalError` and `Date()`.
 - **The language mode is checked twice.** The syntax catches any spelling below 6, in every `#if` branch, including a tools version below 6. `--packages` also checks the effective mode that SwiftPM computes.
