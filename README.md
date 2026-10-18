@@ -1,6 +1,17 @@
 # PrestoCV
 
-A SwiftUI app for iOS and macOS. You write your CV once and export it as a PDF in any of several designs. AI drafting on the device is optional.
+PrestoCV is a CV and résumé app for iPhone and iPad, written in SwiftUI. You write your CV once and export it as a PDF in any of several designs. Where the device supports Apple's Foundation Models, the app can also write a first draft on the device from a description in your own words. The app is in English, German, Spanish, French, Italian and Portuguese, and so are the headings of the documents it exports. A macOS version is part of the target architecture ([ADR 0004](docs/architecture/adr/0004-native-multiplatform-app.md)).
+
+The source is open under the [Apache License 2.0](LICENSE). The name and the icon are not (see [License](#license)).
+
+## Privacy
+
+PrestoCV collects no data. It has no account, no analytics, no advertising and no server of its own:
+- the CVs and the unsaved edits stay on the device, in the app's `Application Support/PrestoCV` folder;
+- the AI draft is written on the device by Apple's Foundation Models, so the description is not sent anywhere;
+- a CV leaves the device only as a PDF that the person shares or saves.
+
+The privacy manifest, `PrestoCV/PrivacyInfo.xcprivacy`, declares no tracking and no collected data. A feature that sends data off the device would need its own ADR, and would change this section and the manifest in the same pull request.
 
 ## Name
 
@@ -12,19 +23,22 @@ Pre-production. The code is being rebuilt on a target architecture that is enfor
 - the architecture is in `docs/architecture/`;
 - the order of work is issue #98.
 
-The current app and packages are the legacy code the migration replaces, one context at a time.
+The current app and packages are the legacy code the migration replaces, one context at a time. Version 1, for the App Store, is the legacy app with its bugs fixed, for iOS only; the migration goes on after it ([ADR 0022](docs/architecture/adr/0022-ship-legacy-app-as-v1.md)).
 
 ## Where things are
 
 | Path | What it is |
 |---|---|
 | `docs/architecture/` | The target architecture: overview and migration strategy, rules R1–R14, modules and allowed imports, document markup contract, glossary, ADRs. |
-| `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). |
-| `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The current packages (legacy, being replaced). |
+| `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). The app icon is `PrestoCV/PrestoCV.icon` ([docs/design/app-icon.md](docs/design/app-icon.md)). |
+| `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The packages of the three contexts: CV Authoring, the design catalog and document rendering, and AI Drafting. Each holds its legacy targets, being replaced, and the new targets that replace them. |
+| `PrestoCVApp/` | The new app package: workflow ports, presentation, integration and the composition root. |
+| `CVPDFExporterExamples/` | The exporter's demos and template viewer, kept apart from the library. |
 | `Tools/ArchitectureCheck/` | The checker that enforces the rules, and its pre-commit hook. |
 | `Tools/Localization/` | `l10n_manager.py`, which adds, reads, lists, checks and updates the texts of the string catalog. Run it from the repository root. |
 | `ci_scripts/`, `TestPlans/`, `docs/release/` | The Xcode Cloud side of the releases: its build scripts, the test plans, and the settings of its workflows. |
 | `Prototypes/ADRValidation/` | The throwaway prototype that validated the ADRs. It is outside the app's build; its README says how to run it. |
+| `.github/` | The GitHub Actions workflow that runs the Linux checks, and the code owners of the architecture rules. |
 
 ## Building and testing
 
@@ -41,6 +55,8 @@ Tools/ArchitectureCheck/check.sh
 The scheme has two test plans. `PrestoCV`, the default, runs every test: the app's, the exporter package's simulator tests, and `PrestoCVUITests`. `CI` leaves out `PrestoCVUITests`, Xcode's template launch tests, which take most of an hour and check nothing.
 
 On Linux, the packages contain only the new targets. They build today and stay empty until the migration fills them; the architecture checker and the prototype also build and test there. The legacy targets are declared only on Apple hosts (ADR 0012).
+
+[CONTRIBUTING.md](CONTRIBUTING.md) lists every command a pull request runs, the other packages' tests and builds among them.
 
 ## Development data
 
@@ -64,9 +80,13 @@ The repository side is `ci_scripts/` (it sets an archive's version from its tag 
 
 ## Contributing
 
-- **Conventions, reviews, commits and pull requests:** `AGENTS.md`.
-- **A change that adds a target or a dependency between targets** updates `docs/architecture/modules.md` and `Tools/ArchitectureCheck/rules.json` in the same pull request.
+- **How to contribute:** [CONTRIBUTING.md](CONTRIBUTING.md): building and testing, the architecture rules and the checker, commits, and what a pull request needs.
+- **Conventions and reviews:** [AGENTS.md](AGENTS.md).
+- **Code of conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+- **Vulnerabilities:** report them privately, as [SECURITY.md](SECURITY.md) says, never in a public issue.
 
 ## License
 
-Copyright © 2024 PrestoCV. All rights reserved.
+Copyright 2026 Giovanni Trovato. The source is licensed under the [Apache License, Version 2.0](LICENSE).
+
+"PrestoCV" and the app icon are trademarks of Giovanni Trovato and are not licensed under it. A fork uses its own name and icon. [NOTICE](NOTICE) has the details and the components the project uses.

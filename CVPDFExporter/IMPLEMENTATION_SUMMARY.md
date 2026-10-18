@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document summarizes the complete implementation of the .mcvt (CV Template) delivery system, built following Test-Driven Development, Clean Architecture, and SOLID principles.
+This document summarizes the complete implementation of the .mcvt template delivery system, built following Test-Driven Development, Clean Architecture, and SOLID principles.
 
 ## Implementation Timeline
 

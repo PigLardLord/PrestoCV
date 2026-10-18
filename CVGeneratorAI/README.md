@@ -93,4 +93,4 @@ availability and errors (`FoundationModelsServiceTests`) needs macOS 26 with the
 
 ## License
 
-Part of the PrestoCV app.
+Part of PrestoCV. Copyright 2026 Giovanni Trovato. Licensed under the Apache License, Version 2.0: see [LICENSE](../LICENSE) and [NOTICE](../NOTICE) at the repository root.
