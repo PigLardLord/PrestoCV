@@ -416,13 +416,12 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1408
+    static let rowsWhenWritten = 1415
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
     static let notImplementedYet: Set<String> = [
-        "first-run-on-the-real-model-example-en", "first-run-on-the-real-model-example-it", "first-run-on-the-real-model-example-es",
-        "first-run-on-the-real-model-example-fr", "first-run-on-the-real-model-example-pt",
+        "first-run-on-the-real-model-example-en", "first-run-on-the-real-model-example-es", "first-run-on-the-real-model-example-fr",
     ]
 
     /// Rows whose desired output the sanitiser does not give, and whose leak the owner accepts as a residual risk (ADR 0023,
@@ -481,6 +480,7 @@ enum GroundingRows {
         rows += referencesAndTheReachablePerson()
         rows += bareNamesBeforeAVerblessContact()
         rows += namesInAFragmentBeforeAContact()
+        rows += hobbiesAreNoSkills()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3230,6 +3230,36 @@ enum GroundingRows {
                             "the subject of being reachable is another person: no email",
                             v.description, CVData(personalInfo: person(email: v.email)), .exactly(CVData()), language: v.language))
         }
+        return rows
+    }
+
+    // MARK: A hobby is no skill (#202)
+
+    /// The model lists the hobbies of the app's example (chess, hiking) as skills too: a skill claims an ability that the person
+    /// never claimed, so a skill whose name is an interest of the same draft goes, whatever its case or accents. The interest stays,
+    /// and so does a skill that only holds an interest's name.
+    private static func hobbiesAreNoSkills() -> [GroundingRow] {
+        typealias Variant = (language: String, interests: [String], skills: [String])
+        var variants: [Variant] = []
+        variants.append(("en", ["chess", "hiking"], ["Chess", "hiking"]))
+        variants.append(("it", ["scacchi", "escursioni"], ["scacchi", "Escursioni"]))
+        variants.append(("de", ["Schach", "Wandern"], ["schach", "Wandern"]))
+        variants.append(("es", ["ajedrez", "senderismo"], ["Ajedrez", "senderismo"]))
+        variants.append(("fr", ["échecs", "randonnée"], ["Echecs", "randonnee"]))
+        variants.append(("pt", ["xadrez", "caminhadas"], ["xadrez", "Caminhadas"]))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-hobby-is-no-skill-\(v.language)",
+                            "the skills are the interests of the same draft, in another case or without accents: they go, the interests stay",
+                            AppExample.text(in: v.language),
+                            CVData(skills: v.skills.map { Skill(name: $0, level: .beginner) }, interests: v.interests),
+                            .exactly(CVData(interests: v.interests)), language: v.language))
+        }
+        rows.append(row("a-skill-that-holds-a-hobby-stays",
+                        "chess coaching is a skill the person claims, though it holds the interest chess: it stays",
+                        "My skills include chess coaching and first aid. In my free time I like chess.",
+                        CVData(skills: [Skill(name: "chess coaching"), Skill(name: "first aid")], interests: ["chess"]), .unchanged))
         return rows
     }
 

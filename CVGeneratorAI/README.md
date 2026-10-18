@@ -45,6 +45,7 @@ are its planned replacement and are still empty.
     of the six languages, and another word in the description's, is that other word: French "j'ai" holds no Italian "ai",
     English "per shift" no Italian "per", German "seit Mai" no Italian "mai" (never). A word of another language that the
     description's language does not have keeps its meaning.
+  - A skill that is also one of the draft's interests ("chess", "hiking") is a hobby, and is dropped; the interest stays.
 - **On device.** The request, the description and the answer never leave the device.
 - **Typed outcomes.** Failures are `CVGenerationError` cases that the app explains in the person's language;
   cancellation is `CancellationError`, never an error case. Availability is an `AIAvailability` value with the reason
