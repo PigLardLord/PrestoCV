@@ -3,9 +3,10 @@ import Foundation
 import NaturalLanguage
 #endif
 
-/// Which words of a text the device's lexical class tells are verbs (ADR 0023, rule (c)). The framework tags the verbs of English and
-/// German, contractions included ("I'm" is "I" and "'m"); for the other languages it tags nothing, and `VerbForms` reads them. Where
-/// the framework is not there, no word is a verb.
+/// Which words of a text the device's lexical class tells are verbs (ADR 0023, rule (c)), contractions included ("I'm" is "I" and
+/// "'m"). Whether a device tags a language depends on the linguistic assets it has downloaded, so grounding asks it only where the
+/// contract holds with its tags, English and German (`VerbForms.readsVerbsByTags`). In Italian, Spanish, French and Portuguese no word
+/// is tagged on any device, whatever its assets, and `VerbForms` reads their verbs. Where the framework is not there, no word is a verb.
 enum LexicalClasses {
     /// What tags the words: the device's framework. A test gives another verdict for the task it runs, with `$tagger.withValue`.
     @TaskLocal static var tagger: any LexicalTagger = DeviceLexicalTagger()
@@ -14,9 +15,9 @@ enum LexicalClasses {
     ///
     /// - Parameters:
     ///   - text: The text the words were read from, so that their ranges are offsets of it.
-    ///   - language: The language of the text; with none, no word is tagged.
+    ///   - language: The language of the text; with none, or in Italian, Spanish, French or Portuguese, no word is tagged.
     static func verbs(in text: String, words: [Word], language: Vocabulary.Language?) -> Set<Int> {
-        guard let language, !words.isEmpty else { return [] }
+        guard let language, VerbForms.readsVerbsByTags(in: language), !words.isEmpty else { return [] }
 
         let verbs = tagger.verbs(in: text, language: language)
         return Set(words.indices.filter { index in verbs.contains { $0.contains(words[index].range.lowerBound) } })
