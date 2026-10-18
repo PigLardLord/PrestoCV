@@ -6,7 +6,7 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 
 | Document | Contents |
 |---|---|
-| [rules.md](rules.md) | The rules (R1–R14), why each exists, and how each is enforced |
+| [rules.md](rules.md) | The rules (R1–R15), why each exists, and how each is enforced |
 | [modules.md](modules.md) | Every package and target: responsibility, allowed dependencies, platforms |
 | [glossary.md](glossary.md) | The vocabulary used in code, UI copy and tickets |
 | [markup-contract.md](markup-contract.md) | The HTML structure designs may style, versioned |

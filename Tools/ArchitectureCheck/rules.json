@@ -34,6 +34,9 @@
   "R9m": [
    "swift5Mode",
    "unsafeFlags"
+  ],
+  "R15": [
+   "bundleLayout"
   ]
  },
  "infrastructureTypes": [
@@ -649,7 +652,8 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "R9m",
+    "R15"
    ]
   },
   {
@@ -660,7 +664,8 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "R9m",
+    "R15"
    ]
   },
   {
@@ -671,7 +676,8 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "R9m",
+    "R15"
    ]
   },
   {
@@ -682,7 +688,8 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "R9m",
+    "R15"
    ]
   },
   {
@@ -693,7 +700,8 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "R9m",
+    "R15"
    ]
   },
   {
@@ -704,7 +712,8 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "R9m",
+    "R15"
    ]
   }
  ]

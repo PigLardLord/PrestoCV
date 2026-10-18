@@ -156,8 +156,10 @@ for (file, target) in assignment where target.kind != "legacy" {
     let rulesFor = detectorToRules(target)
     for hit in scanner.hits {
         // Inside a manifest, the declaration of a legacy target is exempt like its sources (ADR 0012); anything
-        // else in the manifest, including package-level settings and new targets, is checked.
-        if target.kind == "manifest", let owner = hit.packageTarget, isLegacyDeclaration(owner, inManifest: file) { continue }
+        // else in the manifest, including package-level settings and new targets, is checked. A legacy target's resource
+        // layout is checked too, because its bundle is signed in the same build as the new targets' (R15).
+        if target.kind == "manifest", hit.detector != "bundleLayout", let owner = hit.packageTarget,
+           isLegacyDeclaration(owner, inManifest: file) { continue }
         for rule in rulesFor[hit.detector] ?? [] { record(rule: rule, detector: hit.detector, detail: hit.detail, node: hit.node, line: hit.line) }
     }
     // A tools version below 6 builds every target without an explicit mode in Swift 5 mode. Only a manifest
