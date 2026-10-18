@@ -199,16 +199,19 @@ struct VocabularyTests {
         #expect(!withdraws("I'd used Swift for years", .english), "I had used")
         #expect(withdraws("Ich würde gern Spanisch lernen", .german) && withdraws("Ich würde sehr gerne Spanisch lernen", .german))
         #expect(!withdraws("Ich wurde befördert", .german) && !withdraws("Ich wurde Ingenieur", .german))
+        #expect(withdraws("Gerne würde ich Spanisch lernen", .german) && withdraws("Lieber würde ich arbeiten", .german))
+        #expect(withdraws("Davon träume ich", .german) && withdraws("Von Spanien träume ich", .german))
         #expect(withdraws("Ich träume davon", .german) && !withdraws("Mein Traum war Spanisch", .german))
         #expect(withdraws("Sogno di imparare lo spagnolo", .italian) && !withdraws("Era un sogno", .italian))
         #expect(withdraws("Sueño con hablar francés", .spanish) && withdraws("Je rêve d'apprendre l'espagnol", .french))
         #expect(withdraws("Sonho em falar francês", .portuguese) && withdraws("Sonho com aprender italiano", .portuguese))
     }
 
-    @Test("A phrase of the modality lists is two words joined by an underscore", arguments: Vocabulary.Language.allCases)
+    @Test("A phrase of the modality lists is two words joined by an underscore, or by a tilde in either order",
+          arguments: Vocabulary.Language.allCases)
     func modalityPhrasesHaveTwoWords(language: Vocabulary.Language) {
-        for phrase in language.words.modality where phrase.contains("_") {
-            let parts = phrase.split(separator: "_", omittingEmptySubsequences: false)
+        for phrase in language.words.modality where phrase.contains("_") || phrase.contains("~") {
+            let parts = phrase.split(omittingEmptySubsequences: false, whereSeparator: { $0 == "_" || $0 == "~" })
             #expect(parts.count == 2 && parts.allSatisfy { !$0.isEmpty && DescriptionText.normalized(String($0)) == String($0) }, "\(phrase)")
         }
     }

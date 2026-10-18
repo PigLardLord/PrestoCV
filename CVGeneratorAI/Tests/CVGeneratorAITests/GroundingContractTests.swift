@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1546
+    static let rowsWhenWritten = 1554
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -3418,6 +3418,28 @@ enum GroundingRows {
             rows.append(row("a-wish-in-a-phrase-claims-no-language-\(v.id)", "the phrase only wishes the language: no language",
                             v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
         }
+        typealias Fronted = (word: String, description: String, name: String, person: String, title: String, place: String)
+        var fronted: [Fronted] = []
+        fronted.append(("gerne", "Gerne würde ich Spanisch lernen.", "Spanisch",
+                        "Ich bin Maria Rossi. Gerne würde ich als Lehrerin in Berlin arbeiten.", "Lehrerin", "Berlin"))
+        fronted.append(("gern", "Gern würde ich Italienisch lernen.", "Italienisch",
+                        "Ich bin Maria Rossi. Gern würde ich als Krankenschwester in Turin arbeiten.", "Krankenschwester", "Turin"))
+        fronted.append(("lieber", "Lieber würde ich Französisch sprechen.", "Französisch",
+                        "Ich bin Maria Rossi. Lieber würde ich als Lehrer in Berlin arbeiten.", "Lehrer", "Berlin"))
+        for v in fronted {
+            rows.append(row("a-fronted-wish-claims-no-language-\(v.word)-de", "\(v.word) comes before würde, and it still only wishes: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: "de"))
+            rows.append(row("a-fronted-wish-gives-no-title-or-place-\(v.word)-de",
+                            "\(v.word) comes before würde, and it still only wishes: the name stays, the title and the place go",
+                            v.person, CVData(personalInfo: person(name: "Maria Rossi", location: v.place, title: v.title)),
+                            .exactly(CVData(personalInfo: person(name: "Maria Rossi"))), language: "de"))
+        }
+        rows.append(row("a-fronted-dream-claims-no-language-de", "von comes before träume, and it still only dreams: no language",
+                        "Von fließendem Spanisch träume ich.", CVData(languages: [Language(name: "Spanisch")]), .exactly(CVData()),
+                        language: "de"))
+        rows.append(row("a-fronted-gerne-before-a-past-is-an-accepted-loss-de",
+                        "gerne before wurde reads as a wish, though here it is a past: the skill goes, an accepted loss",
+                        "Gerne wurde ich in Python geschult.", CVData(skills: [Skill(name: "Python")]), .exactly(CVData()), language: "de"))
         rows.append(row("a-past-participle-after-d-is-a-claim", "I'd used is I had used: the skill stays",
                         "I'd used Swift for years.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
         rows.append(row("wurde-without-gern-is-a-claim", "ich wurde geschult is a fact: the skill stays",

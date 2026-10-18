@@ -47,10 +47,10 @@ are its planned replacement and are still empty.
     description's language does not have keeps its meaning.
   - Skills, interests, languages and the person's headline title and place count only in a clause of the person that claims
     them. A clause that denies, doubts, wishes or supposes ("I have never used Python", "I would like to work as a nurse in
-    Turin", "I'd like to", "Ich würde gern", "Sogno di", "If I had time, I would play chess") claims nothing, and so does a
-    clause that depends on it; "can", "mostly" and "partly" still claim ("I can speak French"), and a negation that governs a
-    word of level denies only the level ("I am not an expert in Swift" keeps Swift; "I cannot speak German even at a basic
-    level" gives no German).
+    Turin", "I'd like to", "Ich würde gern" or "Gerne würde ich", "Sogno di", "If I had time, I would play chess") claims
+    nothing, and so does a clause that depends on it; "can", "mostly" and "partly" still claim ("I can speak French"), and a
+    negation that governs a word of level denies only the level ("I am not an expert in Swift" keeps Swift; "I cannot speak
+    German even at a basic level" gives no German).
   - A skill that is also one of the draft's interests, and that the person mentions only as leisure ("In my free time I like
     chess and hiking"), is a hobby, and is dropped; the interest stays. A skill the person claims anywhere else ("proficient
     in Python", a job's clause, a list of skills) stays. Another person's clause ("My sister teaches chess") counts for
