@@ -22,6 +22,9 @@
       }
     },
     {
+      "skippedTests" : [
+        "StoreScreenshotsUITests"
+      ],
       "target" : {
         "containerPath" : "container:PrestoCV.xcodeproj",
         "identifier" : "23E2E8BD27562C02000F2E5D",
