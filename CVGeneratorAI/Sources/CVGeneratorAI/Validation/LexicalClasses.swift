@@ -6,7 +6,9 @@ import NaturalLanguage
 /// Which words of a text the device's lexical class tells are verbs (ADR 0023, rule (c)), contractions included ("I'm" is "I" and
 /// "'m"). Whether a device tags a language depends on the linguistic assets it has downloaded, so grounding asks it only where the
 /// contract holds with its tags, English and German (`VerbForms.readsVerbsByTags`). In Italian, Spanish, French and Portuguese no word
-/// is tagged on any device, whatever its assets, and `VerbForms` reads their verbs. Where the framework is not there, no word is a verb.
+/// is tagged on any device, whatever its assets, and `VerbForms` reads their verbs. A device without the assets of English or German,
+/// such as a new iOS simulator, tags no word of theirs either: grounding then mostly drops facts, but it can also take a wish, a plan
+/// or another person's statement for the person's fact (ADR 0023). Where the framework is not there, no word is a verb.
 enum LexicalClasses {
     /// What tags the words: the device's framework. A test gives another verdict for the task it runs, with `$tagger.withValue`.
     @TaskLocal static var tagger: any LexicalTagger = DeviceLexicalTagger()
