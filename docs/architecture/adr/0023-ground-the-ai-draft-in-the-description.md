@@ -134,6 +134,10 @@
 
 - **Thinner drafts.** A clause that holds descriptive words the user did not tie to a job, such as "a busy hospital", backs no facts.
 - **Little prose.** The model paraphrases, so most of its summary and role sentences are dropped. What stays is the user's own wording. The draft's value is in its structure: entries, dates, skills, languages and quoted achievements.
+- **Accepted readings of a claim (c).** Two readings of the claim rule are accepted as they are:
+  - **A negation beside a word of level denies the level only.** So "I have never been fluent in German" keeps German, without a level, as "I am not an expert in Swift" keeps Swift.
+  - **A condition at the start of a clause makes the rest of its sentence a supposition**, habits included: "If I have time, I play chess" and "Wenn ich nicht arbeite, spiele ich Schach" give no chess.
+- **An accepted loss (c).** "could" and German "konnte", which folds with "könnte", withdraw a claim, so "I could already read Latin at school" gives no Latin. Losing beats inventing (f).
 - **A residual risk in four languages.** The device tags no verbs in Italian, Spanish, French or Portuguese. So a wish stated after the name, with no infinitive and no factual verb ("Presso Acme sogno dal 2027"), can keep an entry. The entry holds only the quoted name: that clause backs no date, figure or achievement. Reading words after a verbless name as unexplained would drop real certifications and degrees ("ACLS certifications from the Italian Resuscitation Council"), so the rule stops at the lead-in. The editor's banner asks the user to check the draft.
 - **Drafts wait for the language data.** On a device that has not yet downloaded the data of English or German, a description in either gives no draft until the system has it, and the person is asked to try again in a moment.
 - **Residual risks of the contacts.** Two constructions still keep a third party's contact (b):

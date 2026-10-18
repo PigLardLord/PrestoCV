@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1531
+    static let rowsWhenWritten = 1534
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -484,6 +484,7 @@ enum GroundingRows {
         rows += factsTheDescriptionWithdraws()
         rows += wishesInAPhrase()
         rows += personalFieldsOfAClaim()
+        rows += acceptedReadingsOfAClaim()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3420,6 +3421,22 @@ enum GroundingRows {
                         "I'd used Swift for years.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
         rows.append(row("wurde-without-gern-is-a-claim", "ich wurde geschult is a fact: the skill stays",
                         "Ich wurde in Python geschult.", CVData(skills: [Skill(name: "Python")]), .unchanged, language: "de"))
+        return rows
+    }
+
+    /// The readings of the claim rule that ADR 0023 accepts as they are (Consequences): a negation beside a word of level denies the
+    /// level only, a condition at the start of a clause makes the rest of its sentence a supposition, and "could" withdraws a claim.
+    private static func acceptedReadingsOfAClaim() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        rows.append(row("a-negation-beside-a-level-keeps-the-language",
+                        "never fluent denies the level only: German stays, without a level",
+                        "I have never been fluent in German.", CVData(languages: [Language(name: "German")]), .unchanged))
+        rows.append(row("a-condition-makes-a-habit-a-supposition",
+                        "the condition opens the sentence: playing chess is supposed, and no interest stays",
+                        "If I have time, I play chess.", CVData(interests: ["chess"]), .exactly(CVData())))
+        rows.append(row("could-withdraws-a-claim",
+                        "could withdraws the claim: an accepted loss, and no language stays",
+                        "I could already read Latin at school.", CVData(languages: [Language(name: "Latin")]), .exactly(CVData())))
         return rows
     }
 
