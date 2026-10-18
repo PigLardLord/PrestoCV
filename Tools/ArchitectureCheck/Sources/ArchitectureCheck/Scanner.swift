@@ -251,6 +251,20 @@ final class Scanner: SyntaxVisitor {
         }
     }
 
+    // MARK: Source tree
+
+    /// `#filePath` and `#file` locate the source tree, which the machines that run a test plan do not have (R16). A
+    /// `StaticString` parameter may default to one: that is how XCTest reports where an assertion failed, without reading it.
+    override func visit(_ node: MacroExpansionExprSyntax) -> SyntaxVisitorContinueKind {
+        let name = Self.name(node.macroName)
+        guard name == "filePath" || name == "file" else { return .visitChildren }
+        let parameter = node.parent?.as(InitializerClauseSyntax.self)?.parent?.as(FunctionParameterSyntax.self)
+        if parameter?.type.trimmedDescription != "StaticString" {
+            hit("sourceTreePath", "#\(name) locates the source tree, which the machines that run the test plans do not have: read the file from a bundle", node)
+        }
+        return .visitChildren
+    }
+
     // MARK: Declarations
 
     override func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {

@@ -37,6 +37,9 @@
   ],
   "R15": [
    "bundleLayout"
+  ],
+  "R16": [
+   "sourceTreePath"
   ]
  },
  "infrastructureTypes": [
@@ -47,7 +50,20 @@
   "MacPDFRenderer",
   "FoundationModelsDrafter"
  ],
- "exceptions": [],
+ "exceptions": [
+  {
+   "path": "CVPDFExporter/Tests/CVRenderingTests/GoldenFile.swift",
+   "detector": "sourceTreePath",
+   "adr": "0011",
+   "reason": "UPDATE_GOLDEN=1 rewrites the committed golden file in the checkout, for review like code; the golden test reads it through Bundle.module"
+  },
+  {
+   "path": "PrestoCVTests/Features/Export/BundledDesignThumbnails.swift",
+   "detector": "sourceTreePath",
+   "adr": "0022",
+   "reason": "PRESTOCV_REGENERATE_THUMBNAILS=1 rewrites the thumbnails of version 1's bundled designs in the checkout with the real iOS renderer; without it the test is skipped"
+  }
+ ],
  "notYetImplemented": [
   "App/",
   "Features/",
@@ -312,7 +328,9 @@
     "CVDesignCatalog",
     "Foundation"
    ],
-   "rules": [],
+   "rules": [
+    "R16"
+   ],
    "kind": "test"
   },
   {
@@ -327,7 +345,9 @@
     "CVRenderingTestSupport",
     "CVBundledDesigns"
    ],
-   "rules": [],
+   "rules": [
+    "R16"
+   ],
    "kind": "test"
   },
   {
@@ -357,7 +377,9 @@
     "WebKit",
     "CVRenderingWebKitSupport"
    ],
-   "rules": [],
+   "rules": [
+    "R16"
+   ],
    "kind": "test"
   },
   {
@@ -372,7 +394,9 @@
     "Glibc",
     "Darwin"
    ],
-   "rules": [],
+   "rules": [
+    "R16"
+   ],
    "kind": "test"
   },
   {
@@ -384,7 +408,9 @@
     "CVDesignCatalog",
     "CVBundledDesigns"
    ],
-   "rules": [],
+   "rules": [
+    "R16"
+   ],
    "kind": "test"
   },
   {
@@ -617,14 +643,18 @@
    "path": "PrestoCVTests",
    "kind": "legacy",
    "allowedImports": [],
-   "rules": []
+   "rules": [
+    "R16"
+   ]
   },
   {
    "name": "PrestoCVUITests",
    "path": "PrestoCVUITests",
    "kind": "legacy",
    "allowedImports": [],
-   "rules": []
+   "rules": [
+    "R16"
+   ]
   },
   {
    "name": "ArchitectureCheck",

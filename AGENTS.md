@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Architecture (target)
-- The target architecture and its rules are in `docs/architecture/`: start from `docs/architecture/README.md`, then `rules.md` (R1–R15) and `modules.md` (targets and allowed imports). Decisions are recorded as ADRs in `docs/architecture/adr/`.
+- The target architecture and its rules are in `docs/architecture/`: start from `docs/architecture/README.md`, then `rules.md` (R1–R16) and `modules.md` (targets and allowed imports). Decisions are recorded as ADRs in `docs/architecture/adr/`.
 - New code follows the target architecture, not the current structure described below. The migration is in progress (see the migration strategy in `docs/architecture/README.md`); where this file and `docs/architecture/` disagree, `docs/architecture/` wins.
 - A change that needs a new target or a new dependency between targets updates `modules.md` in the same pull request. A permanent exception to a rule is an entry in the checker's `rules.json` that cites an ADR; a temporary one is a baseline entry, and the baseline may only shrink.
 - Proposed ADRs describe the target and guide new code; a rule becomes binding when its ADR is Accepted and merged.

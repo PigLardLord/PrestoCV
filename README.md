@@ -19,7 +19,7 @@ The current app and packages are the legacy code the migration replaces, one con
 | Path | What it is |
 |---|---|
 | `docs/product/` | The product vision: for whom PrestoCV is, its principles (including scaling with use and paying with revenue), the business model and the release plan. |
-| `docs/architecture/` | The target architecture: overview and migration strategy, rules R1–R15, modules and allowed imports, glossary, ADRs. |
+| `docs/architecture/` | The target architecture: overview and migration strategy, rules R1–R16, modules and allowed imports, glossary, ADRs. |
 | `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). |
 | `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The current packages (legacy, being replaced). |
 | `CVPDFExporter/Docs/` | The document markup contract that designs follow, which the exporter's tests hold the code to. |

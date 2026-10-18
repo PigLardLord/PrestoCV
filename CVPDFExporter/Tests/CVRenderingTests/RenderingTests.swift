@@ -148,8 +148,7 @@ struct BuilderTests {
     @Test("golden output: the fixture renders exactly to the reviewed HTML")
     func golden() throws {
         let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "it"))
-        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Golden/fixture-it.html")
-        if ProcessInfo.processInfo.environment["UPDATE_GOLDEN"] == "1" { try Data(html.utf8).write(to: source) }
+        try GoldenFile.updateIfRequested("fixture-it.html", with: html)
         let url = try #require(Bundle.module.url(forResource: "Golden/fixture-it", withExtension: "html"))
         #expect(html == (try String(contentsOf: url, encoding: .utf8)))
     }
