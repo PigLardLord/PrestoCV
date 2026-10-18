@@ -34,6 +34,7 @@
 - Prefer lightweight spies like the mocks in `PrestoCVTests/PrestoCVTests.swift:18` and assert with `#expect` to keep diagnostics consistent.
 - Aim for full coverage on onboarding and exporting flows before requesting review; add regression tests before modifying core models.
 - Run both `swift test` and simulator-based UI tests for changes touching navigation or exporter integrations.
+- A test that a test plan runs reads files only from bundles: the app's resources from the app bundle, a package's test resources through `Bundle.module`. Xcode Cloud runs the plans on machines without the repository, so a check that reads source text goes into `Tools/SourceChecks` (R16).
 
 ## Reviews
 - **Delta only.** Each review round covers only what changed since the last reviewed commit. Record that commit locally as `refs/reviewed/<branch>`, and list the reviewed commits in the pull request so another machine can continue. A full-branch review happens twice at most: the first one and the final gate. Commit before reviewing, because reviews read commits, not the working tree.
