@@ -87,7 +87,7 @@ struct VerbFormsTests {
         #expect(!isBare("Interessen lesen", at: 1, in: .german))
     }
 
-    @Test("The device tags the verbs of English and German, and of no other language")
+    @Test("Grounding reads the verbs of English and German from the device's tags, and of no other language")
     func verbsByTags() {
         #expect(VerbForms.readsVerbsByTags(in: .english))
         #expect(VerbForms.readsVerbsByTags(in: .german))
