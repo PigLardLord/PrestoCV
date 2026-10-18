@@ -54,7 +54,7 @@ final class ViewModelFactory {
     private func makeCVGeneratorUseCase() -> CVGeneratorUseCase {
         return CVGeneratorUseCase(
             service: FoundationModelsService(),
-            sanitizer: CVDataSanitizer(languageOfText: DescriptionLanguageDetector.languageTag(of:))
+            sanitizer: CVDataSanitizer(languageOfText: DescriptionLanguageDetector.languageTag(of:), lexicalClasses: DeviceLexicalTagger())
         )
     }
 

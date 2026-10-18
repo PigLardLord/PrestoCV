@@ -19,8 +19,8 @@ struct ForcedLexicalTagger: LexicalTagger {
         self.verdicts = verdicts
     }
 
-    func verbs(in text: String, language: Vocabulary.Language) -> [Range<Int>] {
-        switch verdicts[language] {
+    func verbs(in text: String, language: String) -> [Range<Int>] {
+        switch Vocabulary.Language(rawValue: language).flatMap({ verdicts[$0] }) {
         case nil:
             return DeviceLexicalTagger().verbs(in: text, language: language)
         case .noAssets:

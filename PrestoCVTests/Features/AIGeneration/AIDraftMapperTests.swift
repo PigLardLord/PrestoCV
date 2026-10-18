@@ -264,7 +264,7 @@ struct AIDraftMapperTests {
         let description = "I paint now, I worked at Acme in 2012."
         let job = CVGeneratorAI.Experience(title: "", company: "Acme", startDate: "2012", current: true)
 
-        let draft = CVDataSanitizer().sanitize(CVData(experience: [job]), against: description)
+        let draft = CVDataSanitizer(lexicalClasses: FakeLexicalTagger.english).sanitize(CVData(experience: [job]), against: description)
 
         #expect(map(draft, writtenIn: description).relevant_experience.map(\.period) == ["2012"])
     }
@@ -274,7 +274,7 @@ struct AIDraftMapperTests {
         let description = "Currently, I work at Acme since 2012."
         let job = CVGeneratorAI.Experience(title: "", company: "Acme", startDate: "2012", current: true)
 
-        let draft = CVDataSanitizer().sanitize(CVData(experience: [job]), against: description)
+        let draft = CVDataSanitizer(lexicalClasses: FakeLexicalTagger.english).sanitize(CVData(experience: [job]), against: description)
 
         #expect(map(draft, writtenIn: description).relevant_experience.map(\.period) == ["2012 – Oggi"])
     }
@@ -285,7 +285,7 @@ struct AIDraftMapperTests {
         let acme = CVGeneratorAI.Experience(title: "nurse", company: "Acme", startDate: "2012", endDate: "2023", current: true, achievements: ["Trained 3 nurses"])
         let beta = CVGeneratorAI.Experience(title: "nurse", company: "Beta", startDate: "2019", endDate: "2023", achievements: ["Trained 3 nurses"])
 
-        let draft = CVDataSanitizer().sanitize(CVData(experience: [acme, beta]), against: description)
+        let draft = CVDataSanitizer(lexicalClasses: FakeLexicalTagger.english).sanitize(CVData(experience: [acme, beta]), against: description)
 
         let cv = map(draft, writtenIn: description)
         #expect(cv.relevant_experience.map(\.period) == ["2012", "2019 – 2023"])

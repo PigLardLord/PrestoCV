@@ -25,7 +25,7 @@ struct AIGenerationViewModelTests {
 
     private func makeViewModel(appLanguageCode: String? = "it", session: AIDescriptionSession = AIDescriptionSession()) -> AIGenerationViewModel {
         AIGenerationViewModel(
-            cvGenerationUseCase: CVGeneratorUseCase(service: service),
+            cvGenerationUseCase: CVGeneratorUseCase(service: service, sanitizer: CVDataSanitizer(lexicalClasses: FakeLexicalTagger.english)),
             mapper: AIDraftMapper(labels: labels, languageOfText: { _ in "pt-PT" }),
             appLanguageCode: appLanguageCode,
             session: session

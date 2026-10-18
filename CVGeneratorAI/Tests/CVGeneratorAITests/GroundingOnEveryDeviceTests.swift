@@ -21,7 +21,7 @@ struct GroundingOnEveryDeviceTests {
     ]
 
     private func sanitized(_ row: GroundingRow, by tagger: ForcedLexicalTagger) -> CVData {
-        LexicalClasses.$tagger.withValue(tagger) { CVDataSanitizer().sanitize(row.draft, against: row.description) }
+        CVDataSanitizer(lexicalClasses: tagger).sanitize(row.draft, against: row.description)
     }
 
     private func everyUntaggedLanguage(_ verdict: ForcedLexicalTagger.Verdict) -> ForcedLexicalTagger {

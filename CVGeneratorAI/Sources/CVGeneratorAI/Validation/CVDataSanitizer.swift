@@ -28,16 +28,27 @@ import Foundation
 /// invented one.
 public struct CVDataSanitizer: Sendable {
     private let languageOfText: @Sendable (String) -> String?
+    private let lexicalClasses: any LexicalTagger
 
-    /// - Parameter languageOfText: The BCP 47 tag of the language a text is written in, or nil when it cannot tell.
-    ///   With it, prose in another language than the description's is dropped: the model sometimes answers a French
-    ///   description with an English summary. Without it, language is not checked.
-    public init(languageOfText: @escaping @Sendable (String) -> String? = { _ in nil }) {
+    /// - Parameters:
+    ///   - languageOfText: The BCP 47 tag of the language a text is written in, or nil when it cannot tell. With it, prose in
+    ///     another language than the description's is dropped: the model sometimes answers a French description with an English
+    ///     summary. Without it, language is not checked.
+    ///   - lexicalClasses: What tells the verbs of English and German (`LexicalClasses`): the device's lexical class.
+    public init(
+        languageOfText: @escaping @Sendable (String) -> String? = { _ in nil },
+        lexicalClasses: any LexicalTagger = DeviceLexicalTagger()
+    ) {
         self.languageOfText = languageOfText
+        self.lexicalClasses = lexicalClasses
     }
 
     public func sanitize(_ cvData: CVData, against description: String) -> CVData {
         let source = DescriptionText(description, languageOfText: languageOfText)
+        return LexicalClasses.$tagger.withValue(lexicalClasses) { grounded(cvData, in: source) }
+    }
+
+    private func grounded(_ cvData: CVData, in source: DescriptionText) -> CVData {
         let jobTitles = cvData.experience.map(\.title)
         // The person's name, place and title explain themselves in the clauses of the entries, so they are read first, wherever they stand;
         // the clauses that speak for the person then tell which of them stand in the description for the person.
