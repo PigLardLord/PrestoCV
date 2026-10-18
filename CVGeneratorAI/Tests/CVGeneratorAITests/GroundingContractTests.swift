@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1554
+    static let rowsWhenWritten = 1572
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -483,6 +483,7 @@ enum GroundingRows {
         rows += hobbiesOfThePersonAlone()
         rows += factsTheDescriptionWithdraws()
         rows += wishesInAPhrase()
+        rows += wishesAfterTheItem()
         rows += personalFieldsOfAClaim()
         rows += acceptedReadingsOfAClaim()
         rows += negationsOfTheAbility()
@@ -3487,6 +3488,66 @@ enum GroundingRows {
         rows.append(row("could-withdraws-a-claim",
                         "could withdraws the claim: an accepted loss, and no language stays",
                         "I could already read Latin at school.", CVData(languages: [Language(name: "Latin")]), .exactly(CVData())))
+        return rows
+    }
+
+    /// A clause that states nothing as a fact (no verb, or none factual: "Spanisch zu lernen") and is not a fragment of a factual
+    /// clause shares the withdrawal of the clause after it in its sentence (#202): "Spanisch zu lernen, davon träume ich" gives no
+    /// Spanish. A factual clause before a later wish keeps its item.
+    private static func wishesAfterTheItem() -> [GroundingRow] {
+        typealias Wish = (id: String, language: String, description: String, name: String)
+        var wishes: [Wish] = []
+        wishes.append(("de", "de", "Spanisch zu lernen, davon träume ich.", "Spanisch"))
+        wishes.append(("en", "en", "Learning Spanish, that's what I'd like.", "Spanish"))
+        wishes.append(("verbless-en", "en", "Spanish, that's what I'd like to learn.", "Spanish"))
+        wishes.append(("it", "it", "Imparare lo spagnolo, è quello che vorrei.", "spagnolo"))
+        wishes.append(("lo-sogno-it", "it", "Imparare lo spagnolo: lo sogno da sempre.", "spagnolo"))
+        wishes.append(("es", "es", "Aprender alemán, eso es lo que quiero.", "alemán"))
+        wishes.append(("lo-sueno-es", "es", "Hablar francés, lo sueño desde niña.", "francés"))
+        wishes.append(("fr", "fr", "Apprendre l'espagnol, voilà ce que je voudrais.", "espagnol"))
+        wishes.append(("en-reve-fr", "fr", "Parler italien, j'en rêve.", "italien"))
+        wishes.append(("pt", "pt", "Aprender espanhol, é o que eu quero.", "espanhol"))
+
+        var rows: [GroundingRow] = []
+        for v in wishes {
+            rows.append(row("a-wish-after-the-item-claims-no-language-\(v.id)",
+                            "the clause of the language states nothing as a fact, and the clause after it only wishes: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("a-fact-before-a-later-wish-keeps-its-language-de",
+                        "ich spreche Spanisch is a fact: the dream that follows takes nothing from it",
+                        "Ich spreche Spanisch, und davon träume ich nicht mehr.", CVData(languages: [Language(name: "Spanisch")]),
+                        .unchanged, language: "de"))
+        rows.append(row("a-fact-before-a-later-wish-keeps-its-language-en",
+                        "I speak Spanish is a fact; French stands only in the wish: Spanish stays, French goes",
+                        "I speak Spanish, and I'd like to learn French.",
+                        CVData(languages: [Language(name: "Spanish"), Language(name: "French")]),
+                        .exactly(CVData(languages: [Language(name: "Spanish")]))))
+        rows.append(row("the-fragments-of-a-fact-keep-their-languages-before-a-wish",
+                        "English and French belong to I speak: the wish to improve them takes nothing away",
+                        "I speak Italian, English and French, which I'd like to improve.",
+                        CVData(languages: [Language(name: "Italian"), Language(name: "English"), Language(name: "French")]), .unchanged))
+        rows.append(row("a-coordinated-item-before-a-wish-claims-no-language",
+                        "learning German states nothing as a fact, and Spanish is what the person would like: neither language stays",
+                        "Learning German and Spanish is what I'd like.",
+                        CVData(languages: [Language(name: "German"), Language(name: "Spanish")]), .exactly(CVData())))
+        rows.append(row("a-verbless-line-before-a-wish-is-an-accepted-loss-en",
+                        "fluent in English has no verb, and the wish after it withdraws it: English goes too, an accepted loss",
+                        "Fluent in English, and I'd love to learn German.",
+                        CVData(languages: [Language(name: "English"), Language(name: "German")]), .exactly(CVData())))
+        rows.append(row("a-verbless-list-of-skills-before-a-wish-is-an-accepted-loss",
+                        "the list of skills has no verb, and the wish after it withdraws it: Python and SQL go too, an accepted loss",
+                        "Skills: Python and SQL, but I would like to learn Rust.",
+                        CVData(skills: [Skill(name: "Python"), Skill(name: "SQL"), Skill(name: "Rust")]), .exactly(CVData())))
+        rows.append(row("a-verbless-title-before-a-wish-is-an-accepted-loss",
+                        "the line of the title has no verb, and the wish after it withdraws it: the title goes with the place, an accepted loss",
+                        "Teacher at Acme since 2016, and I would like to move to Berlin.",
+                        CVData(personalInfo: person(location: "Berlin", title: "Teacher")), .exactly(CVData())))
+        rows.append(row("a-verbless-list-before-a-wish-is-an-accepted-loss",
+                        "a list with no verb states nothing as a fact, and the wish after it withdraws it: the languages go, an accepted loss",
+                        "Languages: Italian, English and French, which I'd like to improve.",
+                        CVData(languages: [Language(name: "Italian"), Language(name: "English"), Language(name: "French")]),
+                        .exactly(CVData())))
         return rows
     }
 
