@@ -24,6 +24,8 @@ import Foundation
 ///   contact, only as a label ("Email: ..."), the person's possession of the field ("My email is ..."), a verb of contacting whose
 ///   object is the person ("You can reach me at ...") or the person as reachable ("I can be reached at ...") gives it, with no other
 ///   person named ("I can put you in touch with the recruiter at ..." gives none), and never from the references on;
+/// - a language, a skill and an interest are kept only as a clause that claims them gives them: one that denies, wishes or supposes
+///   ("I have never used Python", "I would like to learn Spanish") gives none;
 /// - prose in another language than the description's is dropped, when a language detector is given;
 /// - a description in English or German is grounded only with the device's lexical class of its language (`LexicalClasses`): without
 ///   it, nothing is grounded and `CVGenerationError.languageDataUnavailable` says which language data the device needs.
@@ -77,15 +79,16 @@ public struct CVDataSanitizer: Sendable {
         // the clauses that speak for the person then tell which of them stand in the description for the person.
         let entries = Entries(cvData, personalInfo: sanitize(cvData.personalInfo, jobTitles: jobTitles, source), source)
         let spoken = entries.spoken(in: source)
-        let interests = unique(cvData.interests.compactMap(spoken.named)) { $0 }
+        let claimed = entries.claimed(in: source)
+        let interests = unique(cvData.interests.compactMap(claimed.named)) { $0 }
 
         return CVData(
             personalInfo: sanitize(cvData.personalInfo, jobTitles: jobTitles, spoken, contacts: entries.contacts(in: source)),
             summary: source.grounded(cvData.summary, quoting: entries.summaryQuotes, allowsNumbers: false),
             experience: sanitize(entries.jobs, source, entries),
             education: sanitize(entries.studies, source, entries),
-            skills: sanitize(cvData.skills, spoken, interests: interests, entries),
-            languages: sanitize(cvData.languages, spoken),
+            skills: sanitize(cvData.skills, claimed, interests: interests, entries),
+            languages: sanitize(cvData.languages, claimed),
             certifications: sanitize(entries.certifications, entries),
             interests: interests
         )

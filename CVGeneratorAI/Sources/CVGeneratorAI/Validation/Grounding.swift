@@ -76,6 +76,39 @@ struct Grounding {
             speaks(at: Place(sentence: place.sentence, clause: place.clause - 1))
         }
 
+        /// Whether the clause at `place` claims a skill, an interest or a language for the person (#202): it speaks for the person,
+        /// holds no word that withdraws a claim (`Vocabulary.withdrawals`: "never", "would", "if", but not "can" or "partly"),
+        /// follows no clause of its sentence that opens with a word of condition ("If I had time, I would play chess"), and, when it
+        /// shares the clause before it (a verbless clause split off, or one that starts with its verb after a comma or a conjunction),
+        /// that clause claims too: "I have never used Java or Swift" claims neither.
+        ///
+        /// A negation or a hedge beside a word of level bears on the level: "I am not an expert in Swift" and "I don't speak French
+        /// fluently" claim Swift and French, and the level, which they deny, is not stated (`DescriptionText.levels`).
+        func claims(at place: Place) -> Bool {
+            let clause = clauses.clause(at: place)
+            guard speaks(at: place), !withdraws(clause) else { return false }
+            let supposed = (0..<place.clause).contains { index in
+                let opening = clauses.clause(at: Place(sentence: place.sentence, clause: index)).words.first
+                return opening.map { Vocabulary.isCondition($0.folded, in: language) } ?? false
+            }
+            guard !supposed else { return false }
+            if clause.isAnchored { return true }
+
+            let statement = Statement(clause: clause, quotes: all, language: language)
+            guard statement.startsWithItsVerb || !statement.hasVerbs else { return true }
+            return claims(at: Place(sentence: place.sentence, clause: place.clause - 1))
+        }
+
+        /// Whether the clause withdraws its claim: some word of it does, and not only a negation or a hedge (`StatementWords.hedges`)
+        /// beside a word of level, which denies the level alone.
+        private func withdraws(_ clause: Clause) -> Bool {
+            let withdrawals = Vocabulary.withdrawals(in: clause.words, language: language)
+            guard !withdrawals.isEmpty else { return false }
+            let deniesALevel = clause.words.contains { Vocabulary.isLevel($0.folded, in: language) }
+                && withdrawals.allSatisfy { $0 == "n't" || StatementWords.hedges.contains($0) }
+            return !deniesALevel
+        }
+
         /// Whether the clause at `place` gives the person's contacts (ADR 0023, rule (b)): it stands before the references, speaks for
         /// the person, names no other person, and has one of the three shapes of a contact.
         /// - A verbless clause, read as a label: its words name a contact or a field, or are function words, numbers or the person's own
@@ -210,6 +243,13 @@ struct Grounding {
     /// Whether the clause at `place` speaks for the person: the clauses that `spokenSentences` keeps.
     func speaks(at place: DescriptionClauses.Place) -> Bool {
         reading.speaks(at: place)
+    }
+
+
+    /// The description as the person claims skills, interests and languages in it: its sentences, with every clause that does not
+    /// speak for the person, or that denies, wishes or supposes, left out.
+    var claimedSentences: [String] {
+        clauses.sentences(keeping: reading.claims(at:))
     }
 
     /// The description as the person speaks it: its sentences, with every clause that does not speak for the person left out.

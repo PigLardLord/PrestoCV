@@ -158,6 +158,7 @@ extension Vocabulary {
         accompagneriez accompagnerions accompagnerons accompagneront administrera administrerai administreraient
         administrerais administrerait administreras administrerez administreriez administrerions administrerons
         administreront aidera aiderai aideraient aiderais aiderait aideras aiderez aideriez aiderions aiderons
+        aimeraient aimerais aimerait aimeriez aimerions souhaiteraient souhaiterais souhaiterait souhaiteriez souhaiterions
         aideront ameliorera ameliorerai amelioreraient ameliorerais ameliorerait amelioreras ameliorerez amelioreriez
         ameliorerions ameliorerons amelioreront animera animerai animeraient animerais animerait animeras animerez
         animeriez animerions animerons animeront assurera assurerai assureraient assurerais assurerait assureras
