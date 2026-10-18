@@ -269,6 +269,25 @@ struct VocabularyTests {
         #expect(!Vocabulary.employerPrepositions.contains(word), "\(word)")
     }
 
+    @Test("An employer preposition of another language is another word in the description's language, and introduces no employer there",
+          arguments: [
+            ("ai", Vocabulary.Language.french), ("per", .english), ("all", .english), ("am", .english), ("alle", .german), ("da", .german),
+            ("da", .spanish), ("da", .portuguese), ("nos", .spanish), ("nos", .french),
+          ])
+    func employerPrepositionsThatAreAnotherWord(word: String, language: Vocabulary.Language) {
+        #expect(!Vocabulary.isEmployerPreposition(word, in: language), "\(word) in \(language)")
+        #expect(Vocabulary.isEmployerPreposition(word, in: nil), "\(word), in a description of no known language")
+    }
+
+    @Test("An employer preposition introduces an employer in its own language, and in one that has no such word",
+          arguments: [
+            ("ai", Vocabulary.Language.italian), ("per", .italian), ("da", .italian), ("am", .german), ("nos", .portuguese),
+            ("chez", .english), ("at", .italian), ("presso", .french),
+          ])
+    func employerPrepositionsOfTheDescription(word: String, language: Vocabulary.Language) {
+        #expect(Vocabulary.isEmployerPreposition(word, in: language), "\(word) in \(language)")
+    }
+
     @Test("A verb of a CV, a word of level, of studying and of time are explained, so that they may stand in a clause that backs an entry",
           arguments: ["worked", "taught", "managed", "native", "fluent", "school", "degree", "students", "lavorato", "laurea", "gearbeitet", "abschluss", "trabajado", "diplome", "formei", "years", "now", "march", "anni", "jahre", "anos", "today", "currently"])
     func explainedWords(word: String) {

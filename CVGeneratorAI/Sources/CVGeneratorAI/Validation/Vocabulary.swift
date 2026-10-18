@@ -132,13 +132,39 @@ enum Vocabulary {
 
     private static let everyLevelWord: Set<String> = union { $0.level }
 
-    /// The prepositions that introduce an employer, a school or a place of work, in the six languages ("at", "for", "with",
-    /// "da", "presso", "per", "bei", "für", "en", "para", "chez", "pour", "em", "na", "no" and the like). A quote that holds one
-    /// of them is about somebody's place, not about what a person did.
-    static let employerPrepositions: Set<String> = Set("""
-        agli ai al all alla alle allo am at au aux avec bei beim by chez com con da dagli dai dal dall dalla dalle dallo dans \
-        em en for from fuer fur mit na nas no nos num numa para pela pelo per por pour presso vom von with
-        """.split(whereSeparator: { $0.isWhitespace }).map(String.init))
+    /// The prepositions that introduce an employer, a school or a place of work, in each language ("at", "for", "with"; "da",
+    /// "presso", "per"; "bei", "für"; "en", "para"; "chez", "pour"; "em", "na", "no" and the like). A quote that holds one of them
+    /// is about somebody's place, not about what a person did.
+    private static let employerPrepositionsByLanguage: [Language: Set<String>] = [
+        .english: ["at", "by", "for", "from", "with"],
+        .italian: [
+            "agli", "ai", "al", "all", "alla", "alle", "allo", "con", "da", "dagli", "dai", "dal", "dall", "dalla", "dalle", "dallo", "per",
+            "presso",
+        ],
+        .german: ["am", "bei", "beim", "fuer", "fur", "mit", "vom", "von"],
+        .spanish: ["al", "con", "en", "para", "por"],
+        .french: ["au", "aux", "avec", "chez", "dans", "en", "pour"],
+        .portuguese: ["com", "em", "na", "nas", "no", "nos", "num", "numa", "para", "pela", "pelo", "por"],
+    ]
+
+    /// The employer prepositions of the six languages.
+    static let employerPrepositions: Set<String> = employerPrepositionsByLanguage.values.reduce(into: []) { $0.formUnion($1) }
+
+    /// The employer prepositions of a description in each language: its own, and those of the other languages that are no word of
+    /// its vocabulary. A preposition of another language that the description's language uses for something else is that word:
+    /// French "ai" (j'ai) is no Italian "ai", English "per" (per shift) no Italian "per", Portuguese "da" (of the) no Italian "da".
+    private static let employerPrepositionsOfADescription: [Language: Set<String>] = Dictionary(
+        uniqueKeysWithValues: Language.allCases.map { language in
+            let own = employerPrepositionsByLanguage[language] ?? []
+            let vocabulary = language.words.all
+            return (language, employerPrepositions.filter { own.contains($0) || !vocabulary.contains($0) })
+        }
+    )
+
+    /// Whether `word` introduces an employer in a description in `language`; with no language, whether it does in any of the six.
+    static func isEmployerPreposition(_ word: String, in language: Language?) -> Bool {
+        (language.flatMap { employerPrepositionsOfADescription[$0] } ?? employerPrepositions).contains(word)
+    }
 
     private static let everyModalityWord: Set<String> = union { $0.modality }
 
