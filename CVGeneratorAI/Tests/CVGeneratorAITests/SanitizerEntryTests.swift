@@ -9,14 +9,14 @@ struct SanitizerEntryTests {
 
     @Test("A draft the description fully supports keeps what its clauses name, in each of the six languages of the example",
           arguments: faithfulExamples)
-    func faithfulDraftKeepsWhatItsClausesName(example: FaithfulExample) {
-        #expect(sanitizer.sanitize(example.draft, against: example.description) == example.survivors)
+    func faithfulDraftKeepsWhatItsClausesName(example: FaithfulExample) throws {
+        #expect(try sanitizer.sanitize(example.draft, against: example.description) == example.survivors)
     }
 
     @Test("What the faithful drafts lose is the paraphrased summary, and an achievement that is not a quote of the description",
           arguments: faithfulExamples)
-    func whatTheFaithfulDraftsLose(example: FaithfulExample) {
-        let result = sanitizer.sanitize(example.draft, against: example.description)
+    func whatTheFaithfulDraftsLose(example: FaithfulExample) throws {
+        let result = try sanitizer.sanitize(example.draft, against: example.description)
         let current = result.experience.first { $0.current }
         let past = result.experience.first { !$0.current }
 
@@ -31,7 +31,7 @@ struct SanitizerEntryTests {
     }
 
     @Test("A draft made up around a one-line description loses everything but what the line says")
-    func inventedDraftLosesItsInventions() {
+    func inventedDraftLosesItsInventions() throws {
         let invented = CVData(
             personalInfo: PersonalInfo(
                 name: "Anna Bianchi", email: "anna.bianchi@example.com", phone: "+39 333 123 4567",
@@ -49,13 +49,13 @@ struct SanitizerEntryTests {
             interests: ["Painting", "Running"]
         )
 
-        let result = sanitizer.sanitize(invented, against: "I'm a nurse.")
+        let result = try sanitizer.sanitize(invented, against: "I'm a nurse.")
 
         #expect(result == CVData())
     }
 
     @Test("Repeated entries are kept once, ignoring case and accents")
-    func duplicatesAreRemoved() {
+    func duplicatesAreRemoved() throws {
         let description = "Cook at Trattoria since 2020. Università di Bologna, Nursing. I know Swift, Italian (native). I hold BLS. Chess."
         let cvData = CVData(
             experience: [
@@ -72,7 +72,7 @@ struct SanitizerEntryTests {
             interests: ["Chess", "chess", " Chess "]
         )
 
-        let result = sanitizer.sanitize(cvData, against: description)
+        let result = try sanitizer.sanitize(cvData, against: description)
 
         #expect(result.experience.count == 1)
         #expect(result.experience.first?.startDate == "2020")
@@ -84,7 +84,7 @@ struct SanitizerEntryTests {
     }
 
     @Test("Blank values become absent and blank entries vanish")
-    func blankValues() {
+    func blankValues() throws {
         let cvData = CVData(
             personalInfo: PersonalInfo(location: "  ", title: ""),
             summary: "   ",
@@ -94,7 +94,7 @@ struct SanitizerEntryTests {
             interests: ["", "  "]
         )
 
-        #expect(sanitizer.sanitize(cvData, against: "anything at all") == CVData())
+        #expect(try sanitizer.sanitize(cvData, against: "anything at all") == CVData())
     }
 }
 

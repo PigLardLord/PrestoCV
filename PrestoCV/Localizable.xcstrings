@@ -1559,6 +1559,47 @@
         }
       }
     },
+    "ai.unavailable.language_data_not_ready" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Sprachdaten für den Entwurf werden vorbereitet. Versuchen Sie es gleich noch einmal."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing language data for the draft. Try again in a moment."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparando los datos de idioma para el borrador. Inténtalo de nuevo en un momento."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Préparation des données linguistiques pour le brouillon. Réessayez dans un instant."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparazione dei dati linguistici per la bozza. Riprova tra un attimo."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparando os dados de idioma para o rascunho. Tente novamente em instantes."
+          }
+        }
+      }
+    },
     "ai.unavailable.model_not_ready" : {
       "extractionState" : "manual",
       "localizations" : {

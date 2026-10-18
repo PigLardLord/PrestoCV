@@ -6,9 +6,17 @@ import CVGeneratorAI
 struct FakeLexicalTagger: LexicalTagger {
     /// The verbs that the device tags, with the data of English, in the descriptions of these tests (macOS 27).
     static let english = FakeLexicalTagger(taggedWords: ["am", "paint", "speak", "trained", "work", "worked"])
+    /// A device that has the data of no language yet.
+    static let withoutData = FakeLexicalTagger(taggedWords: [], hasData: false)
 
     /// The words it tags, in lower case.
     let taggedWords: Set<String>
+    /// Whether the device has the data of the languages it is asked about.
+    var hasData = true
+
+    func tagsLexicalClass(inLanguage language: String) -> Bool {
+        hasData
+    }
 
     func verbs(in text: String, language: String) -> [Range<Int>] {
         var verbs: [Range<Int>] = []

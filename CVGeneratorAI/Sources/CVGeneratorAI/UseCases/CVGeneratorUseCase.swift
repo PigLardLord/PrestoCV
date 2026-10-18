@@ -26,17 +26,18 @@ public final class CVGeneratorUseCase {
     /// Generate and validate a CV from user input
     /// - Parameter request: The generation request
     /// - Returns: CV data limited to what the description supports
-    /// - Throws: CVGenerationError if the service is unavailable, or generation or validation fails;
-    ///   CancellationError if the task was cancelled
+    /// - Throws: CVGenerationError if the service is unavailable, the device lacks the language data that grounding the description
+    ///   needs (asked before the model runs), or generation or validation fails; CancellationError if the task was cancelled
     public func generateCV(from request: CVGenerationRequest) async throws -> CVData {
         if case .unavailable(let reason) = service.availability() {
             throw CVGenerationError.unavailable(reason)
         }
 
         try validator.validateRequest(request)
+        try sanitizer.requireLanguageData(for: request.userPrompt)
 
         let generated = try await service.generateCV(from: request)
-        let cvData = sanitizer.sanitize(generated, against: request.userPrompt)
+        let cvData = try sanitizer.sanitize(generated, against: request.userPrompt)
 
         try validator.validateCVData(cvData)
 

@@ -31,6 +31,7 @@ final class ViewModelFactory {
                 labels: makeAIDraftLabels(),
                 languageOfText: DescriptionLanguageDetector.languageTag(of:)
             ),
+            languageData: NaturalLanguageDataRequester(),
             appLanguageCode: Bundle.main.preferredLocalizations.first,
             session: aiDescriptionSession
         )

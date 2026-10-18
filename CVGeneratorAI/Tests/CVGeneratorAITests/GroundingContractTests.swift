@@ -21,18 +21,18 @@ import Foundation
 @Suite("Grounding contract: ADR 0023")
 struct GroundingContractTests {
     @Test("A row of the contract holds", arguments: GroundingRows.all)
-    func rowHolds(_ row: GroundingRow) {
-        func check() {
-            let differences = Verdict.differences(of: row)
+    func rowHolds(_ row: GroundingRow) throws {
+        func check() throws {
+            let differences = try Verdict.differences(of: row)
             #expect(differences.isEmpty, "\(row.id): \(row.reason)\n\(differences.joined(separator: "\n"))")
         }
 
         if GroundingRows.notImplementedYet.contains(row.id) {
-            withKnownIssue("ADR 0023 not implemented yet") { check() }
+            withKnownIssue("ADR 0023 not implemented yet") { try check() }
         } else if GroundingRows.residualRisks.contains(row.id) {
-            withKnownIssue("ADR 0023, Consequences: a residual risk the owner accepts") { check() }
+            withKnownIssue("ADR 0023, Consequences: a residual risk the owner accepts") { try check() }
         } else {
-            check()
+            try check()
         }
     }
 
@@ -294,8 +294,8 @@ private enum Sheet {
 
 private enum Verdict {
     /// What the sanitiser leaves of the draft of a row that the contract does not allow; empty when the row holds.
-    static func differences(of row: GroundingRow) -> [String] {
-        let result = CVDataSanitizer().sanitize(row.draft, against: row.description)
+    static func differences(of row: GroundingRow) throws -> [String] {
+        let result = try CVDataSanitizer().sanitize(row.draft, against: row.description)
         let actual = Sheet.fields(of: result)
 
         switch row.expected {

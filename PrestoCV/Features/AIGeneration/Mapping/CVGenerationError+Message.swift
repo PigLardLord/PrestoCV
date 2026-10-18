@@ -16,6 +16,7 @@ extension CVGenerationError {
         // A failure of the system is not the description's: the neutral sentence asks for nothing
         case .serviceFailed: return "ai.unavailable.unknown"
         case .emptyResult: return "ai.error.empty_result"
+        case .languageDataUnavailable: return "ai.unavailable.language_data_not_ready"
         }
     }
 }
