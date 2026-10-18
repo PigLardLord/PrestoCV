@@ -336,7 +336,7 @@ struct Grounding {
             let texts = (neighbours + [place]).sorted(by: Self.isBefore).map { stated($0).text }
             let years = Set(clauses.places.filter { $0.sentence == place.sentence && counted.contains($0) }
                 .flatMap { stated($0).words }.filter { $0.isNumber && $0.folded.count == 4 }.map(\.folded))
-            return PresentStatement.holds(in: texts.joined(separator: " "), sentenceYears: years.count)
+            return PresentStatement.holds(in: texts.joined(separator: " "), sentenceYears: years.count, language: explainer.language)
         }
     }
 

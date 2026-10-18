@@ -142,6 +142,41 @@ struct VocabularyTests {
         #expect(Vocabulary.modality(in: Word.words(in: "Trabalho no hospital"), language: .portuguese).isEmpty, "no is in the, in Portuguese")
     }
 
+    @Test("A word of negation, doubt or condition of one language is another word in the description's language, and states nothing there",
+          arguments: [
+            ("I worked at Acme in a fast team", Vocabulary.Language.english, "fast"), ("I worked at the Sioux Falls clinic", .english, "falls"),
+            ("Diseñé un plan de formación", .spanish, "plan"), ("J'ai écrit un plan de soins", .french, "plan"),
+            ("J'ai écrit des plans de soins", .french, "plans"), ("Ho gestito casi complessi", .italian, "casi"),
+            ("Lavoro la sera presso Acme", .italian, "sera"), ("Se me asignó la formación", .spanish, "se"),
+            ("Une équipe qui se forme", .french, "se"), ("Mi si è affidato un reparto", .italian, "si"), ("Trabalho para si", .portuguese, "si"),
+          ])
+    func modalityOfAnotherLanguage(text: String, language: Vocabulary.Language, word: String) {
+        #expect(!Vocabulary.modality(in: Word.words(in: text), language: language).contains(word), "\(word) in \(language)")
+        #expect(Vocabulary.modality(in: Word.words(in: text)).contains(word), "\(word), in a description of no known language")
+    }
+
+    @Test("The same word still states negation, doubt or condition in its own language", arguments: [
+        ("Ich habe fast 3 Jahre gearbeitet", Vocabulary.Language.german, "fast"), ("Falls Acme mich einstellt", .german, "falls"),
+        ("I plan to work at Acme", .english, "plan"), ("Casi tres años", .spanish, "casi"), ("Je sera", .french, "sera"),
+        ("Si Acme me contrata", .spanish, "si"), ("Si Acme m'embauche", .french, "si"), ("Se Acme mi assume", .italian, "se"),
+        ("Se a Acme me contratar", .portuguese, "se"),
+    ])
+    func modalityOfItsLanguage(text: String, language: Vocabulary.Language, word: String) {
+        #expect(Vocabulary.modality(in: Word.words(in: text), language: language).contains(word), "\(word) in \(language)")
+    }
+
+    @Test("A hedge of one language is another word in the description's language: a month, or in the")
+    func hedgesOfAnotherLanguage() {
+        #expect(!DescriptionText.hedgesOrNegates("seit mai 2016 arbeite ich bei acme", language: .german))
+        #expect(!DescriptionText.hedgesOrNegates("je travaille chez acme depuis mai 2016", language: .french))
+        #expect(!DescriptionText.hedgesOrNegates("desde 2016 trabalho no hospital", language: .portuguese))
+        #expect(!DescriptionText.hedgesOrNegates("ho gestito casi complessi", language: .italian))
+        #expect(DescriptionText.hedgesOrNegates("seit mai 2016 arbeite ich bei acme"), "with no language, mai is the Italian never")
+        #expect(DescriptionText.hedgesOrNegates("non ho mai lavorato presso acme", language: .italian))
+        #expect(DescriptionText.hedgesOrNegates("no he trabajado en acme", language: .spanish))
+        #expect(DescriptionText.hedgesOrNegates("casi tres anos", language: .spanish))
+    }
+
     @Test("A verb of a CV is known in its inflected forms, by the language of the verb", arguments: [
         "trained", "teach", "taught", "formato", "lavoro", "gearbeitet", "unterrichte", "forme", "travaille", "trabalhei",
     ])

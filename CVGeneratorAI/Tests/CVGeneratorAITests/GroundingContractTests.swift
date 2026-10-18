@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1402
+    static let rowsWhenWritten = 1407
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -450,6 +450,7 @@ enum GroundingRows {
         rows += clausesBetweenTwoEntries()
         rows += quotesThatHoldAnEmployerPreposition()
         rows += employerPrepositionsOfTheDescriptionsLanguage()
+        rows += wordsOfAnotherLanguageStateNothing()
         rows += titlesInANeutralClause()
         rows += negationInProse()
         rows += orderInProse()
@@ -1405,6 +1406,30 @@ enum GroundingRows {
                        v.description, CVData(experience: [current([v.achievement])]),
                        v.keeps ? .unchanged : .exactly(CVData(experience: [current([])])), language: v.language)
         }
+    }
+
+    /// A word of negation, doubt or condition of one language that is another word in the description's language (#202) states
+    /// nothing there: German and French "Mai" is a month and no Italian "mai" (never), Portuguese "no" is "in the" and no English or
+    /// Spanish "no", English "fast" is quick and no German "fast" (almost).
+    private static func wordsOfAnotherLanguageStateNothing() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        rows.append(row("a-month-is-no-italian-never-de", "Mai is the month of the start, not the Italian mai: the job goes on",
+                        "Seit Mai 2016 arbeite ich bei Acme.", CVData(experience: [job("", "Acme", from: "Mai 2016", current: true)]),
+                        .unchanged, language: "de"))
+        rows.append(row("a-month-is-no-italian-never-fr", "mai is the month of the start, not the Italian mai: the job goes on",
+                        "Je travaille chez Acme depuis mai 2016.", CVData(experience: [job("", "Acme", from: "mai 2016", current: true)]),
+                        .unchanged, language: "fr"))
+        rows.append(row("in-the-is-no-denial-of-a-job-pt", "no is in the, not the English or Spanish no: the job goes on",
+                        "Desde 2016 trabalho no Hospital Santa Maria.",
+                        CVData(experience: [job("", "Hospital Santa Maria", from: "2016", current: true)]), .unchanged, language: "pt"))
+        rows.append(row("in-the-is-no-denial-of-a-level-pt", "no is in the, not the English or Spanish no: the level stays",
+                        "Falo inglês (B2) no trabalho.", CVData(languages: [Language(name: "inglês", proficiency: .b2)]),
+                        .unchanged, language: "pt"))
+        rows.append(row("fast-is-no-german-almost-en",
+                        "fast is quick, not the German fast: Acme is mentioned as a fact, though the clause backs no year, as fast and team are unexplained",
+                        "Since 2016 I have worked at Acme in a fast team.", CVData(experience: [job("", "Acme", from: "2016", current: true)]),
+                        .exactly(CVData(experience: [job("", "Acme")]))))
+        return rows
     }
 
     // MARK: A title quoted in a clause that names no entry (b)

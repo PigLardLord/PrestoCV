@@ -179,7 +179,8 @@ struct DescriptionText {
                       nearest.gap < (Self.nearest(to: statement.span, in: otherSpans)?.gap ?? Int.max),
                       !Self.isSeparatedByConjunction(statement.span, nearest.span, in: sentence),
                       Self.isInTheClauseOfTheItem(statement.span, item: nearest.span, clauses: clauses, in: sentence.folded),
-                      !Self.hedgesOrNegates(Self.clauseText(containing: statement.span, ranges: clauses, in: sentence.folded)) else { continue }
+                      !Self.hedgesOrNegates(Self.clauseText(containing: statement.span, ranges: clauses, in: sentence.folded),
+                                           language: vocabularyLanguage) else { continue }
 
                 if statement.isCode {
                     fromCodes.formUnion(statement.levels)
@@ -298,8 +299,10 @@ struct DescriptionText {
         return normalized(String(decoding: units[range.lowerBound..<end], as: UTF16.self))
     }
 
-    static func hedgesOrNegates(_ sentence: String) -> Bool {
-        sentence.contains("n't") || containsAny(StatementWords.hedges, in: sentence)
+    /// Whether the sentence holds a negation or a hedge (`StatementWords.hedges`). A hedge of another language that the description's
+    /// language has as a word of its own is none (`Vocabulary.isOwnWord`): German "Mai" is a month, Portuguese "no" is "in the".
+    static func hedgesOrNegates(_ sentence: String, language: Vocabulary.Language? = nil) -> Bool {
+        sentence.contains("n't") || containsAny(StatementWords.hedges.filter { !Vocabulary.isOwnWord($0, in: language) }, in: sentence)
     }
 
     static func containsAny(_ phrases: [String], in sentence: String) -> Bool {
