@@ -143,13 +143,16 @@ struct Grounding {
             return StatementWords.hedges.contains(word) && !Vocabulary.isOwnWord(word, in: language)
         }
 
-        /// Whether the negation at `index` governs a word of level: only the forms of "to be", indefinite articles and other negations
-        /// stand between them ("not an expert", "never been fluent", "non sono esperto", "kein Experte", "ne suis pas expert"). A verb
-        /// or an item between them makes it a negation of the ability: "cannot speak German even at a basic level".
+        /// Whether the negation at `index` governs a high level (`LevelHeight`): only the forms of "to be", indefinite articles and
+        /// other negations stand between them ("not an expert", "never been fluent", "non sono esperto", "kein Experte", "ne suis pas
+        /// expert"). Denying a high level implies some knowledge; denying a low one ("no basic knowledge", "keine Grundkenntnisse")
+        /// implies none. A verb or an item between them makes it a negation of the ability: "cannot speak German even at a basic
+        /// level".
         private func governsALevel(from index: Int, in words: [Word]) -> Bool {
+            let folded = words.map(\.folded)
             for next in words.indices.dropFirst(index + 1) {
                 let word = words[next]
-                if Vocabulary.isLevel(word.folded, in: language) { return true }
+                if let height = LevelHeight.ofPhrase(at: next, in: folded) { return height == .high }
                 let links = Vocabulary.isBeForm(word.accented, in: language) || EntryWording.isIndefiniteArticle(word.folded, in: language)
                     || isANegation(at: next, in: words)
                 guard links else { return false }

@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1572
+    static let rowsWhenWritten = 1588
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -487,6 +487,7 @@ enum GroundingRows {
         rows += personalFieldsOfAClaim()
         rows += acceptedReadingsOfAClaim()
         rows += negationsOfTheAbility()
+        rows += deniedLowLevels()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3445,6 +3446,39 @@ enum GroundingRows {
                         "I'd used Swift for years.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
         rows.append(row("wurde-without-gern-is-a-claim", "ich wurde geschult is a fact: the skill stays",
                         "Ich wurde in Python geschult.", CVData(skills: [Skill(name: "Python")]), .unchanged, language: "de"))
+        return rows
+    }
+
+    /// A denied level keeps its item only when the level is high (#202): denying "expert" or "fluent" implies some knowledge, while
+    /// denying a basic level, or knowledge itself, denies the item. "I'm not a beginner" denies a low level too, and loses its item:
+    /// an accepted loss.
+    private static func deniedLowLevels() -> [GroundingRow] {
+        typealias Denial = (id: String, language: String, description: String, name: String)
+        var denials: [Denial] = []
+        denials.append(("no-basic-knowledge-en", "en", "I have no basic knowledge of German.", "German"))
+        denials.append(("no-basic-en", "en", "I have no basic German.", "German"))
+        denials.append(("no-knowledge-en", "en", "I have no knowledge of German.", "German"))
+        denials.append(("not-even-basic-en", "en", "I have not even basic knowledge of German.", "German"))
+        denials.append(("keine-grundkenntnisse-de", "de", "Ich habe keine Grundkenntnisse in Deutsch.", "Deutsch"))
+        denials.append(("nicht-einmal-grundkenntnisse-de", "de", "Ich habe nicht einmal Grundkenntnisse in Deutsch.", "Deutsch"))
+        denials.append(("keine-kenntnisse-de", "de", "Ich habe keine Kenntnisse in Deutsch.", "Deutsch"))
+        denials.append(("nessuna-base-it", "it", "Non ho nessuna base di tedesco.", "tedesco"))
+        denials.append(("nessuna-conoscenza-di-base-it", "it", "Non ho nessuna conoscenza di base del tedesco.", "tedesco"))
+        denials.append(("ningun-conocimiento-basico-es", "es", "No tengo ningún conocimiento básico de alemán.", "alemán"))
+        denials.append(("no-es-basico-es", "es", "Mi alemán no es básico.", "alemán"))
+        denials.append(("aucune-notion-de-base-fr", "fr", "Je n'ai aucune notion de base en allemand.", "allemand"))
+        denials.append(("pas-de-notions-fr", "fr", "Je n'ai pas de notions d'allemand.", "allemand"))
+        denials.append(("nenhum-conhecimento-basico-pt", "pt", "Não tenho nenhum conhecimento básico de alemão.", "alemão"))
+        denials.append(("nao-e-basico-pt", "pt", "O meu alemão não é básico.", "alemão"))
+
+        var rows: [GroundingRow] = []
+        for v in denials {
+            rows.append(row("a-denied-low-level-gives-no-language-\(v.id)", "the negation denies a basic level or knowledge itself: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("a-denied-beginner-level-is-an-accepted-loss",
+                        "not a beginner denies a low level, which reads as no knowledge: the skill goes, an accepted loss",
+                        "I'm not a beginner in Python.", CVData(skills: [Skill(name: "Python")]), .exactly(CVData())))
         return rows
     }
 

@@ -216,6 +216,25 @@ struct VocabularyTests {
         }
     }
 
+    @Test("Every phrase of the level vocabularies has one height, and a low level is a beginner's or an A1 or A2")
+    func levelHeights() {
+        let skills = LevelVocabulary<SkillLevel>.skills.phrases, languages = LevelVocabulary<LanguageProficiency>.languages.phrases
+        for phrase in Set(skills.map(\.phrase)).intersection(languages.map(\.phrase)) {
+            let lowSkill = skills.contains { $0.phrase == phrase && $0.levels == [.beginner] }
+            let lowLanguage = languages.contains { $0.phrase == phrase && $0.levels.isSubset(of: [.a1, .a2]) }
+            #expect(lowSkill == lowLanguage, "\(phrase): the skills and the languages give it two heights")
+        }
+        #expect(LevelHeight.phrases.filter(LevelHeight.isLow).allSatisfy(LevelHeight.phrases.contains))
+        func height(_ text: String) -> LevelHeight? { LevelHeight.ofPhrase(at: 0, in: Word.words(in: text).map(\.folded)) }
+        for high in ["expert", "fluent", "advanced", "intermediate", "upper intermediate", "mother tongue", "experte", "fliessend", "b1", "c2"] {
+            #expect(height(high) == .high, "\(high)")
+        }
+        for low in ["basic", "beginner", "elementary", "grundkenntnisse", "notions", "a1", "a2", "basico"] {
+            #expect(height(low) == .low, "\(low)")
+        }
+        #expect(height("knowledge") == nil && height("level") == nil)
+    }
+
     @Test("A hedge of one language is another word in the description's language: a month, or in the")
     func hedgesOfAnotherLanguage() {
         #expect(!DescriptionText.hedgesOrNegates("seit mai 2016 arbeite ich bei acme", language: .german))
