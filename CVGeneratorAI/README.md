@@ -45,7 +45,9 @@ are its planned replacement and are still empty.
     of the six languages, and another word in the description's, is that other word: French "j'ai" holds no Italian "ai",
     English "per shift" no Italian "per", German "seit Mai" no Italian "mai" (never). A word of another language that the
     description's language does not have keeps its meaning.
-  - A skill that is also one of the draft's interests ("chess", "hiking") is a hobby, and is dropped; the interest stays.
+  - A skill that is also one of the draft's interests, and that the description mentions only as leisure ("In my free time I
+    like chess and hiking"), is a hobby, and is dropped; the interest stays. A skill mentioned anywhere else ("proficient in
+    Python", a job's clause, a list of skills) stays.
   - An employer or a school loses a leading indefinite article written in lower case ("a nursery" is "nursery"); an article
     with a capital is part of a name ("UNA Hotels").
   - A degree that only says graduating ("diplôme", "Abschluss", "laurea" or "my degree" alone) is dropped; the school stays.

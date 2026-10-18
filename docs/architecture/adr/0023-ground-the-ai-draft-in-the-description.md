@@ -116,7 +116,10 @@
   - That form is lower case and without diacritics. No lemma is used: a prose quote keeps the user's forms (d), and the closed vocabulary explains a CV verb only in the forms it lists (c), so neither a paraphrase nor a future becomes a fact.
 - **(f) Losing beats inventing.** A dropped fact is acceptable: the editor's banner asks the user to complete the draft. An invented or misattributed fact blocks the release.
 - **(g) Tidying after grounding only removes or reorders.** These steps add nothing:
-  - **A skill that equals an interest of the same draft is dropped.** A hobby is not a claimed ability, and the interest stays.
+  - **A skill that equals an interest of the same draft is dropped when the description mentions it only as leisure.** A hobby is not a claimed ability, and the interest stays.
+    - **A clause of leisure** holds a word of leisure from a short closed list per language ("free time", "hobby", "like"; "tempo libero", "piacciono"; "Freizeit", "mag"; "tiempo libre", "gustan"; "temps libre", "aime"; "tempo livre", "gosto"), and otherwise only the quotes of the draft's interests and function or time words: "In my free time I like chess". A fragment of interests that a comma or a conjunction splits off from such a clause is one too: "and hiking".
+    - **Any other mention keeps the skill.** "I am proficient in Python", a job's clause ("where I do portrait photography") or a list of skills ("My skills include chess") claim the ability, so the skill stays wherever else the interest is mentioned.
+    - **An interest the description does not give removes no skill:** only the interests that grounding keeps count.
   - **A leading indefinite article** ("a", "una", "eine", "une", "um"…) is trimmed from an employer or a school when it is written in lower case. What is left is still a quote, and a name such as "UNA Hotels" keeps its article.
   - **A degree made only of words of graduating, generic degree words and function words is dropped** ("diplôme", "Abschluss", "laurea", "my degree"). The school stays, and a degree with its field stays.
   - **The use case lists the jobs:** the current job first, then the others by their latest year, newest first. Jobs without a year, and jobs of the same year, keep the model's order.

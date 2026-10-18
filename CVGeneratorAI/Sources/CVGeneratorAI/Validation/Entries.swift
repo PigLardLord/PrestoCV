@@ -31,8 +31,10 @@ struct Entries {
     let studies: [Study]
     let certifications: [Certificate]
     private let subjects: [Subject]
+    private let clauses: DescriptionClauses
     private let grounding: Grounding
     private let person: [[String]]
+    private let language: Vocabulary.Language?
 
     init(_ cvData: CVData, personalInfo: PersonalInfo, _ source: DescriptionText) {
         let companies = cvData.experience.map { (company: source.named($0.company), title: source.named($0.title)) }
@@ -65,14 +67,11 @@ struct Entries {
 
         person = [personalInfo.name, personalInfo.location, personalInfo.title].compactMap { $0 }.map(Self.words(of:))
         self.subjects = subjects
-        grounding = Grounding(
-            clauses: DescriptionClauses(
-                sentences: source.sentences.map(\.raw), protecting: subjects.flatMap(\.quotes) + person, language: source.explainer.language
-            ),
-            explainer: source.explainer,
-            subjects: subjects,
-            person: person
+        language = source.explainer.language
+        clauses = DescriptionClauses(
+            sentences: source.sentences.map(\.raw), protecting: subjects.flatMap(\.quotes) + person, language: language
         )
+        grounding = Grounding(clauses: clauses, explainer: source.explainer, subjects: subjects, person: person)
     }
 
     /// What a summary may quote.
@@ -99,6 +98,13 @@ struct Entries {
     /// intention, future or condition. Without one the entry is not kept.
     func hasFactualMention(of subject: Int) -> Bool {
         grounding.hasFactualMention(subject)
+    }
+
+    /// Whether the description mentions `name` only as leisure, among the draft's `interests` that it gives (see `LeisureMentions`):
+    /// "In my free time I like chess" does, "I am proficient in Python" does not.
+    func mentionsOnlyAsLeisure(_ name: String, interests: [String]) -> Bool {
+        let leisure = LeisureMentions(clauses: clauses, language: language, interests: interests.map(Self.words(of:)))
+        return leisure.mentionsOnlyAsLeisure(Self.words(of: name))
     }
 
     /// The title of a job, or the degree of a study, when the description gives it for that entry: in a clause that names the

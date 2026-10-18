@@ -17,7 +17,7 @@ import Foundation
 ///   or of the clauses that back its entry (see `ProseQuotes`); a summary holds no number;
 /// - a skill level or language level stays only if the description states it, in a sentence with no negation or hedge, and a
 ///   language with a level that the description does not state goes whole; a language without a level may stay without one;
-/// - a skill that is also an interest of the draft is a hobby, and goes;
+/// - a skill that is also an interest of the draft, and that the description mentions only as leisure, is a hobby, and goes;
 /// - an employer or a school keeps no leading indefinite article, and a degree that only says graduating ("diplôme") goes;
 /// - every fact is the person's: a language, a skill, an interest and the person's own name, contacts, place and title are kept only
 ///   as the clauses that speak for the person (or a list with no verb) give them, so a sister's French or a manager's email goes; a
@@ -77,16 +77,17 @@ public struct CVDataSanitizer: Sendable {
         // the clauses that speak for the person then tell which of them stand in the description for the person.
         let entries = Entries(cvData, personalInfo: sanitize(cvData.personalInfo, jobTitles: jobTitles, source), source)
         let spoken = entries.spoken(in: source)
+        let interests = unique(cvData.interests.compactMap(spoken.named)) { $0 }
 
         return CVData(
             personalInfo: sanitize(cvData.personalInfo, jobTitles: jobTitles, spoken, contacts: entries.contacts(in: source)),
             summary: source.grounded(cvData.summary, quoting: entries.summaryQuotes, allowsNumbers: false),
             experience: sanitize(entries.jobs, source, entries),
             education: sanitize(entries.studies, source, entries),
-            skills: sanitize(cvData.skills, spoken, interests: cvData.interests),
+            skills: sanitize(cvData.skills, spoken, interests: interests, entries),
             languages: sanitize(cvData.languages, spoken),
             certifications: sanitize(entries.certifications, entries),
-            interests: unique(cvData.interests.compactMap(spoken.named)) { $0 }
+            interests: interests
         )
     }
 
@@ -160,13 +161,17 @@ public struct CVDataSanitizer: Sendable {
         return unique(cleaned) { "\($0.degree ?? "")|\($0.institution ?? "")" }
     }
 
-    /// A skill whose name is one of the draft's interests is a hobby ("chess", "hiking"): as a skill it would claim an ability the
-    /// person never claimed, so it goes, and the interest stays.
-    private func sanitize(_ skills: [Skill], _ source: DescriptionText, interests: [String]) -> [Skill] {
+    /// A skill whose name is one of the interests that the description gives, and that the description mentions only as leisure ("In
+    /// my free time I like chess and hiking"), is a hobby: as a skill it would claim an ability the person never claimed, so it goes, and
+    /// the interest stays. A skill the description mentions anywhere else ("proficient in Python", a job's clause, a list of skills)
+    /// stays.
+    private func sanitize(_ skills: [Skill], _ source: DescriptionText, interests: [String], _ entries: Entries) -> [Skill] {
         let names = skills.compactMap { source.named($0.name) }
         let hobbies = Set(interests.map { DescriptionText.normalized($0) })
         let cleaned = skills.compactMap { skill -> Skill? in
-            guard let name = source.named(skill.name), !hobbies.contains(DescriptionText.normalized(name)) else { return nil }
+            guard let name = source.named(skill.name) else { return nil }
+            let isAHobby = hobbies.contains(DescriptionText.normalized(name)) && entries.mentionsOnlyAsLeisure(name, interests: interests)
+            guard !isAHobby else { return nil }
             let allowed = source.levels(of: name, among: names, vocabulary: .skills)
             return Skill(name: name, level: statedLevel(skill.level, allowed: allowed))
         }
