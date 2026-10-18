@@ -234,7 +234,7 @@ A target's resources reach its bundle in one of two ways:
 A copied directory must not take a name of the bundle's own structure: `Contents`, `Resources`, `MacOS` or `_CodeSignature`, in any case. Copy the directory that holds the files (`.copy("Headings")`), not one that only wraps it.
 
 - Legacy targets follow this rule too: their bundles are signed in the same build as the others.
-- The path of a copied resource is a string literal, so the checker can read it.
+- The path of a copied resource is a string literal without interpolation, so the checker can read its value.
 
 **Why.** An iOS bundle is shallow: its resources sit next to `Info.plist`. A `Resources` or `Contents` directory at its root is the layout of a macOS bundle, and `codesign` rejects the bundle as "bundle format unrecognized, invalid, or unsuitable". A `_CodeSignature` directory at its root is replaced by the signature, and the files in it are lost. `CVRendering` copied a `Resources` directory, and every Xcode Cloud test build failed (#240). No package test showed it: on macOS, SwiftPM makes deep bundles, with the resources under `Contents/Resources`, where a copied `Resources` directory is harmless, and on Linux nothing is signed.
 

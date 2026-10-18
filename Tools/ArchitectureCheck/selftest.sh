@@ -228,6 +228,28 @@ for res in '.copy("Resources/Headings")' '.copy("../../Resources/Templates")' '.
   manifest_case "manifest: resources: [$res] is fine" 0 "" '// swift-tools-version: 6.0' 'import PackageDescription' \
     "let package = Package(name: \"F\", targets: [.target(name: \"Pure\", resources: [$res]), .target(name: \"Other\")])"
 done
+# The detector reads the literal's value, as SwiftPM receives it: escapes decoded, multiline delimiters and line continuations removed (final gate).
+for res in '.copy("\u{52}esources")' '.copy("Assets\u{2F}Resources")' '.copy(#"\#u{52}esources"#)' '.copy(#"Resources"#)'; do
+  manifest_case "manifest: resources: [$res] is refused for its value" 1 "R15 bundleLayout: copies Resources/" '// swift-tools-version: 6.0' \
+    'import PackageDescription' "let package = Package(name: \"F\", targets: [.target(name: \"Pure\", resources: [$res]), .target(name: \"Other\")])"
+done
+manifest_case "manifest: a multiline literal naming Resources is refused for its value" 1 "R15 bundleLayout: copies Resources/" \
+  '// swift-tools-version: 6.0' 'import PackageDescription' 'let package = Package(name: "F", targets: [.target(name: "Pure", resources: [.copy("""' \
+  '    Resources' '    """)]), .target(name: "Other")])'
+manifest_case "manifest: a multiline literal naming Headings is fine" 0 "" \
+  '// swift-tools-version: 6.0' 'import PackageDescription' 'let package = Package(name: "F", targets: [.target(name: "Pure", resources: [.copy("""' \
+  '    Headings' '    """)]), .target(name: "Other")])'
+manifest_case "manifest: a multiline literal continued over two lines into Resources is refused for its value" 1 "R15 bundleLayout: copies Resources/" \
+  '// swift-tools-version: 6.0' 'import PackageDescription' 'let package = Package(name: "F", targets: [.target(name: "Pure", resources: [.copy("""' \
+  '    Res\' '    ources' '    """)]), .target(name: "Other")])'
+manifest_case "manifest: a multiline literal continued over two lines into Headings is fine" 0 "" \
+  '// swift-tools-version: 6.0' 'import PackageDescription' 'let package = Package(name: "F", targets: [.target(name: "Pure", resources: [.copy("""' \
+  '    Head\' '    ings' '    """)]), .target(name: "Other")])'
+manifest_case "manifest: resources: [.copy(\"\\u{48}eadings\")] is fine" 0 "" '// swift-tools-version: 6.0' 'import PackageDescription' \
+  'let package = Package(name: "F", targets: [.target(name: "Pure", resources: [.copy("\u{48}eadings")]), .target(name: "Other")])'
+manifest_case "manifest: an interpolated path is refused" 1 "R15 bundleLayout: the path of a copied resource must be a string literal without interpolation" \
+  '// swift-tools-version: 6.0' 'import PackageDescription' 'let name = "Headings"' \
+  'let package = Package(name: "F", targets: [.target(name: "Pure", resources: [.copy("\(name)")]), .target(name: "Other")])'
 manifest_case "manifest: a copied Resources in an Apple-only branch is refused on every host" 1 "Package.swift:5: R15 bundleLayout" \
   '// swift-tools-version: 6.0' 'import PackageDescription' 'var targets: [Target] = [.target(name: "Pure"), .target(name: "Other")]' \
   '#if !os(Linux)' 'targets[0] = .target(name: "Pure", resources: [.copy("Resources")])' '#endif' 'let package = Package(name: "F", targets: targets)'
