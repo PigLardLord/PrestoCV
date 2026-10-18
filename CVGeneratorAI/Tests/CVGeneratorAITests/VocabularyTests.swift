@@ -235,6 +235,22 @@ struct VocabularyTests {
         #expect(height("knowledge") == nil && height("level") == nil)
     }
 
+    @Test("A mood of supposition withdraws a claim, read with its accents, and the past it folds to does not")
+    func moodsOfSupposition() {
+        func withdraws(_ text: String, _ language: Vocabulary.Language) -> Bool {
+            !Vocabulary.withdrawals(in: Word.words(in: text), language: language).isEmpty
+        }
+        #expect(withdraws("Ich würde arbeiten", .german) && !withdraws("Ich wurde befördert", .german))
+        #expect(withdraws("Ich hätte eine Stelle", .german) && !withdraws("Ich hatte eine Stelle", .german))
+        #expect(withdraws("Ich müsste lernen", .german) && !withdraws("Ich musste lernen", .german))
+        #expect(withdraws("Ich wäre Lehrerin", .german) && withdraws("Am liebsten würde ich Spanisch lernen", .german))
+        #expect(withdraws("I'd work as a teacher", .english) && withdraws("I'd be happy", .english) && withdraws("I'd teach", .english))
+        #expect(!withdraws("I'd worked as a teacher", .english) && !withdraws("I'd used Swift", .english))
+        #expect(!withdraws("I'd taught", .english) && !withdraws("I'd led a team", .english) && !withdraws("I'd been a nurse", .english))
+        #expect(withdraws("Sería feliz", .spanish) && !withdraws("Soy una persona seria", .spanish), "seria is serious in Spanish")
+        #expect(withdraws("Seria feliz", .portuguese) && withdraws("Sarei felice", .italian) && withdraws("Je serais heureuse", .french))
+    }
+
     @Test("A hedge of one language is another word in the description's language: a month, or in the")
     func hedgesOfAnotherLanguage() {
         #expect(!DescriptionText.hedgesOrNegates("seit mai 2016 arbeite ich bei acme", language: .german))

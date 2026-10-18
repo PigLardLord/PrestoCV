@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1588
+    static let rowsWhenWritten = 1608
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -488,6 +488,7 @@ enum GroundingRows {
         rows += acceptedReadingsOfAClaim()
         rows += negationsOfTheAbility()
         rows += deniedLowLevels()
+        rows += moodsOfSupposition()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3479,6 +3480,49 @@ enum GroundingRows {
         rows.append(row("a-denied-beginner-level-is-an-accepted-loss",
                         "not a beginner denies a low level, which reads as no knowledge: the skill goes, an accepted loss",
                         "I'm not a beginner in Python.", CVData(skills: [Skill(name: "Python")]), .exactly(CVData())))
+        return rows
+    }
+
+    /// A mood that only supposes or wishes is never a fact (#202): German Konjunktiv II ("würde", "hätte", "wäre", "müsste",
+    /// "dürfte"), read with its umlaut, so the past "wurde", "hatte", "musste" and "durfte" stay facts; English "'d" before a verb's
+    /// base form; the conditional of "to be", "to have", "to do" and of the verbs of liking in the other languages.
+    private static func moodsOfSupposition() -> [GroundingRow] {
+        typealias Supposed = (id: String, language: String, description: String, draft: CVData)
+        var supposed: [Supposed] = []
+        let maria = { (title: String, place: String) in CVData(personalInfo: person(name: "Maria Rossi", location: place, title: title)) }
+        supposed.append(("am-liebsten-wurde-language-de", "de", "Am liebsten würde ich Spanisch lernen.",
+                         CVData(languages: [Language(name: "Spanisch")])))
+        supposed.append(("am-liebsten-wurde-title-and-place-de", "de", "Ich bin Maria Rossi. Am liebsten würde ich als Lehrer in Berlin arbeiten.",
+                         maria("Lehrer", "Berlin")))
+        supposed.append(("wurde-alone-de", "de", "Ich bin Maria Rossi. Ich würde als Lehrerin in Berlin arbeiten.", maria("Lehrerin", "Berlin")))
+        supposed.append(("am-liebsten-hatte-de", "de", "Ich bin Maria Rossi. Am liebsten hätte ich eine Stelle als Lehrerin in Berlin.",
+                         maria("Lehrerin", "Berlin")))
+        supposed.append(("hatte-gern-de", "de", "Ich hätte gern Spanisch gelernt.", CVData(languages: [Language(name: "Spanisch")])))
+        supposed.append(("ware-gern-de", "de", "Ich bin Maria Rossi. Ich wäre gern Lehrerin in Berlin.", maria("Lehrerin", "Berlin")))
+        supposed.append(("d-work-en", "en", "I'm Maria Rossi. I'd work as a teacher in Berlin.", maria("teacher", "Berlin")))
+        supposed.append(("d-be-en", "en", "I'd be happy to learn Spanish.", CVData(languages: [Language(name: "Spanish")])))
+        supposed.append(("sarei-it", "it", "Sono Maria Rossi. Sarei felice di lavorare come infermiera a Torino.", maria("infermiera", "Torino")))
+        supposed.append(("farei-it", "it", "Sono Maria Rossi. Farei l'infermiera a Torino.", maria("infermiera", "Torino")))
+        supposed.append(("avrei-it", "it", "Avrei voluto imparare lo spagnolo.", CVData(languages: [Language(name: "spagnolo")])))
+        supposed.append(("seria-es", "es", "Soy Maria Rossi. Sería feliz trabajando como enfermera en Turín.", maria("enfermera", "Turín")))
+        supposed.append(("encantaria-es", "es", "Me encantaría aprender alemán.", CVData(languages: [Language(name: "alemán")])))
+        supposed.append(("serais-fr", "fr", "Je suis Maria Rossi. Je serais heureuse de travailler comme infirmière à Turin.",
+                         maria("infirmière", "Turin")))
+        supposed.append(("adorerais-fr", "fr", "J'adorerais apprendre l'espagnol.", CVData(languages: [Language(name: "espagnol")])))
+        supposed.append(("seria-pt", "pt", "Sou Maria Rossi. Seria feliz trabalhando como enfermeira em Turim.", maria("enfermeira", "Turim")))
+        supposed.append(("adoraria-pt", "pt", "Adoraria aprender alemão.", CVData(languages: [Language(name: "alemão")])))
+        supposed.append(("quereria-pt", "pt", "Quereria aprender espanhol.", CVData(languages: [Language(name: "espanhol")])))
+
+        var rows: [GroundingRow] = []
+        for v in supposed {
+            let kept = v.draft.personalInfo.name.map { CVData(personalInfo: person(name: $0)) } ?? CVData()
+            rows.append(row("a-mood-of-supposition-claims-nothing-\(v.id)", "the mood only supposes or wishes: nothing of the clause stays",
+                            v.description, v.draft, .exactly(kept), language: v.language))
+        }
+        rows.append(row("hatte-in-the-past-is-a-fact-de", "hatte without an umlaut is the past: the language stays",
+                        "Ich hatte Spanisch in der Schule.", CVData(languages: [Language(name: "Spanisch")]), .unchanged, language: "de"))
+        rows.append(row("a-past-after-d-keeps-the-title-and-place-en", "I'd worked is I had worked: the title and the place stay",
+                        "I'm Maria Rossi. I'd worked as a teacher in Berlin.", maria("teacher", "Berlin"), .unchanged))
         return rows
     }
 

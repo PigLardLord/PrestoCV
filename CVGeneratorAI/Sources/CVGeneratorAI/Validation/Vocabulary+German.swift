@@ -102,6 +102,8 @@ extension Vocabulary {
         """,
         /// Words of negation, doubt or degree, wish or intention, future and condition: in no other list.
         modality: """
+        würde würdest würden würdet wäre wärest wärst wären wäret wärt hätte hättest hätten hättet müsste müsstest müssten
+        müsstet dürfte dürftest dürften dürftet
         wurde~gern wurde~gerne wurde~lieber traume~davon traume~von
         beabsichtige beinahe darf duerfen durfen etwa eventuell falls fast hoffe hoffen kann kannst kaum kein keine
         keinem keinen keiner keines koennen koennte konnen konnte konnten mochte mochten moechte moechten

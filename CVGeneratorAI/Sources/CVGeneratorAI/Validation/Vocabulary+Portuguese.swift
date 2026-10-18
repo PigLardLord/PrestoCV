@@ -319,6 +319,8 @@ extension Vocabulary {
         """,
         /// Words of negation, doubt or degree, wish or intention, future and condition: in no other list.
         modality: """
+        seria serias seriamos seriam faria farias fariamos fariam teria terias teriamos teriam adoraria adorarias adorariamos
+        adorariam quereria quererias quereriamos quereriam
         sonho_em sonho_com
         acompanhara acompanharao acompanharas acompanharei acompanhareis acompanharemos acompanharia acompanhariam
         acompanhariamos acompanharias acompanharieis administrara administrarao administraras administrarei
