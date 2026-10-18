@@ -77,6 +77,39 @@ struct CVGeneratorUseCaseTests {
         #expect(cvData.experience.first?.endDate == nil)
     }
 
+    @Test("generateCV lists the job that goes on now first, then the newest")
+    func currentJobFirst() async throws {
+        let service = FakeCVGenerationService()
+        service.generateResult = .success(CVData(experience: [
+            Experience(title: "assistant", company: "nursery", startDate: "2012", endDate: "2016"),
+            Experience(title: "", company: "Don Milani school", startDate: "2016", current: true),
+        ]))
+        let useCase = CVGeneratorUseCase(service: service)
+        let request = CVGenerationRequest(
+            userPrompt: "Since 2016 I have taught at the Don Milani school. Before that, from 2012 to 2016, I worked as an assistant in a nursery."
+        )
+
+        let cvData = try await useCase.generateCV(from: request)
+
+        #expect(cvData.experience.map(\.company) == ["Don Milani school", "nursery"])
+        #expect(cvData.experience.map(\.startDate) == ["2016", "2012"])
+    }
+
+    @Test("generateCV orders the jobs only by the years the description backs")
+    func inventedYearsOrderNothing() async throws {
+        let service = FakeCVGenerationService()
+        service.generateResult = .success(CVData(experience: [
+            Experience(title: "", company: "Alpha", startDate: "2010", endDate: "2012"),
+            Experience(title: "", company: "Beta", startDate: "2018", endDate: "2020"),
+        ]))
+        let useCase = CVGeneratorUseCase(service: service)
+
+        let cvData = try await useCase.generateCV(from: CVGenerationRequest(userPrompt: "I worked at Alpha. I worked at Beta."))
+
+        #expect(cvData.experience.map(\.company) == ["Alpha", "Beta"])
+        #expect(cvData.experience.allSatisfy { $0.startDate == nil && $0.endDate == nil })
+    }
+
     @Test("generateCV reports an answer that nothing supports as empty")
     func emptyAfterSanitizing() async {
         let service = FakeCVGenerationService()
