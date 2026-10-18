@@ -58,9 +58,10 @@ enum Vocabulary {
         let graduationFrame: Set<String>
         /// Words of negation, doubt or degree, wish or intention, future and condition ("never", "barely", "want", "will", "if"; "mai",
         /// "appena", "vorrei", "se"; "nie", "kaum", "möchte", "wenn"). They are in no other list: a clause that holds one backs
-        /// nothing and gives no entry, and prose keeps the ones of the clause that explains it. A wish that only a phrase says is
-        /// written as its two words joined by "_" ("d_like" for "I'd like", "sogno_di"): the clause holds it when the second word
-        /// follows the first, so "I'd used" holds none. Joined by "~", the two words may stand in either order, as German fronts
+        /// nothing and gives no entry, and prose keeps the ones of the clause that explains it. A word written with its accents is
+        /// read as written, unfolded: German "würde" and "hätte" (Konjunktiv II) are no "wurde" and "hatte", Spanish "sería" is no
+        /// "seria" (serious). A wish that only a phrase says is written as its two words joined by "_" ("sogno_di"): the clause holds
+        /// it when the second word follows the first. Joined by "~", the two words may stand in either order, as German fronts
         /// them ("wurde~gern": "Ich würde gern…", "Gerne würde ich…"), so "ich wurde geschult" holds none.
         let modality: Set<String>
         /// The present and past of "to be": a verb that says something done on its own ("am", "m", "was"; "sono", "era"; "bin", "war").
@@ -118,10 +119,13 @@ enum Vocabulary {
     /// condition or hedge. In a description in another language, or in one whose language is not known, they are the other
     /// languages' words. Portuguese "no" is "in the", where English and Spanish "no" is a negation; German and French "mai" is a
     /// month, where Italian "mai" is "never"; English "fast" is quick, where German "fast" is "almost"; Italian "casi" are cases,
-    /// where Spanish "casi" is "almost"; Spanish and French "se" is "oneself", where Italian and Portuguese "se" is "if".
+    /// where Spanish "casi" is "almost"; Spanish and French "se" is "oneself", where Italian and Portuguese "se" is "if"; Spanish
+    /// "seria" is serious, where Portuguese "seria" is "would be".
     private static let onlyIn: [String: Set<Language>] = [
         "no": [.portuguese],
         "mai": [.german, .french],
+        "seria": [.spanish],
+        "serias": [.spanish],
         "fast": [.english],
         "falls": [.english],
         "plan": [.spanish, .french],
@@ -204,6 +208,20 @@ enum Vocabulary {
 
     private static let everyBeForm: Set<String> = union { $0.beForms }
 
+    /// The pronouns that stand before the "d" of "'d": "I'd" is the words "i" and "d".
+    private static let beforeD: Set<String> = ["i", "we", "you", "he", "she", "they"]
+
+    /// Whether the word after an English "'d" makes it "had": "been", "had", or a verb of the English lists in a form that has no
+    /// form in "-s" beside it there ("worked", "used", "taught", "led", where "works" and "uses" mark "work" and "use" as base
+    /// forms). Before a base form, or any other word, "'d" is "would": "I'd like", "I'd work", "I'd be".
+    private static func makesAPast(_ word: String) -> Bool {
+        if word == "been" || word == "had" { return true }
+        let verbs = english.verbs.union(english.everydayVerbs)
+        guard verbs.contains(word) else { return false }
+        let thirdPerson = word.hasSuffix("y") ? String(word.dropLast()) + "ies" : word + "s"
+        return !verbs.contains(thirdPerson) && !verbs.contains(word + "es")
+    }
+
     /// The words that stand before the "t" of "n't": "don't" is the words "don" and "t".
     private static let beforeNT: Set<String> = [
         "don", "doesn", "didn", "isn", "aren", "wasn", "weren", "haven", "hasn", "hadn", "won", "wouldn", "shouldn", "couldn", "can", "mustn",
@@ -211,15 +229,21 @@ enum Vocabulary {
     ]
 
     /// Which of the words are words of negation, doubt or degree, wish or intention, future or condition (`Words.modality`), and
-    /// "n't" for a "t" after "don", "isn", "can"... A word that the description's language has of its own is none (`isOwnWord`):
-    /// Portuguese "no" is "in the", German and French "mai" is a month, English "fast" is quick.
+    /// "n't" for a "t" after "don", "isn", "can"..., and "'d" for a "d" after "I", "we", "you"... that a base form follows ("I'd
+    /// work"). A word that the description's language has of its own is none (`isOwnWord`): Portuguese "no" is "in the", German
+    /// and French "mai" is a month, English "fast" is quick. An entry written with its accents is matched as written: "würde".
     static func modality(in words: [Word], language: Language? = nil) -> Set<String> {
         var found = Set<String>()
         for (index, word) in words.enumerated() {
-            if everyModalityWord.contains(word.folded) {
-                if !isOwnWord(word.folded, in: language) { found.insert(word.folded) }
+            if everyModalityWord.contains(word.folded), !isOwnWord(word.folded, in: language) {
+                found.insert(word.folded)
+            } else if word.accented != word.folded, everyModalityWord.contains(word.accented) {
+                found.insert(word.accented)
             } else if word.folded == "t", index > 0, beforeNT.contains(words[index - 1].folded) {
                 found.insert("n't")
+            } else if word.folded == "d", index > 0, beforeD.contains(words[index - 1].folded),
+                      !(index + 1 < words.count && makesAPast(words[index + 1].folded)) {
+                found.insert("'d")
             }
             for second in everyModalityPhrase[word.folded] ?? [] where words[(index + 1)...].contains(where: { $0.folded == second }) {
                 found.insert(word.folded + "_" + second)
