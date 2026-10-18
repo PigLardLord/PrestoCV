@@ -81,7 +81,8 @@ struct Grounding {
         /// follows no clause of its sentence that opens with a word of condition ("If I had time, I would play chess"), and, when it
         /// depends on the clause before it (a clause split off by a comma or a conjunction that has no verb, starts with its verb, or
         /// says nothing as a fact, such as "Spanisch zu lernen"), that clause claims too: "I have never used Java or Swift" claims
-        /// neither, and "Ich träume davon, Spanisch zu lernen" no Spanish.
+        /// neither, and "Ich träume davon, Spanisch zu lernen" no Spanish. A clause that states nothing as a fact shares the
+        /// withdrawal of the clause after it: "Spanisch zu lernen, davon träume ich" gives no Spanish either.
         ///
         /// A negation or a hedge that governs a word of level bears on the level alone: "I am not an expert in Swift" and "I have
         /// never been fluent in German" claim Swift and German, and the level, which they deny, is not stated
@@ -94,12 +95,33 @@ struct Grounding {
                 let opening = clauses.clause(at: Place(sentence: place.sentence, clause: index)).words.first
                 return opening.map { Vocabulary.isCondition($0.folded, in: language) } ?? false
             }
-            guard !supposed else { return false }
+            guard !supposed, !(statesNothing(at: place) && isWithdrawnAhead(of: place)) else { return false }
             if clause.isAnchored { return true }
 
             let statement = Statement(clause: clause, quotes: all, language: language)
             guard statement.startsWithItsVerb || !statement.hasVerbs || !statement.isFactual else { return true }
             return claims(at: Place(sentence: place.sentence, clause: place.clause - 1))
+        }
+
+        /// Whether the clause at `place` states nothing as a fact, and takes no fact from a clause before it: it has no verb, or none
+        /// that is factual ("Spanisch zu lernen", "Spanish"), and it starts its sentence or a semicolon, or a comma or a conjunction
+        /// split it off from a clause that states nothing either. A fragment of a fact ("I speak Italian, English") states its fact.
+        private func statesNothing(at place: Place) -> Bool {
+            let clause = clauses.clause(at: place)
+            let statement = Statement(clause: clause, quotes: all, language: language)
+            guard !statement.hasVerbs || !statement.isFactual else { return false }
+            return clause.isAnchored || statesNothing(at: Place(sentence: place.sentence, clause: place.clause - 1))
+        }
+
+        /// Whether a clause after `place` in its sentence, split off by a comma or a conjunction, withdraws the claim, directly or through
+        /// clauses that state nothing as a fact: "Spanisch zu lernen, davon träume ich", "Python, Java and Swift, which I have never
+        /// used".
+        private func isWithdrawnAhead(of place: Place) -> Bool {
+            let next = Place(sentence: place.sentence, clause: place.clause + 1)
+            guard next.clause < clauses.sentences[place.sentence].count else { return false }
+            let clause = clauses.clause(at: next)
+            guard !clause.isAnchored else { return false }
+            return withdraws(clause) || (statesNothing(at: next) && isWithdrawnAhead(of: next))
         }
 
         /// Whether the clause withdraws its claim: some word of it does, and not only negations or hedges (`StatementWords.hedges`)

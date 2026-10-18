@@ -154,7 +154,7 @@ extension Vocabulary {
         """,
         /// Words of negation, doubt or degree, wish or intention, future and condition: in no other list.
         modality: """
-        reve_de reve_d
+        reve_de reve_d en_reve
         accompagnera accompagnerai accompagneraient accompagnerais accompagnerait accompagneras accompagnerez
         accompagneriez accompagnerions accompagnerons accompagneront administrera administrerai administreraient
         administrerais administrerait administreras administrerez administreriez administrerions administrerons

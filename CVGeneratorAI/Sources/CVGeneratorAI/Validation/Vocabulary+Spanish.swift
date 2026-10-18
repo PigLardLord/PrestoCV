@@ -317,7 +317,7 @@ extension Vocabulary {
         """,
         /// Words of negation, doubt or degree, wish or intention, future and condition: in no other list.
         modality: """
-        sueno_con
+        sueno_con lo_sueno
         administrara administraran administraras administrare administrareis administraremos administraria
         administrariais administrariamos administrarian administrarias analizara analizaran analizaras analizare
         analizareis analizaremos analizaria analizariais analizariamos analizarian analizarias apenas aprendera
