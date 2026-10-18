@@ -165,6 +165,30 @@ struct VocabularyTests {
         #expect(Vocabulary.modality(in: Word.words(in: text), language: language).contains(word), "\(word) in \(language)")
     }
 
+    @Test("The qualifiers of a claim and the words of condition are words of the modality list of their language",
+          arguments: Vocabulary.Language.allCases)
+    func claimWordsAreModality(language: Vocabulary.Language) {
+        let modality = language.words.modality
+        #expect(Vocabulary.claimQualifiers(of: language).subtracting(modality).isEmpty, "\(language)")
+        #expect(Vocabulary.conditions(of: language).subtracting(modality).isEmpty, "\(language)")
+        #expect(!Vocabulary.claimQualifiers(of: language).isEmpty && !Vocabulary.conditions(of: language).isEmpty, "\(language)")
+    }
+
+    @Test("Ability and part qualify a claim; denial, wish and condition withdraw it")
+    func claimsAndWithdrawals() {
+        #expect(Vocabulary.withdrawals(in: Word.words(in: "I can teach chess"), language: .english).isEmpty)
+        #expect(Vocabulary.withdrawals(in: Word.words(in: "I mostly use Swift"), language: .english).isEmpty)
+        #expect(Vocabulary.withdrawals(in: Word.words(in: "Ich unterrichte teilweise Schach"), language: .german).isEmpty)
+        #expect(Vocabulary.withdrawals(in: Word.words(in: "Posso parlare francese"), language: .italian).isEmpty)
+        #expect(!Vocabulary.withdrawals(in: Word.words(in: "I can't teach chess"), language: .english).isEmpty)
+        #expect(!Vocabulary.withdrawals(in: Word.words(in: "I have never used Python"), language: .english).isEmpty)
+        #expect(!Vocabulary.withdrawals(in: Word.words(in: "I would like to learn Spanish"), language: .english).isEmpty)
+        #expect(!Vocabulary.withdrawals(in: Word.words(in: "Vorrei imparare lo spagnolo"), language: .italian).isEmpty)
+        #expect(!Vocabulary.withdrawals(in: Word.words(in: "Si tuviera tiempo"), language: .spanish).isEmpty)
+        #expect(Vocabulary.isCondition("si", in: .french) && Vocabulary.isCondition("wenn", in: .german))
+        #expect(!Vocabulary.isCondition("se", in: .spanish), "Spanish se is oneself")
+    }
+
     @Test("A hedge of one language is another word in the description's language: a month, or in the")
     func hedgesOfAnotherLanguage() {
         #expect(!DescriptionText.hedgesOrNegates("seit mai 2016 arbeite ich bei acme", language: .german))

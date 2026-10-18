@@ -84,6 +84,12 @@ struct Entries {
         DescriptionText(sentences: grounding.spokenSentences, of: source)
     }
 
+    /// The description as the person claims skills, interests and languages in it: `source` without the clauses that speak for
+    /// someone else, or that deny, wish or suppose ("I have never used Python", "I would like to learn Spanish").
+    func claimed(in source: DescriptionText) -> DescriptionText {
+        DescriptionText(sentences: grounding.claimedSentences, of: source)
+    }
+
     /// The description as it gives the person's contacts: `source` without the clauses that speak for someone else or name another
     /// person.
     func contacts(in source: DescriptionText) -> DescriptionText {

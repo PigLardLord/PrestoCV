@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1457
+    static let rowsWhenWritten = 1495
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -481,6 +481,7 @@ enum GroundingRows {
         rows += hobbiesAreNoSkills()
         rows += skillsTheDescriptionClaims()
         rows += hobbiesOfThePersonAlone()
+        rows += factsTheDescriptionWithdraws()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3296,6 +3297,94 @@ enum GroundingRows {
                         "the model makes ECG monitoring an interest too, though the description states no interest: the skill stays",
                         "I am good at ECG monitoring.",
                         CVData(skills: [Skill(name: "ECG monitoring")], interests: ["ECG monitoring"]), .unchanged))
+        return rows
+    }
+
+    // MARK: A clause that denies, wishes or supposes claims no skill, interest or language (c)
+
+    /// A skill, an interest or a language counts only in a clause of the person that claims it (#202): one that denies ("I have never
+    /// used Python"), wishes ("I would like to learn Spanish") or supposes ("If I had time, I would play chess") claims nothing, and
+    /// nor does a clause that follows a condition in its sentence. Ability and part still claim: "I can speak French", "I partly use
+    /// Swift", "I mostly use Swift". The same item in a plain clause of the person stays.
+    private static func factsTheDescriptionWithdraws() -> [GroundingRow] {
+        typealias Variant = (
+            language: String, denied: String, wished: String, supposed: String, skill: String, spoken: String, interest: String,
+            affirmed: String
+        )
+        var variants: [Variant] = []
+        variants.append(("en", "I have never used Python.", "I would like to learn Spanish.", "If I had time, I would play chess.",
+                         "Python", "Spanish", "chess",
+                         "I use Python. I have never used Python for games. I speak Spanish. I would like to speak Spanish better. "
+                            + "I play chess. If I had time, I would play chess more."))
+        variants.append(("it", "Non ho mai usato Python.", "Vorrei imparare lo spagnolo.", "Se avessi tempo, giocherei a scacchi.",
+                         "Python", "spagnolo", "scacchi",
+                         "Uso Python. Non ho mai usato Python per i videogiochi. Parlo spagnolo. Vorrei parlare meglio lo spagnolo. "
+                            + "Gioco a scacchi. Se avessi tempo, giocherei di più a scacchi."))
+        variants.append(("de", "Ich habe nie Python benutzt.", "Ich möchte Spanisch lernen.", "Wenn ich Zeit hätte, würde ich Schach spielen.",
+                         "Python", "Spanisch", "Schach",
+                         "Ich benutze Python. Ich habe nie Python für Spiele benutzt. Ich spreche Spanisch. Ich möchte besser Spanisch "
+                            + "sprechen. Ich spiele Schach. Wenn ich Zeit hätte, würde ich mehr Schach spielen."))
+        variants.append(("es", "Nunca he usado Python.", "Quiero aprender español.", "Si tuviera tiempo, jugaría al ajedrez.",
+                         "Python", "español", "ajedrez",
+                         "Uso Python. Nunca he usado Python para juegos. Hablo español. Quiero hablar mejor español. Juego al ajedrez. "
+                            + "Si tuviera tiempo, jugaría más al ajedrez."))
+        variants.append(("fr", "Je n'ai jamais utilisé Python.", "Je souhaite apprendre l'espagnol.",
+                         "Si j'avais le temps, je jouerais aux échecs.", "Python", "espagnol", "échecs",
+                         "J'utilise Python. Je n'ai jamais utilisé Python pour des jeux. Je parle espagnol. Je souhaite mieux parler "
+                            + "espagnol. Je joue aux échecs. Si j'avais le temps, je jouerais plus aux échecs."))
+        variants.append(("pt", "Nunca usei Python.", "Quero aprender espanhol.", "Se eu tivesse tempo, jogaria xadrez.",
+                         "Python", "espanhol", "xadrez",
+                         "Uso Python. Nunca usei Python para jogos. Falo espanhol. Quero falar melhor espanhol. Jogo xadrez. "
+                            + "Se eu tivesse tempo, jogaria mais xadrez."))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-denied-skill-is-not-the-persons-\(v.language)", "the only clause that names the skill denies it: no skill",
+                            v.denied, CVData(skills: [Skill(name: v.skill)]), .exactly(CVData()), language: v.language))
+            rows.append(row("a-wished-language-is-not-the-persons-\(v.language)", "the only clause that names the language wishes it: no language",
+                            v.wished, CVData(languages: [Language(name: v.spoken)]), .exactly(CVData()), language: v.language))
+            rows.append(row("a-supposed-interest-is-not-the-persons-\(v.language)",
+                            "the only clause that names the interest follows a condition: no interest",
+                            v.supposed, CVData(interests: [v.interest]), .exactly(CVData()), language: v.language))
+            rows.append(row("an-affirmed-skill-language-and-interest-stay-\(v.language)",
+                            "each item also stands in a plain clause of the person, beside one that denies, wishes or supposes it: all stay",
+                            v.affirmed,
+                            CVData(skills: [Skill(name: v.skill)], languages: [Language(name: v.spoken)], interests: [v.interest]),
+                            .unchanged, language: v.language))
+        }
+
+        rows.append(row("a-wished-language-is-not-the-persons-in-the-conditional-fr",
+                        "j'aimerais only wishes the language: no language",
+                        "J'aimerais apprendre l'espagnol.", CVData(languages: [Language(name: "espagnol")]), .exactly(CVData()),
+                        language: "fr"))
+
+        typealias Ability = (language: String, description: String, name: String)
+        var abilities: [Ability] = []
+        abilities.append(("en", "I can speak French.", "French"))
+        abilities.append(("it", "Posso parlare francese.", "francese"))
+        abilities.append(("de", "Ich kann Französisch sprechen.", "Französisch"))
+        abilities.append(("es", "Puedo hablar francés.", "francés"))
+        abilities.append(("fr", "Je peux parler espagnol.", "espagnol"))
+        abilities.append(("pt", "Posso falar francês.", "francês"))
+        for v in abilities {
+            rows.append(row("an-ability-is-a-claim-\(v.language)", "can is an ability the person claims: the language stays",
+                            v.description, CVData(languages: [Language(name: v.name)]), .unchanged, language: v.language))
+        }
+
+        typealias Part = (language: String, description: String)
+        var parts: [Part] = []
+        parts.append(("en", "I partly use Swift."))
+        parts.append(("it", "Uso parzialmente Swift."))
+        parts.append(("de", "Ich nutze teilweise Swift."))
+        parts.append(("es", "Uso parcialmente Swift."))
+        parts.append(("fr", "J'utilise partiellement Swift."))
+        parts.append(("pt", "Uso parcialmente Swift."))
+        for v in parts {
+            rows.append(row("a-part-is-a-claim-\(v.language)", "partly qualifies the claim but does not withdraw it: the skill stays",
+                            v.description, CVData(skills: [Skill(name: "Swift")]), .unchanged, language: v.language))
+        }
+        rows.append(row("most-is-a-claim", "mostly qualifies the claim but does not withdraw it: the skill stays",
+                        "I mostly use Swift.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
         return rows
     }
 
