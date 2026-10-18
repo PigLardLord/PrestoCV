@@ -27,5 +27,13 @@ struct LexicalClassesTests {
     func noLanguage() {
         #expect(verbs("I am going to work at Acme", language: nil).isEmpty)
     }
+
+    @Test("The tagger of the task tells the verbs: a verdict forced for English, the device for German")
+    func taggerOfTheTask() {
+        LexicalClasses.$tagger.withValue(ForcedLexicalTagger([.english: .words(["acme"])])) {
+            #expect(verbs("I am going to work at Acme", language: .english) == ["acme"])
+            #expect(verbs("Ich habe vor, bei Acme zu arbeiten", language: .german) == ["habe", "arbeiten"])
+        }
+    }
 }
 #endif
