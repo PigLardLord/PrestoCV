@@ -102,6 +102,7 @@ extension Vocabulary {
         """,
         /// Words of negation, doubt or degree, wish or intention, future and condition: in no other list.
         modality: """
+        wurde_gern wurde_gerne wurde_lieber traume_davon traume_von
         beabsichtige beinahe darf duerfen durfen etwa eventuell falls fast hoffe hoffen kann kannst kaum kein keine
         keinem keinen keiner keines koennen koennte konnen konnte konnten mochte mochten moechte moechten
         moeglicherweise moglicherweise muessen muss mussen musst nicht nichts nie niemals niemand ob ohne sofern soll

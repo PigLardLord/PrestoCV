@@ -351,6 +351,7 @@ extension Vocabulary {
         """,
         /// Words of negation, doubt or degree, wish or intention, future and condition: in no other list.
         modality: """
+        sogno_di
         aiutera aiuterai aiuteranno aiuterebbe aiuterebbero aiuterei aiuteremmo aiuteremo aiutereste aiuteresti
         aiuterete aiutero amministrera amministrerai amministreranno amministrerebbe amministrerebbero amministrerei
         amministreremmo amministreremo amministrereste amministreresti amministrerete amministrero analizzera

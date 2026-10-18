@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1497
+    static let rowsWhenWritten = 1513
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -482,6 +482,7 @@ enum GroundingRows {
         rows += skillsTheDescriptionClaims()
         rows += hobbiesOfThePersonAlone()
         rows += factsTheDescriptionWithdraws()
+        rows += wishesInAPhrase()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3385,6 +3386,39 @@ enum GroundingRows {
         }
         rows.append(row("most-is-a-claim", "mostly qualifies the claim but does not withdraw it: the skill stays",
                         "I mostly use Swift.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
+        return rows
+    }
+
+    /// Wishes said with a phrase, not one word (#202): English "'d like", "'d love", "'d prefer", "'d rather"; German "würde gern",
+    /// "würde gerne", "würde lieber"; the verbs of dream with their complement ("sogno di", "sueño con", "rêve de", "sonho em",
+    /// "träume davon"). The words alone keep their meaning: "I'd used Swift" and "Ich wurde in Python geschult" claim.
+    private static func wishesInAPhrase() -> [GroundingRow] {
+        typealias Wish = (id: String, language: String, description: String, name: String)
+        var wishes: [Wish] = []
+        wishes.append(("d-like-en", "en", "I'd like to learn Spanish.", "Spanish"))
+        wishes.append(("d-love-en", "en", "I'd love to speak Spanish.", "Spanish"))
+        wishes.append(("d-prefer-en", "en", "I'd prefer to speak French.", "French"))
+        wishes.append(("d-rather-en", "en", "I'd rather learn German.", "German"))
+        wishes.append(("wurde-gern-de", "de", "Ich würde gern Spanisch lernen.", "Spanisch"))
+        wishes.append(("wurde-gerne-de", "de", "Ich würde gerne Italienisch lernen.", "Italienisch"))
+        wishes.append(("wurde-lieber-de", "de", "Ich würde lieber Französisch sprechen.", "Französisch"))
+        wishes.append(("traume-davon-de", "de", "Ich träume davon, Spanisch zu lernen.", "Spanisch"))
+        wishes.append(("sogno-di-it", "it", "Sogno di imparare lo spagnolo.", "spagnolo"))
+        wishes.append(("sueno-con-es", "es", "Sueño con hablar francés.", "francés"))
+        wishes.append(("reve-d-fr", "fr", "Je rêve d'apprendre l'espagnol.", "espagnol"))
+        wishes.append(("reve-de-fr", "fr", "Je rêve de parler italien.", "italien"))
+        wishes.append(("sonho-em-pt", "pt", "Sonho em falar francês.", "francês"))
+        wishes.append(("sonho-com-pt", "pt", "Sonho com aprender italiano.", "italiano"))
+
+        var rows: [GroundingRow] = []
+        for v in wishes {
+            rows.append(row("a-wish-in-a-phrase-claims-no-language-\(v.id)", "the phrase only wishes the language: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("a-past-participle-after-d-is-a-claim", "I'd used is I had used: the skill stays",
+                        "I'd used Swift for years.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
+        rows.append(row("wurde-without-gern-is-a-claim", "ich wurde geschult is a fact: the skill stays",
+                        "Ich wurde in Python geschult.", CVData(skills: [Skill(name: "Python")]), .unchanged, language: "de"))
         return rows
     }
 

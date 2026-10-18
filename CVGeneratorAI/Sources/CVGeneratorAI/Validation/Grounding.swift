@@ -79,8 +79,9 @@ struct Grounding {
         /// Whether the clause at `place` claims a skill, an interest or a language for the person (#202): it speaks for the person,
         /// holds no word that withdraws a claim (`Vocabulary.withdrawals`: "never", "would", "if", but not "can" or "partly"),
         /// follows no clause of its sentence that opens with a word of condition ("If I had time, I would play chess"), and, when it
-        /// shares the clause before it (a verbless clause split off, or one that starts with its verb after a comma or a conjunction),
-        /// that clause claims too: "I have never used Java or Swift" claims neither.
+        /// depends on the clause before it (a clause split off by a comma or a conjunction that has no verb, starts with its verb, or
+        /// says nothing as a fact, such as "Spanisch zu lernen"), that clause claims too: "I have never used Java or Swift" claims
+        /// neither, and "Ich träume davon, Spanisch zu lernen" no Spanish.
         ///
         /// A negation or a hedge beside a word of level bears on the level: "I am not an expert in Swift" and "I don't speak French
         /// fluently" claim Swift and French, and the level, which they deny, is not stated (`DescriptionText.levels`).
@@ -95,7 +96,7 @@ struct Grounding {
             if clause.isAnchored { return true }
 
             let statement = Statement(clause: clause, quotes: all, language: language)
-            guard statement.startsWithItsVerb || !statement.hasVerbs else { return true }
+            guard statement.startsWithItsVerb || !statement.hasVerbs || !statement.isFactual else { return true }
             return claims(at: Place(sentence: place.sentence, clause: place.clause - 1))
         }
 

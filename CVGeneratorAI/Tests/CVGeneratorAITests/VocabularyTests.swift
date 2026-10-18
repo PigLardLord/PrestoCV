@@ -189,6 +189,30 @@ struct VocabularyTests {
         #expect(!Vocabulary.isCondition("se", in: .spanish), "Spanish se is oneself")
     }
 
+    @Test("A wish that only a phrase says withdraws a claim, and the words of the phrase alone do not")
+    func wishesInAPhrase() {
+        func withdraws(_ text: String, _ language: Vocabulary.Language) -> Bool {
+            !Vocabulary.withdrawals(in: Word.words(in: text), language: language).isEmpty
+        }
+        #expect(withdraws("I'd like to learn Spanish", .english) && withdraws("I'd really like to learn Spanish", .english))
+        #expect(withdraws("I'd rather learn German", .english))
+        #expect(!withdraws("I'd used Swift for years", .english), "I had used")
+        #expect(withdraws("Ich würde gern Spanisch lernen", .german) && withdraws("Ich würde sehr gerne Spanisch lernen", .german))
+        #expect(!withdraws("Ich wurde befördert", .german) && !withdraws("Ich wurde Ingenieur", .german))
+        #expect(withdraws("Ich träume davon", .german) && !withdraws("Mein Traum war Spanisch", .german))
+        #expect(withdraws("Sogno di imparare lo spagnolo", .italian) && !withdraws("Era un sogno", .italian))
+        #expect(withdraws("Sueño con hablar francés", .spanish) && withdraws("Je rêve d'apprendre l'espagnol", .french))
+        #expect(withdraws("Sonho em falar francês", .portuguese) && withdraws("Sonho com aprender italiano", .portuguese))
+    }
+
+    @Test("A phrase of the modality lists is two words joined by an underscore", arguments: Vocabulary.Language.allCases)
+    func modalityPhrasesHaveTwoWords(language: Vocabulary.Language) {
+        for phrase in language.words.modality where phrase.contains("_") {
+            let parts = phrase.split(separator: "_", omittingEmptySubsequences: false)
+            #expect(parts.count == 2 && parts.allSatisfy { !$0.isEmpty && DescriptionText.normalized(String($0)) == String($0) }, "\(phrase)")
+        }
+    }
+
     @Test("A hedge of one language is another word in the description's language: a month, or in the")
     func hedgesOfAnotherLanguage() {
         #expect(!DescriptionText.hedgesOrNegates("seit mai 2016 arbeite ich bei acme", language: .german))
