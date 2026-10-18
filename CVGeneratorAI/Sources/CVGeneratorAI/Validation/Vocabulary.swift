@@ -59,8 +59,9 @@ enum Vocabulary {
         /// Words of negation, doubt or degree, wish or intention, future and condition ("never", "barely", "want", "will", "if"; "mai",
         /// "appena", "vorrei", "se"; "nie", "kaum", "möchte", "wenn"). They are in no other list: a clause that holds one backs
         /// nothing and gives no entry, and prose keeps the ones of the clause that explains it. A wish that only a phrase says is
-        /// written as its two words joined by "_" ("d_like" for "I'd like", "wurde_gern", "sogno_di"): the clause holds it when the
-        /// second word follows the first, so "I'd used" and "ich wurde geschult" hold none.
+        /// written as its two words joined by "_" ("d_like" for "I'd like", "sogno_di"): the clause holds it when the second word
+        /// follows the first, so "I'd used" holds none. Joined by "~", the two words may stand in either order, as German fronts
+        /// them ("wurde~gern": "Ich würde gern…", "Gerne würde ich…"), so "ich wurde geschult" holds none.
         let modality: Set<String>
         /// The present and past of "to be": a verb that says something done on its own ("am", "m", "was"; "sono", "era"; "bin", "war").
         /// Written as `Word.accented` writes a word, with accents: French "a" (has) is no "à" (at), and Portuguese "é" (is) no "e" (and).
@@ -187,11 +188,18 @@ enum Vocabulary {
 
     private static let everyModalityWord: Set<String> = union { $0.modality }
 
-    /// The phrases of the modality lists ("d_like"), by their first word: the second words that follow it.
-    private static let everyModalityPhrase: [String: Set<String>] = everyModalityWord.reduce(into: [:]) { phrases, entry in
-        let parts = entry.split(separator: "_").map(String.init)
-        guard parts.count == 2 else { return }
-        phrases[parts[0], default: []].insert(parts[1])
+    /// The phrases of the modality lists whose second word follows the first ("d_like"), by their first word.
+    private static let everyModalityPhrase = phrases(joinedBy: "_")
+
+    /// The phrases of the modality lists whose two words may stand in either order ("wurde~gern"), by their first word.
+    private static let everyModalityPhraseInAnyOrder = phrases(joinedBy: "~")
+
+    private static func phrases(joinedBy joiner: Character) -> [String: Set<String>] {
+        everyModalityWord.reduce(into: [:]) { phrases, entry in
+            let parts = entry.split(separator: joiner).map(String.init)
+            guard parts.count == 2 else { return }
+            phrases[parts[0], default: []].insert(parts[1])
+        }
     }
 
     private static let everyBeForm: Set<String> = union { $0.beForms }
@@ -215,6 +223,9 @@ enum Vocabulary {
             }
             for second in everyModalityPhrase[word.folded] ?? [] where words[(index + 1)...].contains(where: { $0.folded == second }) {
                 found.insert(word.folded + "_" + second)
+            }
+            for second in everyModalityPhraseInAnyOrder[word.folded] ?? [] where words.contains(where: { $0.folded == second }) {
+                found.insert(word.folded + "~" + second)
             }
         }
         return found
