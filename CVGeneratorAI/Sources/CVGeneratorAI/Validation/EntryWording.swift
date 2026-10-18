@@ -32,6 +32,12 @@ enum EntryWording {
 
     private static let everyDegreeWord: Set<String> = degreeWordsByLanguage.values.reduce(into: []) { $0.formUnion($1) }
 
+    /// Whether `word` (as `DescriptionText.normalized` writes it) is an indefinite article, in the language of the description, or
+    /// in any of the six when it is not known.
+    static func isIndefiniteArticle(_ word: String, in language: Vocabulary.Language?) -> Bool {
+        (language.map { articlesByLanguage[$0] ?? [] } ?? everyArticle).contains(word)
+    }
+
     /// The name of an employer or a school without its leading indefinite article ("a nursery", "una guardería", "un'azienda", "einer
     /// Kinderkrippe"), in the language of the description, or in any of the six when it is not known: a CV names the place. An article
     /// written with a capital stays, as part of a name ("UNA Hotels", "A Plus Consulting"), and so does a name that is nothing else.

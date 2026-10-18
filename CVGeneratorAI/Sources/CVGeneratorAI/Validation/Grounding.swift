@@ -83,8 +83,10 @@ struct Grounding {
         /// says nothing as a fact, such as "Spanisch zu lernen"), that clause claims too: "I have never used Java or Swift" claims
         /// neither, and "Ich träume davon, Spanisch zu lernen" no Spanish.
         ///
-        /// A negation or a hedge beside a word of level bears on the level: "I am not an expert in Swift" and "I don't speak French
-        /// fluently" claim Swift and French, and the level, which they deny, is not stated (`DescriptionText.levels`).
+        /// A negation or a hedge that governs a word of level bears on the level alone: "I am not an expert in Swift" and "I have
+        /// never been fluent in German" claim Swift and German, and the level, which they deny, is not stated
+        /// (`DescriptionText.levels`). A negation of the verb withdraws the claim, though a word of level follows: "I cannot speak
+        /// German even at a basic level", "I don't speak French fluently".
         func claims(at place: Place) -> Bool {
             let clause = clauses.clause(at: place)
             guard speaks(at: place), !withdraws(clause) else { return false }
@@ -100,14 +102,37 @@ struct Grounding {
             return claims(at: Place(sentence: place.sentence, clause: place.clause - 1))
         }
 
-        /// Whether the clause withdraws its claim: some word of it does, and not only a negation or a hedge (`StatementWords.hedges`)
-        /// beside a word of level, which denies the level alone.
+        /// Whether the clause withdraws its claim: some word of it does, and not only negations or hedges (`StatementWords.hedges`)
+        /// that each govern a word of level, which deny the level alone.
         private func withdraws(_ clause: Clause) -> Bool {
             let withdrawals = Vocabulary.withdrawals(in: clause.words, language: language)
             guard !withdrawals.isEmpty else { return false }
-            let deniesALevel = clause.words.contains { Vocabulary.isLevel($0.folded, in: language) }
-                && withdrawals.allSatisfy { $0 == "n't" || StatementWords.hedges.contains($0) }
-            return !deniesALevel
+            guard withdrawals.allSatisfy({ $0 == "n't" || StatementWords.hedges.contains($0) }) else { return true }
+            let negations = clause.words.indices.filter { isANegation(at: $0, in: clause.words) }
+            return negations.isEmpty || !negations.allSatisfy { governsALevel(from: $0, in: clause.words) }
+        }
+
+        /// Whether the word at `index` is a negation or a hedge: one of `StatementWords.hedges`, or the "t" of "n't".
+        private func isANegation(at index: Int, in words: [Word]) -> Bool {
+            let word = words[index].folded
+            if word == "t" {
+                return index > 0 && Vocabulary.modality(in: Array(words[(index - 1)...index]), language: language).contains("n't")
+            }
+            return StatementWords.hedges.contains(word) && !Vocabulary.isOwnWord(word, in: language)
+        }
+
+        /// Whether the negation at `index` governs a word of level: only the forms of "to be", indefinite articles and other negations
+        /// stand between them ("not an expert", "never been fluent", "non sono esperto", "kein Experte", "ne suis pas expert"). A verb
+        /// or an item between them makes it a negation of the ability: "cannot speak German even at a basic level".
+        private func governsALevel(from index: Int, in words: [Word]) -> Bool {
+            for next in words.indices.dropFirst(index + 1) {
+                let word = words[next]
+                if Vocabulary.isLevel(word.folded, in: language) { return true }
+                let links = Vocabulary.isBeForm(word.accented, in: language) || EntryWording.isIndefiniteArticle(word.folded, in: language)
+                    || isANegation(at: next, in: words)
+                guard links else { return false }
+            }
+            return false
         }
 
         /// Whether the clause at `place` gives the person's contacts (ADR 0023, rule (b)): it stands before the references, speaks for

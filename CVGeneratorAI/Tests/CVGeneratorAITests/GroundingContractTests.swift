@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1534
+    static let rowsWhenWritten = 1546
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -485,6 +485,7 @@ enum GroundingRows {
         rows += wishesInAPhrase()
         rows += personalFieldsOfAClaim()
         rows += acceptedReadingsOfAClaim()
+        rows += negationsOfTheAbility()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3424,8 +3425,35 @@ enum GroundingRows {
         return rows
     }
 
-    /// The readings of the claim rule that ADR 0023 accepts as they are (Consequences): a negation beside a word of level denies the
-    /// level only, a condition at the start of a clause makes the rest of its sentence a supposition, and "could" withdraws a claim.
+    /// A negation keeps its item only when it governs the word of level (#202): "not an expert", "never been fluent". A negation of
+    /// the ability itself withdraws the claim, though a word of level stands later in the clause: "I cannot speak German even at a
+    /// basic level", "I have never used Python at any level".
+    private static func negationsOfTheAbility() -> [GroundingRow] {
+        typealias Variant = (language: String, cannotSpeak: String, spoken: String, neverUsed: String)
+        var variants: [Variant] = []
+        variants.append(("en", "I cannot speak German even at a basic level.", "German", "I have never used Python at any level."))
+        variants.append(("it", "Non so parlare tedesco nemmeno a livello base.", "tedesco", "Non ho mai usato Python a nessun livello."))
+        variants.append(("de", "Ich kann nicht einmal auf einfachem Niveau Deutsch sprechen.", "Deutsch",
+                         "Ich habe Python nie auf irgendeinem Niveau benutzt."))
+        variants.append(("es", "No puedo hablar alemán ni siquiera a nivel básico.", "alemán", "Nunca he usado Python a ningún nivel."))
+        variants.append(("fr", "Je ne sais pas parler allemand même à un niveau de base.", "allemand",
+                         "Je n'ai jamais utilisé Python à aucun niveau."))
+        variants.append(("pt", "Não consigo falar alemão nem em nível básico.", "alemão", "Nunca usei Python em nenhum nível."))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-denied-ability-beside-a-level-gives-no-language-\(v.language)",
+                            "the negation denies speaking, not a level: no language",
+                            v.cannotSpeak, CVData(languages: [Language(name: v.spoken)]), .exactly(CVData()), language: v.language))
+            rows.append(row("a-denied-use-beside-a-level-gives-no-skill-\(v.language)",
+                            "the negation denies the use, not a level: no skill",
+                            v.neverUsed, CVData(skills: [Skill(name: "Python")]), .exactly(CVData()), language: v.language))
+        }
+        return rows
+    }
+
+    /// The readings of the claim rule that ADR 0023 accepts as they are (Consequences): a negation that governs a word of level denies
+    /// the level only, a condition at the start of a clause makes the rest of its sentence a supposition, and "could" withdraws a claim.
     private static func acceptedReadingsOfAClaim() -> [GroundingRow] {
         var rows: [GroundingRow] = []
         rows.append(row("a-negation-beside-a-level-keeps-the-language",
