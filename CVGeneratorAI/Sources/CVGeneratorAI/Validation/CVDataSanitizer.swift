@@ -18,6 +18,7 @@ import Foundation
 /// - a skill level or language level stays only if the description states it, in a sentence with no negation or hedge, and a
 ///   language with a level that the description does not state goes whole; a language without a level may stay without one;
 /// - a skill that is also an interest of the draft is a hobby, and goes;
+/// - an employer or a school keeps no leading indefinite article;
 /// - every fact is the person's: a language, a skill, an interest and the person's own name, contacts, place and title are kept only
 ///   as the clauses that speak for the person (or a list with no verb) give them, so a sister's French or a manager's email goes; a
 ///   contact, only as a label ("Email: ..."), the person's possession of the field ("My email is ..."), a verb of contacting whose
@@ -124,7 +125,7 @@ public struct CVDataSanitizer: Sendable {
 
             return Experience(
                 title: title ?? "",
-                company: job.company ?? "",
+                company: job.company.map { withoutArticle($0, source) } ?? "",
                 location: job.location.flatMap { evidence.backs($0) ? $0 : nil },
                 startDate: dates[0],
                 endDate: dates[1],
@@ -148,7 +149,7 @@ public struct CVDataSanitizer: Sendable {
 
             return Education(
                 degree: degree,
-                institution: study.institution,
+                institution: study.institution.map { withoutArticle($0, source) },
                 startDate: dates[1],
                 endDate: dates[0],
                 description: source.grounded(study.entry.description, quoting: evidence.quotable, allowsNumbers: true)
@@ -201,6 +202,11 @@ public struct CVDataSanitizer: Sendable {
     }
 
     // MARK: - Helpers
+
+    /// An employer or a school without its leading indefinite article ("a nursery"), when what is left is a quote too.
+    private func withoutArticle(_ name: String, _ source: DescriptionText) -> String {
+        source.named(EntryWording.withoutLeadingArticle(name, in: source.explainer.language)) ?? name
+    }
 
     /// The model's level, if the description allows it.
     private func statedLevel<Level: Hashable>(_ level: Level?, allowed: Set<Level>?) -> Level? {
