@@ -314,10 +314,10 @@ struct Grounding {
     }
 
     /// An achievement explains a clause only if it begins with a verb of a CV ("trained", "ho formato", "formé") and holds no
-    /// preposition that introduces an employer: "Beta employed me" and "at Beta in 2019 I worked" explain nothing. A graduation phrase
-    /// explains nothing of a job.
+    /// preposition that introduces an employer, read in the language of the description: "Beta employed me" and "at Beta in 2019 I
+    /// worked" explain nothing, while "j'ai formé" holds no Italian "ai". A graduation phrase explains nothing of a job.
     private func isQuoteOfAVerb(_ words: [String], of subject: Subject) -> Bool {
-        guard !words.contains(where: Vocabulary.employerPrepositions.contains),
+        guard !words.contains(where: { Vocabulary.isEmployerPreposition($0, in: explainer.language) }),
               subject.isEducation || !explainer.isGraduationPhrase(folded: words),
               let first = words.first(where: { !Vocabulary.leading.contains($0) }) else { return false }
         return explainer.isVerb(first)

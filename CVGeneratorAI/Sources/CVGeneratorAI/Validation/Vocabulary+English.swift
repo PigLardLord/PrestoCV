@@ -7,7 +7,7 @@ extension Vocabulary {
         a across after again against all along already also although am among an and another any are as at be because
         been before being between beyond both but by d did do does doing done during each either even ever every for
         from had has have having here how i in inside into is it its itself just m me mine my myself of on once one
-        ones onto or other our ours ourselves out outside own quite re s same since so some still such that the then
+        ones onto or other our ours ourselves out outside own per quite re s same since so some still such that the then
         there these this those though through throughout till to too toward towards until upon us ve very via was we
         were what whatever when whenever where whereas wherever which while who whoever whom whose why with within you
         your yours yourself

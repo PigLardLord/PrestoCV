@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1396
+    static let rowsWhenWritten = 1402
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -449,6 +449,7 @@ enum GroundingRows {
         rows += summariesOfAnotherCV()
         rows += clausesBetweenTwoEntries()
         rows += quotesThatHoldAnEmployerPreposition()
+        rows += employerPrepositionsOfTheDescriptionsLanguage()
         rows += titlesInANeutralClause()
         rows += negationInProse()
         rows += orderInProse()
@@ -1370,6 +1371,39 @@ enum GroundingRows {
                 "a quote that begins with a verb but holds for, per or für explains nothing: the achievement goes and 2019 is not Acme's",
                 v.description, CVData(experience: [job("", "Acme", from: "2012", to: "2019", achievements: [v.quote])]),
                 .exactly(CVData(experience: [job("", "Acme", from: "2012")])), language: v.language)
+        }
+    }
+
+    /// A word is read in the language of the description (#202): an employer preposition of another language that the description's
+    /// language uses for something else is that word, so French "j'ai" holds no Italian "ai", English "per shift" no Italian "per",
+    /// and Portuguese "da" (of the) no Italian "da". A preposition of another language that is no word of the description's language
+    /// still introduces an employer: "chez Gamma" in English, "at Gamma" in Italian.
+    private static func employerPrepositionsOfTheDescriptionsLanguage() -> [GroundingRow] {
+        typealias Variant = (id: String, language: String, description: String, employer: String, achievement: String, keeps: Bool)
+        var variants: [Variant] = []
+        variants.append(("j-ai-is-no-italian-ai-fr", "fr",
+                         "Depuis 2016, j'enseigne à l'école Don Milani, où j'ai formé 3 nouveaux enseignants.", "école Don Milani",
+                         "j'ai formé 3 nouveaux enseignants", true))
+        variants.append(("per-shift-is-no-italian-per-en", "en",
+                         "Since 2016 I have worked at the Molinette hospital, where I managed up to 12 patients per shift.", "Molinette hospital",
+                         "managed up to 12 patients per shift", true))
+        variants.append(("all-is-no-italian-all-en", "en",
+                         "Since 2016 I have worked at Acme, where I trained all new nurses.", "Acme", "trained all new nurses", true))
+        variants.append(("da-is-no-italian-da-pt", "pt",
+                         "Desde 2016 trabalho na Acme, onde formei 3 enfermeiros da equipe.", "Acme", "formei 3 enfermeiros da equipe", true))
+        variants.append(("chez-still-introduces-an-employer-en", "en",
+                         "Since 2016 I have worked at Acme, where I trained 3 cooks chez Gamma.", "Acme", "trained 3 cooks chez Gamma", false))
+        variants.append(("at-still-introduces-an-employer-it", "it",
+                         "Dal 2016 lavoro presso Acme, dove ho formato 3 cuochi at Gamma.", "Acme", "ho formato 3 cuochi at Gamma", false))
+
+        return variants.map { v in
+            let current = { (achievements: [String]) in job("", v.employer, from: "2016", current: true, achievements: achievements) }
+            return row("employer-preposition-of-the-description-\(v.id)",
+                       v.keeps
+                           ? "the quote holds a preposition of another language that is another word in the description's: the achievement stays"
+                           : "the quote holds a preposition of another language that is no word of the description's: it explains nothing",
+                       v.description, CVData(experience: [current([v.achievement])]),
+                       v.keeps ? .unchanged : .exactly(CVData(experience: [current([])])), language: v.language)
         }
     }
 

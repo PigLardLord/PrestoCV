@@ -41,6 +41,9 @@ are its planned replacement and are still empty.
   - A job stays current only if a clause naming its employer says it goes on now (or "since" with a year, when the sentence
     holds exactly one).
   - Repeated entries are dropped.
+  - Words are read in the description's language. A word that is an employer preposition in another of the six languages,
+    and another word in the description's, is that other word: French "j'ai" holds no Italian "ai", English "per shift" no
+    Italian "per". A preposition of another language that the description's language does not have keeps its meaning.
 - **On device.** The request, the description and the answer never leave the device.
 - **Typed outcomes.** Failures are `CVGenerationError` cases that the app explains in the person's language;
   cancellation is `CancellationError`, never an error case. Availability is an `AIAvailability` value with the reason
