@@ -6,7 +6,7 @@ The texts of PrestoCV's App Store product page for version 1.0, one section per 
 - **Limits.** Name and subtitle: 30 characters. Keywords: 100 bytes of UTF-8, each keyword longer than two characters, separated by commas without spaces. Promotional text: 170 characters. Description, What's New and review notes: 4,000 characters. App Review Guideline 2.3.7 rules out prices and "free" claims in the name, the subtitle and the screenshots, and competitors' names in the keywords; guideline 2.3.1 asks for review notes that say specifically how to reach every feature.
 - **What's New.** App Store Connect has no What's New field for an app's first version, so the 1.0 texts are not entered there. They serve as TestFlight's What to Test, and as the start of the next version's notes.
 - **Counts.** `Tools/Release/check-store-listing.py` counts every text of this file, checks it against those limits, and checks that the table under [Character counts](#character-counts) is current. Run it after changing a text; `--write` rewrites the table.
-- **What each claim rests on.** Every feature named here is in the app as it ships (the legacy app of ADR 0022). The AI draft keeps only facts that occur in the person's description ([ADR 0023](../architecture/adr/0023-ground-the-ai-draft-in-the-description.md)). The device list is Apple's, from "How to get Apple Intelligence" (support.apple.com/en-us/121115), read on 2026-10-18.
+- **What each claim rests on.** Every feature named here is in the app as it ships (the legacy app of ADR 0022). The AI draft keeps only values that occur in the person's description, but it can still put one in the wrong place, so no text promises a draft without mistakes ([ADR 0023](../architecture/adr/0023-ground-the-ai-draft-in-the-description.md)). The device list is Apple's, from "How to get Apple Intelligence" (support.apple.com/en-us/121115), read on 2026-10-18.
 - **The copy is written for each market, not translated.** The register follows the app's own texts: "Sie" in German, "vous" in French, "tu" in Italian and Spanish, "você" in Brazilian Portuguese. The French texts put a no-break space (U+00A0) before a colon and inside « », as French typography does: keep it when copying them.
 
 ## Settings for every localization
@@ -44,17 +44,17 @@ Characters are Unicode characters; keywords are counted in UTF-8 bytes, which is
 <!-- counts:start -->
 | Locale | Name (30) | Subtitle (30) | Keywords (100 bytes) | Promotional text (170) | Description (4000) | Captions (longest) | What's New (4000) |
 |---|---|---|---|---|---|---|---|
-| en-US | 27 | 29 | 98 | 158 | 2328 | 71 (6 captions) | 184 |
-| en-GB | 27 | 29 | 98 | 158 | 2319 | 71 (6 captions) | 184 |
-| de-DE | 30 | 30 | 96 | 170 | 2746 | 72 (6 captions) | 230 |
-| it | 24 | 29 | 99 | 161 | 2495 | 68 (6 captions) | 209 |
-| es-ES | 28 | 26 | 93 | 169 | 2561 | 71 (6 captions) | 213 |
-| es-MX | 28 | 26 | 97 | 168 | 2534 | 71 (6 captions) | 210 |
-| fr-FR | 25 | 28 | 91 | 169 | 2697 | 73 (6 captions) | 220 |
-| pt-PT | 30 | 29 | 94 | 162 | 2614 | 75 (6 captions) | 215 |
-| pt-BR | 28 | 29 | 95 | 165 | 2570 | 72 (6 captions) | 205 |
+| en-US | 27 | 29 | 98 | 158 | 2354 | 71 (6 captions) | 184 |
+| en-GB | 27 | 29 | 98 | 158 | 2345 | 71 (6 captions) | 184 |
+| de-DE | 30 | 30 | 96 | 170 | 2763 | 72 (6 captions) | 230 |
+| it | 24 | 29 | 99 | 161 | 2538 | 68 (6 captions) | 209 |
+| es-ES | 28 | 26 | 93 | 169 | 2595 | 71 (6 captions) | 213 |
+| es-MX | 28 | 26 | 97 | 168 | 2569 | 71 (6 captions) | 210 |
+| fr-FR | 25 | 28 | 91 | 169 | 2722 | 73 (6 captions) | 220 |
+| pt-PT | 30 | 29 | 94 | 162 | 2641 | 75 (6 captions) | 215 |
+| pt-BR | 28 | 29 | 95 | 165 | 2586 | 72 (6 captions) | 205 |
 
-Notes for App Review: 3262 characters (4000).
+Notes for App Review: 3370 characters (4000).
 <!-- counts:end -->
 
 ## Notes for App Review
@@ -76,7 +76,7 @@ THE AI DRAFT
 - On such a device, the first launch leads with "Draft My CV with AI". Later, choose "AI CV Generation" on the New CV screen.
 - Type a description of at least 10 characters. The screen shows an example under "Example"; this is the same text, ready to paste:
 I'm Maria Rossi, a primary school teacher from Bologna. Since 2016 I have taught at the Don Milani school, where I trained 3 new teachers. Before that, from 2012 to 2016, I worked as an assistant in a nursery. I studied Education Sciences at the University of Bologna and graduated in 2012. I speak Italian (native) and English (B2). In my free time I like chess and hiking.
-- Tap "Generate CV with AI". It can take up to a minute. The draft opens in the editor with a notice. It keeps only facts that occur in the description, and anything the description does not mention is left blank. Save it, then export it as above.
+- Tap "Generate CV with AI". It can take up to a minute. The draft opens in the editor with a notice. Every value it fills in occurs in the description, and anything the description does not mention is left blank. It can still put a detail in the wrong place, which is why the notice asks the person to check every field. Save it, then export it as above.
 - If Apple Intelligence is turned off, or its model is still downloading, the AI option is shown dimmed, with a sentence that says what to do. On a device that does not support Apple Intelligence, the AI option is not shown, and the rest of the app works the same.
 
 NETWORK AND DATA
@@ -126,8 +126,8 @@ THREE WAYS TO START
 
 AN AI DRAFT THAT STICKS TO YOUR WORDS
 • Apple's on-device model writes the draft on your iPhone or iPad. Your description isn't sent anywhere.
-• It keeps only the facts you wrote. Names, dates, employers, schools and skills that aren't in your description are left out, and anything you don't mention stays blank.
-• You check every field before you save.
+• Names, dates, employers, schools and skills that aren't in your description are left out, and anything you don't mention stays blank.
+• It can still make mistakes, such as a detail in the wrong place: check every field before you save.
 • The AI draft needs a device that supports Apple Intelligence, with Apple Intelligence turned on: iPhone 15 Pro, iPhone 15 Pro Max, iPhone 16 models or later, iPhone Air, iPad models with M1 or later, and iPad mini (A17 Pro).
 • On every other device, PrestoCV works fully without it: you start from a blank CV or from an example.
 
@@ -155,7 +155,7 @@ No account, no ads, no tracking, no data collected. PrestoCV never sends your CV
 ```text
 No subscription. No account. Your CV stays on your iPhone.
 Describe your career. Apple Intelligence drafts your CV on your iPhone.
-Only your facts: anything you didn't write stays blank.
+Built from your words: anything you didn't write stays blank.
 Start from a blank CV or from one of five examples.
 Three designs, three font styles, four color palettes.
 Send or save your PDF, with headings in your CV's language.
@@ -205,8 +205,8 @@ THREE WAYS TO START
 
 AN AI DRAFT THAT STICKS TO YOUR WORDS
 • Apple's on-device model writes the draft on your iPhone or iPad. Your description isn't sent anywhere.
-• It keeps only the facts you wrote. Names, dates, employers, schools and skills that aren't in your description are left out, and anything you don't mention stays blank.
-• You check every field before you save.
+• Names, dates, employers, schools and skills that aren't in your description are left out, and anything you don't mention stays blank.
+• It can still make mistakes, such as a detail in the wrong place: check every field before you save.
 • The AI draft needs a device that supports Apple Intelligence, with Apple Intelligence turned on: iPhone 15 Pro, iPhone 15 Pro Max, iPhone 16 models or later, iPhone Air, iPad models with M1 or later, and iPad mini (A17 Pro).
 • On every other device, PrestoCV works fully without it: you start from a blank CV or from an example.
 
@@ -234,7 +234,7 @@ No account, no ads, no tracking, no data collected. PrestoCV never sends your CV
 ```text
 No subscription. No account. Your CV stays on your iPhone.
 Describe your career. Apple Intelligence drafts your CV on your iPhone.
-Only your facts: anything you didn't write stays blank.
+Built from your words: anything you didn't write stays blank.
 Start from a blank CV or from one of five examples.
 Three designs, three font styles, four colour palettes.
 Send or save your PDF, with headings in your CV's language.
@@ -284,8 +284,8 @@ DREI WEGE ZUM LEBENSLAUF
 
 EIN KI-ENTWURF, DER SICH AN IHRE WORTE HÄLT
 • Das On-Device-Modell von Apple schreibt den Entwurf direkt auf Ihrem iPhone oder iPad. Ihre Beschreibung wird nirgendwohin gesendet.
-• Der Entwurf übernimmt nur Fakten, die Sie selbst geschrieben haben. Namen, Zeitangaben, Arbeitgeber, Schulen und Kenntnisse, die nicht in Ihrer Beschreibung stehen, fallen weg, und was Sie nicht erwähnen, bleibt leer.
-• Sie prüfen jedes Feld, bevor Sie speichern.
+• Namen, Zeitangaben, Arbeitgeber, Schulen und Kenntnisse, die nicht in Ihrer Beschreibung stehen, fallen weg, und was Sie nicht erwähnen, bleibt leer.
+• Der Entwurf kann trotzdem Fehler enthalten, etwa eine Angabe an der falschen Stelle: Prüfen Sie jedes Feld, bevor Sie speichern.
 • Für den KI-Entwurf brauchen Sie ein Gerät mit Apple Intelligence, auf dem Apple Intelligence eingeschaltet ist: iPhone 15 Pro, iPhone 15 Pro Max, alle Modelle ab iPhone 16, iPhone Air, iPad-Modelle mit M1 oder neuer und iPad mini (A17 Pro).
 • Auf allen anderen Geräten funktioniert PrestoCV vollständig ohne KI: Sie beginnen mit einem leeren Lebenslauf oder einem Beispiel.
 
@@ -313,7 +313,7 @@ Kein Konto, keine Werbung, kein Tracking, keine Datenerhebung. PrestoCV sendet I
 ```text
 Kein Abo. Kein Konto. Ihr Lebenslauf bleibt auf Ihrem iPhone.
 Apple Intelligence entwirft Ihren Lebenslauf auf Ihrem iPhone.
-Nur Ihre Fakten: Was Sie nicht schreiben, bleibt leer.
+Aus Ihren Worten: Was Sie nicht schreiben, bleibt leer.
 Mit einem leeren Lebenslauf oder einem von fünf Beispielen starten.
 Drei Designs, drei Schriftstile, vier Farbpaletten.
 PDF senden oder speichern. Überschriften in der Sprache des Lebenslaufs.
@@ -363,8 +363,8 @@ TRE MODI PER INIZIARE
 
 UNA BOZZA FEDELE ALLE TUE PAROLE
 • La scrive il modello di Apple direttamente sul tuo iPhone o iPad. La tua descrizione non viene inviata da nessuna parte.
-• Tiene solo i dati che hai scritto tu. Nomi, date, datori di lavoro, scuole e competenze che non compaiono nella tua descrizione vengono scartati, e ciò che non indichi resta vuoto.
-• Controlli ogni campo prima di salvare.
+• Nomi, date, datori di lavoro, scuole e competenze che non compaiono nella tua descrizione vengono scartati, e ciò che non indichi resta vuoto.
+• La bozza può comunque contenere errori, per esempio un dato nel posto sbagliato: controlla ogni campo prima di salvare.
 • La bozza con l'IA richiede un dispositivo compatibile con Apple Intelligence, con la funzione attiva: iPhone 15 Pro, iPhone 15 Pro Max, tutti i modelli da iPhone 16 in poi, iPhone Air, modelli di iPad con chip M1 o successivo e iPad mini (A17 Pro).
 • Su tutti gli altri dispositivi PrestoCV funziona completamente anche senza: parti da un CV vuoto o da un esempio.
 
@@ -392,7 +392,7 @@ Nessun account, nessuna pubblicità, nessun tracciamento, nessun dato raccolto. 
 ```text
 Nessun abbonamento. Nessun account. Il tuo CV resta sul tuo iPhone.
 Racconta chi sei: Apple Intelligence scrive la bozza sul tuo iPhone.
-Solo i tuoi dati: ciò che non scrivi resta vuoto.
+Dalle tue parole: ciò che non scrivi resta vuoto.
 Parti da un CV vuoto o da uno dei cinque esempi.
 Tre design, tre stili di carattere, quattro palette di colori.
 Invia o salva il PDF, con i titoli nella lingua del tuo CV.
@@ -442,8 +442,8 @@ TRES FORMAS DE EMPEZAR
 
 UN BORRADOR QUE SE CIÑE A TUS PALABRAS
 • El modelo de Apple lo redacta en tu propio iPhone o iPad. Tu descripción no se envía a ningún sitio.
-• Solo conserva los datos que has escrito tú. Los nombres, fechas, empresas, centros de estudio y competencias que no aparecen en tu descripción se descartan, y lo que no menciones queda en blanco.
-• Revisas cada campo antes de guardar.
+• Los nombres, fechas, empresas, centros de estudio y competencias que no aparecen en tu descripción se descartan, y lo que no menciones queda en blanco.
+• Aun así, el borrador puede tener errores, como un dato en el lugar equivocado: revisa cada campo antes de guardar.
 • El borrador con IA necesita un dispositivo compatible con Apple Intelligence, con Apple Intelligence activado: iPhone 15 Pro, iPhone 15 Pro Max, todos los modelos a partir del iPhone 16, iPhone Air, modelos de iPad con chip M1 o posterior e iPad mini (A17 Pro).
 • En los demás dispositivos, PrestoCV funciona por completo sin él: empiezas con un CV vacío o con un ejemplo.
 
@@ -471,7 +471,7 @@ Sin cuenta, sin anuncios, sin rastreo y sin recopilación de datos. PrestoCV nun
 ```text
 Sin suscripción. Sin cuenta. Tu CV se queda en tu iPhone.
 Describe tu trayectoria: Apple Intelligence redacta tu CV en tu iPhone.
-Solo tus datos: lo que no escribas queda en blanco.
+A partir de tus palabras: lo que no escribas queda en blanco.
 Empieza con un CV vacío o con uno de los cinco ejemplos.
 Tres diseños, tres estilos de fuente, cuatro paletas de colores.
 Envía o guarda tu PDF, con los títulos en el idioma de tu CV.
@@ -521,8 +521,8 @@ TRES FORMAS DE EMPEZAR
 
 UN BORRADOR QUE RESPETA TUS PALABRAS
 • El modelo de Apple lo redacta en tu propio iPhone o iPad. Tu descripción no se envía a ninguna parte.
-• Solo conserva los datos que tú escribiste. Los nombres, fechas, empresas, escuelas y habilidades que no aparecen en tu descripción se descartan, y lo que no menciones queda en blanco.
-• Revisas cada campo antes de guardar.
+• Los nombres, fechas, empresas, escuelas y habilidades que no aparecen en tu descripción se descartan, y lo que no menciones queda en blanco.
+• Aun así, el borrador puede tener errores, como un dato en el lugar equivocado: revisa cada campo antes de guardar.
 • El borrador con IA necesita un dispositivo compatible con Apple Intelligence, con Apple Intelligence activado: iPhone 15 Pro, iPhone 15 Pro Max, todos los modelos a partir del iPhone 16, iPhone Air, modelos de iPad con chip M1 o posterior y iPad mini (A17 Pro).
 • En los demás dispositivos, PrestoCV funciona por completo sin él: empiezas con un CV vacío o con un ejemplo.
 
@@ -550,7 +550,7 @@ Sin cuenta, sin anuncios, sin rastreo y sin recopilación de datos. PrestoCV nun
 ```text
 Sin suscripción. Sin cuenta. Tu CV se queda en tu iPhone.
 Describe tu trayectoria: Apple Intelligence redacta tu CV en tu iPhone.
-Solo tus datos: lo que no escribas queda en blanco.
+A partir de tus palabras: lo que no escribas queda en blanco.
 Empieza con un CV vacío o con uno de los cinco ejemplos.
 Tres diseños, tres estilos de fuente, cuatro paletas de colores.
 Envía o guarda tu PDF, con los títulos en el idioma de tu CV.
@@ -600,8 +600,8 @@ TROIS FAÇONS DE COMMENCER
 
 UN BROUILLON FIDÈLE À VOS MOTS
 • Le modèle d'Apple le rédige directement sur votre iPhone ou votre iPad. Votre description n'est envoyée nulle part.
-• Le brouillon ne garde que les informations que vous avez écrites. Les noms, dates, employeurs, établissements et compétences absents de votre description sont écartés, et ce que vous ne mentionnez pas reste vide.
-• Vous vérifiez chaque champ avant d'enregistrer.
+• Les noms, dates, employeurs, établissements et compétences absents de votre description sont écartés, et ce que vous ne mentionnez pas reste vide.
+• Le brouillon peut tout de même contenir des erreurs, comme une information au mauvais endroit : vérifiez chaque champ avant d'enregistrer.
 • Le brouillon IA nécessite un appareil compatible avec Apple Intelligence, sur lequel Apple Intelligence est activé : iPhone 15 Pro, iPhone 15 Pro Max, tous les modèles à partir de l'iPhone 16, iPhone Air, modèles d'iPad avec puce M1 ou ultérieure et iPad mini (A17 Pro).
 • Sur tous les autres appareils, PrestoCV fonctionne pleinement sans l'IA : vous partez d'un CV vide ou d'un exemple.
 
@@ -629,7 +629,7 @@ Pas de compte, pas de publicité, pas de pistage, aucune donnée collectée. Pre
 ```text
 Sans abonnement. Sans compte. Votre CV reste sur votre iPhone.
 Décrivez-vous : Apple Intelligence rédige votre CV sur votre iPhone.
-Rien que vos informations : ce que vous n'écrivez pas reste vide.
+À partir de vos mots : ce que vous n'écrivez pas reste vide.
 Partez d'un CV vide ou de l'un des cinq exemples.
 Trois mises en page, trois styles de police, quatre palettes de couleurs.
 Envoyez ou enregistrez le PDF, avec des titres dans la langue du CV.
@@ -679,8 +679,8 @@ TRÊS FORMAS DE COMEÇAR
 
 UM RASCUNHO FIEL ÀS SUAS PALAVRAS
 • É o modelo da Apple que o escreve, no seu próprio iPhone ou iPad. A sua descrição não é enviada para lado nenhum.
-• O rascunho só mantém os dados que escreveu. Nomes, datas, empregadores, escolas e competências que não constam da sua descrição são descartados, e o que não mencionar fica em branco.
-• Verifica cada campo antes de guardar.
+• Nomes, datas, empregadores, escolas e competências que não constam da sua descrição são descartados, e o que não mencionar fica em branco.
+• Ainda assim, o rascunho pode ter erros, como um dado no sítio errado: verifique cada campo antes de guardar.
 • O rascunho com IA precisa de um dispositivo compatível com o Apple Intelligence, com esta funcionalidade ativada: iPhone 15 Pro, iPhone 15 Pro Max, todos os modelos a partir do iPhone 16, iPhone Air, modelos de iPad com chip M1 ou posterior e iPad mini (A17 Pro).
 • Nos restantes dispositivos, o PrestoCV funciona plenamente sem IA: começa por um currículo vazio ou por um exemplo.
 
@@ -708,7 +708,7 @@ Sem conta, sem anúncios, sem rastreio e sem recolha de dados. O PrestoCV nunca 
 ```text
 Sem subscrição. Sem conta. O seu currículo fica no seu iPhone.
 Descreva o seu percurso: o Apple Intelligence faz o rascunho no seu iPhone.
-Só os seus dados: o que não escrever fica em branco.
+A partir das suas palavras: o que não escrever fica em branco.
 Comece por um currículo vazio ou por um dos cinco exemplos.
 Três designs, três estilos de letra, quatro paletas de cores.
 Envie ou guarde o PDF, com os títulos na língua do seu currículo.
@@ -758,8 +758,8 @@ TRÊS JEITOS DE COMEÇAR
 
 UM RASCUNHO FIEL ÀS SUAS PALAVRAS
 • Quem escreve é o modelo da Apple, no seu próprio iPhone ou iPad. Sua descrição não é enviada para lugar nenhum.
-• O rascunho só mantém os dados que você escreveu. Nomes, datas, empregadores, escolas e competências que não estão na sua descrição são descartados, e o que você não mencionar fica em branco.
-• Você confere cada campo antes de salvar.
+• Nomes, datas, empregadores, escolas e competências que não estão na sua descrição são descartados, e o que você não mencionar fica em branco.
+• Ainda assim, o rascunho pode ter erros, como um dado no lugar errado: confira cada campo antes de salvar.
 • O rascunho com IA precisa de um aparelho compatível com o Apple Intelligence, com o recurso ativado: iPhone 15 Pro, iPhone 15 Pro Max, todos os modelos a partir do iPhone 16, iPhone Air, modelos de iPad com chip M1 ou posterior e iPad mini (A17 Pro).
 • Nos outros aparelhos, o PrestoCV funciona por completo sem IA: você começa com um currículo em branco ou com um exemplo.
 
@@ -787,7 +787,7 @@ Sem conta, sem anúncios, sem rastreamento e sem coleta de dados. O PrestoCV nun
 ```text
 Sem assinatura. Sem conta. Seu currículo fica no seu iPhone.
 Conte sua trajetória: o Apple Intelligence faz o rascunho no seu iPhone.
-Só os seus dados: o que você não escrever fica em branco.
+A partir das suas palavras: o que você não escrever fica em branco.
 Comece com um currículo em branco ou com um dos cinco exemplos.
 Três designs, três estilos de fonte, quatro paletas de cores.
 Envie ou salve o PDF, com os títulos no idioma do seu currículo.
