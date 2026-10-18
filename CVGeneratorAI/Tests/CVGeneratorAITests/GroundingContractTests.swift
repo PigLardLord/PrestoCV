@@ -416,11 +416,14 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1389
+    static let rowsWhenWritten = 1396
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
-    static let notImplementedYet: Set<String> = []
+    static let notImplementedYet: Set<String> = [
+        "first-run-on-the-real-model-example-en", "first-run-on-the-real-model-example-it", "first-run-on-the-real-model-example-es",
+        "first-run-on-the-real-model-example-fr", "first-run-on-the-real-model-example-pt",
+    ]
 
     /// Rows whose desired output the sanitiser does not give, and whose leak the owner accepts as a residual risk (ADR 0023,
     /// Consequences). Each runs in `withKnownIssue`: once a rule closes the leak the wrapper fails, and the id leaves this list.
@@ -3934,6 +3937,7 @@ enum GroundingRows {
         rows.append(probeContactsEN())
         rows.append(probeSparseEN())
         rows.append(probeSparseIT())
+        rows += firstRunOnTheRealModel()
         return rows
     }
 
@@ -4337,5 +4341,296 @@ enum GroundingRows {
         drops.append(Drop("interests[0]", "Infermieristica is not a word of the description"))
         return row("probe-sparse-it", "kept: only the title the person gave; a sparse description gives a sparse draft",
                    "Sono infermiera.", draft, .keeping(drops), kind: .probe, language: "it")
+    }
+
+    // MARK: The first run on the real on-device model (#202)
+
+    // The raw answers of the on-device model on 2026-10-18 (macOS 27.0.1, Apple Intelligence on), run 1 of each description: the
+    // app's six examples and a nurse in Turin. The three runs of each description gave the same draft. Each row expects the whole
+    // grounded draft, in the model's order of the jobs.
+
+    private static let nurseInTurin = """
+        My name is Giulia Bianchi and I am a registered nurse living in Turin. \
+        My email is giulia.bianchi@example.com and my phone number is +39 333 123 4567. \
+        Since March 2019 I have worked as a ward nurse in the cardiology department of the Molinette hospital in Turin, where I look \
+        after up to 12 patients per shift and train new colleagues. \
+        From 2016 to 2019 I worked as a home care nurse for the Il Sorriso cooperative in Moncalieri. \
+        I graduated in Nursing from the University of Turin in 2016. \
+        I speak Italian (native), English (B2) and French (A2). \
+        I am good at ECG monitoring, wound care and patient education. \
+        In my free time I sing in a choir and go cycling.
+        """
+
+    private static func firstRunOnTheRealModel() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        rows.append(firstRunEN())
+        rows.append(firstRunIT())
+        rows.append(firstRunDE())
+        rows.append(firstRunES())
+        rows.append(firstRunFR())
+        rows.append(firstRunPT())
+        rows.append(firstRunNurseEN())
+        return rows
+    }
+
+    private static func firstRunEN() -> GroundingRow {
+        let draft = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologna"),
+            summary: "I am a primary school teacher from Bologna. Since 2016 I have taught at Don Milani school and trained 3 new teachers. "
+                + "Before that, from 2012 to 2016, I worked as an assistant in a nursery.",
+            experience: [
+                Experience(title: "assistant", company: "a nursery", location: "Bologna", startDate: "2012", endDate: "2016",
+                           description: "I worked as an assistant in a nursery"),
+                Experience(title: "primary school teacher", company: "Don Milani school", location: "Bologna", startDate: "2016", endDate: null,
+                           current: true, description: "I taught at Don Milani school and trained 3 new teachers",
+                           achievements: ["trained 3 new teachers"]),
+            ],
+            education: [
+                Education(degree: "Education Sciences", institution: "University of Bologna", startDate: "2012", endDate: "2012",
+                          description: "I studied Education Sciences at the University of Bologna and graduated in 2012"),
+            ],
+            skills: [Skill(name: "chess", level: .beginner)],
+            languages: [Language(name: "Italian", proficiency: .native), Language(name: "English", proficiency: .b2)],
+            interests: ["chess", "hiking"])
+        let expected = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologna"),
+            experience: [
+                Experience(title: "assistant", company: "nursery", startDate: "2012", endDate: "2016",
+                           description: "I worked as an assistant in a nursery"),
+                Experience(title: "primary school teacher", company: "Don Milani school", startDate: "2016", current: true,
+                           achievements: ["trained 3 new teachers"]),
+            ],
+            education: [
+                Education(degree: "Education Sciences", institution: "University of Bologna", endDate: "2012",
+                          description: "I studied Education Sciences at the University of Bologna and graduated in 2012"),
+            ],
+            languages: [Language(name: "Italian", proficiency: .native), Language(name: "English", proficiency: .b2)],
+            interests: ["chess", "hiking"])
+        return row("first-run-on-the-real-model-example-en",
+                   "kept: name, place, both jobs with titles and years, the 3 new teachers, the degree and its year, languages, interests; "
+                       + "chess is a hobby and no skill, and a nursery loses its article",
+                   AppExample.en, draft, .exactly(expected), kind: .probe, language: "en")
+    }
+
+    private static func firstRunIT() -> GroundingRow {
+        let draft = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologna"),
+            summary: "Sono insegnante di scuola primaria a Bologna. Dal 2016 insegno alla scuola Don Milani, dove ho formato 3 nuovi insegnanti. "
+                + "Prima, dal 2012 al 2016, ho lavorato come assistente in un asilo nido.",
+            experience: [
+                Experience(title: "insegnante", company: "scuola Don Milani", location: "Bologna", current: true,
+                           description: "insegno alla scuola Don Milani", achievements: ["ho formato 3 nuovi insegnanti"]),
+                Experience(title: "assistente", company: "asilo nido", location: "Bologna",
+                           description: "ho lavorato come assistente in un asilo nido"),
+            ],
+            education: [
+                Education(degree: "Scienze della Formazione", institution: "Università di Bologna", startDate: "2012", endDate: "2012",
+                          description: "mi sono laureata nel 2012"),
+            ],
+            skills: [Skill(name: "scacchi", level: .beginner), Skill(name: "escursioni", level: .beginner)],
+            languages: [Language(name: "italiano", proficiency: .native), Language(name: "inglese", proficiency: .b2)],
+            interests: ["scacchi", "escursioni"])
+        let expected = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologna"),
+            experience: [
+                Experience(title: "insegnante", company: "scuola Don Milani", current: true, achievements: ["ho formato 3 nuovi insegnanti"]),
+                Experience(title: "assistente", company: "asilo nido", description: "ho lavorato come assistente in un asilo nido"),
+            ],
+            education: [
+                Education(degree: "Scienze della Formazione", institution: "Università di Bologna", endDate: "2012",
+                          description: "mi sono laureata nel 2012"),
+            ],
+            languages: [Language(name: "italiano", proficiency: .native), Language(name: "inglese", proficiency: .b2)],
+            interests: ["scacchi", "escursioni"])
+        return row("first-run-on-the-real-model-example-it",
+                   "kept: name, place, both jobs with their titles, the 3 new teachers, the degree and its year, languages, interests; "
+                       + "chess and hiking are hobbies and no skills",
+                   AppExample.it, draft, .exactly(expected), kind: .probe, language: "it")
+    }
+
+    private static func firstRunDE() -> GroundingRow {
+        let draft = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologna", title: "Grundschullehrerin"),
+            summary: "Ich bin Grundschullehrerin aus Bologna. Seit 2016 unterrichte ich an der Schule Don Milani, wo ich 3 neue Lehrkräfte "
+                + "eingearbeitet habe. Davor habe ich von 2012 bis 2016 als Betreuerin in einer Kinderkrippe gearbeitet.",
+            experience: [
+                Experience(title: "Betreuerin", company: "Kinderkrippe", location: "Bologna",
+                           description: "von 2012 bis 2016 als Betreuerin in einer Kinderkrippe gearbeitet"),
+                Experience(title: "Grundschullehrerin", company: "Schule Don Milani", location: "Bologna", current: true,
+                           description: "3 neue Lehrkräfte eingearbeitet", achievements: ["3 neue Lehrkräfte eingearbeitet"]),
+            ],
+            education: [
+                Education(degree: "Erziehungswissenschaften", institution: "Universität Bologna", startDate: "2012", endDate: "2012",
+                          description: "2012 meinen Abschluss gemacht"),
+            ],
+            languages: [Language(name: "Italienisch", proficiency: .native), Language(name: "Englisch", proficiency: .b2)],
+            interests: ["Schach", "Wandern"])
+        let expected = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologna", title: "Grundschullehrerin"),
+            experience: [
+                Experience(title: "Betreuerin", company: "Kinderkrippe"),
+                Experience(title: "Grundschullehrerin", company: "Schule Don Milani", current: true),
+            ],
+            education: [
+                Education(degree: "Erziehungswissenschaften", institution: "Universität Bologna", endDate: "2012",
+                          description: "2012 meinen Abschluss gemacht"),
+            ],
+            languages: [Language(name: "Italienisch", proficiency: .native), Language(name: "Englisch", proficiency: .b2)],
+            interests: ["Schach", "Wandern"])
+        return row("first-run-on-the-real-model-example-de",
+                   "kept: name, place, title, both jobs with their titles, the degree and its year, languages, interests; the achievement "
+                       + "begins with a number, not with a CV verb, and goes",
+                   AppExample.de, draft, .exactly(expected), kind: .probe, language: "de")
+    }
+
+    private static func firstRunES() -> GroundingRow {
+        let draft = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bolonia"),
+            summary: "Soy maestra de primaria en Bolonia. Desde 2016 enseño en la escuela Don Milani, donde formé a 3 nuevos maestros. "
+                + "Antes, de 2012 a 2016, trabajé como auxiliar en una guardería.",
+            experience: [
+                Experience(title: "maestra de primaria", company: "escuela Don Milani", location: "Bolonia", current: true,
+                           description: "enseño en la escuela Don Milani", achievements: ["formé a 3 nuevos maestros"]),
+                Experience(title: "auxiliar", company: "una guardería", location: "Bolonia", description: "trabajé como auxiliar en una guardería"),
+            ],
+            education: [
+                Education(degree: "Ciencias de la Educación", institution: "Universidad de Bolonia", startDate: "2012", endDate: "2012",
+                          description: "estudié Ciencias de la Educación en la Universidad de Bolonia y me gradué en 2012"),
+            ],
+            skills: [Skill(name: "ajedrez", level: .beginner), Skill(name: "senderismo", level: .beginner)],
+            languages: [Language(name: "italiano", proficiency: .native), Language(name: "inglés", proficiency: .b2)],
+            interests: ["ajedrez", "senderismo"])
+        let expected = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bolonia"),
+            experience: [
+                Experience(title: "maestra de primaria", company: "escuela Don Milani", current: true, achievements: ["formé a 3 nuevos maestros"]),
+                Experience(title: "auxiliar", company: "guardería", description: "trabajé como auxiliar en una guardería"),
+            ],
+            education: [
+                Education(degree: "Ciencias de la Educación", institution: "Universidad de Bolonia", endDate: "2012",
+                          description: "estudié Ciencias de la Educación en la Universidad de Bolonia y me gradué en 2012"),
+            ],
+            languages: [Language(name: "italiano", proficiency: .native), Language(name: "inglés", proficiency: .b2)],
+            interests: ["ajedrez", "senderismo"])
+        return row("first-run-on-the-real-model-example-es",
+                   "kept: name, place, both jobs with their titles, the 3 new teachers, the degree and its year, languages, interests; "
+                       + "chess and hiking are hobbies and no skills, and una guardería loses its article",
+                   AppExample.es, draft, .exactly(expected), kind: .probe, language: "es")
+    }
+
+    private static func firstRunFR() -> GroundingRow {
+        let draft = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologne"),
+            summary: "Je suis Maria Rossi, institutrice dans une école primaire de Bologne. Depuis 2016, j'enseigne à l'école Don Milani, "
+                + "où j'ai formé 3 nouveaux enseignants. Avant, de 2012 à 2016, j'ai travaillé comme assistante dans une crèche.",
+            experience: [
+                Experience(title: "assistante", company: "crèche", location: "Bologne",
+                           achievements: ["j'ai travaillé comme assistante dans une crèche"]),
+                Experience(title: "institutrice", company: "école Don Milani", location: "Bologne", current: true,
+                           achievements: ["j'ai formé 3 nouveaux enseignants"]),
+            ],
+            education: [Education(degree: "diplôme", institution: "université de Bologne", startDate: "2012")],
+            languages: [Language(name: "italien", proficiency: .native), Language(name: "anglais", proficiency: .b2)],
+            interests: ["échecs", "randonnée"])
+        let expected = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologne"),
+            summary: "Je suis Maria Rossi, institutrice dans une école primaire de Bologne.",
+            experience: [
+                Experience(title: "assistante", company: "crèche", achievements: ["j'ai travaillé comme assistante dans une crèche"]),
+                Experience(title: "institutrice", company: "école Don Milani", current: true, achievements: ["j'ai formé 3 nouveaux enseignants"]),
+            ],
+            education: [Education(institution: "université de Bologne")],
+            languages: [Language(name: "italien", proficiency: .native), Language(name: "anglais", proficiency: .b2)],
+            interests: ["échecs", "randonnée"])
+        return row("first-run-on-the-real-model-example-fr",
+                   "kept: name, place, the first sentence of the summary, both jobs with their titles, the 3 new teachers (j'ai holds no "
+                       + "Italian ai), the university, languages, interests; diplôme alone names no degree",
+                   AppExample.fr, draft, .exactly(expected), kind: .probe, language: "fr")
+    }
+
+    private static func firstRunPT() -> GroundingRow {
+        let draft = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bolonha"),
+            summary: "Sou professora do ensino fundamental em Bolonha. Desde 2016 leciono na escola Don Milani, onde formei 3 novos professores. "
+                + "Antes, de 2012 a 2016, trabalhei como auxiliar em uma creche.",
+            experience: [
+                Experience(title: "auxiliar", company: "creche", location: "Bolonha", startDate: "2012", endDate: "2016"),
+                Experience(title: "professora", company: "escola Don Milani", location: "Bolonha", startDate: "2016", endDate: null, current: true,
+                           achievements: ["formei 3 novos professores"]),
+            ],
+            education: [
+                Education(degree: "Ciências da Educação", institution: "Universidade de Bolonha", startDate: "2012", endDate: "2012",
+                          description: "me formei em 2012"),
+            ],
+            skills: [Skill(name: "xadrez", level: .beginner), Skill(name: "caminhadas", level: .beginner)],
+            languages: [Language(name: "italiano", proficiency: .native), Language(name: "inglês", proficiency: .b2)],
+            interests: ["xadrez", "caminhadas"])
+        let expected = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bolonha"),
+            experience: [
+                Experience(title: "auxiliar", company: "creche", startDate: "2012", endDate: "2016"),
+                Experience(title: "professora", company: "escola Don Milani", startDate: "2016", current: true,
+                           achievements: ["formei 3 novos professores"]),
+            ],
+            education: [
+                Education(degree: "Ciências da Educação", institution: "Universidade de Bolonha", endDate: "2012", description: "me formei em 2012"),
+            ],
+            languages: [Language(name: "italiano", proficiency: .native), Language(name: "inglês", proficiency: .b2)],
+            interests: ["xadrez", "caminhadas"])
+        return row("first-run-on-the-real-model-example-pt",
+                   "kept: name, place, both jobs with titles and years, the school job's title professora (fundamental is a word of "
+                       + "studying), the 3 new teachers, the degree and its year, languages, interests; chess and hiking are no skills",
+                   AppExample.pt, draft, .exactly(expected), kind: .probe, language: "pt")
+    }
+
+    /// The years, the place and the achievements of the current job stand in a clause with words that nothing explains (cardiology,
+    /// department): it backs nothing, so they go, and so does its current flag (ADR 0023, Consequences: thinner drafts).
+    private static func firstRunNurseEN() -> GroundingRow {
+        let draft = CVData(
+            personalInfo: PersonalInfo(name: "Giulia Bianchi", email: "giulia.bianchi@example.com", phone: "+39 333 123 4567", location: "Turin"),
+            summary: "I am a registered nurse living in Turin. Since March 2019 I have worked as a ward nurse in the cardiology department of "
+                + "the Molinette hospital in Turin, where I look after up to 12 patients per shift and train new colleagues. From 2016 to 2019 "
+                + "I worked as a home care nurse for the Il Sorriso cooperative in Moncalieri. I graduated in Nursing from the University of "
+                + "Turin in 2016.",
+            experience: [
+                Experience(title: "ward nurse", company: "Molinette hospital", location: "Turin", startDate: "March 2019", endDate: null,
+                           current: true, description: "I look after up to 12 patients per shift and train new colleagues",
+                           achievements: ["look after up to 12 patients per shift", "train new colleagues"]),
+                Experience(title: "home care nurse", company: "Il Sorriso cooperative", location: "Moncalieri", startDate: "2016", endDate: "2019",
+                           description: "I worked as a home care nurse", achievements: [null]),
+            ],
+            education: [
+                Education(degree: "Nursing", institution: "University of Turin", startDate: "2016", endDate: "2016",
+                          description: "I graduated in Nursing from the University of Turin in 2016"),
+            ],
+            skills: [
+                Skill(name: "ECG monitoring", level: .beginner), Skill(name: "wound care", level: .beginner),
+                Skill(name: "patient education", level: .beginner),
+            ],
+            languages: [
+                Language(name: "Italian", proficiency: .native), Language(name: "English", proficiency: .b2),
+                Language(name: "French", proficiency: .a2),
+            ],
+            interests: ["singing in a choir", "going cycling"])
+        let expected = CVData(
+            personalInfo: PersonalInfo(name: "Giulia Bianchi", email: "giulia.bianchi@example.com", phone: "+39 333 123 4567", location: "Turin"),
+            summary: "I am a registered nurse living in Turin.",
+            experience: [
+                Experience(title: "ward nurse", company: "Molinette hospital"),
+                Experience(title: "home care nurse", company: "Il Sorriso cooperative", location: "Moncalieri", startDate: "2016", endDate: "2019"),
+            ],
+            education: [
+                Education(degree: "Nursing", institution: "University of Turin", endDate: "2016",
+                          description: "I graduated in Nursing from the University of Turin in 2016"),
+            ],
+            skills: [Skill(name: "ECG monitoring"), Skill(name: "wound care"), Skill(name: "patient education")],
+            languages: [
+                Language(name: "Italian", proficiency: .native), Language(name: "English", proficiency: .b2),
+                Language(name: "French", proficiency: .a2),
+            ])
+        return row("first-run-on-the-real-model-nurse-in-turin-en",
+                   "kept: name, contacts, place, the first sentence of the summary, both employers and titles, the years and place of the "
+                       + "older job, the degree and its year, skills without levels, languages; the paraphrased hobbies go",
+                   nurseInTurin, draft, .exactly(expected), kind: .probe, language: "en")
     }
 }
