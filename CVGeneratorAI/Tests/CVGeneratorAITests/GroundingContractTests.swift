@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1449
+    static let rowsWhenWritten = 1457
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -480,6 +480,7 @@ enum GroundingRows {
         rows += namesInAFragmentBeforeAContact()
         rows += hobbiesAreNoSkills()
         rows += skillsTheDescriptionClaims()
+        rows += hobbiesOfThePersonAlone()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3295,6 +3296,46 @@ enum GroundingRows {
                         "the model makes ECG monitoring an interest too, though the description states no interest: the skill stays",
                         "I am good at ECG monitoring.",
                         CVData(skills: [Skill(name: "ECG monitoring")], interests: ["ECG monitoring"]), .unchanged))
+        return rows
+    }
+
+    /// Only the person's own clauses tell a hobby from a skill, as the grounding attributes them: another person's clause neither
+    /// keeps the skill nor drops it. A clause of the person that denies, doubts or only wishes claims no ability, so it keeps no
+    /// skill either.
+    private static func hobbiesOfThePersonAlone() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        let chess = CVData(skills: [Skill(name: "chess")], interests: ["chess"])
+        rows.append(row("a-hobby-is-no-skill-though-another-person-has-it-en",
+                        "the sister teaches chess; the person only likes it in her free time: the skill goes, the interest stays",
+                        "In my free time I like chess. My sister teaches chess.", chess, .exactly(CVData(interests: ["chess"]))))
+        rows.append(row("a-hobby-is-no-skill-though-another-person-has-it-it",
+                        "the sister teaches chess; the person only likes it in her free time: the skill goes, the interest stays",
+                        "Nel tempo libero mi piacciono gli scacchi. Mia sorella insegna scacchi.",
+                        CVData(skills: [Skill(name: "scacchi")], interests: ["scacchi"]), .exactly(CVData(interests: ["scacchi"])),
+                        language: "it"))
+        rows.append(row("a-hobby-is-no-skill-though-a-shared-subject-has-it",
+                        "teaches chess shares the sister as its subject: it is hers, and the person's skill goes",
+                        "In my free time I like chess. My sister is a coach and teaches chess.", chess,
+                        .exactly(CVData(interests: ["chess"]))))
+        rows.append(row("a-skill-of-the-job-stays-though-another-person-has-it-too",
+                        "the person's own job clause claims photography; the sister's clause neither keeps nor drops it: the skill stays",
+                        "I work as a photographer at Studio Luce, where I do portrait photography. My sister loves photography. "
+                            + "In my free time I like photography.",
+                        CVData(skills: [Skill(name: "photography")], interests: ["photography"]), .unchanged))
+        rows.append(row("a-skill-the-person-claims-stays-though-another-person-likes-it",
+                        "the sister's clause of leisure is not the person's; the person coaches chess: the skill stays",
+                        "My sister loves chess. I coach chess at the Acme club.", chess, .unchanged))
+        rows.append(row("a-denied-mention-claims-no-skill",
+                        "I don't play chess claims no ability: the skill goes",
+                        "In my free time I don't play chess.", chess, .safe(never: [], absent: ["skills[0].name"])))
+        rows.append(row("a-hedged-mention-claims-no-skill",
+                        "I almost never play chess claims no ability: the skill goes",
+                        "In my free time I like chess, but I almost never play chess.", chess,
+                        .safe(never: [], absent: ["skills[0].name"])))
+        rows.append(row("a-wish-claims-no-skill",
+                        "I would like to learn Python claims no ability: the skill goes",
+                        "I would like to learn Python.", CVData(skills: [Skill(name: "Python")], interests: ["Python"]),
+                        .safe(never: [], absent: ["skills[0].name"])))
         return rows
     }
 

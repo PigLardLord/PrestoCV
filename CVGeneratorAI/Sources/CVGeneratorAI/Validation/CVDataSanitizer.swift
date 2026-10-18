@@ -17,7 +17,7 @@ import Foundation
 ///   or of the clauses that back its entry (see `ProseQuotes`); a summary holds no number;
 /// - a skill level or language level stays only if the description states it, in a sentence with no negation or hedge, and a
 ///   language with a level that the description does not state goes whole; a language without a level may stay without one;
-/// - a skill that is also an interest of the draft, and that the description mentions only as leisure, is a hobby, and goes;
+/// - a skill that is also an interest of the draft, and that the person mentions only as leisure, is a hobby, and goes;
 /// - an employer or a school keeps no leading indefinite article, and a degree that only says graduating ("diplôme") goes;
 /// - every fact is the person's: a language, a skill, an interest and the person's own name, contacts, place and title are kept only
 ///   as the clauses that speak for the person (or a list with no verb) give them, so a sister's French or a manager's email goes; a
@@ -161,10 +161,10 @@ public struct CVDataSanitizer: Sendable {
         return unique(cleaned) { "\($0.degree ?? "")|\($0.institution ?? "")" }
     }
 
-    /// A skill whose name is one of the interests that the description gives, and that the description mentions only as leisure ("In
-    /// my free time I like chess and hiking"), is a hobby: as a skill it would claim an ability the person never claimed, so it goes, and
-    /// the interest stays. A skill the description mentions anywhere else ("proficient in Python", a job's clause, a list of skills)
-    /// stays.
+    /// A skill whose name is one of the interests that the description gives, and that the person mentions only as leisure ("In my
+    /// free time I like chess and hiking"), is a hobby: as a skill it would claim an ability the person never claimed, so it goes, and
+    /// the interest stays. A skill the person mentions anywhere else ("proficient in Python", a job's clause, a list of skills) stays;
+    /// another person's clause counts for neither (see `LeisureMentions`).
     private func sanitize(_ skills: [Skill], _ source: DescriptionText, interests: [String], _ entries: Entries) -> [Skill] {
         let names = skills.compactMap { source.named($0.name) }
         let hobbies = Set(interests.map { DescriptionText.normalized($0) })
