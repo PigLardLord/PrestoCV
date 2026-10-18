@@ -17,6 +17,7 @@ import Foundation
 ///   or of the clauses that back its entry (see `ProseQuotes`); a summary holds no number;
 /// - a skill level or language level stays only if the description states it, in a sentence with no negation or hedge, and a
 ///   language with a level that the description does not state goes whole; a language without a level may stay without one;
+/// - a skill that is also an interest of the draft is a hobby, and goes;
 /// - every fact is the person's: a language, a skill, an interest and the person's own name, contacts, place and title are kept only
 ///   as the clauses that speak for the person (or a list with no verb) give them, so a sister's French or a manager's email goes; a
 ///   contact, only as a label ("Email: ..."), the person's possession of the field ("My email is ..."), a verb of contacting whose
@@ -81,7 +82,7 @@ public struct CVDataSanitizer: Sendable {
             summary: source.grounded(cvData.summary, quoting: entries.summaryQuotes, allowsNumbers: false),
             experience: sanitize(entries.jobs, source, entries),
             education: sanitize(entries.studies, source, entries),
-            skills: sanitize(cvData.skills, spoken),
+            skills: sanitize(cvData.skills, spoken, interests: cvData.interests),
             languages: sanitize(cvData.languages, spoken),
             certifications: sanitize(entries.certifications, entries),
             interests: unique(cvData.interests.compactMap(spoken.named)) { $0 }
@@ -156,10 +157,13 @@ public struct CVDataSanitizer: Sendable {
         return unique(cleaned) { "\($0.degree ?? "")|\($0.institution ?? "")" }
     }
 
-    private func sanitize(_ skills: [Skill], _ source: DescriptionText) -> [Skill] {
+    /// A skill whose name is one of the draft's interests is a hobby ("chess", "hiking"): as a skill it would claim an ability the
+    /// person never claimed, so it goes, and the interest stays.
+    private func sanitize(_ skills: [Skill], _ source: DescriptionText, interests: [String]) -> [Skill] {
         let names = skills.compactMap { source.named($0.name) }
+        let hobbies = Set(interests.map { DescriptionText.normalized($0) })
         let cleaned = skills.compactMap { skill -> Skill? in
-            guard let name = source.named(skill.name) else { return nil }
+            guard let name = source.named(skill.name), !hobbies.contains(DescriptionText.normalized(name)) else { return nil }
             let allowed = source.levels(of: name, among: names, vocabulary: .skills)
             return Skill(name: name, level: statedLevel(skill.level, allowed: allowed))
         }
