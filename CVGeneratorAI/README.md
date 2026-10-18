@@ -50,9 +50,9 @@ are its planned replacement and are still empty.
     claims nothing; "can", "mostly" and "partly" still claim ("I can speak French"), and a negation beside a word of level
     denies only the level ("I am not an expert in Swift" keeps Swift).
   - A skill that is also one of the draft's interests, and that the person mentions only as leisure ("In my free time I like
-    chess and hiking"), is a hobby, and is dropped; the interest stays. A skill the person mentions anywhere else ("proficient
+    chess and hiking"), is a hobby, and is dropped; the interest stays. A skill the person claims anywhere else ("proficient
     in Python", a job's clause, a list of skills) stays. Another person's clause ("My sister teaches chess") counts for
-    neither, and a clause that denies, doubts or only wishes claims no skill.
+    neither.
   - An employer or a school loses a leading indefinite article written in lower case ("a nursery" is "nursery"); an article
     with a capital is part of a name ("UNA Hotels").
   - A degree that only says graduating ("diplôme", "Abschluss", "laurea" or "my degree" alone) is dropped; the school stays.

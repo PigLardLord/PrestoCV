@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1495
+    static let rowsWhenWritten = 1497
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -3421,6 +3421,13 @@ enum GroundingRows {
                         "I almost never play chess claims no ability: the skill goes",
                         "In my free time I like chess, but I almost never play chess.", chess,
                         .safe(never: [], absent: ["skills[0].name"])))
+        rows.append(row("a-skill-the-person-can-teach-stays-though-it-is-a-hobby",
+                        "I can teach chess claims the ability, can and all: the skill stays",
+                        "I can teach chess. In my free time I like chess.", chess, .unchanged))
+        rows.append(row("a-skill-the-person-partly-teaches-stays-though-it-is-a-hobby-de",
+                        "ich unterrichte teilweise Schach claims the ability, though partly: the skill stays",
+                        "Ich unterrichte teilweise Schach. In meiner Freizeit mag ich Schach.",
+                        CVData(skills: [Skill(name: "Schach")], interests: ["Schach"]), .unchanged, language: "de"))
         rows.append(row("a-wish-claims-no-skill",
                         "I would like to learn Python claims no ability: the skill goes",
                         "I would like to learn Python.", CVData(skills: [Skill(name: "Python")], interests: ["Python"]),
