@@ -36,7 +36,7 @@ final class UnsavedEditsKeeper {
     private var lastWrite: Task<Bool, Never>?
     /// What the last write that went through left in the store: `.some(nil)` when it removed the edits, and `.none`
     /// before any write went through, when the store may still hold what an earlier run kept.
-    private var written: Edits??
+    private(set) var written: Edits??
     /// The editor was left: its edits were saved or discarded, and nothing more is kept for it.
     private var isClosed = false
     /// The claim this keeper holds on its editing; nil while it holds none. Read when the keeper goes away.

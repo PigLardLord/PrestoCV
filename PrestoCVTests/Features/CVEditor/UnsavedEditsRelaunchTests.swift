@@ -439,6 +439,46 @@ struct UnsavedEditsRelaunchTests {
         #expect(stored.first?.personalInfo.title == "Staff nurse")
     }
 
+    // MARK: - A save whose kept edits cannot be brought up to date
+
+    @Test("Restored edits that a launch could neither keep again nor save are offered at the next launch, and saving them updates the CV once")
+    func restoredEditsThatCouldNotBeSavedAreOfferedAgain() async throws {
+        let installation = Installation()
+        defer { installation.remove() }
+        let firstLaunch = try installation.launch()
+        let original = try await firstLaunch.makeCVManagementUseCase()
+            .createCV(from: CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi")))
+        let editor = try makeEditor(in: firstLaunch, cvId: original.id.uuidString)
+        await editor.loadCV()
+        editor.cv.personalInfo.location = "Bristol"
+        await editor.keepUnsavedEdits()
+
+        // The next launch can remove kept edits but not write them, and cannot store the CV
+        let secondLaunch = try installation.launch(keepingThrough: { KeepingFails($0) })
+        let restored = try #require(try await restoreOffer(in: secondLaunch))
+        let restoredEditor = CVEditorViewModel(
+            cvId: nil,
+            restoring: restored.edits,
+            cvManagementUseCase: StoringFails(try secondLaunch.makeCVManagementUseCase()),
+            unsavedEdits: UnsavedEditsKeeper(editing: restored.edits.id, claim: restored.takeClaim(), useCase: secondLaunch.unsavedEdits)
+        )
+        await restoredEditor.loadCV()
+        restoredEditor.cv.personalInfo.title = "Charge nurse"
+        #expect(await restoredEditor.saveCV() == false)
+        #expect(try await installation.keptEdits() == [restored.edits], "The restored edits stay as they were")
+
+        let thirdLaunch = try installation.launch()
+        let offeredAgain = try #require(try await restoreOffer(in: thirdLaunch))
+        let editorAgain = try makeEditor(in: thirdLaunch, restoring: offeredAgain)
+        await editorAgain.loadCV()
+        #expect(editorAgain.cv.personalInfo.location == "Bristol")
+        #expect(await editorAgain.saveCV())
+
+        let stored = try await installation.launch().makeCVManagementUseCase().getAllCVs()
+        #expect(stored.map(\.id) == [original.id], "Restoring must update the CV, not store it again as a copy")
+        #expect(stored.first?.personalInfo.location == "Bristol")
+    }
+
     @Test("Edits whose removal failed after a save are removed by the next launch, and not offered")
     func editsWhoseRemovalFailedAreRemovedByTheNextLaunch() async throws {
         let installation = Installation()
@@ -526,4 +566,35 @@ private struct RemovalFails: UnsavedEditsRepositoryProtocol {
     func allKept() async throws -> [UnsavedEdits] { try await repository.allKept() }
     func kept(editing id: UUID) async throws -> UnsavedEdits? { try await repository.kept(editing: id) }
     func discard(editing id: UUID) async throws { throw AppError.fileSystemError("locked") }
+}
+
+/// Reads and removes edits in the real store, but cannot write them.
+private struct KeepingFails: UnsavedEditsRepositoryProtocol {
+    let repository: UnsavedEditsRepositoryProtocol
+
+    init(_ repository: UnsavedEditsRepositoryProtocol) {
+        self.repository = repository
+    }
+
+    func keep(_ edits: UnsavedEdits) async throws { throw AppError.fileSystemError("disk full") }
+    func allKept() async throws -> [UnsavedEdits] { try await repository.allKept() }
+    func kept(editing id: UUID) async throws -> UnsavedEdits? { try await repository.kept(editing: id) }
+    func discard(editing id: UUID) async throws { try await repository.discard(editing: id) }
+}
+
+/// Reads CVs as the app does, but cannot store any.
+private struct StoringFails: CVManagementUseCaseProtocol {
+    private let cvs: CVManagementUseCaseProtocol
+
+    init(_ cvs: CVManagementUseCaseProtocol) {
+        self.cvs = cvs
+    }
+
+    func storeNewCV(_ cv: CVModel) async throws -> CVModel { throw AppError.fileSystemError("disk full") }
+    func updateCV(_ cv: CVModel) async throws -> CVModel { throw AppError.fileSystemError("disk full") }
+    func createCV(from template: CVModel) async throws -> CVModel { throw AppError.fileSystemError("disk full") }
+    func duplicateCV(id: UUID) async throws -> CVModel { throw AppError.fileSystemError("disk full") }
+    func getAllCVs() async throws -> [CVModel] { try await cvs.getAllCVs() }
+    func deleteCV(id: UUID) async throws { try await cvs.deleteCV(id: id) }
+    func getCV(by id: UUID) async throws -> CVModel? { try await cvs.getCV(by: id) }
 }

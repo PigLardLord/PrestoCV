@@ -242,10 +242,13 @@ final class CVEditorViewModel: ObservableObject {
         // The kept edits say what this save stores before it does: if the app is ended before they are removed,
         // restoring them finds that CV and updates it, instead of storing it a second time
         savingCV = submittedCV
-        if await keepUnsavedEdits() == false {
-            // What is kept could not be brought up to date: rather than leave edits that name the wrong stored CV, which
-            // a restore would take for edits on an older version, they are removed. The form still holds them.
-            await unsavedEdits?.keepNow(nil)
+        if await keepUnsavedEdits() == false, keepsOtherEdits(of: submittedCV) {
+            // What is kept could not be brought up to date, and holds other edits of this CV: once it is stored, a
+            // restore would take them for edits on an older version of it. Removing them could leave nothing of the
+            // edits that outlives the app, so nothing is stored, and they stay as they are.
+            savingCV = nil
+            saveError = "editor.save_error.not_kept".localized
+            return false
         }
 
         do {
@@ -420,6 +423,21 @@ final class CVEditorViewModel: ObservableObject {
     /// running stores; nil when everything is saved.
     private var currentUnsavedEdits: UnsavedEditsKeeper.Edits? {
         hasUnsavedChanges ? UnsavedEditsKeeper.Edits(cv: cv, base: savingCV ?? savedSnapshot) : nil
+    }
+
+    /// Whether the edits kept on the device are edits of `cv` other than `cv` itself. Until the keeper has written, what
+    /// is kept is what an earlier run kept: the edits the editor restored, or nothing for a new editing.
+    private func keepsOtherEdits(of cv: CVModel) -> Bool {
+        guard let unsavedEdits else { return false }
+        let keptCV: CVModel?
+        switch unsavedEdits.written {
+        case .some(let written):
+            keptCV = written?.cv
+        case .none:
+            keptCV = restoredEdits?.cv
+        }
+        guard let keptCV else { return false }
+        return keptCV.id == cv.id && keptCV != cv
     }
 
     /// The form changed: a confirmation of the last save no longer holds, and the edits are kept soon. A form that is
