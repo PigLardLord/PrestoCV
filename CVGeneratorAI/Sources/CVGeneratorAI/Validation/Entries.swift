@@ -107,11 +107,11 @@ struct Entries {
     }
 
     /// Whether the person mentions `name` only as leisure, among the draft's `interests` that the description gives (see
-    /// `LeisureMentions`): "In my free time I like chess" does, "I am proficient in Python" does not, and another person's clause
-    /// counts for neither.
+    /// `LeisureMentions`): "In my free time I like chess" does, "I am proficient in Python" does not, and a clause that claims
+    /// nothing for the person (another person's, or one that denies, wishes or supposes) counts for neither.
     func mentionsOnlyAsLeisure(_ name: String, interests: [String]) -> Bool {
         let leisure = LeisureMentions(
-            clauses: clauses, language: language, interests: interests.map(Self.words(of:)), isThePersons: grounding.speaks(at:)
+            clauses: clauses, language: language, interests: interests.map(Self.words(of:)), isClaimed: grounding.claims(at:)
         )
         return leisure.mentionsOnlyAsLeisure(Self.words(of: name))
     }

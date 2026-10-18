@@ -240,11 +240,11 @@ struct Grounding {
         return ProseQuotes(sources: sources, language: explainer.language)
     }
 
-    /// Whether the clause at `place` speaks for the person: the clauses that `spokenSentences` keeps.
-    func speaks(at place: DescriptionClauses.Place) -> Bool {
-        reading.speaks(at: place)
+    /// Whether the clause at `place` claims a skill, an interest or a language for the person: the clauses that `claimedSentences`
+    /// keeps.
+    func claims(at place: DescriptionClauses.Place) -> Bool {
+        reading.claims(at: place)
     }
-
 
     /// The description as the person claims skills, interests and languages in it: its sentences, with every clause that does not
     /// speak for the person, or that denies, wishes or supposes, left out.
