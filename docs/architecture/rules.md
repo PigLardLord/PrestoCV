@@ -12,7 +12,7 @@ Each rule says what is required, why, and what enforces it:
 - **test**: a required test fails.
 - **review**: nothing automatic can catch it. Kept to a minimum, and marked as such.
 
-The checker applies to **production targets**: domain, application, integration, presentation and adapter targets, and the composition root. Test, test-support and tool targets get the import allow-lists only. Legacy targets are exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)).
+The checker applies to **production targets**: domain, application, integration, presentation and adapter targets, and the composition root. Test, test-support and tool targets get the import allow-lists only. Legacy targets are exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)), except from R15.
 
 ---
 
@@ -223,3 +223,19 @@ A platform-only target wraps **every file** entirely in its platform condition. 
 **Why.** About 45% of `CVPDFExporter` is unreachable from the app, `MockExportRepository` is the production export repository, and a fake "John Doe" document is returned on bad input.
 
 **Enforced by:** checker (detectors `testDouble` for `Mock…`, `Fake…`, `Stub…`, `Test…`, `Spy…`, `Dummy…` declared or referenced in production, and `printing`) and review.
+
+## R15. Resource bundles have a layout every platform can sign
+
+A target's resources reach its bundle in one of two ways:
+
+- `.copy` keeps a directory whole, under its last path component, where the bundle keeps its resources: at its root on iOS, in `Contents/Resources` on macOS;
+- `.process` flattens a directory's files to the root, so the directory's own name never reaches the bundle.
+
+A copied directory must not take a name of the bundle's own structure: `Contents`, `Resources`, `MacOS` or `_CodeSignature`, in any case. Copy the directory that holds the files (`.copy("Headings")`), not one that only wraps it.
+
+- Legacy targets follow this rule too: their bundles are signed in the same build as the others.
+- The path of a copied resource is a string literal without interpolation, so the checker can read its value.
+
+**Why.** An iOS bundle is shallow: its resources sit next to `Info.plist`. A `Resources` or `Contents` directory at its root is the layout of a macOS bundle, and `codesign` rejects the bundle as "bundle format unrecognized, invalid, or unsuitable". A `_CodeSignature` directory at its root is replaced by the signature, and the files in it are lost. `CVRendering` copied a `Resources` directory, and every Xcode Cloud test build failed (#240). No package test showed it: on macOS, SwiftPM makes deep bundles, with the resources under `Contents/Resources`, where a copied `Resources` directory is harmless, and on Linux nothing is signed.
+
+**Enforced by:** checker (detector `bundleLayout` in manifests, in every `#if` branch, legacy declarations included).

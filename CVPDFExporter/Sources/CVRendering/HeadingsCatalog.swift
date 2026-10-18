@@ -18,13 +18,13 @@ public enum HeadingsCatalog {
 
     /// Languages with a table, from the package's own index; used by the completeness test and the UI picker.
     public static func supportedLanguages() throws(Failure) -> [String] {
-        guard let url = Bundle.module.url(forResource: "Resources/Headings/index", withExtension: "json") else { throw .corruptTable("index") }
+        guard let url = Bundle.module.url(forResource: "Headings/index", withExtension: "json") else { throw .corruptTable("index") }
         do { return try JSONDecoder().decode([String].self, from: Data(contentsOf: url)) } catch { throw .corruptTable("index") }
     }
 
     /// nil only when the language has no table; a table that exists but cannot be read is an error (R7).
     static func table(_ tag: String) throws(Failure) -> [String: String]? {
-        guard let url = Bundle.module.url(forResource: "Resources/Headings/\(tag)", withExtension: "json") else { return nil }
+        guard let url = Bundle.module.url(forResource: "Headings/\(tag)", withExtension: "json") else { return nil }
         do { return try JSONDecoder().decode([String: String].self, from: Data(contentsOf: url)) } catch { throw .corruptTable(tag) }
     }
 

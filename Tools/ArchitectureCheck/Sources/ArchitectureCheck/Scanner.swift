@@ -1,3 +1,4 @@
+import SwiftParser
 import SwiftSyntax
 
 /// One detected construct. `node` is the construct's source text without trivia (comments, spacing),
@@ -159,6 +160,7 @@ final class Scanner: SyntaxVisitor {
             if path.count == 1 { callee = path[0] } else { callee = path[path.count - 2]; member = path[path.count - 1] }
         }
         if member == "unsafeFlags" { hit("unsafeFlags", "unsafeFlags", node) }
+        if member == "copy", callee == "" || callee == "Resource" { checkCopiedResource(node) }
         // A language mode below 6 in any spelling: .version("5"), .version("4.2").
         if member == "version", let literal = args.first?.expression.as(StringLiteralExprSyntax.self),
            let major = Int(literal.segments.trimmedDescription.prefix { $0.isNumber }), major < 6 {
@@ -230,6 +232,23 @@ final class Scanner: SyntaxVisitor {
         if n == "LocalizedStringResource" || n == "LocalizedStringKey" { hit("localization", n, node) }
         if n == "DispatchSemaphore" { hit("escapeHatch", n, node) }
         if Self.isTestDoubleName(n) { hit("testDouble", n, node) }
+    }
+
+    // MARK: Resource bundles
+
+    /// The names a bundle reserves for its own structure (R15), compared without case: the default macOS file system ignores it.
+    static let reservedBundleNames: Set<String> = ["contents", "resources", "macos", "_codesignature"]
+
+    /// `.copy` puts a directory at the root of the resource bundle under its last path component. `.process` flattens a
+    /// directory's files to the root, so only `.copy` can put a reserved directory there. The path is the literal's value,
+    /// as SwiftPM receives it: escapes decoded, multiline delimiters and line continuations removed.
+    private func checkCopiedResource(_ node: FunctionCallExprSyntax) {
+        guard let path = node.arguments.first?.expression.as(StringLiteralExprSyntax.self)?.representedLiteralValue else {
+            hit("bundleLayout", "the path of a copied resource must be a string literal without interpolation", node); return
+        }
+        if let entry = path.split(separator: "/").last(where: { $0 != "." }), Self.reservedBundleNames.contains(entry.lowercased()) {
+            hit("bundleLayout", "copies \(entry)/ to the root of the resource bundle, a name the bundle's own structure uses", node)
+        }
     }
 
     // MARK: Declarations
