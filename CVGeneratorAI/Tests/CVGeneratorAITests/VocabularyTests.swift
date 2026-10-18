@@ -324,7 +324,7 @@ struct VocabularyTests {
     }
 
     @Test("A verb of a CV, a word of level, of studying and of time are explained, so that they may stand in a clause that backs an entry",
-          arguments: ["worked", "taught", "managed", "native", "fluent", "school", "degree", "students", "lavorato", "laurea", "gearbeitet", "abschluss", "trabajado", "diplome", "formei", "years", "now", "march", "anni", "jahre", "anos", "today", "currently"])
+          arguments: ["worked", "taught", "managed", "native", "fluent", "school", "degree", "students", "lavorato", "laurea", "gearbeitet", "abschluss", "trabajado", "diplome", "formei", "fundamental", "years", "now", "march", "anni", "jahre", "anos", "today", "currently"])
     func explainedWords(word: String) {
         #expect(Vocabulary.explains(word), "\(word)")
     }

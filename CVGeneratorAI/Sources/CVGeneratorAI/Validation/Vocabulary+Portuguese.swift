@@ -153,7 +153,7 @@ extension Vocabulary {
         /// Words of studying and graduating.
         studying: """
         academia colegio curso cursos diploma doutorado escola escolas estudante estudantes estudos exame faculdade
-        graduacao instituto licenciatura mestrado primaria secundaria tese universidade universidades
+        fundamental graduacao instituto licenciatura mestrado primaria secundaria tese universidade universidades
         """,
         /// Prepositions and adverbs of time, and the conjunctions that join them: what a pure time phrase is made of, with years.
         timePhrase: """
