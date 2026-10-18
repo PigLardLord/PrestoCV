@@ -23,7 +23,7 @@ The current app and packages are the legacy code the migration replaces, one con
 | `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The current packages (legacy, being replaced). |
 | `Tools/ArchitectureCheck/` | The checker that enforces the rules, and its pre-commit hook. |
 | `Tools/Localization/` | `l10n_manager.py`, which adds, reads, lists, checks and updates the texts of the string catalog. Run it from the repository root. |
-| `ci_scripts/`, `TestPlans/`, `docs/release/` | The Xcode Cloud side of the releases: its build scripts, the test plans, and the settings of its workflows. |
+| `ci_scripts/`, `TestPlans/`, `docs/release/` | The releases: Xcode Cloud's build scripts, the test plans, the settings of its workflows, and the App Store listing in every language with the notes for App Review (`docs/release/store-listing.md`, checked by `Tools/Release/check-store-listing.py`). |
 | `Prototypes/ADRValidation/` | The throwaway prototype that validated the ADRs. It is outside the app's build; its README says how to run it. |
 
 ## Building and testing
