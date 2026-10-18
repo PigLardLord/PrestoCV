@@ -18,7 +18,7 @@ import Foundation
 /// - a skill level or language level stays only if the description states it, in a sentence with no negation or hedge, and a
 ///   language with a level that the description does not state goes whole; a language without a level may stay without one;
 /// - a skill that is also an interest of the draft is a hobby, and goes;
-/// - an employer or a school keeps no leading indefinite article;
+/// - an employer or a school keeps no leading indefinite article, and a degree that only says graduating ("diplôme") goes;
 /// - every fact is the person's: a language, a skill, an interest and the person's own name, contacts, place and title are kept only
 ///   as the clauses that speak for the person (or a list with no verb) give them, so a sister's French or a manager's email goes; a
 ///   contact, only as a label ("Email: ..."), the person's possession of the field ("My email is ..."), a verb of contacting whose
@@ -143,7 +143,9 @@ public struct CVDataSanitizer: Sendable {
         let cleaned = studies.compactMap { study -> Education? in
             guard entries.hasFactualMention(of: study.subject) else { return nil }
             let evidence = entries.evidence(of: study.subject)
-            let degree = entries.supportedTitle(of: study.subject, study.degree)
+            let degree = entries.supportedTitle(of: study.subject, study.degree).flatMap {
+                EntryWording.namesADegree($0, in: source.explainer.language) ? $0 : nil
+            }
             guard degree != nil || study.institution != nil else { return nil }
             let dates = evidence.supportedDates([study.entry.endDate, study.entry.startDate], graduationDate: 0)
 
