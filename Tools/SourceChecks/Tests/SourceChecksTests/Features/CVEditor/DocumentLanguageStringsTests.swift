@@ -8,9 +8,7 @@ struct DocumentLanguageStringsTests {
     static let languages = ["de", "en", "es", "fr", "it", "pt"]
 
     private static func value(of key: String, in language: String) throws -> String {
-        let catalogURL = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("PrestoCV/Localizable.xcstrings")
+        let catalogURL = Repository.root.appendingPathComponent("PrestoCV/Localizable.xcstrings")
         let catalog = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: catalogURL)) as? [String: Any])
         let strings = try #require(catalog["strings"] as? [String: Any])
         let entry = try #require(strings[key] as? [String: Any], "\(key) is not in the catalog")

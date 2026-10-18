@@ -24,6 +24,7 @@ The current app and packages are the legacy code the migration replaces, one con
 | `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The current packages (legacy, being replaced). |
 | `CVPDFExporter/Docs/` | The document markup contract that designs follow, which the exporter's tests hold the code to. |
 | `Tools/ArchitectureCheck/` | The checker that enforces the rules, and its pre-commit hook. |
+| `Tools/SourceChecks/` | The checks of source text: the string catalog, the rules the app's views follow, release hygiene. They read the repository, so they run with `swift test`, not in the test plans. |
 | `Tools/Localization/` | `l10n_manager.py`, which adds, reads, lists, checks and updates the texts of the string catalog. Run it from the repository root. |
 | `ci_scripts/`, `TestPlans/`, `docs/release/` | The releases: Xcode Cloud's build scripts, the test plans, the settings of its workflows, and the App Store listing in every language with the notes for App Review (`docs/release/store-listing.md`, checked by `Tools/Release/check-store-listing.py`). |
 | `Prototypes/ADRValidation/` | The throwaway prototype that validated the ADRs. It is outside the app's build; its README says how to run it. |
@@ -37,12 +38,13 @@ xcodebuild -project PrestoCV.xcodeproj -scheme PrestoCV -configuration Debug bui
 xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
 xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -testPlan CI -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
 swift test --package-path PrestoCVCore
+swift test --package-path Tools/SourceChecks
 Tools/ArchitectureCheck/check.sh
 ```
 
 The scheme has two test plans. `PrestoCV`, the default, runs every test: the app's, the exporter package's simulator tests, and `PrestoCVUITests`. `CI` leaves out `PrestoCVUITests`, Xcode's template launch tests, which take most of an hour and check nothing.
 
-On Linux, the packages contain only the new targets. They build today and stay empty until the migration fills them; the architecture checker and the prototype also build and test there. The legacy targets are declared only on Apple hosts (ADR 0012).
+On Linux, the packages contain only the new targets. They build today and stay empty until the migration fills them; the architecture checker, the source checks and the prototype also build and test there. The legacy targets are declared only on Apple hosts (ADR 0012).
 
 ## Development data
 
@@ -62,7 +64,7 @@ Xcode Cloud tests version 1, archives it, signs it and uploads it to TestFlight 
 
 Nothing submits a build for App Review: the owner does it in App Store Connect, with Add for Review.
 
-The repository side is `ci_scripts/` (it sets an archive's version from its tag or branch, checks the archive with `Tools/Release/check-archive.sh` before the upload, and runs the architecture check, the package tests and the package builds), `TestPlans/`, and the `DEVELOPMENT_TEAM` of the project. Xcode Cloud signs the build itself, so the repository holds no key and no secret. `docs/release/xcode-cloud.md` has the exact settings of the three workflows, the one-time setup, and the steps to cut a release.
+The repository side is `ci_scripts/` (it sets an archive's version from its tag or branch, checks the archive with `Tools/Release/check-archive.sh` before the upload, and runs the architecture check, the package tests, the source checks and the package builds), `TestPlans/`, and the `DEVELOPMENT_TEAM` of the project. Xcode Cloud signs the build itself, so the repository holds no key and no secret. `docs/release/xcode-cloud.md` has the exact settings of the three workflows, the one-time setup, and the steps to cut a release.
 
 ## Contributing
 

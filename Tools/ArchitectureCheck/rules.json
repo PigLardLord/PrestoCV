@@ -638,6 +638,16 @@
    "rules": []
   },
   {
+   "name": "SourceChecksTests",
+   "path": "Tools/SourceChecks/Tests/SourceChecksTests",
+   "kind": "tool",
+   "allowedImports": [
+    "Testing",
+    "Foundation"
+   ],
+   "rules": []
+  },
+  {
    "name": "ADRValidationPrototype",
    "path": "Prototypes/ADRValidation",
    "kind": "excluded",
@@ -695,6 +705,18 @@
   {
    "name": "ArchitectureCheckManifest",
    "path": "Tools/ArchitectureCheck/Package.swift",
+   "kind": "manifest",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m",
+    "R15"
+   ]
+  },
+  {
+   "name": "SourceChecksManifest",
+   "path": "Tools/SourceChecks/Package.swift",
    "kind": "manifest",
    "allowedImports": [
     "PackageDescription"
