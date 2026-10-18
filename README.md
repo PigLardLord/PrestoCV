@@ -2,7 +2,7 @@
 
 PrestoCV is a CV and résumé app for iPhone and iPad, written in SwiftUI. You write your CV once and export it as a PDF in any of several designs. Where the device supports Apple's Foundation Models, the app can also write a first draft on the device from a description in your own words. The app is in English, German, Spanish, French, Italian and Portuguese, and so are the headings of the documents it exports. A macOS version is part of the target architecture ([ADR 0004](docs/architecture/adr/0004-native-multiplatform-app.md)).
 
-The source is open under the [Apache License 2.0](LICENSE). The name and the icon are not (see [License](#license)).
+The source is licensed under the [Apache License 2.0](LICENSE). The name and the icon are not (see [License](#license)).
 
 ## Privacy
 
