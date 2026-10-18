@@ -4448,7 +4448,7 @@ enum GroundingRows {
 
     // The raw answers of the on-device model on 2026-10-18 (macOS 27.0.1, Apple Intelligence on), run 1 of each description: the
     // app's six examples and a nurse in Turin. The three runs of each description gave the same draft. Each row expects the whole
-    // grounded draft, in the model's order of the jobs.
+    // grounded draft, in the model's order of the jobs: the use case then puts the current job first (see `JobOrder`).
 
     private static let nurseInTurin = """
         My name is Giulia Bianchi and I am a registered nurse living in Turin. \

@@ -46,6 +46,9 @@ are its planned replacement and are still empty.
     English "per shift" no Italian "per", German "seit Mai" no Italian "mai" (never). A word of another language that the
     description's language does not have keeps its meaning.
   - A skill that is also one of the draft's interests ("chess", "hiking") is a hobby, and is dropped; the interest stays.
+- **The order of a CV.** The use case lists the jobs that go on now first, then the others by their latest year (the end,
+  else the start), the newest first, as the grounded draft gives the years. A job with no year keeps its place among the
+  others, and so do jobs of the same year.
 - **On device.** The request, the description and the answer never leave the device.
 - **Typed outcomes.** Failures are `CVGenerationError` cases that the app explains in the person's language;
   cancellation is `CancellationError`, never an error case. Availability is an `AIAvailability` value with the reason
@@ -65,7 +68,7 @@ CVGeneratorAI/
 ├── Protocols/     # CVGenerationService
 ├── Services/      # FoundationModelsService, the only implementation
 ├── Validation/    # CVValidator (request and answer rules) and CVDataSanitizer
-└── UseCases/      # CVGeneratorUseCase: check, generate, sanitize, check
+└── UseCases/      # CVGeneratorUseCase: check, generate, sanitize, order the jobs (JobOrder), check
 ```
 
 ## Usage
