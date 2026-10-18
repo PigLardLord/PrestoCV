@@ -1,0 +1,532 @@
+// Composes the App Store screenshots: each caption of docs/release/store-listing.md above its screenshot, on the
+// app's dark green with its accent, at the exact size the App Store asks for, plus a contact sheet per device.
+//
+//   swiftc -O -o compose-store-screenshots Tools/Release/compose-store-screenshots.swift
+//   ./compose-store-screenshots <store-listing.md> <captures dir> <output dir> <device>[,<device>...] [<language>,...]
+//
+// A caption is written `Title | Line below`: the title is set large and bold, in at most two lines, and the line below it
+// smaller, in at most three. <captures dir>/<device>/<language>/NN.png are the screenshots StoreScreenshotsUITests
+// attached; a locale uses those of its language (en-GB those of en, pt-PT those of pt), and only the locales of the
+// languages given are composed (all by default). It writes <output dir>/<locale>/<device>/NN.png and
+// <output dir>/contact-sheet-<device>.png. In the iPad set the captions say "iPad" where they say "iPhone", as the
+// listing asks; apostrophes are typeset as ’, and "Apple Intelligence" is kept on one line. The images have no alpha
+// channel, which the App Store rejects. Tools/Release/store-screenshots.sh runs it.
+
+import CoreGraphics
+import CoreText
+import Foundation
+import ImageIO
+import UniformTypeIdentifiers
+
+// MARK: - Devices
+
+/// How one part of the captions is set: the titles, or the lines below them
+struct Style: Sendable {
+    let isBold: Bool
+    /// The largest size, in pixels. All the titles of a locale get one size, and all its lines below another
+    /// (`fitCaptions`).
+    let largestSize: CGFloat
+    let maximumLines: Int
+    let lineHeight: CGFloat
+    let opacity: CGFloat
+}
+
+struct Device: Sendable {
+    let width: Int
+    let height: Int
+    /// The device the captions name: "iPhone" in the listing, replaced in the other sets
+    let name: String
+    let label: String
+    let title: Style
+    let line: Style
+    /// The corner radius of the screen, as a share of its width
+    let cornerRadius: CGFloat
+}
+
+func titleStyle(_ size: CGFloat) -> Style {
+    Style(isBold: true, largestSize: size, maximumLines: 2, lineHeight: 1.0, opacity: 1)
+}
+
+func lineStyle(_ size: CGFloat) -> Style {
+    Style(isBold: false, largestSize: size, maximumLines: 3, lineHeight: 1.08, opacity: 0.85)
+}
+
+let devices: [String: Device] = [
+    "iphone": Device(width: 1320, height: 2868, name: "iPhone", label: "iPhone 6.9-inch",
+                     title: titleStyle(112), line: lineStyle(62), cornerRadius: 0.13),
+    "iphone-6.3": Device(width: 1206, height: 2622, name: "iPhone", label: "iPhone 6.3-inch",
+                         title: titleStyle(102), line: lineStyle(57), cornerRadius: 0.13),
+    "ipad": Device(width: 2064, height: 2752, name: "iPad", label: "iPad 13-inch",
+                   title: titleStyle(132), line: lineStyle(76), cornerRadius: 0.035),
+]
+
+// MARK: - Layout
+
+/// Where things go on a canvas, as shares of its size: the same on every image of a device, so that the screenshots
+/// do not move when the App Store pages through them. The band of the captions is as tall as the tallest caption of
+/// the listing on that device.
+struct Layout {
+    let canvas: CGSize
+    var captionHeight: CGFloat = 0
+    var captionTop: CGFloat { canvas.height * 0.05 }
+    var captionWidth: CGFloat { canvas.width * 0.86 }
+    var screenTop: CGFloat { captionTop + captionHeight + canvas.height * 0.03 }
+    var bottomMargin: CGFloat { canvas.height * 0.04 }
+
+    init(canvas: CGSize) {
+        self.canvas = canvas
+    }
+
+    /// The space between a title and the line below it
+    func gap(below title: SetCaption) -> CGFloat {
+        title.fontSize * 0.3
+    }
+
+    /// The screenshot's frame, top-left origin, as large as fits under the caption
+    func screenFrame(for capture: CGSize, frameWidth: CGFloat) -> CGRect {
+        let height = canvas.height - screenTop - bottomMargin - 2 * frameWidth
+        let width = height * capture.width / capture.height
+        return CGRect(x: (canvas.width - width) / 2, y: screenTop + frameWidth, width: width, height: height)
+    }
+}
+
+let darkGreen = CGColor(srgbRed: 0x0A / 255, green: 0x40 / 255, blue: 0x3B / 255, alpha: 1)
+let deeperGreen = CGColor(srgbRed: 0x06 / 255, green: 0x2C / 255, blue: 0x28 / 255, alpha: 1)
+let accent = CGColor(srgbRed: 0x00 / 255, green: 0xDA / 255, blue: 0xC3 / 255, alpha: 1)
+let frameColor = CGColor(srgbRed: 0x03 / 255, green: 0x16 / 255, blue: 0x14 / 255, alpha: 1)
+let white = CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1)
+
+/// A caption of the listing, `Title | Line below`. A caption without the separator is all title.
+struct Caption {
+    let title: String
+    let line: String
+
+    init(_ text: String) {
+        let parts = text.components(separatedBy: " | ")
+        title = parts[0]
+        line = parts.dropFirst().joined(separator: " | ")
+    }
+
+    /// As it is shown on a device: "iPhone" becomes the device, apostrophes are typeset, and "Apple Intelligence"
+    /// does not break
+    func shown(on device: Device) -> Caption {
+        func typeset(_ text: String) -> String {
+            text.replacingOccurrences(of: "iPhone", with: device.name).replacingOccurrences(of: "'", with: "’")
+                .replacingOccurrences(of: "Apple Intelligence", with: "Apple\u{00A0}Intelligence")
+        }
+        return Caption(title: typeset(title), line: typeset(line))
+    }
+
+    private init(title: String, line: String) {
+        self.title = title
+        self.line = line
+    }
+}
+
+// MARK: - Captions
+
+/// The screenshot captions of every locale of the listing, in its order: the lines of the ```text block under
+/// "### Screenshot captions" of each "## <Language>, <code>" section.
+func captions(in listing: String) -> [(locale: String, captions: [String])] {
+    var result: [(locale: String, captions: [String])] = []
+    var locale: String?
+    var field: String?
+    var block: [String]?
+    let heading = try? NSRegularExpression(pattern: #"^## .+, ([a-z]{2}(?:-[A-Z]{2})?)$"#)
+    for line in listing.components(separatedBy: "\n") {
+        if var lines = block {
+            if line == "```" {
+                if let locale, field == "Screenshot captions" { result.append((locale, lines)) }
+                block = nil
+            } else {
+                lines.append(line)
+                block = lines
+            }
+        } else if line == "```text" {
+            block = []
+        } else if line.hasPrefix("## ") {
+            let range = NSRange(line.startIndex..., in: line)
+            locale = heading?.firstMatch(in: line, range: range)
+                .flatMap { Range($0.range(at: 1), in: line) }
+                .map { String(line[$0]) }
+            field = nil
+        } else if line.hasPrefix("### ") {
+            field = String(line.dropFirst(4))
+        }
+    }
+    return result
+}
+
+// MARK: - Text
+
+func captionText(_ text: String, size: CGFloat, style: Style) -> NSAttributedString {
+    let font = CTFontCreateUIFontForLanguage(style.isBold ? .emphasizedSystem : .system, size, nil)
+        ?? CTFontCreateWithName((style.isBold ? "Helvetica-Bold" : "Helvetica") as CFString, size, nil)
+    var alignment = CTTextAlignment.center
+    var lineHeight = style.lineHeight
+    let paragraph = withUnsafePointer(to: &alignment) { alignmentPointer in
+        withUnsafePointer(to: &lineHeight) { lineHeightPointer in
+            let settings = [
+                CTParagraphStyleSetting(spec: .alignment, valueSize: MemoryLayout<CTTextAlignment>.size,
+                                        value: alignmentPointer),
+                CTParagraphStyleSetting(spec: .lineHeightMultiple, valueSize: MemoryLayout<CGFloat>.size,
+                                        value: lineHeightPointer),
+            ]
+            return CTParagraphStyleCreate(settings, settings.count)
+        }
+    }
+    return NSAttributedString(string: text, attributes: [
+        NSAttributedString.Key(kCTFontAttributeName as String): font,
+        NSAttributedString.Key(kCTForegroundColorAttributeName as String): white.copy(alpha: style.opacity) ?? white,
+        NSAttributedString.Key(kCTParagraphStyleAttributeName as String): paragraph,
+    ])
+}
+
+/// A title or a line below set in its lines: the text, its font size and the size the text takes.
+struct SetCaption {
+    let text: NSAttributedString
+    let fontSize: CGFloat
+    let size: CGSize
+}
+
+/// The lines a text is broken into at a width, and the size of the text
+func lines(of text: NSAttributedString, width: CGFloat) -> (lines: [String], size: CGSize) {
+    let setter = CTFramesetterCreateWithAttributedString(text)
+    let path = CGPath(rect: CGRect(x: 0, y: 0, width: width, height: 100_000), transform: nil)
+    let frame = CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0), path, nil)
+    let string = text.string as NSString
+    let lines = (CTFrameGetLines(frame) as? [CTLine] ?? []).map { line in
+        let range = CTLineGetStringRange(line)
+        return string.substring(with: NSRange(location: range.location, length: range.length))
+    }
+    let size = CTFramesetterSuggestFrameSizeWithConstraints(
+        setter, CFRange(location: 0, length: 0), nil, CGSize(width: width, height: 100_000), nil
+    )
+    return (lines, size)
+}
+
+func lineWidth(_ text: String, size: CGFloat, style: Style) -> CGFloat {
+    let line = CTLineCreateWithAttributedString(captionText(text, size: size, style: style))
+    return CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+}
+
+/// The widest word: a text whose widest word does not fit would be broken inside it.
+func widestWord(_ text: String, size: CGFloat, style: Style) -> CGFloat {
+    text.split(separator: " ").map { lineWidth(String($0), size: size, style: style) }.max() ?? 0
+}
+
+/// Whether the text fits its lines at `size`, none broken inside a word
+func fits(_ text: String, size: CGFloat, style: Style, width: CGFloat) -> Bool {
+    lines(of: captionText(text, size: size, style: style), width: width).lines.count <= style.maximumLines
+        && widestWord(text, size: size, style: style) <= width
+}
+
+/// Short words a line should not end with (articles, prepositions, possessives) and the conjunctions a line reads well
+/// starting with, in the languages of the listing: "a blank / CV" and "ce / que" read badly, "/ or from one" well.
+let weakLineEnds: Set<String> = [
+    "a", "an", "the", "of", "to", "in", "on", "from", "with", "your", "and", "or",
+    "ein", "einem", "einen", "einer", "der", "die", "das", "den", "dem", "von", "auf", "mit", "und", "oder", "ihr",
+    "ihren", "ihrem", "un", "una", "uno", "il", "lo", "la", "le", "i", "di", "da", "del", "della", "nel", "sul", "e",
+    "o", "tuo", "ciò", "che", "el", "los", "las", "de", "en", "con", "y", "tu", "que", "une", "les", "du", "des", "ce",
+    "et", "ou", "votre", "vos", "um", "uma", "os", "as", "do", "dos", "das", "em", "no", "na", "com", "seu", "sua",
+    "for", "für", "zu", "zur", "per", "nella", "pour", "sur", "dans", "por", "para",
+]
+let lineStarts: Set<String> = ["or", "and", "oder", "und", "o", "y", "e", "ou", "et"]
+
+/// What a way of breaking a caption into lines costs: uneven lines cost, a line that ends a sentence or a clause, or
+/// that starts with a conjunction, saves, and a line that ends with a short word, or a last line of one word, costs.
+func cost(of lines: [String], widths: [CGFloat]) -> CGFloat {
+    // Unevenness is measured against the widest line, so that it does not depend on the size of the text
+    let mean = widths.reduce(0, +) / CGFloat(widths.count)
+    let widest = widths.max() ?? 1
+    var cost = widths.map { pow(($0 - mean) / widest, 2) }.reduce(0, +)
+    for line in lines.dropLast() {
+        let last = line.split(separator: " ").last.map { String($0).lowercased() } ?? ""
+        if let mark = line.last, ".:;!?".contains(mark) { cost -= 0.25 }
+        if line.last == "," { cost -= 0.2 }
+        if weakLineEnds.contains(last) { cost += 0.2 }
+    }
+    for line in lines.dropFirst() {
+        if let first = line.split(separator: " ").first, lineStarts.contains(first.lowercased()) { cost -= 0.15 }
+    }
+    if lines.count > 1, lines.last?.contains(" ") == false { cost += 0.3 }
+    return cost
+}
+
+/// The text at `size`, broken the cheapest of every way to break it: in as few lines as fit, or in one more, which
+/// costs, where that reads much better.
+func balanced(
+    _ text: String, size: CGFloat, style: Style, width maximumWidth: CGFloat
+) -> (set: SetCaption, cost: CGFloat) {
+    let words = text.split(separator: " ").map(String.init)
+    let fewest = lines(of: captionText(text, size: size, style: style), width: maximumWidth).lines.count
+    let extraLineCost: CGFloat = 0.35
+    var widths: [String: CGFloat] = [:]
+    func width(_ line: String) -> CGFloat {
+        if let known = widths[line] { return known }
+        let measured = lineWidth(line, size: size, style: style)
+        widths[line] = measured
+        return measured
+    }
+    // An empty text, a caption with no line below, costs nothing and takes no room
+    var best: (cost: CGFloat, lines: [String]) = (words.isEmpty ? 0 : .infinity, [text])
+
+    /// Every way to put the words from `start` on in `remaining` lines
+    func split(from start: Int, into remaining: Int, lines: [String]) {
+        if remaining == 1 {
+            let candidate = lines + [words[start...].joined(separator: " ")]
+            let candidateWidths = candidate.map(width)
+            guard candidateWidths.allSatisfy({ $0 <= maximumWidth }) else { return }
+            let candidateCost = cost(of: candidate, widths: candidateWidths)
+                + extraLineCost * CGFloat(candidate.count - fewest)
+            if candidateCost < best.cost { best = (candidateCost, candidate) }
+            return
+        }
+        guard start + remaining <= words.count else { return }
+        for end in (start + 1)...(words.count - remaining + 1) {
+            let line = words[start..<end].joined(separator: " ")
+            if width(line) > maximumWidth { break }
+            split(from: end, into: remaining - 1, lines: lines + [line])
+        }
+    }
+
+    if !words.isEmpty {
+        for count in fewest...min(fewest + 1, style.maximumLines, words.count) {
+            split(from: 0, into: count, lines: [])
+        }
+    }
+    let set = captionText(best.lines.joined(separator: "\u{2028}"), size: size, style: style)
+    return (SetCaption(text: set, fontSize: size, size: lines(of: set, width: maximumWidth).size), best.cost)
+}
+
+/// Every title, or every line below, of a set at one size: the largest at which all of them fit, or a little smaller
+/// where that lets them break much better. Each step down costs, so that the text stays as large as it can.
+func fitCaptions(_ texts: [String], style: Style, width: CGFloat) throws -> [SetCaption] {
+    var largest = style.largestSize
+    while !texts.allSatisfy({ fits($0, size: largest, style: style, width: width) }) {
+        largest -= 2
+        guard largest >= style.largestSize * 0.55 else {
+            throw Failure("these do not fit in \(style.maximumLines) lines: \(texts)")
+        }
+    }
+    var best: (cost: CGFloat, set: [SetCaption]) = (.infinity, [])
+    var size = largest
+    while size >= largest * 0.9 {
+        let set = texts.map { balanced($0, size: size, style: style, width: width) }
+        let total = set.map(\.cost).reduce(0, +) + 4 * (largest - size) / largest
+        if total < best.cost { best = (total, set.map(\.set)) }
+        size -= 2
+    }
+    return best.set
+}
+
+/// The titles and the lines below of the captions of one locale, set for a device
+func setCaptions(
+    _ captions: [Caption], device: Device, layout: Layout
+) throws -> [(title: SetCaption, line: SetCaption)] {
+    let shown = captions.map { $0.shown(on: device) }
+    let titles = try fitCaptions(shown.map(\.title), style: device.title, width: layout.captionWidth)
+    let lines = try fitCaptions(shown.map(\.line), style: device.line, width: layout.captionWidth)
+    return Array(zip(titles, lines))
+}
+
+/// How tall a title and its line below are, with the space between them
+func height(of caption: (title: SetCaption, line: SetCaption), in layout: Layout) -> CGFloat {
+    let line = caption.line.text.length > 0 ? layout.gap(below: caption.title) + caption.line.size.height : 0
+    return caption.title.size.height + line
+}
+
+// MARK: - Drawing
+
+struct Failure: Error, CustomStringConvertible {
+    let description: String
+    init(_ description: String) { self.description = description }
+}
+
+/// A bitmap with no alpha channel, in sRGB
+func makeCanvas(width: Int, height: Int) throws -> CGContext {
+    guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+          let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else {
+        throw Failure("could not make a \(width) x \(height) canvas")
+    }
+    context.interpolationQuality = .high
+    return context
+}
+
+func loadImage(_ url: URL) throws -> CGImage {
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+          let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+        throw Failure("could not read \(url.path)")
+    }
+    return image
+}
+
+func writePNG(_ image: CGImage, to url: URL) throws {
+    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
+        throw Failure("could not write \(url.path)")
+    }
+    CGImageDestinationAddImage(destination, image, nil)
+    guard CGImageDestinationFinalize(destination) else { throw Failure("could not write \(url.path)") }
+}
+
+/// A rectangle given with a top-left origin, in the bottom-left coordinates of Core Graphics
+func flipped(_ rect: CGRect, in canvas: CGSize) -> CGRect {
+    CGRect(x: rect.minX, y: canvas.height - rect.maxY, width: rect.width, height: rect.height)
+}
+
+func compose(
+    caption: (title: SetCaption, line: SetCaption), capture: CGImage, device: Device, layout: Layout
+) throws -> CGImage {
+    let canvas = layout.canvas
+    let context = try makeCanvas(width: device.width, height: device.height)
+    let space = CGColorSpace(name: CGColorSpace.sRGB)
+
+    // The background: the app's green, a little deeper towards the bottom, with the accent glowing behind the screen
+    if let gradient = CGGradient(colorsSpace: space, colors: [darkGreen, deeperGreen] as CFArray, locations: [0.35, 1]) {
+        context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: canvas.height), end: .zero, options: [])
+    }
+    let captureSize = CGSize(width: capture.width, height: capture.height)
+    let frameWidth = canvas.width * (device.name == "iPad" ? 0.012 : 0.02)
+    let screen = layout.screenFrame(for: captureSize, frameWidth: frameWidth)
+    if let glow = CGGradient(colorsSpace: space,
+                             colors: [accent.copy(alpha: 0.30) ?? accent, accent.copy(alpha: 0) ?? accent] as CFArray,
+                             locations: [0, 1]) {
+        let center = CGPoint(x: canvas.width / 2, y: canvas.height - screen.minY - screen.height * 0.18)
+        context.drawRadialGradient(glow, startCenter: center, startRadius: 0, endCenter: center,
+                                   endRadius: canvas.width * 0.75, options: [])
+    }
+
+    // The title at the top of the band, the line below it under it, each centred
+    func draw(_ text: SetCaption, top: CGFloat) {
+        let rect = CGRect(x: (canvas.width - layout.captionWidth) / 2, y: top, width: layout.captionWidth,
+                          height: text.size.height + 1)
+        let setter = CTFramesetterCreateWithAttributedString(text.text)
+        let path = CGPath(rect: flipped(rect, in: canvas), transform: nil)
+        CTFrameDraw(CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0), path, nil), context)
+    }
+    draw(caption.title, top: layout.captionTop)
+    if caption.line.text.length > 0 {
+        draw(caption.line, top: layout.captionTop + caption.title.size.height + layout.gap(below: caption.title))
+    }
+
+    // A plain frame around the screen, with a shadow and a thin line of the accent: no picture of a device
+    let radius = screen.width * device.cornerRadius
+    let outer = flipped(screen.insetBy(dx: -frameWidth, dy: -frameWidth), in: canvas)
+    let outerPath = CGPath(roundedRect: outer, cornerWidth: radius + frameWidth, cornerHeight: radius + frameWidth,
+                           transform: nil)
+    context.saveGState()
+    context.setShadow(offset: CGSize(width: 0, height: -canvas.height * 0.008), blur: canvas.height * 0.025,
+                      color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.45))
+    context.addPath(outerPath)
+    context.setFillColor(frameColor)
+    context.fillPath()
+    context.restoreGState()
+    context.addPath(outerPath)
+    context.setStrokeColor(accent.copy(alpha: 0.55) ?? accent)
+    context.setLineWidth(max(2, canvas.width * 0.0025))
+    context.strokePath()
+
+    // The screenshot, with the corners of the screen
+    context.saveGState()
+    let inner = flipped(screen, in: canvas)
+    context.addPath(CGPath(roundedRect: inner, cornerWidth: radius, cornerHeight: radius, transform: nil))
+    context.clip()
+    context.draw(capture, in: inner)
+    context.restoreGState()
+
+    guard let image = context.makeImage() else { throw Failure("could not compose") }
+    return image
+}
+
+/// Every image of a device, one row per locale, to look at them at a glance
+func contactSheet(_ rows: [(locale: String, images: [CGImage])], device: Device) throws -> CGImage {
+    let thumbnailWidth: CGFloat = device.name == "iPad" ? 300 : 230
+    let thumbnailHeight = thumbnailWidth * CGFloat(device.height) / CGFloat(device.width)
+    let gap: CGFloat = 24
+    let labelWidth: CGFloat = 170
+    let titleHeight: CGFloat = 110
+    let columns = rows.map(\.images.count).max() ?? 0
+    let width = Int(labelWidth + CGFloat(columns) * (thumbnailWidth + gap) + gap)
+    let height = Int(titleHeight + CGFloat(rows.count) * (thumbnailHeight + gap) + gap)
+    let canvas = CGSize(width: width, height: height)
+    let context = try makeCanvas(width: width, height: height)
+    context.setFillColor(CGColor(srgbRed: 0.90, green: 0.92, blue: 0.91, alpha: 1))
+    context.fill(CGRect(origin: .zero, size: canvas))
+
+    func label(_ text: String, size: CGFloat, at point: CGPoint) {
+        let font = CTFontCreateUIFontForLanguage(.emphasizedSystem, size, nil)
+            ?? CTFontCreateWithName("Helvetica-Bold" as CFString, size, nil)
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [
+            NSAttributedString.Key(kCTFontAttributeName as String): font,
+            NSAttributedString.Key(kCTForegroundColorAttributeName as String): darkGreen,
+        ]))
+        context.textPosition = CGPoint(x: point.x, y: canvas.height - point.y)
+        CTLineDraw(line, context)
+    }
+
+    label("PrestoCV · \(device.label) · \(device.width) × \(device.height)", size: 48, at: CGPoint(x: gap, y: 72))
+    for (row, entry) in rows.enumerated() {
+        let top = titleHeight + CGFloat(row) * (thumbnailHeight + gap)
+        label(entry.locale, size: 40, at: CGPoint(x: gap, y: top + thumbnailHeight / 2))
+        for (column, image) in entry.images.enumerated() {
+            let rect = CGRect(x: labelWidth + CGFloat(column) * (thumbnailWidth + gap), y: top,
+                              width: thumbnailWidth, height: thumbnailHeight)
+            context.draw(image, in: flipped(rect, in: canvas))
+        }
+    }
+    guard let image = context.makeImage() else { throw Failure("could not make the contact sheet") }
+    return image
+}
+
+// MARK: - Main
+
+func run(_ arguments: [String]) throws {
+    guard arguments.count == 5 || arguments.count == 6 else {
+        throw Failure("usage: compose-store-screenshots <store-listing.md> <captures dir> <output dir> <device,...> [<language>,...]")
+    }
+    let languages = arguments.count == 6 ? Set(arguments[5].split(separator: ",").map(String.init)) : nil
+    let listing = try String(contentsOf: URL(fileURLWithPath: arguments[1]), encoding: .utf8)
+    let capturesDirectory = URL(fileURLWithPath: arguments[2], isDirectory: true)
+    let outputDirectory = URL(fileURLWithPath: arguments[3], isDirectory: true)
+    let locales = captions(in: listing)
+    guard !locales.isEmpty else { throw Failure("no screenshot captions in \(arguments[1])") }
+
+    for key in arguments[4].split(separator: ",").map(String.init) {
+        guard let device = devices[key] else { throw Failure("unknown device \(key); known: \(devices.keys.sorted())") }
+        var layout = Layout(canvas: CGSize(width: device.width, height: device.height))
+        // Every locale is set first, those not composed too, so that the band, and the screenshot under it, is the
+        // same in every run
+        var set: [(locale: String, captions: [(title: SetCaption, line: SetCaption)])] = []
+        for (locale, captions) in locales {
+            set.append((locale, try setCaptions(captions.map(Caption.init), device: device, layout: layout)))
+        }
+        layout.captionHeight = set.flatMap(\.captions).map { height(of: $0, in: layout) }.max() ?? 0
+
+        var rows: [(locale: String, images: [CGImage])] = []
+        for (locale, captions) in set {
+            let language = String(locale.prefix(2))
+            if let languages, !languages.contains(language) { continue }
+            var images: [CGImage] = []
+            for (index, caption) in captions.enumerated() {
+                let number = String(format: "%02d.png", index + 1)
+                let capture = capturesDirectory.appendingPathComponent("\(key)/\(language)/\(number)")
+                let image = try compose(caption: caption, capture: try loadImage(capture), device: device, layout: layout)
+                try writePNG(image, to: outputDirectory.appendingPathComponent("\(locale)/\(key)/\(number)"))
+                images.append(image)
+            }
+            rows.append((locale, images))
+            print("\(locale) \(key): \(images.count) screenshots")
+        }
+        try writePNG(try contactSheet(rows, device: device),
+                     to: outputDirectory.appendingPathComponent("contact-sheet-\(key).png"))
+    }
+}
+
+do {
+    try run(CommandLine.arguments)
+} catch {
+    FileHandle.standardError.write(Data("compose-store-screenshots: \(error)\n".utf8))
+    exit(1)
+}

@@ -37,6 +37,32 @@ The texts of PrestoCV's App Store product page for version 1.0, one section per 
 | Portuguese (Portugal) | pt-PT | The default of Portugal. The app's own Portuguese is Brazilian ("você", "salvar", "Carregando"), so this copy describes the buttons instead of quoting them. |
 | Portuguese (Brazil) | pt-BR | Worth it: it is the default language of Brazil and an additional language of the United States, and it is the variety the app's Portuguese texts are written in, so the listing and the app match. |
 
+## Screenshots
+
+Six screenshots per localization and device, one per caption, in the order of the captions. A tool makes them, so that the next version makes them again in the same way.
+
+| # | Screen |
+|---|---|
+| 1 | My CVs: a complete CV and three copies of it adapted to other jobs. |
+| 2 | The AI screen with the person's description typed in. The simulator has no on-device model, so the test turns the AI entry on with `-AIAvailabilityOverride available`. |
+| 3 | The editor of a CV made from that description: what it does not mention, the e-mail, the phone, the portfolio and the summary, is blank. The app makes an AI draft only with the on-device model, and has no fake one (rule R14), so this is a CV stored with those facts, not a draft: it has no draft notice. |
+| 4 | New CV with its two choices, Empty CV and Example CV. The AI card is left out (`deviceNotEligible`), as on a device without Apple Intelligence, because screen 2 shows it. |
+| 5 | The export sheet: the preview, the language of the headings, Send or save PDF, and the designs. |
+| 6 | The share sheet over the export sheet, with the PDF in the serif font style and its headings in the CV's language. |
+
+- **Sizes.** Apple's "Screenshot specifications" (developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications, read on 2026-10-18) require, for an app that runs on iPhone and iPad, an iPhone set for "iPhone with Dynamic Island (medium display)" and an iPad 13-inch set. The tool makes three sets: `iphone-6.3`, 1206 × 2622 (iPhone 17 Pro), the required one; `iphone`, 1320 × 2868 (iPhone 17 Pro Max), for the large display, which App Store Connect accepts and otherwise scales; and `ipad`, 2064 × 2752 (iPad Pro 13-inch). The images are PNG without an alpha channel, which Apple rejects.
+- **Languages.** The app has six languages. en-GB, es-MX and pt-BR use the screenshots of en, es and pt with their own captions; pt-PT uses those of pt, whose texts are Brazilian, like the app's.
+- **People.** One fictional person per language: Emily Parker (en), Lena Hoffmann (de), Lucía Martínez (es), Camille Laurent (fr), Giulia Conti (it), Ana Ferreira (pt). Their employers and schools are made up, their e-mail addresses are at example.com, and they have no phone number. They are in `PrestoCVUITests/StoreScreenshotFixtures.swift`.
+- **Capture.** `StoreScreenshotsUITests`, one test per language. Each screen is a launch of its own: the debug-only launch argument `-PrestoCVUITestsSeed` hands the app the CV files of the screen, in Base64, which it writes into the UI-test storage folder of `-PrestoCVUITestsEmptyStorage` before it reads it. The test finds the buttons by the app's own texts, read from `PrestoCV/Localizable.xcstrings`, and attaches each screen at the simulator's resolution. It is in no test plan that CI runs: the `PrestoCV` plan skips it, the `CI` plan has no UI tests, and only the `StoreScreenshots` plan holds it.
+- **Compose.** `Tools/Release/compose-store-screenshots.swift`, in Swift with Core Text and the system font, puts each caption above its screenshot on the app's dark green (#0A403B), with a glow of the accent (#00DAC3) and a plain rounded frame: no picture of a device. The title is set large and bold, in at most two lines, and the line below it smaller, in at most three. All the titles of a locale and device get one size, and all its lines below another: the largest at which each fits, or a little smaller where that lets them break much better. The line breaks go after a sentence or a clause where they can, and not after a short word such as "a" or "der"; apostrophes are set as ’, and "Apple Intelligence" stays on one line. The titles start at the same height, and the screenshot stays in the same place, on every image of a device.
+- **Regenerating them.** On a Mac with Xcode 27 or later, from the repository:
+
+  ```bash
+  Tools/Release/store-screenshots.sh --output ~/Desktop/PrestoCV-screenshots --devices iphone-6.3,iphone,ipad
+  ```
+
+  The images are in `<output>/<locale>/<device>/NN.png`, and `<output>/contact-sheet-<device>.png` shows every locale of a device at a glance: look at each one before uploading. `--languages de,fr` captures some languages only. After a caption changes, run `check-store-listing.py`, then the same command with `--compose-only`, which composes the captures again without the simulator; `--listing <file>` takes the captions from another copy of this file, such as a change still under review. Each language takes about two and a half minutes per device. The tool erases and boots its own simulators, named `PrestoCV store <device>` (`--simulator-prefix` changes the name), each language in its own language and region, so that the share sheet speaks it too: the status bar at 9:41 (09:41 in the regions that write the hour with two digits), full battery and signal, the light appearance, and no autocorrection or spell check. On iPad the status bar also shows the date of the day the screenshots are made, and the name of the app.
+
 ## Character counts
 
 Characters are Unicode characters; keywords are counted in UTF-8 bytes, which is Apple's limit for them. Captions are counted one by one, the title and the line below apart; the column shows the longest of each (title limit 30, line limit 80, set by the checker so that they fit the screenshot).
