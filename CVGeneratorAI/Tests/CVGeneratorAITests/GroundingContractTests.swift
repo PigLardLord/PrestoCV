@@ -416,13 +416,11 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1435
+    static let rowsWhenWritten = 1443
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
-    static let notImplementedYet: Set<String> = [
-        "first-run-on-the-real-model-example-fr",
-    ]
+    static let notImplementedYet: Set<String> = []
 
     /// Rows whose desired output the sanitiser does not give, and whose leak the owner accepts as a residual risk (ADR 0023,
     /// Consequences). Each runs in `withKnownIssue`: once a rule closes the leak the wrapper fails, and the id leaves this list.
@@ -488,6 +486,7 @@ enum GroundingRows {
         rows += titlesOfOthers()
         rows += schoolsAndCertifications()
         rows += entryNamesWithoutAnArticle()
+        rows += degreesThatNameNoDegree()
         rows += faithfulExamples()
         rows += theAppExampleKeepsEveryFact()
         rows += realModelProbes()
@@ -3738,6 +3737,34 @@ enum GroundingRows {
                         CVData(experience: [job("", "A Plus Consulting", from: "2016", current: true)]), .unchanged))
         rows.append(row("an-employer-that-is-no-quote-stays-no-quote", "the description says the nursery: a nursery is no quote, and nursery is not made one",
                         "I worked at the nursery.", CVData(experience: [job("", "a nursery")]), .exactly(CVData())))
+        return rows
+    }
+
+    // MARK: A degree that only says graduating names no degree (#202)
+
+    /// "diplôme", "Abschluss", "laurea" or "my degree" alone say that the person graduated, not in what: the degree goes, and the
+    /// school stays. A degree with its field of study stays.
+    private static func degreesThatNameNoDegree() -> [GroundingRow] {
+        typealias Variant = (language: String, description: String, degree: String, school: String)
+        var variants: [Variant] = []
+        variants.append(("en", "I got my degree at the University of Bologna.", "degree", "University of Bologna"))
+        variants.append(("it", "Ho una laurea all'Università di Bologna.", "laurea", "Università di Bologna"))
+        variants.append(("de", AppExample.de, "Abschluss", "Universität Bologna"))
+        variants.append(("es", "Obtuve mi título en la Universidad de Bolonia.", "título", "Universidad de Bolonia"))
+        variants.append(("fr", AppExample.fr, "diplôme", "université de Bologne"))
+        variants.append(("pt", "Recebi o meu diploma na Universidade de Bolonha.", "diploma", "Universidade de Bolonha"))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-word-for-graduating-names-no-degree-\(v.language)", "the degree only says graduating: it goes, and the school stays",
+                            v.description, CVData(education: [study(v.degree, at: v.school)]),
+                            .exactly(CVData(education: [study(at: v.school)])), language: v.language))
+        }
+        rows.append(row("a-degree-with-its-field-stays-it", "laurea in Scienze della Formazione names its field: it stays",
+                        "Ho una laurea in Scienze della Formazione all'Università di Bologna.",
+                        CVData(education: [study("laurea in Scienze della Formazione", at: "Università di Bologna")]), .unchanged, language: "it"))
+        rows.append(row("a-word-for-graduating-without-a-school-leaves-nothing-it", "the degree only says graduating, and there is no school: the study goes",
+                        "Ho la laurea.", CVData(education: [study("laurea")]), .exactly(CVData()), language: "it"))
         return rows
     }
 

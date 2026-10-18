@@ -20,6 +20,18 @@ enum EntryWording {
 
     private static let everyElidedArticle: [String] = elidedArticlesByLanguage.values.flatMap { $0 }
 
+    /// The words that only name a qualification, with no field of study: "degree", "laurea", "Abschluss", "diplôme".
+    private static let degreeWordsByLanguage: [Vocabulary.Language: Set<String>] = [
+        .english: ["degree", "degrees", "diploma", "diplomas", "graduation"],
+        .italian: ["laurea", "lauree", "diploma", "diplomi"],
+        .german: ["abschluss", "abschluesse", "abschlusse", "diplom"],
+        .spanish: ["titulo", "titulos", "diploma", "diplomas", "graduacion"],
+        .french: ["diplome", "diplomes"],
+        .portuguese: ["diploma", "diplomas", "graduacao", "formatura"],
+    ]
+
+    private static let everyDegreeWord: Set<String> = degreeWordsByLanguage.values.reduce(into: []) { $0.formUnion($1) }
+
     /// The name of an employer or a school without its leading indefinite article ("a nursery", "una guardería", "un'azienda", "einer
     /// Kinderkrippe"), in the language of the description, or in any of the six when it is not known: a CV names the place. An article
     /// written with a capital stays, as part of a name ("UNA Hotels", "A Plus Consulting"), and so does a name that is nothing else.
@@ -31,6 +43,19 @@ enum EntryWording {
         }
         guard let space = name.firstIndex(where: \.isWhitespace), articles.contains(String(name[..<space])) else { return name }
         return String(name[space...]).trimmedNonEmpty ?? name
+    }
+
+    /// Whether a degree names more than graduating: "diplôme", "Abschluss", "laurea" or "my degree" alone say that the person
+    /// graduated, not in what, while "Laurea in Scienze della Formazione" and "Bachelor" name a degree. A word for a degree, a word of
+    /// graduating, and the function words and pronouns that go with them ("mon", "il", "meinen") name none.
+    static func namesADegree(_ degree: String, in language: Vocabulary.Language?) -> Bool {
+        let degreeWords = language.map { degreeWordsByLanguage[$0] ?? [] } ?? everyDegreeWord
+        let words = EntryEvidence.foldedWords(of: degree)
+        let saysGraduating: (String) -> Bool = { degreeWords.contains($0) || Vocabulary.isGraduating($0, in: language) }
+
+        return !words.contains(where: saysGraduating) || !words.allSatisfy { word in
+            saysGraduating(word) || Vocabulary.isGraduationFrame(word, in: language) || Vocabulary.isNeutral(word, in: language)
+        }
     }
 }
 
