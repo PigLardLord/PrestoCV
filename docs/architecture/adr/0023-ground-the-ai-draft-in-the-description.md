@@ -49,6 +49,8 @@
   - **A joining clause** can be explained only by two things:
     - the closed vocabulary;
     - one of E's achievement quotes that lies inside that clause and contains none of the six languages' employer prepositions ("at", "for", "with", "da", "presso", "per", "bei", "für", "en", "para", "chez", "pour", "em", "na", "no" and the like).
+      - **The description's language decides.** When that language is known, a preposition of another language that is an ordinary word of the description's language does not count as an employer preposition. Examples: French "ai" in "j'ai formé", English "per" in "12 patients per shift". A preposition that the description's language does not have still counts, so "trained 3 cooks chez Gamma" in an English description explains nothing. When the language is unknown, the union applies.
+      - **The same reading for negations and hedges.** A negation or hedge of another language that is an ordinary word of the description's language is read as that ordinary word. Examples: German "Mai" (a month, not Italian "never"), English "fast" (not German "almost"), Portuguese "no" (not English "no").
 
     E's location, description, title or other quotes never explain a joining clause. So a draft that copies another employer's name into one of E's values cannot pull that employer's clause in.
   - **What a joining clause can give.**
@@ -113,6 +115,11 @@
 - **(e) Words are compared in a normalised form.**
   - That form is lower case and without diacritics. No lemma is used: a prose quote keeps the user's forms (d), and the closed vocabulary explains a CV verb only in the forms it lists (c), so neither a paraphrase nor a future becomes a fact.
 - **(f) Losing beats inventing.** A dropped fact is acceptable: the editor's banner asks the user to complete the draft. An invented or misattributed fact blocks the release.
+- **(g) Tidying after grounding only removes or reorders.** These steps add nothing:
+  - **A skill that equals an interest of the same draft is dropped.** A hobby is not a claimed ability, and the interest stays.
+  - **A leading indefinite article** ("a", "una", "eine", "une", "um"…) is trimmed from an employer or a school when it is written in lower case. What is left is still a quote, and a name such as "UNA Hotels" keeps its article.
+  - **A degree made only of words of graduating, generic degree words and function words is dropped** ("diplôme", "Abschluss", "laurea", "my degree"). The school stays, and a degree with its field stays.
+  - **The use case lists the jobs:** the current job first, then the others by their latest year, newest first. Jobs without a year, and jobs of the same year, keep the model's order.
 
 ## Consequences
 
@@ -140,4 +147,8 @@
 
 - **Tests.** `GroundingContractTests` pass, together with the sanitiser's other tests, on the Mac mini.
 - **Existing sanitiser tests.** Those that this ADR reverses are rewritten in the commit that implements it, each one named in the commit. Any safety property they pinned exists as a contract row first.
-- **The real model.** On the app's six example descriptions it keeps each job's employer, title and own years, and nothing invented. The kept and dropped fields are recorded with each run.
+- **The real model.** Each run is recorded with its kept and dropped fields. On 2026-10-18 Apple's on-device model on macOS 27.0.1 drafted the six in-app example descriptions and one realistic description, three times each:
+  - **Nothing was invented** in any of the 21 runs.
+  - **Every employer** (12 of 12) and **every job title** (12 of 12) of the examples were kept, after the fixes of rules (c) and (g).
+  - **Each job's own years** were kept only where the model wrote them: in English and Portuguese. In German, Spanish, French and Italian the model leaves the years out. That loss is the model's, not the grounding's.
+  - **On the realistic description**, the current job loses its dates, because its clause holds words no list explains ("cardiology department"). This is the thinner draft of the Consequences.
