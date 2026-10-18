@@ -19,9 +19,10 @@ The current app and packages are the legacy code the migration replaces, one con
 | Path | What it is |
 |---|---|
 | `docs/product/` | The product vision: for whom PrestoCV is, its principles (including scaling with use and paying with revenue), the business model and the release plan. |
-| `docs/architecture/` | The target architecture: overview and migration strategy, rules R1–R15, modules and allowed imports, document markup contract, glossary, ADRs. |
+| `docs/architecture/` | The target architecture: overview and migration strategy, rules R1–R15, modules and allowed imports, glossary, ADRs. |
 | `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). |
 | `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The current packages (legacy, being replaced). |
+| `CVPDFExporter/Docs/` | The document markup contract that designs follow, which the exporter's tests hold the code to. |
 | `Tools/ArchitectureCheck/` | The checker that enforces the rules, and its pre-commit hook. |
 | `Tools/Localization/` | `l10n_manager.py`, which adds, reads, lists, checks and updates the texts of the string catalog. Run it from the repository root. |
 | `ci_scripts/`, `TestPlans/`, `docs/release/` | The releases: Xcode Cloud's build scripts, the test plans, the settings of its workflows, and the App Store listing in every language with the notes for App Review (`docs/release/store-listing.md`, checked by `Tools/Release/check-store-listing.py`). |

@@ -98,7 +98,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - Pending: a committed JSON Schema.
 
 **`CVDesignCatalog`**
-- **`MarkupContract`**, version 1: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](markup-contract.md).
+- **`MarkupContract`**, version 1: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](../../CVPDFExporter/Docs/markup-contract.md).
 - **The CSS policy:** a tokenizer, an allow-list of properties and values, and canonical re-serialisation into `ValidatedStylesheet`, whose initialiser is internal.
 - **`DesignPackageValidator`** takes raw bytes and returns a `ValidatedDesign`: manifest, stylesheet and PNG preview.
 - **Customisation values:** `HexColor`, `Palette` (exists only with readable contrast) and `FontScheme` (a closed set).
