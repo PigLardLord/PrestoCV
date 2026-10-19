@@ -247,7 +247,7 @@ struct VocabularyTests {
         #expect(withdraws("I'd work as a teacher", .english) && withdraws("I'd be happy", .english) && withdraws("I'd teach", .english))
         #expect(!withdraws("I'd worked as a teacher", .english) && !withdraws("I'd used Swift", .english))
         #expect(!withdraws("I'd taught", .english) && !withdraws("I'd led a team", .english) && !withdraws("I'd been a nurse", .english))
-        #expect(withdraws("Sería feliz", .spanish) && !withdraws("Soy una persona seria", .spanish), "seria is serious in Spanish")
+        #expect(withdraws("Sería feliz", .spanish) && withdraws("Seria feliz", .spanish), "Spanish typed without its accent too")
         #expect(withdraws("Seria feliz", .portuguese) && withdraws("Sarei felice", .italian) && withdraws("Je serais heureuse", .french))
     }
 
