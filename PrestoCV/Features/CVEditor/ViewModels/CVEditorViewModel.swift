@@ -140,6 +140,12 @@ final class CVEditorViewModel: ObservableObject {
         savedSnapshot != nil && !hasUnsavedChanges ? .done : .cancel
     }
     
+    /// Whether the CV can be exported: one with nothing in it has nothing to put in a PDF. Unsaved edits are exported
+    /// as they are.
+    var canExport: Bool {
+        hasMeaningfulContent
+    }
+    
     /// Computed property for save button enabled state
     var isSaveButtonEnabled: Bool {
         hasMeaningfulContent && hasUnsavedChanges && !isSaving

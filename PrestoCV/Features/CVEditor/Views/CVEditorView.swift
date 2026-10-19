@@ -55,7 +55,7 @@ struct CVEditorView: View {
                     ) {
                         showingExportSheet = true
                     }
-                    .disabled(!viewModel.hasMeaningfulContent)
+                    .disabled(!viewModel.canExport)
                 }
             }
 
@@ -181,7 +181,7 @@ struct CVEditorView: View {
                 PrimaryButton.large(
                     title: String(localized: "export.button.title"),
                     icon: "square.and.arrow.up",
-                    isDisabled: !viewModel.hasMeaningfulContent
+                    isDisabled: !viewModel.canExport
                 ) {
                     showingExportSheet = true
                 }
