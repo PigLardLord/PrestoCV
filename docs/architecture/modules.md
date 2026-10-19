@@ -38,6 +38,7 @@ Test targets and test-support targets are described below each package. The chec
   - `LanguageProficiency` (CEFR + native);
   - `EmailAddress`, `PhoneNumber`, `WebLink`, `DocumentLanguage`, `DesignChoice`.
 - **`Period.make(start:end:current:)`** is the single rule that turns loose data into a period, or into a typed `PeriodError`.
+- **`ExampleDraft`**: the fields (`CVField`) a draft started from an example leaves blank, who its person is and how to reach them.
 - **`ExportPolicy`**: version 1's export, the A4 page, its 43-point margin and its 10 pages at most, and the name and e-mail an export needs (`ExportBlocker`). The legacy app reads it while it exports through the legacy exporter; at migration step 5 the policy of `CVRendering` replaces it ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)).
 - Planned: projects (#54), photo (#53).
 

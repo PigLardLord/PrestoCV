@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import PrestoCVCore
 import CVGeneratorAI
+import enum PrestoCVDomain.ExampleDraft
 import os
 
 private let newCVLogger = Logger(subsystem: "com.PigLardLord.prestocv", category: "new-cv")
@@ -119,17 +120,9 @@ final class NewCVChoicesViewModel: ObservableObject {
         }
     }
 
-    /// The CV the editor opens for a sample: its content under a new identity, with the details of the person
-    /// the sample describes left blank. Nothing is stored until the person saves it.
+    /// The CV the editor opens for a sample: its content under a new identity, with what `ExampleDraft` leaves blank.
+    /// Nothing is stored until the person saves it.
     func makeDraft(from sample: CVModel) -> CVModel {
-        var draft = sample.copy()
-        draft.name = ""
-        draft.personalInfo.name = ""
-        draft.personalInfo.email = ""
-        draft.personalInfo.phone = ""
-        draft.personalInfo.location = ""
-        draft.personalInfo.portfolio = ""
-        draft.social = draft.social.map { Social(id: $0.id, platform: $0.platform, url: "") }
-        return draft
+        sample.copy().clearing(ExampleDraft.clearedFields)
     }
 }
