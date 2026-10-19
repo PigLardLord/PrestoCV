@@ -1,0 +1,66 @@
+import SwiftUI
+
+/// The full explanation of the dimmed AI draft, which a tap on it shows: the line it shows in place, then the text that
+/// says why and what the person can do.
+struct AIEntryExplanationView: View {
+    let reason: AIEntry.Reason
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
+                    Text(reason.lineKey.localized)
+                        .typography(.title2)
+                        .foregroundColor(DesignTokens.Colors.primary)
+                        .accessibilityAddTraits(.isHeader)
+
+                    Text(reason.explanationKey.localized)
+                        .typography(.body)
+                        .foregroundColor(DesignTokens.Colors.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(DesignTokens.Spacing.lg)
+            }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    BarButton(title: "common.done".localized, systemImage: "checkmark", screenTextSize: dynamicTypeSize) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+// MARK: - Presenting
+
+extension View {
+    /// Shows the full explanation of the dimmed AI draft while `reason` is set.
+    func aiEntryExplanation(for reason: Binding<AIEntry.Reason?>) -> some View {
+        sheet(item: reason) { reason in
+            AIEntryExplanationView(reason: reason)
+        }
+    }
+
+    /// Reads the dimmed AI draft to VoiceOver as a dimmed button: its title, then the full explanation, then "dimmed",
+    /// in one stop. On screen the entry still takes a tap, which shows the explanation.
+    func readAsDimmedAIDraft(title: String, reason: AIEntry.Reason) -> some View {
+        accessibilityRepresentation {
+            SecondaryButton.text(title: title) {}
+                .disabled(true)
+                .accessibilityValue(reason.explanationKey.localized)
+        }
+    }
+}
+
+// MARK: - Previews
+
+#if DEBUG
+#Preview {
+    AIEntryExplanationView(reason: .notOnThisDevice)
+}
+#endif

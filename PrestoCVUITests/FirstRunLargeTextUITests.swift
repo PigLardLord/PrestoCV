@@ -1,8 +1,8 @@
 import XCTest
 
 /// At the largest text size the welcome alone used to fill the first screen, and every way to start was below it.
-/// The person reaches them without scrolling, whatever the device can do with AI. The AI draft that is off keeps its
-/// sentence, in German too, where the words are long.
+/// The person reaches them without scrolling, whatever the device can do with AI. The dimmed AI draft fits the screen
+/// and explains itself in German too, where the words are long.
 final class FirstRunLargeTextUITests: XCTestCase {
 
     private var app: XCUIApplication!
@@ -51,12 +51,19 @@ final class FirstRunLargeTextUITests: XCTestCase {
         launchAtTheLargestTextSize(aiAvailability: "deviceNotEligible")
 
         assertOnScreenWithoutScrolling([blank, examples, aiDraft])
-        XCTAssertFalse(app.buttons[aiDraft].isEnabled, "The AI draft should be off on a device that cannot run the model")
+        XCTAssertFalse(app.buttons[aiDraft].isEnabled, "The AI draft should be dimmed on a device that cannot run the model")
     }
 
-    /// The German titles and the sentence are the longest: the AI draft that is off still fits the width of the
-    /// screen, below the ways to start that work, and reads its sentence.
-    func testTheAIDraftThatIsOffFitsTheScreenInGerman() throws {
+    func testTheWaysToStartAreOnScreenWhenTheReasonIsUnknown() throws {
+        launchAtTheLargestTextSize(aiAvailability: "unknown")
+
+        assertOnScreenWithoutScrolling([blank, examples, aiDraft])
+        XCTAssertFalse(app.buttons[aiDraft].isEnabled, "The AI draft should be dimmed when the reason is unknown")
+    }
+
+    /// The German titles are the longest: the dimmed AI draft still fits the width of the screen, below the ways to
+    /// start that work, reads its explanation, and a tap shows it.
+    func testTheDimmedAIDraftFitsTheScreenInGerman() throws {
         launchAtTheLargestTextSize(aiAvailability: "deviceNotEligible", language: "de", locale: "de_DE")
         let examplesButton = app.buttons["Mit einem Beispiel beginnen"]
         XCTAssertTrue(examplesButton.waitForExistence(timeout: 20), "The first run should offer the examples")
@@ -66,13 +73,19 @@ final class FirstRunLargeTextUITests: XCTestCase {
         app.scrollTo(aiDraftButton)
 
         XCTAssertTrue(aiDraftButton.isHittable, "The AI draft should be on screen once scrolled to")
-        XCTAssertFalse(aiDraftButton.isEnabled, "The AI draft should be off")
+        XCTAssertFalse(aiDraftButton.isEnabled, "The AI draft should be dimmed")
         let screen = app.windows.firstMatch.frame
         XCTAssertGreaterThanOrEqual(aiDraftButton.frame.minX, screen.minX, "The AI draft should not run off the left of the screen")
         XCTAssertLessThanOrEqual(aiDraftButton.frame.maxX, screen.maxX, "The AI draft should not run off the right of the screen")
         XCTAssertFalse(aiDraftButton.frame.intersects(examplesButton.frame), "The AI draft should not cover the examples")
         XCTAssertEqual(aiDraftButton.value as? String, Self.notOnThisDeviceInGerman, "VoiceOver should read why, after the title")
         add(app.keptScreenshot(named: "First run, German, largest text, device not eligible"))
+
+        aiDraftButton.tap()
+
+        XCTAssertTrue(app.text(Self.notOnThisDeviceInGerman).waitForExistence(timeout: 10), "A tap should show the full explanation")
+        add(app.keptScreenshot(named: "First run, German, largest text, device not eligible, explanation"))
+        app.navigationBars.buttons["Fertig"].tap()
     }
 
     private static let notOnThisDeviceInGerman = "Dieses Gerät unterstützt keine KI-Entwürfe. "

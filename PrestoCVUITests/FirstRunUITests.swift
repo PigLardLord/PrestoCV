@@ -1,7 +1,8 @@
 import XCTest
 
-/// The first run leads with the AI draft where the device can run it. Elsewhere it shows the draft off, after what
-/// works, with the sentence that says why, and the welcome does not promise it where the device cannot make it.
+/// The first run leads with the AI draft where the device can draft now. Elsewhere it shows the draft dimmed, after
+/// the ways to start that work, with a line that says why; a tap shows the full explanation, and the welcome does not
+/// promise the draft.
 final class FirstRunUITests: XCTestCase {
 
     private var app: XCUIApplication!
@@ -24,14 +25,6 @@ final class FirstRunUITests: XCTestCase {
 
     private var aiDraft: XCUIElement { app.buttons["Draft My CV with AI"] }
 
-    /// A text on screen. A query by a label longer than 128 characters needs a predicate.
-    private func text(_ label: String) -> XCUIElement {
-        app.staticTexts.matching(NSPredicate(format: "label == %@", label)).firstMatch
-    }
-
-    /// The sentence under the AI draft on a device that cannot run the model.
-    private let notOnThisDevice = "This device doesn't support AI drafts. You can create your CV by hand or start from an example."
-
     func testTheAIDraftLeadsTheFirstRunAndOpensTheAIScreen() throws {
         launch(aiAvailability: "available")
 
@@ -47,32 +40,36 @@ final class FirstRunUITests: XCTestCase {
         XCTAssertTrue(description.waitForExistence(timeout: 10), "The AI draft should open the AI screen")
     }
 
-    func testTheAIDraftIsOffAndSaysWhyWhereAppleIntelligenceIsOff() throws {
-        launch(aiAvailability: "appleIntelligenceNotEnabled")
-
-        let blank = app.buttons["Create My First CV"]
-        XCTAssertTrue(blank.waitForExistence(timeout: 20), "The first run should offer a blank CV")
-        XCTAssertTrue(aiDraft.exists, "The first run should show the AI draft the device can make once Apple Intelligence is on")
-        XCTAssertFalse(aiDraft.isEnabled, "The AI draft should be off until Apple Intelligence is on")
-        XCTAssertLessThan(blank.frame.minY, aiDraft.frame.minY, "What works now should come first")
-        let reason = aiDraft.value as? String ?? ""
-        XCTAssertTrue(reason.hasPrefix("Apple Intelligence is turned off"), "VoiceOver should read how to turn Apple Intelligence on, after the title")
-        XCTAssertFalse(text(reason).exists, "VoiceOver should read the sentence once, with the AI draft")
+    func testTheAIDraftIsDimmedLastAndExplainsWhileTheModelDownloads() throws {
+        checkTheDimmedAIDraft(.modelNotReady)
     }
 
-    func testTheAIDraftIsOffAndSaysWhyWhereTheDeviceCannotRunIt() throws {
-        launch(aiAvailability: "deviceNotEligible")
+    func testTheAIDraftIsDimmedLastAndExplainsWhereAppleIntelligenceIsOff() throws {
+        checkTheDimmedAIDraft(.appleIntelligenceNotEnabled)
+    }
 
-        let blank = app.buttons["Create My First CV"]
-        XCTAssertTrue(blank.waitForExistence(timeout: 20), "The first run should offer a blank CV")
-        XCTAssertTrue(aiDraft.exists, "The first run should show the AI draft on a device that cannot make it")
-        XCTAssertFalse(aiDraft.isEnabled, "The AI draft should be off, and VoiceOver should read it as dimmed")
-        XCTAssertLessThan(blank.frame.minY, aiDraft.frame.minY, "What works now should come first")
-        XCTAssertEqual(aiDraft.value as? String, notOnThisDevice, "VoiceOver should read why, after the title")
-        XCTAssertFalse(text(notOnThisDevice).exists, "VoiceOver should read the sentence once, with the AI draft")
+    func testTheAIDraftIsDimmedLastAndExplainsWhereTheDeviceCannotRunIt() throws {
+        checkTheDimmedAIDraft(.deviceNotEligible)
+    }
+
+    func testTheAIDraftIsDimmedLastAndExplainsWhenTheReasonIsUnknown() throws {
+        checkTheDimmedAIDraft(.unknown)
+    }
+
+    /// The AI draft is there, dimmed, after the ways to start that work; a tap explains it; the welcome promises no
+    /// AI draft.
+    private func checkTheDimmedAIDraft(_ draft: DimmedAIDraft, file: StaticString = #filePath, line: UInt = #line) {
+        launch(aiAvailability: draft.override)
+
+        let examples = app.buttons["Start from an example"]
+        XCTAssertTrue(examples.waitForExistence(timeout: 20), "The first run should offer the examples", file: file, line: line)
+        XCTAssertTrue(aiDraft.exists, "The first run should show the AI draft", file: file, line: line)
+        XCTAssertLessThan(examples.frame.minY, aiDraft.frame.minY, "The AI draft should come last", file: file, line: line)
         let welcome = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Write your CV, keep it on your device")).firstMatch
-        XCTAssertTrue(welcome.exists, "The welcome should speak of what the device can do")
+        XCTAssertTrue(welcome.exists, "The welcome should speak of what the device can do now", file: file, line: line)
         let promise = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "AI drafts your CV")).firstMatch
-        XCTAssertFalse(promise.exists, "The welcome should not promise AI on a device that cannot run it")
+        XCTAssertFalse(promise.exists, "The welcome should not promise the AI draft", file: file, line: line)
+
+        app.checkDimmedAIDraft(aiDraft, says: draft, file: file, line: line)
     }
 }

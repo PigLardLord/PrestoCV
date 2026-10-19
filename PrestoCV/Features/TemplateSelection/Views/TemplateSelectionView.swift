@@ -7,9 +7,11 @@ struct TemplateSelectionView: View {
     @EnvironmentObject var router: AppRouter
     @StateObject private var viewModel: NewCVChoicesViewModel
     @State private var showingExamples = false
+    /// The reason of the dimmed AI card while its full explanation is shown.
+    @State private var explainedReason: AIEntry.Reason?
 
     /// The cards show a wide picture. A square one fills the screen of an iPad, and on an iPhone it pushes the second
-    /// card, and the sentence that says why it is dimmed, out of sight.
+    /// card out of sight.
     private let previewAspectRatio: CGFloat = 2.4
 
     /// The view model is built once, when the screen first appears, and survives every re-render of the parent.
@@ -19,9 +21,7 @@ struct TemplateSelectionView: View {
 
     var body: some View {
         ScrollView {
-            // A plain stack: in a lazy one VoiceOver reads a text even when it is hidden from it, and the sentence under
-            // a dimmed card would be read twice
-            VStack(spacing: DesignTokens.Spacing.lg) {
+            LazyVStack(spacing: DesignTokens.Spacing.lg) {
                 Section(header:
                     SectionHeaderView(
                         title: "template.create.new".localized,
@@ -48,6 +48,7 @@ struct TemplateSelectionView: View {
         .exampleSelection(isPresented: $showingExamples, from: viewModel) { draft in
             router.navigateToEditorWithTemplate(draft)
         }
+        .aiEntryExplanation(for: $explainedReason)
     }
 
     // MARK: - View Components
@@ -56,7 +57,9 @@ struct TemplateSelectionView: View {
     private func card(for choice: NewCVChoice) -> some View {
         switch choice {
         case .aiDraft:
-            aiGenerationCard
+            aiGenerationCard(line: "ai.card.subtitle".localized) {
+                router.navigate(to: .aiGeneration)
+            }
         case .aiDraftUnavailable(let reason):
             disabledAIGenerationCard(reason)
         case .blank:
@@ -118,26 +121,19 @@ struct TemplateSelectionView: View {
         }
     }
 
-    /// The AI card, dimmed and disabled, with the sentence that says why. VoiceOver reads the sentence once, with the
-    /// card: its title, the sentence, then that it is dimmed.
+    /// The AI card, dimmed, with the line that says why in place of what the AI draft does. A tap shows the full
+    /// explanation, which VoiceOver reads with the title, in one stop.
     private func disabledAIGenerationCard(_ reason: AIEntry.Reason) -> some View {
-        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-            aiGenerationCard
-                .disabled(true)
-                .opacity(DesignTokens.Opacity.subtle)
-                .accessibilityValue(reason.explanationKey.localized)
-
-            Text(reason.explanationKey.localized)
-                .typography(.caption1)
-                .foregroundColor(DesignTokens.Colors.secondary)
-                .accessibilityHidden(true)
+        aiGenerationCard(line: reason.lineKey.localized) {
+            explainedReason = reason
         }
+        .opacity(DesignTokens.Opacity.subtle)
+        .readAsDimmedAIDraft(title: "ai.card.title".localized, reason: reason)
     }
 
-    private var aiGenerationCard: some View {
-        Button(action: {
-            router.navigate(to: .aiGeneration)
-        }) {
+    /// The AI card, with `line` under its title.
+    private func aiGenerationCard(line: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             CardView(padding: DesignTokens.Spacing.sm) {
                 VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
                     // AI generation preview
@@ -171,7 +167,7 @@ struct TemplateSelectionView: View {
                                 .foregroundColor(DesignTokens.Colors.accent)
                         }
 
-                        Text("ai.card.subtitle".localized)
+                        Text(line)
                             .typography(.caption1)
                             .foregroundColor(DesignTokens.Colors.secondary)
                     }

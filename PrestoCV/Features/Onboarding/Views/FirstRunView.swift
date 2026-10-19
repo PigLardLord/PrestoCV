@@ -8,6 +8,8 @@ struct FirstRunView: View {
     @StateObject private var viewModel: NewCVChoicesViewModel
     @EnvironmentObject var router: AppRouter
     @State private var showingExamples = false
+    /// The reason of the dimmed AI draft while its full explanation is shown.
+    @State private var explainedReason: AIEntry.Reason?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     
@@ -41,6 +43,7 @@ struct FirstRunView: View {
         .exampleSelection(isPresented: $showingExamples, from: viewModel) { draft in
             router.navigateToEditorWithTemplate(draft)
         }
+        .aiEntryExplanation(for: $explainedReason)
     }
     
     // MARK: - View Sections
@@ -104,16 +107,17 @@ struct FirstRunView: View {
         }
     }
     
-    /// The AI draft, dimmed and off, with the sentence that says why. VoiceOver reads the sentence once, with the
-    /// button: its title, the sentence, then that it is dimmed.
+    /// The AI draft, dimmed, with the line that says why. A tap shows the full explanation, which VoiceOver reads with
+    /// the title, in one stop.
     private func unavailableAIDraft(_ reason: AIEntry.Reason) -> some View {
         VStack(spacing: DesignTokens.Spacing.xs) {
-            SecondaryButton.text(title: "onboarding.ai.button".localized, icon: "sparkles", action: openAIDraft)
-                .disabled(true)
-                .opacity(DesignTokens.Opacity.subtle)
-                .accessibilityValue(reason.explanationKey.localized)
+            SecondaryButton.text(title: "onboarding.ai.button".localized, icon: "sparkles") {
+                explainedReason = reason
+            }
+            .opacity(DesignTokens.Opacity.subtle)
+            .readAsDimmedAIDraft(title: "onboarding.ai.button".localized, reason: reason)
             
-            Text(reason.explanationKey.localized)
+            Text(reason.lineKey.localized)
                 .typography(.caption1)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)
