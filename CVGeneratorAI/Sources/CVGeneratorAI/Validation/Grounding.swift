@@ -76,20 +76,28 @@ struct Grounding {
             speaks(at: Place(sentence: place.sentence, clause: place.clause - 1))
         }
 
+        /// The positions of the words of the clause at `place` that claim a skill, an interest, a language, or the person's title or
+        /// place (#202): none when the clause claims nothing (`claims(at:)`); otherwise every word but those inside quotation marks
+        /// (`QuotedSpeech`), which are someone else's, or only quoted.
+        func claimedWords(at place: Place) -> Set<Int> {
+            guard claims(at: place) else { return [] }
+            return Set(clauses.clause(at: place).words.indices).subtracting(clauses.quotedWords(at: place))
+        }
+
         /// Whether the clause at `place` claims a skill, an interest or a language for the person (#202): it speaks for the person,
         /// holds no word that withdraws a claim (`Vocabulary.withdrawals`: "never", "would", "if", but not "can" or "partly"), asks
         /// nothing (its sentence ends with a question mark), follows no clause of its sentence that opens with a word of condition
         /// ("If I had time, I would play chess"), and, when it depends on the clause before it (a clause split off by a comma or a
         /// conjunction that has no verb, starts with its verb, or says nothing as a fact, such as "Spanisch zu lernen"), that clause
-        /// claims too: "I have never used Java or Swift" claims neither, and "Ich träume davon, Spanisch zu lernen" no Spanish. A
-        /// clause that states nothing as a fact shares the withdrawal of the clause after it: "Spanisch zu lernen, davon träume ich"
-        /// gives no Spanish either.
+        /// claims to its last word: "I have never used Java or Swift" claims neither, and "Ich träume davon, Spanisch zu lernen" no
+        /// Spanish. A clause that states nothing as a fact shares the withdrawal of the clause after it: "Spanisch zu lernen, davon
+        /// träume ich" gives no Spanish either.
         ///
         /// A negation or a hedge that governs a word of level bears on the level alone: "I am not an expert in Swift" and "I have
         /// never been fluent in German" claim Swift and German, and the level, which they deny, is not stated
         /// (`DescriptionText.levels`). A negation of the verb withdraws the claim, though a word of level follows: "I cannot speak
         /// German even at a basic level", "I don't speak French fluently".
-        func claims(at place: Place) -> Bool {
+        private func claims(at place: Place) -> Bool {
             let clause = clauses.clause(at: place)
             guard speaks(at: place), !withdraws(clause), !asks(at: place) else { return false }
             let supposed = (0..<place.clause).contains { index in
@@ -101,7 +109,8 @@ struct Grounding {
 
             let statement = Statement(clause: clause, quotes: all, language: language)
             guard statement.startsWithItsVerb || !statement.hasVerbs || !statement.isFactual else { return true }
-            return claims(at: Place(sentence: place.sentence, clause: place.clause - 1))
+            let previous = Place(sentence: place.sentence, clause: place.clause - 1)
+            return claimedWords(at: previous).contains(clauses.clause(at: previous).words.count - 1)
         }
 
         /// Whether the clause at `place` asks rather than claims: its sentence ends with a question mark ("Do I speak French?",
@@ -298,16 +307,16 @@ struct Grounding {
         return ProseQuotes(sources: sources, language: explainer.language)
     }
 
-    /// Whether the clause at `place` claims a skill, an interest or a language for the person: the clauses that `claimedSentences`
-    /// keeps.
-    func claims(at place: DescriptionClauses.Place) -> Bool {
-        reading.claims(at: place)
+    /// The positions of the words of the clause at `place` that claim a skill, an interest or a language for the person: the words
+    /// that `claimedSentences` keeps.
+    func claimedWords(at place: DescriptionClauses.Place) -> Set<Int> {
+        reading.claimedWords(at: place)
     }
 
     /// The description as the person claims skills, interests and languages in it: its sentences, with every clause that does not
-    /// speak for the person, or that denies, wishes, supposes or asks, left out.
+    /// speak for the person, or that denies, wishes, supposes or asks, left out, and every word inside quotation marks.
     var claimedSentences: [String] {
-        clauses.sentences(keeping: reading.claims(at:))
+        clauses.sentences(keepingWords: reading.claimedWords(at:))
     }
 
     /// The description as the person speaks it: its sentences, with every clause that does not speak for the person left out.

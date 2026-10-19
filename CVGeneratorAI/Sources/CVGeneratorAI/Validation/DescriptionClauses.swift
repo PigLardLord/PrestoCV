@@ -52,6 +52,28 @@ struct Clause {
         preamble + String(original)
     }
 
+    /// The clause as the sentence has it (`source`), with every run of words that `kept` leaves out written as a semicolon, so that
+    /// the words around it stay apart. A clause none of whose words is kept is a semicolon.
+    func source(keeping kept: Set<Int>) -> String {
+        guard !kept.isEmpty else { return "; " }
+        guard words.indices.contains(where: { !kept.contains($0) }) else { return source }
+
+        var text = preamble
+        var cursor = 0
+        var index = 0
+        while index < words.count {
+            guard !kept.contains(index) else {
+                index += 1
+                continue
+            }
+            let start = min(words[index].range.lowerBound - offset, original.count)
+            while index < words.count, !kept.contains(index) { index += 1 }
+            text += String(original[min(cursor, start)..<start]) + "; "
+            cursor = index < words.count ? min(words[index].range.lowerBound - offset, original.count) : original.count
+        }
+        return text + String(original[cursor...])
+    }
+
     /// Whether the clause ends with a question mark, past the spaces, the punctuation and the closing marks after it: "Parlo
     /// francese?", "«Parli francese?»".
     var endsAQuestion: Bool {
@@ -109,6 +131,8 @@ struct DescriptionClauses {
     let sentences: [[Clause]]
     /// The sentences as written.
     private let texts: [String]
+    /// The offsets of the characters of each sentence that stand inside quotation marks (`QuotedSpeech`).
+    private let quoted: [IndexSet]
     /// A clause by where it stands: its sentence, and its place in the sentence.
     struct Place: Hashable {
         let sentence: Int
@@ -121,6 +145,7 @@ struct DescriptionClauses {
     ///   - language: The language of the description, to tell which words are verbs (`Word.isTaggedVerb`); with none, no word is.
     init(sentences: [String], protecting quotes: [[String]], language: Vocabulary.Language? = nil) {
         texts = sentences
+        quoted = QuotedSpeech.offsets(in: sentences)
         self.sentences = sentences.map { sentence in
             Self.clauses(of: sentence, blanked: AddressTokens(sentence).remainder, protecting: quotes, language: language)
         }
@@ -138,13 +163,25 @@ struct DescriptionClauses {
     /// so that the ones around it stay apart. A sentence of no words (an address on its own) stays as written, if `keepsAnAddress` lets
     /// it (it gets the sentence's position), and is left out otherwise.
     func sentences(keeping isKept: (Place) -> Bool, keepsAnAddress: (Int) -> Bool = { _ in true }) -> [String] {
+        sentences(keepingWords: { isKept($0) ? Set(clause(at: $0).words.indices) : [] }, keepsAnAddress: keepsAnAddress)
+    }
+
+    /// The sentences as written, each clause with only the words that `kept` gives it (`Clause.source(keeping:)`): a word left out
+    /// becomes a semicolon, as a clause left out does. A sentence of no words is kept as `sentences(keeping:keepsAnAddress:)` keeps it.
+    func sentences(keepingWords kept: (Place) -> Set<Int>, keepsAnAddress: (Int) -> Bool = { _ in true }) -> [String] {
         sentences.indices.map { sentence in
             guard !sentences[sentence].isEmpty else { return keepsAnAddress(sentence) ? texts[sentence] : "" }
 
             return sentences[sentence].indices.map { clause in
-                isKept(Place(sentence: sentence, clause: clause)) ? sentences[sentence][clause].source : "; "
+                sentences[sentence][clause].source(keeping: kept(Place(sentence: sentence, clause: clause)))
             }.joined()
         }
+    }
+
+    /// The positions of the words of the clause at `place` that stand inside quotation marks (`QuotedSpeech`).
+    func quotedWords(at place: Place) -> Set<Int> {
+        let words = clause(at: place).words
+        return Set(words.indices.filter { quoted[place.sentence].contains(words[$0].range.lowerBound) })
     }
 
     /// The places of the clauses next to `place` in its sentence.

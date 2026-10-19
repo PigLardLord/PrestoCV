@@ -111,7 +111,7 @@ struct Entries {
     /// nothing for the person (another person's, or one that denies, wishes or supposes) counts for neither.
     func mentionsOnlyAsLeisure(_ name: String, interests: [String]) -> Bool {
         let leisure = LeisureMentions(
-            clauses: clauses, language: language, interests: interests.map(Self.words(of:)), isClaimed: grounding.claims(at:)
+            clauses: clauses, language: language, interests: interests.map(Self.words(of:)), claimed: grounding.claimedWords(at:)
         )
         return leisure.mentionsOnlyAsLeisure(Self.words(of: name))
     }

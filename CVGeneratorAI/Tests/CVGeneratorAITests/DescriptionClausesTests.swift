@@ -154,6 +154,33 @@ struct DescriptionClausesTests {
         #expect(result.sentences[0][0].words.indices.filter(result.sentences[0][0].isCapitalised) == [0, 2, 3])
     }
 
+    private func quoted(_ text: String) -> [String] {
+        let clauses = DescriptionClauses(sentences: SentenceSplitter.sentences(in: text), protecting: [])
+        return clauses.places.flatMap { place in
+            clauses.quotedWords(at: place).sorted().map { clauses.clause(at: place).words[$0].folded }
+        }
+    }
+
+    @Test("The words inside quotation marks are quoted, over two sentences too; an apostrophe or an inch mark is no mark, nor one that nothing closes")
+    func quotationMarks() {
+        #expect(quoted("She wrote “I speak French” to me") == ["i", "speak", "french"])
+        #expect(quoted("Il a écrit : « Je parle français. Je parle allemand. »") == ["je", "parle", "francais", "je", "parle", "allemand"])
+        #expect(quoted("Er schrieb: »Ich spreche Französisch« und ging") == ["ich", "spreche", "franzosisch"])
+        #expect(quoted("I’m sure l’inglese isn't 'hard'") == ["hard"])
+        #expect(quoted("A 27\" monitor and a \"big\" desk") == ["big"])
+        #expect(quoted("I speak “French and German").isEmpty)
+    }
+
+    @Test("A clause keeps only the words it is given: a run of words left out becomes a semicolon, and so does a clause with none")
+    func keepingWords() {
+        let clauses = DescriptionClauses(sentences: ["I work with a colleague who speaks French.", "I speak “fluent” French, German."], protecting: [])
+        let kept: [DescriptionClauses.Place: Set<Int>] = [
+            .init(sentence: 0, clause: 0): [0, 1, 2, 3, 4], .init(sentence: 1, clause: 0): [0, 1, 3], .init(sentence: 1, clause: 1): [],
+        ]
+
+        #expect(clauses.sentences(keepingWords: { kept[$0] ?? [] }) == ["I work with a colleague ; ", "I speak “; French, ; "])
+    }
+
     @Test("A clause ends a question when a question mark ends it, past closing marks")
     func questions() {
         let sentences = ["Parlo francese e tedesco, giusto?", "«Parli francese?»", "«Parli francese?», mi chiedono."]

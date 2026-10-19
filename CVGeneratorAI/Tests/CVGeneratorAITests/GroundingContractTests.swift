@@ -494,6 +494,7 @@ enum GroundingRows {
         rows += textWithoutAccents()
         rows += moodsOfSupposition()
         rows += questionsClaimNothing()
+        rows += quotedSpeechClaimsNothing()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3578,6 +3579,63 @@ enum GroundingRows {
         rows.append(row("a-question-the-person-answers-is-an-accepted-loss",
                         "the item stands only in the question, and the answer does not name it: French goes, an accepted loss",
                         "Do I speak French? Yes, fluently.", CVData(languages: [Language(name: "French")]), .exactly(CVData())))
+        return rows
+    }
+
+    /// What stands inside quotation marks claims nothing (#202): another person's words, or words the person only quotes. Every
+    /// mark of the six languages counts, straight or typographic, and a quote may run over two sentences. An apostrophe inside a word
+    /// is no mark, and a mark that nothing closes quotes nothing. A skill the person puts between quotation marks goes: an accepted
+    /// loss.
+    private static func quotedSpeechClaimsNothing() -> [GroundingRow] {
+        typealias Message = (language: String, description: String, name: String)
+        var messages: [Message] = []
+        messages.append(("en", "A message from my colleague:\n“I speak French.”", "French"))
+        messages.append(("it", "Messaggio del mio collega:\n«Parlo francese.»", "francese"))
+        messages.append(("de", "Eine Nachricht meines Kollegen:\n„Ich spreche Französisch.“", "Französisch"))
+        messages.append(("es", "Un mensaje de mi colega:\n«Hablo francés.»", "francés"))
+        messages.append(("fr", "Un message de mon collègue :\n« Je parle français. »", "français"))
+        messages.append(("pt", "Uma mensagem do meu colega:\n“Falo francês.”", "francês"))
+
+        var rows: [GroundingRow] = []
+        for v in messages {
+            rows.append(row("a-quoted-message-claims-no-language-\(v.language)", "the language stands only inside quotation marks: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        let marks: [(id: String, open: String, close: String)] = [
+            ("straight-double", "\"", "\""), ("straight-single", "'", "'"), ("curly-double", "“", "”"), ("curly-single", "‘", "’"),
+            ("guillemets", "«", "»"), ("low-and-high", "„", "“"), ("low-and-curly", "„", "”"), ("reversed-guillemets", "»", "«"),
+            ("single-guillemets", "‹", "›"),
+        ]
+        for mark in marks {
+            rows.append(row("speech-in-\(mark.id)-marks-claims-nothing", "the whole description is a quote: no language",
+                            "\(mark.open)I speak French.\(mark.close)", CVData(languages: [Language(name: "French")]), .exactly(CVData())))
+        }
+        rows.append(row("a-quote-of-two-sentences-claims-nothing",
+                        "the quote runs over two sentences: neither language stays",
+                        "Feedback from a client: “I speak French. I also speak German.”",
+                        CVData(languages: [Language(name: "French"), Language(name: "German")]), .exactly(CVData())))
+        rows.append(row("words-after-a-quote-still-claim",
+                        "only the quoted words claim nothing: Swift stands after the closing mark, and stays",
+                        "I use “clean code” principles with Swift every day.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
+        rows.append(row("typographic-apostrophes-are-no-quotation-marks-en",
+                        "the apostrophes of I’m and I’ve are inside words: French and Swift stay",
+                        "I’m fluent in French and I’ve used Swift.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]), .unchanged))
+        rows.append(row("typographic-apostrophes-are-no-quotation-marks-fr",
+                        "the apostrophes of j’ai and l’anglais are inside words: Swift and English stay",
+                        "J’ai utilisé Swift et je parle l’anglais.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "anglais")]), .unchanged, language: "fr"))
+        rows.append(row("typographic-apostrophes-are-no-quotation-marks-it",
+                        "the apostrophe of l’inglese is inside the word: English stays",
+                        "Ho usato Swift e parlo l’inglese.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "inglese")]), .unchanged, language: "it"))
+        rows.append(row("a-mark-nothing-closes-quotes-nothing",
+                        "the opening mark has no closing one: it quotes nothing, and both languages stay",
+                        "I speak “French and German.",
+                        CVData(languages: [Language(name: "French"), Language(name: "German")]), .unchanged))
+        rows.append(row("a-skill-in-quotation-marks-is-an-accepted-loss",
+                        "the skill stands only inside quotation marks: Swift goes, an accepted loss",
+                        "I work with “Swift” every day.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData())))
         return rows
     }
 

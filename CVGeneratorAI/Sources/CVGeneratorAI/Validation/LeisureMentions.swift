@@ -3,7 +3,7 @@ import Foundation
 /// Whether the person mentions a phrase only as leisure (#202), so that a skill that is also one of the draft's interests is a hobby
 /// and no ability the person claims.
 ///
-/// Only the clauses that claim something for the person count, as the grounding reads them (`Grounding.claims(at:)`, the clauses
+/// Only the words that claim something for the person count, as the grounding reads them (`Grounding.claimedWords(at:)`, the words
 /// that skills, interests and languages are grounded in): "My sister teaches chess" and "I don't play chess" neither keep nor drop
 /// the person's chess.
 ///
@@ -33,23 +33,26 @@ struct LeisureMentions {
     private let language: Vocabulary.Language?
     /// The folded words of the draft's interests that the description gives.
     private let interests: [[String]]
-    /// Whether the clause at a place claims something for the person.
-    private let isClaimed: (DescriptionClauses.Place) -> Bool
+    /// The positions of the words of the clause at a place that claim something for the person.
+    private let claimed: (DescriptionClauses.Place) -> Set<Int>
 
     init(
         clauses: DescriptionClauses, language: Vocabulary.Language?, interests: [[String]],
-        isClaimed: @escaping (DescriptionClauses.Place) -> Bool
+        claimed: @escaping (DescriptionClauses.Place) -> Set<Int>
     ) {
         self.clauses = clauses
         self.language = language
         self.interests = interests
-        self.isClaimed = isClaimed
+        self.claimed = claimed
     }
 
-    /// Whether some clause that claims something for the person mentions `phrase` (its folded words), and every one that does is a
-    /// clause of leisure. When none holds the phrase whole (it runs across two clauses), nothing tells, and the skill stays.
+    /// Whether some clause mentions `phrase` (its folded words) in words that claim something for the person, and every one that does
+    /// is a clause of leisure. When none holds the phrase whole (it runs across two clauses), nothing tells, and the skill stays.
     func mentionsOnlyAsLeisure(_ phrase: [String]) -> Bool {
-        let mentioning = clauses.places.filter { isClaimed($0) && clauses.clause(at: $0).contains(phrase) }
+        let mentioning = clauses.places.filter { place in
+            let words = claimed(place)
+            return clauses.clause(at: place).spans(of: phrase).contains { $0.allSatisfy(words.contains) }
+        }
         return !mentioning.isEmpty && mentioning.allSatisfy(isLeisure)
     }
 
