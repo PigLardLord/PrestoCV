@@ -6,7 +6,7 @@ enum RouteDestination: Equatable {
     case list
     case templateSelection
     case aiGeneration
-    case cvEditor(cvId: String?)
+    case cvEditor(EditorRequest)
 
     static func resolve(_ route: Route, isAIShipped: Bool) -> RouteDestination {
         switch route {
@@ -16,8 +16,8 @@ enum RouteDestination: Equatable {
             return .templateSelection
         case .aiGeneration:
             return isAIShipped ? .aiGeneration : .list
-        case .cvEditor(let cvId):
-            return .cvEditor(cvId: cvId)
+        case .cvEditor(let request):
+            return .cvEditor(request)
         }
     }
 }

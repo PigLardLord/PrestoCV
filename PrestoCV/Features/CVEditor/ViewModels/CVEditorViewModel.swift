@@ -18,6 +18,8 @@ final class CVEditorViewModel: ObservableObject {
     @Published private(set) var showsSavedConfirmation = false
     @Published var showingCancelConfirmation = false
     @Published private(set) var pendingDeletion: PendingDeletion?
+    /// The message shown above a new CV, set by the screen that opened it.
+    let notice: EditorNotice?
     
     /// How long the confirmation of a save stays.
     static let savedConfirmationDuration = Duration.seconds(3)
@@ -156,6 +158,7 @@ final class CVEditorViewModel: ObservableObject {
     // MARK: - Initialization
     /// - Parameters:
     ///   - initialCV: What a new CV starts from. The CV gets an id of its own, which its saves store it under.
+    ///   - notice: The message shown above a new CV, such as the one that asks to check an AI draft.
     ///   - restoring: Edits an earlier run of the app kept. They are shown over the CV stored under their id once it
     ///     is loaded, or as a new CV when there is none.
     ///   - documentLanguageDetector: Reads which language the CV is written in, for the Automatic document language.
@@ -164,6 +167,7 @@ final class CVEditorViewModel: ObservableObject {
     init(
         cvId: String?,
         initialCV: CVModel? = nil,
+        notice: EditorNotice? = nil,
         restoring restoredEdits: UnsavedEdits? = nil,
         cvManagementUseCase: CVManagementUseCaseProtocol,
         documentLanguageDetector: DocumentLanguageDetector = .onDevice,
@@ -171,6 +175,7 @@ final class CVEditorViewModel: ObservableObject {
         sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
         self.cvId = cvId
+        self.notice = notice
         self.cvManagementUseCase = cvManagementUseCase
         self.documentLanguageDetector = documentLanguageDetector
         self.restoredEdits = restoredEdits

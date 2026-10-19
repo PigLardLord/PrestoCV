@@ -126,7 +126,7 @@ struct CVListView<EmptyState: View>: View {
                 subtitle: viewModel.personLine(of: cv),
                 caption: viewModel.lastSavedLine(of: cv),
                 onTap: {
-                    router.navigate(to: .cvEditor(cvId: cv.id.uuidString))
+                    router.navigate(to: .cvEditor(.stored(cvId: cv.id.uuidString)))
                 },
                 onDuplicate: {
                     Task { await viewModel.duplicateCV(withId: cv.id) }

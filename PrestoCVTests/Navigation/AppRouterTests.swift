@@ -16,7 +16,7 @@ struct AppRouterTests {
         // Given - Multiple routes in navigation path
         let router = AppRouter()
         router.navigate(to: .templateSelection)
-        router.navigate(to: .cvEditor(cvId: nil))
+        router.navigateToEditorWithTemplate(CVModel())
 
         // Verify path has items
         #expect(router.navigationPath.count == 2, "Should have 2 items in path")
@@ -83,7 +83,7 @@ struct AppRouterTests {
         let router = AppRouter(isAIShipped: true)
         router.navigate(to: .templateSelection)
         router.navigate(to: .aiGeneration)
-        router.navigate(to: .cvEditor(cvId: nil))
+        router.navigateToEditorWithTemplate(CVModel())
 
         #expect(router.navigationPath.count == 3)
 
@@ -101,7 +101,7 @@ struct AppRouterTests {
         // Given
         let router = AppRouter()
         router.navigate(to: .templateSelection)
-        router.navigate(to: .cvEditor(cvId: nil))
+        router.navigateToEditorWithTemplate(CVModel())
 
         #expect(router.navigationPath.count == 2)
 
@@ -127,7 +127,7 @@ struct AppRouterTests {
 
     // MARK: - Navigate To Editor With Template Tests
 
-    @Test("navigateToEditorWithTemplate stores initialCV")
+    @Test("navigateToEditorWithTemplate opens the editor on the template, carried by its route")
     func navigateToEditorStoresTemplate() {
         // Given
         let router = AppRouter()
@@ -137,8 +137,7 @@ struct AppRouterTests {
         router.navigateToEditorWithTemplate(template)
 
         // Then
-        #expect(router.initialCVForEditor != nil, "initialCVForEditor should be set")
-        #expect(router.initialCVForEditor?.name == "Test Template", "Template should be stored")
+        #expect(router.currentRoute == .cvEditor(.new(template: template, notice: nil)), "The route carries the template")
         #expect(router.navigationPath.count == 1, "Should add editor to path")
     }
 
@@ -152,7 +151,7 @@ struct AppRouterTests {
         router.navigateToEditorWithTemplate(emptyCV)
 
         // Then
-        #expect(router.initialCVForEditor != nil, "initialCVForEditor should be set even for empty CV")
+        #expect(router.currentRoute == .cvEditor(.new(template: emptyCV, notice: nil)), "Even an empty CV is carried")
         #expect(router.navigationPath.count == 1, "Should add editor to path")
     }
 
@@ -168,13 +167,14 @@ struct AppRouterTests {
         router.navigateToEditorWithAIDraft(draft)
 
         // Then
-        #expect(router.initialCVForEditor == draft, "The draft should be handed to the editor")
-        #expect(router.editorNotice == .aiDraft, "The editor should be told the CV came from AI")
+        #expect(
+            router.currentRoute == .cvEditor(.new(template: draft, notice: .aiDraft)),
+            "The draft opens as a new CV, not a saved one, and the editor is told it came from AI"
+        )
         #expect(router.navigationPath.count == 1, "Should add editor to path")
-        #expect(router.currentRoute == .cvEditor(cvId: nil), "The draft opens as a new CV, not a saved one")
     }
 
-    @Test("navigateToEditorWithTemplate clears the notice of an earlier AI draft")
+    @Test("navigateToEditorWithTemplate does not carry the notice of an earlier AI draft")
     func navigateToEditorWithTemplateClearsNotice() {
         // Given
         let router = AppRouter()
@@ -182,13 +182,14 @@ struct AppRouterTests {
         router.navigateToRoot()
 
         // When
-        router.navigateToEditorWithTemplate(CVModel(name: "Template"))
+        let template = CVModel(name: "Template")
+        router.navigateToEditorWithTemplate(template)
 
         // Then
-        #expect(router.editorNotice == nil, "A template must not show the AI notice")
+        #expect(router.currentRoute == .cvEditor(.new(template: template, notice: nil)), "A template must not show the AI notice")
     }
 
-    @Test("opening an existing CV clears the AI notice")
+    @Test("opening an existing CV does not carry the AI notice")
     func navigateToExistingCVClearsNotice() {
         // Given
         let router = AppRouter()
@@ -196,10 +197,11 @@ struct AppRouterTests {
         router.navigateToRoot()
 
         // When
-        router.navigate(to: .cvEditor(cvId: UUID().uuidString))
+        let cvId = UUID().uuidString
+        router.navigate(to: .cvEditor(.stored(cvId: cvId)))
 
         // Then
-        #expect(router.editorNotice == nil, "A saved CV must not show the AI notice")
+        #expect(router.currentRoute == .cvEditor(.stored(cvId: cvId)), "A saved CV opens as stored, without the AI notice")
     }
 
     // MARK: - Navigation Path State Tests
@@ -225,7 +227,7 @@ struct AppRouterTests {
         // When
         router.navigate(to: .templateSelection)
         router.navigate(to: .aiGeneration)
-        router.navigate(to: .cvEditor(cvId: nil))
+        router.navigateToEditorWithTemplate(CVModel())
 
         // Then
         #expect(router.navigationPath.count == 3, "Each navigate should add to path")
@@ -270,7 +272,10 @@ struct AppRouterTests {
 
         // Then
         #expect(router.navigationPath.count == 2)
-        #expect(router.currentRoute == .cvEditor(cvId: nil))
+        guard case .cvEditor(.new) = router.currentRoute else {
+            Issue.record("The editor should open on a new CV, not \(router.currentRoute)")
+            return
+        }
     }
 
     @Test("With AI drafting shipped, navigating to it opens the generation screen as before")
@@ -341,7 +346,7 @@ struct AppRouterTests {
         router.navigateToEditorWithTemplate(CVModel())
 
         // Step: User saves and taps Done
-        // In CVEditorView, handleSaveConfirmationDone() calls navigateToRoot()
+        // In CVEditorView, handleCancelTap() calls navigateToRoot()
         router.navigateToRoot()
 
         // Then - Should be back at CV List
@@ -376,12 +381,11 @@ struct AppRouterTests {
     @Test("Restoring edits opens the editor with them, which reads the CV stored under their id itself")
     func restoringEditsOpensTheEditorWithThem() {
         let router = AppRouter()
-        let edits = keptEdits(over: CVModel(name: "Stored"))
+        let restoredEdits = restored(keptEdits(over: CVModel(name: "Stored")))
 
-        router.navigateToEditor(restoring: restored(edits))
+        router.navigateToEditor(restoring: restoredEdits)
 
-        #expect(router.currentRoute == .cvEditor(cvId: nil))
-        #expect(router.restoringEdits == edits)
+        #expect(router.currentRoute == .cvEditor(.restoring(restoredEdits)))
         #expect(router.navigationPath.count == 1)
     }
 
@@ -390,30 +394,37 @@ struct AppRouterTests {
         let router = AppRouter()
         router.navigateToEditorWithAIDraft(CVModel(name: "Draft"))
         router.navigateToRoot()
-        let edits = keptEdits(over: nil)
+        let restoredEdits = restored(keptEdits(over: nil))
 
-        router.navigateToEditor(restoring: restored(edits))
+        router.navigateToEditor(restoring: restoredEdits)
 
-        #expect(router.restoringEdits == edits)
-        #expect(router.editorNotice == nil, "Restored edits are the person's own, not a draft to check")
+        #expect(
+            router.currentRoute == .cvEditor(.restoring(restoredEdits)),
+            "Restored edits are the person's own, not a draft to check"
+        )
     }
 
-    @Test("Opening any other editor afterwards forgets the restored edits")
+    @Test("Each editor opens on its own request: nothing of the restored edits reaches the next one")
     func otherEditorsForgetTheRestoredEdits() {
         let router = AppRouter()
         router.navigateToEditor(restoring: restored(keptEdits(over: CVModel(name: "Stored"))))
         router.navigateToRoot()
 
-        router.navigate(to: .cvEditor(cvId: UUID().uuidString))
-        #expect(router.restoringEdits == nil, "A CV opened from the list shows what is stored")
+        let cvId = UUID().uuidString
+        router.navigate(to: .cvEditor(.stored(cvId: cvId)))
+        #expect(router.currentRoute == .cvEditor(.stored(cvId: cvId)), "A CV opened from the list shows what is stored")
 
         router.navigateToRoot()
         router.navigateToEditor(restoring: restored(keptEdits(over: nil)))
-        router.navigateToEditorWithTemplate(CVModel(name: "Template"))
-        #expect(router.restoringEdits == nil, "A new CV from a template starts from the template")
+        let template = CVModel(name: "Template")
+        router.navigateToEditorWithTemplate(template)
+        #expect(
+            router.currentRoute == .cvEditor(.new(template: template, notice: nil)),
+            "A new CV from a template starts from the template"
+        )
     }
 
-    @Test("initialCVForEditor can be updated multiple times")
+    @Test("Each new CV opens on its own template")
     func initialCVForEditorCanBeUpdated() {
         // Given
         let router = AppRouter()
@@ -421,7 +432,7 @@ struct AppRouterTests {
         // When
         let cv1 = CVModel(name: "First")
         router.navigateToEditorWithTemplate(cv1)
-        #expect(router.initialCVForEditor?.name == "First")
+        #expect(router.currentRoute == .cvEditor(.new(template: cv1, notice: nil)))
 
         router.navigateBack()
 
@@ -429,6 +440,16 @@ struct AppRouterTests {
         router.navigateToEditorWithTemplate(cv2)
 
         // Then
-        #expect(router.initialCVForEditor?.name == "Second", "Should update to new template")
+        #expect(router.currentRoute == .cvEditor(.new(template: cv2, notice: nil)), "Should open on the new template")
+    }
+
+    @Test("Two restores of the same edits are two requests, each with its own claim")
+    func restoresAreRequestsOfTheirOwn() {
+        let edits = keptEdits(over: nil)
+        let first = restored(edits)
+
+        #expect(EditorRequest.restoring(first) == .restoring(first))
+        #expect(EditorRequest.restoring(first) != .restoring(restored(edits)))
+        #expect(EditorRequest.new(template: CVModel(), notice: nil) != .new(template: CVModel(), notice: nil), "Two blank CVs are two CVs")
     }
 }
