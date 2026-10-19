@@ -56,10 +56,11 @@ are its planned replacement and are still empty.
     after a letter or a digit may be an apostrophe, "patients' records", "un po'", and closes none: a quote that only such a
     mark may close runs to the end of its line), nor the line after a colon line that another person speaks ("My
     colleague wrote:"), nor what follows a relative that brings in another subject ("I work with a colleague who speaks
-    French"); "which I use", "che uso" and an item before the relative still claim. "plan", "plans" and "planning"
-    withdraw only as verbs ("I am planning to learn Rust"), not as nouns ("route planning", "care plans", "einen Plan
-    erstellt"); an intention said by a phrase withdraws like a wish ("Ho intenzione di", "J'ai l'intention d'", "Ich
-    plane", "Ich habe vor, …").
+    French"); "which I use", "che uso", "tengo que hablar" and an item before the relative still claim, and a word that only
+    ends like an infinitive keeps no person ("qui prépare", "che appare"). "plan", "plans" and "planning" withdraw only as
+    verbs ("I am planning to learn Rust"), not as nouns ("route planning", "care plans", "einen Plan erstellt"); an
+    intention said by a phrase withdraws like a wish ("Ho intenzione di", "J'ai l'intention d'", "Ich plane", "Ich habe
+    vor, …").
   - A skill that is also one of the draft's interests, and that the person mentions only as leisure ("In my free time I like
     chess and hiking"), is a hobby, and is dropped; the interest stays. A skill the person claims anywhere else ("proficient
     in Python", a job's clause, a list of skills) stays. Another person's clause ("My sister teaches chess") counts for

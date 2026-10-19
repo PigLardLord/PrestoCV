@@ -6,8 +6,13 @@ import Foundation
 /// (see `Grounding`).
 ///
 /// - The person stays the subject when a pronoun of the first person follows ("which I use", "das ich nutze", "que je parle"), or, in the
-///   languages that drop the pronoun, a listed form of a verb that only the person says ("che uso", "que hablo", "que falo"), or an
-///   infinitive, which has no subject of its own ("tengo que hablar").
+///   languages that drop the pronoun, a listed form of a verb that only the person says ("che uso", "que hablo", "que falo").
+/// - Spanish and Portuguese "que" brings in no subject after a form of "tener" or "ter" that the person can say: it makes their
+///   periphrasis of obligation, whose infinitive is the person's ("tengo que hablar", "he tenido que hablar", "tenho que falar").
+/// - A word that only ends the way an infinitive does keeps no person: it is often a finite form of the subject the relative brings in
+///   ("qui prépare", "qui offre", "che appare", "que requer", "quem souber"). An infinitive after a relative outside the periphrasis
+///   claims nothing either, an accepted loss: "hay que hablar inglés" says what a job needs, and "un team con cui parlare inglese"
+///   gives no English.
 /// - German "der", "die" and "das" are articles too: they bring in a subject only at the start of a clause that a comma or a conjunction
 ///   split off, or right after a preposition there ("mit dem").
 /// - English "that" is a demonstrative too: it brings in a subject only after the first word of its clause, and before a verb, a pronoun
@@ -19,26 +24,43 @@ enum RelativeClauses {
     private static let articles = Vocabulary.relatives(of: .german)
     /// The relatives that are demonstratives as well.
     private static let demonstratives: Set<String> = ["that"]
+    /// The forms of Spanish "tener" and Portuguese "ter" that the person can say, alone or with the auxiliary of their perfect, as
+    /// `Word.folded` writes them: "que" after one of them makes the periphrasis of obligation.
+    private static let obligations: [Vocabulary.Language: [[String]]] = [
+        .spanish: [["tengo"], ["tenia"], ["tuve"], ["he", "tenido"], ["habia", "tenido"]],
+        .portuguese: [["tenho"], ["tinha"], ["tive"], ["tenho", "tido"], ["tinha", "tido"]],
+    ]
+    private static let everyObligation: [[String]] = obligations.values.flatMap { $0 }
 
     /// The position in `clause` of the word from which it speaks of another subject, or nil when it speaks of none.
     static func start(in clause: Clause, language: Vocabulary.Language?) -> Int? {
         let words = clause.words
         return words.indices.dropLast().first { index in
             let word = words[index].folded
-            guard Vocabulary.isRelative(word, in: language), !keepsThePerson(words[index + 1], language: language) else { return false }
+            guard Vocabulary.isRelative(word, in: language), !keepsThePerson(words[index + 1], language: language),
+                  !makesAnObligation(at: index, in: words, language: language) else { return false }
             if articles.contains(word) { return startsTheClause(index, clause, language: language) }
             if demonstratives.contains(word) { return index > 0 && bringsInASubject(words[index + 1], language: language) }
             return true
         }
     }
 
-    /// Whether the word after a relative keeps the person as the subject: a pronoun of the first person, an infinitive, or, where the
-    /// pronoun is dropped, a listed form of a verb that is no form of another person and none that a noun can be the subject of.
+    /// Whether the word after a relative keeps the person as the subject: a pronoun of the first person, or, where the pronoun is
+    /// dropped, a listed form of a verb that is no form of another person and none that a noun can be the subject of.
     private static func keepsThePerson(_ next: Word, language: Vocabulary.Language?) -> Bool {
-        if rules(of: language).firstPerson.contains(next.accented) || VerbForms.hasInfinitiveEnding(next, in: language) { return true }
+        if rules(of: language).firstPerson.contains(next.accented) { return true }
         let isListed = Vocabulary.isVerb(next.folded, in: language) || Vocabulary.isAuxiliary(next.accented, in: language)
             || Vocabulary.isBeForm(next.accented, in: language)
         return isListed && !Vocabulary.isOtherPerson(next.accented, in: language) && !Vocabulary.canTakeANounSubject(next.accented, in: language)
+    }
+
+    /// Whether the relative at `index` is the "que" of a periphrasis of obligation: right after a form of "tener" or "ter" that the person
+    /// can say ("tengo que hablar", "tenho que falar").
+    private static func makesAnObligation(at index: Int, in words: [Word], language: Vocabulary.Language?) -> Bool {
+        guard words[index].folded == "que" else { return false }
+        let before = words[..<index].map(\.folded)
+        let forms = language.map { obligations[$0] ?? [] } ?? everyObligation
+        return forms.contains { form in before.count >= form.count && before.suffix(form.count).elementsEqual(form) }
     }
 
     /// Whether the relative at `index` starts a clause that a comma or a conjunction split off, alone or after a preposition.

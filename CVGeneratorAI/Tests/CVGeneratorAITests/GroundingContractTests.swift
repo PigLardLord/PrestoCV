@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1761
+    static let rowsWhenWritten = 1778
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -3859,6 +3859,59 @@ enum GroundingRows {
         rows.append(row("lo-que-before-the-item-is-an-accepted-loss",
                         "what I like most is the person's, but que reads as bringing in another subject: the interest goes, an accepted loss",
                         "Lo que más me gusta es el ajedrez.", CVData(interests: ["ajedrez"]), .exactly(CVData()), language: "es"))
+        rows += infinitivesAfterARelative()
+        return rows
+    }
+
+    /// A word after a relative that ends the way an infinitive does keeps no person by its ending (#202): it is often a finite form of
+    /// the subject the relative brings in ("qui prépare", "qui offre", "che appare", "que requer", "quem souber"). The person stays
+    /// the subject of an infinitive after "que" only in the periphrasis of obligation, after a form of Spanish "tener" or Portuguese
+    /// "ter" that the person can say ("tengo que hablar", "he tenido que", "tenho que falar"). Any other infinitive after a relative
+    /// claims nothing: "hay que hablar inglés" says what a job needs, and "un team con cui parlare inglese" loses English, accepted
+    /// losses.
+    private static func infinitivesAfterARelative() -> [GroundingRow] {
+        typealias Variant = (id: String, language: String, description: String, skill: String)
+        var finite: [Variant] = []
+        finite.append(("prepare-fr", "fr", "Je travaille avec une collègue qui prépare des cours de Python.", "Python"))
+        finite.append(("assure-fr", "fr", "Je travaille avec une collègue qui assure les cours de Python.", "Python"))
+        finite.append(("offre-fr", "fr", "Je travaille avec un collègue qui offre des formations en Python.", "Python"))
+        finite.append(("decouvre-fr", "fr", "Je travaille avec un collègue qui découvre Kotlin.", "Kotlin"))
+        finite.append(("appare-it", "it", "Lavoro con un collega che appare spesso nei video su Python.", "Python"))
+        finite.append(("compare-it", "it", "Lavoro con un collega che compare in tutti i video di Python.", "Python"))
+        finite.append(("requer-pt", "pt", "Trabalho com uma equipe que requer Python.", "Python"))
+        finite.append(("souber-pt", "pt", "Trabalho com quem souber Kotlin.", "Kotlin"))
+
+        var rows: [GroundingRow] = []
+        for v in finite {
+            rows.append(row("a-finite-form-that-ends-like-an-infinitive-after-a-relative-is-another-subjects-\(v.id)",
+                            "the verb after the relative is a finite form of another subject, though it ends like an infinitive: the skill goes",
+                            v.description, CVData(skills: [Skill(name: v.skill)]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("an-infinitive-after-a-relative-outside-an-obligation-claims-nothing-es",
+                        "que follows a quantity, not a form of tener: the infinitive says what is left to learn, and Python goes",
+                        "Tengo mucho que aprender de Python.", CVData(skills: [Skill(name: "Python")]), .exactly(CVData()), language: "es"))
+        rows.append(row("an-impersonal-obligation-is-an-accepted-loss-es",
+                        "hay que says what the job needs, not what the person speaks: English goes, an accepted loss",
+                        "En mi trabajo hay que hablar inglés.", CVData(languages: [Language(name: "inglés")]), .exactly(CVData()), language: "es"))
+        rows.append(row("an-infinitive-after-a-relative-is-an-accepted-loss-it",
+                        "the person speaks English with the team, but cui reads as bringing in another subject: English goes, an accepted loss",
+                        "Ho trovato un team con cui parlare inglese ogni giorno.", CVData(languages: [Language(name: "inglese")]), .exactly(CVData()),
+                        language: "it"))
+
+        // The periphrasis of obligation with a form of tener or ter that the person can say: the infinitive is the person's.
+        let obligations: [(id: String, language: String, description: String, name: String)] = [
+            ("tuve-es", "es", "Tuve que hablar inglés en el trabajo.", "inglés"),
+            ("tenia-es", "es", "Tenía que hablar inglés en el trabajo.", "inglés"),
+            ("he-tenido-es", "es", "He tenido que hablar inglés en el trabajo.", "inglés"),
+            ("tenho-pt", "pt", "Tenho que falar inglês no trabalho.", "inglês"),
+            ("tive-pt", "pt", "Tive que falar inglês no trabalho.", "inglês"),
+            ("tinha-pt", "pt", "Tinha que falar inglês no trabalho.", "inglês"),
+        ]
+        for v in obligations {
+            rows.append(row("que-in-an-obligation-of-the-person-brings-in-no-subject-\(v.id)",
+                            "que after the person's form of tener or ter brings in no subject: the language stays",
+                            v.description, CVData(languages: [Language(name: v.name)]), .unchanged, language: v.language))
+        }
         return rows
     }
 
