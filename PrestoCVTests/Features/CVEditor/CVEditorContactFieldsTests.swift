@@ -20,17 +20,22 @@ struct CVEditorContactFieldsTests {
 
     // MARK: - E-mail address
 
-    @Test("The e-mail field is required, and says so until the address is not one", arguments: [
+    @Test("The name is the required field: a PDF is made only with it")
+    func nameIsRequired() {
+        #expect(editor(PersonalInfo()).nameStatus == FieldStatus(validity: .none, isRequired: true, note: .required))
+    }
+
+    @Test("The e-mail field is optional, and valid once it holds an address", arguments: [
         ("", FieldStatus.Validity.none),
         ("ada@example.com", .valid),
     ])
-    func emailIsRequired(email: String, validity: FieldStatus.Validity) {
-        #expect(left(PersonalInfo(email: email)).emailStatus == FieldStatus(validity: validity, isRequired: true, note: .required))
+    func emailIsOptional(email: String, validity: FieldStatus.Validity) {
+        #expect(left(PersonalInfo(email: email)).emailStatus == FieldStatus(validity: validity, isRequired: false, note: nil))
     }
 
     @Test("An address that is not one is marked invalid, and the line under it says so", arguments: ["ada.example.com", "clara.weiss@", "name@"])
     func invalidEmailIsMarked(email: String) {
-        #expect(left(PersonalInfo(email: email)).emailStatus == FieldStatus(validity: .invalid, isRequired: true, note: .invalidEmail))
+        #expect(left(PersonalInfo(email: email)).emailStatus == FieldStatus(validity: .invalid, isRequired: false, note: .invalidEmail))
     }
 
     @Test("A field is checked when the person leaves it, not at every key")

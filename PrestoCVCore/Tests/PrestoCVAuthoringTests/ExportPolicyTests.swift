@@ -9,11 +9,4 @@ struct ExportPolicyTests {
         #expect(policy.pageWidth == 595.28 && policy.pageHeight == 841.89)
         #expect(policy.margin == 43 && policy.maxPages == 10)
     }
-
-    @Test("a CV is exported only once it has the name and the e-mail of its person; white space is not a value",
-          arguments: [("Ada Lovelace", "ada@example.com", nil), ("", "ada@example.com", ExportBlocker.missingNameOrEmail),
-                      ("Ada Lovelace", " ", .missingNameOrEmail), (" \n", "", .missingNameOrEmail)] as [(String, String, ExportBlocker?)])
-    func blocker(name: String, email: String, blocker: ExportBlocker?) {
-        #expect(ExportPolicy.standard.blocker(name: name, email: email) == blocker)
-    }
 }

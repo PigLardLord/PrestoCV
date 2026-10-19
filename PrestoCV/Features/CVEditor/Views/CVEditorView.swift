@@ -136,6 +136,7 @@ struct CVEditorView: View {
                     documentLanguage: $viewModel.documentLanguageSelection,
                     automaticLanguageTitle: viewModel.automaticDocumentLanguageTitle,
                     documentLanguageTitle: viewModel.documentLanguageTitle,
+                    nameStatus: viewModel.nameStatus,
                     emailStatus: viewModel.emailStatus,
                     phoneStatus: viewModel.phoneStatus,
                     portfolioStatus: viewModel.portfolioStatus,

@@ -3,6 +3,7 @@ import Foundation
 import PrestoCVCore
 import CVPDFExporter
 import struct PrestoCVDomain.ExportPolicy
+import struct PrestoCVDomain.ExportReadiness
 
 /// What the user chose in the export sheet: while the sheet is shown, each change of it makes a new preview.
 struct ExportSelection: Equatable {
@@ -40,6 +41,8 @@ final class CVExportSheetViewModel: ObservableObject {
     @Published private(set) var sharePDF: ExportedPDF?
     /// Why no PDF is made for this CV, in words the user can act on; nil when the CV can be exported
     @Published private(set) var shareBlocker: String?
+    /// What the PDF lacks, though it is made, in words the user can act on; nil when it lacks nothing
+    @Published private(set) var shareWarning: String?
     /// How the last share of this PDF ended, when it went through
     @Published private(set) var shareOutcome: ShareOutcome?
     @Published var errorMessage: String?
@@ -203,7 +206,9 @@ final class CVExportSheetViewModel: ObservableObject {
         var printedCV = cv
         printedCV.documentLanguage = documentLanguage.rawValue
         shareOutcome = nil
-        shareBlocker = shareBlocker(for: cv)
+        let readiness = ExportReadiness(name: cv.personalInfo.name, email: cv.personalInfo.email, phone: cv.personalInfo.phone)
+        shareBlocker = Self.blockerText(for: readiness)
+        shareWarning = Self.warningText(for: readiness)
         isPreviewLoading = selectedTemplateId != nil
         isPreparingPDF = selectedTemplateId != nil && shareBlocker == nil
 
@@ -339,14 +344,19 @@ final class CVExportSheetViewModel: ObservableObject {
         }
     }
 
-    /// What the export policy says keeps the CV from being exported, said beforehand, next to the preview, instead of in
-    /// an alert when the sheet opens
-    private func shareBlocker(for cv: CVModel) -> String? {
-        switch exportPolicy.blocker(name: cv.personalInfo.name, email: cv.personalInfo.email) {
-        case .missingNameOrEmail?:
-            return String(localized: "export.error.missing_name_email")
-        case nil:
-            return nil
+    /// What keeps the CV from being exported, by `ExportReadiness`: the name, said beforehand, next to the preview,
+    /// instead of in an alert when the sheet opens
+    private static func blockerText(for readiness: ExportReadiness) -> String? {
+        readiness.blockers.contains(.name) ? String(localized: "export.readiness.name_required") : nil
+    }
+
+    /// What the PDF lacks, by `ExportReadiness`: a way to reach the person, which it is still made without
+    private static func warningText(for readiness: ExportReadiness) -> String? {
+        switch (readiness.warnings.contains(.email), readiness.warnings.contains(.phone)) {
+        case (true, true): return String(localized: "export.readiness.no_email_phone")
+        case (true, false): return String(localized: "export.readiness.no_email")
+        case (false, true): return String(localized: "export.readiness.no_phone")
+        case (false, false): return nil
         }
     }
 

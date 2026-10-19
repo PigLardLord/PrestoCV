@@ -537,15 +537,15 @@ struct CVExportSheetViewModelTests {
         #expect(viewModel.sharePDF == nil)
     }
 
-    @Test("a CV without name or email asks for them")
-    func missingNameAndEmailAsksForThem() async {
+    @Test("a CV the exporter refuses for its name asks for it")
+    func refusedNameAsksForIt() async {
         let mockService = MockCVExportService()
-        await mockService.setExportResult(.failure(PDFExportError.invalidContent("Document must have an email")))
+        await mockService.setExportResult(.failure(PDFExportError.invalidContent("Document must have a name")))
         let viewModel = makeViewModel(mockService)
 
         await viewModel.requestPreview().value
 
-        #expect(viewModel.errorMessage == String(localized: "export.error.missing_name_email"))
+        #expect(viewModel.errorMessage == String(localized: "export.readiness.name_required"))
     }
 
     @Test("a new selection removes the PDF of the old one at once and its file after")
@@ -650,11 +650,10 @@ struct CVExportSheetViewModelTests {
 
     // MARK: - A CV the exporter would refuse
 
-    @Test("a CV without a name or an email gets its preview but no PDF, and a hint instead of an alert",
+    @Test("a CV without a name gets its preview but no PDF, and a hint that asks for the name instead of an alert",
           arguments: [
               PrestoCVCore.PersonalInfo(name: "", email: ""),
-              PrestoCVCore.PersonalInfo(name: "Ada Lovelace", email: ""),
-              PrestoCVCore.PersonalInfo(name: "", email: "ada@example.com"),
+              PrestoCVCore.PersonalInfo(name: "", email: "ada@example.com", phone: "+39 06 1234567"),
               PrestoCVCore.PersonalInfo(name: "   ", email: "\n")
           ])
     func incompleteCVGetsNoPDF(personalInfo: PrestoCVCore.PersonalInfo) async {
@@ -664,11 +663,39 @@ struct CVExportSheetViewModelTests {
         await viewModel.requestPreview().value
 
         #expect(viewModel.previewHTML != nil, "the preview shows what is missing")
-        #expect(viewModel.shareBlocker == String(localized: "export.error.missing_name_email"))
+        #expect(viewModel.shareBlocker == String(localized: "export.readiness.name_required"))
         #expect(viewModel.sharePDF == nil)
         #expect(!viewModel.isPreparingPDF)
         #expect(viewModel.errorMessage == nil, "no alert when the sheet opens")
         #expect(await mockService.exportCallCount == 0)
+    }
+
+    @Test("a CV without an email address or a phone number gets its PDF, with a warning that says which is missing",
+          arguments: [
+              (PrestoCVCore.PersonalInfo(name: "Ada Lovelace", email: ""), "export.readiness.no_email_phone"),
+              (PrestoCVCore.PersonalInfo(name: "Ada Lovelace", email: "", phone: "+39 06 1234567"), "export.readiness.no_email"),
+              (PrestoCVCore.PersonalInfo(name: "Ada Lovelace", email: "ada@example.com"), "export.readiness.no_phone"),
+          ])
+    func missingContactsOnlyWarn(personalInfo: PrestoCVCore.PersonalInfo, warning: String) async {
+        let mockService = MockCVExportService()
+        let viewModel = makeViewModel(mockService, cv: CVModel(name: "Draft", personalInfo: personalInfo))
+
+        await viewModel.requestPreview().value
+
+        #expect(viewModel.shareBlocker == nil)
+        #expect(viewModel.shareWarning == String(localized: String.LocalizationValue(warning)))
+        #expect(viewModel.sharePDF != nil)
+        #expect(await mockService.exportCallCount == 1)
+    }
+
+    @Test("a CV with a name, an email address and a phone number has nothing to say")
+    func readyCVHasNoWarning() async {
+        let personalInfo = PrestoCVCore.PersonalInfo(name: "Ada Lovelace", email: "ada@example.com", phone: "+39 06 1234567")
+        let viewModel = makeViewModel(MockCVExportService(), cv: CVModel(name: "Draft", personalInfo: personalInfo))
+
+        await viewModel.requestPreview().value
+
+        #expect(viewModel.shareBlocker == nil && viewModel.shareWarning == nil)
     }
 
     @Test("a complete CV has nothing in the way of the PDF")

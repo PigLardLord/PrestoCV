@@ -8,6 +8,7 @@ struct PersonalInfoSection: View {
     let automaticLanguageTitle: String
     /// The language chosen, or what automatic stands for
     let documentLanguageTitle: String
+    let nameStatus: FieldStatus
     let emailStatus: FieldStatus
     let phoneStatus: FieldStatus
     let portfolioStatus: FieldStatus
@@ -55,7 +56,7 @@ struct PersonalInfoSection: View {
             // Personal Information - High Priority
             Section {
                 VStack(spacing: DesignTokens.Spacing.sm) {
-                    LabeledTextField(label: "field.full_name".localized, text: $cv.personalInfo.name)
+                    LabeledTextField(label: "field.full_name".localized, text: $cv.personalInfo.name, state: nameStatus.fieldState)
                     
                     LabeledTextField(label: "field.professional_title".localized, text: $cv.personalInfo.title)
                     
@@ -179,7 +180,8 @@ struct SectionHeader: View {
         documentLanguage: .constant(nil),
         automaticLanguageTitle: "Automatic (English)",
         documentLanguageTitle: "Automatic (English)",
-        emailStatus: FieldStatus(validity: .none, isRequired: true, note: .required),
+        nameStatus: FieldStatus(validity: .none, isRequired: true, note: .required),
+        emailStatus: FieldStatus(validity: .none, isRequired: false, note: nil),
         phoneStatus: FieldStatus(validity: .none, isRequired: false, note: .phoneHelp),
         portfolioStatus: FieldStatus(validity: .none, isRequired: false, note: .webAddressHelp),
         onLeave: { _ in }

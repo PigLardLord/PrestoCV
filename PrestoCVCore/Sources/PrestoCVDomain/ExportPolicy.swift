@@ -1,8 +1,8 @@
 import Foundation
 
-/// How version 1 exports a CV: on an A4 page, with a margin of 0.6 in (43 points) on every side, since the usual inch
-/// leaves too little room for text on A4, on at most 10 pages, and only once the CV says who its person is and how to
-/// reach them. The preview follows the same page.
+/// The page version 1 exports a CV on: A4, with a margin of 0.6 in (43 points) on every side, since the usual inch leaves
+/// too little room for text on A4, and at most 10 pages. The preview follows the same page. What a CV needs before it is
+/// exported is `ExportReadiness`.
 public struct ExportPolicy: Hashable, Sendable {
     /// The page, in points
     public let pageWidth: Double, pageHeight: Double
@@ -16,16 +16,4 @@ public struct ExportPolicy: Hashable, Sendable {
     }
 
     public static let standard = ExportPolicy(pageWidth: 595.28, pageHeight: 841.89, margin: 43, maxPages: 10)
-
-    /// What keeps a CV from being exported; nil when nothing does. White space is not a value.
-    public func blocker(name: String, email: String) -> ExportBlocker? {
-        let missing = [name, email].contains { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        return missing ? .missingNameOrEmail : nil
-    }
-}
-
-/// Why a CV cannot be exported yet
-public enum ExportBlocker: Hashable, Sendable {
-    /// A PDF names its person and says how to reach them: the name and the e-mail are required
-    case missingNameOrEmail
 }

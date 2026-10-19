@@ -18,13 +18,14 @@ extension FieldStatus {
         }
     }
 
-    private var noteText: String {
+    private var noteText: String? {
         switch note {
-        case .required: return "field.help.required".localized
-        case .invalidEmail: return "field.email.error_invalid".localized
-        case .phoneHelp: return "field.phone.help".localized
-        case .phoneWithoutDigits: return "field.phone.no_digits".localized
-        case .webAddressHelp: return "field.url.help".localized
+        case .required?: return "field.help.required".localized
+        case .invalidEmail?: return "field.email.error_invalid".localized
+        case .phoneHelp?: return "field.phone.help".localized
+        case .phoneWithoutDigits?: return "field.phone.no_digits".localized
+        case .webAddressHelp?: return "field.url.help".localized
+        case nil: return nil
         }
     }
 }

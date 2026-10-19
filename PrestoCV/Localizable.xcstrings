@@ -5075,47 +5075,6 @@
         }
       }
     },
-    "export.error.missing_name_email" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fügen Sie Ihrem Lebenslauf Ihren Namen und Ihre E-Mail-Adresse hinzu, bevor Sie ihn exportieren."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add your name and email to the CV before exporting it."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agrega tu nombre y tu correo electrónico al CV antes de exportarlo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajoutez votre nom et votre adresse e-mail au CV avant de l'exporter."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiungi il tuo nome e la tua e-mail al CV prima di esportarlo."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicione seu nome e seu e-mail ao currículo antes de exportá-lo."
-          }
-        }
-      }
-    },
     "export.error.no_templates" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5727,6 +5686,170 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Páginas: %d"
+          }
+        }
+      }
+    },
+    "export.readiness.name_required" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügen Sie Ihrem Lebenslauf Ihren Namen hinzu, bevor Sie ihn exportieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add your name to the CV before exporting it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrega tu nombre al CV antes de exportarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez votre nom au CV avant de l'exporter."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi il tuo nome al CV prima di esportarlo."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione seu nome ao currículo antes de exportá-lo."
+          }
+        }
+      }
+    },
+    "export.readiness.no_email" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügen Sie eine E-Mail-Adresse hinzu, damit Personalverantwortliche Ihnen antworten können."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add an email address so that recruiters can reply to you."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrega un correo electrónico para que los reclutadores puedan responderte."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez une adresse e-mail pour que les recruteurs puissent vous répondre."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi un indirizzo e-mail perché i selezionatori possano risponderti."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione um e-mail para que os recrutadores possam responder a você."
+          }
+        }
+      }
+    },
+    "export.readiness.no_email_phone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügen Sie eine E-Mail-Adresse oder eine Telefonnummer hinzu, damit Personalverantwortliche Sie erreichen können."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add an email address or a phone number so that recruiters can contact you."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrega un correo electrónico o un número de teléfono para que los reclutadores puedan contactarte."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez une adresse e-mail ou un numéro de téléphone pour que les recruteurs puissent vous contacter."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi un indirizzo e-mail o un numero di telefono perché i selezionatori possano contattarti."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione um e-mail ou um número de telefone para que os recrutadores possam entrar em contato com você."
+          }
+        }
+      }
+    },
+    "export.readiness.no_phone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügen Sie eine Telefonnummer hinzu, damit Personalverantwortliche Sie anrufen können."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a phone number so that recruiters can call you."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrega un número de teléfono para que los reclutadores puedan llamarte."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez un numéro de téléphone pour que les recruteurs puissent vous appeler."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi un numero di telefono perché i selezionatori possano chiamarti."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione um número de telefone para que os recrutadores possam ligar para você."
           }
         }
       }
