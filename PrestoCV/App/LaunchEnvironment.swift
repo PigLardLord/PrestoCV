@@ -29,6 +29,21 @@ enum LaunchEnvironment {
         )
     }
 
+    /// Whether the app was launched to host the unit tests, which the test plans ask for. The tests build what they need,
+    /// so the app then composes nothing: it neither reads nor changes the simulator's data, and does no work beside the
+    /// tests. Release builds ignore the request.
+    static func hostsUnitTests(arguments: [String]) -> Bool {
+        #if DEBUG
+        return arguments.contains(unitTestHostArgument)
+        #else
+        return false
+        #endif
+    }
+
+    /// The launch argument of the test plans that makes the app a bare host for the unit tests. The plans follow it with
+    /// a value, so that an argument after it is not read as its value.
+    static let unitTestHostArgument = "-PrestoCVUnitTestHost"
+
     #if DEBUG
     /// The name of the folder a UI test asked for, if it asked for one.
     private static func uiTestFolder(arguments: [String]) -> String? {

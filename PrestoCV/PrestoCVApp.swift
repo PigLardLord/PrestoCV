@@ -26,14 +26,18 @@ struct PrestoCVApp: App {
 
     var body: some Scene {
         WindowGroup {
-            AppLaunchView(
-                viewModel: AppLaunchViewModel(
-                    makeDependencyContainer: { DependencyContainer(storageDirectory: Self.storage.cvs) },
-                    makeUnsavedEdits: { try Self.unsavedEdits.get() },
-                    environment: Self.environment,
-                    bootstrapTemplates: { await Self.installBundledTemplates() }
+            if LaunchEnvironment.hostsUnitTests(arguments: Self.environment.arguments) {
+                EmptyView()
+            } else {
+                AppLaunchView(
+                    viewModel: AppLaunchViewModel(
+                        makeDependencyContainer: { DependencyContainer(storageDirectory: Self.storage.cvs) },
+                        makeUnsavedEdits: { try Self.unsavedEdits.get() },
+                        environment: Self.environment,
+                        bootstrapTemplates: { await Self.installBundledTemplates() }
+                    )
                 )
-            )
+            }
         }
     }
 
