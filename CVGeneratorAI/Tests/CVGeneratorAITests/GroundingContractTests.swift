@@ -416,13 +416,18 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1611
+    static let rowsWhenWritten = 1700
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
     static let notImplementedYet: Set<String> = [
         // Text typed without accents: an open residual risk of ADR 0023 that #249 must close before release.
         "a-konjunktiv-typed-without-its-umlaut-claims-nothing-de",
+        // Whose words and whose title and place a claim gives: open residual risks of ADR 0023 that #249 must close before release.
+        "speech-on-the-line-of-the-colon-claims-nothing",
+        "the-title-of-a-person-the-claim-names-is-not-the-persons-en", "the-title-of-a-person-the-claim-names-is-not-the-persons-it",
+        "the-title-of-a-person-the-claim-names-is-not-the-persons-de", "the-title-of-a-person-the-claim-names-is-not-the-persons-es",
+        "the-title-of-a-person-the-claim-names-is-not-the-persons-fr", "the-title-of-a-person-the-claim-names-is-not-the-persons-pt",
     ]
 
     /// Rows whose desired output the sanitiser does not give, and whose leak the owner accepts as a residual risk (ADR 0023,
@@ -497,6 +502,7 @@ enum GroundingRows {
         rows += quotedSpeechClaimsNothing()
         rows += speechAfterALineOfAnotherPerson()
         rows += relativeClausesOfAnotherSubject()
+        rows += titlesOfAnotherPersonInAClaim()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3643,7 +3649,9 @@ enum GroundingRows {
 
     /// A line that ends with a colon and does not speak for the person introduces someone else's words: the line after it claims
     /// nothing, all its sentences (#202). The line after that claims as usual, and so does the line after a colon line that the
-    /// person speaks ("My languages:", "Skills:", "I worked with my team on:").
+    /// person speaks ("My languages:", "Skills:", "I worked with my team on:"). Words without marks after the colon on its own line
+    /// are read by their own clauses, and a sentence after the colon's keeps its item: an open residual risk that #249 must close
+    /// (`notImplementedYet`).
     private static func speechAfterALineOfAnotherPerson() -> [GroundingRow] {
         typealias Speech = (language: String, description: String, name: String)
         var speeches: [Speech] = []
@@ -3665,6 +3673,10 @@ enum GroundingRows {
                         "My colleague wrote:\nI speak French. I speak German.\nI speak Italian.",
                         CVData(languages: [Language(name: "French"), Language(name: "German"), Language(name: "Italian")]),
                         .exactly(CVData(languages: [Language(name: "Italian")]))))
+        rows.append(row("speech-on-the-line-of-the-colon-claims-nothing",
+                        "the colleague's words follow the colon on its own line: neither language stays",
+                        "My colleague wrote: I speak French. I speak German.",
+                        CVData(languages: [Language(name: "French"), Language(name: "German")]), .exactly(CVData())))
         rows.append(row("the-line-after-the-persons-own-colon-claims-en", "my languages are the person's: both languages stay",
                         "My languages:\nItalian and English.",
                         CVData(languages: [Language(name: "Italian"), Language(name: "English")]), .unchanged))
@@ -3756,6 +3768,26 @@ enum GroundingRows {
                         "what I like most is the person's, but que reads as bringing in another subject: the interest goes, an accepted loss",
                         "Lo que más me gusta es el ajedrez.", CVData(interests: ["ajedrez"]), .exactly(CVData()), language: "es"))
         return rows
+    }
+
+    /// The person's title and place come from a clause that claims them, but nothing tells whose they are inside it (ADR 0023,
+    /// Consequences): "Io lavoro con un infermiere a Torino" gives the person the nurse's title. An open residual risk that #249 must
+    /// close (`notImplementedYet`).
+    private static func titlesOfAnotherPersonInAClaim() -> [GroundingRow] {
+        typealias Variant = (language: String, description: String, title: String)
+        var variants: [Variant] = []
+        variants.append(("it", "Io lavoro con un infermiere a Torino.", "infermiere"))
+        variants.append(("en", "I work with a nurse in Turin.", "nurse"))
+        variants.append(("de", "Ich arbeite mit einem Krankenpfleger in Turin.", "Krankenpfleger"))
+        variants.append(("es", "Trabajo con un enfermero en Turín.", "enfermero"))
+        variants.append(("fr", "Je travaille avec un infirmier à Turin.", "infirmier"))
+        variants.append(("pt", "Trabalho com um enfermeiro em Turim.", "enfermeiro"))
+
+        return variants.map { v in
+            row("the-title-of-a-person-the-claim-names-is-not-the-persons-\(v.language)",
+                "the person works with a nurse: the title is the nurse's, and goes", v.description,
+                CVData(personalInfo: person(title: v.title)), .exactly(CVData()), language: v.language)
+        }
     }
 
     /// A negation keeps its item only when it governs the word of level (#202): "not an expert", "never been fluent". A negation of
