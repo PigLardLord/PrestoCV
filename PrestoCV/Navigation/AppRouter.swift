@@ -49,6 +49,12 @@ final class AppRouter: ObservableObject {
         navigationPath = NavigationPath()
     }
 
+    /// The person leaves the editor, with Cancel, with Done, or by discarding its edits: the list of CVs shows again,
+    /// whatever screens led to the editor.
+    func closeEditor() {
+        navigateToRoot()
+    }
+
     /// The screen a route of the path shows, whether `navigate(to:)` appended it or not.
     func destination(for route: Route) -> RouteDestination {
         RouteDestination.resolve(route, isAIShipped: isAIShipped)

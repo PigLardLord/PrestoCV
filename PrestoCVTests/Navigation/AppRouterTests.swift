@@ -309,8 +309,8 @@ struct AppRouterTests {
         #expect(router.navigationPath.count == 2)
 
         // Step 3: User taps Cancel (without any changes)
-        // In CVEditorView, handleCancelTap() calls navigateToRoot()
-        router.navigateToRoot()
+        // In CVEditorView, handleCancelTap() calls closeEditor()
+        router.closeEditor()
 
         // Then - Should be back at CV List (empty path)
         #expect(router.navigationPath.count == 0, "Should return to CV List after cancel")
@@ -330,8 +330,8 @@ struct AppRouterTests {
         #expect(router.navigationPath.count == 2)
 
         // Step 3: User makes changes and then taps Cancel → Discard
-        // In CVEditorView, handleDiscardChanges() calls navigateToRoot()
-        router.navigateToRoot()
+        // In CVEditorView, handleDiscardChanges() calls closeEditor()
+        router.closeEditor()
 
         // Then - Should be back at CV List
         #expect(router.navigationPath.count == 0, "Should return to CV List after discard")
@@ -346,8 +346,8 @@ struct AppRouterTests {
         router.navigateToEditorWithTemplate(CVModel())
 
         // Step: User saves and taps Done
-        // In CVEditorView, handleCancelTap() calls navigateToRoot()
-        router.navigateToRoot()
+        // In CVEditorView, handleCancelTap() calls closeEditor()
+        router.closeEditor()
 
         // Then - Should be back at CV List
         #expect(router.navigationPath.count == 0, "Should return to CV List after save + done")
@@ -451,5 +451,19 @@ struct AppRouterTests {
         #expect(EditorRequest.restoring(first) == .restoring(first))
         #expect(EditorRequest.restoring(first) != .restoring(restored(edits)))
         #expect(EditorRequest.new(template: CVModel(), notice: nil) != .new(template: CVModel(), notice: nil), "Two blank CVs are two CVs")
+    }
+
+    // MARK: - Leaving the Editor
+
+    @Test("closeEditor returns to the list, whatever screens led to the editor")
+    func closeEditorReturnsToTheList() {
+        let router = AppRouter(isAIShipped: true)
+        router.navigate(to: .templateSelection)
+        router.navigate(to: .aiGeneration)
+        router.navigateToEditorWithAIDraft(CVModel(name: "Draft"))
+
+        router.closeEditor()
+
+        #expect(router.navigationPath.count == 0)
     }
 }

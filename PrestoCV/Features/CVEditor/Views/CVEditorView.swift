@@ -207,13 +207,8 @@ struct CVEditorView: View {
     // MARK: - Action Handlers
     
     private func handleCancelTap() {
-        leaveEditorUnlessEditsWouldBeLost()
-    }
-
-    /// For new CVs, always go to root (CV List), not just back one level
-    private func leaveEditorUnlessEditsWouldBeLost() {
         if viewModel.requestLeaving() {
-            router.navigateToRoot()
+            router.closeEditor()
         }
     }
     
@@ -225,7 +220,7 @@ struct CVEditorView: View {
     
     private func handleDiscardChanges() {
         viewModel.confirmCancel()
-        router.navigateToRoot()
+        router.closeEditor()
     }
 }
 
