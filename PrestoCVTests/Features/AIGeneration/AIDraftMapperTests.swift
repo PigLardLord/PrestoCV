@@ -200,6 +200,13 @@ struct AIDraftMapperTests {
         #expect(cv.skills.first?.level == stars)
     }
 
+    @Test("An expert skill gets every star the editor shows")
+    func expertSkillGetsEveryStar() {
+        let cv = map(CVData(skills: [CVGeneratorAI.Skill(name: "Chess", level: .expert)]))
+
+        #expect(cv.skills.first?.level == PrestoCVCore.Skill.maxLevel)
+    }
+
     @Test("Every language level maps to its own level", arguments: [
         (LanguageProficiency.a1, LanguageProficiencyLevel.a1),
         (.a2, .a2),

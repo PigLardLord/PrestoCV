@@ -102,10 +102,9 @@ struct SkillRowView: View {
                 DeleteButton(label: skill.displayName, action: onDelete)
             }
             
-            SkillLevelView(
-                level: $skill.level,
-                maxLevel: 5
-            )
+            SkillLevelView(level: skill.level, maxLevel: Skill.maxLevel) { star in
+                skill.chooseLevel(star)
+            }
         }
         .padding(.vertical, DesignTokens.Spacing.xs)
     }

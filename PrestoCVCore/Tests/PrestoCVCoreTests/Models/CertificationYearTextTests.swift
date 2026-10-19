@@ -1,5 +1,4 @@
 import Testing
-@testable import PrestoCV
 @testable import PrestoCVCore
 
 @Suite("Certification year text - what the year field shows and what typing in it stores")
