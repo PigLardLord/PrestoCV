@@ -1,7 +1,9 @@
 #if os(macOS)   // macOS only (R11)
 import Testing
 import Foundation
+import AppKit
 import PDFKit
+import WebKit
 import CVRendering
 import CVRenderingMacOS
 import CVRenderingWebKitSupport
@@ -58,13 +60,30 @@ struct MacPDFRendererTests {
         let document = try ContractFixture.rendered()
         let long = document.html.replacingOccurrences(of: "</main>", with: String(repeating: "<p>Line of a long document.</p>", count: 30_000) + "</main>")
         let renderer = try await renderer()
-        let start = ContinuousClock.now
+        let existing = Set(NSApplication.shared.windows.map(ObjectIdentifier.init))
         let task = Task { try await renderer.render(html: long, page: PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 10_000)) }
-        try await Task.sleep(for: .milliseconds(20))   // the render has started: it is loading or printing
+        #expect(await Self.renderWindowAppears(besides: existing), "the render did not start")
+        let cancelled = ContinuousClock.now
         task.cancel()
         let result = await task.result
         #expect(throws: CancellationError.self) { _ = try result.get() }
-        #expect(ContinuousClock.now - start < .seconds(10))
+        #expect(ContinuousClock.now - cancelled < Self.patience, "the render should end with the cancellation, not run on")
+    }
+
+    /// The bound on a wait for something that must happen: generous, since it costs time only when the code is broken.
+    static let patience: Duration = .seconds(60)
+
+    /// Whether a window holding a web view appears besides `existing`, within `patience`. A render makes its offscreen
+    /// window just before it loads, and prints from it: while the window is there, the render is loading or printing.
+    static func renderWindowAppears(besides existing: Set<ObjectIdentifier>) async -> Bool {
+        let deadline = ContinuousClock.now + patience
+        while ContinuousClock.now < deadline {
+            if NSApplication.shared.windows.contains(where: { !existing.contains(ObjectIdentifier($0)) && $0.contentView is WKWebView }) {
+                return true
+            }
+            do { try await Task.sleep(for: .milliseconds(10)) } catch { return false }
+        }
+        return false
     }
 
     @Test("a page setup with no page or no printable height is refused", arguments: [
