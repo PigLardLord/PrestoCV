@@ -108,9 +108,9 @@ extension Vocabulary {
         /// Words of negation, doubt or degree, wish or intention, future and condition: in no other list.
         modality: """
         aim aimed aims almost barely can cannot could dream dreams gonna hardly hope hoped hopes if intend intended
-        intends ll may maybe might mostly must nearly neither never no nobody none nor not nothing nowhere otherwise
-        partially partly perhaps plan planned planning plans possibly probably scarcely shall should slightly somewhat
-        unless want wanted wants whether will wish wished wishes without would
+        intention_of intention_to intends ll may maybe might mostly must nearly neither never no nobody none nor not
+        nothing nowhere otherwise partially partly perhaps plan planned planning plans possibly probably scarcely shall
+        should slightly somewhat unless want wanted wants whether will wish wished wishes without would
         """
     )
 }

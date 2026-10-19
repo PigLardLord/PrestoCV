@@ -105,7 +105,7 @@ extension Vocabulary {
         würde würdest würden würdet wäre wärest wärst wären wäret wärt hätte hättest hätten hättet müsste müsstest müssten
         müsstet dürfte dürftest dürften dürftet
         wurde~gern wurde~gerne wurde~lieber traume~davon traume~von
-        beabsichtige beinahe darf duerfen durfen etwa eventuell falls fast hoffe hoffen kann kannst kaum kein keine
+        plane beabsichtige beinahe darf duerfen durfen etwa eventuell falls fast hoffe hoffen kann kannst kaum kein keine
         keinem keinen keiner keines koennen koennte konnen konnte konnten mochte mochten moechte moechten
         moeglicherweise moglicherweise muessen muss mussen musst nicht nichts nie niemals niemand ob ohne sofern soll
         sollen sollte teilweise ungefaehr ungefahr vielleicht wahrscheinlich weder wenn werde werden werdet will

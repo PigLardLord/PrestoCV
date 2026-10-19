@@ -127,6 +127,7 @@ enum Vocabulary {
         "falls": [.english],
         "plan": [.spanish, .french],
         "plans": [.french],
+        "plane": [.english, .italian, .spanish, .french, .portuguese],
         "casi": [.italian],
         "sera": [.italian],
         "se": [.spanish, .french],
@@ -219,6 +220,9 @@ enum Vocabulary {
         return !verbs.contains(thirdPerson) && !verbs.contains(word + "es")
     }
 
+    /// The forms of German "haben" whose clause ends with the "vor" of "vorhaben": "Ich habe vor", "das hatte ich vor".
+    private static let formsOfHaben: Set<String> = ["habe", "hast", "hat", "haben", "habt", "hatte", "hattest", "hatten", "hattet"]
+
     /// The words that stand before the "t" of "n't": "don't" is the words "don" and "t".
     private static let beforeNT: Set<String> = [
         "don", "doesn", "didn", "isn", "aren", "wasn", "weren", "haven", "hasn", "hadn", "won", "wouldn", "shouldn", "couldn", "can", "mustn",
@@ -228,13 +232,15 @@ enum Vocabulary {
     /// Which of the words are words of negation, doubt or degree, wish or intention, future or condition (`Words.modality`), and
     /// "n't" for a "t" after "don", "isn", "can"..., and "'d" for a "d" after "I", "we", "you"... that a base form follows ("I'd
     /// work"). A word that the description's language has of its own is none (`isOwnWord`): Portuguese "no" is "in the", German
-    /// and French "mai" is a month, English "fast" is quick. Nor, in an English description, is "plan", "plans" or "planning" used as
-    /// a noun (`IntentionNouns`): "route planning", "care plans". An entry written with its accents is matched as written: "würde".
+    /// and French "mai" is a month, English "fast" is quick. Nor is a word of intention used as a noun (`IntentionNouns`): "route
+    /// planning", "care plans", "einen Plan erstellt". German "vor" ends a clause that holds a form of "haben" as the intention
+    /// "vorhaben" ("Ich habe vor, Rust zu lernen", "das habe ich vor"), and no "vor" before a time ("vor 5 Jahren") is one. An entry
+    /// written with its accents is matched as written: "würde".
     static func modality(in words: [Word], language: Language? = nil) -> Set<String> {
         var found = Set<String>()
         for (index, word) in words.enumerated() {
             if everyModalityWord.contains(word.folded), !isOwnWord(word.folded, in: language),
-               !(language == .english && IntentionNouns.isANoun(at: index, in: words)) {
+               !IntentionNouns.isANoun(at: index, in: words, language: language) {
                 found.insert(word.folded)
             } else if word.accented != word.folded, everyModalityWord.contains(word.accented) {
                 found.insert(word.accented)
@@ -243,6 +249,9 @@ enum Vocabulary {
             } else if word.folded == "d", index > 0, beforeD.contains(words[index - 1].folded),
                       !(index + 1 < words.count && makesAPast(words[index + 1].folded)) {
                 found.insert("'d")
+            } else if word.folded == "vor", language == .german || language == nil, index == words.count - 1 || word.endsWithABreak,
+                      words[..<index].contains(where: { formsOfHaben.contains($0.folded) }) {
+                found.insert("vor")
             }
             for second in everyModalityPhrase[word.folded] ?? [] where words[(index + 1)...].contains(where: { $0.folded == second }) {
                 found.insert(word.folded + "_" + second)

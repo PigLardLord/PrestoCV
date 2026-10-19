@@ -228,6 +228,22 @@ struct VocabularyTests {
         #expect(withdraws("Sogno di imparare lo spagnolo", .italian) && !withdraws("Era un sogno", .italian))
         #expect(withdraws("Sueño con hablar francés", .spanish) && withdraws("Je rêve d'apprendre l'espagnol", .french))
         #expect(withdraws("Sonho em falar francês", .portuguese) && withdraws("Sonho com aprender italiano", .portuguese))
+        #expect(withdraws("Ho intenzione di imparare Rust", .italian) && !withdraws("Ho capito l'intenzione del cliente", .italian))
+        #expect(withdraws("Tengo la intención de aprender Rust", .spanish) && withdraws("J'ai l'intention d'apprendre Rust", .french))
+        #expect(withdraws("Tenho a intenção de aprender Rust", .portuguese) && withdraws("I have the intention of learning Rust", .english))
+        #expect(withdraws("Ich plane, Rust zu lernen", .german) && withdraws("Nächstes Jahr plane ich", .german))
+        #expect(!withdraws("Ich habe einen Plan erstellt", .german) && !withdraws("Ich habe Pläne erstellt", .german))
+        #expect(withdraws("Mein Plan ist, Rust zu lernen", .german))
+    }
+
+    @Test("German vor ends a clause of haben as the intention vorhaben, and no vor before a time is one")
+    func vorhaben() {
+        func modality(_ text: String) -> Set<String> { Vocabulary.modality(in: Word.words(in: text), language: .german) }
+
+        #expect(modality("Ich habe vor, Rust zu lernen") == ["vor"])
+        #expect(modality("das habe ich vor") == ["vor"])
+        #expect(modality("Ich habe vor 5 Jahren bei Acme gearbeitet").isEmpty)
+        #expect(modality("Ich stelle mich kurz vor").isEmpty, "no form of haben")
     }
 
     @Test("A phrase of the modality lists is two words joined by an underscore, or by a tilde in either order",

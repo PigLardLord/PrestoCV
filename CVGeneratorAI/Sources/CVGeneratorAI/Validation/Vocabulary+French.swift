@@ -156,7 +156,7 @@ extension Vocabulary {
         modality: """
         serais serait serions seriez seraient aurais aurait aurions auriez auraient ferais ferait ferions feriez feraient
         adorerais adorerait adorerions adoreriez adoreraient
-        reve_de reve_d en_reve
+        reve_de reve_d en_reve intention_de intention_d
         accompagnera accompagnerai accompagneraient accompagnerais accompagnerait accompagneras accompagnerez
         accompagneriez accompagnerions accompagnerons accompagneront administrera administrerai administreraient
         administrerais administrerait administreras administrerez administreriez administrerions administrerons

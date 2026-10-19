@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1720
+    static let rowsWhenWritten = 1736
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -504,6 +504,7 @@ enum GroundingRows {
         rows += relativeClausesOfAnotherSubject()
         rows += titlesOfAnotherPersonInAClaim()
         rows += intentionWordsAsNouns()
+        rows += intentionsInAPhrase()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3840,6 +3841,48 @@ enum GroundingRows {
             rows.append(row("a-verb-of-planning-claims-nothing-\(v.language)", "the person only plans to learn it: no skill",
                             v.intention, CVData(skills: [Skill(name: "Rust")]), .exactly(CVData()), language: v.language))
         }
+        return rows
+    }
+
+    /// An intention said by a phrase claims nothing (#202), like a wish: "Ho intenzione di", "Tengo la intención de", "J'ai l'intention
+    /// d'", "Tenho a intenção de", "I have the intention of"; German "Ich plane" and "vorhaben", whose "vor" ends its clause ("Ich habe
+    /// vor, Rust zu lernen", "das habe ich vor"). A "vor" before a time is none ("vor 5 Jahren"), and "Plan", "Pläne" after a content
+    /// word or an article are nouns.
+    private static func intentionsInAPhrase() -> [GroundingRow] {
+        typealias Intention = (id: String, language: String, description: String)
+        var intentions: [Intention] = []
+        intentions.append(("intenzione-di-it", "it", "Ho intenzione di imparare Rust."))
+        intentions.append(("intencion-de-es", "es", "Tengo la intención de aprender Rust."))
+        intentions.append(("intention-d-fr", "fr", "J'ai l'intention d'apprendre Rust."))
+        intentions.append(("intention-de-fr", "fr", "J'ai l'intention de suivre un cours de Rust."))
+        intentions.append(("intencao-de-pt", "pt", "Tenho a intenção de aprender Rust."))
+        intentions.append(("intention-of-en", "en", "I have the intention of learning Rust."))
+        intentions.append(("ich-plane-de", "de", "Ich plane, Rust zu lernen."))
+        intentions.append(("plane-ich-de", "de", "Nächstes Jahr plane ich, Rust zu lernen."))
+        intentions.append(("habe-vor-de", "de", "Ich habe vor, Rust zu lernen."))
+        intentions.append(("das-habe-ich-vor-de", "de", "Rust zu lernen, das habe ich vor."))
+
+        var rows: [GroundingRow] = []
+        for v in intentions {
+            rows.append(row("an-intention-in-a-phrase-claims-nothing-\(v.id)", "the person only intends to learn it: no skill",
+                            v.description, CVData(skills: [Skill(name: "Rust")]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("an-intended-place-is-not-the-persons-fr", "the person only intends to work there: the name stays, the place goes",
+                        "Je suis Maria Rossi. J'ai l'intention de travailler à Berlin.",
+                        CVData(personalInfo: person(name: "Maria Rossi", location: "Berlin")),
+                        .exactly(CVData(personalInfo: person(name: "Maria Rossi"))), language: "fr"))
+        rows.append(row("vor-before-a-time-keeps-the-entry-de", "vor 5 Jahren is a time, no intention: the entry stays",
+                        "Ich habe vor 5 Jahren bei Acme gearbeitet.", CVData(experience: [job("", "Acme")]), .unchanged, language: "de"))
+        rows.append(row("a-plan-after-an-article-is-a-noun-de", "einen Plan names what the person made: Python stays",
+                        "Ich habe einen Plan erstellt und kenne Python.", CVData(skills: [Skill(name: "Python")]), .unchanged, language: "de"))
+        rows.append(row("plans-after-a-verb-are-a-noun-de", "Pläne names what the person made: Python stays",
+                        "Ich habe Pläne für 30 Baustellen erstellt und kenne Python.", CVData(skills: [Skill(name: "Python")]), .unchanged,
+                        language: "de"))
+        rows.append(row("my-plan-is-an-intention-de", "a possessive before Plan makes it the person's intention: no skill",
+                        "Mein Plan ist, Rust zu lernen.", CVData(skills: [Skill(name: "Rust")]), .exactly(CVData()), language: "de"))
+        rows.append(row("an-intention-without-its-preposition-is-no-intention-it",
+                        "intenzione without di names the client's: Python stays",
+                        "Ho capito l'intenzione del cliente e uso Python.", CVData(skills: [Skill(name: "Python")]), .unchanged, language: "it"))
         return rows
     }
 

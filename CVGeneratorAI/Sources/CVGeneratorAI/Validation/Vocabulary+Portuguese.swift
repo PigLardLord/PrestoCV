@@ -321,7 +321,7 @@ extension Vocabulary {
         modality: """
         seria serias seriamos seriam faria farias fariamos fariam teria terias teriamos teriam adoraria adorarias adorariamos
         adorariam quereria quererias quereriamos quereriam
-        sonho_em sonho_com
+        sonho_em sonho_com intencao_de
         acompanhara acompanharao acompanharas acompanharei acompanhareis acompanharemos acompanharia acompanhariam
         acompanhariamos acompanharias acompanharieis administrara administrarao administraras administrarei
         administrareis administraremos administraria administrariam administrariamos administrarias administrarieis

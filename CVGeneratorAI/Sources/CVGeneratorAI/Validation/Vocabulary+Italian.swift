@@ -353,7 +353,7 @@ extension Vocabulary {
         modality: """
         sarei saresti sarebbe saremmo sareste sarebbero avrei avresti avrebbe avremmo avreste avrebbero farei faresti farebbe
         faremmo fareste farebbero
-        sogno_di lo_sogno
+        sogno_di lo_sogno intenzione_di
         aiutera aiuterai aiuteranno aiuterebbe aiuterebbero aiuterei aiuteremmo aiuteremo aiutereste aiuteresti
         aiuterete aiutero amministrera amministrerai amministreranno amministrerebbe amministrerebbero amministrerei
         amministreremmo amministreremo amministrereste amministreresti amministrerete amministrero analizzera
