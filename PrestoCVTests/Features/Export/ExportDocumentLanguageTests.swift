@@ -37,7 +37,7 @@ struct ExportDocumentLanguageTests {
         )
         viewModel.selectedTemplateId = "professional"
 
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         let pdf = try #require(viewModel.sharePDF, "\(viewModel.errorMessage ?? "no PDF")")
         let text = try #require(PDFDocument(url: pdf.url)?.string)

@@ -17,7 +17,7 @@ struct CVExportSheetShareTests {
             previewDebounce: .zero
         )
         viewModel.selectedTemplateId = "modern"
-        await viewModel.requestPreview(for: .exportable).value
+        await viewModel.requestPreview().value
         return viewModel
     }
 
@@ -78,7 +78,7 @@ struct CVExportSheetShareTests {
         viewModel.shareEnded(activityType: CVExportSheetViewModel.saveToFilesActivity, completed: true)
 
         viewModel.selectedColorPalette = .minimal
-        await viewModel.requestPreview(for: .exportable).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.shareConfirmationText == nil)
         #expect(viewModel.closeButtonTitle == String(localized: "common.cancel"))

@@ -181,7 +181,7 @@ struct CVExportSheetViewModelPreferencesTests {
         viewModel.selectedColorPalette = .creative
         viewModel.selectedFontScheme = .serif
 
-        await viewModel.requestPreview(for: CVModel.exportable).value
+        await viewModel.requestPreview().value
 
         #expect(store.stored == ExportPreferences(templateId: "modern", colorPalette: .creative, fontScheme: .serif))
     }
@@ -192,7 +192,7 @@ struct CVExportSheetViewModelPreferencesTests {
         await service.setExportResult(.failure(AppError.unknown("Export error")))
         viewModel.selectedTemplateId = "modern"
 
-        await viewModel.requestPreview(for: CVModel.exportable).value
+        await viewModel.requestPreview().value
 
         #expect(store.saveCount == 0)
     }
@@ -201,7 +201,7 @@ struct CVExportSheetViewModelPreferencesTests {
     func noTemplateStoresNothing() async {
         let (viewModel, store, _) = await makeViewModel(templates: [])
 
-        await viewModel.requestPreview(for: CVModel.exportable).value
+        await viewModel.requestPreview().value
 
         #expect(store.saveCount == 0)
     }
@@ -212,7 +212,7 @@ struct CVExportSheetViewModelPreferencesTests {
         store.saveError = CocoaError(.fileWriteOutOfSpace)
         viewModel.selectedTemplateId = "modern"
 
-        await viewModel.requestPreview(for: CVModel.exportable).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.sharePDF != nil)
         #expect(viewModel.errorMessage == nil)

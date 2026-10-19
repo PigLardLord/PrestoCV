@@ -120,7 +120,7 @@ struct CVEditorView: View {
             Text("editor.delete_row.message".localizedWithArgs(deletion.rowName))
         }
         .sheet(isPresented: $showingExportSheet) {
-            CVExportSheetView(cv: viewModel.cv, viewModel: makeExportSheet(viewModel.cv)) { language in
+            CVExportSheetView(viewModel: makeExportSheet(viewModel.cv)) { language in
                 viewModel.documentLanguageSelection = language
             }
         }

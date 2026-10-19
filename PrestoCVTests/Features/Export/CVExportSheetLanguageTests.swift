@@ -83,7 +83,7 @@ struct CVExportSheetLanguageTests {
         let service = MockCVExportService()
         let viewModel = makeViewModel(cv: Self.englishCV, service: service)
 
-        await viewModel.requestPreview(for: Self.englishCV).value
+        await viewModel.requestPreview().value
 
         #expect(await service.lastPreviewCV?.documentLanguage == "en")
         #expect(await service.lastExportCV?.documentLanguage == "en")
@@ -98,7 +98,7 @@ struct CVExportSheetLanguageTests {
 
         viewModel.documentLanguageChoice = .french
         #expect(viewModel.selection != before, "A new language is a new selection, which the sheet makes a preview of")
-        await viewModel.requestPreview(for: Self.englishCV).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.documentLanguage == .french)
         #expect(viewModel.documentLanguageText == headings(in: .french))
@@ -114,21 +114,22 @@ struct CVExportSheetLanguageTests {
         let viewModel = makeViewModel(cv: cv, service: service)
 
         viewModel.documentLanguageChoice = nil
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.documentLanguage == .english)
         #expect(await service.lastExportCV?.documentLanguage == "en")
     }
 
-    @Test("Automatic follows the CV it is asked to make, as the CV changes")
+    @Test("Automatic follows the CV the sheet exports: each sheet makes its PDF in the language of its own CV")
     func automaticFollowsTheCV() async {
         let service = MockCVExportService()
-        let viewModel = makeViewModel(cv: .exportable, service: service)
-        #expect(viewModel.documentLanguage == .italian)
+        let shortCV = makeViewModel(cv: .exportable, service: service)
+        let englishCV = makeViewModel(cv: Self.englishCV, service: service)
+        #expect(shortCV.documentLanguage == .italian)
 
-        await viewModel.requestPreview(for: Self.englishCV).value
+        await englishCV.requestPreview().value
 
-        #expect(viewModel.documentLanguage == .english)
+        #expect(englishCV.documentLanguage == .english)
         #expect(await service.lastExportCV?.documentLanguage == "en")
     }
 }
