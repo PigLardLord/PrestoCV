@@ -101,6 +101,31 @@ struct CVGeneratorUseCaseTests {
         }
     }
 
+    @Test("generateCV asks for the language data of an English or German description before the model, and says when it is missing",
+          arguments: [("I am John Doe, an engineer at Tech Corp since 2020", "en"), ("Ich bin Ingenieurin bei Tech Corp seit 2020.", "de")])
+    func missingLanguageDataStopsBeforeTheModel(description: String, language: String) async {
+        let service = FakeCVGenerationService()
+        let withoutData = ForcedLexicalTagger([.english: .noAssets, .german: .noAssets])
+        let useCase = CVGeneratorUseCase(service: service, sanitizer: CVDataSanitizer(lexicalClasses: withoutData))
+
+        await #expect(throws: CVGenerationError.languageDataUnavailable(languageCode: language)) {
+            try await useCase.generateCV(from: CVGenerationRequest(userPrompt: description))
+        }
+        #expect(service.generateRequests.isEmpty)
+    }
+
+    @Test("An Italian description needs no language data of the device")
+    func italianNeedsNoLanguageData() async throws {
+        let service = FakeCVGenerationService()
+        service.generateResult = .success(CVData(experience: [Experience(title: "", company: "Tech Corp")]))
+        let withoutData = ForcedLexicalTagger(Dictionary(uniqueKeysWithValues: Vocabulary.Language.allCases.map { ($0, .noAssets) }))
+        let useCase = CVGeneratorUseCase(service: service, sanitizer: CVDataSanitizer(lexicalClasses: withoutData))
+
+        let cvData = try await useCase.generateCV(from: CVGenerationRequest(userPrompt: "Dal 2020 lavoro presso Tech Corp."))
+
+        #expect(cvData.experience.map(\.company) == ["Tech Corp"])
+    }
+
     @Test("generateCV lets cancellation through as cancellation")
     func cancellationIsPropagated() async {
         let service = FakeCVGenerationService()

@@ -22,22 +22,54 @@ import Foundation
 ///   contact, only as a label ("Email: ..."), the person's possession of the field ("My email is ..."), a verb of contacting whose
 ///   object is the person ("You can reach me at ...") or the person as reachable ("I can be reached at ...") gives it, with no other
 ///   person named ("I can put you in touch with the recruiter at ..." gives none), and never from the references on;
-/// - prose in another language than the description's is dropped, when a language detector is given.
+/// - prose in another language than the description's is dropped, when a language detector is given;
+/// - a description in English or German is grounded only with the device's lexical class of its language (`LexicalClasses`): without
+///   it, nothing is grounded and `CVGenerationError.languageDataUnavailable` says which language data the device needs.
 ///
 /// The rules are conservative by construction: what could be read two ways is not accepted, and a dropped fact costs less than an
 /// invented one.
 public struct CVDataSanitizer: Sendable {
     private let languageOfText: @Sendable (String) -> String?
+    private let lexicalClasses: any LexicalTagger
 
-    /// - Parameter languageOfText: The BCP 47 tag of the language a text is written in, or nil when it cannot tell.
-    ///   With it, prose in another language than the description's is dropped: the model sometimes answers a French
-    ///   description with an English summary. Without it, language is not checked.
-    public init(languageOfText: @escaping @Sendable (String) -> String? = { _ in nil }) {
+    /// - Parameters:
+    ///   - languageOfText: The BCP 47 tag of the language a text is written in, or nil when it cannot tell. With it, prose in
+    ///     another language than the description's is dropped: the model sometimes answers a French description with an English
+    ///     summary. Without it, language is not checked.
+    ///   - lexicalClasses: What tells the verbs of English and German (`LexicalClasses`): the device's lexical class.
+    public init(
+        languageOfText: @escaping @Sendable (String) -> String? = { _ in nil },
+        lexicalClasses: any LexicalTagger = DeviceLexicalTagger()
+    ) {
         self.languageOfText = languageOfText
+        self.lexicalClasses = lexicalClasses
     }
 
-    public func sanitize(_ cvData: CVData, against description: String) -> CVData {
+    /// The draft, with what `description` does not support taken out.
+    ///
+    /// - Throws: `CVGenerationError.languageDataUnavailable`, and no draft, when the description is in English or German and the
+    ///   device does not tag its language.
+    public func sanitize(_ cvData: CVData, against description: String) throws(CVGenerationError) -> CVData {
         let source = DescriptionText(description, languageOfText: languageOfText)
+        try requireLanguageData(of: source)
+        return LexicalClasses.$tagger.withValue(lexicalClasses) { grounded(cvData, in: source) }
+    }
+
+    /// Whether the device has the language data that grounding `description` needs, asked before the model writes a draft.
+    ///
+    /// - Throws: `CVGenerationError.languageDataUnavailable` when the description is in English or German and the device does not
+    ///   tag its language.
+    public func requireLanguageData(for description: String) throws(CVGenerationError) {
+        try requireLanguageData(of: DescriptionText(description, languageOfText: languageOfText))
+    }
+
+    private func requireLanguageData(of source: DescriptionText) throws(CVGenerationError) {
+        guard let language = source.explainer.language, VerbForms.readsVerbsByTags(in: language),
+              !lexicalClasses.tagsLexicalClass(inLanguage: language.rawValue) else { return }
+        throw .languageDataUnavailable(languageCode: language.rawValue)
+    }
+
+    private func grounded(_ cvData: CVData, in source: DescriptionText) -> CVData {
         let jobTitles = cvData.experience.map(\.title)
         // The person's name, place and title explain themselves in the clauses of the entries, so they are read first, wherever they stand;
         // the clauses that speak for the person then tell which of them stand in the description for the person.

@@ -2,8 +2,9 @@ import Foundation
 
 /// Verbs the vocabulary does not list, told by their form (ADR 0023, rule (c)).
 ///
-/// The device tags the verbs of English and German (`LexicalClasses`) and tags nothing in Italian, Spanish, French or Portuguese.
-/// There a verb that is not a listed present or past form is told by its ending: an infinitive ("lavorare", "trabajar",
+/// Grounding reads the verbs of English and German from the device's tags (`LexicalClasses`). It never reads those of Italian, Spanish,
+/// French or Portuguese from tags, on any device and whatever assets it has, so that their rows of the contract hold everywhere. In
+/// those languages a verb that is not a listed present or past form is told by its ending: an infinitive ("lavorare", "trabajar",
 /// "travailler"), a future ("resterò", "quedaré", "resterai", "ficarei") or a conditional ("lavorerei", "trabajaría",
 /// "travaillerais"). Endings are read from the word with its accents: the accent is what tells "lavorerò" (will work) from "numero".
 enum VerbForms {
@@ -75,8 +76,9 @@ enum VerbForms {
         language.flatMap { rules[$0] }.map { !$0.infinitive.isEmpty } ?? false
     }
 
-    /// Whether the device tags the verbs of the language: English and German. Where it does, a form of the vocabulary that the device
-    /// does not tag as a verb is a noun ("quality control", "customer support", "team lead").
+    /// Whether grounding reads the verbs of the language from the device's tags: English and German, the languages whose rows of the
+    /// contract hold with them. There a form of the vocabulary that the device does not tag as a verb is a noun ("quality control",
+    /// "customer support", "team lead").
     static func readsVerbsByTags(in language: Vocabulary.Language?) -> Bool {
         language == .english || language == .german
     }

@@ -31,6 +31,7 @@ final class ViewModelFactory {
                 labels: makeAIDraftLabels(),
                 languageOfText: DescriptionLanguageDetector.languageTag(of:)
             ),
+            languageData: NaturalLanguageDataRequester(),
             appLanguageCode: Bundle.main.preferredLocalizations.first,
             session: aiDescriptionSession
         )
@@ -54,7 +55,7 @@ final class ViewModelFactory {
     private func makeCVGeneratorUseCase() -> CVGeneratorUseCase {
         return CVGeneratorUseCase(
             service: FoundationModelsService(),
-            sanitizer: CVDataSanitizer(languageOfText: DescriptionLanguageDetector.languageTag(of:))
+            sanitizer: CVDataSanitizer(languageOfText: DescriptionLanguageDetector.languageTag(of:), lexicalClasses: DeviceLexicalTagger())
         )
     }
 

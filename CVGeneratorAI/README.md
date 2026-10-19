@@ -45,6 +45,11 @@ are its planned replacement and are still empty.
 - **Typed outcomes.** Failures are `CVGenerationError` cases that the app explains in the person's language;
   cancellation is `CancellationError`, never an error case. Availability is an `AIAvailability` value with the reason
   when the model cannot run (device not eligible, Apple Intelligence off, model not ready).
+- **Language data.** The verbs of English and German are read from the device's lexical class (`LexicalTagger`, the
+  device's `DeviceLexicalTagger` in the app), which the device has once it has downloaded the language's data. Without
+  it, `generateCV` throws `languageDataUnavailable` with the language, before the model runs, and the sanitiser throws it
+  too: such a description is never grounded another way. The app asks the system for the data and tells the person to try
+  again in a moment.
 
 ## Layout
 

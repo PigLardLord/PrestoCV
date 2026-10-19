@@ -23,10 +23,16 @@ struct AIGenerationViewModelTests {
     private let labels = AIDraftLabels(present: "Oggi", untitled: "Nuovo CV", cvNameFormat: "CV di %@")
     private let validPrompt = "I am John Doe, an engineer at Tech Corp since 2020. I speak Italian (native) and French."
 
-    private func makeViewModel(appLanguageCode: String? = "it", session: AIDescriptionSession = AIDescriptionSession()) -> AIGenerationViewModel {
+    private let languageData = LanguageDataSpy()
+
+    private func makeViewModel(
+        appLanguageCode: String? = "it", session: AIDescriptionSession = AIDescriptionSession(),
+        lexicalClasses: FakeLexicalTagger = .english
+    ) -> AIGenerationViewModel {
         AIGenerationViewModel(
-            cvGenerationUseCase: CVGeneratorUseCase(service: service),
+            cvGenerationUseCase: CVGeneratorUseCase(service: service, sanitizer: CVDataSanitizer(lexicalClasses: lexicalClasses)),
             mapper: AIDraftMapper(labels: labels, languageOfText: { _ in "pt-PT" }),
+            languageData: languageData,
             appLanguageCode: appLanguageCode,
             session: session
         )
@@ -175,6 +181,59 @@ struct AIGenerationViewModelTests {
         #expect(viewModel.errorMessage == "ai.unavailable.model_not_ready".localized)
         #expect(service.generateRequests.isEmpty)
         #expect(!viewModel.isGenerating)
+    }
+
+    // MARK: - Language data
+
+    @Test("A description whose language data the device has not got asks the system for it, and says the draft is being prepared")
+    func missingLanguageDataIsRequested() async {
+        let viewModel = makeViewModel(lexicalClasses: .withoutData)
+        viewModel.prompt = validPrompt
+
+        await viewModel.generateCV()
+
+        #expect(languageData.requests == ["en"])
+        #expect(viewModel.errorMessage == "ai.unavailable.language_data_not_ready".localized)
+        #expect(viewModel.draft == nil)
+        #expect(service.generateRequests.isEmpty, "The model does not write a draft that could not be grounded")
+        #expect(!viewModel.isGenerating)
+        #expect(viewModel.canGenerate, "Generate stays on, to try again once the data is there")
+    }
+
+    @Test("The same state follows the error wherever the generator raises it")
+    func languageDataMissingAfterTheModel() async {
+        service.generateResult = .failure(CVGenerationError.languageDataUnavailable(languageCode: "de"))
+        let viewModel = makeViewModel()
+        viewModel.prompt = validPrompt
+
+        await viewModel.generateCV()
+
+        #expect(languageData.requests == ["de"])
+        #expect(viewModel.errorMessage == "ai.unavailable.language_data_not_ready".localized)
+        #expect(viewModel.draft == nil)
+    }
+
+    @Test("An Italian description needs no language data: nothing is asked of the system")
+    func italianNeedsNoLanguageData() async {
+        let viewModel = makeViewModel(lexicalClasses: .withoutData)
+        viewModel.prompt = "Sono John Doe, ingegnere presso Tech Corp dal 2020. Parlo italiano (madrelingua) e francese."
+
+        await viewModel.generateCV()
+
+        #expect(languageData.requests.isEmpty)
+        #expect(viewModel.draft?.name == "CV di John Doe")
+        #expect(viewModel.errorMessage.isEmpty)
+    }
+
+    @Test("Another failure asks the system for nothing")
+    func otherFailureAsksForNoData() async {
+        service.generateResult = .failure(CVGenerationError.busy)
+        let viewModel = makeViewModel()
+        viewModel.prompt = validPrompt
+
+        await viewModel.generateCV()
+
+        #expect(languageData.requests.isEmpty)
     }
 
     @Test("generateCV explains a failure with the message of its error", arguments: [

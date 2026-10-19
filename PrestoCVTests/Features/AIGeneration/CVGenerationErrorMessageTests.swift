@@ -18,6 +18,7 @@ struct CVGenerationErrorMessageTests {
         (.generationFailed, "ai.error.failed"),
         (.serviceFailed, "ai.unavailable.unknown"),
         (.emptyResult, "ai.error.empty_result"),
+        (.languageDataUnavailable(languageCode: "en"), "ai.unavailable.language_data_not_ready"),
     ]
 
     @Test("Each error maps to its message key", arguments: errors)

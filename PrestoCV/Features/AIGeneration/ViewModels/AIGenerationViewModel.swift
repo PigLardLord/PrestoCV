@@ -19,6 +19,7 @@ final class AIGenerationViewModel: ObservableObject {
 
     private let cvGenerationUseCase: CVGeneratorUseCase
     private let mapper: AIDraftMapper
+    private let languageData: LanguageDataRequesting
     private let appLanguageCode: String?
     /// Where the description of this creation is kept, until a draft is made from it. The screen then lets go of it for
     /// good: its own text stays, to adjust and generate again, but nothing it does reaches the next creation.
@@ -34,9 +35,13 @@ final class AIGenerationViewModel: ObservableObject {
         let request: CVGenerationRequest
     }
 
-    init(cvGenerationUseCase: CVGeneratorUseCase, mapper: AIDraftMapper, appLanguageCode: String?, session: AIDescriptionSession) {
+    init(
+        cvGenerationUseCase: CVGeneratorUseCase, mapper: AIDraftMapper, languageData: LanguageDataRequesting, appLanguageCode: String?,
+        session: AIDescriptionSession
+    ) {
         self.cvGenerationUseCase = cvGenerationUseCase
         self.mapper = mapper
+        self.languageData = languageData
         self.appLanguageCode = appLanguageCode
         self.session = session
         self.prompt = session.text
@@ -92,6 +97,7 @@ final class AIGenerationViewModel: ObservableObject {
             // Neither an error nor a draft; cancel() has already reset the screen.
         } catch {
             guard mayAct(generation) else { return finish(generation) }
+            requestLanguageData(missingFor: error)
             errorMessage = message(for: error)
         }
 
@@ -120,6 +126,13 @@ final class AIGenerationViewModel: ObservableObject {
 
     func clearError() {
         errorMessage = ""
+    }
+
+    /// The device has not got the language data that grounding the description needs: the system is asked for it, and the message
+    /// says the draft is being prepared, so the person tries again in a moment.
+    private func requestLanguageData(missingFor error: Error) {
+        guard case .languageDataUnavailable(let language)? = error as? CVGenerationError else { return }
+        languageData.requestLexicalClassData(forLanguage: language)
     }
 
     private func message(for error: Error) -> String {
