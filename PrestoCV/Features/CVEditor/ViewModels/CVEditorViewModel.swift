@@ -74,57 +74,6 @@ final class CVEditorViewModel: ObservableObject {
         !cv.interests.isEmpty
     }
     
-    /// Calculates completion percentage based on filled sections
-    var completionPercentage: Double {
-        var filledSections = 0
-        let totalSections = 8 // Total number of main sections
-        
-        // CV Name (weight: 1)
-        if !cv.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            filledSections += 1
-        }
-        
-        // Personal Info (weight: 1) - any field counts
-        if !cv.personalInfo.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-           !cv.personalInfo.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-           !cv.personalInfo.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-           !cv.personalInfo.profile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            filledSections += 1
-        }
-        
-        // Skills (weight: 1)
-        if !cv.skills.isEmpty {
-            filledSections += 1
-        }
-        
-        // Experience (weight: 1)
-        if !cv.relevant_experience.isEmpty {
-            filledSections += 1
-        }
-        
-        // Education (weight: 1)
-        if !cv.education.isEmpty {
-            filledSections += 1
-        }
-        
-        // Languages (weight: 1)
-        if !cv.languages.isEmpty {
-            filledSections += 1
-        }
-        
-        // Certifications (weight: 1)
-        if !cv.certifications.isEmpty {
-            filledSections += 1
-        }
-        
-        // Social/Interests combined (weight: 1)
-        if !cv.social.isEmpty || !cv.interests.isEmpty {
-            filledSections += 1
-        }
-        
-        return Double(filledSections) / Double(totalSections)
-    }
-    
     /// Indicates if there are unsaved changes: a CV that was never stored has them once it holds
     /// meaningful content, a stored one when it differs from what was last stored.
     var hasUnsavedChanges: Bool {
