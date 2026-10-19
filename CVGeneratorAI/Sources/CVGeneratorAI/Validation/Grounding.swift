@@ -86,12 +86,13 @@ struct Grounding {
 
         /// Whether the clause at `place` claims a skill, an interest or a language for the person (#202): it speaks for the person,
         /// holds no word that withdraws a claim (`Vocabulary.withdrawals`: "never", "would", "if", but not "can" or "partly"), asks
-        /// nothing (its sentence ends with a question mark), follows no clause of its sentence that opens with a word of condition
-        /// ("If I had time, I would play chess"), and, when it depends on the clause before it (a clause split off by a comma or a
-        /// conjunction that has no verb, starts with its verb, or says nothing as a fact, such as "Spanisch zu lernen"), that clause
-        /// claims to its last word: "I have never used Java or Swift" claims neither, and "Ich träume davon, Spanisch zu lernen" no
-        /// Spanish. A clause that states nothing as a fact shares the withdrawal of the clause after it: "Spanisch zu lernen, davon
-        /// träume ich" gives no Spanish either.
+        /// nothing (its sentence ends with a question mark), stands on no line that another person's line introduces ("My
+        /// colleague wrote:"), follows no clause of its sentence that opens with a word of condition ("If I had time, I would play
+        /// chess"), and, when it depends on the clause before it (a clause split off by a comma or a conjunction that has no verb,
+        /// starts with its verb, or says nothing as a fact, such as "Spanisch zu lernen"), that clause claims to its last word:
+        /// "I have never used Java or Swift" claims neither, and "Ich träume davon, Spanisch zu lernen" no Spanish. A clause that
+        /// states nothing as a fact shares the withdrawal of the clause after it: "Spanisch zu lernen, davon träume ich" gives no
+        /// Spanish either.
         ///
         /// A negation or a hedge that governs a word of level bears on the level alone: "I am not an expert in Swift" and "I have
         /// never been fluent in German" claim Swift and German, and the level, which they deny, is not stated
@@ -99,7 +100,7 @@ struct Grounding {
         /// German even at a basic level", "I don't speak French fluently".
         private func claims(at place: Place) -> Bool {
             let clause = clauses.clause(at: place)
-            guard speaks(at: place), !withdraws(clause), !asks(at: place) else { return false }
+            guard speaks(at: place), !withdraws(clause), !asks(at: place), !isIntroduced(place.sentence) else { return false }
             let supposed = (0..<place.clause).contains { index in
                 let opening = clauses.clause(at: Place(sentence: place.sentence, clause: index)).words.first
                 return opening.map { Vocabulary.isCondition($0.folded, in: language) } ?? false
@@ -117,6 +118,16 @@ struct Grounding {
         /// "Parlo francese e tedesco, giusto?"). A question mark inside a sentence ends no clause.
         private func asks(at place: Place) -> Bool {
             clauses.sentences[place.sentence].last?.endsAQuestion == true
+        }
+
+        /// Whether the sentence at `sentence` stands on the line right after a line that ends with a colon and that does not speak for
+        /// the person ("My colleague wrote:", "Il mio collega ha scritto:"): it gives another person's words, all its sentences. A line
+        /// the person speaks introduces the person's own ("My languages:", "Skills:", "I worked with my team on:").
+        private func isIntroduced(_ sentence: Int) -> Bool {
+            guard let line = clauses.lineStart(of: sentence), line > 0 else { return false }
+            let before = clauses.sentences[line - 1]
+            guard before.last?.endsWithAColon == true else { return false }
+            return before.indices.contains { !speaks(at: Place(sentence: line - 1, clause: $0)) }
         }
 
         /// Whether the clause at `place` states nothing as a fact, and takes no fact from a clause before it: it has no verb, or none

@@ -80,6 +80,11 @@ struct Clause {
         lastMark == "?"
     }
 
+    /// Whether the clause ends with a colon: "My colleague wrote:".
+    var endsWithAColon: Bool {
+        lastMark == ":"
+    }
+
     private static let trailing: Set<Character> = [",", ";", "!", ")", "]", "}", "\"", "'", "»", "«", "”", "“", "’", "‘", "›", "‹"]
 
     private var lastMark: Character? {
@@ -133,6 +138,8 @@ struct DescriptionClauses {
     private let texts: [String]
     /// The offsets of the characters of each sentence that stand inside quotation marks (`QuotedSpeech`).
     private let quoted: [IndexSet]
+    /// The sentences that start a line of the description: the first one, and each one after a line break.
+    private let lineStarts: Set<Int>
     /// A clause by where it stands: its sentence, and its place in the sentence.
     struct Place: Hashable {
         let sentence: Int
@@ -143,9 +150,11 @@ struct DescriptionClauses {
     ///   - sentences: The sentences of the description, as written.
     ///   - protecting: The quotes of the draft, as the folded words they are made of.
     ///   - language: The language of the description, to tell which words are verbs (`Word.isTaggedVerb`); with none, no word is.
-    init(sentences: [String], protecting quotes: [[String]], language: Vocabulary.Language? = nil) {
+    ///   - lineStarts: The sentences that start a line of the description; with none, no sentence is known to.
+    init(sentences: [String], protecting quotes: [[String]], language: Vocabulary.Language? = nil, lineStarts: Set<Int> = []) {
         texts = sentences
         quoted = QuotedSpeech.offsets(in: sentences)
+        self.lineStarts = lineStarts
         self.sentences = sentences.map { sentence in
             Self.clauses(of: sentence, blanked: AddressTokens(sentence).remainder, protecting: quotes, language: language)
         }
@@ -182,6 +191,11 @@ struct DescriptionClauses {
     func quotedWords(at place: Place) -> Set<Int> {
         let words = clause(at: place).words
         return Set(words.indices.filter { quoted[place.sentence].contains(words[$0].range.lowerBound) })
+    }
+
+    /// The sentence that starts the line of sentence `sentence`, or nil when no sentence before it is known to start one.
+    func lineStart(of sentence: Int) -> Int? {
+        (0...sentence).last { lineStarts.contains($0) }
     }
 
     /// The places of the clauses next to `place` in its sentence.

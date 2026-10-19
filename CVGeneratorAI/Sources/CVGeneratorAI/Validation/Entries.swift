@@ -69,7 +69,8 @@ struct Entries {
         self.subjects = subjects
         language = source.explainer.language
         clauses = DescriptionClauses(
-            sentences: source.sentences.map(\.raw), protecting: subjects.flatMap(\.quotes) + person, language: language
+            sentences: source.sentences.map(\.raw), protecting: subjects.flatMap(\.quotes) + person, language: language,
+            lineStarts: Set(source.sentences.indices.filter { source.sentences[$0].startsALine })
         )
         grounding = Grounding(clauses: clauses, explainer: source.explainer, subjects: subjects, person: person)
     }

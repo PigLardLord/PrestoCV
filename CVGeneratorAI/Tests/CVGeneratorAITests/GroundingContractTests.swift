@@ -495,6 +495,7 @@ enum GroundingRows {
         rows += moodsOfSupposition()
         rows += questionsClaimNothing()
         rows += quotedSpeechClaimsNothing()
+        rows += speechAfterALineOfAnotherPerson()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3636,6 +3637,44 @@ enum GroundingRows {
         rows.append(row("a-skill-in-quotation-marks-is-an-accepted-loss",
                         "the skill stands only inside quotation marks: Swift goes, an accepted loss",
                         "I work with “Swift” every day.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData())))
+        return rows
+    }
+
+    /// A line that ends with a colon and does not speak for the person introduces someone else's words: the line after it claims
+    /// nothing, all its sentences (#202). The line after that claims as usual, and so does the line after a colon line that the
+    /// person speaks ("My languages:", "Skills:", "I worked with my team on:").
+    private static func speechAfterALineOfAnotherPerson() -> [GroundingRow] {
+        typealias Speech = (language: String, description: String, name: String)
+        var speeches: [Speech] = []
+        speeches.append(("en", "My colleague wrote:\nI speak French.", "French"))
+        speeches.append(("it", "Il mio collega ha scritto:\nParlo francese.", "francese"))
+        speeches.append(("de", "Mein Kollege schrieb:\nIch spreche Französisch.", "Französisch"))
+        speeches.append(("es", "Mi colega escribió:\nHablo francés.", "francés"))
+        speeches.append(("fr", "Mon collègue a écrit :\nJe parle français.", "français"))
+        speeches.append(("pt", "O meu colega escreveu:\nFalo francês.", "francês"))
+
+        var rows: [GroundingRow] = []
+        for v in speeches {
+            rows.append(row("the-line-after-another-persons-colon-claims-nothing-\(v.language)",
+                            "the colleague's line introduces the colleague's words: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("every-sentence-of-the-introduced-line-claims-nothing",
+                        "both sentences of the line after the colon are the colleague's; the next line is the person's: Italian stays",
+                        "My colleague wrote:\nI speak French. I speak German.\nI speak Italian.",
+                        CVData(languages: [Language(name: "French"), Language(name: "German"), Language(name: "Italian")]),
+                        .exactly(CVData(languages: [Language(name: "Italian")]))))
+        rows.append(row("the-line-after-the-persons-own-colon-claims-en", "my languages are the person's: both languages stay",
+                        "My languages:\nItalian and English.",
+                        CVData(languages: [Language(name: "Italian"), Language(name: "English")]), .unchanged))
+        rows.append(row("the-line-after-the-persons-own-colon-claims-it", "le mie lingue are the person's: both languages stay",
+                        "Le mie lingue:\nitaliano e inglese.",
+                        CVData(languages: [Language(name: "italiano"), Language(name: "inglese")]), .unchanged, language: "it"))
+        rows.append(row("the-line-after-a-label-claims", "a label speaks for no one else: both skills stay",
+                        "Skills:\nPython, Swift.", CVData(skills: [Skill(name: "Python"), Skill(name: "Swift")]), .unchanged))
+        rows.append(row("the-line-after-the-persons-own-statement-claims", "the person speaks the colon line: both skills stay",
+                        "I worked with my team on:\nSwift and Kotlin apps.",
+                        CVData(skills: [Skill(name: "Swift"), Skill(name: "Kotlin")]), .unchanged))
         return rows
     }
 

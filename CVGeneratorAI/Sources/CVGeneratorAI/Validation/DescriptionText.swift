@@ -29,7 +29,7 @@ struct DescriptionText {
         language = languageOfText(description).map(Self.primaryLanguage)
         vocabularyLanguage = (language ?? LanguageGuess.tag(of: description)).flatMap(Vocabulary.Language.init(tag:))
         text = Self.normalized(description)
-        sentences = SentenceSplitter.sentences(in: description).map(Sentence.init)
+        sentences = SentenceSplitter.sentencesByLine(in: description).map { Sentence($0.text, startsALine: $0.startsALine) }
         (emails, links, phones) = Self.addresses(in: description)
     }
 
@@ -41,7 +41,7 @@ struct DescriptionText {
         language = source.language
         vocabularyLanguage = source.vocabularyLanguage
         text = Self.normalized(raw.joined(separator: " "))
-        sentences = raw.map(Sentence.init)
+        sentences = raw.map { Sentence($0) }
         (emails, links, phones) = Self.addresses(in: raw.joined(separator: " "))
     }
 
@@ -65,11 +65,14 @@ struct DescriptionText {
         let raw: String
         let folded: String
         let accented: String
+        /// Whether the sentence starts a line of the description: not known of the sentences of a text made of kept clauses.
+        let startsALine: Bool
 
-        init(_ text: String) {
+        init(_ text: String, startsALine: Bool = false) {
             raw = text
             folded = DescriptionText.normalized(text)
             accented = DescriptionText.normalized(text, foldingAccents: false)
+            self.startsALine = startsALine
         }
     }
 

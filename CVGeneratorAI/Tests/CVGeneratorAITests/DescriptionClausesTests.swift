@@ -181,11 +181,20 @@ struct DescriptionClausesTests {
         #expect(clauses.sentences(keepingWords: { kept[$0] ?? [] }) == ["I work with a colleague ; ", "I speak “; French, ; "])
     }
 
-    @Test("A clause ends a question when a question mark ends it, past closing marks")
+    @Test("A clause ends a question when a question mark ends it, past closing marks, and a colon the same way")
     func questions() {
-        let sentences = ["Parlo francese e tedesco, giusto?", "«Parli francese?»", "«Parli francese?», mi chiedono."]
+        let sentences = ["Parlo francese e tedesco, giusto?", "«Parli francese?»", "«Parli francese?», mi chiedono.", "My colleague wrote:"]
         let clauses = DescriptionClauses(sentences: sentences, protecting: [])
 
-        #expect(clauses.sentences.map { $0.map(\.endsAQuestion) } == [[false, false, true], [true], [false]])
+        #expect(clauses.sentences.map { $0.map(\.endsAQuestion) } == [[false, false, true], [true], [false], [false]])
+        #expect(clauses.sentences.map { $0.map(\.endsWithAColon) } == [[false, false, false], [false], [false], [true]])
+    }
+
+    @Test("A sentence starts a line when it is the first, or a line break comes before it")
+    func lineStarts() {
+        let sentences = SentenceSplitter.sentencesByLine(in: "My colleague wrote:\nI speak French. I speak German.\n\nI speak Italian.")
+
+        #expect(sentences.map(\.text) == ["My colleague wrote:", "I speak French.", "I speak German.", "I speak Italian."])
+        #expect(sentences.map(\.startsALine) == [true, true, false, true])
     }
 }
