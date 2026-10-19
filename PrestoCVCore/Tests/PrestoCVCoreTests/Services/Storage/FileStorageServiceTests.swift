@@ -684,10 +684,11 @@ struct FileStorageServiceTests {
         
         // Simulate concurrent read/write/delete operations
         let results = await withTaskGroup(of: Bool.self, returning: [Bool].self) { group in
-            // Read operations
+            // Read operations. Tasks start in no set order, so the read may come before or after the update: it must
+            // return one of the two CVs whole, never fail or mix them
             group.addTask {
                 if let cv = try? await service.load(CVModel.self, from: "test_cv") {
-                    return cv.name == "Base CV"
+                    return ["Base CV", "Updated CV"].contains(cv.name)
                 }
                 return false
             }
