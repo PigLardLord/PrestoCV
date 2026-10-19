@@ -41,6 +41,10 @@ jobs:
           fi
       - name: Checker self-test
         run: Tools/ArchitectureCheck/selftest.sh
+      - name: Source checks
+        # The string catalog, the rules the app's views follow and release hygiene: they read the repository, so they
+        # run here and on the Xcode Cloud build host, not in the test plans.
+        run: swift test --package-path Tools/SourceChecks
       - name: Build and test the new targets
         # On Linux only the new targets exist; the legacy ones are declared for Apple hosts only (ADR 0012).
         run: |

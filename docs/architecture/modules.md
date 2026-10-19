@@ -98,7 +98,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - Pending: a committed JSON Schema.
 
 **`CVDesignCatalog`**
-- **`MarkupContract`**, version 1: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](markup-contract.md).
+- **`MarkupContract`**, version 1: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](../../CVPDFExporter/Docs/markup-contract.md).
 - **The CSS policy:** a tokenizer, an allow-list of properties and values, and canonical re-serialisation into `ValidatedStylesheet`, whose initialiser is internal.
 - **`DesignPackageValidator`** takes raw bytes and returns a `ValidatedDesign`: manifest, stylesheet and PNG preview.
 - **Customisation values:** `HexColor`, `Palette` (exists only with readable contrast) and `FontScheme` (a closed set).
@@ -234,6 +234,18 @@ A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-
 | `DesignSystem/` | tokens and reusable components | SwiftUI |
 | `Platform/` | the platform shims: iOS-only modifiers wrapped for `Features/`, HTML and PDF previews, sharing, pasteboard, file import and export | SwiftUI, UIKit, AppKit, WebKit, PDFKit, QuickLook, UniformTypeIdentifiers, `CVRenderingWebKitSupport`, `PrestoCVPresentation` |
 | `Resources/` | `Localizable.xcstrings`, sample CV JSON, assets | — |
+
+---
+
+## Tools
+
+Packages under `Tools/` that check the repository. They are `tool` targets in `rules.json`, so the checker applies only their import allow-lists, and nothing in the app depends on them.
+
+- **`Tools/ArchitectureCheck`**: the architecture checker ([ADR 0006](adr/0006-enforce-architecture-mechanically.md)). Its `ArchitectureCheck` executable may import SwiftSyntax, SwiftParser and Foundation.
+- **`Tools/SourceChecks`**: the checks of source text, which read the repository and so cannot run in a test plan: the machines that run one have only the built products.
+  - **What it checks:** the string catalog in its six languages and the keys the code uses; the rules the app's views follow (accent colours, button presses, the list's delete button); release hygiene (console output, the privacy manifest, the linked products).
+  - **Its target:** one test target, `SourceChecksTests`, which may import Testing and Foundation. It depends on no package, so it builds in seconds on Linux.
+  - **Where it runs:** `swift test` runs it on the Linux CI job and, after build-for-testing, on the Xcode Cloud build host.
 
 ---
 

@@ -2,9 +2,9 @@
 # Pre-commit architecture check (ADR 0006). It checks what is being committed, a checkout of the index in a
 # temporary directory, not the working tree. So a violation that is staged blocks the commit, and one that is
 # only in the working tree does not.
-# It runs only when the commit touches something the checker reads: Swift files, manifests, the checker itself,
-# or docs/architecture. Renames count as a deletion plus an addition, so moving a file out of a watched path still
-# triggers the check. The staged checker is the one that runs; its build shares the working tree's build cache.
+# It runs only when the commit touches something the checker reads: Swift files, manifests, test plans, the checker
+# itself, or docs/architecture. Renames count as a deletion plus an addition, so moving a file out of a watched path
+# still triggers the check. The staged checker is the one that runs; its build shares the working tree's build cache.
 set -euo pipefail
 REPO="$(git rev-parse --show-toplevel)"
 TMP="$(mktemp -d)"
@@ -14,7 +14,7 @@ trap 'rm -rf "$TMP"' EXIT
 git -C "$REPO" diff --cached --name-only --no-renames -z > "$TMP/paths"
 RELEVANT=0
 while IFS= read -r -d '' path; do
-  if [[ "$path" =~ \.swift$|(^|/)Package\.swift$|^Tools/ArchitectureCheck/|^docs/architecture/ ]]; then RELEVANT=1; break; fi
+  if [[ "$path" =~ \.swift$|(^|/)Package\.swift$|\.xctestplan$|^Tools/ArchitectureCheck/|^docs/architecture/ ]]; then RELEVANT=1; break; fi
 done < "$TMP/paths"
 [ "$RELEVANT" = 1 ] || exit 0
 mkdir -p "$TMP/tree"

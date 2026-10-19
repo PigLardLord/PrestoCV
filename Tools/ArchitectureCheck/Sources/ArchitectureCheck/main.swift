@@ -16,6 +16,8 @@ import SwiftSyntax
 // 4. Exceptions are permanent, justified by an existing ADR; baseline entries are temporary.
 // 5. --modules: rules.json and modules.md must agree in both directions; rules may be stricter.
 // 6. --packages: each package's declared target dependencies must be allowed imports.
+// 7. Test plans: every test target an .xctestplan runs has the rule with the sourceTreePath detector (R16), because
+//    the machines that run a plan have only the built products. Legacy targets are checked for the rules listed for them.
 
 struct Config: Decodable {
     struct Target: Decodable {
@@ -65,14 +67,21 @@ for t in config.targets where !FileManager.default.fileExists(atPath: root.appen
     problems.append("target \(t.name): path \(t.path) does not exist")
 }
 var files: [String] = []
-if let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isSymbolicLinkKey]) {
+var testPlans: [String] = []
+if let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isSymbolicLinkKey, .isDirectoryKey]) {
     for case let url as URL in e {
         let rel = url.standardizedFileURL.path.replacingOccurrences(of: root.path + "/", with: "")
-        if rel.hasPrefix(".git") || rel.contains("/.build") || rel.hasPrefix(".build") { e.skipDescendants(); continue }
+        if rel.hasPrefix(".git") || rel.contains("/.build") || rel.hasPrefix(".build") {
+            // Only a directory's descendants are skipped: on Darwin, skipDescendants() after a file, such as .gitignore,
+            // skips the next directory instead, and that directory's files would go unchecked.
+            if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true { e.skipDescendants() }
+            continue
+        }
         if (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
             problems.append("symbolic link in the source tree: \(rel)"); continue
         }
         if url.pathExtension == "swift" { files.append(rel) }
+        if url.pathExtension == "xctestplan" { testPlans.append(rel) }
     }
 }
 var assignment: [(file: String, target: Config.Target)] = []
@@ -131,7 +140,8 @@ func isLegacyDeclaration(_ name: String, inManifest manifest: String) -> Bool {
     legacyTargets.contains { $0.name == name && owningManifest(of: $0.path) == manifest }
 }
 
-for (file, target) in assignment where target.kind != "legacy" {
+// A legacy target is exempt (ADR 0012) except from the rules listed for it: R16 for the legacy test targets a test plan runs.
+for (file, target) in assignment where target.kind != "legacy" || !target.rules.isEmpty {
     guard let source = try? String(contentsOf: root.appendingPathComponent(file), encoding: .utf8) else { problems.append("cannot read \(file)"); continue }
     let tree = Parser.parse(source: source)
     let scanner = Scanner(tree: tree, file: file, infrastructureTypes: Set(config.infrastructureTypes))
@@ -144,7 +154,7 @@ for (file, target) in assignment where target.kind != "legacy" {
         findings.append(Finding(key: "\(base)#\(n)", message: "\(file):\(line): \(rule) \(detector): \(detail)"))
     }
     let allowed = Set(target.allowedImports + ["Swift"])
-    for imp in scanner.imports where !allowed.contains(imp.module) {
+    for imp in scanner.imports where target.kind != "legacy" && !allowed.contains(imp.module) {
         record(rule: "R1", detector: "import", detail: imp.node, node: imp.node, line: imp.line)
     }
     for imp in scanner.imports where target.requiredImportAccess?[imp.module] == "internal" {
@@ -244,6 +254,26 @@ if let packages = value(after: "--packages") {
             }
             let extra = Set(deps).subtracting(rule.allowedImports)
             if !extra.isEmpty { problems.append("package \(dir): target \(name) depends on \(extra.sorted()), which its rules do not allow") }
+        }
+    }
+}
+
+// MARK: 7. Test plans
+
+// A plan's test targets run on machines that have only the built products, so each one needs the rule that keeps its
+// tests from reading the source tree. The plans of an excluded path are not the repository's.
+let excludedPaths = config.targets.filter { $0.kind == "excluded" }.map { key($0.path) }
+let sourceTreeRules = config.rules.filter { $0.value.contains("sourceTreePath") }.keys.sorted()
+let targetsByName = Dictionary(config.targets.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+for plan in testPlans.sorted() where !excludedPaths.contains(where: plan.hasPrefix) {
+    guard let data = FileManager.default.contents(atPath: root.appendingPathComponent(plan).path),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let entries = json["testTargets"] as? [[String: Any]] else { problems.append("cannot read the test plan \(plan)"); continue }
+    for entry in entries {
+        guard let name = (entry["target"] as? [String: Any])?["name"] as? String else { problems.append("\(plan) has a test target without a name"); continue }
+        guard let target = targetsByName[name] else { problems.append("test plan \(plan) runs \(name), which rules.json does not know"); continue }
+        if Set(target.rules).isDisjoint(with: sourceTreeRules) {
+            problems.append("test plan \(plan) runs \(name) without the repository, so its rules must include \(sourceTreeRules.isEmpty ? "a rule with the sourceTreePath detector" : sourceTreeRules.joined(separator: " or "))")
         }
     }
 }

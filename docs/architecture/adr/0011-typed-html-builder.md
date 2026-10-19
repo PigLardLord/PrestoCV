@@ -23,7 +23,7 @@ The three bundled designs are CSS-only (`htmlContent: null`). R8 already rejects
   - The language attribute must look like a BCP 47 tag.
   - Links are kept only as parsed `WebLink`s.
   - Dates are typed until the builder formats them in the document's language. An ended period with no end date shows only its start; it never says "present".
-- **The document markup contract.** The output follows a stable, versioned structure, specified in [markup-contract.md](../markup-contract.md). A golden HTML file in the tests pins it.
+- **The document markup contract.** The output follows a stable, versioned structure, specified in [markup-contract.md](../../../CVPDFExporter/Docs/markup-contract.md). A golden HTML file in the tests pins it.
 - **Designs are CSS only, and their CSS is parsed, not sanitised.**
   - A CSS tokenizer accepts only the contract's selectors and an **allow-list** of properties with bounded values. It then re-serialises the tokens, so the emitted CSS is exactly the validated CSS.
   - The allow-list leaves out everything that can load a resource, or hide, move, reorder or inject content. Colours come only from palette variables, and a palette exists only with readable contrast. Fonts come only from a closed set of system families.

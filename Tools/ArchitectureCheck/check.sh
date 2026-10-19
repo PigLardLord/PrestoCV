@@ -13,4 +13,4 @@ swift build -c release --package-path "$TOOL" --scratch-path "$SCRATCH" >&2
 "$SCRATCH/release/ArchitectureCheck" "$ROOT" \
   --rules "$ROOT/Tools/ArchitectureCheck/rules.json" --baseline "$ROOT/Tools/ArchitectureCheck/baseline.json" \
   --modules "$ROOT/docs/architecture/modules.md" --adr-dir "$ROOT/docs/architecture/adr" \
-  --packages PrestoCVCore,CVPDFExporter,CVPDFExporterExamples,CVGeneratorAI,PrestoCVApp,Tools/ArchitectureCheck "$@"
+  --packages PrestoCVCore,CVPDFExporter,CVPDFExporterExamples,CVGeneratorAI,PrestoCVApp,Tools/ArchitectureCheck,Tools/SourceChecks "$@"

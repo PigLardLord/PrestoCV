@@ -1,6 +1,5 @@
 import Testing
 import Foundation
-@testable import PrestoCV
 
 // MARK: - CVListView Delete Button Tests
 
@@ -11,11 +10,7 @@ struct CVListViewTests {
 
     /// Returns the path to CVListView.swift in the main app target
     private func getCVListViewFilePath() -> URL {
-        return URL(fileURLWithPath: #file)
-            .deletingLastPathComponent()  // Remove CVListViewTests.swift
-            .deletingLastPathComponent()  // Remove CVList
-            .deletingLastPathComponent()  // Remove Features
-            .deletingLastPathComponent()  // Remove PrestoCVTests
+        return Repository.root
             .appendingPathComponent("PrestoCV")
             .appendingPathComponent("Features")
             .appendingPathComponent("CVList")

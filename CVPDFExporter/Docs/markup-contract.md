@@ -1,13 +1,13 @@
 # Document markup contract and design CSS grammar
 
-This document defines two things, both normative ([ADR 0011](adr/0011-typed-html-builder.md)):
+This document defines two things, both normative ([ADR 0011](../../docs/architecture/adr/0011-typed-html-builder.md)):
 
 - the HTML structure that `CVRendering` produces from a `CVDocument`;
 - the CSS a design may use to style it.
 
 A design declares the contract version it targets in its manifest (`markupContract`), and the validator rejects any other version.
 
-The source of truth is code in `CVDesignCatalog`: `MarkupContract` for the structure, `allowedProperties` for the properties. This page must match that code exactly. That code is `CSS.swift` and `MarkupContract.swift` in `CVPDFExporter/Sources/CVDesignCatalog/`, with the attack fixtures in `CVPDFExporter/Tests/`. `MarkupContractPageTests`, in `CVPDFExporter/Tests/CVDesignCatalogTests/`, reads this page and fails when it and the code disagree: the sets must be equal, and every documented value and bound is probed at its edges.
+The source of truth is code in `CVDesignCatalog`: `MarkupContract` for the structure, `allowedProperties` for the properties. This page must match that code exactly. That code is `CSS.swift` and `MarkupContract.swift` in `CVPDFExporter/Sources/CVDesignCatalog/`, with the attack fixtures in `CVPDFExporter/Tests/`. `MarkupContractPageTests`, in `CVPDFExporter/Tests/CVDesignCatalogTests/`, reads this page through `Bundle.module`, since its test target copies it, and fails when it and the code disagree: the sets must be equal, and every documented value and bound is probed at its edges.
 
 ## Version 1
 
@@ -50,7 +50,7 @@ html[lang]
 - The native renderer tests check the separation in the printed text (#78).
 
 **Links print their destination.** Every link's destination is printed as text, exactly as its `href`.
-- Whether a PDF keeps clickable link annotations depends on the platform's PDF path. The printed text is what completeness checks ([R8](rules.md#r8-untrusted-input-enters-through-one-validating-boundary)), so a PDF that keeps a link's label but loses its destination fails.
+- Whether a PDF keeps clickable link annotations depends on the platform's PDF path. The printed text is what completeness checks ([R8](../../docs/architecture/rules.md#r8-untrusted-input-enters-through-one-validating-boundary)), so a PDF that keeps a link's label but loses its destination fails.
 - Where a platform keeps the annotations, the native renderer tests also check that they match the `href`s.
 - The builder's own base style sets `a { overflow-wrap: anywhere }`, so a long destination wraps instead of running off the page. Designs cannot set `overflow-wrap`.
 
@@ -124,7 +124,7 @@ Units and bounds:
 | `break-inside`, `page-break-inside` | `auto`, `avoid` |
 | `break-before`, `break-after` | `auto`, `page`, `avoid` |
 
-Anything that could load a resource, or hide, move, reorder or inject content, is absent from this table by design. That includes `position`, `transform`, `zoom`, `filter`, `mask`, `clip`, `overflow`, `visibility`, `opacity`, `height`, `content`, `list-style`, `quotes`, counters, `direction`, `unicode-bidi`, `order` and grid placement. The palette itself only exists with readable contrast ([R8](rules.md#r8-untrusted-input-enters-through-one-validating-boundary)).
+Anything that could load a resource, or hide, move, reorder or inject content, is absent from this table by design. That includes `position`, `transform`, `zoom`, `filter`, `mask`, `clip`, `overflow`, `visibility`, `opacity`, `height`, `content`, `list-style`, `quotes`, counters, `direction`, `unicode-bidi`, `order` and grid placement. The palette itself only exists with readable contrast ([R8](../../docs/architecture/rules.md#r8-untrusted-input-enters-through-one-validating-boundary)).
 
 ## Changelog
 

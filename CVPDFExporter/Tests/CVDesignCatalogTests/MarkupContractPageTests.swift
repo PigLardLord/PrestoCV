@@ -63,11 +63,12 @@ struct MarkupContractPageTests {
 enum Page {
     struct PageError: Error, CustomStringConvertible { let description: String }
 
-    /// The page, from the repository: this file is CVPDFExporter/Tests/CVDesignCatalogTests/….
+    /// The page, CVPDFExporter/Docs/markup-contract.md, which the test target copies into its bundle.
     static func text() throws -> String {
-        var root = URL(fileURLWithPath: #filePath)
-        for _ in 0..<4 { root.deleteLastPathComponent() }
-        return try String(contentsOf: root.appendingPathComponent("docs/architecture/markup-contract.md"), encoding: .utf8)
+        guard let url = Bundle.module.url(forResource: "markup-contract", withExtension: "md") else {
+            throw PageError(description: "the test bundle has no markup-contract.md")
+        }
+        return try String(contentsOf: url, encoding: .utf8)
     }
 
     static func section(from start: String, to end: String) throws -> String {

@@ -5,14 +5,32 @@ Xcode Cloud tests version 1, archives it, signs it and uploads it to TestFlight 
 | Path | What it does |
 |---|---|
 | `ci_scripts/ci_pre_xcodebuild.sh` | Before an archive: sets `MARKETING_VERSION` from the tag `v<version>` or the branch `release/<version>`. Any other ref keeps the project's version. A tag `v…` or branch `release/…` that does not name a version such as `1.2` or `1.2.3` fails the build. It edits only the CI checkout. The build number is Xcode Cloud's. |
-| `ci_scripts/ci_post_xcodebuild.sh` | After an archive: runs `Tools/Release/check-archive.sh`, and a failure stops the build before TestFlight. After `build-for-testing`: runs the package tests of `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI`, the architecture check and its self-test (which see the Apple-only branches of the package manifests), and `swift build` of `PrestoCVApp` and `CVPDFExporterExamples`. Every step runs and the script fails at the end. On a pull request the checker compares the baseline with `origin/<target branch>`; a checkout without that branch is compared with an empty baseline. |
+| `ci_scripts/ci_post_xcodebuild.sh` | After an archive: runs `Tools/Release/check-archive.sh`, and a failure stops the build before TestFlight. After `build-for-testing`: runs the package tests of `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI`, the source checks of `Tools/SourceChecks`, the architecture check and its self-test (which see the Apple-only branches of the package manifests), and `swift build` of `PrestoCVApp` and `CVPDFExporterExamples`. Every step runs and the script fails at the end. On a pull request the checker compares the baseline with `origin/<target branch>`; a checkout without that branch is compared with an empty baseline. |
 | `TestPlans/PrestoCV.xctestplan` | The scheme's default plan: `PrestoCVTests`, the exporter's simulator test targets, and `PrestoCVUITests`. |
 | `TestPlans/CI.xctestplan` | The same without `PrestoCVUITests`, which are Xcode's template launch tests: they take most of an hour and check nothing, so they would spend the free compute hours. |
 | `PrestoCV.xcodeproj/project.xcproj` | `DEVELOPMENT_TEAM`, in the project's build settings: the one place that holds the Team ID. |
 
 Xcode Cloud finds the scripts because `ci_scripts/` is next to `PrestoCV.xcodeproj`. They need no setting in a workflow.
 
-Both plans hold the four simulator test targets of the `CVPDFExporter` package, `CVDesignCatalogTests`, `CVDesignCatalogFileStoreTests`, `CVRenderingTests` and `CVRenderingWebKitSupportTests`: the native renderer contract on the simulator, so it runs in the same Test action on the iPhone and the iPad. They are the targets of the package's `ExporterTests` scheme, which stays for running them from the package. A new simulator test target of that package goes into the scheme and into both plans.
+Both plans hold the four simulator test targets of the `CVPDFExporter` package, `CVDesignCatalogTests`, `CVDesignCatalogFileStoreTests`, `CVRenderingTests` and `CVRenderingWebKitSupportTests`: the native renderer contract on the simulator, so it runs in the same Test action on the iPhone and the iPad. They are the targets of the package's `ExporterTests` scheme, which stays for running them from the package. A new simulator test target of that package goes into the scheme and into both plans, and gets R16 in `Tools/ArchitectureCheck/rules.json`.
+
+## Tests run without the repository
+
+The Test action runs in two steps, on different machines:
+
+1. **The build host** has the repository. It runs `xcodebuild build-for-testing` with the plan, then `ci_scripts/ci_post_xcodebuild.sh`, so the package tests, the source checks and the architecture check run there.
+2. **The test machines** have only what the build made: the `.xctestrun` file and the products. They run `xcodebuild test-without-building` on the iPhone and the iPad. The repository is not there, and neither is the build host's build folder.
+
+So a test in a plan finds its files in a bundle, never through `#filePath` ([R16](../architecture/rules.md#r16-tests-that-a-test-plan-runs-read-only-bundles)):
+
+| What a test reads | Where it reads it |
+|---|---|
+| The example CVs and the other resources the app ships | The app bundle, through `Bundle(for:)` with a class of the app |
+| A package's test resources, such as the markup contract page of `CVDesignCatalogTests` and the golden files of `CVRenderingTests` | `Bundle.module`, declared in the package's manifest |
+| A document an app test compares with the app: `docs/design/app-icon.md` | The test bundle; the project copies it into `PrestoCVTests` |
+| The string catalog's source, the Swift sources, the project file and the privacy manifest | Nowhere in a plan. `Tools/SourceChecks` checks them, on the build host and on the Linux job |
+
+A test that read the source tree passed on a Mac, next to the sources, and failed on Xcode Cloud: that was #246. The architecture checker refuses `#filePath` and `#file` in every target that a plan runs, and a plan target without R16.
 
 ## Workflows
 
@@ -100,7 +118,7 @@ xcodebuild build-for-testing -scheme PrestoCV -project PrestoCV.xcodeproj \
   CODE_SIGN_IDENTITY=- AD_HOC_CODE_SIGNING_ALLOWED=YES COMPILER_INDEX_STORE_ENABLE=NO
 ```
 
-`xcrun simctl list devices available` gives the ids. Take the simulators of the latest iOS runtime; if it has none of that model, create one with `xcrun simctl create "iPhone 17 Pro" "iPhone 17 Pro" <runtime id>`, the runtime id from `xcrun simctl list runtimes`. To run the tests as well, use `test` instead of `build-for-testing`.
+`xcrun simctl list devices available` gives the ids. Take the simulators of the latest iOS runtime; if it has none of that model, create one with `xcrun simctl create "iPhone 17 Pro" "iPhone 17 Pro" <runtime id>`, the runtime id from `xcrun simctl list runtimes`. To run the tests as well, use `test` instead of `build-for-testing`: that runs them next to the sources, which the test machines do not have (see the next section).
 
 | Argument | Why |
 |---|---|
@@ -110,3 +128,19 @@ xcodebuild build-for-testing -scheme PrestoCV -project PrestoCV.xcodeproj \
 | `COMPILER_INDEX_STORE_ENABLE=NO` | No index, as on Xcode Cloud. The build is faster. |
 
 Ad hoc signing matters because it signs every bundle the plan builds: the app, the test bundles and the resource bundle of each package target, and `codesign` checks the layout of each one. The package tests cannot show a layout that `codesign` rejects in an iOS bundle ([R15](../architecture/rules.md#r15-resource-bundles-have-a-layout-every-platform-can-sign)): on macOS, `swift test` makes deep bundles, with the resources under `Contents/Resources`, and on Linux nothing is signed. Only the signed iOS build shows it, as `CodeSign …/CVPDFExporter_CVRendering.bundle` followed by `bundle format unrecognized, invalid, or unsuitable` (#240). Xcode 27.1 also signs a simulator build ad hoc when the two settings are left out, so that build fails the same way; passing them keeps the build the same as Xcode Cloud's whatever the Mac's settings.
+
+## Reproducing a test run on a Mac
+
+When a test passes on a Mac and fails on Xcode Cloud, it may read something the test machines do not have. To run the tests as the test machines run them, build into a folder outside the checkout, then move the products and rename the checkout, so that neither the paths in `#filePath` nor the build folder are where they were:
+
+```bash
+xcodebuild build-for-testing -scheme PrestoCV -project PrestoCV.xcodeproj \
+  -destination 'platform=iOS Simulator,id=<iPhone 17 Pro>' -destination 'platform=iOS Simulator,id=<iPad Pro 13-inch (M5)>' \
+  -testPlan CI -derivedDataPath ../dd CODE_SIGN_IDENTITY=- AD_HOC_CODE_SIGNING_ALLOWED=YES COMPILER_INDEX_STORE_ENABLE=NO
+mv ../dd/Build/Products ../products && cd .. && mv PrestoCV PrestoCV.away
+xcodebuild test-without-building -xctestrun products/PrestoCV_CI_*.xctestrun \
+  -destination 'platform=iOS Simulator,id=<iPhone 17 Pro>' -destination 'platform=iOS Simulator,id=<iPad Pro 13-inch (M5)>'
+mv PrestoCV.away PrestoCV
+```
+
+Here the checkout is `PrestoCV`; use the name of yours.

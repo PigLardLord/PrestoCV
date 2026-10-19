@@ -19,7 +19,7 @@ P
   cat > "$ROOT/rules.json" <<'J'
 {"rules":{"R1":["exportedImport"],"R2":["wallClock","randomIdentity","ambientEnvironment","localization","printing"],
   "R4":["singleton","infrastructureConstruction"],"R7":["swallowedError"],"R9":["escapeHatch"],"R11":["platformCondition"],
-  "R14":["testDouble"],"R9m":["swift5Mode","unsafeFlags"],"R15":["bundleLayout"]},
+  "R14":["testDouble"],"R9m":["swift5Mode","unsafeFlags"],"R15":["bundleLayout"],"R16":["sourceTreePath"]},
  "infrastructureTypes":["FileStore"],
  "targets":[{"name":"Pure","path":"Sources/Pure","allowedImports":["Foundation"],"rules":["R1","R2","R4","R7","R9","R11","R14"]},
             {"name":"Other","path":"Sources/Other","allowedImports":["Foundation"],"rules":[]},
@@ -256,6 +256,86 @@ manifest_case "manifest: a copied Resources in an Apple-only branch is refused o
 legacy_setup; printf '%s\n' '// swift-tools-version: 6.0' 'import PackageDescription' \
   'let package = Package(name: "F", targets: [.target(name: "Pure"), .target(name: "Other"), .target(name: "Old", resources: [.copy("Resources")])])' > "$ROOT/Package.swift"
 expect "manifest: a legacy target's copied Resources is refused too, since its bundle is signed in the same build" 1 "R15 bundleLayout"
+# --- R16: a target a test plan runs reads no source tree, since the plan runs where only the built products are (#246)
+plan() {   # $1 = plan path under the root, $2... = the names of its test targets
+  local file="$ROOT/$1"; shift; mkdir -p "$(dirname "$file")"
+  python3 - "$file" "$@" <<'PY'
+import json, sys
+json.dump({"testTargets": [{"target": {"containerPath": "container:F", "identifier": n, "name": n}} for n in sys.argv[2:]], "version": 1},
+          open(sys.argv[1], "w"))
+PY
+}
+with_rule() {   # $1 = target name, $2 = rule: adds the rule to the target's rules
+  python3 - "$ROOT/rules.json" "$1" "$2" <<'PY'
+import json, sys
+p, name, rule = sys.argv[1:]; r = json.load(open(p))
+next(t for t in r["targets"] if t["name"] == name)["rules"].append(rule); json.dump(r, open(p, "w"))
+PY
+}
+on_device() { setup; with_rule Pure R16; plan TestPlans/CI.xctestplan Pure; src "$2"; expect "$1" "$3" "${4:-}"; }
+for form in 'let here = URL(fileURLWithPath: #filePath)' 'let here = #file' 'let p = "at \(#filePath)"' \
+            'func root(_ path: String = #filePath) -> String { path }' $'#if DEBUG\nlet here = #filePath\n#endif'; do
+  on_device "R16: ${form//$'\n'/⏎} in a target a test plan runs" "$form" 1 "R16 sourceTreePath"
+done
+for form in 'func check(file: StaticString = #filePath, line: UInt = #line) {}' 'func check(_ file: StaticString = #file) {}' \
+            'let id = #fileID' '// URL(fileURLWithPath: #filePath)' 'let s = "#filePath"'; do
+  on_device "R16: '$form' reads no source tree" "$form" 0
+done
+# A StaticString that defaults to #filePath only reports where an assertion failed while it is forwarded, unchanged, as
+# the file: argument of a call. Turned into text it is a path of the checkout (final gate of #246).
+for form in 'func root(file: StaticString = #filePath) -> URL { URL(fileURLWithPath: String(describing: file)).deletingLastPathComponent() }' \
+            'func root(file: StaticString = #filePath) -> String { "\(file)" }' \
+            'func root(file: StaticString = #filePath) -> String { file.description }' \
+            'func root(file: StaticString = #file) -> String { file.withUTF8Buffer { String(decoding: $0, as: UTF8.self) } }' \
+            'func root(file path: StaticString = #filePath) -> String { "\(path)" }' \
+            'func check(file: StaticString = #filePath) { let f = file; XCTFail("x", file: f) }' \
+            'func check(file: StaticString = #filePath) { record(at: file) }' \
+            'func check(file: StaticString = #filePath) { let t = (file: file, line: 1); _ = t }'; do
+  on_device "R16: '$form' turns the location into a path" "$form" 1 "R16 sourceTreePath"
+done
+for form in 'func check(_ ok: Bool, file: StaticString = #filePath, line: UInt = #line) { XCTAssertTrue(ok, "x", file: file, line: line) }' \
+            'func check(at file: StaticString = #filePath) { items.forEach { XCTFail("\($0)", file: file) } }' \
+            'func check(file: StaticString = #filePath) { XCTFail(report.file, file: file); assertWhole(file: file) }' \
+            'init(file: StaticString = #filePath) { XCTFail("x", file: file) }'; do
+  on_device "R16: '$form' only forwards the location" "$form" 0
+done
+setup; src 'let x = 1'; plan TestPlans/CI.xctestplan Pure
+expect "R16: a target a test plan runs without the rule is an error" 1 "test plan TestPlans/CI.xctestplan runs Pure without the repository, so its rules must include R16"
+setup; src 'let x = 1'; plan TestPlans/CI.xctestplan Ghost
+expect "R16: a test plan that runs a target rules.json does not know is an error" 1 "runs Ghost, which rules.json does not know"
+setup; src 'let x = 1'; mkdir -p "$ROOT/TestPlans"; echo 'not json' > "$ROOT/TestPlans/CI.xctestplan"
+expect "R16: a test plan that cannot be read is an error, never a silent pass" 1 "cannot read the test plan"
+setup; src 'let x = 1'; mkdir -p "$ROOT/Prototypes/P"; echo 'let p = 1' > "$ROOT/Prototypes/P/P.swift"
+python3 - "$ROOT/rules.json" <<'PY'
+import json, sys
+p = sys.argv[1]; r = json.load(open(p)); r["targets"].append({"name": "Proto", "path": "Prototypes", "kind": "excluded", "allowedImports": [], "rules": []})
+json.dump(r, open(p, "w"))
+PY
+plan Prototypes/P/Old.xctestplan Ghost
+expect "R16: a test plan in an excluded path is not the repository's" 0 ""
+legacy_tests() {   # a legacy test target with the given rules, whose code reads the source tree, breaks R1 and R2, and is in a plan
+  setup; src 'let x = 1'; mkdir -p "$ROOT/Tests/Old"
+  printf '%s\n' 'import Unlisted' 'let here = #filePath' 'let d = Date()' > "$ROOT/Tests/Old/OldTests.swift"
+  python3 - "$ROOT/rules.json" "$1" <<'PY'
+import json, sys
+p, rules = sys.argv[1], [x for x in sys.argv[2].split(",") if x]; r = json.load(open(p))
+r["targets"].append({"name": "OldTests", "path": "Tests/Old", "kind": "legacy", "allowedImports": [], "rules": rules})
+json.dump(r, open(p, "w"))
+PY
+}
+legacy_tests "R16"; plan TestPlans/CI.xctestplan OldTests
+expect "R16: a legacy test target a test plan runs is checked for it" 1 "Tests/Old/OldTests.swift:2: R16 sourceTreePath"
+if grep -qE "R1 import|wallClock" "$ROOT/out.txt"; then fail=$((fail+1)); echo "FAIL a legacy target was checked for more than the rules listed for it"; sed 's/^/     /' "$ROOT/out.txt"
+else pass=$((pass+1)); echo "ok   a legacy target is checked only for the rules listed for it, without its imports"; fi
+legacy_tests ""; expect "R16: a legacy target with no rules stays exempt (ADR 0012)" 0 ""
+setup; with_rule Pure R16; plan TestPlans/CI.xctestplan Pure; src 'let here = #filePath'
+python3 - "$ROOT/rules.json" <<'PY'
+import json, sys
+p = sys.argv[1]; r = json.load(open(p))
+r["exceptions"] = [{"path": "Sources/Pure/P.swift", "detector": "sourceTreePath", "adr": "0011", "reason": "writes a golden file on request"}]
+json.dump(r, open(p, "w"))
+PY
+expect "R16: an exception backed by an ADR allows a writer that needs the checkout" 0 ""
 # --- baseline: occurrences, stability, monotonicity
 setup; src 'func a() { fatalError("x") }'
 "$CHECK" "$ROOT" --rules "$ROOT/rules.json" --baseline "$ROOT/baseline.json" --adr-dir "$ROOT/adr" --write-baseline >/dev/null
@@ -281,6 +361,11 @@ expect "an exception citing a missing ADR is an error" 1 "does not exist"
 # --- inventory
 setup; src 'let x = 1'; mkdir -p "$ROOT/Sources/Stray"; echo 'let s = 1' > "$ROOT/Sources/Stray/S.swift"
 expect "a file outside every target is an error" 1 "unmapped file"
+# On Darwin, skipDescendants() after a file skips the next directory: .gitignore hid PrestoCVTests on a Mac (#246). On
+# APFS, .buildinfo is listed before Nested, so a folder that holds only the two shows it on every Mac.
+setup; src 'let x = 1'; mkdir -p "$ROOT/Sources/Pure/Generated/Nested"; touch "$ROOT/Sources/Pure/Generated/.buildinfo"
+echo 'let d = Date()' > "$ROOT/Sources/Pure/Generated/Nested/N.swift"
+expect "inventory: the folder after a skipped file is still checked" 1 "Sources/Pure/Generated/Nested/N.swift:1: R2 wallClock"
 setup; src 'let x = 1'; ln -s "$ROOT/Sources/Other" "$ROOT/Sources/Pure/Linked"
 expect "a symbolic link in the source tree is an error" 1 "symbolic link"
 setup; src 'let x = 1'

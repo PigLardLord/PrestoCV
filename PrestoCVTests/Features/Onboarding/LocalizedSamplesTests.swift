@@ -15,17 +15,15 @@ struct LocalizedSamplesTests {
     /// What a translation must keep as it is: a link, an address, a number to dial and a level are not words.
     private static let untranslatedKeys: Set<String> = ["email", "phone", "portfolio", "url", "level", "year"]
 
-    private static let resources = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        .appendingPathComponent("PrestoCV/Resources", isDirectory: true)
-
-    private static func fileURL(_ name: String, language: String?) -> URL {
-        resources.appendingPathComponent(language.map { "\(name).\($0).json" } ?? "\(name).json")
+    /// A sample as the app bundle carries it, or nil when the bundle does not have it
+    private static func fileURL(_ name: String, language: String?) -> URL? {
+        Bundle(for: AppRouter.self).url(forResource: language.map { "\(name).\($0)" } ?? name, withExtension: "json")
     }
 
     private static func json(_ name: String, language: String?) throws -> [String: Any] {
-        let data = try Data(contentsOf: fileURL(name, language: language))
-        return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let file = language.map { "\(name).\($0).json" } ?? "\(name).json"
+        let url = try #require(fileURL(name, language: language), "The app bundle has no \(file)")
+        return try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
     }
 
     /// Where a translation has another structure than the English sample, and where it changed what is not words
@@ -52,8 +50,7 @@ struct LocalizedSamplesTests {
     func everySampleExistsInEveryLanguage() {
         for name in Self.names {
             for language in Self.translatedLanguages {
-                let file = Self.fileURL(name, language: language)
-                #expect(FileManager.default.fileExists(atPath: file.path), "\(file.lastPathComponent) is missing")
+                #expect(Self.fileURL(name, language: language) != nil, "\(name).\(language).json is missing")
             }
         }
     }

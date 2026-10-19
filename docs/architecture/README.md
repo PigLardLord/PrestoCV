@@ -6,10 +6,10 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 
 | Document | Contents |
 |---|---|
-| [rules.md](rules.md) | The rules (R1–R15), why each exists, and how each is enforced |
+| [rules.md](rules.md) | The rules (R1–R16), why each exists, and how each is enforced |
 | [modules.md](modules.md) | Every package and target: responsibility, allowed dependencies, platforms |
 | [glossary.md](glossary.md) | The vocabulary used in code, UI copy and tickets |
-| [markup-contract.md](markup-contract.md) | The HTML structure designs may style, versioned |
+| [markup-contract.md](../../CVPDFExporter/Docs/markup-contract.md) | The HTML structure designs may style, versioned |
 | [adr/](adr/) | Architecture decision records |
 
 ## Bounded contexts
@@ -108,7 +108,7 @@ The current code is not refactored in place. The new structure is built next to 
 1. **Rules and checks first.** Write this directory, commit the validation prototype (as `excluded`), then add `Tools/ArchitectureCheck` and the CI matrix ([ADR 0006](adr/0006-enforce-architecture-mechanically.md)).
    - The old targets are mapped as `legacy`, declared only on Apple hosts, and exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)). The new targets start with an empty baseline.
 2. **Empty targets.** Create every target in [modules.md](modules.md) with its dependency list, so the compiler holds the boundaries from day one.
-3. **Rendering and Design Catalog.** They are the most broken part (GitHub issues #1, #2, #3, #8, #9, #21, #22) and the one meant for reuse. Build them in the new targets with contract tests, and rewrite the bundled designs against [markup contract 1](markup-contract.md).
+3. **Rendering and Design Catalog.** They are the most broken part (GitHub issues #1, #2, #3, #8, #9, #21, #22) and the one meant for reuse. Build them in the new targets with contract tests, and rewrite the bundled designs against [markup contract 1](../../CVPDFExporter/Docs/markup-contract.md).
    - The legacy exporter, with its `PrestoCVCoreAdapter`, keeps serving the old app until step 5.
 4. **CV Authoring.** Rich aggregate, persistence DTOs with schema v1, use cases returning the persisted identity (#4, #5, #10, #11, #12, #13, #27, #45).
 5. **App integration, presentation and composition.** One composition root, view models in `PrestoCVPresentation`, workflow ports in `PrestoCVWorkflowPorts`, mappers in `PrestoCVIntegration`, NavigationSplitView for iOS and macOS (#6, #7, #14, #49). The app switches to the new export and editing workflows here; the legacy exporter is deleted.

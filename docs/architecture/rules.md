@@ -12,7 +12,7 @@ Each rule says what is required, why, and what enforces it:
 - **test**: a required test fails.
 - **review**: nothing automatic can catch it. Kept to a minimum, and marked as such.
 
-The checker applies to **production targets**: domain, application, integration, presentation and adapter targets, and the composition root. Test, test-support and tool targets get the import allow-lists only. Legacy targets are exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)), except from R15.
+The checker applies to **production targets**: domain, application, integration, presentation and adapter targets, and the composition root. Test, test-support and tool targets get the import allow-lists only, plus R16 where a test plan runs them. Legacy targets are exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)), except from R15 and R16.
 
 ---
 
@@ -117,7 +117,7 @@ Untrusted input is: design packages, AI output, persisted files, and on a backen
 
 - **Design packages** ([ADR 0011](adr/0011-typed-html-builder.md)):
   - validated on the raw bytes: size cap first, then strict decoding (unknown keys and any `htmlContent` key are rejected), identifier `[a-z0-9-]{1,64}`, the supported markup contract version, and a PNG preview within size;
-  - **design CSS is parsed and allow-listed, never sanitised.** A CSS tokenizer accepts only the selectors of the [markup contract](markup-contract.md) and an allow-list of properties with bounded values. It then re-serialises the tokens, so the CSS emitted is exactly the CSS validated;
+  - **design CSS is parsed and allow-listed, never sanitised.** A CSS tokenizer accepts only the selectors of the [markup contract](../../CVPDFExporter/Docs/markup-contract.md) and an allow-list of properties with bounded values. It then re-serialises the tokens, so the CSS emitted is exactly the CSS validated;
   - rejected outright: `<`, CSS escapes, comments inside tokens, at-rules other than `@media print|screen|all`, pseudo-elements, `:has()` and other functional pseudo-classes, ids, custom properties, `!important`, every resource-bearing function;
   - **not in the allow-list**, so it cannot hide, move, reorder or inject content: `position`, `transform`, `zoom`, `filter`, `mask`, `clip`, `overflow`, `visibility`, `opacity`, `content`, `list-style`, `quotes`, counters, `direction`, `order`;
   - **colours** only through the palette variables. Text can only use `--color-text` or `--color-primary`, and a palette exists only if text contrast is at least 4.5:1 and primary contrast at least 3:1;
@@ -127,7 +127,7 @@ Untrusted input is: design packages, AI output, persisted files, and on a backen
   - The document language must look like a BCP 47 tag; otherwise it becomes `und`.
   - A link is kept only as a parsed `WebLink`, in its parsed form: an allow-listed scheme; for http(s) an ASCII host, no credentials and default ports; no control or format characters; at most 2048 bytes.
 - **The web view** has JavaScript off for content and a non-persistent store. Network is blocked by a compiled content rule list: one block rule per network scheme, plus a block on every subresource type. The rule list is compiled once, in the composition root; if it cannot be installed, rendering fails. The view accepts only the initial load, and cancels any later navigation.
-- **Completeness.** Every export is checked against its own document. Every text node the builder produced (fields, headings, dates, levels) needs **its own span of the PDF text**, ignoring case and spacing, that no other node uses; longer nodes are placed first. So removing one of two identical entries is detected, so is removing a value that also appears inside another one (a skill named in the summary), and so is a value that only appears across the boundary of two others ("Greg" + "Officer" contains "go"). Link destinations are printed as text ([markup contract](markup-contract.md)), so losing one is detected too, even when the clickable annotation is not part of the PDF. A shortfall fails the export.
+- **Completeness.** Every export is checked against its own document. Every text node the builder produced (fields, headings, dates, levels) needs **its own span of the PDF text**, ignoring case and spacing, that no other node uses; longer nodes are placed first. So removing one of two identical entries is detected, so is removing a value that also appears inside another one (a skill named in the summary), and so is a value that only appears across the boundary of two others ("Greg" + "Officer" contains "go"). Link destinations are printed as text ([markup contract](../../CVPDFExporter/Docs/markup-contract.md)), so losing one is detected too, even when the clickable annotation is not part of the PDF. A shortfall fails the export.
 - **Installing a design.** A design is stored only after it has been validated and has rendered a fixture document completely. The fixture exercises every section; a truncated render is a failure. The catalog owns the rendering-gate port, and `CVRendering` implements it. The renderer contract runs the same check.
 - **Native evidence.** The native renderers must also pass a geometric check: each field inside the page, and legible. It is pending until they exist ([ADR 0003](adr/0003-one-pdf-renderer-per-platform.md)).
 - **Documents** arriving as JSON (backend) pass `CVDocumentValidator`: supported version, required name, bounded text and counts, valid dates and ratings.
@@ -239,3 +239,23 @@ A copied directory must not take a name of the bundle's own structure: `Contents
 **Why.** An iOS bundle is shallow: its resources sit next to `Info.plist`. A `Resources` or `Contents` directory at its root is the layout of a macOS bundle, and `codesign` rejects the bundle as "bundle format unrecognized, invalid, or unsuitable". A `_CodeSignature` directory at its root is replaced by the signature, and the files in it are lost. `CVRendering` copied a `Resources` directory, and every Xcode Cloud test build failed (#240). No package test showed it: on macOS, SwiftPM makes deep bundles, with the resources under `Contents/Resources`, where a copied `Resources` directory is harmless, and on Linux nothing is signed.
 
 **Enforced by:** checker (detector `bundleLayout` in manifests, in every `#if` branch, legacy declarations included).
+
+## R16. Tests that a test plan runs read only bundles
+
+A test target that a test plan runs, on a simulator or a device, reads files only from bundles. It never locates the source tree with `#filePath`, `#file` or a path built from them.
+
+- **Resources the app ships**, such as the example CVs, are read from the app bundle the tests run in.
+- **A package's test resources** are declared in its manifest and read through `Bundle.module`. The markup contract page is one: `CVDesignCatalogTests` copies it.
+- **A document that an app test compares with the app**, such as `docs/design/app-icon.md`, is copied into the test bundle by the project.
+- **Checks of source text** are tests of the `Tools/SourceChecks` package ([modules.md](modules.md#tools)). `swift test` runs them where the repository is: on the Linux CI job and on the Xcode Cloud build host. They cover the string catalog, the rules the app's views follow and release hygiene. A check that also needs the app's types or UIKit stays an app test, fed from a bundle.
+- `#filePath` and `#file` may still be the default value of a `StaticString` parameter, while the function only forwards it, unchanged, as the `file:` argument of a call. That is how XCTest reports where an assertion failed. Any other use of the parameter is refused: `String(describing:)`, an interpolation, `.description`, `withUTF8Buffer` or a copy into a variable can turn it into a path of the checkout.
+- A test that writes into the checkout on purpose, behind an environment variable that only a developer sets, is an exception in `rules.json`. Two exist: the golden file's update ([ADR 0011](adr/0011-typed-html-builder.md)) and the thumbnails of version 1's bundled designs ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)).
+
+Legacy test targets follow this rule too, since the same test plan runs them.
+
+**Why.** Xcode Cloud builds for testing on one machine, then runs the tests on others that have only the built products, not the repository ([ADR 0024](adr/0024-run-apple-ci-and-releases-on-xcode-cloud.md)). There, a test that finds a file through `#filePath` finds nothing, and 48 tests of the `CI` plan failed on each device (#246). They had passed only because the tests ran next to the sources. A scan of a folder that does not exist finds nothing wrong, so two more of them passed without checking anything.
+
+**Enforced by:**
+- **checker:** the `sourceTreePath` detector, in every target whose rules list R16, legacy targets included.
+- **checker:** every `.xctestplan` in the repository is read. A target that a plan runs must be in `rules.json` and must have R16.
+- **CI:** Xcode Cloud's Test action, which runs the tests without the repository.

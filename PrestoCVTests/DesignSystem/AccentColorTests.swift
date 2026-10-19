@@ -166,22 +166,6 @@ struct AccentColorTests {
         #expect(appearance.hex(of: look.foreground) == appearance.hex(of: DesignTokens.Colors.disabledButtonForeground))
     }
 
-    // MARK: - Source
-
-    @Test("No colour of the app is hard-coded to the system blue, purple or indigo: the brand's colour is the Mint of the asset catalog")
-    func noColourIsHardCodedToBlueOrPurple() throws {
-        let hue = try NSRegularExpression(pattern: #"\.(system)?(blue|purple|indigo|Blue|Purple|Indigo)\b"#)
-        let files = try RepositorySources.swiftFiles(in: "PrestoCV")
-        try #require(!files.isEmpty, "The sources of the app are next to the tests")
-
-        let offending = files.flatMap { file in
-            file.text.components(separatedBy: .newlines).enumerated()
-                .filter { _, line in hue.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil }
-                .map { index, line in "\(file.path):\(index + 1): \(line.trimmingCharacters(in: .whitespaces))" }
-        }
-        #expect(offending.isEmpty, "\(offending.joined(separator: "\n"))")
-    }
-
     // MARK: - Documentation
 
     /// The colours of the accent, named as in the table of `docs/design/app-icon.md`.
@@ -194,7 +178,7 @@ struct AccentColorTests {
 
     @Test("The accent section of docs/design/app-icon.md shows the colours and the contrasts the app has")
     func documentationShowsTheColoursAndContrasts() throws {
-        let document = try RepositorySources.text(of: "docs/design/app-icon.md")
+        let document = try TestBundle.text(of: "app-icon", withExtension: "md")
         let colourRows = Self.documentedColours.map { colour in
             Self.row(colour.name, Appearance.allCases.map { "`\($0.hex(of: colour.color))`" })
         }
@@ -337,29 +321,12 @@ private struct RenderedPixels {
     }
 }
 
-/// The files of the repository, read from the source tree next to the tests.
-enum RepositorySources {
-    struct File {
-        let path: String
-        let text: String
-    }
+/// The documents the tests compare the app with, which the test bundle carries: the tests run where the repository is not.
+private enum TestBundle {
+    private final class Marker {}
 
-    private static let root = URL(fileURLWithPath: #filePath).resolvingSymlinksInPath()
-        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-
-    static func text(of path: String) throws -> String {
-        try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
-    }
-
-    /// The Swift files under a folder of the repository.
-    static func swiftFiles(in folder: String) throws -> [File] {
-        guard let enumerator = FileManager.default.enumerator(at: root.appendingPathComponent(folder), includingPropertiesForKeys: nil) else {
-            return []
-        }
-        var files: [File] = []
-        for case let url as URL in enumerator where url.pathExtension == "swift" {
-            files.append(File(path: String(url.path.dropFirst(root.path.count + 1)), text: try String(contentsOf: url, encoding: .utf8)))
-        }
-        return files.sorted { $0.path < $1.path }
+    static func text(of name: String, withExtension type: String) throws -> String {
+        let url = try #require(Bundle(for: Marker.self).url(forResource: name, withExtension: type), "The test bundle has no \(name).\(type)")
+        return try String(contentsOf: url, encoding: .utf8)
     }
 }

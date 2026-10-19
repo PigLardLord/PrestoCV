@@ -1,6 +1,5 @@
 import Testing
 import Foundation
-@testable import PrestoCV
 
 /// The strings of the export flow: each key the code uses exists in the six languages, no key is left over,
 /// and a translation is a translation and not the English text copied.
@@ -21,10 +20,7 @@ struct ExportStringsTests {
 
     // MARK: - Reading the project
 
-    private static var projectRoot: URL {
-        URL(fileURLWithPath: #filePath).resolvingSymlinksInPath()
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    }
+    private static var projectRoot: URL { Repository.root }
 
     /// The catalog's entries of the export flow: key, and the value of each language
     private static func catalogValues() throws -> [String: [String: String]] {

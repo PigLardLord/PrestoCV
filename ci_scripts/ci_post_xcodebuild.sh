@@ -4,7 +4,8 @@
 #   archive            checks the archive, so one that is wrong never reaches TestFlight;
 #   build-for-testing  runs what ADR 0006 needs on a Mac beyond the app tests: the package tests, the architecture check
 #                      and its self-test (they see the Apple-only branches of the manifests), and the builds of PrestoCVApp
-#                      and CVPDFExporterExamples.
+#                      and CVPDFExporterExamples. It also runs the source checks, which read the repository: the machines
+#                      that then run the test plan have only the built products.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -25,6 +26,7 @@ case "$ACTION" in
     for package in PrestoCVCore CVPDFExporter CVGeneratorAI; do
       step swift test --package-path "$ROOT/$package"
     done
+    step swift test --package-path "$ROOT/Tools/SourceChecks"
     # On a pull request the baseline may only shrink, so it is compared with the target branch's. When the checkout has
     # no such branch, the comparison is with an empty baseline.
     check_args=()
