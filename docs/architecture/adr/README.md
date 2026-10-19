@@ -25,5 +25,6 @@ Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected*
 | [0022](0022-ship-legacy-app-as-v1.md) | Ship the legacy app, fixed, as version 1 | Accepted |
 | [0023](0023-ground-the-ai-draft-in-the-description.md) | Ground the AI draft by quoting the description and explaining every word | Accepted |
 | [0024](0024-run-apple-ci-and-releases-on-xcode-cloud.md) | Run the Apple CI and the releases on Xcode Cloud | Accepted |
+| [0025](0025-check-each-claim-again-with-the-on-device-model.md) | Check each personal claim of the AI draft again with the on-device model | Proposed |
 
 New ADRs copy [template.md](template.md).
