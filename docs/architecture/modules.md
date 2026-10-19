@@ -235,6 +235,10 @@ A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-
 | `Platform/` | the platform shims: iOS-only modifiers wrapped for `Features/`, HTML and PDF previews, sharing, pasteboard, file import and export | SwiftUI, UIKit, AppKit, WebKit, PDFKit, QuickLook, UniformTypeIdentifiers, `CVRenderingWebKitSupport`, `PrestoCVPresentation` |
 | `Resources/` | `Localizable.xcstrings`, sample CV JSON, assets | — |
 
+**The legacy target `PrestoCV`**, which version 1 ships ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), imports the legacy `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI`, and also `PrestoCVDomain` and `PrestoCVApplication`, whose rules its view models call ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)):
+- it imports each declaration of the two by name (`import struct PrestoCVDomain.ExportPolicy`), since the legacy `PrestoCVCore` declares types with the same names;
+- its adapters from the legacy `CVModel` to the plain values the rules read are in `PrestoCV/Shared/CoreRules/`;
+
 ---
 
 ## Tools
