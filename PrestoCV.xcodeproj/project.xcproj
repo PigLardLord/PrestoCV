@@ -73,6 +73,9 @@
         }, {
           "product-name": "PrestoCVCore",
           "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "product-name": "PrestoCVDomain",
+          "build-phase": { "build-phase": "frameworks" },
         },
       ],
       "build-settings": {

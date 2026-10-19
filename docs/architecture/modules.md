@@ -29,7 +29,7 @@ Test targets and test-support targets are described below each package. The chec
   - a typed identity (`CVID`);
   - `revision`, `createdAt` and `updatedAt`, settable only inside the package;
   - a private title, `PersonalDetails`, and ordered sections of entries;
-  - the "has enough content to be saved" rule;
+  - the "has enough content to be saved" rule, `SaveRule`: a detail of the person is written, or a section has an entry. It reads plain values, so the legacy app's editor is judged by it too ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md));
   - duplication with a title composed by the caller.
 - **Value objects:**
   - `PartialDate` (year or month precision, partial order);

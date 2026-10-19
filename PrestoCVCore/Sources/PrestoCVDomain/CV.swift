@@ -31,8 +31,16 @@ public struct CV: Hashable, Sendable {
            sections: sections, design: design, language: language)
     }
 
-    /// The one definition of "has enough content to be saved".
-    public var canBeSaved: Bool { !personal.fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    /// "Has enough content to be saved", as `SaveRule` defines it.
+    public var canBeSaved: Bool {
+        let p = personal, s = sections
+        return SaveRule.allowsSaving(
+            personalDetails: [p.fullName, p.professionalTitle, p.email?.value ?? "", p.phone?.value ?? "", p.location,
+                              p.website?.value ?? "", p.summary],
+            sectionSizes: [s.experiences.count, s.education.count, s.skills.count, s.languages.count, s.certifications.count,
+                           s.profiles.count, s.interests.count]
+        )
+    }
 
     public mutating func rename(_ newTitle: String) { title = newTitle }
     public mutating func setPersonalDetails(_ details: PersonalDetails) { personal = details }

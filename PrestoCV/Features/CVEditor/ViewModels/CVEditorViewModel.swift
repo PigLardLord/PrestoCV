@@ -55,23 +55,9 @@ final class CVEditorViewModel: ObservableObject {
         return personName.isEmpty ? "cv.untitled".localized : personName
     }
     
-    /// Determines if the CV has meaningful content beyond just the name
+    /// Whether the CV has enough content to be saved, by the save rule of PrestoCVDomain
     var hasMeaningfulContent: Bool {
-        // Check if any essential fields have content
-        !cv.personalInfo.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !cv.personalInfo.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !cv.personalInfo.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !cv.personalInfo.phone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !cv.personalInfo.location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !cv.personalInfo.portfolio.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !cv.personalInfo.profile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !cv.skills.isEmpty ||
-        !cv.relevant_experience.isEmpty ||
-        !cv.education.isEmpty ||
-        !cv.languages.isEmpty ||
-        !cv.certifications.isEmpty ||
-        !cv.social.isEmpty ||
-        !cv.interests.isEmpty
+        cv.allowsSaving
     }
     
     /// Indicates if there are unsaved changes: a CV that was never stored has them once it holds
