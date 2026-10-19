@@ -10,30 +10,32 @@ struct PerformanceMonitorTests {
     @Test("Performance monitor tracks execution time")
     func performanceMonitorTracksTime() async {
         // Given
-        let monitor = PerformanceMonitor()
+        let clock = ManualClock()
+        let monitor = PerformanceMonitor(now: clock.now)
 
         // When
         let result = await monitor.measure(label: "test") {
-            // Simulate work
-            try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
+            // Work that takes a quarter of a second
+            clock.advance(by: 0.25)
             return "completed"
         }
 
         // Then
         #expect(result == "completed")
         #expect(await monitor.lastMeasurement?.label == "test")
-        #expect(await monitor.lastMeasurement?.duration ?? 0 >= 0.01) // At least 10ms
+        #expect(await monitor.lastMeasurement?.duration == 0.25)
     }
 
     @Test("Performance monitor calculates statistics")
     func performanceMonitorCalculatesStats() async {
         // Given
-        let monitor = PerformanceMonitor()
+        let clock = ManualClock()
+        let monitor = PerformanceMonitor(now: clock.now)
 
-        // When - perform multiple measurements
+        // When - perform multiple measurements, the i-th taking i eighths of a second
         for i in 1...5 {
             _ = await monitor.measure(label: "operation") {
-                try? await Task.sleep(nanoseconds: UInt64(i * 1_000_000)) // i ms
+                clock.advance(by: Double(i) / 8)
                 return i
             }
         }
@@ -42,9 +44,9 @@ struct PerformanceMonitorTests {
         let stats = await monitor.getStatistics(for: "operation")
         #expect(stats != nil)
         #expect(stats?.count == 5)
-        #expect(stats?.average ?? 0 > 0)
-        #expect(stats?.min ?? 0 > 0)
-        #expect(stats?.max ?? 0 > stats?.min ?? 0)
+        #expect(stats?.average == 0.375)
+        #expect(stats?.min == 0.125)
+        #expect(stats?.max == 0.625)
     }
 
     @Test("Performance monitor tracks memory usage")
@@ -106,18 +108,19 @@ struct PerformanceMonitorTests {
     @Test("Performance monitor threshold alerts")
     func performanceMonitorThresholdAlerts() async {
         // Given
-        let monitor = PerformanceMonitor()
-        await monitor.setThreshold(for: "slow-task", threshold: 0.005) // 5ms threshold
+        let clock = ManualClock()
+        let monitor = PerformanceMonitor(now: clock.now)
+        await monitor.setThreshold(for: "slow-task", threshold: 0.125)
 
-        // When - perform slow operation
+        // When - perform an operation that takes longer than the threshold
         let (_, alert) = await monitor.measureWithAlert(label: "slow-task") {
-            try? await Task.sleep(nanoseconds: 20_000_000) // 20ms
+            clock.advance(by: 0.25)
             return "slow"
         }
 
         // Then
         #expect(alert.exceeded == true)
-        #expect(alert.duration > 0.005)
+        #expect(alert.duration == 0.25)
     }
 
     @Test("Performance monitor exports metrics")
