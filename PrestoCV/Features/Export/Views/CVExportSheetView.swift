@@ -5,8 +5,6 @@ import PrestoCVCore
 import CVPDFExporter
 
 struct CVExportSheetView: View {
-    /// Takes the language chosen for the PDF in the sheet, for the CV to keep; nil is automatic
-    let onDocumentLanguageChange: (DocumentLanguage?) -> Void
     @StateObject private var viewModel: CVExportSheetViewModel
     @StateObject private var previewCoordinator = HTMLPreviewCoordinator()
     /// The PDF in the share sheet, while the share sheet is open
@@ -20,11 +18,7 @@ struct CVExportSheetView: View {
     private let largestOptionsHeight: CGFloat = 420
 
     /// The view model is built once, when the sheet first appears, and survives every re-render of the screen under it.
-    init(
-        viewModel: @autoclosure @escaping () -> CVExportSheetViewModel,
-        onDocumentLanguageChange: @escaping (DocumentLanguage?) -> Void
-    ) {
-        self.onDocumentLanguageChange = onDocumentLanguageChange
+    init(viewModel: @autoclosure @escaping () -> CVExportSheetViewModel) {
         self._viewModel = StateObject(wrappedValue: viewModel())
     }
 
@@ -102,9 +96,6 @@ struct CVExportSheetView: View {
             })
             .task {
                 await viewModel.start()
-            }
-            .onChange(of: viewModel.documentLanguageChoice) { _, choice in
-                onDocumentLanguageChange(choice)
             }
             .onChange(of: viewModel.shareConfirmationText) { _, confirmation in
                 if let confirmation {
@@ -564,8 +555,13 @@ private extension Color {
     let mockCV = adapter.convertToCVModel(from: SampleCVData.complete)
 
     return CVExportSheetView(
-        viewModel: CVExportSheetViewModel(cv: mockCV, exportService: CVExportService(), preferencesStore: FileExportPreferencesStore())
-    ) { _ in }
+        viewModel: CVExportSheetViewModel(
+            cv: mockCV,
+            exportService: CVExportService(),
+            preferencesStore: FileExportPreferencesStore(),
+            documentLanguageSink: { _ in }
+        )
+    )
 }
 
 

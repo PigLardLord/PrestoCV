@@ -183,7 +183,9 @@ struct CVExportSheetViewModelTests {
         debounce: Duration = .zero,
         store: InMemoryExportPreferencesStore = InMemoryExportPreferencesStore()
     ) -> CVExportSheetViewModel {
-        let viewModel = CVExportSheetViewModel(cv: cv, exportService: service, preferencesStore: store, previewDebounce: debounce)
+        let viewModel = CVExportSheetViewModel(
+            cv: cv, exportService: service, preferencesStore: store, documentLanguageSink: { _ in }, previewDebounce: debounce
+        )
         viewModel.selectedTemplateId = template
         return viewModel
     }

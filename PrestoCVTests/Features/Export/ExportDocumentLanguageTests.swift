@@ -32,6 +32,7 @@ struct ExportDocumentLanguageTests {
             cv: cv,
             exportService: environment.makeService(),
             preferencesStore: InMemoryExportPreferencesStore(),
+            documentLanguageSink: { _ in },
             documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: [appLanguage], read: NaturalLanguageReader.read),
             previewDebounce: .zero
         )

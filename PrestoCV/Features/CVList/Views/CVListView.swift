@@ -79,9 +79,7 @@ struct CVListView<EmptyState: View>: View {
             await viewModel.loadCVs()
         }
         .sheet(item: $exportTarget) { cv in
-            CVExportSheetView(viewModel: makeExportSheet(cv)) { language in
-                Task { await viewModel.setDocumentLanguage(language, ofCVWithId: cv.id) }
-            }
+            CVExportSheetView(viewModel: makeExportSheet(cv))
         }
         .anchoredConfirmationDialog(
             String(localized: "cv.delete.confirmation.title"),
@@ -223,7 +221,12 @@ struct CVListView_Previews: PreviewProvider {
     }
     
     private static func makeExportSheet(_ cv: CVModel) -> CVExportSheetViewModel {
-        CVExportSheetViewModel(cv: cv, exportService: CVExportService(), preferencesStore: FileExportPreferencesStore())
+        CVExportSheetViewModel(
+            cv: cv,
+            exportService: CVExportService(),
+            preferencesStore: FileExportPreferencesStore(),
+            documentLanguageSink: { _ in }
+        )
     }
     
     private static func createMockViewModel() -> CVListViewModel {

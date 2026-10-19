@@ -116,7 +116,9 @@ struct CVExportSheetViewModelPreferencesTests {
         let service = MockCVExportService()
         await service.setAvailableTemplatesResult(.success(templates))
         let store = InMemoryExportPreferencesStore(stored: stored)
-        let viewModel = CVExportSheetViewModel(cv: .exportable, exportService: service, preferencesStore: store, previewDebounce: .zero)
+        let viewModel = CVExportSheetViewModel(
+            cv: .exportable, exportService: service, preferencesStore: store, documentLanguageSink: { _ in }, previewDebounce: .zero
+        )
         return (viewModel, store, service)
     }
 

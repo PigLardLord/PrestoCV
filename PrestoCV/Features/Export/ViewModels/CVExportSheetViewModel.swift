@@ -11,6 +11,9 @@ struct ExportSelection: Equatable {
     var documentLanguage: DocumentLanguage?
 }
 
+/// Where the language chosen for a CV's PDF in its export sheet goes, for the CV to keep it; nil is automatic.
+typealias DocumentLanguageSink = @MainActor (DocumentLanguage?) -> Void
+
 /// Drives the export sheet of one CV: the template, palette, font and language the user picks, the preview of that
 /// choice, and the PDF that is rendered once the preview has settled so that sharing it is a single tap.
 ///
@@ -60,6 +63,7 @@ final class CVExportSheetViewModel: ObservableObject {
     private let cv: CVModel
     private let exportService: any CVExportServiceProtocol
     private let preferencesStore: any ExportPreferencesStore
+    private let documentLanguageSink: DocumentLanguageSink
     private let previewDebounce: Duration
     private var refreshTask: Task<Void, Never>?
     private var generation = 0
@@ -135,18 +139,21 @@ final class CVExportSheetViewModel: ObservableObject {
     ///   - cv: The CV to export. The sheet starts with the language chosen for it.
     ///   - exportService: Makes the preview and the PDF.
     ///   - preferencesStore: Keeps the design chosen last, for the next export.
+    ///   - documentLanguageSink: Takes each language chosen in the sheet, for the CV to keep.
     ///   - previewDebounce: How long a selection must stay put before its preview is made, so that changing the
     ///     template, the palette and the font in quick succession makes one preview and one PDF
     init(
         cv: CVModel,
         exportService: any CVExportServiceProtocol,
         preferencesStore: any ExportPreferencesStore,
+        documentLanguageSink: @escaping DocumentLanguageSink,
         documentLanguageDetector: DocumentLanguageDetector = .onDevice,
         previewDebounce: Duration = .milliseconds(250)
     ) {
         self.cv = cv
         self.exportService = exportService
         self.preferencesStore = preferencesStore
+        self.documentLanguageSink = documentLanguageSink
         self.previewDebounce = previewDebounce
         selection = ExportSelection(
             templateId: nil,
@@ -264,9 +271,15 @@ final class CVExportSheetViewModel: ObservableObject {
 
     // MARK: - Refreshing
 
+    /// A language chosen in the sheet goes to the CV at once; any change makes a new preview while the sheet shows.
     private func selectionDidChange(from oldValue: ExportSelection) {
-        guard selection != oldValue, isShown else { return }
-        requestPreview()
+        guard selection != oldValue else { return }
+        if selection.documentLanguage != oldValue.documentLanguage {
+            documentLanguageSink(selection.documentLanguage)
+        }
+        if isShown {
+            requestPreview()
+        }
     }
 
     private func refresh(for cv: CVModel, generation requestGeneration: Int) async {

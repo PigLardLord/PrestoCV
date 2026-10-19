@@ -46,10 +46,21 @@ final class ViewModelFactory {
         }
     }
     
-    /// The export sheet of `cv`, with a service and a preferences store of its own.
+    /// The export sheet of a CV of the list: the language chosen in it is stored with the CV.
     @MainActor
-    func makeExportSheetViewModel(cv: CVModel) -> CVExportSheetViewModel {
-        CVExportSheetViewModel(cv: cv, exportService: CVExportService(), preferencesStore: FileExportPreferencesStore())
+    func makeExportSheetViewModel(exporting cv: CVModel, from list: CVListViewModel) -> CVExportSheetViewModel {
+        makeExportSheetViewModel(cv: cv) { language in
+            Task { await list.setDocumentLanguage(language, ofCVWithId: cv.id) }
+        }
+    }
+    
+    /// The export sheet of the CV an editor shows: the language chosen in it goes into the form, which saves it with
+    /// the rest of the edits.
+    @MainActor
+    func makeExportSheetViewModel(editing editor: CVEditorViewModel) -> CVExportSheetViewModel {
+        makeExportSheetViewModel(cv: editor.cv) { language in
+            editor.documentLanguageSelection = language
+        }
     }
     
     @MainActor
@@ -72,6 +83,20 @@ final class ViewModelFactory {
     }
 
     // MARK: - Private Composition Root
+
+    /// An export sheet with a service and a preferences store of its own.
+    @MainActor
+    private func makeExportSheetViewModel(
+        cv: CVModel,
+        documentLanguageSink: @escaping DocumentLanguageSink
+    ) -> CVExportSheetViewModel {
+        CVExportSheetViewModel(
+            cv: cv,
+            exportService: CVExportService(),
+            preferencesStore: FileExportPreferencesStore(),
+            documentLanguageSink: documentLanguageSink
+        )
+    }
 
     @MainActor
     private func makeCVEditorViewModel(

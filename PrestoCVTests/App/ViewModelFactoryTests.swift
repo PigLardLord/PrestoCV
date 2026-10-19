@@ -138,13 +138,33 @@ struct ViewModelFactoryTests {
 
     // MARK: - The Export Sheet
 
-    @Test("The export sheet of a CV starts with the language chosen for that CV")
-    func exportSheetStartsOnItsCV() throws {
+    @Test("The language chosen in the export sheet of a listed CV is stored with that CV")
+    func listExportSheetStoresTheLanguage() async throws {
         let cv = CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi"), documentLanguage: "de")
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let list = CVListViewModel(cvManagementUseCase: CVManagementUseCase(cvRepository: repository, sampleRepository: NoSamples()))
+        let sheet = try makeFactory().makeExportSheetViewModel(exporting: cv, from: list)
+        #expect(sheet.documentLanguageChoice == .german, "The sheet starts with the language chosen for the CV")
 
-        let sheet = try makeFactory().makeExportSheetViewModel(cv: cv)
+        await repository.holdNextListings(1)
+        sheet.documentLanguageChoice = .french
+        // Once the language is stored, the list reads the CVs again
+        await repository.waitUntilListingsAreHeld(1)
 
-        #expect(sheet.documentLanguageChoice == .german)
-        #expect(sheet.templates.isEmpty, "Nothing is loaded before the sheet shows")
+        #expect(try await repository.getCV(by: cv.id)?.documentLanguage == "fr")
+        await repository.releaseOldestListing()
+    }
+
+    @Test("The language chosen in the export sheet of the editor goes into the form, to be saved with it")
+    func editorExportSheetSetsTheForm() throws {
+        let factory = try makeFactory()
+        let editor = factory.makeCVEditorViewModel(for: .new(template: CVModel(documentLanguage: "de"), notice: nil))
+        let sheet = factory.makeExportSheetViewModel(editing: editor)
+        #expect(sheet.documentLanguageChoice == .german, "The sheet starts with the language of the form")
+
+        sheet.documentLanguageChoice = .french
+
+        #expect(editor.documentLanguageSelection == .french)
+        #expect(editor.cv.documentLanguage == "fr")
     }
 }

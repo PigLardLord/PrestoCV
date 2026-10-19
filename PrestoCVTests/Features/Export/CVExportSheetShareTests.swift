@@ -14,6 +14,7 @@ struct CVExportSheetShareTests {
             cv: .exportable,
             exportService: MockCVExportService(),
             preferencesStore: InMemoryExportPreferencesStore(),
+            documentLanguageSink: { _ in },
             previewDebounce: .zero
         )
         viewModel.selectedTemplateId = "modern"

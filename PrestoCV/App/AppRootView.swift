@@ -74,7 +74,10 @@ struct AppRootView: View {
     }
     
     private var listView: some View {
-        CVListView(viewModel: cvListViewModel, makeExportSheet: viewModelFactory.makeExportSheetViewModel(cv:)) {
+        CVListView(
+            viewModel: cvListViewModel,
+            makeExportSheet: { viewModelFactory.makeExportSheetViewModel(exporting: $0, from: cvListViewModel) }
+        ) {
             FirstRunView(viewModel: viewModelFactory.makeNewCVChoicesViewModel())
         }
     }
@@ -91,7 +94,7 @@ struct AppRootView: View {
         case .cvEditor(let request):
             CVEditorView(
                 viewModel: viewModelFactory.makeCVEditorViewModel(for: request),
-                makeExportSheet: viewModelFactory.makeExportSheetViewModel(cv:)
+                makeExportSheet: viewModelFactory.makeExportSheetViewModel(editing:)
             )
         }
     }

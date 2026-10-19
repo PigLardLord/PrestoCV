@@ -4,7 +4,7 @@ import PrestoCVCore
 struct CVEditorView: View {
     @EnvironmentObject var router: AppRouter
     @StateObject private var viewModel: CVEditorViewModel
-    private let makeExportSheet: @MainActor (CVModel) -> CVExportSheetViewModel
+    private let makeExportSheet: @MainActor (CVEditorViewModel) -> CVExportSheetViewModel
     @State private var showingExportSheet = false
     @State private var deletionAnchor = RowDeletionAnchor()
     @StateObject private var keyboard = KeyboardVisibility()
@@ -20,7 +20,7 @@ struct CVEditorView: View {
     /// - Parameter makeExportSheet: Gives the export sheet of the CV as the editor shows it.
     init(
         viewModel: @autoclosure @escaping () -> CVEditorViewModel,
-        makeExportSheet: @escaping @MainActor (CVModel) -> CVExportSheetViewModel
+        makeExportSheet: @escaping @MainActor (CVEditorViewModel) -> CVExportSheetViewModel
     ) {
         self._viewModel = StateObject(wrappedValue: viewModel())
         self.makeExportSheet = makeExportSheet
@@ -120,9 +120,7 @@ struct CVEditorView: View {
             Text("editor.delete_row.message".localizedWithArgs(deletion.rowName))
         }
         .sheet(isPresented: $showingExportSheet) {
-            CVExportSheetView(viewModel: makeExportSheet(viewModel.cv)) { language in
-                viewModel.documentLanguageSelection = language
-            }
+            CVExportSheetView(viewModel: makeExportSheet(viewModel))
         }
     }
     
@@ -238,8 +236,13 @@ struct CVEditorView: View {
 struct CVEditorView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            CVEditorView(viewModel: createMockViewModel()) { cv in
-                CVExportSheetViewModel(cv: cv, exportService: CVExportService(), preferencesStore: FileExportPreferencesStore())
+            CVEditorView(viewModel: createMockViewModel()) { editor in
+                CVExportSheetViewModel(
+                    cv: editor.cv,
+                    exportService: CVExportService(),
+                    preferencesStore: FileExportPreferencesStore(),
+                    documentLanguageSink: { editor.documentLanguageSelection = $0 }
+                )
             }
         }
         .environmentObject(AppRouter())

@@ -20,6 +20,7 @@ struct CVExportSheetStartTests {
             cv: cv,
             exportService: service,
             preferencesStore: InMemoryExportPreferencesStore(stored: stored),
+            documentLanguageSink: { _ in },
             previewDebounce: .zero
         )
     }
