@@ -18,6 +18,8 @@ final class CVEditorViewModel: ObservableObject {
     @Published private(set) var showsSavedConfirmation = false
     @Published var showingCancelConfirmation = false
     @Published private(set) var pendingDeletion: PendingDeletion?
+    /// What each contact field said when the person last left it: its check, which typing does not change.
+    @Published private(set) var leftContactText: [ContactField: String] = [:]
     /// The message shown above a new CV, set by the screen that opened it.
     let notice: EditorNotice?
     
@@ -267,6 +269,17 @@ final class CVEditorViewModel: ObservableObject {
     @MainActor
     func clearError() {
         saveError = nil
+    }
+
+    /// The person left a contact field: what it says now is checked, until they leave it again.
+    @MainActor
+    func fieldWasLeft(_ field: ContactField) {
+        let info = cv.personalInfo
+        switch field {
+        case .email: leftContactText[field] = info.email
+        case .phone: leftContactText[field] = info.phone
+        case .portfolio: leftContactText[field] = info.portfolio
+        }
     }
     
     @MainActor

@@ -22,6 +22,8 @@ struct LabeledTextField: View {
     var isSecure: Bool = false
     var state = FieldState()
     var onCommit: (() -> Void)? = nil
+    /// Called when the field loses the focus: the person has left it
+    var onLeave: (() -> Void)? = nil
     
     @FocusState private var isFocused: Bool
     
@@ -53,6 +55,11 @@ struct LabeledTextField: View {
             )
         }
         .padding(.vertical, DesignTokens.Spacing.xs)
+        .onChange(of: isFocused) { _, focused in
+            if !focused {
+                onLeave?()
+            }
+        }
     }
 }
 
@@ -63,7 +70,8 @@ extension LabeledTextField {
         text: Binding<String>,
         placeholder: String = "field.email.placeholder".localized,
         state: FieldState,
-        onCommit: (() -> Void)? = nil
+        onCommit: (() -> Void)? = nil,
+        onLeave: (() -> Void)? = nil
     ) -> LabeledTextField {
         LabeledTextField(
             label: label,
@@ -72,7 +80,8 @@ extension LabeledTextField {
             keyboardType: .emailAddress,
             textContentType: .emailAddress,
             state: state,
-            onCommit: onCommit
+            onCommit: onCommit,
+            onLeave: onLeave
         )
     }
     
@@ -81,7 +90,8 @@ extension LabeledTextField {
         text: Binding<String>,
         placeholder: String = "field.phone.placeholder".localized,
         state: FieldState,
-        onCommit: (() -> Void)? = nil
+        onCommit: (() -> Void)? = nil,
+        onLeave: (() -> Void)? = nil
     ) -> LabeledTextField {
         LabeledTextField(
             label: label,
@@ -90,7 +100,8 @@ extension LabeledTextField {
             keyboardType: .phonePad,
             textContentType: .telephoneNumber,
             state: state,
-            onCommit: onCommit
+            onCommit: onCommit,
+            onLeave: onLeave
         )
     }
     
@@ -99,7 +110,8 @@ extension LabeledTextField {
         text: Binding<String>,
         placeholder: String = "https://example.com",
         state: FieldState,
-        onCommit: (() -> Void)? = nil
+        onCommit: (() -> Void)? = nil,
+        onLeave: (() -> Void)? = nil
     ) -> LabeledTextField {
         LabeledTextField(
             label: label,
@@ -108,7 +120,8 @@ extension LabeledTextField {
             keyboardType: .URL,
             textContentType: .URL,
             state: state,
-            onCommit: onCommit
+            onCommit: onCommit,
+            onLeave: onLeave
         )
     }
 }

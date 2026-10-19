@@ -9,18 +9,18 @@ public enum FieldCheck: Equatable, Sendable {
     /// The text cannot be what the field asks for.
     case implausible
 
-    /// An e-mail address has an at sign and a dot.
+    /// An e-mail address is one `EmailAddress` accepts: a local part, an at sign and a domain with its top-level label.
     public static func email(_ text: String) -> FieldCheck {
-        check(text) { $0.contains("@") && $0.contains(".") }
+        check(text) { EmailAddress($0) != nil }
     }
 
-    /// A web address starts with http, as http:// and https:// do, in any case.
+    /// A web address is one `WebLink` accepts: http or https, with a host and no credentials.
     public static func webAddress(_ text: String) -> FieldCheck {
-        check(text) { $0.lowercased().hasPrefix("http") }
+        check(text) { WebLink($0) != nil }
     }
 
-    /// A phone number has a digit: from text without one, such as "abc", no number can be called. How the number is
-    /// written is up to the person.
+    /// A phone number has a digit: from text without one, such as "call me", no number can be called. How the number is
+    /// written is up to the person, so that an extension or a note beside it is no reason to doubt it.
     public static func phoneNumber(_ text: String) -> FieldCheck {
         check(text) { $0.contains(where: \.isWholeNumber) }
     }

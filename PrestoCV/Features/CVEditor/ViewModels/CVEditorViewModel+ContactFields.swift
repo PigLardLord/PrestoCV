@@ -1,10 +1,13 @@
 import PrestoCVCore
+import enum PrestoCVDomain.FieldCheck
 
+/// Each contact field is checked by the rules of PrestoCVDomain when the person leaves it, not at every key: what it said
+/// then is what its status tells, until they leave it again.
 extension CVEditorViewModel {
 
-    /// The e-mail address: required, since a PDF is made only with one, and checked once something is typed.
+    /// The e-mail address: required, since a PDF is made only with one, and checked once it is left.
     var emailStatus: FieldStatus {
-        switch FieldCheck.email(cv.personalInfo.email) {
+        switch FieldCheck.email(leftContactText[.email] ?? "") {
         case .empty:
             return FieldStatus(validity: .none, isRequired: true, note: .required)
         case .plausible:
@@ -17,7 +20,7 @@ extension CVEditorViewModel {
     /// The phone number: a warning when it has no digit, which does not stop the CV from being saved. How the number
     /// is written is up to the person.
     var phoneStatus: FieldStatus {
-        switch FieldCheck.phoneNumber(cv.personalInfo.phone) {
+        switch FieldCheck.phoneNumber(leftContactText[.phone] ?? "") {
         case .empty, .plausible:
             return FieldStatus(validity: .none, isRequired: false, note: .phoneHelp)
         case .implausible:
@@ -25,9 +28,9 @@ extension CVEditorViewModel {
         }
     }
 
-    /// The portfolio: a web address, doubtful without http.
+    /// The portfolio: a web address, doubtful without http or https and a host.
     var portfolioStatus: FieldStatus {
-        switch FieldCheck.webAddress(cv.personalInfo.portfolio) {
+        switch FieldCheck.webAddress(leftContactText[.portfolio] ?? "") {
         case .empty:
             return FieldStatus(validity: .none, isRequired: false, note: .webAddressHelp)
         case .plausible:

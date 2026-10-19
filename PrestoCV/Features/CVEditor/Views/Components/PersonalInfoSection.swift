@@ -11,6 +11,8 @@ struct PersonalInfoSection: View {
     let emailStatus: FieldStatus
     let phoneStatus: FieldStatus
     let portfolioStatus: FieldStatus
+    /// Tells the editor that the person left a contact field, which checks it
+    let onLeave: (ContactField) -> Void
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     
@@ -23,12 +25,14 @@ struct PersonalInfoSection: View {
         return layout {
             LabeledTextField.email(
                 text: $cv.personalInfo.email,
-                state: emailStatus.fieldState
+                state: emailStatus.fieldState,
+                onLeave: { onLeave(.email) }
             )
             
             LabeledTextField.phone(
                 text: $cv.personalInfo.phone,
-                state: phoneStatus.fieldState
+                state: phoneStatus.fieldState,
+                onLeave: { onLeave(.phone) }
             )
         }
     }
@@ -62,7 +66,8 @@ struct PersonalInfoSection: View {
                     LabeledTextField.url(
                         label: "field.portfolio_url".localized,
                         text: $cv.personalInfo.portfolio,
-                        state: portfolioStatus.fieldState
+                        state: portfolioStatus.fieldState,
+                        onLeave: { onLeave(.portfolio) }
                     )
                 }
             } header: {
@@ -176,6 +181,7 @@ struct SectionHeader: View {
         documentLanguageTitle: "Automatic (English)",
         emailStatus: FieldStatus(validity: .none, isRequired: true, note: .required),
         phoneStatus: FieldStatus(validity: .none, isRequired: false, note: .phoneHelp),
-        portfolioStatus: FieldStatus(validity: .none, isRequired: false, note: .webAddressHelp)
+        portfolioStatus: FieldStatus(validity: .none, isRequired: false, note: .webAddressHelp),
+        onLeave: { _ in }
     )
 }
