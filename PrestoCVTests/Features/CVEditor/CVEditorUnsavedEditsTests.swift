@@ -197,33 +197,6 @@ struct CVEditorUnsavedEditsTests {
         #expect(await repository.kept[editing]?.base == submitted, "Once stored, that is what the edits were made on")
     }
 
-    @Test("When the edits cannot be brought up to date before a save, the out-of-date ones are gone while it stores")
-    func outOfDateEditsAreRemovedBeforeASave() async throws {
-        let repository = InMemoryUnsavedEditsRepository()
-        let gated = GatedCVManagementUseCase(gating: .create)
-        let editing = UUID()
-        let useCase = UnsavedEditsUseCase(repository: repository, now: { Date() })
-        let viewModel = CVEditorViewModel(
-            cvId: nil,
-            cvManagementUseCase: gated,
-            unsavedEdits: UnsavedEditsKeeper(editing: editing, useCase: useCase, wait: { _ in try await Task.sleep(for: .seconds(3600)) }),
-            sleep: { _ in }
-        )
-        await viewModel.loadCV()
-        viewModel.cv.personalInfo.name = "Marta"
-        await viewModel.keepUnsavedEdits()
-        viewModel.cv.personalInfo.name = "Marta Rinaldi"
-        await repository.failKeeping(with: AppError.fileSystemError("disk full"))
-
-        let saving = Task { await viewModel.saveCV() }
-        await gated.waitUntilGatedCallStarts()
-        let keptWhileStoring = await repository.kept[editing]
-        await gated.openGate()
-        #expect(await saving.value)
-
-        #expect(keptWhileStoring == nil, "Edits that name no stored CV must not outlive the app being ended while it stores one")
-    }
-
     @Test("A save that fails puts the kept edits back on what was stored before")
     func failedSavePutsTheEditsBack() async {
         let cvs = MockCVManagementUseCase()
@@ -236,6 +209,74 @@ struct CVEditorUnsavedEditsTests {
 
         #expect(await editor.kept?.base == nil, "Nothing was stored: the edits are on no stored CV")
         #expect(await editor.kept?.cv.personalInfo.name == "Marta Rinaldi")
+    }
+
+    // MARK: - A save whose kept edits cannot be brought up to date
+
+    @Test("A failed save whose edits could be neither brought up to date nor kept again leaves the older edits, restored after a relaunch")
+    func failedSaveLeavesTheOlderEditsForARelaunch() async throws {
+        let cvs = MockCVManagementUseCase()
+        await cvs.setCreateCVResult(.failure(AppError.fileSystemError("disk full")))
+        let editor = makeEditor(cvs: cvs)
+        await editor.viewModel.loadCV()
+        editor.viewModel.cv.personalInfo.name = "Marta"
+        await editor.viewModel.keepUnsavedEdits()
+        editor.viewModel.cv.personalInfo.name = "Marta Rinaldi"
+        await editor.repository.failKeeping(with: AppError.fileSystemError("disk full"))
+
+        #expect(await editor.viewModel.saveCV() == false)
+
+        // The app is ended, and launched again over the same store
+        await editor.repository.failKeeping(with: nil)
+        let relaunch = UnsavedEditsUseCase(repository: editor.repository, now: { Date() })
+        let offered = try #require(await relaunch.editsToRestoreOrNil(), "The edits kept before the save must still be there")
+        let restored = makeEditor(restoring: offered, repository: editor.repository, useCase: relaunch)
+        await restored.viewModel.loadCV()
+        #expect(restored.viewModel.cv.personalInfo.name == "Marta")
+    }
+
+    @Test("A save whose edits cannot be brought up to date, while older edits of the CV are kept, stores nothing and says why")
+    func saveStoresNothingWhileOlderEditsAreKept() async {
+        let editor = makeEditor()
+        await editor.viewModel.loadCV()
+        editor.viewModel.cv.personalInfo.name = "Marta"
+        await editor.viewModel.keepUnsavedEdits()
+        let keptBefore = await editor.kept
+        editor.viewModel.cv.personalInfo.name = "Marta Rinaldi"
+        await editor.repository.failKeeping(with: AppError.fileSystemError("disk full"))
+
+        #expect(await editor.viewModel.saveCV() == false)
+
+        #expect(await editor.cvs.createCVCallCount == 0, "Once the CV is stored, a restore would take the older edits for a second CV")
+        #expect(await editor.kept == keptBefore, "The older edits stay: they may be all that outlives the app")
+        #expect(editor.viewModel.saveError == "editor.save_error.not_kept".localized)
+        #expect(editor.viewModel.cv.personalInfo.name == "Marta Rinaldi", "The form keeps the edits")
+        #expect(editor.viewModel.isSaveButtonEnabled, "Save can be tried again")
+    }
+
+    @Test("Kept edits that already hold what a save stores do not stop it when they cannot be brought up to date, and are not restored")
+    func keptEditsThatHoldWhatASaveStoresDoNotStopIt() async {
+        let editor = makeEditor()
+        await editor.viewModel.loadCV()
+        editor.viewModel.cv.personalInfo.name = "Marta Rinaldi"
+        await editor.viewModel.keepUnsavedEdits()
+        await editor.repository.failKeeping(with: AppError.fileSystemError("disk full"))
+        await editor.repository.failDiscarding(with: AppError.fileSystemError("disk full"))
+
+        #expect(await editor.viewModel.saveCV())
+        #expect(await editor.cvs.createdCVs.map(\.personalInfo.name) == ["Marta Rinaldi"])
+
+        // The kept edits could not be removed after the save either; the app is launched again over the same store
+        await editor.repository.failKeeping(with: nil)
+        await editor.repository.failDiscarding(with: nil)
+        let offer = UnsavedEditsOfferViewModel(
+            useCase: UnsavedEditsUseCase(repository: editor.repository, now: { Date() }),
+            cvs: editor.cvs
+        )
+        await offer.checkForEditsToRestore()
+        #expect(offer.offer == nil, "The stored CV holds the edits: restoring them would store it again")
+        #expect(await editor.repository.kept.isEmpty)
+        #expect(await editor.cvs.createCVCallCount == 1)
     }
 
     @Test("Discarding the edits removes what was kept, and nothing more is kept afterwards")
