@@ -119,13 +119,10 @@ enum Vocabulary {
     /// condition or hedge. In a description in another language, or in one whose language is not known, they are the other
     /// languages' words. Portuguese "no" is "in the", where English and Spanish "no" is a negation; German and French "mai" is a
     /// month, where Italian "mai" is "never"; English "fast" is quick, where German "fast" is "almost"; Italian "casi" are cases,
-    /// where Spanish "casi" is "almost"; Spanish and French "se" is "oneself", where Italian and Portuguese "se" is "if"; Spanish
-    /// "seria" is serious, where Portuguese "seria" is "would be".
+    /// where Spanish "casi" is "almost"; Spanish and French "se" is "oneself", where Italian and Portuguese "se" is "if".
     private static let onlyIn: [String: Set<Language>] = [
         "no": [.portuguese],
         "mai": [.german, .french],
-        "seria": [.spanish],
-        "serias": [.spanish],
         "fast": [.english],
         "falls": [.english],
         "plan": [.spanish, .french],

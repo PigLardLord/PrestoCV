@@ -416,11 +416,14 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1608
+    static let rowsWhenWritten = 1611
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
-    static let notImplementedYet: Set<String> = []
+    static let notImplementedYet: Set<String> = [
+        // Text typed without accents: an open residual risk of ADR 0023 that #249 must close before release.
+        "a-konjunktiv-typed-without-its-umlaut-claims-nothing-de",
+    ]
 
     /// Rows whose desired output the sanitiser does not give, and whose leak the owner accepts as a residual risk (ADR 0023,
     /// Consequences). Each runs in `withKnownIssue`: once a rule closes the leak the wrapper fails, and the id leaves this list.
@@ -488,6 +491,7 @@ enum GroundingRows {
         rows += acceptedReadingsOfAClaim()
         rows += negationsOfTheAbility()
         rows += deniedLowLevels()
+        rows += textWithoutAccents()
         rows += moodsOfSupposition()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
@@ -3447,6 +3451,25 @@ enum GroundingRows {
                         "I'd used Swift for years.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
         rows.append(row("wurde-without-gern-is-a-claim", "ich wurde geschult is a fact: the skill stays",
                         "Ich wurde in Python geschult.", CVData(skills: [Skill(name: "Python")]), .unchanged, language: "de"))
+        return rows
+    }
+
+    /// Text typed without accents (#202, #249): the moods of supposition lose the mark that tells them from a fact. Spanish "seria"
+    /// still withdraws through the Portuguese "seria" (would be), which also takes Spanish "seria" (serious): an accepted loss.
+    /// "wurde" for "würde" reads as a past and keeps its item: an open residual risk that #249 must close (`notImplementedYet`).
+    private static func textWithoutAccents() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        rows.append(row("a-conditional-typed-without-its-accent-claims-nothing-es",
+                        "seria for sería still supposes: no language",
+                        "Yo seria feliz aprendiendo aleman.", CVData(languages: [Language(name: "alemán")]), .exactly(CVData()), language: "es"))
+        rows.append(row("a-konjunktiv-typed-without-its-umlaut-claims-nothing-de",
+                        "wurde for würde still wishes: no language",
+                        "Am liebsten wurde ich Spanisch lernen.", CVData(languages: [Language(name: "Spanisch")]), .exactly(CVData()),
+                        language: "de"))
+        rows.append(row("serious-in-spanish-is-an-accepted-loss",
+                        "seria (serious) reads as the Portuguese would be: the clause and the one that shares it claim nothing, an accepted loss",
+                        "Soy una persona seria y hablo alemán.", CVData(languages: [Language(name: "alemán")]), .exactly(CVData()),
+                        language: "es"))
         return rows
     }
 
