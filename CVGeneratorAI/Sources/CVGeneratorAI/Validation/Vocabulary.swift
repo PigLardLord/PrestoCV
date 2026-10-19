@@ -228,11 +228,13 @@ enum Vocabulary {
     /// Which of the words are words of negation, doubt or degree, wish or intention, future or condition (`Words.modality`), and
     /// "n't" for a "t" after "don", "isn", "can"..., and "'d" for a "d" after "I", "we", "you"... that a base form follows ("I'd
     /// work"). A word that the description's language has of its own is none (`isOwnWord`): Portuguese "no" is "in the", German
-    /// and French "mai" is a month, English "fast" is quick. An entry written with its accents is matched as written: "würde".
+    /// and French "mai" is a month, English "fast" is quick. Nor, in an English description, is "plan", "plans" or "planning" used as
+    /// a noun (`IntentionNouns`): "route planning", "care plans". An entry written with its accents is matched as written: "würde".
     static func modality(in words: [Word], language: Language? = nil) -> Set<String> {
         var found = Set<String>()
         for (index, word) in words.enumerated() {
-            if everyModalityWord.contains(word.folded), !isOwnWord(word.folded, in: language) {
+            if everyModalityWord.contains(word.folded), !isOwnWord(word.folded, in: language),
+               !(language == .english && IntentionNouns.isANoun(at: index, in: words)) {
                 found.insert(word.folded)
             } else if word.accented != word.folded, everyModalityWord.contains(word.accented) {
                 found.insert(word.accented)

@@ -183,6 +183,20 @@ struct VocabularyTests {
         #expect(relatives.isDisjoint(with: Voice.words[language]?.firstPerson ?? []), "\(language)")
     }
 
+    @Test("plan, plans and planning are words of intention as verbs, and none as nouns")
+    func planningNouns() {
+        func modality(_ text: String) -> Set<String> { Vocabulary.modality(in: Word.words(in: text), language: .english) }
+
+        #expect(modality("I am planning to learn Rust") == ["planning"])
+        #expect(modality("I'm also planning a move") == ["planning"])
+        #expect(modality("My plan is to learn Spanish") == ["plan"])
+        #expect(modality("I plan routes") == ["plan"])
+        #expect(modality("I do route planning").isEmpty)
+        #expect(modality("I wrote care plans for patients").isEmpty)
+        #expect(modality("I was responsible for planning").isEmpty)
+        #expect(modality("planning, budgeting").isEmpty)
+    }
+
     @Test("Ability and part qualify a claim; denial, wish and condition withdraw it")
     func claimsAndWithdrawals() {
         #expect(Vocabulary.withdrawals(in: Word.words(in: "I can teach chess"), language: .english).isEmpty)

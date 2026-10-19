@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1700
+    static let rowsWhenWritten = 1720
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -503,6 +503,7 @@ enum GroundingRows {
         rows += speechAfterALineOfAnotherPerson()
         rows += relativeClausesOfAnotherSubject()
         rows += titlesOfAnotherPersonInAClaim()
+        rows += intentionWordsAsNouns()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3788,6 +3789,58 @@ enum GroundingRows {
                 "the person works with a nurse: the title is the nurse's, and goes", v.description,
                 CVData(personalInfo: person(title: v.title)), .exactly(CVData()), language: v.language)
         }
+    }
+
+    /// "plan", "plans" and "planning" say an intention only as verbs (#202): with "to", "on", an article or a possessive after them, or a
+    /// subject, a form of "to be", an auxiliary or a possessive before them ("I am planning to learn Rust", "I'm also planning a move",
+    /// "My plan is to"). After a content word, an article or a preposition they name an activity, and withdraw nothing: "route
+    /// planning", "care plans", "responsible for planning". The other languages name the activity with a noun of its own
+    /// ("pianificazione", "Routenplanung", "planificación", "planification", "planejamento"). A mention still needs a factual verb and
+    /// an explained lead-in (rule (c)): "Since 2018 I have done route planning at Acme" gives no entry.
+    private static func intentionWordsAsNouns() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        rows.append(row("care-plans-name-an-activity", "care plans names what the person wrote: the clause after it claims Python",
+                        "I wrote care plans for 12 patients and I know Python.", CVData(skills: [Skill(name: "Python")]), .unchanged))
+        rows.append(row("route-planning-in-a-job-clause-gives-the-entry",
+                        "route planning names an activity: the clause mentions Acme as a fact, and the entry stays",
+                        "Since 2018 I have worked in route planning at Acme.", CVData(experience: [job("", "Acme")]), .unchanged))
+        rows.append(row("route-planning-before-the-name-after-done-is-an-accepted-loss",
+                        "done is no verb of a CV and route planning stands unexplained before the name: no factual mention, an accepted loss",
+                        "Since 2018 I have done route planning at Acme.", CVData(experience: [job("", "Acme")]), .exactly(CVData())))
+        rows.append(row("planning-to-learn-claims-nothing", "planning to is an intention: no skill",
+                        "I am planning to learn Rust.", CVData(skills: [Skill(name: "Rust")]), .exactly(CVData())))
+        rows.append(row("route-planning-is-a-skill-the-person-claims",
+                        "route planning is a skill, and team leadership shares its clause: the three skills stay",
+                        "I am good at SAP, route planning and team leadership.",
+                        CVData(skills: [Skill(name: "SAP"), Skill(name: "route planning"), Skill(name: "team leadership")]), .unchanged))
+        rows.append(row("planning-after-a-preposition-names-the-work", "responsible for planning names the work: budgeting stays",
+                        "I was responsible for planning and budgeting.", CVData(skills: [Skill(name: "budgeting")]), .unchanged))
+        rows.append(row("planning-in-a-list-of-skills-is-a-skill", "a list of skills names planning: the three skills stay",
+                        "Skills: planning, budgeting and Excel.",
+                        CVData(skills: [Skill(name: "planning"), Skill(name: "budgeting"), Skill(name: "Excel")]), .unchanged))
+        rows.append(row("my-plan-is-an-intention", "a possessive before plan makes it the person's intention: no language",
+                        "My plan is to learn Spanish.", CVData(languages: [Language(name: "Spanish")]), .exactly(CVData())))
+        rows.append(row("planning-a-move-is-an-intention", "planning before an article plans a move: the place goes, the name stays",
+                        "I'm Maria Rossi. I'm also planning a move to Berlin.",
+                        CVData(personalInfo: person(name: "Maria Rossi", location: "Berlin")),
+                        .exactly(CVData(personalInfo: person(name: "Maria Rossi")))))
+        rows.append(row("planning-on-is-an-intention", "planning on is an intention: no skill",
+                        "I'm planning on a Rust course.", CVData(skills: [Skill(name: "Rust")]), .exactly(CVData())))
+
+        typealias Planning = (language: String, activity: String, intention: String)
+        var others: [Planning] = []
+        others.append(("it", "Mi occupo della pianificazione dei percorsi e conosco Python.", "Intendo imparare Rust."))
+        others.append(("de", "Ich bin für die Routenplanung zuständig und kenne Python.", "Ich beabsichtige, Rust zu lernen."))
+        others.append(("es", "Me encargo de la planificación de rutas y conozco Python.", "Planeo aprender Rust."))
+        others.append(("fr", "Je m'occupe de la planification des itinéraires et je connais Python.", "Je prévois d'apprendre Rust."))
+        others.append(("pt", "Cuido do planejamento de rotas e conheço Python.", "Planeio aprender Rust."))
+        for v in others {
+            rows.append(row("a-noun-of-planning-withdraws-nothing-\(v.language)", "the noun names the work: Python stays",
+                            v.activity, CVData(skills: [Skill(name: "Python")]), .unchanged, language: v.language))
+            rows.append(row("a-verb-of-planning-claims-nothing-\(v.language)", "the person only plans to learn it: no skill",
+                            v.intention, CVData(skills: [Skill(name: "Rust")]), .exactly(CVData()), language: v.language))
+        }
+        return rows
     }
 
     /// A negation keeps its item only when it governs the word of level (#202): "not an expert", "never been fluent". A negation of
