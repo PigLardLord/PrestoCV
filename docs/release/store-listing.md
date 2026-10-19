@@ -44,8 +44,8 @@ Six screenshots per localization and device, one per caption, in the order of th
 | # | Screen |
 |---|---|
 | 1 | My CVs: a complete CV and three copies of it adapted to other jobs. |
-| 2 | The AI screen with the person's description typed in. The simulator has no on-device model, so the test turns the AI entry on with `-AIAvailabilityOverride available`. |
-| 3 | The editor of a CV made from that description: what it does not mention, the e-mail, the phone, the portfolio and the summary, is blank. The app makes an AI draft only with the on-device model, and has no fake one (rule R14), so this is a CV stored with those facts, not a draft: it has no draft notice. |
+| 2 | The AI screen with the person's description typed in. The simulator has no on-device model, so the test turns the AI entry on with `-AIAvailabilityOverride available`. On a smaller iPhone the form goes up to show the whole of Generate, but the heading stays below the navigation bar: the descriptions are short enough for both. |
+| 3 | The editor of a CV made from that description: what it does not mention, the e-mail, the phone, the portfolio and the summary, is blank. On iPhone the form is scrolled until the city sits under the navigation bar, so that the section bar floats over the empty summary and covers no text. The app makes an AI draft only with the on-device model, and has no fake one (rule R14), so this is a CV stored with those facts, not a draft: it has no draft notice. |
 | 4 | New CV with its two choices, Empty CV and Example CV. The AI card is left out (`deviceNotEligible`), as on a device without Apple Intelligence, because screen 2 shows it. |
 | 5 | The export sheet: the preview, the language of the headings, Send or save PDF, and the designs. |
 | 6 | The share sheet over the export sheet, with the PDF in the serif font style and its headings in the CV's language. |

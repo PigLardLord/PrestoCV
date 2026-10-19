@@ -66,39 +66,53 @@ final class StoreScreenshotsUITests: XCTestCase {
         description.typeText(fixture.description)
         closeTheKeyboard(in: app)
         app.swipeDown()
-        // On a smaller screen the form goes up just enough to show the whole of Generate
+        // On a smaller screen the form goes up to show the whole of Generate, but no further than the collapse of the
+        // large title: the heading of the screen stays below the navigation bar, not behind it. The descriptions are
+        // short enough for both on every device.
         let generate = app.buttons.matching(labeled(text("ai.generation.button_title"), containing: true)).firstMatch
+        let heading = app.staticTexts.matching(labeled(text("ai.generation.header_title"))).firstMatch
         XCTAssertTrue(generate.waitForExistence(timeout: 10), "The AI screen should offer to generate")
+        waitUntilStill(generate)
         let hidden = generate.frame.maxY + 24 - app.frame.maxY
         if hidden > 0 {
             scroll(app, by: hidden)
+            waitUntilStill(heading)
+            let behindTheBar = app.navigationBars.firstMatch.frame.maxY + 8 - heading.frame.minY
+            if behindTheBar > 0 {
+                scroll(app, by: -behindTheBar)
+                waitUntilStill(heading)
+            }
         }
+        XCTAssertGreaterThanOrEqual(heading.frame.minY, app.navigationBars.firstMatch.frame.maxY,
+                                    "The heading should be below the navigation bar, not behind it")
+        XCTAssertLessThanOrEqual(generate.frame.maxY, app.frame.maxY - 8,
+                                 "Generate should be whole: the description is too long for this screen")
         attachScreenshot(2, showing: generate)
     }
 
     /// 3. A CV with only the facts of that description: what it does not mention is blank
+    ///
+    /// On iPhone the section bar floats over the lower part of the form, and the form is taller than the room between
+    /// the bars. The form goes up until the city, the last fact of the description, sits just under the navigation
+    /// bar, with its small label behind the bar's Done button: no title is left behind the navigation bar, and the
+    /// blank fields with their hints stay above the section bar, which floats over the empty summary. The city field
+    /// moves with the push of the editor and with the scroll, so the screen is taken once it has stopped moving after
+    /// both: the navigation bar has finished its transition by then.
     private func captureTheFactsOnly() throws {
         let app = try launch(with: fixture.draftFiles())
         let draft = row(named: fixture.draftName, in: app)
         XCTAssertTrue(draft.waitForExistence(timeout: 30), "The list should show the CV")
         draft.tap()
-        XCTAssertTrue(app.textFields.matching(labeled(text("field.full_name"))).firstMatch.waitForExistence(timeout: 10),
-                      "The editor should open")
-        // Where the tab bar floats over the blank contact fields, the form goes up: the personal details to the top, and
-        // further where the last blank field would still be under the tab bar
-        let portfolio = app.textFields.matching(labeled(text("field.portfolio_url"))).firstMatch
-        XCTAssertTrue(portfolio.waitForExistence(timeout: 10), "The editor should have the portfolio field")
-        waitUntilStill(portfolio)
-        let tabBar = app.tabBars.firstMatch
-        let barTop = tabBar.exists ? tabBar.frame.minY : app.frame.height * 0.7
-        if barTop > app.frame.height / 2 && portfolio.frame.maxY > barTop {
-            let header = app.staticTexts.matching(labeled(text("section.personal_info"))).firstMatch
-            XCTAssertTrue(header.waitForExistence(timeout: 5), "The editor should have the personal details")
-            let toTheTop = header.frame.minY - app.navigationBars.firstMatch.frame.maxY
-            let clearOfTheTabBar = portfolio.frame.maxY + 16 - barTop
-            scroll(app, by: max(toTheTop, clearOfTheTabBar))
+        let location = app.textFields.matching(labeled(text("field.location"))).firstMatch
+        XCTAssertTrue(location.waitForExistence(timeout: 10), "The editor should open on the CV")
+        waitUntilStill(location)
+        let sectionBar = app.tabBars.firstMatch
+        if sectionBar.exists && sectionBar.frame.minY > app.frame.height / 2 {
+            scroll(app, by: location.frame.minY - app.navigationBars.firstMatch.frame.maxY)
+            waitUntilStill(location)
+            assertNoText(of: app.collectionViews.firstMatch, under: sectionBar)
         }
-        attachScreenshot(3, showing: portfolio)
+        attachScreenshot(3, showing: location)
     }
 
     /// 4. The ways to start a CV: blank or from an example. The AI draft has its own screenshot, so its card is left out,
@@ -177,6 +191,14 @@ final class StoreScreenshotsUITests: XCTestCase {
         let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
         let to = from.withOffset(CGVector(dx: 0, dy: -distance))
         from.press(forDuration: 0.1, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.5)
+    }
+
+    /// Fails if a text or a field of the form is under the bar, which would hide it
+    private func assertNoText(of form: XCUIElement, under bar: XCUIElement) {
+        let covered = (form.staticTexts.allElementsBoundByIndex + form.textFields.allElementsBoundByIndex)
+            .filter { $0.frame.intersects(bar.frame) }
+            .map(\.label)
+        XCTAssertTrue(covered.isEmpty, "The section bar should cover no text, and it covers \(covered)")
     }
 
     private func closeTheKeyboard(in app: XCUIApplication) {

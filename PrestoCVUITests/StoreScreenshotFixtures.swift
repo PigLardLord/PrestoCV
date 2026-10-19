@@ -161,8 +161,7 @@ extension StoreScreenshotFixture {
         ],
         description: "Ich bin Lena Hoffmann, Pflegefachfrau aus Hamburg. Seit 2018 arbeite ich auf der Intensivstation im "
             + "Klinikum Elbufer, wo ich 5 Auszubildende anleite. Davor war ich von 2014 bis 2018 auf einer Station für Innere "
-            + "Medizin in Lüneburg. Meine Ausbildung zur Pflegefachfrau habe ich 2014 abgeschlossen. Ich spreche Deutsch "
-            + "(Muttersprache) und Englisch (B2). In meiner Freizeit rudere ich und koche gern.",
+            + "Medizin in Lüneburg. Ich spreche Deutsch (Muttersprache) und Englisch (B2).",
         draftName: "Mein Lebenslauf",
         draft: CV(
             title: "Pflegefachfrau",
@@ -172,9 +171,9 @@ extension StoreScreenshotFixture {
                       description: "Anleitung von 5 Auszubildenden."),
                 Entry(title: "Pflegefachfrau, Innere Medizin", place: "", location: "Lüneburg", period: "2014 – 2018"),
             ],
-            education: [Entry(title: "Ausbildung zur Pflegefachfrau", place: "", period: "2014")],
+            education: [],
             languages: [("Deutsch", "Native"), ("Englisch", "B2")],
-            interests: ["Rudern", "Kochen"]
+            interests: []
         )
     )
 }
@@ -351,7 +350,7 @@ extension StoreScreenshotFixture {
         description: "Je suis Camille Laurent, développeuse web à Nantes. Depuis 2021, je développe des applications de gestion "
             + "à l'Atelier Numérique de l'Erdre, où j'accompagne 2 développeurs juniors. Avant, de 2018 à 2021, j'étais "
             + "développeuse dans une agence web à Angers. J'ai obtenu un master en informatique en 2018. Je parle français "
-            + "(langue maternelle) et anglais (C1). Pendant mon temps libre, je fais de l'escalade.",
+            + "(langue maternelle) et anglais (C1).",
         draftName: "Mon CV",
         draft: CV(
             title: "Développeuse web",
@@ -363,7 +362,7 @@ extension StoreScreenshotFixture {
             ],
             education: [Entry(title: "Master en informatique", place: "", period: "2018")],
             languages: [("Français", "Native"), ("Anglais", "C1")],
-            interests: ["Escalade"]
+            interests: []
         )
     )
 }
