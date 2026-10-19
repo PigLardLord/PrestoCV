@@ -71,9 +71,7 @@ struct CVListView<EmptyState: View>: View {
             await viewModel.keepPresentationDateCurrent()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                viewModel.refreshPresentationDate()
-            }
+            viewModel.sceneDidChange(isActive: phase == .active)
         }
         .refreshable {
             await viewModel.loadCVs()

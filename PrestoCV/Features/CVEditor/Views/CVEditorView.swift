@@ -81,10 +81,7 @@ struct CVEditorView: View {
             await viewModel.loadCV()
         }
         .onChange(of: scenePhase) { _, phase in
-            // On its way to the background the app can be ended by iOS at any moment: what is not saved is kept now
-            if phase != .active {
-                Task { await viewModel.keepUnsavedEdits() }
-            }
+            Task { await viewModel.sceneDidChange(isActive: phase == .active) }
         }
         .onChange(of: viewModel.showsSavedConfirmation) { _, isShown in
             if isShown {

@@ -108,6 +108,14 @@ final class CVListViewModel: ObservableObject {
         presentationDate = now()
     }
     
+    /// The app came to the foreground or left it. Back in the foreground, which can be days after the rows were last
+    /// drawn, the times of the rows are told again.
+    func sceneDidChange(isActive: Bool) {
+        if isActive {
+            refreshPresentationDate()
+        }
+    }
+    
     /// Keeps the clock of the list current, one tick a minute, until the task that runs it is cancelled.
     func keepPresentationDateCurrent() async {
         while !Task.isCancelled {

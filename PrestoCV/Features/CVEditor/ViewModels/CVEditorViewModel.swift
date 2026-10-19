@@ -304,6 +304,14 @@ final class CVEditorViewModel: ObservableObject {
         return await unsavedEdits.keepNow(currentUnsavedEdits)
     }
     
+    /// The app came to the foreground or left it. On its way to the background the app can be ended by iOS at any
+    /// moment: what is not saved is kept now.
+    @MainActor
+    func sceneDidChange(isActive: Bool) async {
+        guard !isActive else { return }
+        await keepUnsavedEdits()
+    }
+    
     /// The question every way out of the editor asks first: Cancel, or Done once everything is saved.
     /// True when leaving would lose nothing. Otherwise the user is asked what to do, or, while a save is
     /// running, has to wait for it, since it would finish after the editor is gone.
