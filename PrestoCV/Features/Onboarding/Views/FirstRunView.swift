@@ -66,7 +66,7 @@ struct FirstRunView: View {
                 .multilineTextAlignment(.center)
             
             // The welcome promises the AI draft only where the device can make it
-            Text(viewModel.offersAI ? "welcome.description.ai".localized : "welcome.description".localized)
+            Text(viewModel.promisesAIDraft ? "welcome.description.ai".localized : "welcome.description".localized)
                 .typography(.body)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)

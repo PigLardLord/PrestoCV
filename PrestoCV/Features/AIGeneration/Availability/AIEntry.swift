@@ -6,19 +6,22 @@ enum AIEntry: Equatable {
     case available
     /// The AI draft is there but cannot be used yet, with a sentence that says what to do.
     case disabled(Explanation)
-    /// No AI draft: this device cannot run the model, it said why in words this version does not know, or the release
+    /// No AI draft: the device said why it cannot run the model in words this version does not know, or the release
     /// does not ship AI drafting (`AIFeature.isShipped`).
     case hidden
 
     enum Explanation: Hashable {
         case turnOnAppleIntelligence
         case modelStillDownloading
+        /// This device cannot run the model: the person can still write the CV or start from an example.
+        case notOnThisDeviceYet
 
         /// Catalog key of the sentence shown under the disabled AI draft.
         var key: String {
             switch self {
             case .turnOnAppleIntelligence: return "ai.unavailable.not_enabled"
             case .modelStillDownloading: return "ai.unavailable.model_not_ready"
+            case .notOnThisDeviceYet: return "ai.unavailable.not_on_this_device_yet"
             }
         }
     }
@@ -35,7 +38,9 @@ enum AIEntry: Equatable {
             self = .disabled(.turnOnAppleIntelligence)
         case .unavailable(.modelNotReady):
             self = .disabled(.modelStillDownloading)
-        case .unavailable(.deviceNotEligible), .unavailable(.unknown):
+        case .unavailable(.deviceNotEligible):
+            self = .disabled(.notOnThisDeviceYet)
+        case .unavailable(.unknown):
             self = .hidden
         }
     }

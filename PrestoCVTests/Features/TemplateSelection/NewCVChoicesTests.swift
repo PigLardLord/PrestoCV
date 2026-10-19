@@ -25,7 +25,7 @@ struct NewCVChoicesTests {
         let viewModel = await makeViewModel(.available)
 
         #expect(viewModel.choices == [.aiDraft, .blank, .example])
-        #expect(viewModel.offersAI, "The welcome may speak of the AI draft")
+        #expect(viewModel.promisesAIDraft, "The welcome may promise the AI draft")
     }
 
     @Test("Where Apple Intelligence is off or the model is still downloading, the AI draft comes last, off, with what to do",
@@ -37,16 +37,23 @@ struct NewCVChoicesTests {
         let viewModel = await makeViewModel(availability)
 
         #expect(viewModel.choices == [.blank, .example, .aiDraftUnavailable(explanation)])
-        #expect(viewModel.offersAI, "The device can draft once the person has done what the sentence says")
+        #expect(viewModel.promisesAIDraft, "The device can draft once the person has done what the sentence says")
     }
 
-    @Test("Where the device cannot run the model, only a blank CV and the examples are offered, and AI is not promised",
-          arguments: [AIAvailability.unavailable(.deviceNotEligible), .unavailable(.unknown)])
-    func hiddenOffersOnlyWhatTheDeviceDoes(availability: AIAvailability) async {
-        let viewModel = await makeViewModel(availability)
+    @Test("Where the device cannot run the model, the AI draft comes last, off, with the sentence that it cannot draft yet, and AI is not promised")
+    func notEligibleShowsTheAIDraftOffWithoutPromisingIt() async {
+        let viewModel = await makeViewModel(.unavailable(.deviceNotEligible))
+
+        #expect(viewModel.choices == [.blank, .example, .aiDraftUnavailable(.notOnThisDeviceYet)])
+        #expect(!viewModel.promisesAIDraft, "The welcome does not promise a draft this device cannot make")
+    }
+
+    @Test("Where the device gives a reason this version does not know, only a blank CV and the examples are offered, and AI is not promised")
+    func unknownReasonOffersOnlyWhatTheDeviceDoes() async {
+        let viewModel = await makeViewModel(.unavailable(.unknown))
 
         #expect(viewModel.choices == [.blank, .example])
-        #expect(!viewModel.offersAI)
+        #expect(!viewModel.promisesAIDraft)
     }
 
     @Test("A release that does not ship AI drafting offers a blank CV and the examples only, and does not promise AI",
@@ -61,7 +68,7 @@ struct NewCVChoicesTests {
         let viewModel = await makeViewModel(availability, isAIShipped: false)
 
         #expect(viewModel.choices == [.blank, .example])
-        #expect(!viewModel.offersAI)
+        #expect(!viewModel.promisesAIDraft)
     }
 
     @Test("Without examples there is no example to start from, whatever the availability",

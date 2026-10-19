@@ -13,8 +13,8 @@ typealias AIAvailabilityProvider = @MainActor () -> AIAvailability
 /// The wait between two reads of an availability that is still changing. It throws when the wait is cancelled.
 typealias AIAvailabilityPause = @MainActor () async throws -> Void
 
-/// The ways to start a new CV that the first run and the "New CV" screen offer: an AI draft where the device can run
-/// it, a blank CV, and the example CVs.
+/// The ways to start a new CV that the first run and the "New CV" screen offer: an AI draft, which is off with the
+/// sentence that says why where the device cannot make it now, a blank CV, and the example CVs.
 @MainActor
 final class NewCVChoicesViewModel: ObservableObject {
 
@@ -62,10 +62,16 @@ final class NewCVChoicesViewModel: ObservableObject {
         }
     }
 
-    /// Whether the screens may speak of AI drafting: only where the device can make a draft, now or once the person
-    /// has turned Apple Intelligence on or the model has finished downloading.
-    var offersAI: Bool {
-        aiEntry != .hidden
+    /// Whether the screens may promise an AI draft: only where the device can make one, now or once the person has
+    /// turned Apple Intelligence on or the model has finished downloading. A device that cannot run the model shows
+    /// the AI draft off, with its sentence, and nothing promises it.
+    var promisesAIDraft: Bool {
+        switch aiEntry {
+        case .available, .disabled(.turnOnAppleIntelligence), .disabled(.modelStillDownloading):
+            return true
+        case .disabled(.notOnThisDeviceYet), .hidden:
+            return false
+        }
     }
 
     // MARK: - AI Drafting

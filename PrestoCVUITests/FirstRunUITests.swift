@@ -1,6 +1,7 @@
 import XCTest
 
-/// The first run leads with the AI draft where the device can run it, and promises it nowhere else.
+/// The first run leads with the AI draft where the device can run it. Elsewhere it shows the draft off, after what
+/// works, with the sentence that says why, and the welcome does not promise it where the device cannot make it.
 final class FirstRunUITests: XCTestCase {
 
     private var app: XCUIApplication!
@@ -27,6 +28,10 @@ final class FirstRunUITests: XCTestCase {
     private func text(_ label: String) -> XCUIElement {
         app.staticTexts.matching(NSPredicate(format: "label == %@", label)).firstMatch
     }
+
+    /// The sentence under the AI draft on a device that cannot run the model.
+    private let notOnThisDevice = "This device doesn't support AI drafts yet. We're working on bringing them to more devices. "
+        + "Meanwhile, you can create your CV by hand or start from an example."
 
     func testTheAIDraftLeadsTheFirstRunAndOpensTheAIScreen() throws {
         launch(aiAvailability: "available")
@@ -56,12 +61,19 @@ final class FirstRunUITests: XCTestCase {
         XCTAssertFalse(text(reason).exists, "VoiceOver should read the sentence once, with the AI draft")
     }
 
-    func testTheFirstRunDoesNotPromiseAIWhereTheDeviceCannotRunIt() throws {
+    func testTheAIDraftIsOffAndSaysWhyWhereTheDeviceCannotRunIt() throws {
         launch(aiAvailability: "deviceNotEligible")
 
-        XCTAssertTrue(app.buttons["Create My First CV"].waitForExistence(timeout: 20), "The first run should offer a blank CV")
-        XCTAssertFalse(aiDraft.exists, "A device that cannot run the model should not be offered the AI draft")
-        let mentionsAI = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "AI")).firstMatch
-        XCTAssertFalse(mentionsAI.exists, "The welcome should not promise AI on a device that cannot run it")
+        let blank = app.buttons["Create My First CV"]
+        XCTAssertTrue(blank.waitForExistence(timeout: 20), "The first run should offer a blank CV")
+        XCTAssertTrue(aiDraft.exists, "The first run should show the AI draft on a device that cannot make it yet")
+        XCTAssertFalse(aiDraft.isEnabled, "The AI draft should be off, and VoiceOver should read it as dimmed")
+        XCTAssertLessThan(blank.frame.minY, aiDraft.frame.minY, "What works now should come first")
+        XCTAssertEqual(aiDraft.value as? String, notOnThisDevice, "VoiceOver should read why, after the title")
+        XCTAssertFalse(text(notOnThisDevice).exists, "VoiceOver should read the sentence once, with the AI draft")
+        let welcome = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Write your CV, keep it on your device")).firstMatch
+        XCTAssertTrue(welcome.exists, "The welcome should speak of what the device can do")
+        let promise = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "AI drafts your CV")).firstMatch
+        XCTAssertFalse(promise.exists, "The welcome should not promise AI on a device that cannot run it")
     }
 }

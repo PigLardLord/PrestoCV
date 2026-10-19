@@ -111,7 +111,7 @@ struct NewCVChoicesViewModelTests {
         #expect(availability.reads == 1)
     }
 
-    @Test("A model that stops being ready for good, on a device found not eligible, ends the reads and hides the card")
+    @Test("A model that stops being ready for good, on a device found not eligible, ends the reads and says the device cannot draft yet")
     func followingStopsAtAFinalState() async {
         let availability = Availability(.unavailable(.modelNotReady))
         let pauses = Pauses()
@@ -120,7 +120,7 @@ struct NewCVChoicesViewModelTests {
 
         await viewModel.followAIAvailability()
 
-        #expect(viewModel.aiEntry == .hidden)
+        #expect(viewModel.aiEntry == .disabled(.notOnThisDeviceYet))
         #expect(pauses.count == 1)
     }
 
@@ -145,14 +145,18 @@ struct NewCVChoicesViewModelTests {
         #expect(viewModel.aiEntry == .disabled(.modelStillDownloading))
     }
 
-    @Test("A device that is not eligible has no entry, and still has none after a refresh")
-    func notEligibleStaysHidden() {
+    @Test("A device that is not eligible shows the entry off, with the sentence that it cannot draft yet, and keeps it after a refresh")
+    func notEligibleShowsTheEntryOff() {
         let availability = Availability(.unavailable(.deviceNotEligible))
         let viewModel = makeViewModel(availability)
+        #expect(viewModel.aiEntry == .disabled(.notOnThisDeviceYet))
 
         viewModel.refreshAIAvailability()
 
-        #expect(viewModel.aiEntry == .hidden)
+        #expect(viewModel.aiEntry == .disabled(.notOnThisDeviceYet))
+        #expect(viewModel.choices.contains(.aiDraftUnavailable(.notOnThisDeviceYet)), "The entry is shown")
+        #expect(!viewModel.choices.contains(.aiDraft), "The entry cannot be used")
+        #expect(AIEntry.Explanation.notOnThisDeviceYet.key == "ai.unavailable.not_on_this_device_yet")
     }
 
     @Test("A release that does not ship AI drafting has no entry whatever the availability, and does not follow it",
