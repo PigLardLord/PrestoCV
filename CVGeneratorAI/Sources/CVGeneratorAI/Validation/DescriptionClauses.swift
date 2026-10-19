@@ -52,6 +52,18 @@ struct Clause {
         preamble + String(original)
     }
 
+    /// Whether the clause ends with a question mark, past the spaces, the punctuation and the closing marks after it: "Parlo
+    /// francese?", "«Parli francese?»".
+    var endsAQuestion: Bool {
+        lastMark == "?"
+    }
+
+    private static let trailing: Set<Character> = [",", ";", "!", ")", "]", "}", "\"", "'", "»", "«", "”", "“", "’", "‘", "›", "‹"]
+
+    private var lastMark: Character? {
+        source.last { !$0.isWhitespace && !Self.trailing.contains($0) }
+    }
+
     /// Where `phrase` (the folded words of a quote) stands in the clause, as ranges of word positions.
     func spans(of phrase: [String]) -> [Range<Int>] {
         guard !phrase.isEmpty, words.count >= phrase.count else { return [] }

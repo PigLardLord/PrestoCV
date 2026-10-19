@@ -153,4 +153,12 @@ struct DescriptionClausesTests {
         #expect(fragment.words.indices.filter(fragment.isCapitalised) == [3, 4])
         #expect(result.sentences[0][0].words.indices.filter(result.sentences[0][0].isCapitalised) == [0, 2, 3])
     }
+
+    @Test("A clause ends a question when a question mark ends it, past closing marks")
+    func questions() {
+        let sentences = ["Parlo francese e tedesco, giusto?", "«Parli francese?»", "«Parli francese?», mi chiedono."]
+        let clauses = DescriptionClauses(sentences: sentences, protecting: [])
+
+        #expect(clauses.sentences.map { $0.map(\.endsAQuestion) } == [[false, false, true], [true], [false]])
+    }
 }

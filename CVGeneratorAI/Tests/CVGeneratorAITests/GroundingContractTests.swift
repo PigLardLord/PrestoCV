@@ -493,6 +493,7 @@ enum GroundingRows {
         rows += deniedLowLevels()
         rows += textWithoutAccents()
         rows += moodsOfSupposition()
+        rows += questionsClaimNothing()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3546,6 +3547,37 @@ enum GroundingRows {
                         "Ich hatte Spanisch in der Schule.", CVData(languages: [Language(name: "Spanisch")]), .unchanged, language: "de"))
         rows.append(row("a-past-after-d-keeps-the-title-and-place-en", "I'd worked is I had worked: the title and the place stay",
                         "I'm Maria Rossi. I'd worked as a teacher in Berlin.", maria("teacher", "Berlin"), .unchanged))
+        return rows
+    }
+
+    /// A question claims nothing (#202): a sentence that ends with a question mark, every clause of it. The sentence after it claims
+    /// as usual, and a question the person answers loses its item: an accepted loss.
+    private static func questionsClaimNothing() -> [GroundingRow] {
+        typealias Question = (language: String, question: String, name: String, answered: String)
+        var questions: [Question] = []
+        questions.append(("en", "Do I speak French?", "French", "Do you need a translator? I speak French."))
+        questions.append(("it", "Parlo francese?", "francese", "Cercate un traduttore? Parlo francese."))
+        questions.append(("de", "Spreche ich Französisch?", "Französisch", "Suchen Sie einen Übersetzer? Ich spreche Französisch."))
+        questions.append(("es", "¿Hablo francés?", "francés", "¿Busca un traductor? Hablo francés."))
+        questions.append(("fr", "Est-ce que je parle français ?", "français", "Vous cherchez un traducteur ? Je parle français."))
+        questions.append(("pt", "Falo francês?", "francês", "Procura um tradutor? Falo francês."))
+
+        var rows: [GroundingRow] = []
+        for v in questions {
+            let draft = CVData(languages: [Language(name: v.name)])
+            rows.append(row("a-question-claims-no-language-\(v.language)", "the person only asks: no language",
+                            v.question, draft, .exactly(CVData()), language: v.language))
+            rows.append(row("a-fact-after-a-question-keeps-its-language-\(v.language)",
+                            "the question is the reader's; the sentence after it is a fact: the language stays",
+                            v.answered, draft, .unchanged, language: v.language))
+        }
+        rows.append(row("a-sentence-that-ends-in-a-question-claims-nothing",
+                        "the sentence ends with a question mark: neither language stays, not even the one before the comma",
+                        "Parlo francese e tedesco, giusto?",
+                        CVData(languages: [Language(name: "francese"), Language(name: "tedesco")]), .exactly(CVData()), language: "it"))
+        rows.append(row("a-question-the-person-answers-is-an-accepted-loss",
+                        "the item stands only in the question, and the answer does not name it: French goes, an accepted loss",
+                        "Do I speak French? Yes, fluently.", CVData(languages: [Language(name: "French")]), .exactly(CVData())))
         return rows
     }
 
