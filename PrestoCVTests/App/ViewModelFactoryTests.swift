@@ -59,7 +59,7 @@ struct ViewModelFactoryTests {
             dependencyContainer: UnusedContainer(),
             cvManagementUseCase: cvs,
             unsavedEditsUseCase: keepsUnsavedEdits ? unsavedEdits : nil,
-            newEditingID: { ids.next() }
+            environment: .fixed(newEditingID: { ids.next() })
         )
     }
 

@@ -115,7 +115,7 @@ struct AppLaunchViewModelTests {
     func containerThatBuildsGivesDependencies() {
         let supplier = ContainerSupplier(failures: [nil])
 
-        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeUnsavedEdits: inMemoryUnsavedEdits, bootstrapTemplates: {})
+        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeUnsavedEdits: inMemoryUnsavedEdits, environment: .fixed(), bootstrapTemplates: {})
 
         guard case .ready = viewModel.phase else {
             Issue.record("Expected the ready phase")
@@ -127,7 +127,7 @@ struct AppLaunchViewModelTests {
     func containerThatFailsGivesTheReason() {
         let supplier = ContainerSupplier(failures: [storageFailure])
 
-        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeUnsavedEdits: inMemoryUnsavedEdits, bootstrapTemplates: {})
+        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeUnsavedEdits: inMemoryUnsavedEdits, environment: .fixed(), bootstrapTemplates: {})
 
         guard case .failed(let message) = viewModel.phase else {
             Issue.record("Expected the failed phase")
@@ -141,7 +141,7 @@ struct AppLaunchViewModelTests {
     @Test("Retry asks for a new container and recovers when it builds")
     func retryAsksForNewContainerAndRecovers() {
         let supplier = ContainerSupplier(failures: [storageFailure, nil])
-        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeUnsavedEdits: inMemoryUnsavedEdits, bootstrapTemplates: {})
+        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeUnsavedEdits: inMemoryUnsavedEdits, environment: .fixed(), bootstrapTemplates: {})
 
         viewModel.retry()
 
@@ -155,7 +155,7 @@ struct AppLaunchViewModelTests {
     @Test("Retry keeps showing the failure while the container still cannot be built")
     func retryKeepsFailureWhileStillFailing() {
         let supplier = ContainerSupplier(failures: [storageFailure, storageFailure])
-        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeUnsavedEdits: inMemoryUnsavedEdits, bootstrapTemplates: {})
+        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeUnsavedEdits: inMemoryUnsavedEdits, environment: .fixed(), bootstrapTemplates: {})
 
         viewModel.retry()
 
@@ -173,6 +173,7 @@ struct AppLaunchViewModelTests {
         let viewModel = AppLaunchViewModel(
             makeDependencyContainer: { StubDependencyContainer(onboardingUseCase: onboardingUseCase) },
             makeUnsavedEdits: inMemoryUnsavedEdits,
+            environment: .fixed(),
             bootstrapTemplates: {
                 for await _ in templatesReleased.stream {
                     return
@@ -195,6 +196,7 @@ struct AppLaunchViewModelTests {
         let viewModel = AppLaunchViewModel(
             makeDependencyContainer: supplier.next,
             makeUnsavedEdits: inMemoryUnsavedEdits,
+            environment: .fixed(),
             bootstrapTemplates: { await installs.increment() }
         )
 
@@ -214,6 +216,7 @@ struct AppLaunchViewModelTests {
         let viewModel = AppLaunchViewModel(
             makeDependencyContainer: { StubDependencyContainer() },
             makeUnsavedEdits: { throw NoFolder() },
+            environment: .fixed(),
             bootstrapTemplates: {}
         )
 
@@ -236,6 +239,7 @@ struct AppLaunchViewModelTests {
         let viewModel = AppLaunchViewModel(
             makeDependencyContainer: supplier.next,
             makeUnsavedEdits: inMemoryUnsavedEdits,
+            environment: .fixed(),
             bootstrapTemplates: { await installs.increment() }
         )
 

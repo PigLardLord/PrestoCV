@@ -30,6 +30,7 @@ final class CVListViewModel: ObservableObject {
     // MARK: - Private Properties
     private let cvManagementUseCase: CVManagementUseCaseProtocol
     private let storedCVChanges: ChangeStoredCV<CVModel>
+    private let locale: Locale
     private let now: () -> Date
     private let waitBetweenTicks: (Duration) async throws -> Void
     private let calendar: () -> Calendar
@@ -74,6 +75,7 @@ final class CVListViewModel: ObservableObject {
     // MARK: - Initialization
     /// - Parameters:
     ///   - storedCVChanges: Renames a stored CV, or sets the language of its PDF.
+    ///   - locale: The language of the words that say when a CV was saved: the language of the app.
     ///   - now: The clock of the app.
     ///   - calendar: What counts as a day when a save is told in days. It is asked for each time a text is made, so
     ///     that a change of the time zone of the device moves the days with it.
@@ -81,12 +83,14 @@ final class CVListViewModel: ObservableObject {
     init(
         cvManagementUseCase: CVManagementUseCaseProtocol,
         storedCVChanges: ChangeStoredCV<CVModel>,
-        now: @escaping () -> Date = { Date() },
-        calendar: @escaping () -> Calendar = { .autoupdatingCurrent },
-        sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+        locale: Locale,
+        now: @escaping () -> Date,
+        calendar: @escaping () -> Calendar,
+        sleep: @escaping (Duration) async throws -> Void
     ) {
         self.cvManagementUseCase = cvManagementUseCase
         self.storedCVChanges = storedCVChanges
+        self.locale = locale
         self.now = now
         self.waitBetweenTicks = sleep
         self.presentationDate = now()
@@ -118,7 +122,7 @@ final class CVListViewModel: ObservableObject {
     
     /// When a CV was last saved, in words, for its row. Nil while that is not known.
     func lastSavedLine(of cv: CVModel) -> String? {
-        lastSavedAt[cv.id].map { LastSavedDescription(calendar: calendar()).text(for: $0, relativeTo: presentationDate) }
+        lastSavedAt[cv.id].map { LastSavedDescription(locale: locale, calendar: calendar()).text(for: $0, relativeTo: presentationDate) }
     }
     
     /// Moves the clock of the list to now, so that the times of the rows are told again. The list calls it when the

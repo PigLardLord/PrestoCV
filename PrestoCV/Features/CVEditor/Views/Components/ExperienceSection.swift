@@ -90,6 +90,6 @@ struct EducationSubsection: View {
 
 #if DEBUG
 #Preview {
-    ExperienceSection(viewModel: CVEditorViewModel(cvId: nil, cvManagementUseCase: PreviewDependencies.cvManagement()))
+    ExperienceSection(viewModel: PreviewDependencies.editor())
 }
 #endif

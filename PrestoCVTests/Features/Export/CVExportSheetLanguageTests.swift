@@ -32,6 +32,7 @@ struct CVExportSheetLanguageTests {
             documentLanguageSink: sink,
             exportPolicy: .standard,
             documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: ["it-IT"], read: NaturalLanguageReader.read),
+            appLocale: Locale(identifier: "en"),
             previewDebounce: .zero
         )
         viewModel.selectedTemplateId = "modern"
@@ -39,7 +40,7 @@ struct CVExportSheetLanguageTests {
     }
 
     private func headings(in language: DocumentLanguage) -> String {
-        String(format: String(localized: "export.language.headings"), language.nameInAppLanguage)
+        String(format: String(localized: "export.language.headings"), language.name(in: Locale(identifier: "en")))
     }
 
     // MARK: - What the sheet shows

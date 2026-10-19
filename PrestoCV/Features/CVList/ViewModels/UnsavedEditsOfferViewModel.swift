@@ -35,8 +35,8 @@ final class UnsavedEditsOfferViewModel: ObservableObject {
     init(
         useCase: UnsavedEditsUseCaseProtocol?,
         cvs: CVManagementUseCaseProtocol,
-        locale: Locale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en"),
-        timeZone: TimeZone = .autoupdatingCurrent
+        locale: Locale,
+        timeZone: TimeZone
     ) {
         self.useCase = useCase
         self.cvs = cvs

@@ -56,7 +56,8 @@ struct CVEditorViewModelDocumentLanguageTests {
             cvId: nil,
             initialCV: CVModel(personalInfo: PersonalInfo(name: "Luca Ferrari", title: "Sales Manager")),
             cvManagementUseCase: MockCVManagementUseCase(),
-            documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: ["it-IT"], read: NaturalLanguageReader.read)
+            documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: ["it-IT"], read: NaturalLanguageReader.read),
+            sleep: waitUntilCancelled
         )
         let automatic = { (name: String) in String(format: String(localized: "language.automatic"), name) }
         #expect(viewModel.automaticDocumentLanguageTitle == automatic("Italiano"), "Too few words to tell: the app's language")
@@ -74,7 +75,8 @@ struct CVEditorViewModelDocumentLanguageTests {
             cvId: nil,
             initialCV: CVModel(),
             cvManagementUseCase: MockCVManagementUseCase(),
-            documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: ["it-IT"], read: NaturalLanguageReader.read)
+            documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: ["it-IT"], read: NaturalLanguageReader.read),
+            sleep: waitUntilCancelled
         )
         #expect(viewModel.documentLanguageTitle == viewModel.automaticDocumentLanguageTitle)
 

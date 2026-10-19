@@ -1,21 +1,9 @@
 import Combine
 import Foundation
 import PrestoCVCore
-import CVPDFExporter
-import struct PrestoCVApplication.ChangeStoredCV
 import os
 
 private let launchLogger = Logger(subsystem: "com.PigLardLord.prestocv", category: "launch")
-
-/// Installs the templates that ship with the app. A failure is logged and does not block the launch.
-func installBundledTemplates() async {
-    do {
-        let bootstrapService = try TemplateBootstrapService()
-        try await bootstrapService.syncBundledTemplates()
-    } catch {
-        launchLogger.error("Bundled templates were not installed: \(error.localizedDescription, privacy: .public)")
-    }
-}
 
 /// The long-lived objects behind the root screens, built once from one dependency container.
 struct RootDependencies {
@@ -43,19 +31,25 @@ final class AppLaunchViewModel: ObservableObject {
     // MARK: - Private Properties
     private let makeDependencyContainer: @MainActor () -> PrestoCVCore.DependencyContainerProtocol
     private let makeUnsavedEdits: @MainActor () throws -> UnsavedEditsUseCaseProtocol
+    private let environment: AppEnvironment
     private let bootstrapTemplates: @Sendable () async -> Void
 
     // MARK: - Initialization
-    /// - Parameter makeUnsavedEdits: Gives the unsaved edits of the app, which every window shares.
+    /// - Parameters:
+    ///   - makeUnsavedEdits: Gives the unsaved edits of the app, which every window shares.
+    ///   - environment: What the view models read from the device.
+    ///   - bootstrapTemplates: Installs the templates that ship with the app.
     init(
         makeDependencyContainer: @escaping @MainActor () -> PrestoCVCore.DependencyContainerProtocol,
         makeUnsavedEdits: @escaping @MainActor () throws -> UnsavedEditsUseCaseProtocol,
-        bootstrapTemplates: @escaping @Sendable () async -> Void = { await installBundledTemplates() }
+        environment: AppEnvironment,
+        bootstrapTemplates: @escaping @Sendable () async -> Void
     ) {
         self.makeDependencyContainer = makeDependencyContainer
         self.makeUnsavedEdits = makeUnsavedEdits
+        self.environment = environment
         self.bootstrapTemplates = bootstrapTemplates
-        self.phase = Self.compose(from: makeDependencyContainer(), unsavedEdits: makeUnsavedEdits)
+        self.phase = Self.compose(from: makeDependencyContainer(), unsavedEdits: makeUnsavedEdits, environment: environment)
     }
 
     // MARK: - Public Methods
@@ -72,13 +66,14 @@ final class AppLaunchViewModel: ObservableObject {
     }
 
     func retry() {
-        phase = Self.compose(from: makeDependencyContainer(), unsavedEdits: makeUnsavedEdits)
+        phase = Self.compose(from: makeDependencyContainer(), unsavedEdits: makeUnsavedEdits, environment: environment)
     }
 
     // MARK: - Private Methods
     private static func compose(
         from container: PrestoCVCore.DependencyContainerProtocol,
-        unsavedEdits makeUnsavedEdits: @MainActor () throws -> UnsavedEditsUseCaseProtocol
+        unsavedEdits makeUnsavedEdits: @MainActor () throws -> UnsavedEditsUseCaseProtocol,
+        environment: AppEnvironment
     ) -> Phase {
         do {
             let cvManagementUseCase = try container.makeCVManagementUseCase()
@@ -86,16 +81,14 @@ final class AppLaunchViewModel: ObservableObject {
             let viewModelFactory = try ViewModelFactory(
                 dependencyContainer: container,
                 cvManagementUseCase: cvManagementUseCase,
-                unsavedEditsUseCase: unsavedEditsUseCase
+                unsavedEditsUseCase: unsavedEditsUseCase,
+                environment: environment
             )
             return .ready(
                 RootDependencies(
                     onboardingViewModel: try viewModelFactory.makeOnboardingViewModel(),
-                    cvListViewModel: CVListViewModel(
-                        cvManagementUseCase: cvManagementUseCase,
-                        storedCVChanges: ChangeStoredCV(cvs: ManagedStoredCVs(cvs: cvManagementUseCase))
-                    ),
-                    unsavedEditsOfferViewModel: UnsavedEditsOfferViewModel(useCase: unsavedEditsUseCase, cvs: cvManagementUseCase),
+                    cvListViewModel: viewModelFactory.makeCVListViewModel(),
+                    unsavedEditsOfferViewModel: viewModelFactory.makeUnsavedEditsOfferViewModel(),
                     viewModelFactory: viewModelFactory
                 )
             )

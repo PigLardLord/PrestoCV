@@ -106,9 +106,9 @@ final class CVEditorViewModel: ObservableObject {
         notice: EditorNotice? = nil,
         restoring restoredEdits: UnsavedEdits? = nil,
         cvManagementUseCase: CVManagementUseCaseProtocol,
-        documentLanguageDetector: DocumentLanguageDetector = .onDevice,
+        documentLanguageDetector: DocumentLanguageDetector,
         unsavedEdits: UnsavedEditsKeeper? = nil,
-        sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+        sleep: @escaping (Duration) async throws -> Void
     ) {
         self.cvId = cvId
         self.notice = notice

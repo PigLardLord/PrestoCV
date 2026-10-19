@@ -8,8 +8,7 @@ extension DocumentLanguage {
     }
 
     /// The name of the language in the language the app is shown in: "inglese" in Italian, "Englisch" in German
-    var nameInAppLanguage: String {
-        let appLanguage = Locale(identifier: Bundle.main.preferredLocalizations.first ?? DocumentLanguage.english.rawValue)
-        return appLanguage.localizedString(forLanguageCode: rawValue) ?? nativeName
+    func name(in appLocale: Locale) -> String {
+        appLocale.localizedString(forLanguageCode: rawValue) ?? nativeName
     }
 }

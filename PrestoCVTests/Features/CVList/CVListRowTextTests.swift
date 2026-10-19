@@ -36,7 +36,7 @@ struct CVListRowTextTests {
 
     /// What the row of a CV that was saved at `savedAt` says when it is looked at in `moment`, in a time zone.
     private func line(saved savedAt: Date, at moment: Date, zone: String = "UTC") -> String {
-        LastSavedDescription(calendar: TestZone(zone).calendar).text(for: savedAt, relativeTo: moment)
+        LastSavedDescription(locale: Locale(identifier: "en"), calendar: TestZone(zone).calendar).text(for: savedAt, relativeTo: moment)
     }
 
     private static let calendar: Calendar = {

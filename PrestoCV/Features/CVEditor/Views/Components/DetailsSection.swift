@@ -116,6 +116,6 @@ struct InterestsSubsection: View {
 
 #if DEBUG
 #Preview {
-    DetailsSection(viewModel: CVEditorViewModel(cvId: nil, cvManagementUseCase: PreviewDependencies.cvManagement()))
+    DetailsSection(viewModel: PreviewDependencies.editor())
 }
 #endif

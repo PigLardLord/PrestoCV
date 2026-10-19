@@ -92,7 +92,7 @@ struct FileExportPreferencesStoreTests {
 
     @Test("the default file lives in Application Support, outside UserDefaults")
     func defaultFileIsInApplicationSupport() {
-        let path = FileExportPreferencesStore.defaultFileURL.path
+        let path = AppEnvironment.device().exportPreferencesFile.path
 
         #expect(path.contains("Application Support"))
         #expect(path.hasSuffix("export-preferences.json"))
@@ -118,7 +118,7 @@ struct CVExportSheetViewModelPreferencesTests {
         let store = InMemoryExportPreferencesStore(stored: stored)
         let viewModel = CVExportSheetViewModel(
             cv: .exportable, exportService: service, preferencesStore: store, documentLanguageSink: { _ in }, exportPolicy: .standard,
-            previewDebounce: .zero
+            documentLanguageDetector: englishDocumentLanguageDetector, appLocale: Locale(identifier: "en"), previewDebounce: .zero
         )
         return (viewModel, store, service)
     }

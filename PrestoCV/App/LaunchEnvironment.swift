@@ -12,7 +12,7 @@ enum LaunchEnvironment {
     /// Where the app keeps its data. The debug build keeps it in a folder of its own when a UI test asks for one, so
     /// that the test does not depend on what the simulator already holds: a new, empty folder for each launch, or a
     /// named one that the launches of one test share, as a relaunch needs. Release builds ignore the request.
-    static func storage(arguments: [String] = ProcessInfo.processInfo.arguments) -> Storage {
+    static func storage(arguments: [String]) -> Storage {
         #if DEBUG
         if let folder = uiTestFolder(arguments: arguments) {
             let directory = FileManager.default.temporaryDirectory
