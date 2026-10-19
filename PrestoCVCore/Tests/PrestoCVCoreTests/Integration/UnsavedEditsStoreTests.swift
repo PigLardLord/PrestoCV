@@ -148,8 +148,8 @@ struct UnsavedEditsStoreTests {
         defer { installation.remove() }
         let cv = CVTestDataBuilder.minimalCV().build()
 
-        let claim = try await keep(cv, in: try UnsavedEditsUseCase.inDirectory(installation.unsavedEdits))
-        let offered = try await UnsavedEditsUseCase.inDirectory(installation.unsavedEdits).editsToRestore()
+        let claim = try await keep(cv, in: try DependencyContainer.makeUnsavedEditsUseCase(in: installation.unsavedEdits))
+        let offered = try await DependencyContainer.makeUnsavedEditsUseCase(in: installation.unsavedEdits).editsToRestore()
 
         #expect(FileManager.default.fileExists(atPath: installation.unsavedEdits.appendingPathComponent("edits_\(claim.editing.uuidString).json").path))
         #expect(offered?.cv == cv)

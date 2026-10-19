@@ -16,20 +16,11 @@ public actor UnsavedEditsUseCase: UnsavedEditsUseCaseProtocol {
     public init(
         repository: UnsavedEditsRepositoryProtocol,
         now: @escaping @Sendable () -> Date,
-        makeToken: @escaping @Sendable () -> UUID = { UUID() }
+        makeToken: @escaping @Sendable () -> UUID
     ) {
         self.repository = repository
         self.now = now
         self.makeToken = makeToken
-    }
-
-    /// The use case of the app, over the folder that holds the unsaved edits.
-    /// - Throws: AppError if the folder cannot be made
-    public static func inDirectory(_ directory: URL) throws -> UnsavedEditsUseCase {
-        UnsavedEditsUseCase(
-            repository: UnsavedEditsRepository(storageService: try FileStorageService(baseDirectory: directory)),
-            now: { Date() }
-        )
     }
 
     public func claimEditing(_ editing: UUID) async -> UnsavedEditsClaim? {

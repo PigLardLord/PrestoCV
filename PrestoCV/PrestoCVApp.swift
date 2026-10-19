@@ -15,7 +15,7 @@ struct PrestoCVApp: App {
     /// The unsaved edits of the whole app, made once and shared by every window, so that each set of edits has one
     /// holder at a time, and is never offered while an editor holds it.
     private static let unsavedEdits = Result {
-        try UnsavedEditsUseCase.inDirectory(storage.unsavedEdits())
+        try DependencyContainer.makeUnsavedEditsUseCase(in: storage.unsavedEdits())
     }
 
     var body: some Scene {

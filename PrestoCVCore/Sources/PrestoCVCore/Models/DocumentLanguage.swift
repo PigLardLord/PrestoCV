@@ -35,7 +35,7 @@ public enum DocumentLanguage: String, CaseIterable, Identifiable, Sendable {
     ///     for, counts as no choice.
     ///   - preferredLanguages: The languages of the user, most wanted first. With no choice for the CV, the
     ///     first of them that is supported is used, and English when none is.
-    public static func resolve(_ tag: String?, preferredLanguages: [String] = Locale.preferredLanguages) -> DocumentLanguage {
+    public static func resolve(_ tag: String?, preferredLanguages: [String]) -> DocumentLanguage {
         if let tag, let chosen = DocumentLanguage(languageTag: tag) {
             return chosen
         }
