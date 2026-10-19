@@ -153,7 +153,7 @@ struct DescriptionClauses {
     ///   - lineStarts: The sentences that start a line of the description; with none, no sentence is known to.
     init(sentences: [String], protecting quotes: [[String]], language: Vocabulary.Language? = nil, lineStarts: Set<Int> = []) {
         texts = sentences
-        quoted = QuotedSpeech.offsets(in: sentences)
+        quoted = QuotedSpeech.offsets(in: sentences, lineStarts: lineStarts)
         self.lineStarts = lineStarts
         self.sentences = sentences.map { sentence in
             Self.clauses(of: sentence, blanked: AddressTokens(sentence).remainder, protecting: quotes, language: language)

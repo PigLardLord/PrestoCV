@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1736
+    static let rowsWhenWritten = 1761
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -3646,6 +3646,96 @@ enum GroundingRows {
         rows.append(row("a-skill-in-quotation-marks-is-an-accepted-loss",
                         "the skill stands only inside quotation marks: Swift goes, an accepted loss",
                         "I work with “Swift” every day.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData())))
+        rows += singleMarksAfterAWord()
+        return rows
+    }
+
+    /// A single mark right after a letter or a digit may end a word rather than a quote (#202): a possessive ("patients' records",
+    /// "Hans’ Team"), an elision ("un po'", "all' università", "jusqu' à") or a prime ("a 5' de la oficina"), whatever follows it. It
+    /// closes no quote: the quote runs to a mark that closes it for sure, after a punctuation mark, or, with none, to the end of the
+    /// line of the last mark that may. An apostrophe outside a quote still claims as usual ("I'm", "l'inglese", "dell'università",
+    /// "clients' apps"). A quote that such a mark closes takes the rest of its line with it, and so does an apostrophe that starts a
+    /// word when a later one may close it ("the '90s"): accepted losses.
+    private static func singleMarksAfterAWord() -> [GroundingRow] {
+        typealias Passage = (id: String, language: String, description: String, name: String)
+        var passages: [Passage] = []
+        passages.append(("straight-possessive-en", "en", "My colleague said 'I manage patients' records. I speak French.'", "French"))
+        passages.append(("curly-possessive-en", "en", "My colleague said ‘I manage patients’ records. I speak French.’", "French"))
+        passages.append(("possessive-of-a-name-de", "de", "Mein Kollege sagte: ‚Ich leite Hans’ Team. Ich spreche Französisch.‘", "Französisch"))
+        passages.append(("low-mark-as-an-apostrophe-de", "de", "Mein Kollege sagte: ‚Ich leite Hans‘ Team. Ich spreche Französisch.‘",
+                         "Französisch"))
+        passages.append(("straight-possessive-of-a-name-de", "de", "Mein Kollege sagte: 'Ich leite Hans' Team. Ich spreche Französisch.'",
+                         "Französisch"))
+        passages.append(("elision-before-a-word-it", "it", "Il mio collega ha detto: 'Parlo un po' di tedesco. Parlo francese.'", "francese"))
+        passages.append(("elision-before-a-full-stop-it", "it", "Il mio collega ha detto: 'Parlo tedesco solo un po'. Parlo francese.'",
+                         "francese"))
+        passages.append(("elision-before-a-space-it", "it", "Il mio collega ha scritto: 'Ho studiato all' università. Parlo francese.'",
+                         "francese"))
+        passages.append(("elision-before-a-space-fr", "fr", "Mon collègue a écrit : 'Je travaille jusqu' à huit heures. Je parle français.'",
+                         "français"))
+        passages.append(("prime-es", "es", "Mi colega dijo: 'Vivo a 5' de la oficina. Hablo francés.'", "francés"))
+        passages.append(("prime-pt", "pt", "O meu colega disse: 'Moro a 5' do escritório. Falo francês.'", "francês"))
+
+        var rows: [GroundingRow] = []
+        for v in passages {
+            rows.append(row("a-quote-runs-past-a-\(v.id)",
+                            "the mark after the word may end the word, not the quote: the quote runs to the mark after the full stop, and no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+
+        let unclosed: [Passage] = [
+            ("straight-possessive-en", "en", "My colleague said 'I manage patients' records. I speak French.", "French"),
+            ("curly-possessive-en", "en", "My colleague said ‘I manage patients’ records. I speak French.", "French"),
+            ("possessive-of-a-name-de", "de", "Mein Kollege sagte: ‚Ich leite Hans’ Team. Ich spreche Französisch.", "Französisch"),
+            ("elision-it", "it", "Il mio collega ha detto: 'Parlo un po' di tedesco. Parlo francese.", "francese"),
+        ]
+        for v in unclosed {
+            rows.append(row("a-quote-only-a-word-could-close-runs-to-the-end-of-its-line-\(v.id)",
+                            "nothing closes the quote for sure: it runs to the end of its line, and no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("a-quote-only-a-word-could-close-stops-at-the-end-of-its-line",
+                        "the quote runs to the end of its line; the next line is the person's: German stays",
+                        "My colleague said 'I manage patients' records. I speak French.\nI speak German.",
+                        CVData(languages: [Language(name: "French"), Language(name: "German")]),
+                        .exactly(CVData(languages: [Language(name: "German")]))))
+
+        // No quote: the apostrophes and the possessives claim as usual.
+        rows.append(row("straight-apostrophes-are-no-quotation-marks-en",
+                        "the apostrophes of I'm and I've are inside words: French and Swift stay",
+                        "I'm fluent in French and I've used Swift.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]), .unchanged))
+        rows.append(row("straight-apostrophes-are-no-quotation-marks-fr",
+                        "the apostrophes of J'ai and l'anglais are inside words: Swift and English stay",
+                        "J'ai utilisé Swift et je parle l'anglais.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "anglais")]), .unchanged, language: "fr"))
+        rows.append(row("straight-apostrophes-are-no-quotation-marks-it",
+                        "the apostrophes of dell'università and l'inglese are inside words: English stays",
+                        "Ho una laurea dell'università di Bologna e parlo l'inglese.",
+                        CVData(languages: [Language(name: "inglese")]), .unchanged, language: "it"))
+        rows.append(row("a-possessive-outside-quotation-marks-claims-en",
+                        "no mark opens a quote: the possessive is only a possessive, and Swift stays",
+                        "I built my clients' apps with Swift.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
+        rows.append(row("a-possessive-outside-quotation-marks-claims-de",
+                        "no mark opens a quote: the possessive is only a possessive, and Swift stays",
+                        "Ich habe in Hans' Team mit Swift gearbeitet.", CVData(skills: [Skill(name: "Swift")]), .unchanged, language: "de"))
+        rows.append(row("a-possessive-after-a-closed-quote-claims",
+                        "the quote closed before the possessive: Swift stays",
+                        "My motto is “clean code”. I built my clients' apps with Swift.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
+
+        // Accepted losses: a single mark that closes a quote right after a word may be an apostrophe, so the rest of its line goes.
+        rows.append(row("words-after-a-single-mark-after-a-word-are-an-accepted-loss",
+                        "the mark after code may be an apostrophe: the quote runs to the end of the line, and Swift goes, an accepted loss",
+                        "I use 'clean code' principles with Swift every day.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData())))
+        rows.append(row("a-sentence-after-a-single-mark-after-a-word-is-an-accepted-loss",
+                        "the mark after French may be an apostrophe: the quote runs to the end of the line, and German goes too, an accepted loss",
+                        "My colleague said 'I speak French'. I speak German.",
+                        CVData(languages: [Language(name: "French"), Language(name: "German")]), .exactly(CVData())))
+        rows.append(row("an-apostrophe-that-starts-a-word-before-a-possessive-is-an-accepted-loss",
+                        "the apostrophe of '90s may open a quote that the possessive may close: both lines go, Swift with them, an accepted loss; French stays",
+                        "I grew up in the '90s.\nI built my clients' apps with Swift.\nI speak French.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]),
+                        .exactly(CVData(languages: [Language(name: "French")]))))
         return rows
     }
 
