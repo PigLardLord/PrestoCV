@@ -12,7 +12,7 @@ final class AIGenerationUITests: XCTestCase {
         // The simulator cannot run the model: the debug override offers the AI card all the same
         app.launchArguments += [
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage",
-            "-AIAvailabilityOverride", "available",
+            "-AIAvailabilityOverride", "available", "-PrestoCVUITestsKeepSavedConfirmation",
         ]
         app.launch()
     }
