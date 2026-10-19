@@ -40,11 +40,11 @@ struct NewCVChoicesTests {
         #expect(viewModel.promisesAIDraft, "The device can draft once the person has done what the sentence says")
     }
 
-    @Test("Where the device cannot run the model, the AI draft comes last, off, with the sentence that it cannot draft yet, and AI is not promised")
+    @Test("Where the device cannot run the model, the AI draft comes last, off, with the sentence that it cannot draft, and AI is not promised")
     func notEligibleShowsTheAIDraftOffWithoutPromisingIt() async {
         let viewModel = await makeViewModel(.unavailable(.deviceNotEligible))
 
-        #expect(viewModel.choices == [.blank, .example, .aiDraftUnavailable(.notOnThisDeviceYet)])
+        #expect(viewModel.choices == [.blank, .example, .aiDraftUnavailable(.notOnThisDevice)])
         #expect(!viewModel.promisesAIDraft, "The welcome does not promise a draft this device cannot make")
     }
 

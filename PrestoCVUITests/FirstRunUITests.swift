@@ -30,8 +30,7 @@ final class FirstRunUITests: XCTestCase {
     }
 
     /// The sentence under the AI draft on a device that cannot run the model.
-    private let notOnThisDevice = "This device doesn't support AI drafts yet. We're working on bringing them to more devices. "
-        + "Meanwhile, you can create your CV by hand or start from an example."
+    private let notOnThisDevice = "This device doesn't support AI drafts. You can create your CV by hand or start from an example."
 
     func testTheAIDraftLeadsTheFirstRunAndOpensTheAIScreen() throws {
         launch(aiAvailability: "available")
@@ -66,7 +65,7 @@ final class FirstRunUITests: XCTestCase {
 
         let blank = app.buttons["Create My First CV"]
         XCTAssertTrue(blank.waitForExistence(timeout: 20), "The first run should offer a blank CV")
-        XCTAssertTrue(aiDraft.exists, "The first run should show the AI draft on a device that cannot make it yet")
+        XCTAssertTrue(aiDraft.exists, "The first run should show the AI draft on a device that cannot make it")
         XCTAssertFalse(aiDraft.isEnabled, "The AI draft should be off, and VoiceOver should read it as dimmed")
         XCTAssertLessThan(blank.frame.minY, aiDraft.frame.minY, "What works now should come first")
         XCTAssertEqual(aiDraft.value as? String, notOnThisDevice, "VoiceOver should read why, after the title")

@@ -75,9 +75,8 @@ final class FirstRunLargeTextUITests: XCTestCase {
         add(app.keptScreenshot(named: "First run, German, largest text, device not eligible"))
     }
 
-    private static let notOnThisDeviceInGerman = "Dieses Gerät unterstützt KI-Entwürfe noch nicht. "
-        + "Wir arbeiten daran, sie auf weitere Geräte zu bringen. "
-        + "Bis dahin können Sie Ihren Lebenslauf selbst erstellen oder mit einem Beispiel beginnen."
+    private static let notOnThisDeviceInGerman = "Dieses Gerät unterstützt keine KI-Entwürfe. "
+        + "Sie können Ihren Lebenslauf selbst erstellen oder mit einem Beispiel beginnen."
 
     /// Each way to start can be tapped where the first screen shows it. The examples are offered once they are
     /// loaded, so the check waits for them; the welcome is still there, after them.

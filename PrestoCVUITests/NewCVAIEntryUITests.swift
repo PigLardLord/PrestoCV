@@ -29,7 +29,7 @@ final class NewCVAIEntryUITests: XCTestCase {
         let example = card("Example CV")
         XCTAssertTrue(example.waitForExistence(timeout: 10), "The New CV screen should offer the examples")
         let aiCard = card("AI CV Generation")
-        XCTAssertTrue(aiCard.exists, "The New CV screen should show the AI card on a device that cannot use it yet")
+        XCTAssertTrue(aiCard.exists, "The New CV screen should show the AI card on a device that cannot use it")
         XCTAssertLessThan(example.frame.minY, aiCard.frame.minY, "What works now should come first")
         XCTAssertFalse(aiCard.isEnabled, "The AI card should be off, and VoiceOver should read it as dimmed")
         XCTAssertEqual(aiCard.value as? String, Self.notOnThisDevice, "VoiceOver should read why, after the card")
@@ -70,10 +70,8 @@ final class NewCVAIEntryUITests: XCTestCase {
 
     // MARK: - Sentences
 
-    private static let notOnThisDevice = "This device doesn't support AI drafts yet. We're working on bringing them to more devices. "
-        + "Meanwhile, you can create your CV by hand or start from an example."
+    private static let notOnThisDevice = "This device doesn't support AI drafts. You can create your CV by hand or start from an example."
 
-    private static let notOnThisDeviceInGerman = "Dieses Gerät unterstützt KI-Entwürfe noch nicht. "
-        + "Wir arbeiten daran, sie auf weitere Geräte zu bringen. "
-        + "Bis dahin können Sie Ihren Lebenslauf selbst erstellen oder mit einem Beispiel beginnen."
+    private static let notOnThisDeviceInGerman = "Dieses Gerät unterstützt keine KI-Entwürfe. "
+        + "Sie können Ihren Lebenslauf selbst erstellen oder mit einem Beispiel beginnen."
 }

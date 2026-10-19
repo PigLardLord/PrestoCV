@@ -30,8 +30,8 @@ struct AIEntryTests {
     func deviceNotEligibleGivesADisabledCard() {
         let entry = AIEntry(availability: .unavailable(.deviceNotEligible), isShipped: true)
 
-        #expect(entry == .disabled(.notOnThisDeviceYet))
-        #expect(AIEntry.Explanation.notOnThisDeviceYet.key == "ai.unavailable.not_on_this_device_yet")
+        #expect(entry == .disabled(.notOnThisDevice))
+        #expect(AIEntry.Explanation.notOnThisDevice.key == "ai.unavailable.not_on_this_device")
     }
 
     @Test("A reason this version does not know gets no entry at all")
@@ -52,7 +52,7 @@ struct AIEntryTests {
 
     @Test("Each explanation is a sentence in every language, not a key")
     func explanationsAreLocalized() {
-        for explanation in [AIEntry.Explanation.turnOnAppleIntelligence, .modelStillDownloading, .notOnThisDeviceYet] {
+        for explanation in [AIEntry.Explanation.turnOnAppleIntelligence, .modelStillDownloading, .notOnThisDevice] {
             #expect(explanation.key.localized != explanation.key)
         }
     }

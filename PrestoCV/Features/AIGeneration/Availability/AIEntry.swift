@@ -14,14 +14,14 @@ enum AIEntry: Equatable {
         case turnOnAppleIntelligence
         case modelStillDownloading
         /// This device cannot run the model: the person can still write the CV or start from an example.
-        case notOnThisDeviceYet
+        case notOnThisDevice
 
         /// Catalog key of the sentence shown under the disabled AI draft.
         var key: String {
             switch self {
             case .turnOnAppleIntelligence: return "ai.unavailable.not_enabled"
             case .modelStillDownloading: return "ai.unavailable.model_not_ready"
-            case .notOnThisDeviceYet: return "ai.unavailable.not_on_this_device_yet"
+            case .notOnThisDevice: return "ai.unavailable.not_on_this_device"
             }
         }
     }
@@ -39,7 +39,7 @@ enum AIEntry: Equatable {
         case .unavailable(.modelNotReady):
             self = .disabled(.modelStillDownloading)
         case .unavailable(.deviceNotEligible):
-            self = .disabled(.notOnThisDeviceYet)
+            self = .disabled(.notOnThisDevice)
         case .unavailable(.unknown):
             self = .hidden
         }

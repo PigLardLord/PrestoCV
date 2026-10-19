@@ -69,7 +69,7 @@ final class NewCVChoicesViewModel: ObservableObject {
         switch aiEntry {
         case .available, .disabled(.turnOnAppleIntelligence), .disabled(.modelStillDownloading):
             return true
-        case .disabled(.notOnThisDeviceYet), .hidden:
+        case .disabled(.notOnThisDevice), .hidden:
             return false
         }
     }

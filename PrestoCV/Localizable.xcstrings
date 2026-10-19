@@ -1641,43 +1641,43 @@
         }
       }
     },
-    "ai.unavailable.not_on_this_device_yet" : {
+    "ai.unavailable.not_on_this_device" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dieses Gerät unterstützt KI-Entwürfe noch nicht. Wir arbeiten daran, sie auf weitere Geräte zu bringen. Bis dahin können Sie Ihren Lebenslauf selbst erstellen oder mit einem Beispiel beginnen."
+            "value" : "Dieses Gerät unterstützt keine KI-Entwürfe. Sie können Ihren Lebenslauf selbst erstellen oder mit einem Beispiel beginnen."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This device doesn't support AI drafts yet. We're working on bringing them to more devices. Meanwhile, you can create your CV by hand or start from an example."
+            "value" : "This device doesn't support AI drafts. You can create your CV by hand or start from an example."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este dispositivo aún no es compatible con los borradores con IA. Estamos trabajando para llevarlos a más dispositivos. Mientras tanto, puedes crear tu CV a mano o empezar con un ejemplo."
+            "value" : "Este dispositivo no es compatible con los borradores con IA. Puedes crear tu CV a mano o empezar con un ejemplo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cet appareil n'est pas encore compatible avec les brouillons rédigés par l'IA. Nous travaillons à les proposer sur davantage d'appareils. En attendant, vous pouvez créer votre CV vous-même ou commencer avec un exemple."
+            "value" : "Cet appareil n'est pas compatible avec les brouillons rédigés par l'IA. Vous pouvez créer votre CV vous-même ou commencer avec un exemple."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questo dispositivo non supporta ancora le bozze con l'IA. Stiamo lavorando per portarle su più dispositivi. Nel frattempo, puoi creare il tuo CV a mano o partire da un esempio."
+            "value" : "Questo dispositivo non supporta le bozze con l'IA. Puoi creare il tuo CV a mano o partire da un esempio."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este dispositivo ainda não é compatível com os rascunhos com IA. Estamos trabalhando para levá-los a mais dispositivos. Enquanto isso, você pode criar seu currículo manualmente ou começar com um exemplo."
+            "value" : "Este dispositivo não é compatível com os rascunhos com IA. Você pode criar seu currículo manualmente ou começar com um exemplo."
           }
         }
       }
