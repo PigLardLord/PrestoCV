@@ -135,4 +135,16 @@ struct ViewModelFactoryTests {
         #expect(await editor.keepUnsavedEdits() == nil, "Nothing is kept")
         #expect(await editor.saveCV())
     }
+
+    // MARK: - The Export Sheet
+
+    @Test("The export sheet of a CV starts with the language chosen for that CV")
+    func exportSheetStartsOnItsCV() throws {
+        let cv = CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi"), documentLanguage: "de")
+
+        let sheet = try makeFactory().makeExportSheetViewModel(cv: cv)
+
+        #expect(sheet.documentLanguageChoice == .german)
+        #expect(sheet.templates.isEmpty, "Nothing is loaded before the sheet shows")
+    }
 }

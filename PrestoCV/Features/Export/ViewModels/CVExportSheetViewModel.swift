@@ -117,16 +117,18 @@ final class CVExportSheetViewModel: ObservableObject {
 
     /// - Parameters:
     ///   - cv: The CV to export. The sheet starts with the language chosen for it.
+    ///   - exportService: Makes the preview and the PDF.
+    ///   - preferencesStore: Keeps the design chosen last, for the next export.
     ///   - previewDebounce: How long a selection must stay put before its preview is made, so that changing the
     ///     template, the palette and the font in quick succession makes one preview and one PDF
     init(
         cv: CVModel,
-        exportService: (any CVExportServiceProtocol)? = nil,
-        preferencesStore: any ExportPreferencesStore = FileExportPreferencesStore(),
+        exportService: any CVExportServiceProtocol,
+        preferencesStore: any ExportPreferencesStore,
         documentLanguageDetector: DocumentLanguageDetector = .onDevice,
         previewDebounce: Duration = .milliseconds(250)
     ) {
-        self.exportService = exportService ?? CVExportService()
+        self.exportService = exportService
         self.preferencesStore = preferencesStore
         self.documentLanguageDetector = documentLanguageDetector
         self.previewDebounce = previewDebounce

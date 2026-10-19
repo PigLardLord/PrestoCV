@@ -14,10 +14,17 @@ struct CVListView<EmptyState: View>: View {
     @State private var deleteAnchor: CGRect?
     @State private var renameTarget: CVModel?
     @State private var renameText = ""
+    private let makeExportSheet: @MainActor (CVModel) -> CVExportSheetViewModel
     private let emptyState: EmptyState
 
-    init(viewModel: CVListViewModel, @ViewBuilder emptyState: () -> EmptyState) {
+    /// - Parameter makeExportSheet: Gives the export sheet of a CV of the list.
+    init(
+        viewModel: CVListViewModel,
+        makeExportSheet: @escaping @MainActor (CVModel) -> CVExportSheetViewModel,
+        @ViewBuilder emptyState: () -> EmptyState
+    ) {
         self.viewModel = viewModel
+        self.makeExportSheet = makeExportSheet
         self.emptyState = emptyState()
     }
     
@@ -72,7 +79,7 @@ struct CVListView<EmptyState: View>: View {
             await viewModel.loadCVs()
         }
         .sheet(item: $exportTarget) { cv in
-            CVExportSheetView(cv: cv) { language in
+            CVExportSheetView(cv: cv, viewModel: makeExportSheet(cv)) { language in
                 Task { await viewModel.setDocumentLanguage(language, ofCVWithId: cv.id) }
             }
         }
@@ -208,11 +215,15 @@ private struct CVRowView: View {
 struct CVListView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            CVListView(viewModel: createMockViewModel()) {
+            CVListView(viewModel: createMockViewModel(), makeExportSheet: makeExportSheet) {
                 Text("navigation.my_cvs".localized)
             }
         }
         .environmentObject(AppRouter())
+    }
+    
+    private static func makeExportSheet(_ cv: CVModel) -> CVExportSheetViewModel {
+        CVExportSheetViewModel(cv: cv, exportService: CVExportService(), preferencesStore: FileExportPreferencesStore())
     }
     
     private static func createMockViewModel() -> CVListViewModel {

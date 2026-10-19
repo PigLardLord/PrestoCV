@@ -46,6 +46,12 @@ final class ViewModelFactory {
         }
     }
     
+    /// The export sheet of `cv`, with a service and a preferences store of its own.
+    @MainActor
+    func makeExportSheetViewModel(cv: CVModel) -> CVExportSheetViewModel {
+        CVExportSheetViewModel(cv: cv, exportService: CVExportService(), preferencesStore: FileExportPreferencesStore())
+    }
+    
     @MainActor
     func makeNewCVChoicesViewModel() -> NewCVChoicesViewModel {
         return NewCVChoicesViewModel(aiAvailability: makeAIAvailabilityProvider(), sampleRepository: sampleRepository)

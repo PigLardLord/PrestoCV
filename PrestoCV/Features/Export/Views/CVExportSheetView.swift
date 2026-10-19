@@ -21,10 +21,15 @@ struct CVExportSheetView: View {
     @ScaledMetric(relativeTo: .footnote) private var optionsHeight: CGFloat = 300
     private let largestOptionsHeight: CGFloat = 420
 
-    init(cv: CVModel, onDocumentLanguageChange: @escaping (DocumentLanguage?) -> Void) {
+    /// The view model is built once, when the sheet first appears, and survives every re-render of the screen under it.
+    init(
+        cv: CVModel,
+        viewModel: @autoclosure @escaping () -> CVExportSheetViewModel,
+        onDocumentLanguageChange: @escaping (DocumentLanguage?) -> Void
+    ) {
         self.cv = cv
         self.onDocumentLanguageChange = onDocumentLanguageChange
-        self._viewModel = StateObject(wrappedValue: CVExportSheetViewModel(cv: cv))
+        self._viewModel = StateObject(wrappedValue: viewModel())
     }
 
     var body: some View {
@@ -567,7 +572,10 @@ private extension Color {
     let adapter = CVDocumentAdapter()
     let mockCV = adapter.convertToCVModel(from: SampleCVData.complete)
 
-    return CVExportSheetView(cv: mockCV) { _ in }
+    return CVExportSheetView(
+        cv: mockCV,
+        viewModel: CVExportSheetViewModel(cv: mockCV, exportService: CVExportService(), preferencesStore: FileExportPreferencesStore())
+    ) { _ in }
 }
 
 
