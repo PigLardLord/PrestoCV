@@ -16,7 +16,8 @@
 # is left, and boots it in that language and region, so that the system's own screens (the share sheet) and the clock
 # speak it too: the status bar at 9:41 (09:41 where the region writes it so), full battery and full signal, the light
 # appearance, and a keyboard without autocorrection, spell check or predictions, which would change or underline the
-# description the test types. It runs the language's test and exports the screenshots the test attached.
+# description the test types. It runs the language's test, handing it the app's texts in that language from the string
+# catalog (the test does not read the source tree), and exports the screenshots the test attached.
 #
 # Output in <dir>:
 #   captures/<device>/<language>/NN.png   the screenshots as the simulator took them
@@ -119,6 +120,22 @@ prepare() {
         --cellularMode active --cellularBars 4 --operatorName "" --batteryState charged --batteryLevel 100
 }
 
+# The app's texts in a language, from its string catalog, as the test takes them: a JSON object from key to text, in
+# Base64. A key without a text in the language has the source language's.
+app_strings() {
+    python3 - "$ROOT/PrestoCV/Localizable.xcstrings" "$1" <<'PY'
+import base64, json, sys
+catalog = json.load(open(sys.argv[1], encoding="utf-8"))
+texts = {}
+for key, entry in catalog["strings"].items():
+    units = entry.get("localizations", {})
+    unit = (units.get(sys.argv[2]) or units.get(catalog.get("sourceLanguage", "en")) or {}).get("stringUnit")
+    if unit:
+        texts[key] = unit["value"]
+print(base64.b64encode(json.dumps(texts, ensure_ascii=False).encode("utf-8")).decode("ascii"))
+PY
+}
+
 # Copies the screenshots of a result bundle, which the test names <language>-NN, to the captures
 export_captures() {
     local bundle="$1" device="$2" attachments="$WORK/attachments"
@@ -150,6 +167,7 @@ capture() {
         prepare "$udid" "$language"
         bundle="$WORK/$device-$language.xcresult"; log="$WORK/$device-$language.log"
         rm -rf "$bundle"
+        TEST_RUNNER_STORE_SCREENSHOT_STRINGS="$(app_strings "$language")" \
         xcodebuild test-without-building "${build[@]}" -destination "id=$udid" -resultBundlePath "$bundle" \
             -parallel-testing-enabled NO -collect-test-diagnostics never \
             "-only-testing:PrestoCVUITests/StoreScreenshotsUITests/$(test_method "$language")" </dev/null >"$log" 2>&1 \

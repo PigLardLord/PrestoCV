@@ -1,19 +1,18 @@
 import Foundation
 
-/// The app's own texts in one of its languages, read from the string catalog in the source tree, so that a UI test can
-/// find a button by what it says in any language. A key that has no text in the language has the source language's.
+/// The app's own texts in the language of the test, so that a UI test can find a button by what it says in any
+/// language. They are handed over, not read from the source tree: `Tools/Release/store-screenshots.sh` takes them from
+/// the string catalog and passes them in `STORE_SCREENSHOT_STRINGS`, a JSON object from key to text, in Base64.
 struct AppStrings {
+    static let environmentKey = "STORE_SCREENSHOT_STRINGS"
+
     private let texts: [String: String]
 
-    init(language: String) throws {
-        let catalog = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("PrestoCV/Localizable.xcstrings")
-        let file = try JSONDecoder().decode(Catalog.self, from: Data(contentsOf: catalog))
-        texts = file.strings.compactMapValues { entry in
-            let units = entry.localizations ?? [:]
-            return (units[language] ?? units[file.sourceLanguage])?.stringUnit?.value
+    init(environment: [String: String] = ProcessInfo.processInfo.environment) throws {
+        guard let encoded = environment[Self.environmentKey], let json = Data(base64Encoded: encoded) else {
+            throw Missing()
         }
+        texts = try JSONDecoder().decode([String: String].self, from: json)
     }
 
     subscript(key: String) -> String {
@@ -25,20 +24,9 @@ struct AppStrings {
         String(format: self[key], arguments: arguments)
     }
 
-    private struct Catalog: Decodable {
-        let sourceLanguage: String
-        let strings: [String: Entry]
-    }
-
-    private struct Entry: Decodable {
-        let localizations: [String: Localization]?
-    }
-
-    private struct Localization: Decodable {
-        let stringUnit: StringUnit?
-    }
-
-    private struct StringUnit: Decodable {
-        let value: String
+    struct Missing: Error, CustomStringConvertible {
+        var description: String {
+            "The app's texts were not handed over in \(AppStrings.environmentKey): run Tools/Release/store-screenshots.sh"
+        }
     }
 }

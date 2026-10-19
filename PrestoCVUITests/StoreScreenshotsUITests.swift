@@ -4,8 +4,10 @@ import XCTest
 /// `StoreScreenshotFixture`, attached to the test results at the full resolution of the simulator.
 ///
 /// It is in no test plan that CI runs: `Tools/Release/store-screenshots.sh` runs it through the `StoreScreenshots`
-/// test plan, on simulators with a fixed status bar, and puts the captions of `docs/release/store-listing.md` above
-/// the screenshots. Each attachment is named after the language and the screen, as in `de-03`.
+/// test plan, on a simulator erased for each language and with a fixed status bar, hands it the app's texts, and puts
+/// the captions of `docs/release/store-listing.md` above the screenshots. Each attachment is named after the language
+/// and the screen, as in `de-03`. Nothing waits for a fixed time: each screen is taken once the element it shows has
+/// come to rest.
 final class StoreScreenshotsUITests: XCTestCase {
 
     private var app: XCUIApplication?
@@ -32,7 +34,7 @@ final class StoreScreenshotsUITests: XCTestCase {
 
     private func captureTheScreens(in language: String) throws {
         fixture = try XCTUnwrap(StoreScreenshotFixture.fixture(for: language), "No fixture for \(language)")
-        strings = try AppStrings(language: language)
+        strings = try AppStrings()
         try captureTheList()
         try captureTheAIDescription()
         try captureTheFactsOnly()
@@ -45,8 +47,9 @@ final class StoreScreenshotsUITests: XCTestCase {
     /// 1. The list: a complete CV and three copies adapted to other jobs, all on the device
     private func captureTheList() throws {
         let app = try launch(with: fixture.listFiles())
-        XCTAssertTrue(row(named: fixture.completeName, in: app).waitForExistence(timeout: 30), "The list should show the CVs")
-        attachScreenshot(1)
+        let last = row(named: fixture.adaptations[fixture.adaptations.count - 1].name, in: app)
+        XCTAssertTrue(last.waitForExistence(timeout: 30), "The list should show the CVs")
+        attachScreenshot(1, showing: last)
     }
 
     /// 2. The AI screen with the person's description typed in and the keyboard closed
@@ -70,7 +73,7 @@ final class StoreScreenshotsUITests: XCTestCase {
         if hidden > 0 {
             scroll(app, by: hidden)
         }
-        attachScreenshot(2)
+        attachScreenshot(2, showing: generate)
     }
 
     /// 3. A CV with only the facts of that description: what it does not mention is blank
@@ -85,6 +88,7 @@ final class StoreScreenshotsUITests: XCTestCase {
         // further where the last blank field would still be under the tab bar
         let portfolio = app.textFields.matching(labeled(text("field.portfolio_url"))).firstMatch
         XCTAssertTrue(portfolio.waitForExistence(timeout: 10), "The editor should have the portfolio field")
+        waitUntilStill(portfolio)
         let tabBar = app.tabBars.firstMatch
         let barTop = tabBar.exists ? tabBar.frame.minY : app.frame.height * 0.7
         if barTop > app.frame.height / 2 && portfolio.frame.maxY > barTop {
@@ -94,7 +98,7 @@ final class StoreScreenshotsUITests: XCTestCase {
             let clearOfTheTabBar = portfolio.frame.maxY + 16 - barTop
             scroll(app, by: max(toTheTop, clearOfTheTabBar))
         }
-        attachScreenshot(3)
+        attachScreenshot(3, showing: portfolio)
     }
 
     /// 4. The ways to start a CV: blank or from an example. The AI draft has its own screenshot, so its card is left out,
@@ -105,7 +109,7 @@ final class StoreScreenshotsUITests: XCTestCase {
         app.navigationBars.buttons.firstMatch.tap()
         let example = app.buttons.matching(labeled(text("template.example.title"), containing: true)).firstMatch
         XCTAssertTrue(example.waitForExistence(timeout: 10), "The New CV screen should offer the examples")
-        attachScreenshot(4)
+        attachScreenshot(4, showing: example)
     }
 
     /// 5. The export sheet with its designs, then 6. the PDF in another font style, on its way to the share sheet
@@ -121,7 +125,7 @@ final class StoreScreenshotsUITests: XCTestCase {
         let send = app.buttons.matching(labeled(text("export.share"))).firstMatch
         XCTAssertTrue(send.waitForExistence(timeout: 30), "The export sheet should open")
         XCTAssertTrue(wait(until: send, isEnabled: true, timeout: 120), "The PDF should be ready")
-        attachScreenshot(5)
+        attachScreenshot(5, showing: send)
 
         app.buttons.matching(labeled(text("export.fonts.tab"))).firstMatch.tap()
         let serif = app.buttons.matching(labeled(text("export.font.serif"))).firstMatch
@@ -130,9 +134,9 @@ final class StoreScreenshotsUITests: XCTestCase {
         _ = wait(until: send, isEnabled: false, timeout: 5)
         XCTAssertTrue(wait(until: send, isEnabled: true, timeout: 120), "The PDF should be ready in the new font style")
         send.tap()
-        // The share sheet is drawn by another process: it is given time to appear and settle
-        Thread.sleep(forTimeInterval: 4)
-        attachScreenshot(6)
+        let shareSheet = app.otherElements["ActivityListView"]
+        XCTAssertTrue(shareSheet.waitForExistence(timeout: 30), "The share sheet should open")
+        attachScreenshot(6, showing: shareSheet)
     }
 
     // MARK: - Helpers
@@ -187,9 +191,22 @@ final class StoreScreenshotsUITests: XCTestCase {
         return XCTWaiter().wait(for: [condition], timeout: timeout) == .completed
     }
 
-    /// Attaches the whole screen once its animations are over.
-    private func attachScreenshot(_ screen: Int) {
-        Thread.sleep(forTimeInterval: 1.5)
+    /// Waits until the element has stopped moving: its frame is the same on two reads in a row.
+    private func waitUntilStill(_ element: XCUIElement, timeout: TimeInterval = 30) {
+        var last = CGRect.null
+        let still = NSPredicate { _, _ in
+            guard element.exists else { return false }
+            let frame = element.frame
+            defer { last = frame }
+            return frame == last
+        }
+        let rest = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: still, object: nil)], timeout: timeout)
+        XCTAssertEqual(rest, .completed, "\(element) should come to rest")
+    }
+
+    /// Attaches the whole screen once the element it shows has come to rest.
+    private func attachScreenshot(_ screen: Int, showing element: XCUIElement) {
+        waitUntilStill(element)
         let attachment = XCTAttachment(
             uniformTypeIdentifier: "public.png",
             name: String(format: "%@-%02d", fixture.language, screen),

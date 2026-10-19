@@ -2,20 +2,27 @@ import Foundation
 
 /// The fixtures as the files the app stores its CVs in, handed to the app at launch with `-PrestoCVUITestsSeed`.
 extension StoreScreenshotFixture {
-    /// The CVs of the list, the complete one first, each saved a little earlier than the one above it.
-    func listFiles(now: Date = Date()) throws -> [String: String] {
-        let ages: [TimeInterval] = [2 * 3_600, 26 * 3_600, 3 * 86_400, 12 * 86_400]
-        let adapted = adaptations.prefix(ages.count - 1).enumerated().map { index, adaptation in
+    /// The CVs of the list, the complete one first, each saved some days before the one above it. They are saved at
+    /// noon of whole days, so that the list reads "yesterday", "2 days ago" at any time of the day the test runs.
+    func listFiles(now: Date = Date(), calendar: Calendar = .current) throws -> [String: String] {
+        let days = [1, 2, 5, 12]
+        let adapted = adaptations.prefix(days.count - 1).enumerated().map { index, adaptation in
             var cv = complete
             cv.title = adaptation.title
-            return file(named: adaptation.name, from: cv, savedAt: now - ages[index + 1])
+            return file(named: adaptation.name, from: cv, savedAt: noon(days[index + 1], daysBefore: now, in: calendar))
         }
-        return try encode([file(named: completeName, from: complete, savedAt: now - ages[0])] + adapted)
+        let first = file(named: completeName, from: complete, savedAt: noon(days[0], daysBefore: now, in: calendar))
+        return try encode([first] + adapted)
     }
 
     /// The CV with only the facts of the description, alone in the list.
-    func draftFiles(now: Date = Date()) throws -> [String: String] {
-        try encode([file(named: draftName, from: draft, savedAt: now - 60)])
+    func draftFiles(now: Date = Date(), calendar: Calendar = .current) throws -> [String: String] {
+        try encode([file(named: draftName, from: draft, savedAt: noon(1, daysBefore: now, in: calendar))])
+    }
+
+    private func noon(_ days: Int, daysBefore now: Date, in calendar: Calendar) -> Date {
+        let day = calendar.date(byAdding: .day, value: -days, to: calendar.startOfDay(for: now)) ?? now
+        return day.addingTimeInterval(12 * 3_600)
     }
 
     // MARK: - File format
