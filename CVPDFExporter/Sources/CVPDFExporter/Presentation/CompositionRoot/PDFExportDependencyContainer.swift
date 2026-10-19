@@ -9,14 +9,21 @@ public final class PDFExportDependencyContainer: @unchecked Sendable {
     private let templateRepository: BundledTemplateRepository
     private let templateCache: TemplateCache
     private let exportRepository: NullExportRepository
+    private let makeRenderer: @MainActor @Sendable () -> PDFRendererProtocol
 
     // MARK: - Initialization
 
-    /// - Parameter templateRepository: Where the templates come from; the installed bundled templates by default
-    public init(templateRepository: BundledTemplateRepository = BundledTemplateRepository()) {
+    /// - Parameters:
+    ///   - templateRepository: Where the templates come from; the installed bundled templates by default
+    ///   - makeRenderer: Makes the renderer of each export; the platform's by default
+    public init(
+        templateRepository: BundledTemplateRepository = BundledTemplateRepository(),
+        makeRenderer: @escaping @MainActor @Sendable () -> PDFRendererProtocol = { PDFRendererFactory.createRenderer() }
+    ) {
         self.templateRepository = templateRepository
         self.templateCache = TemplateCache()
         self.exportRepository = NullExportRepository()
+        self.makeRenderer = makeRenderer
     }
 
     // MARK: - Factory Methods (Public API)
@@ -67,10 +74,10 @@ public final class PDFExportDependencyContainer: @unchecked Sendable {
         MustacheTemplateEngine()
     }
 
-    /// Creates platform-appropriate PDF renderer
+    /// Creates the PDF renderer of an export
     @MainActor
     public func makePDFRenderer() -> PDFRendererProtocol {
-        PDFRendererFactory.createRenderer()
+        makeRenderer()
     }
 
     /// Creates AI service

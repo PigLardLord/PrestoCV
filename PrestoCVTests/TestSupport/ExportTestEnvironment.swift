@@ -35,9 +35,16 @@ struct ExportTestEnvironment {
         return ExportTestEnvironment(root: root, repository: BundledTemplateRepository(fileRepository: fileRepository))
     }
 
+    /// The real renderer, as the tests use it: a page that is not ready in time fails the render instead of being drawn
+    /// as it is, and a newly created simulator has all the time it needs to start its web content.
+    @MainActor
+    static func makeRenderer() -> EnhancedWKWebViewPDFRenderer {
+        EnhancedWKWebViewPDFRenderer(pageLoadTimeout: patience, readinessTimeout: patience, onReadinessTimeout: .fail)
+    }
+
     func makeService() -> CVExportService {
         CVExportService(
-            container: PDFExportDependencyContainer(templateRepository: repository),
+            container: PDFExportDependencyContainer(templateRepository: repository, makeRenderer: { Self.makeRenderer() }),
             fileNames: ExportFileName(titlePattern: { _ in "%@ – CV" }),
             temporaryDirectory: exportsDirectory
         )
