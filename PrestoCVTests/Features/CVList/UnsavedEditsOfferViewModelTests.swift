@@ -307,7 +307,9 @@ struct UnsavedEditsOfferViewModelTests {
 
             await offer.checkForEditsToRestore()
 
-            #expect(offer.message?.contains("“\(title)”") == true, "\(offer.message ?? "no message")")
+            // Up to the time, as the catalog words it in the app's language, with that language's quotes around the title
+            let namesTheCV = String(format: "unsaved_edits.restore.message".localized.components(separatedBy: "%2$@").first ?? "", title)
+            #expect(offer.message?.hasPrefix(namesTheCV) == true, "\(offer.message ?? "no message")")
         }
     }
 }
