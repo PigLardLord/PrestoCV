@@ -34,7 +34,7 @@ chmod +x .githooks/pre-commit.d/architecture-check
 - **A permanent exception:** an entry in `exceptions` that cites an ADR.
 - **A temporary one:** a baseline entry. The baseline may only shrink.
 - **Legacy targets** are exempt until they are deleted (ADR 0012), except from the rules listed for them: R16 for the legacy test targets that a test plan runs. Their imports stay unchecked.
-- **A test plan's targets read no source tree (R16):** `#filePath` and `#file` are refused there, except as the default value of a `StaticString` parameter, which reports where an assertion failed. A target that writes into the checkout on purpose is an exception.
+- **A test plan's targets read no source tree (R16):** `#filePath` and `#file` are refused there, except as the default value of a `StaticString` parameter that the function only forwards, unchanged, as the `file:` argument of a call, which is how XCTest reports where an assertion failed. A target that writes into the checkout on purpose is an exception.
 - **The resource layout (R15) is checked in legacy declarations too:** a legacy target's bundle is signed in the same build as the others.
 - **`Prototypes/` is excluded.**
 - **Module qualifiers do not hide a name:** `Swift.fatalError` and `Foundation.Date()` are checked like `fatalError` and `Date()`.

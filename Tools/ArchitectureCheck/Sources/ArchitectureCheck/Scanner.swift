@@ -254,15 +254,50 @@ final class Scanner: SyntaxVisitor {
     // MARK: Source tree
 
     /// `#filePath` and `#file` locate the source tree, which the machines that run a test plan do not have (R16). A
-    /// `StaticString` parameter may default to one: that is how XCTest reports where an assertion failed, without reading it.
+    /// `StaticString` parameter may default to one, as long as it only reports where an assertion failed: see
+    /// `onlyForwardsLocation`.
     override func visit(_ node: MacroExpansionExprSyntax) -> SyntaxVisitorContinueKind {
         let name = Self.name(node.macroName)
         guard name == "filePath" || name == "file" else { return .visitChildren }
         let parameter = node.parent?.as(InitializerClauseSyntax.self)?.parent?.as(FunctionParameterSyntax.self)
-        if parameter?.type.trimmedDescription != "StaticString" {
+        if let parameter, parameter.type.trimmedDescription == "StaticString" {
+            if !Self.onlyForwardsLocation(parameter) {
+                hit("sourceTreePath", "#\(name) is used other than to report where an assertion failed: forward it, unchanged, only as the file: argument of a call", node)
+            }
+        } else {
             hit("sourceTreePath", "#\(name) locates the source tree, which the machines that run the test plans do not have: read the file from a bundle", node)
         }
         return .visitChildren
+    }
+
+    /// Whether every use of the parameter in its function forwards it, unchanged, as the `file:` argument of a call: that is
+    /// how XCTest's assertions take the location they report. Any other use, such as `String(describing:)`, an
+    /// interpolation, `.description` or `withUTF8Buffer`, or a copy into a variable or a tuple, can turn it into a path of
+    /// the checkout.
+    private static func onlyForwardsLocation(_ parameter: FunctionParameterSyntax) -> Bool {
+        let name = name(parameter.secondName ?? parameter.firstName)
+        guard name != "_" else { return true }
+        var scope = parameter.parent
+        while let node = scope, !node.is(FunctionDeclSyntax.self), !node.is(InitializerDeclSyntax.self),
+              !node.is(SubscriptDeclSyntax.self), !node.is(MacroDeclSyntax.self) {
+            scope = node.parent
+        }
+        guard let scope else { return false }
+        return references(to: name, in: scope).allSatisfy { reference in
+            guard let argument = reference.parent?.as(LabeledExprSyntax.self), argument.label?.text == "file" else { return false }
+            return argument.parent?.parent?.is(FunctionCallExprSyntax.self) == true
+        }
+    }
+
+    /// The references to a name under a node. The member `file` of another value (`report.file`) is not one.
+    private static func references(to name: String, in node: Syntax) -> [DeclReferenceExprSyntax] {
+        var found: [DeclReferenceExprSyntax] = []
+        if let reference = node.as(DeclReferenceExprSyntax.self), Self.name(reference.baseName) == name,
+           reference.parent?.as(MemberAccessExprSyntax.self).map({ $0.declName.id == reference.id }) != true {
+            found.append(reference)
+        }
+        for child in node.children(viewMode: .sourceAccurate) { found += references(to: name, in: child) }
+        return found
     }
 
     // MARK: Declarations

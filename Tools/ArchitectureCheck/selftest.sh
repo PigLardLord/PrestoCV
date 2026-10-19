@@ -281,6 +281,24 @@ for form in 'func check(file: StaticString = #filePath, line: UInt = #line) {}' 
             'let id = #fileID' '// URL(fileURLWithPath: #filePath)' 'let s = "#filePath"'; do
   on_device "R16: '$form' reads no source tree" "$form" 0
 done
+# A StaticString that defaults to #filePath only reports where an assertion failed while it is forwarded, unchanged, as
+# the file: argument of a call. Turned into text it is a path of the checkout (final gate of #246).
+for form in 'func root(file: StaticString = #filePath) -> URL { URL(fileURLWithPath: String(describing: file)).deletingLastPathComponent() }' \
+            'func root(file: StaticString = #filePath) -> String { "\(file)" }' \
+            'func root(file: StaticString = #filePath) -> String { file.description }' \
+            'func root(file: StaticString = #file) -> String { file.withUTF8Buffer { String(decoding: $0, as: UTF8.self) } }' \
+            'func root(file path: StaticString = #filePath) -> String { "\(path)" }' \
+            'func check(file: StaticString = #filePath) { let f = file; XCTFail("x", file: f) }' \
+            'func check(file: StaticString = #filePath) { record(at: file) }' \
+            'func check(file: StaticString = #filePath) { let t = (file: file, line: 1); _ = t }'; do
+  on_device "R16: '$form' turns the location into a path" "$form" 1 "R16 sourceTreePath"
+done
+for form in 'func check(_ ok: Bool, file: StaticString = #filePath, line: UInt = #line) { XCTAssertTrue(ok, "x", file: file, line: line) }' \
+            'func check(at file: StaticString = #filePath) { items.forEach { XCTFail("\($0)", file: file) } }' \
+            'func check(file: StaticString = #filePath) { XCTFail(report.file, file: file); assertWhole(file: file) }' \
+            'init(file: StaticString = #filePath) { XCTFail("x", file: file) }'; do
+  on_device "R16: '$form' only forwards the location" "$form" 0
+done
 setup; src 'let x = 1'; plan TestPlans/CI.xctestplan Pure
 expect "R16: a target a test plan runs without the rule is an error" 1 "test plan TestPlans/CI.xctestplan runs Pure without the repository, so its rules must include R16"
 setup; src 'let x = 1'; plan TestPlans/CI.xctestplan Ghost
