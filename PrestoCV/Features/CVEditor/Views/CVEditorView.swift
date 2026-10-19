@@ -68,7 +68,7 @@ struct CVEditorView: View {
                         action: handleSaveTap
                     )
                     .disabled(!viewModel.isSaveButtonEnabled)
-                    .foregroundColor(viewModel.saveButtonColor)
+                    .foregroundColor(saveButtonColor)
                     .fontWeight(.semibold)
                 }
             }
@@ -190,6 +190,10 @@ struct CVEditorView: View {
                 .background(DesignTokens.Colors.background)
             }
         }
+    }
+    
+    private var saveButtonColor: Color {
+        viewModel.isSaveButtonEnabled ? DesignTokens.Colors.accent : DesignTokens.Colors.disabledButtonForeground
     }
     
     private var exitTitle: String {

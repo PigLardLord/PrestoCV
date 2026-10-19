@@ -1,4 +1,4 @@
-import SwiftUI
+import Foundation
 import PrestoCVCore
 import Combine
 
@@ -149,11 +149,6 @@ final class CVEditorViewModel: ObservableObject {
     /// Computed property for save button enabled state
     var isSaveButtonEnabled: Bool {
         hasMeaningfulContent && hasUnsavedChanges && !isSaving
-    }
-    
-    /// Computed property for save button color
-    var saveButtonColor: Color {
-        isSaveButtonEnabled ? DesignTokens.Colors.accent : DesignTokens.Colors.disabledButtonForeground
     }
     
     /// Computed property for error alert binding
