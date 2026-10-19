@@ -23,6 +23,11 @@ final class FirstRunUITests: XCTestCase {
 
     private var aiDraft: XCUIElement { app.buttons["Draft My CV with AI"] }
 
+    /// A text on screen. A query by a label longer than 128 characters needs a predicate.
+    private func text(_ label: String) -> XCUIElement {
+        app.staticTexts.matching(NSPredicate(format: "label == %@", label)).firstMatch
+    }
+
     func testTheAIDraftLeadsTheFirstRunAndOpensTheAIScreen() throws {
         launch(aiAvailability: "available")
 
@@ -46,8 +51,9 @@ final class FirstRunUITests: XCTestCase {
         XCTAssertTrue(aiDraft.exists, "The first run should show the AI draft the device can make once Apple Intelligence is on")
         XCTAssertFalse(aiDraft.isEnabled, "The AI draft should be off until Apple Intelligence is on")
         XCTAssertLessThan(blank.frame.minY, aiDraft.frame.minY, "What works now should come first")
-        let reason = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Apple Intelligence is turned off")).firstMatch
-        XCTAssertTrue(reason.exists, "The first run should say how to turn Apple Intelligence on")
+        let reason = aiDraft.value as? String ?? ""
+        XCTAssertTrue(reason.hasPrefix("Apple Intelligence is turned off"), "VoiceOver should read how to turn Apple Intelligence on, after the title")
+        XCTAssertFalse(text(reason).exists, "VoiceOver should read the sentence once, with the AI draft")
     }
 
     func testTheFirstRunDoesNotPromiseAIWhereTheDeviceCannotRunIt() throws {

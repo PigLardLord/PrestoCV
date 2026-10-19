@@ -105,18 +105,20 @@ struct FirstRunView: View {
         }
     }
     
-    /// The AI draft, dimmed and off, with the sentence that says what to do before it can be used
+    /// The AI draft, dimmed and off, with the sentence that says why. VoiceOver reads the sentence once, with the
+    /// button: its title, the sentence, then that it is dimmed.
     private func unavailableAIDraft(_ explanation: AIEntry.Explanation) -> some View {
         VStack(spacing: DesignTokens.Spacing.xs) {
             SecondaryButton.text(title: "onboarding.ai.button".localized, icon: "sparkles", action: openAIDraft)
                 .disabled(true)
                 .opacity(DesignTokens.Opacity.subtle)
-                .accessibilityHint(explanation.key.localized)
+                .accessibilityValue(explanation.key.localized)
             
             Text(explanation.key.localized)
                 .typography(.caption1)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)
+                .accessibilityHidden(true)
         }
     }
     

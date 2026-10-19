@@ -19,7 +19,9 @@ struct TemplateSelectionView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: DesignTokens.Spacing.lg) {
+            // A plain stack: in a lazy one VoiceOver reads a text even when it is hidden from it, and the sentence under
+            // a dimmed card would be read twice
+            VStack(spacing: DesignTokens.Spacing.lg) {
                 Section(header:
                     SectionHeaderView(
                         title: "template.create.new".localized,
@@ -116,17 +118,19 @@ struct TemplateSelectionView: View {
         }
     }
 
-    /// The AI card, dimmed and disabled, with the sentence that says what to do before it can be used
+    /// The AI card, dimmed and disabled, with the sentence that says why. VoiceOver reads the sentence once, with the
+    /// card: its title, the sentence, then that it is dimmed.
     private func disabledAIGenerationCard(_ explanation: AIEntry.Explanation) -> some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
             aiGenerationCard
                 .disabled(true)
                 .opacity(DesignTokens.Opacity.subtle)
-                .accessibilityHint(explanation.key.localized)
+                .accessibilityValue(explanation.key.localized)
 
             Text(explanation.key.localized)
                 .typography(.caption1)
                 .foregroundColor(DesignTokens.Colors.secondary)
+                .accessibilityHidden(true)
         }
     }
 
