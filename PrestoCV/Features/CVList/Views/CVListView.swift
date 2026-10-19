@@ -135,7 +135,7 @@ struct CVListView<EmptyState: View>: View {
                     Task { await viewModel.duplicateCV(withId: cv.id) }
                 },
                 onRename: {
-                    renameText = cv.name
+                    renameText = viewModel.title(of: cv)
                     renameTarget = cv
                 },
                 onExport: {

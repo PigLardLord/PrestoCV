@@ -1,6 +1,7 @@
 import Foundation
 import PrestoCVCore
 import Combine
+import enum PrestoCVDomain.CVTitle
 
 /// The editor of one CV. It runs on the main actor, as its form does: every change of the form is kept on the device
 /// a few seconds later, so the change and the keeping happen in order.
@@ -47,14 +48,11 @@ final class CVEditorViewModel: ObservableObject {
         saveError ?? ""
     }
     
-    /// The title of the screen: the name of the CV. A CV that was never stored is "New CV" until it is named.
-    /// A stored CV without a name shows the name of the person, or "Untitled CV" when it has neither.
+    /// The title of the screen, by the title rule of PrestoCVDomain: the name of the CV, otherwise the role it is for.
+    /// Without either, a CV that was never stored is "New CV", and a stored one "Untitled CV", as the list calls it.
     var screenTitle: String {
-        let cvName = cv.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard cvName.isEmpty else { return cvName }
-        guard savedSnapshot != nil else { return "editor.new_cv".localized }
-        let personName = cv.personalInfo.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return personName.isEmpty ? "cv.untitled".localized : personName
+        guard case .untitled = cv.cvTitle else { return cv.cvTitle.text }
+        return savedSnapshot == nil ? "editor.new_cv".localized : "cv.untitled".localized
     }
     
     /// Whether the CV has enough content to be saved, by the save rule of PrestoCVDomain

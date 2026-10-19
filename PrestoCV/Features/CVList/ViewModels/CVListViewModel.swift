@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import PrestoCVCore
 import struct PrestoCVApplication.ChangeStoredCV
+import enum PrestoCVDomain.CVTitle
 import enum PrestoCVApplication.StoredCVChangeError
 
 @MainActor
@@ -89,10 +90,12 @@ final class CVListViewModel: ObservableObject {
     
     // MARK: - Row Text
     
-    /// What the list calls a CV: its name, or "Untitled CV" while it has none.
+    /// What the list calls a CV, by the title rule of PrestoCVDomain: its name, otherwise the role it is for, otherwise
+    /// "Untitled CV". A CV whose title reads like another's in the list is numbered, so that no two rows read alike.
     func title(of cv: CVModel) -> String {
-        let hasName = !cv.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return hasName ? cv.name : "cv.untitled".localized
+        let numbers = CVTitle.numbers(for: cvs.map { (id: $0.id.uuidString, title: $0.cvTitle) })
+        guard let number = numbers[cv.id.uuidString] else { return cv.cvTitle.text }
+        return "cv.title.numbered".localizedWithArgs(cv.cvTitle.text, number)
     }
     
     /// The person a CV is about, for the line under its name: the name of the person and the job title, or the one

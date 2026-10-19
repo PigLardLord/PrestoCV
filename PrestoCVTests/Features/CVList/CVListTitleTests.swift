@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
 
@@ -13,8 +14,31 @@ struct CVListTitleTests {
         #expect(viewModel.title(of: CVModel(name: "Backend Engineer")) == "Backend Engineer")
     }
 
-    @Test("A CV without a name, or with only white space, is listed as Untitled CV", arguments: ["", "   ", " \n "])
+    @Test("A CV without a name is listed under the role it is for", arguments: ["", "   ", " \n "])
+    func unnamedCVIsListedUnderItsRole(name: String) {
+        #expect(viewModel.title(of: CVModel(name: name, personalInfo: PersonalInfo(title: "Infermiera"))) == "Infermiera")
+    }
+
+    @Test("A CV with neither a name nor a role, or only white space, is listed as Untitled CV", arguments: ["", "   ", " \n "])
     func unnamedCVIsListedAsUntitled(name: String) {
-        #expect(viewModel.title(of: CVModel(name: name)) == "cv.untitled".localized)
+        #expect(viewModel.title(of: CVModel(name: name, personalInfo: PersonalInfo(title: name))) == "cv.untitled".localized)
+    }
+
+    @Test("Rows whose titles read alike are numbered, so that no two read the same")
+    func alikeRowsAreNumbered() async {
+        let ids = ["00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002",
+                   "00000000-0000-0000-0000-000000000003"].compactMap(UUID.init(uuidString:))
+        let first = CVModel(id: ids[0]), second = CVModel(id: ids[1])
+        let named = CVModel(id: ids[2], name: "Backend Engineer")
+        let useCase = MockCVManagementUseCase()
+        for cv in [second, named, first] {
+            await useCase.storeCV(cv)
+        }
+        let list = CVListViewModel(cvManagementUseCase: useCase)
+        await list.loadCVs()
+
+        #expect(list.title(of: first) == "cv.untitled".localized)
+        #expect(list.title(of: second) == "cv.title.numbered".localizedWithArgs("cv.untitled".localized, 2))
+        #expect(list.title(of: named) == "Backend Engineer")
     }
 }

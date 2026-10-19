@@ -33,11 +33,20 @@ struct CVEditorViewModelTitleTests {
         #expect(viewModel.screenTitle == "Backend engineer")
     }
 
-    @Test("A stored CV without a name shows the name of the person")
-    func storedCVWithoutNameShowsThePerson() async {
+    @Test("A CV without a name shows the role it is for, stored or not")
+    func cvWithoutNameShowsItsRole() async {
+        let stored = await loadedViewModel(storing: CVModel(name: "", personalInfo: PersonalInfo(name: "Ada Lovelace", title: "Data Analyst")))
+        let new = CVEditorViewModel(cvId: nil, initialCV: CVModel(personalInfo: PersonalInfo(title: "Infermiera")), cvManagementUseCase: MockCVManagementUseCase())
+
+        #expect(stored.screenTitle == "Data Analyst")
+        #expect(new.screenTitle == "Infermiera")
+    }
+
+    @Test("A stored CV without a name or a role does not show the name of the person")
+    func storedCVWithoutNameOrRoleIsUntitled() async {
         let viewModel = await loadedViewModel(storing: CVModel(name: "", personalInfo: PersonalInfo(name: "Ada Lovelace")))
 
-        #expect(viewModel.screenTitle == "Ada Lovelace")
+        #expect(viewModel.screenTitle == "cv.untitled".localized)
     }
 
     @Test("A stored CV with neither name is Untitled CV, not New CV")
