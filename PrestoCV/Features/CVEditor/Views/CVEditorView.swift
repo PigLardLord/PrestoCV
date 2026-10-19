@@ -67,6 +67,9 @@ struct CVEditorView: View {
                 }
             }
         }
+        .onAppear {
+            router.editorAppeared(viewModel)
+        }
         .task {
             // Load CV data when the view appears
             await viewModel.loadCV()
@@ -89,7 +92,7 @@ struct CVEditorView: View {
         }
         .alert("dialog.discard_changes.title".localized, isPresented: $viewModel.showingCancelConfirmation) {
             Button("common.discard".localized, role: .destructive, action: handleDiscardChanges)
-            Button("editor.keep_editing".localized, role: .cancel) { }
+            Button("editor.keep_editing".localized, role: .cancel) { router.keepEditing() }
         } message: {
             Text("dialog.discard_changes.message".asLoclizedKey)
         }

@@ -584,6 +584,8 @@ final class CVEditorViewModel: ObservableObject {
     }
 }
 
+extension CVEditorViewModel: LeavableEditor {}
+
 private extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil

@@ -1,6 +1,16 @@
 import SwiftUI
 import PrestoCVCore
 
+/// The editor on screen, as far as leaving it goes: it is asked before another CV takes its place.
+@MainActor
+protocol LeavableEditor: AnyObject {
+    /// True when the editor can go at once. Otherwise it asks the person whether to discard the edits, and is left with
+    /// `AppRouter.closeEditor()` once they are discarded, or it cannot be left yet, while a save is running.
+    func requestLeaving() -> Bool
+    /// The editor is asking the person whether to discard the edits.
+    var showingCancelConfirmation: Bool { get }
+}
+
 @MainActor
 final class AppRouter: ObservableObject {
 
@@ -8,8 +18,13 @@ final class AppRouter: ObservableObject {
     @Published var navigationPath = NavigationPath()
     @Published var currentRoute: Route = .onboarding
 
+    /// The CV the person picked while the editor on screen was asking whether to discard its edits. It opens once they
+    /// are discarded, and is dropped when the person keeps editing.
+    private(set) var pendingSelection: EditorRequest?
+
     // MARK: - Private Properties
     private let isAIShipped: Bool
+    private weak var shownEditor: (any LeavableEditor)?
 
     // MARK: - Initialization
     init(isAIShipped: Bool = AIFeature.isShipped) {
@@ -49,14 +64,46 @@ final class AppRouter: ObservableObject {
         navigationPath = NavigationPath()
     }
 
-    /// The person leaves the editor, with Cancel, with Done, or by discarding its edits: the list of CVs shows again,
-    /// whatever screens led to the editor.
+    /// The person leaves the editor, with Cancel, with Done, or by discarding its edits. The CV picked meanwhile opens;
+    /// otherwise the list of CVs shows again, whatever screens led to the editor.
     func closeEditor() {
+        shownEditor = nil
         navigateToRoot()
+        if let pendingSelection {
+            self.pendingSelection = nil
+            navigate(to: .cvEditor(pendingSelection))
+        }
     }
 
     /// The screen a route of the path shows, whether `navigate(to:)` appended it or not.
     func destination(for route: Route) -> RouteDestination {
         RouteDestination.resolve(route, isAIShipped: isAIShipped)
+    }
+
+    // MARK: - Selecting a CV
+
+    /// The editor is on screen: the next selection asks it first.
+    func editorAppeared(_ editor: any LeavableEditor) {
+        shownEditor = editor
+    }
+
+    /// Opens the editor on `request` in place of the editor on screen, if any. An editor that has unsaved edits is
+    /// asked first, and the new one waits until they are discarded; while a save is running, nothing opens.
+    func select(_ request: EditorRequest) {
+        guard let shownEditor else {
+            navigate(to: .cvEditor(request))
+            return
+        }
+        pendingSelection = request
+        if shownEditor.requestLeaving() {
+            closeEditor()
+        } else if !shownEditor.showingCancelConfirmation {
+            pendingSelection = nil
+        }
+    }
+
+    /// The person keeps editing instead of discarding the edits: the CV picked meanwhile does not open.
+    func keepEditing() {
+        pendingSelection = nil
     }
 }

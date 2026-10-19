@@ -466,4 +466,125 @@ struct AppRouterTests {
 
         #expect(router.navigationPath.count == 0)
     }
+
+    @Test("Picking a CV with no editor on screen opens it")
+    func selectingWithoutAnEditorOpensIt() {
+        let router = AppRouter()
+        let cvId = UUID().uuidString
+
+        router.select(.stored(cvId: cvId))
+
+        #expect(router.currentRoute == .cvEditor(.stored(cvId: cvId)))
+        #expect(router.navigationPath.count == 1)
+        #expect(router.pendingSelection == nil)
+    }
+
+    @Test("Picking another CV while the editor has nothing unsaved opens it in place of the editor")
+    func selectingReplacesAnEditorWithNothingUnsaved() {
+        let router = AppRouter()
+        router.select(.stored(cvId: "first"))
+        let editor = LeavableEditorSpy(leaving: .allowed)
+        router.editorAppeared(editor)
+
+        router.select(.stored(cvId: "second"))
+
+        #expect(editor.leaveRequests == 1, "The editor is asked first")
+        #expect(router.currentRoute == .cvEditor(.stored(cvId: "second")))
+        #expect(router.navigationPath.count == 1, "The second editor takes the place of the first")
+        #expect(router.pendingSelection == nil)
+    }
+
+    @Test("Picking another CV while the editor has unsaved edits waits for the person to discard them")
+    func selectingWaitsForTheDiscard() {
+        let router = AppRouter()
+        router.select(.stored(cvId: "first"))
+        let editor = LeavableEditorSpy(leaving: .asksFirst)
+        router.editorAppeared(editor)
+
+        router.select(.stored(cvId: "second"))
+
+        #expect(editor.showingCancelConfirmation, "The editor asks whether to discard the edits")
+        #expect(router.currentRoute == .cvEditor(.stored(cvId: "first")), "Nothing opens before the answer")
+        #expect(router.pendingSelection == .stored(cvId: "second"))
+
+        // The person discards the edits
+        router.closeEditor()
+
+        #expect(router.currentRoute == .cvEditor(.stored(cvId: "second")))
+        #expect(router.navigationPath.count == 1)
+        #expect(router.pendingSelection == nil)
+    }
+
+    @Test("Keeping the edits drops the CV picked meanwhile: leaving later shows the list")
+    func keepingTheEditsDropsTheSelection() {
+        let router = AppRouter()
+        router.select(.stored(cvId: "first"))
+        let editor = LeavableEditorSpy(leaving: .asksFirst)
+        router.editorAppeared(editor)
+        router.select(.stored(cvId: "second"))
+
+        router.keepEditing()
+        router.closeEditor()
+
+        #expect(editor.leaveRequests == 1)
+        #expect(router.navigationPath.count == 0)
+        #expect(router.pendingSelection == nil)
+    }
+
+    @Test("Picking another CV while a save is running opens nothing, now or later")
+    func selectingWhileSavingOpensNothing() {
+        let router = AppRouter()
+        router.select(.stored(cvId: "first"))
+        let editor = LeavableEditorSpy(leaving: .refused)
+        router.editorAppeared(editor)
+
+        router.select(.stored(cvId: "second"))
+        router.closeEditor()
+
+        #expect(editor.leaveRequests == 1)
+        #expect(router.navigationPath.count == 0, "Leaving after the save shows the list, not the CV picked during it")
+        #expect(router.pendingSelection == nil)
+    }
+
+    @Test("The editor asks before another CV takes its place when it has unsaved edits")
+    func realEditorAsksBeforeTheSelectionChanges() {
+        let router = AppRouter()
+        router.select(.stored(cvId: "first"))
+        let editor = CVEditorViewModel(cvId: nil, initialCV: CVModel(), cvManagementUseCase: MockCVManagementUseCase())
+        editor.cv.personalInfo.name = "Marta Rinaldi"
+        router.editorAppeared(editor)
+
+        router.select(.stored(cvId: "second"))
+
+        #expect(editor.showingCancelConfirmation)
+        #expect(router.currentRoute == .cvEditor(.stored(cvId: "first")))
+        #expect(router.pendingSelection == .stored(cvId: "second"))
+    }
+}
+
+/// An editor that answers the request to leave it as the test says.
+@MainActor
+private final class LeavableEditorSpy: LeavableEditor {
+    enum Leaving {
+        /// Nothing would be lost
+        case allowed
+        /// The editor has unsaved edits and asks whether to discard them
+        case asksFirst
+        /// A save is running: the editor cannot be left yet
+        case refused
+    }
+
+    private let leaving: Leaving
+    private(set) var leaveRequests = 0
+    private(set) var showingCancelConfirmation = false
+
+    init(leaving: Leaving) {
+        self.leaving = leaving
+    }
+
+    func requestLeaving() -> Bool {
+        leaveRequests += 1
+        showingCancelConfirmation = leaving == .asksFirst
+        return leaving == .allowed
+    }
 }
