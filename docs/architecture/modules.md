@@ -41,6 +41,7 @@ Test targets and test-support targets are described below each package. The chec
 - **`FieldCheck`**: whether the text of an e-mail, phone or web-address field reads as one. E-mail addresses and web addresses are judged by `EmailAddress` and `WebLink`; a phone number needs a digit, and is otherwise written as the person likes. The legacy app's editor checks a field when the person leaves it.
 - **`CVTitle`**: what a CV is called wherever it is named: its name, otherwise the role it is for, otherwise "Untitled CV", which the app words; and the numbers that tell apart CVs whose titles read alike, so that no two rows of a list read the same.
 - **`ExampleDraft`**: the fields (`CVField`) a draft started from an example leaves blank, who its person is and how to reach them.
+- **`PDFFileName`**: the title of an exported PDF and the name of its file, from the person's name or the CV's, cleaned for every file system and cut to its bytes, around the pattern of the PDF's language, which the app gives from its catalog.
 - **`ExportPolicy`**: version 1's export, the A4 page, its 43-point margin and its 10 pages at most, and the name and e-mail an export needs (`ExportBlocker`). The legacy app reads it while it exports through the legacy exporter; at migration step 5 the policy of `CVRendering` replaces it ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)).
 - Planned: projects (#54), photo (#53).
 
