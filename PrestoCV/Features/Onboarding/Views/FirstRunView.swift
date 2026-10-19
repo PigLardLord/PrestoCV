@@ -65,8 +65,7 @@ struct FirstRunView: View {
                 .foregroundColor(DesignTokens.Colors.primary)
                 .multilineTextAlignment(.center)
             
-            // The welcome promises the AI draft only where the device can make it
-            Text(viewModel.promisesAIDraft ? "welcome.description.ai".localized : "welcome.description".localized)
+            Text(viewModel.aiEntry.welcomeKey.localized)
                 .typography(.body)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)
@@ -90,8 +89,8 @@ struct FirstRunView: View {
         switch choice {
         case .aiDraft:
             PrimaryButton(title: "onboarding.ai.button".localized, icon: "sparkles", action: openAIDraft)
-        case .aiDraftUnavailable(let explanation):
-            unavailableAIDraft(explanation)
+        case .aiDraftUnavailable(let reason):
+            unavailableAIDraft(reason)
         case .blank:
             if leads {
                 PrimaryButton(title: "onboarding.create.button".localized, icon: "plus.circle.fill", action: openBlankCV)
@@ -107,14 +106,14 @@ struct FirstRunView: View {
     
     /// The AI draft, dimmed and off, with the sentence that says why. VoiceOver reads the sentence once, with the
     /// button: its title, the sentence, then that it is dimmed.
-    private func unavailableAIDraft(_ explanation: AIEntry.Explanation) -> some View {
+    private func unavailableAIDraft(_ reason: AIEntry.Reason) -> some View {
         VStack(spacing: DesignTokens.Spacing.xs) {
             SecondaryButton.text(title: "onboarding.ai.button".localized, icon: "sparkles", action: openAIDraft)
                 .disabled(true)
                 .opacity(DesignTokens.Opacity.subtle)
-                .accessibilityValue(explanation.key.localized)
+                .accessibilityValue(reason.explanationKey.localized)
             
-            Text(explanation.key.localized)
+            Text(reason.explanationKey.localized)
                 .typography(.caption1)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)

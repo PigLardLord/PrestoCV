@@ -65,7 +65,11 @@ final class ViewModelFactory {
     
     @MainActor
     func makeNewCVChoicesViewModel() -> NewCVChoicesViewModel {
-        return NewCVChoicesViewModel(aiAvailability: makeAIAvailabilityProvider(), sampleRepository: sampleRepository)
+        return NewCVChoicesViewModel(
+            aiAvailability: makeAIAvailabilityProvider(),
+            sampleRepository: sampleRepository,
+            platform: .current
+        )
     }
 
     @MainActor

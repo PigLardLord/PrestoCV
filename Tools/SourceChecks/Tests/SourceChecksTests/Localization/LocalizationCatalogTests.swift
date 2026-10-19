@@ -143,8 +143,11 @@ struct LocalizationCatalogTests {
     /// Keys that the code builds from other values, so that no literal names them.
     fileprivate static let dynamicKeyPrefixes = ["language.level."]
 
-    /// Names that keep their capital letter inside a sentence: Apple Intelligence, Siri and the Settings app.
-    fileprivate static let properNames: Set<String> = ["Apple", "Intelligence", "Siri", "Ajustes", "Réglages", "Impostazioni"]
+    /// Names that keep their capital letter inside a sentence: Apple Intelligence, Siri, and the Settings app of the
+    /// iPhone and of the Mac ("Ajustes del Sistema", "Réglages Système", "Impostazioni di Sistema").
+    fileprivate static let properNames: Set<String> = [
+        "Apple", "Intelligence", "Siri", "Ajustes", "Réglages", "Impostazioni", "Sistema", "Système",
+    ]
 
     /// Keys whose text is the name of a person in every language.
     fileprivate static let personNames: Set<String> = ["export.font_preview_name"]

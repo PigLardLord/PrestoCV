@@ -11,49 +11,49 @@ struct NewCVChoicesTests {
     private func makeViewModel(
         _ availability: AIAvailability,
         samples: [CVModel] = [CVModel(name: "Nurse")],
-        isAIShipped: Bool = true
+        isAIShipped: Bool = true,
+        platform: AIPlatform = .iPhoneOrIPad
     ) async -> NewCVChoicesViewModel {
         let repository = MockSampleCVRepository()
         repository.samples = samples
-        let viewModel = NewCVChoicesViewModel(aiAvailability: { availability }, sampleRepository: repository, isAIShipped: isAIShipped)
+        let viewModel = NewCVChoicesViewModel(
+            aiAvailability: { availability }, sampleRepository: repository, isAIShipped: isAIShipped, platform: platform
+        )
         await viewModel.loadSamples()
         return viewModel
     }
 
-    @Test("Where the device can run the model, the AI draft leads, before a blank CV and the examples")
+    @Test("Where the device can run the model, the AI draft leads, before a blank CV and the examples, and the welcome promises it")
     func availableLeadsWithTheAIDraft() async {
         let viewModel = await makeViewModel(.available)
 
         #expect(viewModel.choices == [.aiDraft, .blank, .example])
-        #expect(viewModel.promisesAIDraft, "The welcome may promise the AI draft")
+        #expect(viewModel.aiEntry.welcomeKey == "welcome.description.ai")
     }
 
-    @Test("Where Apple Intelligence is off or the model is still downloading, the AI draft comes last, off, with what to do",
+    @Test("Where the AI draft cannot be made now, it comes last, dimmed, with its reason, and the welcome does not promise it",
           arguments: zip(
-              [AIAvailability.unavailable(.appleIntelligenceNotEnabled), .unavailable(.modelNotReady)],
-              [AIEntry.Explanation.turnOnAppleIntelligence, .modelStillDownloading]
+              [
+                  AIAvailability.unavailable(.modelNotReady), .unavailable(.appleIntelligenceNotEnabled),
+                  .unavailable(.deviceNotEligible), .unavailable(.unknown),
+              ],
+              [
+                  AIEntry.Reason.modelStillDownloading, .turnOnAppleIntelligence, .notOnThisDevice, .notAvailableRightNow,
+              ]
           ))
-    func disabledComesLastWithItsReason(availability: AIAvailability, explanation: AIEntry.Explanation) async {
+    func unavailableComesLastWithItsReason(availability: AIAvailability, reason: AIEntry.Reason) async {
         let viewModel = await makeViewModel(availability)
 
-        #expect(viewModel.choices == [.blank, .example, .aiDraftUnavailable(explanation)])
-        #expect(viewModel.promisesAIDraft, "The device can draft once the person has done what the sentence says")
+        #expect(viewModel.choices == [.blank, .example, .aiDraftUnavailable(reason)])
+        #expect(viewModel.aiEntry.welcomeKey == "welcome.description")
     }
 
-    @Test("Where the device cannot run the model, the AI draft comes last, off, with the sentence that it cannot draft, and AI is not promised")
-    func notEligibleShowsTheAIDraftOffWithoutPromisingIt() async {
-        let viewModel = await makeViewModel(.unavailable(.deviceNotEligible))
+    @Test("On a Mac, a device found not eligible gets the AI draft last with the way to turn it on in System Settings")
+    func theMacPointsToSystemSettings() async {
+        let viewModel = await makeViewModel(.unavailable(.deviceNotEligible), platform: .mac)
 
-        #expect(viewModel.choices == [.blank, .example, .aiDraftUnavailable(.notOnThisDevice)])
-        #expect(!viewModel.promisesAIDraft, "The welcome does not promise a draft this device cannot make")
-    }
-
-    @Test("Where the device gives a reason this version does not know, only a blank CV and the examples are offered, and AI is not promised")
-    func unknownReasonOffersOnlyWhatTheDeviceDoes() async {
-        let viewModel = await makeViewModel(.unavailable(.unknown))
-
-        #expect(viewModel.choices == [.blank, .example])
-        #expect(!viewModel.promisesAIDraft)
+        #expect(viewModel.choices == [.blank, .example, .aiDraftUnavailable(.turnOnAppleIntelligenceInSystemSettings)])
+        #expect(viewModel.aiEntry.explanationKey == "ai.unavailable.not_enabled.mac")
     }
 
     @Test("A release that does not ship AI drafting offers a blank CV and the examples only, and does not promise AI",
@@ -68,7 +68,7 @@ struct NewCVChoicesTests {
         let viewModel = await makeViewModel(availability, isAIShipped: false)
 
         #expect(viewModel.choices == [.blank, .example])
-        #expect(!viewModel.promisesAIDraft)
+        #expect(viewModel.aiEntry.welcomeKey == "welcome.description")
     }
 
     @Test("Without examples there is no example to start from, whatever the availability",

@@ -57,8 +57,8 @@ struct TemplateSelectionView: View {
         switch choice {
         case .aiDraft:
             aiGenerationCard
-        case .aiDraftUnavailable(let explanation):
-            disabledAIGenerationCard(explanation)
+        case .aiDraftUnavailable(let reason):
+            disabledAIGenerationCard(reason)
         case .blank:
             createNewCard
         case .example:
@@ -120,14 +120,14 @@ struct TemplateSelectionView: View {
 
     /// The AI card, dimmed and disabled, with the sentence that says why. VoiceOver reads the sentence once, with the
     /// card: its title, the sentence, then that it is dimmed.
-    private func disabledAIGenerationCard(_ explanation: AIEntry.Explanation) -> some View {
+    private func disabledAIGenerationCard(_ reason: AIEntry.Reason) -> some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
             aiGenerationCard
                 .disabled(true)
                 .opacity(DesignTokens.Opacity.subtle)
-                .accessibilityValue(explanation.key.localized)
+                .accessibilityValue(reason.explanationKey.localized)
 
-            Text(explanation.key.localized)
+            Text(reason.explanationKey.localized)
                 .typography(.caption1)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .accessibilityHidden(true)
