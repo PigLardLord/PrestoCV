@@ -94,7 +94,8 @@ final class ViewModelFactory {
             cv: cv,
             exportService: CVExportService(),
             preferencesStore: FileExportPreferencesStore(),
-            documentLanguageSink: documentLanguageSink
+            documentLanguageSink: documentLanguageSink,
+            exportPolicy: .standard
         )
     }
 

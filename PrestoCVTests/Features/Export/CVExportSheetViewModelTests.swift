@@ -3,6 +3,7 @@ import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
 @testable import CVPDFExporter
+import struct PrestoCVDomain.ExportPolicy
 
 // MARK: - Mock CVExportService
 
@@ -184,7 +185,8 @@ struct CVExportSheetViewModelTests {
         store: InMemoryExportPreferencesStore = InMemoryExportPreferencesStore()
     ) -> CVExportSheetViewModel {
         let viewModel = CVExportSheetViewModel(
-            cv: cv, exportService: service, preferencesStore: store, documentLanguageSink: { _ in }, previewDebounce: debounce
+            cv: cv, exportService: service, preferencesStore: store, documentLanguageSink: { _ in }, exportPolicy: .standard,
+            previewDebounce: debounce
         )
         viewModel.selectedTemplateId = template
         return viewModel
@@ -463,7 +465,7 @@ struct CVExportSheetViewModelTests {
     func pagesHaveAUniformBorder() {
         let margins = makeViewModel(MockCVExportService()).currentExportOptions().margins
 
-        #expect(margins.top == CVExportSheetViewModel.pageMargin)
+        #expect(margins.top == ExportPolicy.standard.margin)
         #expect(margins.left == margins.top)
         #expect(margins.bottom == margins.top)
         #expect(margins.right == margins.top)
@@ -483,7 +485,7 @@ struct CVExportSheetViewModelTests {
         #expect(!viewModel.isPreparingPDF)
         let exportOptions = await mockService.lastExportOptions
         let previewOptions = viewModel.previewOptions
-        #expect(exportOptions?.maxPages == CVExportSheetViewModel.maxPages)
+        #expect(exportOptions?.maxPages == ExportPolicy.standard.maxPages)
         #expect(exportOptions?.maxPages == previewOptions?.maxPages)
         #expect(exportOptions?.templateId == "modern")
         #expect(exportOptions?.customization == previewOptions?.customization)
@@ -726,7 +728,7 @@ struct CVExportSheetViewModelTests {
         #expect(options.templateId == "modern")
         #expect(options.customization.colorPalette == .minimal)
         #expect(options.customization.fontScheme == .modern)
-        #expect(options.maxPages == CVExportSheetViewModel.maxPages)
+        #expect(options.maxPages == ExportPolicy.standard.maxPages)
         #expect(options.maxPages != ExportOptions.default.maxPages)
     }
 

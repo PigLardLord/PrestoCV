@@ -30,6 +30,7 @@ struct CVExportSheetLanguageTests {
             exportService: service,
             preferencesStore: InMemoryExportPreferencesStore(),
             documentLanguageSink: sink,
+            exportPolicy: .standard,
             documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: ["it-IT"], read: NaturalLanguageReader.read),
             previewDebounce: .zero
         )

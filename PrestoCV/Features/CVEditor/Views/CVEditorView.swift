@@ -246,7 +246,8 @@ struct CVEditorView_Previews: PreviewProvider {
                     cv: editor.cv,
                     exportService: CVExportService(),
                     preferencesStore: PreviewExportPreferencesStore(),
-                    documentLanguageSink: { editor.documentLanguageSelection = $0 }
+                    documentLanguageSink: { editor.documentLanguageSelection = $0 },
+                    exportPolicy: .standard
                 )
             }
         }

@@ -3,6 +3,7 @@ import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
 @testable import CVPDFExporter
+import struct PrestoCVDomain.ExportPolicy
 
 /// How the bundled designs paginate. The planted CVs are exported with the real renderer and the options of the
 /// export sheet, and the PDFs are read back with PDFKit: where the text of every page is says how the page was
@@ -91,7 +92,7 @@ struct PDFPaginationTests {
     func pageLimit(design: String) async throws {
         let longest = try #require(PlantedCVs.paginated.first { $0.label == "long10x4" })
         let layout = try await Self.layout(of: longest, design: design)
-        #expect(layout.pageCount <= CVExportSheetViewModel.maxPages, "\(design): \(layout.summary)")
+        #expect(layout.pageCount <= ExportPolicy.standard.maxPages, "\(design): \(layout.summary)")
 
         let environment = try await ExportTestEnvironment.make()
         defer { environment.cleanUp() }
@@ -103,7 +104,7 @@ struct PDFPaginationTests {
             _ = try await service.export(cv: tooLong, templateId: design, options: options)
             Issue.record("A CV of 22 long entries should be refused")
         } catch PDFExportError.tooManyPages(let count, let limit) {
-            #expect(limit == CVExportSheetViewModel.maxPages)
+            #expect(limit == ExportPolicy.standard.maxPages)
             #expect(count > limit)
         }
     }

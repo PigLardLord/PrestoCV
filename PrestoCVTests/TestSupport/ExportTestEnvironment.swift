@@ -51,6 +51,7 @@ struct ExportTestEnvironment {
             exportService: makeService(),
             preferencesStore: InMemoryExportPreferencesStore(),
             documentLanguageSink: { _ in },
+            exportPolicy: .standard,
             previewDebounce: .zero
         )
         viewModel.selectedTemplateId = design

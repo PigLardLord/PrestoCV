@@ -224,7 +224,8 @@ struct CVListView_Previews: PreviewProvider {
             cv: cv,
             exportService: CVExportService(),
             preferencesStore: PreviewExportPreferencesStore(),
-            documentLanguageSink: { _ in }
+            documentLanguageSink: { _ in },
+            exportPolicy: .standard
         )
     }
     

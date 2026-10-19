@@ -538,7 +538,8 @@ private extension FontScheme {
             cv: mockCV,
             exportService: CVExportService(),
             preferencesStore: PreviewExportPreferencesStore(),
-            documentLanguageSink: { _ in }
+            documentLanguageSink: { _ in },
+            exportPolicy: .standard
         )
     )
 }
