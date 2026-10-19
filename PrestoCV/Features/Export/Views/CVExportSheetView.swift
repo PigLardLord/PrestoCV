@@ -527,6 +527,7 @@ private extension FontScheme {
 
 
 
+#if DEBUG
 #Preview("CV Export Sheet") {
     // Use the comprehensive sample CV from CVPDFExporter
     let adapter = CVDocumentAdapter()
@@ -536,10 +537,11 @@ private extension FontScheme {
         viewModel: CVExportSheetViewModel(
             cv: mockCV,
             exportService: CVExportService(),
-            preferencesStore: FileExportPreferencesStore(),
+            preferencesStore: PreviewExportPreferencesStore(),
             documentLanguageSink: { _ in }
         )
     )
 }
+#endif
 
 

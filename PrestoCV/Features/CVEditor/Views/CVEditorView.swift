@@ -237,31 +237,20 @@ struct CVEditorView: View {
 
 // MARK: - Previews
 
+#if DEBUG
 struct CVEditorView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            CVEditorView(viewModel: createMockViewModel()) { editor in
+            CVEditorView(viewModel: CVEditorViewModel(cvId: nil, cvManagementUseCase: PreviewDependencies.cvManagement())) { editor in
                 CVExportSheetViewModel(
                     cv: editor.cv,
                     exportService: CVExportService(),
-                    preferencesStore: FileExportPreferencesStore(),
+                    preferencesStore: PreviewExportPreferencesStore(),
                     documentLanguageSink: { editor.documentLanguageSelection = $0 }
                 )
             }
         }
         .environmentObject(AppRouter())
     }
-    
-    private static func createMockViewModel() -> CVEditorViewModel {
-        let container = DependencyContainer()
-        do {
-            let cvManagementUseCase = try container.makeCVManagementUseCase()
-            return CVEditorViewModel(
-                cvId: nil,
-                cvManagementUseCase: cvManagementUseCase
-            )
-        } catch {
-            fatalError("Failed to create mock view model: \(error)")
-        }
-    }
 }
+#endif

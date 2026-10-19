@@ -208,10 +208,11 @@ private struct CVRowView: View {
 
 // MARK: - Previews
 
+#if DEBUG
 struct CVListView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            CVListView(viewModel: createMockViewModel(), makeExportSheet: makeExportSheet) {
+            CVListView(viewModel: makeViewModel(), makeExportSheet: makeExportSheet) {
                 Text("navigation.my_cvs".localized)
             }
         }
@@ -222,18 +223,17 @@ struct CVListView_Previews: PreviewProvider {
         CVExportSheetViewModel(
             cv: cv,
             exportService: CVExportService(),
-            preferencesStore: FileExportPreferencesStore(),
+            preferencesStore: PreviewExportPreferencesStore(),
             documentLanguageSink: { _ in }
         )
     }
     
-    private static func createMockViewModel() -> CVListViewModel {
-        let container = DependencyContainer()
-        do {
-            let cvManagementUseCase = try container.makeCVManagementUseCase()
-            return CVListViewModel(cvManagementUseCase: cvManagementUseCase)
-        } catch {
-            fatalError("Failed to create mock view model: \(error)")
-        }
+    private static func makeViewModel() -> CVListViewModel {
+        let cvs = [
+            CVModel(name: "Backend Engineer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Software Engineer")),
+            CVModel(name: "Product Designer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Designer")),
+        ]
+        return CVListViewModel(cvManagementUseCase: PreviewDependencies.cvManagement(cvs: cvs))
     }
 }
+#endif

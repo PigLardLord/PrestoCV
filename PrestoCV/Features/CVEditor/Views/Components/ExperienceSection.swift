@@ -88,10 +88,8 @@ struct EducationSubsection: View {
     }
 }
 
+#if DEBUG
 #Preview {
-    let container = DependencyContainer()
-    let cvManagementUseCase = try! container.makeCVManagementUseCase()
-    let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: cvManagementUseCase)
-    
-    return ExperienceSection(viewModel: viewModel)
+    ExperienceSection(viewModel: CVEditorViewModel(cvId: nil, cvManagementUseCase: PreviewDependencies.cvManagement()))
 }
+#endif
