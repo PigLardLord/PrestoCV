@@ -4,7 +4,7 @@ import PrestoCVCore
 struct CVEditorView: View {
     @EnvironmentObject var router: AppRouter
     @StateObject private var viewModel: CVEditorViewModel
-    private let notice: EditorNotice?
+    private let makeExportSheet: @MainActor (CVEditorViewModel) -> CVExportSheetViewModel
     @State private var showingExportSheet = false
     @State private var deletionAnchor = RowDeletionAnchor()
     @StateObject private var keyboard = KeyboardVisibility()
@@ -17,9 +17,13 @@ struct CVEditorView: View {
     }
 
     /// The view model is built once, when the screen first appears, and survives every re-render of the parent.
-    init(viewModel: @autoclosure @escaping () -> CVEditorViewModel, notice: EditorNotice? = nil) {
+    /// - Parameter makeExportSheet: Gives the export sheet of the CV as the editor shows it.
+    init(
+        viewModel: @autoclosure @escaping () -> CVEditorViewModel,
+        makeExportSheet: @escaping @MainActor (CVEditorViewModel) -> CVExportSheetViewModel
+    ) {
         self._viewModel = StateObject(wrappedValue: viewModel())
-        self.notice = notice
+        self.makeExportSheet = makeExportSheet
     }
     
     var body: some View {
@@ -51,7 +55,7 @@ struct CVEditorView: View {
                     ) {
                         showingExportSheet = true
                     }
-                    .disabled(!viewModel.hasMeaningfulContent)
+                    .disabled(!viewModel.canExport)
                 }
             }
 
@@ -64,20 +68,20 @@ struct CVEditorView: View {
                         action: handleSaveTap
                     )
                     .disabled(!viewModel.isSaveButtonEnabled)
-                    .foregroundColor(viewModel.saveButtonColor)
+                    .foregroundColor(saveButtonColor)
                     .fontWeight(.semibold)
                 }
             }
+        }
+        .onAppear {
+            router.editorAppeared(viewModel)
         }
         .task {
             // Load CV data when the view appears
             await viewModel.loadCV()
         }
         .onChange(of: scenePhase) { _, phase in
-            // On its way to the background the app can be ended by iOS at any moment: what is not saved is kept now
-            if phase != .active {
-                Task { await viewModel.keepUnsavedEdits() }
-            }
+            Task { await viewModel.sceneDidChange(isActive: phase == .active) }
         }
         .onChange(of: viewModel.showsSavedConfirmation) { _, isShown in
             if isShown {
@@ -91,7 +95,7 @@ struct CVEditorView: View {
         }
         .alert("dialog.discard_changes.title".localized, isPresented: $viewModel.showingCancelConfirmation) {
             Button("common.discard".localized, role: .destructive, action: handleDiscardChanges)
-            Button("editor.keep_editing".localized, role: .cancel) { }
+            Button("editor.keep_editing".localized, role: .cancel) { router.keepEditing() }
         } message: {
             Text("dialog.discard_changes.message".asLoclizedKey)
         }
@@ -113,9 +117,7 @@ struct CVEditorView: View {
             Text("editor.delete_row.message".localizedWithArgs(deletion.rowName))
         }
         .sheet(isPresented: $showingExportSheet) {
-            CVExportSheetView(cv: viewModel.cv) { language in
-                viewModel.documentLanguageSelection = language
-            }
+            CVExportSheetView(viewModel: makeExportSheet(viewModel))
         }
     }
     
@@ -123,7 +125,7 @@ struct CVEditorView: View {
     
     private var editorView: some View {
         VStack(spacing: 0) {
-            if let notice {
+            if let notice = viewModel.notice {
                 EditorNoticeBanner(notice: notice)
             }
 
@@ -133,7 +135,10 @@ struct CVEditorView: View {
                     cv: $viewModel.cv,
                     documentLanguage: $viewModel.documentLanguageSelection,
                     automaticLanguageTitle: viewModel.automaticDocumentLanguageTitle,
-                    documentLanguageTitle: viewModel.documentLanguageTitle
+                    documentLanguageTitle: viewModel.documentLanguageTitle,
+                    emailStatus: viewModel.emailStatus,
+                    phoneStatus: viewModel.phoneStatus,
+                    portfolioStatus: viewModel.portfolioStatus
                 )
                     .keyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
@@ -173,7 +178,7 @@ struct CVEditorView: View {
                 PrimaryButton.large(
                     title: String(localized: "export.button.title"),
                     icon: "square.and.arrow.up",
-                    isDisabled: !viewModel.hasMeaningfulContent
+                    isDisabled: !viewModel.canExport
                 ) {
                     showingExportSheet = true
                 }
@@ -185,6 +190,10 @@ struct CVEditorView: View {
                 .background(DesignTokens.Colors.background)
             }
         }
+    }
+    
+    private var saveButtonColor: Color {
+        viewModel.isSaveButtonEnabled ? DesignTokens.Colors.accent : DesignTokens.Colors.disabledButtonForeground
     }
     
     private var exitTitle: String {
@@ -209,13 +218,8 @@ struct CVEditorView: View {
     // MARK: - Action Handlers
     
     private func handleCancelTap() {
-        leaveEditorUnlessEditsWouldBeLost()
-    }
-
-    /// For new CVs, always go to root (CV List), not just back one level
-    private func leaveEditorUnlessEditsWouldBeLost() {
         if viewModel.requestLeaving() {
-            router.navigateToRoot()
+            router.closeEditor()
         }
     }
     
@@ -227,30 +231,26 @@ struct CVEditorView: View {
     
     private func handleDiscardChanges() {
         viewModel.confirmCancel()
-        router.navigateToRoot()
+        router.closeEditor()
     }
 }
 
 // MARK: - Previews
 
+#if DEBUG
 struct CVEditorView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            CVEditorView(viewModel: createMockViewModel())
+            CVEditorView(viewModel: CVEditorViewModel(cvId: nil, cvManagementUseCase: PreviewDependencies.cvManagement())) { editor in
+                CVExportSheetViewModel(
+                    cv: editor.cv,
+                    exportService: CVExportService(),
+                    preferencesStore: PreviewExportPreferencesStore(),
+                    documentLanguageSink: { editor.documentLanguageSelection = $0 }
+                )
+            }
         }
         .environmentObject(AppRouter())
     }
-    
-    private static func createMockViewModel() -> CVEditorViewModel {
-        let container = DependencyContainer()
-        do {
-            let cvManagementUseCase = try container.makeCVManagementUseCase()
-            return CVEditorViewModel(
-                cvId: nil,
-                cvManagementUseCase: cvManagementUseCase
-            )
-        } catch {
-            fatalError("Failed to create mock view model: \(error)")
-        }
-    }
 }
+#endif

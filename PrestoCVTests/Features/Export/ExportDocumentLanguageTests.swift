@@ -32,12 +32,13 @@ struct ExportDocumentLanguageTests {
             cv: cv,
             exportService: environment.makeService(),
             preferencesStore: InMemoryExportPreferencesStore(),
+            documentLanguageSink: { _ in },
             documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: [appLanguage], read: NaturalLanguageReader.read),
             previewDebounce: .zero
         )
         viewModel.selectedTemplateId = "professional"
 
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         let pdf = try #require(viewModel.sharePDF, "\(viewModel.errorMessage ?? "no PDF")")
         let text = try #require(PDFDocument(url: pdf.url)?.string)

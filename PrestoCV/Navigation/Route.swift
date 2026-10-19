@@ -5,7 +5,7 @@ import Foundation
 enum Route: Hashable, Sendable {
     case onboarding
     case cvList
-    case cvEditor(cvId: String?)
+    case cvEditor(EditorRequest)
     case templateSelection
     case aiGeneration
 }

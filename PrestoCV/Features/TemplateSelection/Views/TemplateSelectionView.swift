@@ -66,8 +66,7 @@ struct TemplateSelectionView: View {
 
     private var createNewCard: some View {
         Button(action: {
-            // For empty CV, just pass an empty CVModel - no need to load from repository
-            router.navigateToEditorWithTemplate(CVModel())
+            router.navigateToEditorWithTemplate(viewModel.makeBlankDraft())
         }) {
             plainCard(
                 icon: "plus.rectangle.on.rectangle",
@@ -184,11 +183,7 @@ struct TemplateSelectionView: View {
 
 #if DEBUG
 #Preview {
-    let container = DependencyContainer()
-    let viewModel = NewCVChoicesViewModel(
-        aiAvailability: { .available },
-        sampleRepository: try! container.makeSampleCVRepository()
-    )
+    let viewModel = NewCVChoicesViewModel(aiAvailability: { .available }, sampleRepository: PreviewDependencies.samples)
 
     return NavigationStack {
         TemplateSelectionView(viewModel: viewModel)

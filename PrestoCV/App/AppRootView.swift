@@ -7,16 +7,12 @@ struct AppRootView: View {
     @ObservedObject private var onboardingViewModel: OnboardingViewModel
     @ObservedObject private var cvListViewModel: CVListViewModel
     @ObservedObject private var unsavedEditsOffer: UnsavedEditsOfferViewModel
-    private let cvManagementUseCase: CVManagementUseCaseProtocol
-    private let unsavedEditsUseCase: UnsavedEditsUseCaseProtocol?
     private let viewModelFactory: ViewModelFactory
     
     init(dependencies: RootDependencies) {
         self.onboardingViewModel = dependencies.onboardingViewModel
         self.cvListViewModel = dependencies.cvListViewModel
         self.unsavedEditsOffer = dependencies.unsavedEditsOfferViewModel
-        self.cvManagementUseCase = dependencies.cvManagementUseCase
-        self.unsavedEditsUseCase = dependencies.unsavedEditsUseCase
         self.viewModelFactory = dependencies.viewModelFactory
     }
     
@@ -78,7 +74,10 @@ struct AppRootView: View {
     }
     
     private var listView: some View {
-        CVListView(viewModel: cvListViewModel) {
+        CVListView(
+            viewModel: cvListViewModel,
+            makeExportSheet: { viewModelFactory.makeExportSheetViewModel(exporting: $0, from: cvListViewModel) }
+        ) {
             FirstRunView(viewModel: viewModelFactory.makeNewCVChoicesViewModel())
         }
     }
@@ -92,23 +91,10 @@ struct AppRootView: View {
             TemplateSelectionView(viewModel: viewModelFactory.makeNewCVChoicesViewModel())
         case .aiGeneration:
             AIGenerationView(viewModel: viewModelFactory.makeAIGenerationViewModel())
-        case .cvEditor(let cvId):
+        case .cvEditor(let request):
             CVEditorView(
-                viewModel: CVEditorViewModel(
-                    cvId: cvId,
-                    initialCV: router.initialCVForEditor,
-                    restoring: router.restoringEdits,
-                    cvManagementUseCase: cvManagementUseCase,
-                    // Restored edits go on being kept as the editing they belong to, with the claim the window took
-                    unsavedEdits: unsavedEditsUseCase.map {
-                        UnsavedEditsKeeper(
-                            editing: router.restoringEdits?.id ?? UUID(),
-                            claim: router.restored?.takeClaim(),
-                            useCase: $0
-                        )
-                    }
-                ),
-                notice: router.editorNotice
+                viewModel: viewModelFactory.makeCVEditorViewModel(for: request),
+                makeExportSheet: viewModelFactory.makeExportSheetViewModel(editing:)
             )
         }
     }

@@ -1,4 +1,5 @@
-import SwiftUI
+import Combine
+import Foundation
 import PrestoCVCore
 
 @MainActor
@@ -82,6 +83,12 @@ final class CVListViewModel: ObservableObject {
     
     // MARK: - Row Text
     
+    /// What the list calls a CV: its name, or "Untitled CV" while it has none.
+    func title(of cv: CVModel) -> String {
+        let hasName = !cv.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return hasName ? cv.name : "cv.untitled".localized
+    }
+    
     /// The person a CV is about, for the line under its name: the name of the person and the job title, or the one
     /// of them that is there. It tells apart CVs that have no name of their own. Nil when the CV has neither.
     func personLine(of cv: CVModel) -> String? {
@@ -100,6 +107,14 @@ final class CVListViewModel: ObservableObject {
     /// app comes back to the foreground, which can be days after the rows were last drawn.
     func refreshPresentationDate() {
         presentationDate = now()
+    }
+    
+    /// The app came to the foreground or left it. Back in the foreground, which can be days after the rows were last
+    /// drawn, the times of the rows are told again.
+    func sceneDidChange(isActive: Bool) {
+        if isActive {
+            refreshPresentationDate()
+        }
     }
     
     /// Keeps the clock of the list current, one tick a minute, until the task that runs it is cancelled.

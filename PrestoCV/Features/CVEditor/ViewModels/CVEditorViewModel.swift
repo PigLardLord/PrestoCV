@@ -1,4 +1,4 @@
-import SwiftUI
+import Foundation
 import PrestoCVCore
 import Combine
 
@@ -18,6 +18,8 @@ final class CVEditorViewModel: ObservableObject {
     @Published private(set) var showsSavedConfirmation = false
     @Published var showingCancelConfirmation = false
     @Published private(set) var pendingDeletion: PendingDeletion?
+    /// The message shown above a new CV, set by the screen that opened it.
+    let notice: EditorNotice?
     
     /// How long the confirmation of a save stays.
     static let savedConfirmationDuration = Duration.seconds(3)
@@ -138,14 +140,15 @@ final class CVEditorViewModel: ObservableObject {
         savedSnapshot != nil && !hasUnsavedChanges ? .done : .cancel
     }
     
+    /// Whether the CV can be exported: one with nothing in it has nothing to put in a PDF. Unsaved edits are exported
+    /// as they are.
+    var canExport: Bool {
+        hasMeaningfulContent
+    }
+    
     /// Computed property for save button enabled state
     var isSaveButtonEnabled: Bool {
         hasMeaningfulContent && hasUnsavedChanges && !isSaving
-    }
-    
-    /// Computed property for save button color
-    var saveButtonColor: Color {
-        isSaveButtonEnabled ? DesignTokens.Colors.accent : DesignTokens.Colors.disabledButtonForeground
     }
     
     /// Computed property for error alert binding
@@ -156,6 +159,7 @@ final class CVEditorViewModel: ObservableObject {
     // MARK: - Initialization
     /// - Parameters:
     ///   - initialCV: What a new CV starts from. The CV gets an id of its own, which its saves store it under.
+    ///   - notice: The message shown above a new CV, such as the one that asks to check an AI draft.
     ///   - restoring: Edits an earlier run of the app kept. They are shown over the CV stored under their id once it
     ///     is loaded, or as a new CV when there is none.
     ///   - documentLanguageDetector: Reads which language the CV is written in, for the Automatic document language.
@@ -164,6 +168,7 @@ final class CVEditorViewModel: ObservableObject {
     init(
         cvId: String?,
         initialCV: CVModel? = nil,
+        notice: EditorNotice? = nil,
         restoring restoredEdits: UnsavedEdits? = nil,
         cvManagementUseCase: CVManagementUseCaseProtocol,
         documentLanguageDetector: DocumentLanguageDetector = .onDevice,
@@ -171,6 +176,7 @@ final class CVEditorViewModel: ObservableObject {
         sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
         self.cvId = cvId
+        self.notice = notice
         self.cvManagementUseCase = cvManagementUseCase
         self.documentLanguageDetector = documentLanguageDetector
         self.restoredEdits = restoredEdits
@@ -291,6 +297,14 @@ final class CVEditorViewModel: ObservableObject {
     func keepUnsavedEdits() async -> Bool? {
         guard viewState.data != nil, let unsavedEdits else { return nil }
         return await unsavedEdits.keepNow(currentUnsavedEdits)
+    }
+    
+    /// The app came to the foreground or left it. On its way to the background the app can be ended by iOS at any
+    /// moment: what is not saved is kept now.
+    @MainActor
+    func sceneDidChange(isActive: Bool) async {
+        guard !isActive else { return }
+        await keepUnsavedEdits()
     }
     
     /// The question every way out of the editor asks first: Cancel, or Done once everything is saved.
@@ -578,6 +592,8 @@ final class CVEditorViewModel: ObservableObject {
         cv[keyPath: rows].remove(at: index)
     }
 }
+
+extension CVEditorViewModel: LeavableEditor {}
 
 private extension Array {
     subscript(safe index: Int) -> Element? {

@@ -180,6 +180,25 @@ struct CVListRowTextTests {
         #expect(Set([justNow, minutesLater, hoursLater].compactMap { $0 }).count == 3)
     }
 
+    @Test("Coming back to the foreground tells the times of the rows again; leaving it does not")
+    func foregroundTellsTheTimesAgain() async {
+        let saved = cv(name: "A")
+        let savedAt = moment(14, 12)
+        let repository = InMemoryCVRepository(cvs: [saved])
+        await repository.setLastSaved(savedAt, for: saved.id)
+        let clock = TestClock(savedAt.addingTimeInterval(30))
+        let viewModel = makeViewModel(repository: repository, clock: clock)
+        await viewModel.loadCVs()
+        let justNow = viewModel.lastSavedLine(of: saved)
+
+        clock.advance(by: 2 * 3_600)
+        viewModel.sceneDidChange(isActive: false)
+        #expect(viewModel.lastSavedLine(of: saved) == justNow, "Leaving the foreground moves nothing")
+
+        viewModel.sceneDidChange(isActive: true)
+        #expect(viewModel.lastSavedLine(of: saved) == line(saved: savedAt, at: savedAt.addingTimeInterval(30 + 2 * 3_600)))
+    }
+
     @Test("A CV saved in the evening reads yesterday once the clock passes midnight")
     func eveningSaveReadsYesterdayAfterMidnight() async {
         let saved = cv(name: "A")

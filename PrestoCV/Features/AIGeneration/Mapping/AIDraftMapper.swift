@@ -119,14 +119,14 @@ struct AIDraftMapper {
         }
     }
 
-    /// The editor rates skills from 0 to 5 stars; no level is no stars.
+    /// The editor rates skills with up to `Skill.maxLevel` stars; no level is no stars, and an expert gets them all.
     private func skillLevel(_ level: CVGeneratorAI.SkillLevel?) -> Int {
         switch level {
         case nil: return 0
         case .beginner?: return 1
         case .intermediate?: return 3
         case .advanced?: return 4
-        case .expert?: return 5
+        case .expert?: return PrestoCVCore.Skill.maxLevel
         }
     }
 

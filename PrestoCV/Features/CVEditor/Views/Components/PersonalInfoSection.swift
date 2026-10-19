@@ -8,6 +8,9 @@ struct PersonalInfoSection: View {
     let automaticLanguageTitle: String
     /// The language chosen, or what automatic stands for
     let documentLanguageTitle: String
+    let emailStatus: FieldStatus
+    let phoneStatus: FieldStatus
+    let portfolioStatus: FieldStatus
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     
@@ -20,12 +23,12 @@ struct PersonalInfoSection: View {
         return layout {
             LabeledTextField.email(
                 text: $cv.personalInfo.email,
-                isRequired: true
+                state: emailStatus.fieldState
             )
             
             LabeledTextField.phone(
                 text: $cv.personalInfo.phone,
-                lacksDigits: cv.personalInfo.phoneLacksDigits
+                state: phoneStatus.fieldState
             )
         }
     }
@@ -58,7 +61,8 @@ struct PersonalInfoSection: View {
                     
                     LabeledTextField.url(
                         label: "field.portfolio_url".localized,
-                        text: $cv.personalInfo.portfolio
+                        text: $cv.personalInfo.portfolio,
+                        state: portfolioStatus.fieldState
                     )
                 }
             } header: {
@@ -169,6 +173,9 @@ struct SectionHeader: View {
         cv: .constant(CVModel()),
         documentLanguage: .constant(nil),
         automaticLanguageTitle: "Automatic (English)",
-        documentLanguageTitle: "Automatic (English)"
+        documentLanguageTitle: "Automatic (English)",
+        emailStatus: FieldStatus(validity: .none, isRequired: true, note: .required),
+        phoneStatus: FieldStatus(validity: .none, isRequired: false, note: .phoneHelp),
+        portfolioStatus: FieldStatus(validity: .none, isRequired: false, note: .webAddressHelp)
     )
 }

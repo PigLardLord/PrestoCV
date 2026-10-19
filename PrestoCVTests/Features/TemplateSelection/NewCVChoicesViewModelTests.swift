@@ -253,6 +253,31 @@ struct NewCVChoicesViewModelTests {
         #expect(sampleRepository.getAllSamplesCallCount == 2)
     }
 
+    @Test("A blank draft is an empty CV, and each one is a CV of its own")
+    func blankDraftIsEmpty() {
+        let viewModel = makeViewModel(sampleRepository: MockSampleCVRepository())
+
+        let draft = viewModel.makeBlankDraft()
+
+        #expect(draft == CVModel(id: draft.id), "Nothing is filled in")
+        #expect(viewModel.makeBlankDraft().id != draft.id)
+    }
+
+    @Test("Each example is listed under the job it is for, with what it says of its person; one without a job as Untitled CV")
+    func examplesAreListedUnderTheirJob() async {
+        let sampleRepository = MockSampleCVRepository()
+        let withoutJob = CVModel(name: "Second", personalInfo: PersonalInfo(profile: "A summary."))
+        sampleRepository.samples = [makeSample(), withoutJob]
+        let viewModel = makeViewModel(sampleRepository: sampleRepository)
+
+        await viewModel.loadSamples()
+
+        #expect(viewModel.examples == [
+            ExampleChoice(sample: viewModel.samples[0], title: "Senior Software Engineer", summary: "Senior engineer with 8+ years of experience."),
+            ExampleChoice(sample: withoutJob, title: "cv.untitled".localized, summary: "A summary."),
+        ])
+    }
+
     @Test("A draft has a new identity and no name of its own")
     func draftHasNewIdentityAndNoName() {
         let sample = makeSample()

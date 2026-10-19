@@ -221,11 +221,11 @@ struct AppLaunchViewModelTests {
             Issue.record("The app must open when only its unsaved edits cannot be kept")
             return
         }
-        #expect(dependencies.unsavedEditsUseCase == nil, "Keeping unsaved edits is off")
         await dependencies.unsavedEditsOfferViewModel.checkForEditsToRestore()
         #expect(dependencies.unsavedEditsOfferViewModel.offer == nil)
-        let editor = CVEditorViewModel(cvId: nil, cvManagementUseCase: dependencies.cvManagementUseCase)
+        let editor = dependencies.viewModelFactory.makeCVEditorViewModel(for: .new(template: CVModel(), notice: nil))
         editor.cv.personalInfo.name = "Marta Rinaldi"
+        #expect(await editor.keepUnsavedEdits() == nil, "Keeping unsaved edits is off")
         #expect(await editor.saveCV(), "The editor saves as before")
     }
 

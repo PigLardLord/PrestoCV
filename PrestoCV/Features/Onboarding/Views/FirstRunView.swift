@@ -127,7 +127,7 @@ struct FirstRunView: View {
     }
     
     private func openBlankCV() {
-        router.navigateToEditorWithTemplate(CVModel())
+        router.navigateToEditorWithTemplate(viewModel.makeBlankDraft())
     }
 }
 
@@ -135,11 +135,7 @@ struct FirstRunView: View {
 
 #if DEBUG
 #Preview {
-    let container = DependencyContainer()
-    let viewModel = NewCVChoicesViewModel(
-        aiAvailability: { .available },
-        sampleRepository: try! container.makeSampleCVRepository()
-    )
+    let viewModel = NewCVChoicesViewModel(aiAvailability: { .available }, sampleRepository: PreviewDependencies.samples)
     
     return FirstRunView(viewModel: viewModel)
         .environmentObject(AppRouter())

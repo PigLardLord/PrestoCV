@@ -6182,47 +6182,6 @@
         }
       }
     },
-    "field.email.help" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wird in Ihrem Lebenslauf für die berufliche Kontaktaufnahme angezeigt"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shown on your CV for professional contact"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se muestra en tu CV para el contacto profesional"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Affiché dans votre CV pour les contacts professionnels"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mostrata nel tuo CV per i contatti professionali"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aparece no seu currículo para contato profissional"
-          }
-        }
-      }
-    },
     "field.email.placeholder" : {
       "extractionState" : "manual",
       "localizations" : {

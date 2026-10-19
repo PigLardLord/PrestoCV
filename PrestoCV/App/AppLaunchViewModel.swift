@@ -21,9 +21,6 @@ struct RootDependencies {
     let onboardingViewModel: OnboardingViewModel
     let cvListViewModel: CVListViewModel
     let unsavedEditsOfferViewModel: UnsavedEditsOfferViewModel
-    let cvManagementUseCase: CVManagementUseCaseProtocol
-    /// Nil when the unsaved edits cannot be kept on this device: the app works without them.
-    let unsavedEditsUseCase: UnsavedEditsUseCaseProtocol?
     let viewModelFactory: ViewModelFactory
 }
 
@@ -83,16 +80,18 @@ final class AppLaunchViewModel: ObservableObject {
         unsavedEdits makeUnsavedEdits: @MainActor () throws -> UnsavedEditsUseCaseProtocol
     ) -> Phase {
         do {
-            let viewModelFactory = try ViewModelFactory(dependencyContainer: container)
             let cvManagementUseCase = try container.makeCVManagementUseCase()
             let unsavedEditsUseCase = unsavedEditsIfAvailable(from: makeUnsavedEdits)
+            let viewModelFactory = try ViewModelFactory(
+                dependencyContainer: container,
+                cvManagementUseCase: cvManagementUseCase,
+                unsavedEditsUseCase: unsavedEditsUseCase
+            )
             return .ready(
                 RootDependencies(
                     onboardingViewModel: try viewModelFactory.makeOnboardingViewModel(),
                     cvListViewModel: CVListViewModel(cvManagementUseCase: cvManagementUseCase),
                     unsavedEditsOfferViewModel: UnsavedEditsOfferViewModel(useCase: unsavedEditsUseCase, cvs: cvManagementUseCase),
-                    cvManagementUseCase: cvManagementUseCase,
-                    unsavedEditsUseCase: unsavedEditsUseCase,
                     viewModelFactory: viewModelFactory
                 )
             )

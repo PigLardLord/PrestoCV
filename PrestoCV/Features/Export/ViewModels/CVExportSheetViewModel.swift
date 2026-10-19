@@ -1,8 +1,9 @@
-import SwiftUI
+import Combine
+import Foundation
 import PrestoCVCore
 import CVPDFExporter
 
-/// What the user chose in the export sheet: the single value the sheet watches to refresh the preview.
+/// What the user chose in the export sheet: while the sheet is shown, each change of it makes a new preview.
 struct ExportSelection: Equatable {
     var templateId: String?
     var colorPalette: ColorPalette
@@ -11,8 +12,11 @@ struct ExportSelection: Equatable {
     var documentLanguage: DocumentLanguage?
 }
 
-/// Drives the export sheet: the template, palette, font and language the user picks, the preview of that choice, and
-/// the PDF that is rendered once the preview has settled so that sharing it is a single tap.
+/// Where the language chosen for a CV's PDF in its export sheet goes, for the CV to keep it; nil is automatic.
+typealias DocumentLanguageSink = @MainActor (DocumentLanguage?) -> Void
+
+/// Drives the export sheet of one CV: the template, palette, font and language the user picks, the preview of that
+/// choice, and the PDF that is rendered once the preview has settled so that sharing it is a single tap.
 ///
 /// All the work of a selection runs in one task that the view model owns. A new selection, or the sheet closing,
 /// cancels it, and a generation number keeps a result that arrives late, from a task that was cancelled while it
@@ -20,13 +24,14 @@ struct ExportSelection: Equatable {
 @MainActor
 final class CVExportSheetViewModel: ObservableObject {
     @Published var templates: [Template] = []
-    @Published var selectedTemplateId: String?
-    @Published var selectedColorPalette: ColorPalette = .professional
-    @Published var selectedFontScheme: FontScheme = .classic
-    /// The language chosen for the PDF; nil is automatic. It starts as the language chosen for the CV.
-    @Published var documentLanguageChoice: DocumentLanguage?
+    /// The template, palette, font and language chosen. While the sheet is shown, each change makes a new preview.
+    @Published private(set) var selection: ExportSelection {
+        didSet { selectionDidChange(from: oldValue) }
+    }
+    /// True until the templates are loaded, when the sheet first shows
+    @Published private(set) var isLoadingTemplates = true
     /// The language automatic stands for with the CV: the one it is written in, or the app's
-    @Published private(set) var automaticDocumentLanguage: DocumentLanguage
+    let automaticDocumentLanguage: DocumentLanguage
     @Published private(set) var previewHTML: String?
     @Published private(set) var previewOptions: ExportOptions?
     @Published private(set) var isPreviewLoading = false
@@ -55,20 +60,36 @@ final class CVExportSheetViewModel: ObservableObject {
     /// The activity of the share sheet that saves a file to Files
     static let saveToFilesActivity = "com.apple.DocumentManagerUICore.SaveToFiles"
 
+    /// The CV the sheet exports
+    private let cv: CVModel
     private let exportService: any CVExportServiceProtocol
     private let preferencesStore: any ExportPreferencesStore
-    private let documentLanguageDetector: DocumentLanguageDetector
+    private let documentLanguageSink: DocumentLanguageSink
     private let previewDebounce: Duration
     private var refreshTask: Task<Void, Never>?
     private var generation = 0
+    /// The sheet is on screen, from `start()` to `stop()`: a change of the selection makes its preview
+    private var isShown = false
 
-    var selection: ExportSelection {
-        ExportSelection(
-            templateId: selectedTemplateId,
-            colorPalette: selectedColorPalette,
-            fontScheme: selectedFontScheme,
-            documentLanguage: documentLanguageChoice
-        )
+    var selectedTemplateId: String? {
+        get { selection.templateId }
+        set { selection.templateId = newValue }
+    }
+
+    var selectedColorPalette: ColorPalette {
+        get { selection.colorPalette }
+        set { selection.colorPalette = newValue }
+    }
+
+    var selectedFontScheme: FontScheme {
+        get { selection.fontScheme }
+        set { selection.fontScheme = newValue }
+    }
+
+    /// The language chosen for the PDF; nil is automatic. It starts as the language chosen for the CV.
+    var documentLanguageChoice: DocumentLanguage? {
+        get { selection.documentLanguage }
+        set { selection.documentLanguage = newValue }
     }
 
     /// The language the PDF is written in: the one chosen, or the one automatic stands for
@@ -117,21 +138,39 @@ final class CVExportSheetViewModel: ObservableObject {
 
     /// - Parameters:
     ///   - cv: The CV to export. The sheet starts with the language chosen for it.
+    ///   - exportService: Makes the preview and the PDF.
+    ///   - preferencesStore: Keeps the design chosen last, for the next export.
+    ///   - documentLanguageSink: Takes each language chosen in the sheet, for the CV to keep.
     ///   - previewDebounce: How long a selection must stay put before its preview is made, so that changing the
     ///     template, the palette and the font in quick succession makes one preview and one PDF
     init(
         cv: CVModel,
-        exportService: (any CVExportServiceProtocol)? = nil,
-        preferencesStore: any ExportPreferencesStore = FileExportPreferencesStore(),
+        exportService: any CVExportServiceProtocol,
+        preferencesStore: any ExportPreferencesStore,
+        documentLanguageSink: @escaping DocumentLanguageSink,
         documentLanguageDetector: DocumentLanguageDetector = .onDevice,
         previewDebounce: Duration = .milliseconds(250)
     ) {
-        self.exportService = exportService ?? CVExportService()
+        self.cv = cv
+        self.exportService = exportService
         self.preferencesStore = preferencesStore
-        self.documentLanguageDetector = documentLanguageDetector
+        self.documentLanguageSink = documentLanguageSink
         self.previewDebounce = previewDebounce
-        documentLanguageChoice = cv.chosenDocumentLanguage
+        selection = ExportSelection(
+            templateId: nil,
+            colorPalette: .professional,
+            fontScheme: .classic,
+            documentLanguage: cv.chosenDocumentLanguage
+        )
         automaticDocumentLanguage = documentLanguageDetector.automaticLanguage(for: cv)
+    }
+
+    /// The sheet shows: the templates are loaded, which selects the one chosen last and so makes the first preview.
+    /// From then on, until `stop()`, each change of the selection makes a new preview.
+    func start() async {
+        isShown = true
+        await loadTemplates()
+        isLoadingTemplates = false
     }
 
     func loadTemplates() async {
@@ -155,13 +194,12 @@ final class CVExportSheetViewModel: ObservableObject {
     /// A CV without a name or an email still gets its preview, which shows what is missing, but no PDF.
     /// - Returns: The task that does the work, for a caller that wants to wait for it
     @discardableResult
-    func requestPreview(for cv: CVModel) -> Task<Void, Never> {
+    func requestPreview() -> Task<Void, Never> {
         refreshTask?.cancel()
         generation += 1
         let requestGeneration = generation
         let staleFile = takeSharePDF()
 
-        automaticDocumentLanguage = documentLanguageDetector.automaticLanguage(for: cv)
         var printedCV = cv
         printedCV.documentLanguage = documentLanguage.rawValue
         shareOutcome = nil
@@ -185,6 +223,7 @@ final class CVExportSheetViewModel: ObservableObject {
     /// - Returns: The task that removes the file, for a caller that wants to wait for it
     @discardableResult
     func stop() -> Task<Void, Never> {
+        isShown = false
         refreshTask?.cancel()
         refreshTask = nil
         generation += 1
@@ -232,6 +271,17 @@ final class CVExportSheetViewModel: ObservableObject {
     }
 
     // MARK: - Refreshing
+
+    /// A language chosen in the sheet goes to the CV at once; any change makes a new preview while the sheet shows.
+    private func selectionDidChange(from oldValue: ExportSelection) {
+        guard selection != oldValue else { return }
+        if selection.documentLanguage != oldValue.documentLanguage {
+            documentLanguageSink(selection.documentLanguage)
+        }
+        if isShown {
+            requestPreview()
+        }
+    }
 
     private func refresh(for cv: CVModel, generation requestGeneration: Int) async {
         let options = currentExportOptions()
@@ -317,16 +367,19 @@ final class CVExportSheetViewModel: ObservableObject {
     // MARK: - Remembering the choice
 
     /// Starts from what the user chose last time; a template that is no longer installed gives way to the first one.
+    /// The choice changes at once, so that it makes one preview.
     private func restoreLastChoice(among availableTemplates: [Template]) {
         let lastChoice = preferencesStore.load()
+        var restored = selection
         if let lastTemplateId = lastChoice.templateId,
            availableTemplates.contains(where: { $0.id == lastTemplateId }) {
-            selectedTemplateId = lastTemplateId
+            restored.templateId = lastTemplateId
         } else {
-            selectedTemplateId = availableTemplates.first?.id
+            restored.templateId = availableTemplates.first?.id
         }
-        selectedColorPalette = lastChoice.colorPalette ?? selectedColorPalette
-        selectedFontScheme = lastChoice.fontScheme ?? selectedFontScheme
+        restored.colorPalette = lastChoice.colorPalette ?? restored.colorPalette
+        restored.fontScheme = lastChoice.fontScheme ?? restored.fontScheme
+        selection = restored
     }
 
     private func rememberChoice(templateId: String, customization: CustomizationOptions) {

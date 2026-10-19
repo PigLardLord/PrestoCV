@@ -20,11 +20,16 @@ struct CVExportSheetLanguageTests {
     )
 
     /// The phone of the user is in Italian
-    private func makeViewModel(cv: CVModel, service: MockCVExportService = MockCVExportService()) -> CVExportSheetViewModel {
+    private func makeViewModel(
+        cv: CVModel,
+        service: MockCVExportService = MockCVExportService(),
+        sink: @escaping DocumentLanguageSink = { _ in }
+    ) -> CVExportSheetViewModel {
         let viewModel = CVExportSheetViewModel(
             cv: cv,
             exportService: service,
             preferencesStore: InMemoryExportPreferencesStore(),
+            documentLanguageSink: sink,
             documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: ["it-IT"], read: NaturalLanguageReader.read),
             previewDebounce: .zero
         )
@@ -83,7 +88,7 @@ struct CVExportSheetLanguageTests {
         let service = MockCVExportService()
         let viewModel = makeViewModel(cv: Self.englishCV, service: service)
 
-        await viewModel.requestPreview(for: Self.englishCV).value
+        await viewModel.requestPreview().value
 
         #expect(await service.lastPreviewCV?.documentLanguage == "en")
         #expect(await service.lastExportCV?.documentLanguage == "en")
@@ -98,7 +103,7 @@ struct CVExportSheetLanguageTests {
 
         viewModel.documentLanguageChoice = .french
         #expect(viewModel.selection != before, "A new language is a new selection, which the sheet makes a preview of")
-        await viewModel.requestPreview(for: Self.englishCV).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.documentLanguage == .french)
         #expect(viewModel.documentLanguageText == headings(in: .french))
@@ -114,21 +119,48 @@ struct CVExportSheetLanguageTests {
         let viewModel = makeViewModel(cv: cv, service: service)
 
         viewModel.documentLanguageChoice = nil
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.documentLanguage == .english)
         #expect(await service.lastExportCV?.documentLanguage == "en")
     }
 
-    @Test("Automatic follows the CV it is asked to make, as the CV changes")
+    @Test("Automatic follows the CV the sheet exports: each sheet makes its PDF in the language of its own CV")
     func automaticFollowsTheCV() async {
         let service = MockCVExportService()
-        let viewModel = makeViewModel(cv: .exportable, service: service)
-        #expect(viewModel.documentLanguage == .italian)
+        let shortCV = makeViewModel(cv: .exportable, service: service)
+        let englishCV = makeViewModel(cv: Self.englishCV, service: service)
+        #expect(shortCV.documentLanguage == .italian)
 
-        await viewModel.requestPreview(for: Self.englishCV).value
+        await englishCV.requestPreview().value
 
-        #expect(viewModel.documentLanguage == .english)
+        #expect(englishCV.documentLanguage == .english)
         #expect(await service.lastExportCV?.documentLanguage == "en")
+    }
+
+    // MARK: - Where the language goes
+
+    @Test("Each language chosen in the sheet goes to the CV, automatic as none")
+    func chosenLanguageGoesToTheCV() {
+        var sent: [DocumentLanguage?] = []
+        let viewModel = makeViewModel(cv: Self.englishCV, sink: { sent.append($0) })
+
+        viewModel.documentLanguageChoice = .french
+        viewModel.documentLanguageChoice = .french
+        viewModel.documentLanguageChoice = nil
+
+        #expect(sent == [.french, nil], "The same language chosen again is not sent twice")
+    }
+
+    @Test("A design chosen in the sheet does not touch the language of the CV")
+    func designDoesNotTouchTheLanguage() {
+        var sent: [DocumentLanguage?] = []
+        let viewModel = makeViewModel(cv: Self.englishCV, sink: { sent.append($0) })
+
+        viewModel.selectedTemplateId = "classic"
+        viewModel.selectedColorPalette = .creative
+        viewModel.selectedFontScheme = .serif
+
+        #expect(sent.isEmpty)
     }
 }

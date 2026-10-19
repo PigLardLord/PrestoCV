@@ -68,6 +68,19 @@ struct CVEditorUnsavedEditsTests {
         #expect(kept?.cv.id == editor.viewModel.cv.id, "The edits name the id the CV will be stored under")
     }
 
+    @Test("When the scene leaves the foreground the edits are kept at once; when it comes back nothing is written")
+    func sceneLeavingTheForegroundKeepsTheEdits() async {
+        let editor = makeEditor()
+        await editor.viewModel.loadCV()
+        editor.viewModel.cv.personalInfo.name = "Marta Rinaldi"
+
+        await editor.viewModel.sceneDidChange(isActive: true)
+        #expect(await editor.repository.writeCount == 0, "Coming back to the foreground writes nothing")
+
+        await editor.viewModel.sceneDidChange(isActive: false)
+        #expect(await editor.kept?.cv.personalInfo.name == "Marta Rinaldi")
+    }
+
     @Test("Leaving the foreground keeps the edits at once")
     func leavingTheForegroundKeepsTheEditsAtOnce() async {
         let editor = makeEditor()

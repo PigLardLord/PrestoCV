@@ -1,4 +1,5 @@
-import SwiftUI
+import Combine
+import Foundation
 import PrestoCVCore
 import CVGeneratorAI
 import os
@@ -89,6 +90,14 @@ final class NewCVChoicesViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Blank CV
+
+    /// The CV the editor opens for a blank start: empty, with an identity of its own. Nothing is stored until the
+    /// person saves it.
+    func makeBlankDraft() -> CVModel {
+        CVModel()
+    }
+
     // MARK: - Examples
 
     /// Loads the sample CVs the person can start from. Without samples the person can still start from a blank CV.
@@ -99,6 +108,14 @@ final class NewCVChoicesViewModel: ObservableObject {
             samples = try await sampleRepository.getAllSamples()
         } catch {
             newCVLogger.error("The sample CVs were not loaded: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// The examples as the sheet of examples lists them.
+    var examples: [ExampleChoice] {
+        samples.map { sample in
+            let job = sample.personalInfo.title
+            return ExampleChoice(sample: sample, title: job.isEmpty ? "cv.untitled".localized : job, summary: sample.personalInfo.profile)
         }
     }
 

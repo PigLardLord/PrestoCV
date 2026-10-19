@@ -114,10 +114,8 @@ struct InterestsSubsection: View {
     }
 }
 
+#if DEBUG
 #Preview {
-    let container = DependencyContainer()
-    let cvManagementUseCase = try! container.makeCVManagementUseCase()
-    let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: cvManagementUseCase)
-    
-    return DetailsSection(viewModel: viewModel)
+    DetailsSection(viewModel: CVEditorViewModel(cvId: nil, cvManagementUseCase: PreviewDependencies.cvManagement()))
 }
+#endif
