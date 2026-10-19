@@ -4,8 +4,8 @@ import Foundation
 /// and no ability the person claims.
 ///
 /// Only the words that claim something for the person count, as the grounding reads them (`Grounding.claimedWords(at:)`, the words
-/// that skills, interests and languages are grounded in): "My sister teaches chess" and "I don't play chess" neither keep nor drop
-/// the person's chess.
+/// that skills, interests and languages are grounded in): "My sister teaches chess", "I don't play chess" and "I have a friend who
+/// teaches chess" neither keep nor drop the person's chess.
 ///
 /// A clause of leisure holds a word of leisure ("free time", "hobby", "like"; "tempo libero", "piacciono"; "Freizeit", "mag"; "tiempo
 /// libre", "gustan"; "temps libre", "aime"; "tempo livre", "gosto"), and nothing else but the quotes of the draft's interests and

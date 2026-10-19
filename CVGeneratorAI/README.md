@@ -53,7 +53,9 @@ are its planned replacement and are still empty.
     negation that governs a high level denies only the level ("I am not an expert in Swift" keeps Swift), while one of a
     low level or of the ability denies the item ("I have no basic knowledge of German", "I cannot speak German even at a
     basic level"). A question claims nothing ("Do I speak French?"), nor do the words inside quotation marks, nor the line
-    after a colon line that another person speaks ("My colleague wrote:").
+    after a colon line that another person speaks ("My colleague wrote:"), nor what follows a relative that brings in another
+    subject ("I work with a colleague who speaks French"); "which I use", "che uso" and an item before the relative still
+    claim.
   - A skill that is also one of the draft's interests, and that the person mentions only as leisure ("In my free time I like
     chess and hiking"), is a hobby, and is dropped; the interest stays. A skill the person claims anywhere else ("proficient
     in Python", a job's clause, a list of skills) stays. Another person's clause ("My sister teaches chess") counts for

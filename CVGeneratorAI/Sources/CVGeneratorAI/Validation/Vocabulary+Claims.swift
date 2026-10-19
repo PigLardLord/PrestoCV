@@ -32,6 +32,19 @@ extension Vocabulary {
 
     private static let everyCondition: Set<String> = conditionsByLanguage.values.reduce(into: []) { $0.formUnion($1) }
 
+    /// The relative pronouns and the subordinators that can bring another subject into a clause: what follows one of them may be that
+    /// subject's ("I work with a colleague who speaks French"), and claims nothing for the person (see `RelativeClauses`).
+    private static let relativesByLanguage: [Language: Set<String>] = [
+        .english: ["who", "whom", "whose", "which", "that"],
+        .italian: ["che", "cui"],
+        .german: ["der", "die", "das", "dem", "den", "deren", "dessen", "denen", "welche", "welcher", "welches", "welchem", "welchen"],
+        .spanish: ["que", "quien", "quienes", "cuyo", "cuya", "cuyos", "cuyas"],
+        .french: ["qui", "que", "qu", "dont"],
+        .portuguese: ["que", "quem", "cujo", "cuja", "cujos", "cujas"],
+    ]
+
+    private static let everyRelative: Set<String> = relativesByLanguage.values.reduce(into: []) { $0.formUnion($1) }
+
     /// The qualifiers of each language, for the vocabulary's own tests.
     static func claimQualifiers(of language: Language) -> Set<String> {
         claimQualifiersByLanguage[language] ?? []
@@ -40,6 +53,17 @@ extension Vocabulary {
     /// The words of condition of each language, for the vocabulary's own tests.
     static func conditions(of language: Language) -> Set<String> {
         conditionsByLanguage[language] ?? []
+    }
+
+    /// The relative pronouns and subordinators of each language, for the vocabulary's own tests.
+    static func relatives(of language: Language) -> Set<String> {
+        relativesByLanguage[language] ?? []
+    }
+
+    /// Whether `word` (as `DescriptionText.normalized` writes it) is a relative pronoun or a subordinator that can bring another subject
+    /// into a clause, in the language of the description when it is known.
+    static func isRelative(_ word: String, in language: Language?) -> Bool {
+        (language.map(relatives(of:)) ?? everyRelative).contains(word)
     }
 
     /// The words that withdraw a claim: the words of negation, doubt, wish, future or condition (`modality`) that are no qualifier of

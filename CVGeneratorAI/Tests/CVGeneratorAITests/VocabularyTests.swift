@@ -174,6 +174,15 @@ struct VocabularyTests {
         #expect(!Vocabulary.claimQualifiers(of: language).isEmpty && !Vocabulary.conditions(of: language).isEmpty, "\(language)")
     }
 
+    @Test("A relative is no conjunction, so its clause does not end before it, and no pronoun of the first person",
+          arguments: Vocabulary.Language.allCases)
+    func relativesStandInTheirClause(language: Vocabulary.Language) {
+        let relatives = Vocabulary.relatives(of: language)
+        #expect(!relatives.isEmpty, "\(language)")
+        #expect(relatives.allSatisfy { !StatementWords.isConjunction($0, in: language) }, "\(language)")
+        #expect(relatives.isDisjoint(with: Voice.words[language]?.firstPerson ?? []), "\(language)")
+    }
+
     @Test("Ability and part qualify a claim; denial, wish and condition withdraw it")
     func claimsAndWithdrawals() {
         #expect(Vocabulary.withdrawals(in: Word.words(in: "I can teach chess"), language: .english).isEmpty)

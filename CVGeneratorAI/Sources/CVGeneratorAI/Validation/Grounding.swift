@@ -77,11 +77,14 @@ struct Grounding {
         }
 
         /// The positions of the words of the clause at `place` that claim a skill, an interest, a language, or the person's title or
-        /// place (#202): none when the clause claims nothing (`claims(at:)`); otherwise every word but those inside quotation marks
-        /// (`QuotedSpeech`), which are someone else's, or only quoted.
+        /// place (#202): none when the clause claims nothing (`claims(at:)`); otherwise every word before a relative that brings in
+        /// another subject ("I work with a colleague who speaks French", see `RelativeClauses`), but for the words inside quotation
+        /// marks (`QuotedSpeech`), which are someone else's, or only quoted.
         func claimedWords(at place: Place) -> Set<Int> {
             guard claims(at: place) else { return [] }
-            return Set(clauses.clause(at: place).words.indices).subtracting(clauses.quotedWords(at: place))
+            let clause = clauses.clause(at: place)
+            let end = RelativeClauses.start(in: clause, language: language) ?? clause.words.count
+            return Set(0..<end).subtracting(clauses.quotedWords(at: place))
         }
 
         /// Whether the clause at `place` claims a skill, an interest or a language for the person (#202): it speaks for the person,
@@ -90,9 +93,9 @@ struct Grounding {
         /// colleague wrote:"), follows no clause of its sentence that opens with a word of condition ("If I had time, I would play
         /// chess"), and, when it depends on the clause before it (a clause split off by a comma or a conjunction that has no verb,
         /// starts with its verb, or says nothing as a fact, such as "Spanisch zu lernen"), that clause claims to its last word:
-        /// "I have never used Java or Swift" claims neither, and "Ich träume davon, Spanisch zu lernen" no Spanish. A clause that
-        /// states nothing as a fact shares the withdrawal of the clause after it: "Spanisch zu lernen, davon träume ich" gives no
-        /// Spanish either.
+        /// "I have never used Java or Swift" claims neither, "Ich träume davon, Spanisch zu lernen" no Spanish, and "a colleague who
+        /// speaks French and German" no German. A clause that states nothing as a fact shares the withdrawal of the clause after it:
+        /// "Spanisch zu lernen, davon träume ich" gives no Spanish either.
         ///
         /// A negation or a hedge that governs a word of level bears on the level alone: "I am not an expert in Swift" and "I have
         /// never been fluent in German" claim Swift and German, and the level, which they deny, is not stated
@@ -325,7 +328,8 @@ struct Grounding {
     }
 
     /// The description as the person claims skills, interests and languages in it: its sentences, with every clause that does not
-    /// speak for the person, or that denies, wishes, supposes or asks, left out, and every word inside quotation marks.
+    /// speak for the person, or that denies, wishes, supposes or asks, left out, and every word of another subject or inside
+    /// quotation marks.
     var claimedSentences: [String] {
         clauses.sentences(keepingWords: reading.claimedWords(at:))
     }

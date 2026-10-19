@@ -496,6 +496,7 @@ enum GroundingRows {
         rows += questionsClaimNothing()
         rows += quotedSpeechClaimsNothing()
         rows += speechAfterALineOfAnotherPerson()
+        rows += relativeClausesOfAnotherSubject()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
@@ -3675,6 +3676,85 @@ enum GroundingRows {
         rows.append(row("the-line-after-the-persons-own-statement-claims", "the person speaks the colon line: both skills stay",
                         "I worked with my team on:\nSwift and Kotlin apps.",
                         CVData(skills: [Skill(name: "Swift"), Skill(name: "Kotlin")]), .unchanged))
+        return rows
+    }
+
+    /// A relative pronoun or a subordinator that brings in another subject withdraws what follows it in its clause (#202): "I work with
+    /// a colleague who speaks French" claims no French, nor "Ich leite ein Team, das Kotlin und Swift nutzt" Kotlin. When the person
+    /// stays the subject ("which I use", "che uso", "das ich nutze", "que je parle"), or the item stands before the pronoun, the item
+    /// stays. When the person is the subject that the pronoun brings in ("I am a developer who knows Swift"), the item goes: an
+    /// accepted loss.
+    private static func relativeClausesOfAnotherSubject() -> [GroundingRow] {
+        typealias Variant = (
+            language: String, colleague: String, spoken: String, team: String, before: String, person: String, languages: [String]
+        )
+        var variants: [Variant] = []
+        variants.append(("en", "I work with a colleague who speaks French.", "French", "I manage a team that uses Kotlin and Swift.",
+                         "I speak French, which I use every day.", "The languages that I speak are French and German.", ["French", "German"]))
+        variants.append(("it", "Io lavoro con un collega che parla francese.", "francese", "Gestisco un team che usa Kotlin e Swift.",
+                         "Parlo francese, che uso ogni giorno.", "Le lingue che parlo sono il francese e il tedesco.", ["francese", "tedesco"]))
+        variants.append(("de", "Ich arbeite mit einem Kollegen, der Französisch spricht.", "Französisch",
+                         "Ich leite ein Team, das Kotlin und Swift nutzt.", "Ich spreche Französisch, das ich täglich nutze.",
+                         "Die Sprachen, die ich spreche, sind Französisch und Deutsch.", ["Französisch", "Deutsch"]))
+        variants.append(("es", "Trabajo con un colega que habla francés.", "francés", "Dirijo un equipo que usa Kotlin y Swift.",
+                         "Hablo francés, que uso cada día.", "Los idiomas que hablo son el francés y el alemán.", ["francés", "alemán"]))
+        variants.append(("fr", "Je travaille avec un collègue qui parle français.", "français", "Je dirige une équipe qui utilise Kotlin et Swift.",
+                         "Je parle français, que j'utilise tous les jours.", "Les langues que je parle sont le français et l'allemand.",
+                         ["français", "allemand"]))
+        variants.append(("pt", "Trabalho com um colega que fala francês.", "francês", "Coordeno uma equipe que usa Kotlin e Swift.",
+                         "Falo francês, que uso todos os dias.", "As línguas que falo são o francês e o alemão.", ["francês", "alemão"]))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-colleagues-language-after-a-relative-is-not-the-persons-\(v.language)",
+                            "the colleague speaks the language: no language", v.colleague, CVData(languages: [Language(name: v.spoken)]),
+                            .exactly(CVData()), language: v.language))
+            rows.append(row("a-teams-skills-after-a-relative-are-not-the-persons-\(v.language)",
+                            "the team uses both skills, the one after the conjunction too: no skill", v.team,
+                            CVData(skills: [Skill(name: "Kotlin"), Skill(name: "Swift")]), .exactly(CVData()), language: v.language))
+            rows.append(row("an-item-before-a-relative-stays-\(v.language)",
+                            "the person speaks the language before the pronoun, and uses it after: the language stays", v.before,
+                            CVData(languages: [Language(name: v.spoken)]), .unchanged, language: v.language))
+            rows.append(row("the-person-after-a-relative-keeps-the-items-\(v.language)",
+                            "the person is the subject after the pronoun: both languages stay", v.person,
+                            CVData(languages: v.languages.map { Language(name: $0) }), .unchanged, language: v.language))
+        }
+        rows.append(row("a-clause-of-the-person-after-a-relative-claims",
+                        "the colleague speaks French; the person speaks German in a clause of their own: German stays",
+                        "I work with a colleague who speaks French, and I speak German.",
+                        CVData(languages: [Language(name: "French"), Language(name: "German")]),
+                        .exactly(CVData(languages: [Language(name: "German")]))))
+        rows.append(row("a-relative-after-the-item-keeps-it",
+                        "Python stands before which, and the person knows it: the skill stays",
+                        "I work with Python, which I know well.", CVData(skills: [Skill(name: "Python")]), .unchanged))
+        rows.append(row("a-friends-skill-in-a-relative-is-no-skill-of-the-person",
+                        "the friend teaches chess; the person only likes it in her free time: the skill goes, the interest stays",
+                        "In my free time I like chess. I have a friend who teaches chess.",
+                        CVData(skills: [Skill(name: "chess")], interests: ["chess"]), .exactly(CVData(interests: ["chess"]))))
+        rows.append(row("a-demonstrative-that-is-no-relative",
+                        "that before a noun points at the role: Python stays", "In that role I used Python.",
+                        CVData(skills: [Skill(name: "Python")]), .unchanged))
+        rows.append(row("a-demonstrative-that-after-a-preposition-is-no-relative",
+                        "that after on points at the project: Swift stays", "I worked on that project with Swift.",
+                        CVData(skills: [Skill(name: "Swift")]), .unchanged))
+        rows.append(row("que-before-an-infinitive-brings-in-no-subject",
+                        "tengo que hablar has no other subject: English stays", "Tengo que hablar inglés en el trabajo.",
+                        CVData(languages: [Language(name: "inglés")]), .unchanged, language: "es"))
+        rows.append(row("the-person-as-the-subject-of-who-is-an-accepted-loss",
+                        "the developer who knows Swift is the person, but who reads as another subject: Swift goes, an accepted loss",
+                        "I am a developer who knows Swift.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData())))
+        rows.append(row("the-person-as-the-subject-of-che-is-an-accepted-loss",
+                        "the person who loves photography is the person, but che reads as another subject: the interest goes, an accepted loss",
+                        "Sono una persona che ama la fotografia.", CVData(interests: ["fotografia"]), .exactly(CVData()), language: "it"))
+        rows.append(row("a-thing-that-uses-a-skill-is-an-accepted-loss-en",
+                        "the apps use Swift and the person builds them, but that reads as another subject: Swift goes, an accepted loss",
+                        "I build apps that use Swift.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData())))
+        rows.append(row("a-thing-that-uses-a-skill-is-an-accepted-loss-it",
+                        "the apps use Swift and the person builds them, but che reads as another subject: Swift goes, an accepted loss",
+                        "Sviluppo app che usano Swift.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData()), language: "it"))
+        rows.append(row("lo-que-before-the-item-is-an-accepted-loss",
+                        "what I like most is the person's, but que reads as bringing in another subject: the interest goes, an accepted loss",
+                        "Lo que más me gusta es el ajedrez.", CVData(interests: ["ajedrez"]), .exactly(CVData()), language: "es"))
         return rows
     }
 
