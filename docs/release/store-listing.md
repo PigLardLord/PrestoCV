@@ -54,7 +54,7 @@ Characters are Unicode characters; keywords are counted in UTF-8 bytes, which is
 | pt-PT | 30 | 29 | 94 | 168 | 2641 | 27 / 61 (6 captions) | 215 |
 | pt-BR | 28 | 29 | 95 | 162 | 2586 | 27 / 61 (6 captions) | 205 |
 
-Notes for App Review: 3370 characters (4000).
+Notes for App Review: 3757 characters (4000).
 <!-- counts:end -->
 
 ## Notes for App Review
@@ -78,9 +78,10 @@ THE AI DRAFT
 I'm Maria Rossi, a primary school teacher from Bologna. Since 2016 I have taught at the Don Milani school, where I trained 3 new teachers. Before that, from 2012 to 2016, I worked as an assistant in a nursery. I studied Education Sciences at the University of Bologna and graduated in 2012. I speak Italian (native) and English (B2). In my free time I like chess and hiking.
 - Tap "Generate CV with AI". It can take up to a minute. The draft opens in the editor with a notice. Every value it fills in occurs in the description, and anything the description does not mention is left blank. It can still put a detail in the wrong place, which is why the notice asks the person to check every field. Save it, then export it as above.
 - If Apple Intelligence is turned off, or its model is still downloading, the AI option is shown dimmed, with a sentence that says what to do. On a device that does not support Apple Intelligence, the AI option is not shown, and the rest of the app works the same.
+- For an English or German description, the draft also needs the system's language data for that language. If iOS has not downloaded it yet, the screen says the data is being prepared and the app asks iOS to download it; the next try works once it is there.
 
 NETWORK AND DATA
-- The app makes no network requests. It contains no networking code and no third-party SDKs. The AI draft runs on Apple's on-device model through the Foundation Models framework, and the PDF is rendered on the device.
+- The app makes no network requests. It contains no networking code and no third-party SDKs. The only download it can start is the system's own: iOS downloads its language data for the AI draft, as it downloads the model. The AI draft runs on Apple's on-device model through the Foundation Models framework, and the PDF is rendered on the device.
 - CVs and unsaved changes are stored only in the app's container on the device. Nothing is sent to the developer or to anyone else; a PDF leaves the device only when the user shares it from the share sheet.
 - The privacy label "Data Not Collected" is therefore accurate: the app collects no data and does not track. Its privacy manifest declares no collected data types, no tracking and no tracking domains.
 
