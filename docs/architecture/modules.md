@@ -49,7 +49,8 @@ Test targets and test-support targets are described below each package. The chec
   - `SampleCVSource`, `IDGenerator`, `TimeSource`. `TimeSource` is so named to avoid shadowing `Swift.Clock`.
 - **Use cases:**
   - `NewCV`, `SaveCV` (create or conditional update, errors translated to `AuthoringError`, including `tooLarge`), `LoadCV`;
-  - list (by last change), rename, duplicate, delete, start from a sample, determine onboarding.
+  - list (by last change), rename, duplicate, delete, start from a sample, determine onboarding;
+  - `ChangeStoredCV`: renames a stored CV (trimmed, never blank) or sets the language of its PDF, reading it again just before it is stored, so nothing else changes. It works through the `StoredCVs` port, generic over the store's own CV, which the legacy app implements over its stored CVs until the migration replaces them ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)).
 - **Listing** returns the healthy CVs plus `StoreIssue`s: `corrupt`, `upgradeRequired`, `unreadable`, `tooLarge`, `quarantineFailed`.
 
 **`PrestoCVPersistence`**

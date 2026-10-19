@@ -1,6 +1,8 @@
 import Combine
 import Foundation
 import PrestoCVCore
+import struct PrestoCVApplication.ChangeStoredCV
+import enum PrestoCVApplication.StoredCVChangeError
 
 @MainActor
 final class CVListViewModel: ObservableObject {
@@ -24,6 +26,7 @@ final class CVListViewModel: ObservableObject {
     
     // MARK: - Private Properties
     private let cvManagementUseCase: CVManagementUseCaseProtocol
+    private let storedCVChanges: ChangeStoredCV<CVModel>
     private let now: () -> Date
     private let waitBetweenTicks: (Duration) async throws -> Void
     private let calendar: () -> Calendar
@@ -64,17 +67,20 @@ final class CVListViewModel: ObservableObject {
     
     // MARK: - Initialization
     /// - Parameters:
+    ///   - storedCVChanges: Renames a stored CV, or sets the language of its PDF.
     ///   - now: The clock of the app.
     ///   - calendar: What counts as a day when a save is told in days. It is asked for each time a text is made, so
     ///     that a change of the time zone of the device moves the days with it.
     ///   - sleep: How the clock of the list waits between two ticks.
     init(
         cvManagementUseCase: CVManagementUseCaseProtocol,
+        storedCVChanges: ChangeStoredCV<CVModel>,
         now: @escaping () -> Date = { Date() },
         calendar: @escaping () -> Calendar = { .autoupdatingCurrent },
         sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
         self.cvManagementUseCase = cvManagementUseCase
+        self.storedCVChanges = storedCVChanges
         self.now = now
         self.waitBetweenTicks = sleep
         self.presentationDate = now()
@@ -176,23 +182,15 @@ final class CVListViewModel: ObservableObject {
         }
     }
     
-    /// Gives a CV a new name. The name is trimmed and an empty one is refused. The CV is read again before it is
-    /// saved, so that nothing but its name changes.
+    /// Gives a CV a new name, as `ChangeStoredCV` does: trimmed, never blank, and nothing but the name changes.
     func renameCV(id: UUID, to newName: String) async {
-        let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        
         await perform {
-            guard var cv = try await self.cvManagementUseCase.getCV(by: id) else {
-                throw AppError.notFound("error.subject.cv".localized)
-            }
-            cv.name = name
-            return .replaced(try await self.cvManagementUseCase.updateCV(cv))
+            try await self.storedCVChanges.rename(id, to: newName).map(CommittedChange.replaced)
         }
     }
 
-    /// Sets the language of a CV's PDF, as chosen in its export sheet; nil is automatic. The CV is read again before it
-    /// is saved, so that nothing but its language changes.
+    /// Sets the language of a CV's PDF, as chosen in its export sheet; nil is automatic. `ChangeStoredCV` reads the CV
+    /// again before it is saved, so that nothing but its language changes.
     ///
     /// The saves of one CV run one after the other. A choice made while one is being saved waits, and replaces any
     /// choice still waiting, so that the latest choice is always the one stored last: the language the sheet shows.
@@ -204,11 +202,7 @@ final class CVListViewModel: ObservableObject {
 
         while let wanted = pendingDocumentLanguages.removeValue(forKey: id) {
             await perform {
-                guard var cv = try await self.cvManagementUseCase.getCV(by: id) else {
-                    throw AppError.notFound("error.subject.cv".localized)
-                }
-                cv.documentLanguage = wanted?.rawValue
-                return .replaced(try await self.cvManagementUseCase.updateCV(cv))
+                .replaced(try await self.storedCVChanges.setDocumentLanguage(wanted?.rawValue, of: id))
             }
         }
     }
@@ -226,18 +220,27 @@ final class CVListViewModel: ObservableObject {
     }
     
     /// Runs a change of the stored CVs. A change that fails is reported as an action error and leaves the list
-    /// alone. One that goes through is shown in the list at once, from what it returned, and the list is then read
-    /// again, so that the user sees what happened even when that read fails.
-    private func perform(_ change: () async throws -> CommittedChange) async {
+    /// alone, and so does one that changed nothing (nil). One that goes through is shown in the list at once, from what
+    /// it returned, and the list is then read again, so that the user sees what happened even when that read fails.
+    private func perform(_ change: () async throws -> CommittedChange?) async {
         let committed: CommittedChange
         do {
-            committed = try await change()
+            guard let change = try await change() else { return }
+            committed = change
         } catch {
-            actionError = error.localizedAppErrorDescription
+            actionError = Self.message(for: error)
             return
         }
         apply(committed)
         await loadCVs()
+    }
+    
+    /// Why a change failed, in words. A CV deleted meanwhile is not found, as the store says of one it has not got.
+    private static func message(for error: Error) -> String {
+        guard error as? StoredCVChangeError == .notFound else {
+            return error.localizedAppErrorDescription
+        }
+        return AppError.notFound("error.subject.cv".localized).localizedDescription
     }
     
     private func apply(_ change: CommittedChange) {

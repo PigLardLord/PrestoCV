@@ -234,7 +234,8 @@ struct CVListView_Previews: PreviewProvider {
             CVModel(name: "Backend Engineer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Software Engineer")),
             CVModel(name: "Product Designer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Designer")),
         ]
-        return CVListViewModel(cvManagementUseCase: PreviewDependencies.cvManagement(cvs: cvs))
+        let cvManagement = PreviewDependencies.cvManagement(cvs: cvs)
+        return CVListViewModel(cvManagementUseCase: cvManagement, storedCVChanges: .init(cvs: ManagedStoredCVs(cvs: cvManagement)))
     }
 }
 #endif

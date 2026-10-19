@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import PrestoCVCore
 import CVPDFExporter
+import struct PrestoCVApplication.ChangeStoredCV
 import os
 
 private let launchLogger = Logger(subsystem: "com.PigLardLord.prestocv", category: "launch")
@@ -90,7 +91,10 @@ final class AppLaunchViewModel: ObservableObject {
             return .ready(
                 RootDependencies(
                     onboardingViewModel: try viewModelFactory.makeOnboardingViewModel(),
-                    cvListViewModel: CVListViewModel(cvManagementUseCase: cvManagementUseCase),
+                    cvListViewModel: CVListViewModel(
+                        cvManagementUseCase: cvManagementUseCase,
+                        storedCVChanges: ChangeStoredCV(cvs: ManagedStoredCVs(cvs: cvManagementUseCase))
+                    ),
                     unsavedEditsOfferViewModel: UnsavedEditsOfferViewModel(useCase: unsavedEditsUseCase, cvs: cvManagementUseCase),
                     viewModelFactory: viewModelFactory
                 )
