@@ -89,6 +89,14 @@ final class NewCVChoicesViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Blank CV
+
+    /// The CV the editor opens for a blank start: empty, with an identity of its own. Nothing is stored until the
+    /// person saves it.
+    func makeBlankDraft() -> CVModel {
+        CVModel()
+    }
+
     // MARK: - Examples
 
     /// Loads the sample CVs the person can start from. Without samples the person can still start from a blank CV.

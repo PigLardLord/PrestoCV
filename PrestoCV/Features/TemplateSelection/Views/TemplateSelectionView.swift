@@ -66,8 +66,7 @@ struct TemplateSelectionView: View {
 
     private var createNewCard: some View {
         Button(action: {
-            // For empty CV, just pass an empty CVModel - no need to load from repository
-            router.navigateToEditorWithTemplate(CVModel())
+            router.navigateToEditorWithTemplate(viewModel.makeBlankDraft())
         }) {
             plainCard(
                 icon: "plus.rectangle.on.rectangle",

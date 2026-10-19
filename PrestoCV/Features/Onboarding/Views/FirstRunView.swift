@@ -127,7 +127,7 @@ struct FirstRunView: View {
     }
     
     private func openBlankCV() {
-        router.navigateToEditorWithTemplate(CVModel())
+        router.navigateToEditorWithTemplate(viewModel.makeBlankDraft())
     }
 }
 
