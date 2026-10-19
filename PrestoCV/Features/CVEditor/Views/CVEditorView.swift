@@ -138,7 +138,10 @@ struct CVEditorView: View {
                     cv: $viewModel.cv,
                     documentLanguage: $viewModel.documentLanguageSelection,
                     automaticLanguageTitle: viewModel.automaticDocumentLanguageTitle,
-                    documentLanguageTitle: viewModel.documentLanguageTitle
+                    documentLanguageTitle: viewModel.documentLanguageTitle,
+                    emailStatus: viewModel.emailStatus,
+                    phoneStatus: viewModel.phoneStatus,
+                    portfolioStatus: viewModel.portfolioStatus
                 )
                     .keyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
