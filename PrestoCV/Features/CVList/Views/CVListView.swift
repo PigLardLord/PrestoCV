@@ -99,7 +99,7 @@ struct CVListView<EmptyState: View>: View {
                 deleteTarget = nil
             }
         } message: { target in
-            Text("cv.delete.confirmation.message_named".localizedWithArgs(target.listTitle))
+            Text("cv.delete.confirmation.message_named".localizedWithArgs(viewModel.title(of: target)))
         }
         .alert(
             "cv.rename.title".localized,
@@ -127,7 +127,7 @@ struct CVListView<EmptyState: View>: View {
     private var cvListView: some View {
         DeletableList(items: viewModel.cvs) { cv in
             CVRowView(
-                cv: cv,
+                title: viewModel.title(of: cv),
                 subtitle: viewModel.personLine(of: cv),
                 caption: viewModel.lastSavedLine(of: cv),
                 onTap: {
@@ -158,7 +158,7 @@ struct CVListView<EmptyState: View>: View {
 // MARK: - CV Row View
 
 private struct CVRowView: View {
-    let cv: CVModel
+    let title: String
     let subtitle: String?
     let caption: String?
     let onTap: () -> Void
@@ -169,7 +169,7 @@ private struct CVRowView: View {
 
     var body: some View {
         NavigationRow(
-            title: cv.listTitle,
+            title: title,
             subtitle: subtitle,
             caption: caption,
             action: onTap

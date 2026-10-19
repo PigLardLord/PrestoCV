@@ -102,6 +102,14 @@ final class NewCVChoicesViewModel: ObservableObject {
         }
     }
 
+    /// The examples as the sheet of examples lists them.
+    var examples: [ExampleChoice] {
+        samples.map { sample in
+            let job = sample.personalInfo.title
+            return ExampleChoice(sample: sample, title: job.isEmpty ? "cv.untitled".localized : job, summary: sample.personalInfo.profile)
+        }
+    }
+
     /// The CV the editor opens for a sample: its content under a new identity, with the details of the person
     /// the sample describes left blank. Nothing is stored until the person saves it.
     func makeDraft(from sample: CVModel) -> CVModel {

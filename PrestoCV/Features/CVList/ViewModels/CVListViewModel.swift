@@ -82,6 +82,12 @@ final class CVListViewModel: ObservableObject {
     
     // MARK: - Row Text
     
+    /// What the list calls a CV: its name, or "Untitled CV" while it has none.
+    func title(of cv: CVModel) -> String {
+        let hasName = !cv.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return hasName ? cv.name : "cv.untitled".localized
+    }
+    
     /// The person a CV is about, for the line under its name: the name of the person and the job title, or the one
     /// of them that is there. It tells apart CVs that have no name of their own. Nil when the CV has neither.
     func personLine(of cv: CVModel) -> String? {
