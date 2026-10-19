@@ -1,5 +1,5 @@
 {
- "_comment": "Architecture rules of the repository (ADR 0006). Every Swift file belongs to exactly one target. Legacy targets are exempt until deleted (ADR 0012); targets listed in modules.md but not built yet are in notYetImplemented.",
+ "_comment": "Architecture rules of the repository (ADR 0006). Every Swift file belongs to exactly one target. Legacy targets are exempt until deleted (ADR 0012), except from the rules listed for them (ADR 0025); targets listed in modules.md but not built yet are in notYetImplemented.",
  "rules": {
   "R1": [
    "exportedImport"
@@ -14,6 +14,10 @@
   "R4": [
    "singleton",
    "infrastructureConstruction"
+  ],
+  "R5": [
+   "viewDependency",
+   "viewModelImport"
   ],
   "R7": [
    "swallowedError"
@@ -40,6 +44,9 @@
   ],
   "R16": [
    "sourceTreePath"
+  ],
+  "R17": [
+   "defaultDependency"
   ]
  },
  "infrastructureTypes": [
@@ -49,6 +56,28 @@
   "IOSPDFRenderer",
   "MacPDFRenderer",
   "FoundationModelsDrafter"
+ ],
+ "serviceSuffixes": [
+  "UseCase",
+  "Repository",
+  "Service",
+  "Container"
+ ],
+ "dependencySuffixes": [
+  "UseCase",
+  "Repository",
+  "Service",
+  "Container",
+  "Store",
+  "Detector",
+  "Provider",
+  "Manager",
+  "Client",
+  "Loader",
+  "Renderer",
+  "Engine",
+  "Requester",
+  "Factory"
  ],
  "exceptions": [
   {
@@ -86,7 +115,8 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -104,7 +134,8 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -122,7 +153,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -180,7 +212,8 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -197,7 +230,8 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -214,7 +248,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -229,7 +264,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -248,7 +284,8 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -264,7 +301,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -282,7 +320,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -300,7 +339,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -316,7 +356,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -427,7 +468,8 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -443,7 +485,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -462,7 +505,8 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -486,7 +530,8 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -507,7 +552,9 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R5",
+    "R17"
    ],
    "requiredImportAccess": {
     "PrestoCVDomain": "internal",
@@ -542,7 +589,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -550,7 +598,10 @@
    "path": "PrestoCVCore/Sources/PrestoCVCore",
    "kind": "legacy",
    "allowedImports": [],
-   "rules": []
+   "rules": [
+    "R5",
+    "R17"
+   ]
   },
   {
    "name": "PrestoCVCoreTests",
@@ -636,7 +687,10 @@
    "path": "PrestoCV",
    "kind": "legacy",
    "allowedImports": [],
-   "rules": []
+   "rules": [
+    "R5",
+    "R17"
+   ]
   },
   {
    "name": "PrestoCVTests",

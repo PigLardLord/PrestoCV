@@ -22,6 +22,14 @@ final class Scanner: SyntaxVisitor {
     private(set) var declaredPackageTargets: [String] = []
     private let converter: SourceLocationConverter
     private let infrastructureTypes: Set<String>
+    /// The views of the file's target, from every file of it: an extension of a view in another file is part of the view.
+    private let viewTypes: Set<String>
+    /// The suffixes of the names of services a view may not hold (R5), and of the dependencies a default argument may not
+    /// make (R17). A trailing `Protocol` does not count.
+    private let serviceSuffixes: [String], dependencySuffixes: [String]
+    /// The imports of the file, and whether it declares or extends a view model (R5).
+    private var importDecls: [ImportDeclSyntax] = []
+    private var declaresViewModel = false
 
     static let ambientTypes: Set<String> = ["Bundle", "FileManager", "UserDefaults", "ProcessInfo", "NotificationCenter"]
     static let ambientMembers: [String: Set<String>] = [
@@ -32,9 +40,13 @@ final class Scanner: SyntaxVisitor {
     static let escapeCalls: Set<String> = ["fatalError", "precondition", "preconditionFailure", "unsafeBitCast"]
     static let printCalls: Set<String> = ["print", "debugPrint", "NSLog", "dump"]
 
-    init(tree: SourceFileSyntax, file: String, infrastructureTypes: Set<String>) {
+    init(tree: SourceFileSyntax, file: String, infrastructureTypes: Set<String>, viewTypes: Set<String> = [],
+         serviceSuffixes: [String] = [], dependencySuffixes: [String] = []) {
         converter = SourceLocationConverter(fileName: file, tree: tree)
         self.infrastructureTypes = infrastructureTypes
+        self.viewTypes = viewTypes
+        self.serviceSuffixes = serviceSuffixes
+        self.dependencySuffixes = dependencySuffixes
         super.init(viewMode: .sourceAccurate)
     }
 
@@ -80,12 +92,13 @@ final class Scanner: SyntaxVisitor {
         return nil
     }
 
-    private static func name(_ token: TokenSyntax) -> String { token.text.trimmingCharacters(in: CharacterSet(charactersIn: "`")) }
+    static func name(_ token: TokenSyntax) -> String { token.text.trimmingCharacters(in: CharacterSet(charactersIn: "`")) }
 
     // MARK: Imports
 
     override func visit(_ node: ImportDeclSyntax) -> SyntaxVisitorContinueKind {
         guard let first = node.path.first else { return .skipChildren }
+        importDecls.append(node)
         let access = node.modifiers.map(\.name.text).first { ["public", "package", "internal", "fileprivate", "private"].contains($0) }
         imports.append((Self.name(first.name), node.startLocation(converter: converter).line, "import " + Self.name(first.name), access))
         if node.attributes.contains(where: { $0.as(AttributeSyntax.self)?.attributeName.trimmedDescription == "_exported" }) {
@@ -170,6 +183,10 @@ final class Scanner: SyntaxVisitor {
            let nameLiteral = args.first(where: { $0.label?.text == "name" })?.expression.as(StringLiteralExprSyntax.self) {
             declaredPackageTargets.append(nameLiteral.segments.trimmedDescription)
         }
+        if let path = Self.unqualifiedPath(node.calledExpression), Self.constructsViewModel(path, node), isInView(node),
+           !Self.isInDebugBranch(node) {
+            hit("viewDependency", "a view makes no view model: it is given one, which the composition root makes", node)
+        }
         guard let callee else { return .visitChildren }
         let isInit = member == nil || member == "init"
         if callee == "Date", isInit, args.isEmpty { hit("wallClock", "Date()", node) }
@@ -211,6 +228,7 @@ final class Scanner: SyntaxVisitor {
         if Self.ambientTypes.contains(n), !ownResources { hit("ambientEnvironment", n, node) }
         if n == "LocalizedStringResource" || n == "LocalizedStringKey" { hit("localization", n, node) }
         if Self.isTestDoubleName(n) { hit("testDouble", n, node) }
+        checkViewReference(n, node)
         return .visitChildren
     }
 
@@ -219,11 +237,13 @@ final class Scanner: SyntaxVisitor {
         if let base = node.baseType.as(IdentifierTypeSyntax.self), Self.moduleQualifiers.contains(Self.name(base.name)) {
             checkType(Self.name(node.name), node)
         }
+        checkViewReference(Self.name(node.name), node)
         return .visitChildren
     }
 
     override func visit(_ node: IdentifierTypeSyntax) -> SyntaxVisitorContinueKind {
         checkType(Self.name(node.name), node)
+        checkViewReference(Self.name(node.name), node)
         return .visitChildren
     }
 
@@ -300,6 +320,242 @@ final class Scanner: SyntaxVisitor {
         return found
     }
 
+    // MARK: Views and view models (R5)
+
+    /// The protocols that make a type a view: `View`, and the representables that refine it.
+    static let viewProtocols: Set<String> = ["View", "UIViewRepresentable", "UIViewControllerRepresentable", "NSViewRepresentable",
+                                             "NSViewControllerRepresentable"]
+    /// The frameworks a view model does not import. Combine and Observation are not UI frameworks.
+    static let uiFrameworks: Set<String> = ["SwiftUI", "UIKit", "AppKit", "WatchKit"]
+
+    /// Whether an inheritance clause names a view protocol, plain, module-qualified (`SwiftUI.View`) or in a composition
+    /// (`Equatable & View`).
+    static func declaresView(_ clause: InheritanceClauseSyntax?) -> Bool {
+        clause?.inheritedTypes.contains { inherited in
+            let types = inherited.type.as(CompositionTypeSyntax.self).map { $0.elements.map(\.type) } ?? [inherited.type]
+            return types.contains { viewProtocols.contains(typeName($0) ?? "") }
+        } ?? false
+    }
+
+    /// The name of a plain or member type (`View`, `SwiftUI.View`, `Outer.Inner` gives "Inner"); nil for any other type.
+    static func typeName(_ type: TypeSyntax) -> String? {
+        if let t = type.as(IdentifierTypeSyntax.self) { return name(t.name) }
+        if let t = type.as(MemberTypeSyntax.self) { return name(t.name) }
+        return nil
+    }
+
+    /// The names of the views a file declares, as a type that conforms to a view protocol or an extension that makes one.
+    static func viewTypeNames(in tree: SourceFileSyntax) -> Set<String> {
+        final class Collector: SyntaxVisitor {
+            var names: Set<String> = []
+            func add(_ name: String?, _ clause: InheritanceClauseSyntax?) { if let name, Scanner.declaresView(clause) { names.insert(name) } }
+            override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind { add(Scanner.name(node.name), node.inheritanceClause); return .visitChildren }
+            override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind { add(Scanner.name(node.name), node.inheritanceClause); return .visitChildren }
+            override func visit(_ node: EnumDeclSyntax) -> SyntaxVisitorContinueKind { add(Scanner.name(node.name), node.inheritanceClause); return .visitChildren }
+            override func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind { add(Scanner.typeName(node.extendedType), node.inheritanceClause); return .visitChildren }
+        }
+        let collector = Collector(viewMode: .sourceAccurate)
+        collector.walk(tree)
+        return collector.names
+    }
+
+    /// Whether a node is part of a view: inside a view's declaration, or inside an extension of a view.
+    private func isInView(_ node: some SyntaxProtocol) -> Bool {
+        var current = node.parent
+        while let n = current {
+            if let d = n.as(StructDeclSyntax.self), viewTypes.contains(Self.name(d.name)) || Self.declaresView(d.inheritanceClause) { return true }
+            if let d = n.as(ClassDeclSyntax.self), viewTypes.contains(Self.name(d.name)) || Self.declaresView(d.inheritanceClause) { return true }
+            if let d = n.as(EnumDeclSyntax.self), viewTypes.contains(Self.name(d.name)) || Self.declaresView(d.inheritanceClause) { return true }
+            if let e = n.as(ExtensionDeclSyntax.self), viewTypes.contains(Self.typeName(e.extendedType) ?? "") || Self.declaresView(e.inheritanceClause) {
+                return true
+            }
+            current = n.parent
+        }
+        return false
+    }
+
+    /// Whether a node is in the `#if DEBUG` branch of a condition, which only debug builds compile: where previews make their
+    /// view models with fakes. A condition that only adds to DEBUG (`DEBUG && os(iOS)`) counts; `#else` and `!DEBUG` do not.
+    static func isInDebugBranch(_ node: some SyntaxProtocol) -> Bool {
+        var current = node.parent
+        while let n = current {
+            if let clause = n.as(IfConfigClauseSyntax.self), let condition = clause.condition?.trimmedDescription,
+               !condition.contains("||"), !condition.contains("!"),
+               condition.components(separatedBy: "&&").contains(where: { $0.trimmingCharacters(in: .whitespaces) == "DEBUG" }) {
+                return true
+            }
+            current = n.parent
+        }
+        return false
+    }
+
+    /// The name as written, when it names a type whose name, without a trailing `Protocol`, ends with one of the suffixes.
+    static func hasSuffix(_ n: String, in suffixes: [String]) -> Bool {
+        guard n.first?.isUppercase == true else { return false }
+        let base = n.hasSuffix("Protocol") ? String(n.dropLast("Protocol".count)) : n
+        return suffixes.contains { base.hasSuffix($0) }
+    }
+
+    /// A view holds no use case, repository, service or dependency container: its view model does (R5). Another view of
+    /// the target is not one, whatever its name (`ViewStateContainer`).
+    private func checkViewReference(_ n: String, _ node: some SyntaxProtocol) {
+        guard Self.hasSuffix(n, in: serviceSuffixes), !viewTypes.contains(n), isInView(node), !Self.isInDebugBranch(node) else { return }
+        hit("viewDependency", "a view holds no \(n): its view model does, and the composition root makes it", node)
+    }
+
+    static func isViewModelName(_ n: String) -> Bool { n.first?.isUppercase == true && n.hasSuffix("ViewModel") }
+
+    /// `ListViewModel(…)`, `ListViewModel.init(…)`, or `.init(…)` for a value declared as a view model.
+    static func constructsViewModel(_ path: [String], _ call: FunctionCallExprSyntax) -> Bool {
+        if path.count == 1 { return isViewModelName(path[0]) }
+        guard path.last == "init" else { return false }
+        if path.count >= 2, !path[path.count - 2].isEmpty { return isViewModelName(path[path.count - 2]) }
+        var current = call.parent
+        while let n = current {
+            if let binding = n.as(PatternBindingSyntax.self) {
+                return binding.typeAnnotation.flatMap { typeName($0.type) }.map(isViewModelName) ?? false
+            }
+            current = n.parent
+        }
+        return false
+    }
+
+    override func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
+        if Self.isViewModelName(Self.typeName(node.extendedType) ?? "") { declaresViewModel = true }
+        return .visitChildren
+    }
+
+    /// A file that declares or extends a view model imports no UI framework, in any form (R5).
+    override func visitPost(_ node: SourceFileSyntax) {
+        guard declaresViewModel else { return }
+        for decl in importDecls {
+            guard let module = decl.path.first.map({ Self.name($0.name) }), Self.uiFrameworks.contains(module) else { continue }
+            hit("viewModelImport", "a view model imports no UI framework, and \(module) is one: Combine, Observation and Foundation are not", decl)
+        }
+    }
+
+    // MARK: Default arguments (R17)
+
+    /// A default argument that makes a dependency or reads ambient state hides it from the caller, and from tests: every
+    /// dependency comes in through the initialiser, from the composition root.
+    override func visit(_ node: FunctionParameterSyntax) -> SyntaxVisitorContinueKind {
+        if let value = node.defaultValue?.value, let reason = hiddenDependency(value, type: node.type) {
+            let parameter = Self.name(node.secondName ?? node.firstName)
+            hit("defaultDependency", "the default of \(parameter) \(reason): take it as an argument, which the composition root passes", node)
+        }
+        return .visitChildren
+    }
+
+    /// Members of `URL` that are directories of the device.
+    static let deviceDirectories: Set<String> = [
+        "applicationSupportDirectory", "temporaryDirectory", "documentsDirectory", "cachesDirectory", "homeDirectory", "desktopDirectory",
+        "downloadsDirectory", "libraryDirectory", "moviesDirectory", "musicDirectory", "picturesDirectory", "sharedPublicDirectory",
+        "trashDirectory", "userDirectory", "applicationDirectory", "currentDirectory",
+    ]
+
+    /// Why a default value is a hidden dependency; nil when it is a plain value. Nil is always a plain value.
+    private func hiddenDependency(_ value: ExprSyntax, type: TypeSyntax) -> String? {
+        if value.is(NilLiteralExprSyntax.self) { return nil }
+        let typeName = Self.baseTypeName(type)
+        if let typeName, Self.hasSuffix(typeName, in: dependencySuffixes) || infrastructureTypes.contains(typeName) {
+            return "makes a \(typeName)"
+        }
+        if let typeName, Self.ambientTypes.contains(typeName), Self.unqualifiedPath(value).map({ $0 != ["", "module"] && $0 != ["Bundle", "module"] }) ?? true {
+            return "is the device's \(typeName)"
+        }
+        if let closure = value.as(ClosureExprSyntax.self) {
+            if !Self.isConstant(closure) { return "is a closure, which does the real work" }
+        } else if Self.isFunctionType(type), value.is(DeclReferenceExprSyntax.self) || value.is(MemberAccessExprSyntax.self) {
+            return "is a function, which does the real work"
+        }
+        let finder = AmbientFinder(type: type, scanner: self)
+        finder.walk(value)
+        return finder.reason
+    }
+
+    /// Whether a closure does nothing, or only answers a literal (`{ _ in true }`, `{ nil }`): a value, not a dependency.
+    static func isConstant(_ closure: ClosureExprSyntax) -> Bool {
+        guard let only = closure.statements.first else { return true }
+        guard closure.statements.count == 1, let expr = only.item.as(ExprSyntax.self) else { return false }
+        return expr.is(BooleanLiteralExprSyntax.self) || expr.is(NilLiteralExprSyntax.self) || expr.is(IntegerLiteralExprSyntax.self)
+            || expr.is(FloatLiteralExprSyntax.self) || (expr.as(StringLiteralExprSyntax.self).map { $0.segments.allSatisfy { $0.is(StringSegmentSyntax.self) } } ?? false)
+    }
+
+    /// The type of a parameter without optionality, attributes, `some` or `any`, parentheses and a trailing `Protocol`.
+    static func baseTypeName(_ type: TypeSyntax) -> String? {
+        if let t = type.as(OptionalTypeSyntax.self) { return baseTypeName(t.wrappedType) }
+        if let t = type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) { return baseTypeName(t.wrappedType) }
+        if let t = type.as(AttributedTypeSyntax.self) { return baseTypeName(t.baseType) }
+        if let t = type.as(SomeOrAnyTypeSyntax.self) { return baseTypeName(t.constraint) }
+        if let t = type.as(TupleTypeSyntax.self), t.elements.count == 1, let only = t.elements.first { return baseTypeName(only.type) }
+        return typeName(type)
+    }
+
+    /// Whether a parameter takes a function: its type is a function type, or is `@escaping`, which only a function can be.
+    static func isFunctionType(_ type: TypeSyntax) -> Bool {
+        if let t = type.as(OptionalTypeSyntax.self) { return isFunctionType(t.wrappedType) }
+        if let t = type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) { return isFunctionType(t.wrappedType) }
+        if let t = type.as(AttributedTypeSyntax.self) {
+            return t.attributes.contains { $0.as(AttributeSyntax.self)?.attributeName.trimmedDescription == "escaping" } || isFunctionType(t.baseType)
+        }
+        if let t = type.as(TupleTypeSyntax.self), t.elements.count == 1, let only = t.elements.first { return isFunctionType(only.type) }
+        return type.is(FunctionTypeSyntax.self)
+    }
+
+    /// Finds, anywhere in a default value, what reads the device or makes a dependency.
+    private final class AmbientFinder: SyntaxVisitor {
+        private(set) var reason: String?
+        private let typeText: String
+        private unowned let scanner: Scanner
+        init(type: TypeSyntax, scanner: Scanner) {
+            typeText = type.trimmedDescription; self.scanner = scanner
+            super.init(viewMode: .sourceAccurate)
+        }
+        private func found(_ why: String) { if reason == nil { reason = why } }
+
+        override func visit(_ node: FunctionCallExprSyntax) -> SyntaxVisitorContinueKind {
+            guard let path = Scanner.unqualifiedPath(node.calledExpression) else { return .visitChildren }
+            let isInit = path.count == 1 || path.last == "init"
+            let type = path.count == 1 ? path[0] : path[path.count - 2]
+            if isInit, type == "Date", node.arguments.isEmpty { found("reads the clock") }
+            if isInit, type == "ContinuousClock" || type == "SuspendingClock" { found("is the real clock") }
+            if path == ["NSTemporaryDirectory"] || path == ["NSHomeDirectory"] { found("reads the file system") }
+            if path == ["NSLocalizedString"] || (isInit && type == "String" && node.arguments.first?.label?.text == "localized") {
+                found("reads the app's language")
+            }
+            if isInit, Scanner.hasSuffix(type, in: scanner.dependencySuffixes) || scanner.infrastructureTypes.contains(type) { found("makes a \(type)") }
+            return .visitChildren
+        }
+
+        override func visit(_ node: MemberAccessExprSyntax) -> SyntaxVisitorContinueKind {
+            let member = Scanner.name(node.declName.baseName)
+            let base = node.base.flatMap { Scanner.unqualifiedPath($0)?.last }
+            if member == "now", base == nil || base == "Date" { found("reads the clock") }
+            if member == "current" || member == "autoupdatingCurrent" {
+                if let base, ["Locale", "TimeZone", "Calendar"].contains(base) { found("reads the device's \(base)") }
+                if base == nil, member == "autoupdatingCurrent" || typeText.range(of: #"\b(Locale|TimeZone|Calendar)\b"#, options: .regularExpression) != nil {
+                    found("reads the device's settings")
+                }
+            }
+            if base == "Locale", member == "preferredLanguages" { found("reads the person's languages") }
+            if base == "Task", member == "sleep" { found("waits on the real clock") }
+            if member == "continuous" || member == "suspending", base == nil || base == "ContinuousClock" || base == "SuspendingClock" {
+                found("is the real clock")
+            }
+            if Scanner.deviceDirectories.contains(member), base == nil || base == "URL" { found("reads the file system") }
+            return .visitChildren
+        }
+
+        override func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
+            let n = Scanner.name(node.baseName)
+            let ownResources = n == "Bundle" && node.parent?.as(MemberAccessExprSyntax.self).map { Scanner.name($0.declName.baseName) == "module" } == true
+            if Scanner.ambientTypes.contains(n), !ownResources { found("reads the device's \(n)") }
+            if n == "LocalizedStringResource" || n == "LocalizedStringKey" { found("reads the app's language") }
+            if Scanner.hasSuffix(n, in: scanner.dependencySuffixes) || scanner.infrastructureTypes.contains(n) { found("names a \(n)") }
+            return .visitChildren
+        }
+    }
+
     // MARK: Declarations
 
     override func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {
@@ -315,6 +571,7 @@ final class Scanner: SyntaxVisitor {
 
     private func declared(_ name: TokenSyntax, _ node: some SyntaxProtocol) {
         if Self.isTestDoubleName(Self.name(name)) { hit("testDouble", Self.name(name), name) }
+        if Self.isViewModelName(Self.name(name)) { declaresViewModel = true }
     }
 
     static func isTestDoubleName(_ n: String) -> Bool {

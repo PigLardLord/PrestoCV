@@ -33,7 +33,9 @@ chmod +x .githooks/pre-commit.d/architecture-check
 - **A new target:** add it to `rules.json` and to `docs/architecture/modules.md` in the same pull request, and remove it from `notYetImplemented`.
 - **A permanent exception:** an entry in `exceptions` that cites an ADR.
 - **A temporary one:** a baseline entry. The baseline may only shrink.
-- **Legacy targets** are exempt until they are deleted (ADR 0012), except from the rules listed for them: R16 for the legacy test targets that a test plan runs. Their imports stay unchecked.
+- **Legacy targets** are exempt until they are deleted (ADR 0012), except from the rules listed for them: R16 for the legacy test targets that a test plan runs, R5 and R17 for the legacy app and `PrestoCVCore` (ADR 0025). Their imports stay unchecked.
+- **Views and view models (R5):** a type that conforms to `View`, or an extension of one in any file of its target, holds no type whose name ends with one of `serviceSuffixes` and makes no view model, except in an `#if DEBUG` branch; a file that declares or extends a view model imports no UI framework.
+- **Default arguments (R17):** a default makes no dependency (a type whose name ends with one of `dependencySuffixes`, or an infrastructure type), is no closure or function that does work, and reads no ambient state. Both suffix lists are in `rules.json`; a trailing `Protocol` does not count.
 - **A test plan's targets read no source tree (R16):** `#filePath` and `#file` are refused there, except as the default value of a `StaticString` parameter that the function only forwards, unchanged, as the `file:` argument of a call, which is how XCTest reports where an assertion failed. A target that writes into the checkout on purpose is an exception.
 - **The resource layout (R15) is checked in legacy declarations too:** a legacy target's bundle is signed in the same build as the others.
 - **`Prototypes/` is excluded.**

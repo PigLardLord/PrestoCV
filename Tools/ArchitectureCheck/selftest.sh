@@ -19,8 +19,11 @@ P
   cat > "$ROOT/rules.json" <<'J'
 {"rules":{"R1":["exportedImport"],"R2":["wallClock","randomIdentity","ambientEnvironment","localization","printing"],
   "R4":["singleton","infrastructureConstruction"],"R7":["swallowedError"],"R9":["escapeHatch"],"R11":["platformCondition"],
-  "R14":["testDouble"],"R9m":["swift5Mode","unsafeFlags"],"R15":["bundleLayout"],"R16":["sourceTreePath"]},
+  "R14":["testDouble"],"R9m":["swift5Mode","unsafeFlags"],"R15":["bundleLayout"],"R16":["sourceTreePath"],
+  "R5":["viewDependency","viewModelImport"],"R17":["defaultDependency"]},
  "infrastructureTypes":["FileStore"],
+ "serviceSuffixes":["UseCase","Repository","Service","Container"],
+ "dependencySuffixes":["UseCase","Repository","Service","Container","Store","Detector","Provider","Factory"],
  "targets":[{"name":"Pure","path":"Sources/Pure","allowedImports":["Foundation"],"rules":["R1","R2","R4","R7","R9","R11","R14"]},
             {"name":"Other","path":"Sources/Other","allowedImports":["Foundation"],"rules":[]},
             {"name":"Manifest","path":"Package.swift","kind":"manifest","allowedImports":["PackageDescription"],"rules":["R9m","R15"]}]}
@@ -336,6 +339,87 @@ r["exceptions"] = [{"path": "Sources/Pure/P.swift", "detector": "sourceTreePath"
 json.dump(r, open(p, "w"))
 PY
 expect "R16: an exception backed by an ADR allows a writer that needs the checkout" 0 ""
+# --- R5: a view renders and forwards intents; it holds no service and makes no view model, except in a DEBUG preview (#256)
+only_rule() {   # $1 = rule: the Pure target has only this rule, and may import the UI frameworks, so a case shows this rule alone
+  python3 - "$ROOT/rules.json" "$1" <<'PY'
+import json, sys
+p, rule = sys.argv[1:]; r = json.load(open(p)); t = next(t for t in r["targets"] if t["name"] == "Pure")
+t["rules"] = [rule]; t["allowedImports"] += ["SwiftUI", "UIKit", "AppKit", "Combine", "Observation"]; json.dump(r, open(p, "w"))
+PY
+}
+view_case() { setup; only_rule R5; src "$2"; expect "$1" "$3" "${4:-}"; }
+for form in 'struct V: View { let service: ExportService; var body: some View { EmptyView() } }' \
+            'struct V: View { var body: some View { Text(LiveExportService().name) } }' \
+            'struct V: SwiftUI.View { let container: DependencyContainerProtocol; var body: some View { EmptyView() } }' \
+            'struct V: View { let cvs: CVManagementUseCaseProtocol; var body: some View { EmptyView() } }' \
+            'struct R: UIViewRepresentable { let repository: CVRepository }' \
+            'struct V: Equatable & View { let store: CVRepository; var body: some View { EmptyView() } }' \
+            $'struct V: View {\n    var body: some View { EmptyView() }\n}\nextension V {\n    func load() { _ = CVRepository.self }\n}'; do
+  view_case "R5: a view references a service: ${form//$'\n'/⏎}" "$form" 1 "R5 viewDependency"
+done
+for form in 'struct V: View { @StateObject private var viewModel = ListViewModel(); var body: some View { EmptyView() } }' \
+            'struct V: View { @StateObject private var viewModel: ListViewModel; init() { _viewModel = StateObject(wrappedValue: ListViewModel()) }; var body: some View { EmptyView() } }' \
+            'struct V: View { @StateObject private var viewModel: ListViewModel = .init(); var body: some View { EmptyView() } }' \
+            'struct V: View { var body: some View { Child(viewModel: ChildViewModel.init(title: "")) } }' \
+            $'struct V: View {\n    var body: some View {\n        #if DEBUG\n        EmptyView()\n        #else\n        Child(viewModel: ChildViewModel())\n        #endif\n    }\n}'; do
+  view_case "R5: a view makes a view model: ${form//$'\n'/⏎}" "$form" 1 "R5 viewDependency"
+done
+for form in 'struct V: View { @ObservedObject var viewModel: ListViewModel; let makeSheet: (Int) -> SheetViewModel; var body: some View { EmptyView() } }' \
+            'struct V: View { let makeViewModel: () -> ListViewModel; var body: some View { Child(viewModel: makeViewModel()) } }' \
+            $'struct V: View {\n    var body: some View { EmptyView() }\n}\n#if DEBUG\n#Preview { V(viewModel: ListViewModel(useCase: PreviewUseCase())) }\nstruct V_Previews: PreviewProvider { static var previews: some View { V(viewModel: ListViewModel(service: PreviewService())) } }\n#endif' \
+            $'struct V: View {\n    var body: some View { EmptyView() }\n    #if DEBUG\n    static func preview() -> ListViewModel { ListViewModel(useCase: PreviewUseCase()) }\n    #endif\n}' \
+            'final class ViewModelFactory { func make() -> ListViewModel { ListViewModel(service: LiveExportService()) } }' \
+            'struct Row { let service: ExportService }' \
+            $'struct ItemsContainer: View {\n    var body: some View { EmptyView() }\n}\nstruct V: View {\n    var body: some View { ItemsContainer() }\n}'; do
+  view_case "R5: allowed: ${form//$'\n'/⏎}" "$form" 0
+done
+# A view's extension in another file of the target is part of the view.
+setup; only_rule R5; printf '%s\n' 'struct V: View { var body: some View { EmptyView() } }' > "$ROOT/Sources/Pure/V.swift"
+src $'extension V {\n    func make() -> ListViewModel { ListViewModel() }\n}'
+expect "R5: an extension of a view declared in another file makes a view model" 1 "Sources/Pure/P.swift:2: R5 viewDependency"
+# --- R5: a view model imports no UI framework (Combine and Observation are fine)
+for form in $'import SwiftUI\nfinal class ListViewModel: ObservableObject {}' $'import UIKit\nextension ListViewModel {}' \
+            $'import struct SwiftUI.Color\nstruct ListViewModel {}' $'@preconcurrency import AppKit\nactor ListViewModel {}'; do
+  view_case "R5: a view model's file imports a UI framework: ${form//$'\n'/⏎}" "$form" 1 "R5 viewModelImport"
+done
+for form in $'import Combine\nimport Observation\nimport Foundation\nfinal class ListViewModel: ObservableObject {}' \
+            $'import SwiftUI\nstruct ListView: View { @ObservedObject var viewModel: ListViewModel; var body: some View { EmptyView() } }'; do
+  view_case "R5: allowed: ${form//$'\n'/⏎}" "$form" 0
+done
+# --- R17: a default argument never makes a dependency or reads ambient state; the composition root passes them (#256)
+default_case() { setup; only_rule R17; src "$2"; expect "$1" "$3" "${4:-}"; }
+for form in 'init(now: @escaping () -> Date = { Date() }) {}' 'func f(date: Date = .now) {}' 'func f(date: Date = Foundation.Date()) {}' \
+            'init(calendar: Calendar = .autoupdatingCurrent) {}' 'init(locale: Locale = .current) {}' 'init(zone: TimeZone = TimeZone.current) {}' \
+            'init(languages: [String] = Locale.preferredLanguages) {}' 'init(languages: [String] = Bundle.main.preferredLocalizations) {}' \
+            'init(locale: Locale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en")) {}' \
+            'init(directory: URL = FileManager.default.temporaryDirectory) {}' 'init(file: URL = .applicationSupportDirectory) {}' \
+            'init(file: URL = URL.documentsDirectory) {}' 'init(path: String = NSTemporaryDirectory()) {}' \
+            'init(defaults: UserDefaults = .standard) {}' 'init(arguments: [String] = ProcessInfo.processInfo.arguments) {}' \
+            'init(title: String = String(localized: "export.file_name")) {}' 'init(title: String = NSLocalizedString("k", comment: "")) {}' \
+            'init(sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {}' \
+            'init(clock: any Clock<Duration> = ContinuousClock()) {}' \
+            'init(service: ExportService = ExportService()) {}' 'init(service: any ExportServiceProtocol = LiveExport()) {}' \
+            'init(detector: LanguageDetector = .onDevice) {}' 'init(store: (any PreferencesStore)? = .init()) {}' \
+            'init(container: Container = Container.shared) {}' 'init(store: FileStore = FileStore()) {}' \
+            'init(directory: @escaping () throws -> URL = DependencyContainer.defaultDirectory) {}' \
+            'init(makeID: @escaping () -> UUID = { UUID() }) {}' 'init(bootstrap: @escaping () async -> Void = installTemplates) {}' \
+            'init(availability: AvailabilityProvider = { .available }) {}' \
+            $'#if DEBUG\nfunc current(arguments: [String] = ProcessInfo.processInfo.arguments) {}\n#endif'; do
+  default_case "R17: refused: $form" "$form" 1 "R17 defaultDependency"
+done
+for form in 'init(id: UUID = UUID()) {}' 'init(debounce: Duration = .milliseconds(250)) {}' \
+            'init(margin: Double = 43, title: String = "", items: [Int] = [], flag: Bool = Feature.isShipped) {}' \
+            'init(onTap: @escaping () -> Void = {}) {}' 'init(onChange: @escaping (Int) -> Void = { _ in }) {}' \
+            'func find(matcher: @escaping @Sendable (Int) -> Bool = { _ in true }) {}' 'init(limit: @escaping () -> Int? = { nil }) {}' \
+            'init(modifier: ((String) -> String)? = nil) {}' 'init(service: ExportService) {}' 'init(service: (any ExportServiceProtocol)? = nil) {}' \
+            'init(bundle: Bundle = .module) {}' 'init(bundle: Bundle = Bundle.module) {}' 'func f() { let now = Date(); _ = now }' 'init(style: Style = .default, side: Double = Thumbnail.side) {}' \
+            'init(file: StaticString = #filePath, line: UInt = #line) {}'; do
+  default_case "R17: allowed: $form" "$form" 0
+done
+legacy_tests "R17"; printf '%s\n' 'init(now: @escaping () -> Date = { Date() }) {}' >> "$ROOT/Tests/Old/OldTests.swift"
+expect "R17: a legacy target with R17 is checked for it, and only for it" 1 "Tests/Old/OldTests.swift:4: R17 defaultDependency"
+if grep -qE "R1 import|wallClock" "$ROOT/out.txt"; then fail=$((fail+1)); echo "FAIL a legacy target with R17 was checked for more"; sed 's/^/     /' "$ROOT/out.txt"
+else pass=$((pass+1)); echo "ok   a legacy target with R17 is checked for nothing else"; fi
 # --- baseline: occurrences, stability, monotonicity
 setup; src 'func a() { fatalError("x") }'
 "$CHECK" "$ROOT" --rules "$ROOT/rules.json" --baseline "$ROOT/baseline.json" --adr-dir "$ROOT/adr" --write-baseline >/dev/null

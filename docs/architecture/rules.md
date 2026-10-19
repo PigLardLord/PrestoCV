@@ -12,7 +12,7 @@ Each rule says what is required, why, and what enforces it:
 - **test**: a required test fails.
 - **review**: nothing automatic can catch it. Kept to a minimum, and marked as such.
 
-The checker applies to **production targets**: domain, application, integration, presentation and adapter targets, and the composition root. Test, test-support and tool targets get the import allow-lists only, plus R16 where a test plan runs them. Legacy targets are exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)), except from R15 and R16.
+The checker applies to **production targets**: domain, application, integration, presentation and adapter targets, and the composition root. Test, test-support and tool targets get the import allow-lists only, plus R16 where a test plan runs them. Legacy targets are exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)), except from R15 and R16, and, for the legacy app and `PrestoCVCore`, from R5 and R17 ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)).
 
 ---
 
@@ -62,7 +62,7 @@ A protocol with one implementation exists only if it is a port or has a test dou
 Only `PrestoCVComposition` creates infrastructure: repositories, stores, renderers, the compiled web-view rule list, the AI adapter, file locations, time sources, identifier generators and loggers.
 
 - The `@main` App type creates the composition **once**, as a `static let`. That is the only process-wide instance.
-- Libraries do not provide `init()`s or default arguments that create infrastructure.
+- Libraries do not provide `init()`s or default arguments that create infrastructure. [R17](#r17-dependencies-come-in-through-the-initialiser) extends this to every default argument of production code.
 - Libraries contain no containers, service locators or `static let shared` singletons.
 - Each stateful resource (the design store, the CV store) exists once per process. Across processes, the file store serialises writers with a lock ([ADR 0009](adr/0009-persisted-schema-v1.md)).
 
@@ -72,19 +72,22 @@ Only `PrestoCVComposition` creates infrastructure: repositories, stores, rendere
 
 ## R5. Views render; view models present; neither decides
 
-- **Views** (Xcode app target) render presentation state and turn status enums into localised text. They forward user intents to the view model, and never construct view models or services.
+- **Views** (Xcode app target) render presentation state and turn status enums into localised text. They forward user intents to the view model, and never construct view models or hold services. A view is given its view model, made by the composition root; only a preview, in `#if DEBUG`, makes one, with fakes.
 - **View models** (`PrestoCVPresentation`) hold presentation state and call workflow ports. Rules:
   - They depend on `PrestoCVWorkflowPorts`, never on `PrestoCVIntegration`.
   - They import `PrestoCVDomain` and `PrestoCVApplication` with `internal import`, so no domain type can appear in their public API.
   - They import no UI framework.
 - **Business rules** live in the domain or application layer of their context.
 
-**Why.** Today the rule for "a CV can be saved" lives in `CVEditorViewModel`, the export-enabled rule in `CVExportSheetView`, the AI-to-CV mapping in `AIGenerationViewModel`, and `AppRootView` is the composition root.
+**Why.** The rule for "a CV can be saved" lived in `CVEditorViewModel`, the export-enabled rule in `CVExportSheetView`, the AI-to-CV mapping in `AIGenerationViewModel`, and `AppRootView` was the composition root (#251, #256).
 
 **Enforced by:**
 - **compiler:** `internal import`. A public property of type `CV` fails with "property cannot be declared public because its type uses an internal type", as verified.
 - **compiler:** target dependencies.
 - **checker:** import allow-lists, and the `importAccess` constraint. In `PrestoCVPresentation`, `PrestoCVDomain` and `PrestoCVApplication` must be imported `internal` or narrower. A plain `import` is public in Swift 6, so it fails as well.
+- **checker:** the `viewDependency` detector. A type that conforms to `View`, or an extension of one anywhere in its target, references no type whose name ends with one of `serviceSuffixes` in `rules.json` (use cases, repositories, services, containers; another view of the target is not one), and constructs no view model. Code in an `#if DEBUG` branch is exempt.
+- **checker:** the `viewModelImport` detector. A file that declares or extends a type named `…ViewModel` imports no SwiftUI, UIKit, AppKit or WatchKit, in any form.
+- The legacy app and `PrestoCVCore` have R5 too ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)).
 - **review:** whether a view contains a business rule.
 
 ## R6. The domain is rich and keeps its invariants
@@ -259,3 +262,15 @@ Legacy test targets follow this rule too, since the same test plan runs them.
 - **checker:** the `sourceTreePath` detector, in every target whose rules list R16, legacy targets included.
 - **checker:** every `.xctestplan` in the repository is read. A target that a plan runs must be in `rules.json` and must have R16.
 - **CI:** Xcode Cloud's Test action, which runs the tests without the repository.
+
+## R17. Dependencies come in through the initialiser
+
+Every dependency of a type is a parameter of its initialiser, or of the function that needs it, and its caller passes it: a service, a repository, a store, a clock, a wait, the calendar, the time zone, the locale and the languages, a bundle, a folder, the launch arguments, a function that does work. Only the composition root makes the real ones: the app's entry point, which reads the device once, and the factories and containers it hands them to.
+
+- **No default argument makes a dependency or reads ambient state** in production code. It may not construct or name a type whose name ends with one of `dependencySuffixes` in `rules.json` or is an infrastructure type, be the default of a parameter of such a type, be a closure or a function that does work, or read the clock, the locale, the time zone, the calendar, the preferred languages, a bundle other than `Bundle.module`, the file system, user defaults, the process or localised text.
+- **Values may have defaults:** a margin, a page size, the length of a debounce, an empty list, `nil`, a closure that does nothing or answers a constant (`{ _ in true }`), and an entity's new identity (`id: UUID = UUID()`).
+- **Tests pass their own.** A test target may hold initialisers that give the fixed values its tests do not vary; production code may not.
+
+**Why.** Initialisers made their own services and read the clock, the locale, the main bundle and the launch arguments when the caller passed nothing. A test that forgot an argument used the device's, so it passed on one machine and failed on another (#247), and a view could make a whole export stack without anyone seeing it (#251, #256).
+
+**Enforced by:** checker (detector `defaultDependency`, in every production target, and in the legacy app and `PrestoCVCore`, [ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)) and review, for a dependency that the name of its type does not show.
