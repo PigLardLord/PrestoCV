@@ -377,6 +377,32 @@ done
 setup; only_rule R5; printf '%s\n' 'struct V: View { var body: some View { EmptyView() } }' > "$ROOT/Sources/Pure/V.swift"
 src $'extension V {\n    func make() -> ListViewModel { ListViewModel() }\n}'
 expect "R5: an extension of a view declared in another file makes a view model" 1 "Sources/Pure/P.swift:2: R5 viewDependency"
+# Contextual `.init(…)` is resolved through the type the context expects, and a qualified type name is still a view model.
+for form in 'struct V: View { var body: some View { Child(viewModel: .init(title: "")) } }' \
+            $'struct V: View {\n    @StateObject private var viewModel: ListViewModel\n    init() { _viewModel = StateObject(wrappedValue: .init()) }\n    var body: some View { EmptyView() }\n}' \
+            $'struct V: View {\n    @StateObject private var viewModel: ListViewModel\n    init() { self._viewModel = StateObject(wrappedValue: .init(title: "")) }\n    var body: some View { EmptyView() }\n}' \
+            $'struct V: View {\n    @State private var model: ListViewModel\n    init() { model = .init() }\n    var body: some View { EmptyView() }\n}' \
+            'struct V: View { @StateObject private var viewModel = PrestoCVPresentation.ListViewModel(); var body: some View { EmptyView() } }' \
+            'struct V: View { var body: some View { Child(viewModel: Outer.ChildViewModel.init()) } }' \
+            $'struct Child: View {\n    let model: ChildViewModel\n    var body: some View { EmptyView() }\n}\nstruct V: View { var body: some View { Child(model: .init()) } }' \
+            $'struct Child: View {\n    init(model: ChildViewModel) {}\n    var body: some View { EmptyView() }\n}\nstruct V: View { var body: some View { Child(model: .init()) } }' \
+            $'struct V: View {\n    func make() -> ListViewModel { .init() }\n    var body: some View { EmptyView() }\n}' \
+            $'struct V: View {\n    var body: some View {\n        #if DEBUG\n        EmptyView()\n        #else\n        Child(viewModel: .init())\n        #endif\n    }\n}' \
+            $'struct V: View {\n    @StateObject private var viewModel: ListViewModel\n    init() {\n        #if DEBUG\n        _viewModel = StateObject(wrappedValue: ListViewModel(useCase: PreviewUseCase()))\n        #else\n        _viewModel = StateObject(wrappedValue: .init())\n        #endif\n    }\n    var body: some View { EmptyView() }\n}' \
+            $'struct V: View {\n    var body: some View {\n        #if os(iOS)\n        Child(viewModel: PrestoCVPresentation.ChildViewModel())\n        #endif\n    }\n}'; do
+  view_case "R5: a view makes a view model: ${form//$'\n'/⏎}" "$form" 1 "R5 viewDependency"
+done
+for form in 'struct V: View { var body: some View { Child(title: .init()) } }' \
+            $'struct V: View {\n    @State private var title: String\n    init() { _title = State(wrappedValue: .init()) }\n    var body: some View { EmptyView() }\n}' \
+            'struct V: View { var body: some View { PrestoCVPresentation.ListView(viewModel: viewModel) } }' \
+            $'struct V: View {\n    var body: some View {\n        #if DEBUG\n        Child(viewModel: .init(useCase: PreviewUseCase()))\n        #endif\n    }\n}' \
+            'final class ViewModelFactory { func make() -> ListViewModel { .init() }; func list() -> PrestoCVPresentation.ListViewModel { .init() } }'; do
+  view_case "R5: allowed: ${form//$'\n'/⏎}" "$form" 0
+done
+# The type a contextual `.init(…)` makes is found in another file of the target too.
+setup; only_rule R5; printf '%s\n' 'struct Child: View { let model: ChildViewModel; var body: some View { EmptyView() } }' > "$ROOT/Sources/Pure/C.swift"
+src 'struct V: View { var body: some View { Child(model: .init()) } }'
+expect "R5: a contextual .init for a parameter of a view declared in another file makes a view model" 1 "Sources/Pure/P.swift:1: R5 viewDependency"
 # --- R5: a view model imports no UI framework (Combine and Observation are fine)
 for form in $'import SwiftUI\nfinal class ListViewModel: ObservableObject {}' $'import UIKit\nextension ListViewModel {}' \
             $'import struct SwiftUI.Color\nstruct ListViewModel {}' $'@preconcurrency import AppKit\nactor ListViewModel {}'; do
