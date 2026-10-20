@@ -146,6 +146,7 @@ struct CVEditorView: View {
                     onLeave: { viewModel.fieldWasLeft($0) }
                 )
                     .keyboardDoneButton()
+                    .keepsClearOfTheKeyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
                     .savedConfirmation(isShown: viewModel.showsSavedConfirmation)
                     .tabItem {
@@ -154,6 +155,7 @@ struct CVEditorView: View {
 
                 ExperienceSection(viewModel: viewModel)
                     .keyboardDoneButton()
+                    .keepsClearOfTheKeyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
                     .savedConfirmation(isShown: viewModel.showsSavedConfirmation)
                     .tabItem {
@@ -162,6 +164,7 @@ struct CVEditorView: View {
 
                 DetailsSection(viewModel: viewModel)
                     .keyboardDoneButton()
+                    .keepsClearOfTheKeyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
                     .savedConfirmation(isShown: viewModel.showsSavedConfirmation)
                     .tabItem {

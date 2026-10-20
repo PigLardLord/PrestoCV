@@ -66,6 +66,53 @@ final class EditorKeyboardUITests: XCTestCase {
         XCTAssertEqual(name.value as? String, "Maria Rossi", "Return should not add a line to the name")
     }
 
+    /// A row added at the end of the form, and each field of it, comes up above the keyboard and above the Done button
+    /// over it, so that what is typed goes into a field the person sees. Without the bar below the form, a new row used to
+    /// stop under the Done button and a field below it under the keyboard.
+    func testTheFieldsOfRowsAddedLowInTheFormStayAboveTheKeyboard() throws {
+        let experienceTab = app.buttons["Experience"].firstMatch
+        XCTAssertTrue(experienceTab.waitForExistence(timeout: 10), "The editor should show its tabs")
+        experienceTab.tap()
+
+        let addSkill = app.buttons["Add Skill"]
+        app.scrollTo(addSkill)
+        addSkill.tap()
+        let skill = app.textFields["Skill"].firstMatch
+        XCTAssertTrue(skill.waitForExistence(timeout: 10), "Add Skill should add a row")
+        assertAboveTheKeyboard(skill, "The new skill")
+        skill.typeText("Triage")
+
+        app.toolbars.buttons["Done"].tap()
+        let addEducation = app.buttons["Add Education"]
+        app.scrollTo(addEducation)
+        addEducation.tap()
+        let degree = app.textFields["Degree"].firstMatch
+        XCTAssertTrue(degree.waitForExistence(timeout: 10), "Add Education should add a row")
+        assertAboveTheKeyboard(degree, "The degree of the new education")
+        degree.typeText("BSc Nursing")
+
+        let school = app.textFields["School"].firstMatch
+        school.tap()
+        assertAboveTheKeyboard(school, "The school of the new education")
+        school.typeText("Sapienza University of Rome")
+        XCTAssertEqual(school.value as? String, "Sapienza University of Rome", "Everything typed should arrive in the school")
+    }
+
+    /// Waits until `field` has the keyboard focus and is above the keyboard and above the Done button over it.
+    private func assertAboveTheKeyboard(_ field: XCUIElement, _ name: String) {
+        XCTAssertTrue(field.waitForKeyboardFocus(true), "\(name) should get the keyboard focus")
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 10), XCUIApplication.noSoftwareKeyboard)
+        let done = app.toolbars.buttons["Done"]
+        let bar = app.navigationBars.firstMatch
+        let clear = NSPredicate { _, _ in
+            let top = done.exists ? min(keyboard.frame.minY, done.frame.minY) : keyboard.frame.minY
+            return field.exists && field.frame.maxY <= top && field.frame.minY >= bar.frame.maxY
+        }
+        let waited = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: clear, object: nil)], timeout: 5)
+        XCTAssertEqual(waited, .completed, "\(name) should be in view above the keyboard and its Done button")
+    }
+
     private func waitUntil(_ element: XCUIElement, exists: Bool, timeout: TimeInterval = 10) -> Bool {
         let condition = expectation(for: NSPredicate(format: "exists == %@", NSNumber(value: exists)), evaluatedWith: element)
         return XCTWaiter().wait(for: [condition], timeout: timeout) == .completed
