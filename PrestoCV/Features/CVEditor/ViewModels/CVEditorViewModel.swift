@@ -1,6 +1,7 @@
 import Foundation
 import PrestoCVCore
 import Combine
+import enum PrestoCVDomain.CVTitle
 
 /// The editor of one CV. It runs on the main actor, as its form does: every change of the form is kept on the device
 /// a few seconds later, so the change and the keeping happen in order.
@@ -18,6 +19,8 @@ final class CVEditorViewModel: ObservableObject {
     @Published private(set) var showsSavedConfirmation = false
     @Published var showingCancelConfirmation = false
     @Published private(set) var pendingDeletion: PendingDeletion?
+    /// What each contact field said when the person last left it: its check, which typing does not change.
+    @Published private(set) var leftContactText: [ContactField: String] = [:]
     /// The message shown above a new CV, set by the screen that opened it.
     let notice: EditorNotice?
     
@@ -45,84 +48,16 @@ final class CVEditorViewModel: ObservableObject {
         saveError ?? ""
     }
     
-    /// The title of the screen: the name of the CV. A CV that was never stored is "New CV" until it is named.
-    /// A stored CV without a name shows the name of the person, or "Untitled CV" when it has neither.
+    /// The title of the screen, by the title rule of PrestoCVDomain: the name of the CV, otherwise the name of its
+    /// person, otherwise the role it is for. Without any of them, a CV that was never stored is "New CV", and a stored
+    /// one "Untitled CV", as the list calls it.
     var screenTitle: String {
-        let cvName = cv.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard cvName.isEmpty else { return cvName }
-        guard savedSnapshot != nil else { return "editor.new_cv".localized }
-        let personName = cv.personalInfo.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return personName.isEmpty ? "cv.untitled".localized : personName
+        cv.editorTitle(isStored: savedSnapshot != nil)
     }
     
-    /// Determines if the CV has meaningful content beyond just the name
+    /// Whether the CV has enough content to be saved, by the save rule of PrestoCVDomain
     var hasMeaningfulContent: Bool {
-        // Check if any essential fields have content
-        !cv.personalInfo.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !cv.personalInfo.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !cv.personalInfo.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !cv.personalInfo.phone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !cv.personalInfo.location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !cv.personalInfo.portfolio.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !cv.personalInfo.profile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !cv.skills.isEmpty ||
-        !cv.relevant_experience.isEmpty ||
-        !cv.education.isEmpty ||
-        !cv.languages.isEmpty ||
-        !cv.certifications.isEmpty ||
-        !cv.social.isEmpty ||
-        !cv.interests.isEmpty
-    }
-    
-    /// Calculates completion percentage based on filled sections
-    var completionPercentage: Double {
-        var filledSections = 0
-        let totalSections = 8 // Total number of main sections
-        
-        // CV Name (weight: 1)
-        if !cv.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            filledSections += 1
-        }
-        
-        // Personal Info (weight: 1) - any field counts
-        if !cv.personalInfo.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-           !cv.personalInfo.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-           !cv.personalInfo.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-           !cv.personalInfo.profile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            filledSections += 1
-        }
-        
-        // Skills (weight: 1)
-        if !cv.skills.isEmpty {
-            filledSections += 1
-        }
-        
-        // Experience (weight: 1)
-        if !cv.relevant_experience.isEmpty {
-            filledSections += 1
-        }
-        
-        // Education (weight: 1)
-        if !cv.education.isEmpty {
-            filledSections += 1
-        }
-        
-        // Languages (weight: 1)
-        if !cv.languages.isEmpty {
-            filledSections += 1
-        }
-        
-        // Certifications (weight: 1)
-        if !cv.certifications.isEmpty {
-            filledSections += 1
-        }
-        
-        // Social/Interests combined (weight: 1)
-        if !cv.social.isEmpty || !cv.interests.isEmpty {
-            filledSections += 1
-        }
-        
-        return Double(filledSections) / Double(totalSections)
+        cv.allowsSaving
     }
     
     /// Indicates if there are unsaved changes: a CV that was never stored has them once it holds
@@ -333,6 +268,17 @@ final class CVEditorViewModel: ObservableObject {
     func clearError() {
         saveError = nil
     }
+
+    /// The person left a contact field: what it says now is checked, until they leave it again.
+    @MainActor
+    func fieldWasLeft(_ field: ContactField) {
+        let info = cv.personalInfo
+        switch field {
+        case .email: leftContactText[field] = info.email
+        case .phone: leftContactText[field] = info.phone
+        case .portfolio: leftContactText[field] = info.portfolio
+        }
+    }
     
     @MainActor
     func addSkill() {
@@ -540,13 +486,10 @@ final class CVEditorViewModel: ObservableObject {
         await keepUnsavedEdits()
     }
 
-    /// What a copy made of restored edits is called: the name of the CV they were made on, or of the person, marked
-    /// as recovered.
+    /// What a copy made of restored edits is called: the title of the CV they were made on, marked as recovered.
     private static func recoveredName(of cv: CVModel) -> String {
-        let names = [cv.name, cv.personalInfo.name].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        let name = names.first { !$0.isEmpty } ?? "cv.untitled".localized
         let recovered = "unsaved_edits.recovered_suffix".localized
-        return "\(name) \(recovered)"
+        return "\(cv.cvTitle.text) \(recovered)"
     }
 
     @MainActor

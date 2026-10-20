@@ -7,15 +7,4 @@ import Foundation
 struct AIDraftLabels: Equatable {
     /// End of a current job's period, e.g. "Present"
     let present: String
-    /// Name of a CV drafted without the person's name, e.g. "New CV"
-    let untitled: String
-    /// Format of a CV's name from the person's name, e.g. "CV of %@"
-    let cvNameFormat: String
-
-    func cvName(for personName: String?) -> String {
-        guard let name = personName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
-            return untitled
-        }
-        return String(format: cvNameFormat, name)
-    }
 }

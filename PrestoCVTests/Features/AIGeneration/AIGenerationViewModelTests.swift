@@ -20,7 +20,7 @@ enum LateEnd: Sendable {
 @Suite("AIGenerationViewModel Tests")
 struct AIGenerationViewModelTests {
     private let service = FakeCVGenerationService()
-    private let labels = AIDraftLabels(present: "Oggi", untitled: "Nuovo CV", cvNameFormat: "CV di %@")
+    private let labels = AIDraftLabels(present: "Oggi")
     private let validPrompt = "I am John Doe, an engineer at Tech Corp since 2020. I speak Italian (native) and French."
 
     private let languageData = LanguageDataSpy()
@@ -151,7 +151,8 @@ struct AIGenerationViewModelTests {
 
         await viewModel.generateCV()
 
-        #expect(viewModel.draft?.name == "CV di John Doe")
+        #expect(viewModel.draft?.personalInfo.name == "John Doe")
+        #expect(viewModel.draft?.name.isEmpty == true, "The list calls the draft by its person until it is renamed")
         #expect(viewModel.draft?.relevant_experience.first?.period == "2020 – Oggi")
         #expect(viewModel.draft?.languages.map(\.name) == ["Italian"], "A language without a level is skipped")
         #expect(viewModel.draft?.documentLanguage == "pt", "The CV follows the language of the description")
@@ -221,7 +222,7 @@ struct AIGenerationViewModelTests {
         await viewModel.generateCV()
 
         #expect(languageData.requests.isEmpty)
-        #expect(viewModel.draft?.name == "CV di John Doe")
+        #expect(viewModel.draft?.personalInfo.name == "John Doe")
         #expect(viewModel.errorMessage.isEmpty)
     }
 

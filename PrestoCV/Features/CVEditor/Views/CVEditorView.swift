@@ -136,9 +136,11 @@ struct CVEditorView: View {
                     documentLanguage: $viewModel.documentLanguageSelection,
                     automaticLanguageTitle: viewModel.automaticDocumentLanguageTitle,
                     documentLanguageTitle: viewModel.documentLanguageTitle,
+                    nameStatus: viewModel.nameStatus,
                     emailStatus: viewModel.emailStatus,
                     phoneStatus: viewModel.phoneStatus,
-                    portfolioStatus: viewModel.portfolioStatus
+                    portfolioStatus: viewModel.portfolioStatus,
+                    onLeave: { viewModel.fieldWasLeft($0) }
                 )
                     .keyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
@@ -246,7 +248,8 @@ struct CVEditorView_Previews: PreviewProvider {
                     cv: editor.cv,
                     exportService: CVExportService(),
                     preferencesStore: PreviewExportPreferencesStore(),
-                    documentLanguageSink: { editor.documentLanguageSelection = $0 }
+                    documentLanguageSink: { editor.documentLanguageSelection = $0 },
+                    exportPolicy: .standard
                 )
             }
         }

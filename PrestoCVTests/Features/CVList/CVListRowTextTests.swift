@@ -53,35 +53,50 @@ struct CVListRowTextTests {
         CVModel(name: name, personalInfo: PersonalInfo(name: person, title: jobTitle))
     }
 
-    // MARK: - The person
+    // MARK: - The line under the title
 
-    @Test("The person line gives the name of the person and the job title")
-    func personLineHasNameAndJobTitle() {
+    @Test("Under a CV titled by its own name, the line gives the name of the person and the job title")
+    func subtitleOfANamedCVHasNameAndJobTitle() {
         let viewModel = makeViewModel(repository: InMemoryCVRepository())
 
-        #expect(viewModel.personLine(of: cv(person: "Alex Morgan", jobTitle: "Product Designer")) == "Alex Morgan\(separator)Product Designer")
+        #expect(viewModel.subtitle(of: cv(name: "Portfolio", person: "Alex Morgan", jobTitle: "Product Designer")) == "Alex Morgan\(separator)Product Designer")
     }
 
-    @Test("The person line has what is there when the name or the job title is missing")
-    func personLineHasWhatIsThere() {
+    @Test("Under a CV titled by its own name, the line has what is there when the name or the job title is missing")
+    func subtitleOfANamedCVHasWhatIsThere() {
         let viewModel = makeViewModel(repository: InMemoryCVRepository())
 
-        #expect(viewModel.personLine(of: cv(person: "Alex Morgan")) == "Alex Morgan")
-        #expect(viewModel.personLine(of: cv(jobTitle: "Product Designer")) == "Product Designer")
+        #expect(viewModel.subtitle(of: cv(name: "Portfolio", person: "Alex Morgan")) == "Alex Morgan")
+        #expect(viewModel.subtitle(of: cv(name: "Portfolio", jobTitle: "Product Designer")) == "Product Designer")
     }
 
-    @Test("The person line is nil when the CV has neither a name nor a job title, or only white space", arguments: ["", "  ", " \n "])
-    func personLineIsNilWithoutPersonOrTitle(blank: String) {
+    @Test("Under a CV titled by its person, the line gives only the job title, and nothing without one")
+    func subtitleOfACVTitledByItsPersonIsTheJobTitle() {
         let viewModel = makeViewModel(repository: InMemoryCVRepository())
 
-        #expect(viewModel.personLine(of: cv(person: blank, jobTitle: blank)) == nil)
+        #expect(viewModel.subtitle(of: cv(person: "Alex Morgan", jobTitle: "Product Designer")) == "Product Designer")
+        #expect(viewModel.subtitle(of: cv(person: "Alex Morgan")) == nil)
     }
 
-    @Test("The person line trims the white space around the parts")
-    func personLineTrims() {
+    @Test("Under a CV titled by its job title there is no line: it has no person")
+    func subtitleOfACVTitledByItsRoleIsNil() {
         let viewModel = makeViewModel(repository: InMemoryCVRepository())
 
-        #expect(viewModel.personLine(of: cv(person: "  Alex Morgan ", jobTitle: " Designer\n")) == "Alex Morgan\(separator)Designer")
+        #expect(viewModel.subtitle(of: cv(jobTitle: "Product Designer")) == nil)
+    }
+
+    @Test("There is no line when the CV has neither a name nor a job title, or only white space", arguments: ["", "  ", " \n "])
+    func subtitleIsNilWithoutPersonOrTitle(blank: String) {
+        let viewModel = makeViewModel(repository: InMemoryCVRepository())
+
+        #expect(viewModel.subtitle(of: cv(person: blank, jobTitle: blank)) == nil)
+    }
+
+    @Test("The line trims the white space around the parts")
+    func subtitleTrims() {
+        let viewModel = makeViewModel(repository: InMemoryCVRepository())
+
+        #expect(viewModel.subtitle(of: cv(name: "Portfolio", person: "  Alex Morgan ", jobTitle: " Designer\n")) == "Alex Morgan\(separator)Designer")
     }
 
     // MARK: - The last save

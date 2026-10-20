@@ -29,7 +29,7 @@ Test targets and test-support targets are described below each package. The chec
   - a typed identity (`CVID`);
   - `revision`, `createdAt` and `updatedAt`, settable only inside the package;
   - a private title, `PersonalDetails`, and ordered sections of entries;
-  - the "has enough content to be saved" rule;
+  - the "has enough content to be saved" rule, `SaveRule`: a detail of the person is written, or a section has an entry. It reads plain values, so the legacy app's editor is judged by it too ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md));
   - duplication with a title composed by the caller.
 - **Value objects:**
   - `PartialDate` (year or month precision, partial order);
@@ -38,6 +38,14 @@ Test targets and test-support targets are described below each package. The chec
   - `LanguageProficiency` (CEFR + native);
   - `EmailAddress`, `PhoneNumber`, `WebLink`, `DocumentLanguage`, `DesignChoice`.
 - **`Period.make(start:end:current:)`** is the single rule that turns loose data into a period, or into a typed `PeriodError`.
+- **`FieldCheck`**: whether the text of an e-mail, phone or web-address field reads as one. E-mail addresses and web addresses are judged by `EmailAddress` and `WebLink`; a phone number needs a digit, and is otherwise written as the person likes. The legacy app's editor checks a field when the person leaves it.
+- **`CVTitle`**: what a CV is called wherever it is named: its name, otherwise the name of its person, otherwise the role it is for; "Untitled CV", which the app words, only for a CV with none of the three; the name of a copy, that title followed by the app's word for a copy; and the labels of a list's rows, in which a CV whose title reads like another's takes the first number that gives a label no other row shows, so that no two rows read the same. The legacy app passes the name of a copy to the legacy duplicate operation.
+- **`CVSubtitle`**: the line under the title of a CV in a row of the list, which never repeats the title: the name of the person and the role under a CV titled by its own name, only the role under one titled by its person, only the person under one titled by its role; an empty part leaves no separator.
+- **`ExampleDraft`**: the fields (`CVField`) a draft started from an example leaves blank, who its person is and how to reach them.
+- **`PDFFileName`**: the title of an exported PDF and the name of its file, from the person's name or the CV's, cleaned for every file system and cut to its bytes, around the pattern of the PDF's language, which the app gives from its catalog.
+- **`ExportReadiness`**: whether a CV can be exported, and which field to fix: only the person's name is required; a missing e-mail address or phone number only warns.
+- **`ExportPolicy`**: the page of version 1's export, A4 with a 43-point margin and 10 pages at most.
+- The legacy app reads both while it exports through the legacy exporter; at migration step 5 the policy of `CVRendering` replaces them ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)).
 - Planned: projects (#54), photo (#53).
 
 **`PrestoCVApplication`**
@@ -47,7 +55,8 @@ Test targets and test-support targets are described below each package. The chec
   - `SampleCVSource`, `IDGenerator`, `TimeSource`. `TimeSource` is so named to avoid shadowing `Swift.Clock`.
 - **Use cases:**
   - `NewCV`, `SaveCV` (create or conditional update, errors translated to `AuthoringError`, including `tooLarge`), `LoadCV`;
-  - list (by last change), rename, duplicate, delete, start from a sample, determine onboarding.
+  - list (by last change), rename, duplicate, delete, start from a sample, determine onboarding;
+  - `ChangeStoredCV`: renames a stored CV (trimmed, never blank) or sets the language of its PDF, reading it again just before it is stored, so nothing else changes. It works through the `StoredCVs` port, generic over the store's own CV, which the legacy app implements over its stored CVs until the migration replaces them ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)).
 - **Listing** returns the healthy CVs plus `StoreIssue`s: `corrupt`, `upgradeRequired`, `unreadable`, `tooLarge`, `quarantineFailed`.
 
 **`PrestoCVPersistence`**
@@ -234,6 +243,10 @@ A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-
 | `DesignSystem/` | tokens and reusable components | SwiftUI |
 | `Platform/` | the platform shims: iOS-only modifiers wrapped for `Features/`, HTML and PDF previews, sharing, pasteboard, file import and export | SwiftUI, UIKit, AppKit, WebKit, PDFKit, QuickLook, UniformTypeIdentifiers, `CVRenderingWebKitSupport`, `PrestoCVPresentation` |
 | `Resources/` | `Localizable.xcstrings`, sample CV JSON, assets | — |
+
+**The legacy target `PrestoCV`**, which version 1 ships ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), imports the legacy `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI`, and also `PrestoCVDomain` and `PrestoCVApplication`, whose rules its view models call ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)):
+- it imports each declaration of the two by name (`import struct PrestoCVDomain.ExportPolicy`), since the legacy `PrestoCVCore` declares types with the same names;
+- its adapters from the legacy `CVModel` to the plain values the rules read are in `PrestoCV/Shared/CoreRules/`;
 
 ---
 

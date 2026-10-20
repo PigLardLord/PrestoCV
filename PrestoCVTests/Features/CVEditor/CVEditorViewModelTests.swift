@@ -109,13 +109,13 @@ actor MockCVManagementUseCase: CVManagementUseCaseProtocol {
         return Array(storedCVs.values)
     }
 
-    func duplicateCV(id: UUID) async throws -> CVModel {
+    func duplicateCV(id: UUID, named name: String) async throws -> CVModel {
         guard let original = storedCVs[id] else {
             throw AppError.notFound("CV with id \(id)")
         }
         var duplicate = original
         duplicate.id = UUID()
-        duplicate.name = "\(original.name) Copy"
+        duplicate.name = name
         storedCVs[duplicate.id] = duplicate
         return duplicate
     }
@@ -192,7 +192,7 @@ actor GatedCVManagementUseCase: CVManagementUseCaseProtocol {
     func getCV(by id: UUID) async throws -> CVModel? { storedCV }
     func getAllCVs() async throws -> [CVModel] { [] }
     func deleteCV(id: UUID) async throws {}
-    func duplicateCV(id: UUID) async throws -> CVModel { throw AppError.notFound("CV with id \(id)") }
+    func duplicateCV(id: UUID, named name: String) async throws -> CVModel { throw AppError.notFound("CV with id \(id)") }
 }
 
 private extension ViewState {
@@ -943,6 +943,20 @@ struct CVEditorViewModelTests {
         #expect(viewModel.showsSavedConfirmation == false)
     }
 
+    @Test("The error alert tells why the save failed, and has nothing to tell before")
+    func errorAlertTellsWhyTheSaveFailed() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let failure = AppError.fileSystemError("disk full")
+        await mockUseCase.setCreateCVResult(.failure(failure))
+        let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: mockUseCase)
+        viewModel.cv.personalInfo.name = "John Doe"
+        #expect(viewModel.errorMessage.isEmpty)
+
+        _ = await viewModel.saveCV()
+
+        #expect(viewModel.errorMessage == failure.localizedDescription)
+    }
+
     @Test("After a failed create the next save creates the CV")
     func saveAfterFailedCreateCreatesCV() async {
         let mockUseCase = MockCVManagementUseCase()
@@ -1005,6 +1019,17 @@ struct CVEditorViewModelTests {
 
         #expect(await mockUseCase.getCVCallCount == 1, "A CV already loaded must not be read again")
         #expect(viewModel.cv.personalInfo.phone == "+1234567890", "A second load must not drop the edits")
+    }
+
+    @Test("A CV deleted before its editor opens is reported as not found")
+    func deletedCVIsNotFound() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let viewModel = CVEditorViewModel(cvId: UUID().uuidString, cvManagementUseCase: mockUseCase)
+
+        await viewModel.loadCV()
+
+        #expect(viewModel.viewState.errorMessage == AppError.notFound("error.subject.cv".localized).localizedDescription)
+        #expect(await mockUseCase.getCVCallCount == 1)
     }
 
     @Test("A failed load shows the error and a retry reads the CV again")

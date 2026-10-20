@@ -28,5 +28,6 @@ struct FieldStatus: Equatable {
 
     let validity: Validity
     let isRequired: Bool
-    let note: Note
+    /// The line under the field; nil when the field has none
+    let note: Note?
 }

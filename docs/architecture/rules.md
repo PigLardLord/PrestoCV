@@ -92,7 +92,7 @@ Only `PrestoCVComposition` creates infrastructure: repositories, stores, rendere
 - **Behaviour, not fields.** Aggregates and entities expose behaviour, not `public var` fields. State changes go through methods.
 - **Repository-owned state.** The revision and the timestamps are assigned only by repositories (`package` access).
 - **Value objects validate on creation.** `SkillLevel` is bounded. `PartialDate` has year or month precision, and only a partial order. `EmailAddress` and `WebLink` are parsed. Identifiers are typed.
-- **A rule exists once.** Periods are built only by `Period.make(start:end:current:)`, which both persistence and the AI mapper use. A second copy anywhere is a defect.
+- **A rule exists once.** Periods are built only by `Period.make(start:end:current:)`, which both persistence and the AI mapper use. "Has enough content to be saved" is `SaveRule`, which `CV.canBeSaved` and the legacy app's editor both read. A second copy anywhere is a defect.
 - **Two separate validity rules, by design.** "Can be saved" is Authoring's rule. "Can be rendered" is the rendering policy of the published `CVDocument`. A test asserts that every saveable CV maps to a renderable document.
 
 **Why.** Today there are four definitions of "valid CV", three skill scales, three language-level parsers and four period formats.

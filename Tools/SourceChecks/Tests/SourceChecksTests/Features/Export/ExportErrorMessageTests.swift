@@ -14,7 +14,7 @@ struct ExportErrorMessageTests {
         )
         let strings = try #require(catalog["strings"] as? [String: Any])
         let keys = [
-            "export.error.too_many_pages", "export.error.missing_name_email", "export.error.template_unavailable",
+            "export.error.too_many_pages", "export.readiness.name_required", "export.error.template_unavailable",
             "export.error.failed", "export.error.preview_failed", "export.error.no_templates"
         ]
 

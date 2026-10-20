@@ -23,7 +23,7 @@ actor CVExportService: CVExportServiceProtocol {
     /// - Parameter temporaryDirectory: Where each export gets a folder of its own; the system's by default
     init(
         container: PDFExportDependencyContainer = PDFExportDependencyContainer(),
-        fileNames: ExportFileName = ExportFileName(),
+        fileNames: ExportFileName = ExportFileName(titlePattern: DocumentTitlePatterns(bundle: .main).pattern(in:)),
         temporaryDirectory: URL = FileManager.default.temporaryDirectory
     ) {
         self.container = container
@@ -49,7 +49,7 @@ actor CVExportService: CVExportServiceProtocol {
         let personName = cv.personalInfo.name
         let author = personName.trimmingCharacters(in: .whitespacesAndNewlines)
         let documentOptions = options.withDocumentInfo(
-            title: fileNames.title(personName: personName, cvName: cv.name),
+            title: fileNames.title(for: cv),
             author: author.isEmpty ? nil : author
         )
 
@@ -61,7 +61,7 @@ actor CVExportService: CVExportServiceProtocol {
             options: documentOptions
         )
 
-        let url = try writePDF(result.pdfData, fileName: fileNames.fileName(personName: personName, cvName: cv.name))
+        let url = try writePDF(result.pdfData, fileName: fileNames.fileName(for: cv))
         let thumbnail = await PDFThumbnail.pngData(from: result.pdfData)
         return ExportedPDF(url: url, pageCount: result.pageCount, thumbnail: thumbnail)
     }

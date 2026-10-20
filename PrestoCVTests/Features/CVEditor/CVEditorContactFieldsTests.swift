@@ -11,42 +11,71 @@ struct CVEditorContactFieldsTests {
         CVEditorViewModel(cvId: nil, initialCV: CVModel(personalInfo: personalInfo), cvManagementUseCase: MockCVManagementUseCase())
     }
 
+    /// An editor whose contact fields the person has just left
+    private func left(_ personalInfo: PersonalInfo) -> CVEditorViewModel {
+        let viewModel = editor(personalInfo)
+        [ContactField.email, .phone, .portfolio].forEach(viewModel.fieldWasLeft)
+        return viewModel
+    }
+
     // MARK: - E-mail address
 
-    @Test("The e-mail field is required, and says so until the address is not one", arguments: [
+    @Test("The name is the required field: a PDF is made only with it")
+    func nameIsRequired() {
+        #expect(editor(PersonalInfo()).nameStatus == FieldStatus(validity: .none, isRequired: true, note: .required))
+    }
+
+    @Test("The e-mail field is optional, and valid once it holds an address", arguments: [
         ("", FieldStatus.Validity.none),
         ("ada@example.com", .valid),
     ])
-    func emailIsRequired(email: String, validity: FieldStatus.Validity) {
-        #expect(editor(PersonalInfo(email: email)).emailStatus == FieldStatus(validity: validity, isRequired: true, note: .required))
+    func emailIsOptional(email: String, validity: FieldStatus.Validity) {
+        #expect(left(PersonalInfo(email: email)).emailStatus == FieldStatus(validity: validity, isRequired: false, note: nil))
     }
 
-    @Test("An address that is not one is marked invalid, and the line under it says so")
-    func invalidEmailIsMarked() {
-        #expect(editor(PersonalInfo(email: "ada.example.com")).emailStatus == FieldStatus(validity: .invalid, isRequired: true, note: .invalidEmail))
+    @Test("An address that is not one is marked invalid, and the line under it says so", arguments: ["ada.example.com", "clara.weiss@", "name@"])
+    func invalidEmailIsMarked(email: String) {
+        #expect(left(PersonalInfo(email: email)).emailStatus == FieldStatus(validity: .invalid, isRequired: false, note: .invalidEmail))
     }
 
-    @Test("The e-mail field follows the form as it changes")
-    func emailFollowsTheForm() {
+    @Test("A field is checked when the person leaves it, not at every key")
+    func fieldIsCheckedWhenLeft() {
         let viewModel = editor(PersonalInfo())
 
-        viewModel.cv.personalInfo.email = "ada"
+        viewModel.cv.personalInfo.email = "clara.weiss@"
+        #expect(viewModel.emailStatus.validity == .none, "Still typing: nothing is said yet")
+
+        viewModel.fieldWasLeft(.email)
         #expect(viewModel.emailStatus.validity == .invalid)
 
-        viewModel.cv.personalInfo.email = "ada@example.com"
+        viewModel.cv.personalInfo.email = "clara.weiss@beispiel.de"
+        #expect(viewModel.emailStatus.validity == .invalid, "Typing again changes nothing until the field is left")
+
+        viewModel.fieldWasLeft(.email)
         #expect(viewModel.emailStatus.validity == .valid)
+    }
+
+    @Test("Leaving one field checks that field only")
+    func leavingChecksOneField() {
+        let viewModel = editor(PersonalInfo(email: "ada", phone: "call me", portfolio: "ada.dev"))
+
+        viewModel.fieldWasLeft(.phone)
+
+        #expect(viewModel.phoneStatus.validity == .warning)
+        #expect(viewModel.emailStatus.validity == .none)
+        #expect(viewModel.portfolioStatus.validity == .none)
     }
 
     // MARK: - Phone number
 
     @Test("A phone with digits, or none, gets the help of the field", arguments: ["", "+39 06 1234567"])
     func phoneGetsItsHelp(phone: String) {
-        #expect(editor(PersonalInfo(phone: phone)).phoneStatus == FieldStatus(validity: .none, isRequired: false, note: .phoneHelp))
+        #expect(left(PersonalInfo(phone: phone)).phoneStatus == FieldStatus(validity: .none, isRequired: false, note: .phoneHelp))
     }
 
     @Test("A phone without a digit gets a warning, which does not stop the save")
     func phoneWithoutDigitsWarns() async {
-        let viewModel = editor(PersonalInfo(name: "Ada Lovelace", phone: "call me"))
+        let viewModel = left(PersonalInfo(name: "Ada Lovelace", phone: "call me"))
 
         #expect(viewModel.phoneStatus == FieldStatus(validity: .warning, isRequired: false, note: .phoneWithoutDigits))
         #expect(await viewModel.saveCV())
@@ -54,13 +83,14 @@ struct CVEditorContactFieldsTests {
 
     // MARK: - Web address
 
-    @Test("The portfolio is valid with http, doubtful without, and unmarked when empty", arguments: [
+    @Test("The portfolio is valid with http or https and a host, doubtful without, and unmarked when empty", arguments: [
         ("", FieldStatus.Validity.none),
         ("https://ada.dev", .valid),
         ("ada.dev", .warning),
+        ("https://", .warning),
     ])
     func portfolioIsChecked(portfolio: String, validity: FieldStatus.Validity) {
-        #expect(editor(PersonalInfo(portfolio: portfolio)).portfolioStatus == FieldStatus(validity: validity, isRequired: false, note: .webAddressHelp))
+        #expect(left(PersonalInfo(portfolio: portfolio)).portfolioStatus == FieldStatus(validity: validity, isRequired: false, note: .webAddressHelp))
     }
 
     // MARK: - What the field shows

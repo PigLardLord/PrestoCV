@@ -38,7 +38,7 @@ struct ExportTestEnvironment {
     func makeService() -> CVExportService {
         CVExportService(
             container: PDFExportDependencyContainer(templateRepository: repository),
-            fileNames: ExportFileName(titlePattern: "%@ – CV"),
+            fileNames: ExportFileName(titlePattern: { _ in "%@ – CV" }),
             temporaryDirectory: exportsDirectory
         )
     }
@@ -51,6 +51,7 @@ struct ExportTestEnvironment {
             exportService: makeService(),
             preferencesStore: InMemoryExportPreferencesStore(),
             documentLanguageSink: { _ in },
+            exportPolicy: .standard,
             previewDebounce: .zero
         )
         viewModel.selectedTemplateId = design

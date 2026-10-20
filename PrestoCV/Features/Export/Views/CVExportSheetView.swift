@@ -36,6 +36,17 @@ struct CVExportSheetView: View {
                         previewFooter
                     }
 
+                    if let warning = viewModel.shareWarning {
+                        Label(warning, systemImage: "exclamationmark.circle")
+                            .typography(.footnote)
+                            .foregroundColor(DesignTokens.Colors.secondary)
+                            .multilineTextAlignment(.center)
+                            // The sentence is shown whole, as the one below; the PDF is made all the same
+                            .fixedSize(horizontal: false, vertical: true)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+                            .padding(.horizontal, DesignTokens.Spacing.lg)
+                    }
+
                     if let blocker = viewModel.shareBlocker {
                         Label(blocker, systemImage: "info.circle")
                             .typography(.footnote)
@@ -538,7 +549,8 @@ private extension FontScheme {
             cv: mockCV,
             exportService: CVExportService(),
             preferencesStore: PreviewExportPreferencesStore(),
-            documentLanguageSink: { _ in }
+            documentLanguageSink: { _ in },
+            exportPolicy: .standard
         )
     )
 }

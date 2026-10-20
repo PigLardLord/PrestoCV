@@ -2,6 +2,8 @@ import Combine
 import Foundation
 import PrestoCVCore
 import CVPDFExporter
+import struct PrestoCVDomain.ExportPolicy
+import struct PrestoCVDomain.ExportReadiness
 
 /// What the user chose in the export sheet: while the sheet is shown, each change of it makes a new preview.
 struct ExportSelection: Equatable {
@@ -39,6 +41,8 @@ final class CVExportSheetViewModel: ObservableObject {
     @Published private(set) var sharePDF: ExportedPDF?
     /// Why no PDF is made for this CV, in words the user can act on; nil when the CV can be exported
     @Published private(set) var shareBlocker: String?
+    /// What the PDF lacks, though it is made, in words the user can act on; nil when it lacks nothing
+    @Published private(set) var shareWarning: String?
     /// How the last share of this PDF ended, when it went through
     @Published private(set) var shareOutcome: ShareOutcome?
     @Published var errorMessage: String?
@@ -51,15 +55,11 @@ final class CVExportSheetViewModel: ObservableObject {
         case sent
     }
 
-    /// The longest CV the export accepts, for the preview and for the PDF alike
-    static let maxPages = 10
-
-    /// The white border of every page, in points (0.6 in); the 1 in default leaves too little room for text on A4
-    static let pageMargin: Double = 43
-
     /// The activity of the share sheet that saves a file to Files
     static let saveToFilesActivity = "com.apple.DocumentManagerUICore.SaveToFiles"
 
+    /// How the CV is exported: the page, its border, the longest CV, and what a CV needs before it is exported
+    let exportPolicy: ExportPolicy
     /// The CV the sheet exports
     private let cv: CVModel
     private let exportService: any CVExportServiceProtocol
@@ -141,6 +141,7 @@ final class CVExportSheetViewModel: ObservableObject {
     ///   - exportService: Makes the preview and the PDF.
     ///   - preferencesStore: Keeps the design chosen last, for the next export.
     ///   - documentLanguageSink: Takes each language chosen in the sheet, for the CV to keep.
+    ///   - exportPolicy: How the CV is exported, for the preview and the PDF alike.
     ///   - previewDebounce: How long a selection must stay put before its preview is made, so that changing the
     ///     template, the palette and the font in quick succession makes one preview and one PDF
     init(
@@ -148,6 +149,7 @@ final class CVExportSheetViewModel: ObservableObject {
         exportService: any CVExportServiceProtocol,
         preferencesStore: any ExportPreferencesStore,
         documentLanguageSink: @escaping DocumentLanguageSink,
+        exportPolicy: ExportPolicy,
         documentLanguageDetector: DocumentLanguageDetector = .onDevice,
         previewDebounce: Duration = .milliseconds(250)
     ) {
@@ -155,6 +157,7 @@ final class CVExportSheetViewModel: ObservableObject {
         self.exportService = exportService
         self.preferencesStore = preferencesStore
         self.documentLanguageSink = documentLanguageSink
+        self.exportPolicy = exportPolicy
         self.previewDebounce = previewDebounce
         selection = ExportSelection(
             templateId: nil,
@@ -203,7 +206,9 @@ final class CVExportSheetViewModel: ObservableObject {
         var printedCV = cv
         printedCV.documentLanguage = documentLanguage.rawValue
         shareOutcome = nil
-        shareBlocker = Self.shareBlocker(for: cv)
+        let readiness = ExportReadiness(name: cv.personalInfo.name, email: cv.personalInfo.email, phone: cv.personalInfo.phone)
+        shareBlocker = Self.blockerText(for: readiness)
+        shareWarning = Self.warningText(for: readiness)
         isPreviewLoading = selectedTemplateId != nil
         isPreparingPDF = selectedTemplateId != nil && shareBlocker == nil
 
@@ -259,14 +264,14 @@ final class CVExportSheetViewModel: ObservableObject {
 
     func currentExportOptions() -> ExportOptions {
         ExportOptions(
-            pageSize: .a4,
-            margins: .uniform(Self.pageMargin),
+            pageSize: PageSize(width: exportPolicy.pageWidth, height: exportPolicy.pageHeight),
+            margins: .uniform(exportPolicy.margin),
             templateId: selectedTemplateId,
             customization: CustomizationOptions(
                 colorPalette: selectedColorPalette,
                 fontScheme: selectedFontScheme
             ),
-            maxPages: Self.maxPages
+            maxPages: exportPolicy.maxPages
         )
     }
 
@@ -339,12 +344,20 @@ final class CVExportSheetViewModel: ObservableObject {
         }
     }
 
-    /// The exporter refuses a document without a name or an email; say so beforehand, next to the preview,
+    /// What keeps the CV from being exported, by `ExportReadiness`: the name, said beforehand, next to the preview,
     /// instead of in an alert when the sheet opens
-    private static func shareBlocker(for cv: CVModel) -> String? {
-        let hasName = !cv.personalInfo.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let hasEmail = !cv.personalInfo.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return hasName && hasEmail ? nil : String(localized: "export.error.missing_name_email")
+    private static func blockerText(for readiness: ExportReadiness) -> String? {
+        readiness.blockers.contains(.name) ? String(localized: "export.readiness.name_required") : nil
+    }
+
+    /// What the PDF lacks, by `ExportReadiness`: a way to reach the person, which it is still made without
+    private static func warningText(for readiness: ExportReadiness) -> String? {
+        switch (readiness.warnings.contains(.email), readiness.warnings.contains(.phone)) {
+        case (true, true): return String(localized: "export.readiness.no_email_phone")
+        case (true, false): return String(localized: "export.readiness.no_email")
+        case (false, true): return String(localized: "export.readiness.no_phone")
+        case (false, false): return nil
+        }
     }
 
     /// A result belongs to the request that is current, and only while the task that made it is not cancelled

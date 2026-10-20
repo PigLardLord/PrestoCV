@@ -119,7 +119,8 @@ struct LocalizationCatalogTests {
 
     /// Texts that read the same in every language: symbols, abbreviations, formats.
     fileprivate static let sameInEveryLanguage: Set<String> = [
-        "%@. %@", "ai.generation.character_count", "common.ok", "export.font_preview_sample", "field.url", "format.required_indicator",
+        "%@. %@", "ai.generation.character_count", "common.ok", "cv.title.numbered", "export.font_preview_sample", "field.url",
+        "format.required_indicator",
     ]
 
     /// Words that happen to be written the same in English and in these languages.

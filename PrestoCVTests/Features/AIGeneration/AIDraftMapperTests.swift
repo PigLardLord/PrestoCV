@@ -7,7 +7,7 @@ import CVGeneratorAI
 @Suite("AIDraftMapper Tests")
 struct AIDraftMapperTests {
     /// Words that appear nowhere in the mapper, so a test fails if it falls back to English.
-    private let labels = AIDraftLabels(present: "Oggi", untitled: "Nuovo CV", cvNameFormat: "CV di %@")
+    private let labels = AIDraftLabels(present: "Oggi")
 
     private func map(_ cvData: CVData, writtenIn description: String = "A description.", language: String? = nil) -> CVModel {
         AIDraftMapper(labels: labels, languageOfText: { _ in language }).map(cvData, writtenIn: description)
@@ -15,19 +15,25 @@ struct AIDraftMapperTests {
 
     // MARK: - CV name and personal info
 
-    @Test("The CV is named after the person with the injected format")
-    func cvNameUsesTheFormat() {
-        let cv = map(CVData(personalInfo: CVGeneratorAI.PersonalInfo(name: "Maria Rossi")))
+    @Test("A draft has no name of its own, whatever the model found", arguments: [
+        ("Maria Rossi", "Infermiera"), (nil, "Infermiera"), (nil, nil), ("   ", nil),
+    ] as [(String?, String?)])
+    func draftHasNoName(person: String?, role: String?) {
+        let cv = map(CVData(personalInfo: CVGeneratorAI.PersonalInfo(name: person, title: role)))
 
-        #expect(cv.name == "CV di Maria Rossi")
-        #expect(cv.personalInfo.name == "Maria Rossi")
+        #expect(cv.name.isEmpty)
     }
 
-    @Test("Without a name the CV gets the untitled label", arguments: [nil, "", "   "] as [String?])
-    func cvNameFallsBackToUntitled(name: String?) {
-        let cv = map(CVData(personalInfo: CVGeneratorAI.PersonalInfo(name: name)))
+    @MainActor
+    @Test("The list calls a draft by its person, and a draft with only a role by its role", arguments: [
+        ("Maria Rossi", "Infermiera", "Maria Rossi"), (nil, "Infermiera", "Infermiera"),
+    ] as [(String?, String, String)])
+    func draftIsListedByTheTitleRule(person: String?, role: String, listed: String) {
+        let draft = map(CVData(personalInfo: CVGeneratorAI.PersonalInfo(name: person, title: role)))
+        let list = CVListViewModel(cvManagementUseCase: MockCVManagementUseCase())
 
-        #expect(cv.name == "Nuovo CV")
+        #expect(list.title(of: draft) == listed)
+        #expect(draft.personalInfo.name == (person ?? ""))
     }
 
     @Test("Personal fields are copied and the summary becomes the profile")

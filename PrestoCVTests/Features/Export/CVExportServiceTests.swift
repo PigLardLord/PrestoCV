@@ -5,6 +5,7 @@ import UIKit
 @testable import PrestoCV
 @testable import PrestoCVCore
 @testable import CVPDFExporter
+import struct PrestoCVDomain.ExportPolicy
 
 // MARK: - CVExportService Tests
 
@@ -14,7 +15,7 @@ struct CVExportServiceTests {
 
     private static let cv = CVDocumentAdapter().convertToCVModel(from: SampleCVData.complete)
 
-    private func options(templateId: String, maxPages: Int = CVExportSheetViewModel.maxPages) -> ExportOptions {
+    private func options(templateId: String, maxPages: Int = ExportPolicy.standard.maxPages) -> ExportOptions {
         ExportOptions(templateId: templateId, maxPages: maxPages)
     }
 
@@ -38,7 +39,7 @@ struct CVExportServiceTests {
         // Then
         let document = try #require(PDFDocument(url: exported.url))
         #expect(document.pageCount >= 1)
-        #expect(document.pageCount <= CVExportSheetViewModel.maxPages)
+        #expect(document.pageCount <= ExportPolicy.standard.maxPages)
         // A template may set its text in capitals, and a long line wraps: compare words, ignoring case
         let words = (document.string ?? "").split(whereSeparator: \.isWhitespace).joined(separator: " ")
         #expect(words.localizedCaseInsensitiveContains("Maya Chen"))
@@ -185,5 +186,17 @@ struct CVExportServiceTests {
         // Then: the folder that holds it is not an export folder, so it stays with its other files
         #expect(!FileManager.default.fileExists(atPath: strayFile.path))
         #expect(FileManager.default.fileExists(atPath: neighbour.path))
+    }
+
+    // MARK: - Designs
+
+    @Test("the designs on offer are the ones that ship with the app", .timeLimit(.minutes(2)))
+    func offersTheBundledDesigns() async throws {
+        let environment = try await ExportTestEnvironment.make()
+        defer { environment.cleanUp() }
+
+        let designs = try await environment.makeService().availableTemplates()
+
+        #expect(Set(designs.map(\.id)) == ["professional", "modern", "minimal"])
     }
 }

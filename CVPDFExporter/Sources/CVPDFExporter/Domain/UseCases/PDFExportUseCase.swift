@@ -102,9 +102,6 @@ public actor PDFExportUseCase {
         guard !document.personalInfo.name.isEmpty else {
             throw PDFExportError.invalidContent("Document must have a name")
         }
-        guard !document.personalInfo.email.isEmpty else {
-            throw PDFExportError.invalidContent("Document must have an email")
-        }
     }
 
     /// The number of pages the PDF has, read from the document itself

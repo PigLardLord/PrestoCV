@@ -94,7 +94,8 @@ final class ViewModelFactory {
             cv: cv,
             exportService: CVExportService(),
             preferencesStore: FileExportPreferencesStore(),
-            documentLanguageSink: documentLanguageSink
+            documentLanguageSink: documentLanguageSink,
+            exportPolicy: .standard
         )
     }
 
@@ -138,10 +139,6 @@ final class ViewModelFactory {
     }
 
     private func makeAIDraftLabels() -> AIDraftLabels {
-        return AIDraftLabels(
-            present: String(localized: "template.present"),
-            untitled: String(localized: "editor.new_cv"),
-            cvNameFormat: String(localized: "ai.draft.cv_name")
-        )
+        return AIDraftLabels(present: String(localized: "template.present"))
     }
 }

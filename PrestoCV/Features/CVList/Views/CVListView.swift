@@ -126,7 +126,7 @@ struct CVListView<EmptyState: View>: View {
         DeletableList(items: viewModel.cvs) { cv in
             CVRowView(
                 title: viewModel.title(of: cv),
-                subtitle: viewModel.personLine(of: cv),
+                subtitle: viewModel.subtitle(of: cv),
                 caption: viewModel.lastSavedLine(of: cv),
                 onTap: {
                     router.select(.stored(cvId: cv.id.uuidString))
@@ -135,7 +135,7 @@ struct CVListView<EmptyState: View>: View {
                     Task { await viewModel.duplicateCV(withId: cv.id) }
                 },
                 onRename: {
-                    renameText = cv.name
+                    renameText = viewModel.title(of: cv)
                     renameTarget = cv
                 },
                 onExport: {
@@ -224,7 +224,8 @@ struct CVListView_Previews: PreviewProvider {
             cv: cv,
             exportService: CVExportService(),
             preferencesStore: PreviewExportPreferencesStore(),
-            documentLanguageSink: { _ in }
+            documentLanguageSink: { _ in },
+            exportPolicy: .standard
         )
     }
     
@@ -233,7 +234,8 @@ struct CVListView_Previews: PreviewProvider {
             CVModel(name: "Backend Engineer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Software Engineer")),
             CVModel(name: "Product Designer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Designer")),
         ]
-        return CVListViewModel(cvManagementUseCase: PreviewDependencies.cvManagement(cvs: cvs))
+        let cvManagement = PreviewDependencies.cvManagement(cvs: cvs)
+        return CVListViewModel(cvManagementUseCase: cvManagement, storedCVChanges: .init(cvs: ManagedStoredCVs(cvs: cvManagement)))
     }
 }
 #endif

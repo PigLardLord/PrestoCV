@@ -17,7 +17,7 @@ enum ExportErrorMessage {
         case PDFExportError.tooManyPages(let count, let limit):
             return String(format: String(localized: "export.error.too_many_pages"), count, limit)
         case PDFExportError.invalidContent:
-            return String(localized: "export.error.missing_name_email")
+            return String(localized: "export.readiness.name_required")
         case PDFExportError.templateError, TemplateError.templateNotFound, TemplateError.invalidTemplate:
             return String(localized: "export.error.template_unavailable")
         default:

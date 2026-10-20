@@ -93,11 +93,13 @@ public protocol CVManagementUseCaseProtocol: Sendable {
     /// - Throws: AppError if deletion fails
     func deleteCV(id: UUID) async throws
     
-    /// Creates a duplicate copy of an existing CV
-    /// - Parameter id: The UUID of the CV to duplicate
-    /// - Returns: The new duplicated CVModel with a unique ID and modified name
+    /// Stores a copy of an existing CV, under a new identity
+    /// - Parameters:
+    ///   - id: The UUID of the CV to duplicate
+    ///   - name: The name of the copy, which the caller gives it by the rule of PrestoCVDomain (`CVTitle.copyName`)
+    /// - Returns: The copy, as stored
     /// - Throws: AppError if source CV doesn't exist or duplication fails
-    func duplicateCV(id: UUID) async throws -> CVModel
+    func duplicateCV(id: UUID, named name: String) async throws -> CVModel
     
     /// Retrieves a specific CV by its unique identifier
     /// - Parameter id: The UUID of the CV to retrieve
