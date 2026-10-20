@@ -7,7 +7,7 @@ struct CVEditorView: View {
     private let makeExportSheet: @MainActor (CVEditorViewModel) -> CVExportSheetViewModel
     @State private var showingExportSheet = false
     @State private var deletionAnchor = RowDeletionAnchor()
-    @StateObject private var keyboard = KeyboardVisibility()
+    @StateObject private var keyboard = KeyboardVisibility(notificationCenter: .default)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
@@ -243,14 +243,8 @@ struct CVEditorView: View {
 struct CVEditorView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            CVEditorView(viewModel: CVEditorViewModel(cvId: nil, cvManagementUseCase: PreviewDependencies.cvManagement())) { editor in
-                CVExportSheetViewModel(
-                    cv: editor.cv,
-                    exportService: CVExportService(),
-                    preferencesStore: PreviewExportPreferencesStore(),
-                    documentLanguageSink: { editor.documentLanguageSelection = $0 },
-                    exportPolicy: .standard
-                )
+            CVEditorView(viewModel: PreviewDependencies.editor()) { editor in
+                PreviewDependencies.exportSheet(for: editor.cv, sink: { editor.documentLanguageSelection = $0 })
             }
         }
         .environmentObject(AppRouter())

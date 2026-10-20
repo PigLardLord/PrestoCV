@@ -220,22 +220,14 @@ struct CVListView_Previews: PreviewProvider {
     }
     
     private static func makeExportSheet(_ cv: CVModel) -> CVExportSheetViewModel {
-        CVExportSheetViewModel(
-            cv: cv,
-            exportService: CVExportService(),
-            preferencesStore: PreviewExportPreferencesStore(),
-            documentLanguageSink: { _ in },
-            exportPolicy: .standard
-        )
+        PreviewDependencies.exportSheet(for: cv, sink: { _ in })
     }
     
     private static func makeViewModel() -> CVListViewModel {
-        let cvs = [
+        PreviewDependencies.list(of: [
             CVModel(name: "Backend Engineer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Software Engineer")),
             CVModel(name: "Product Designer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Designer")),
-        ]
-        let cvManagement = PreviewDependencies.cvManagement(cvs: cvs)
-        return CVListViewModel(cvManagementUseCase: cvManagement, storedCVChanges: .init(cvs: ManagedStoredCVs(cvs: cvManagement)))
+        ])
     }
 }
 #endif

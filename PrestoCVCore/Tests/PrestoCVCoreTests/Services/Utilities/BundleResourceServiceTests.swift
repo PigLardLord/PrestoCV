@@ -9,14 +9,6 @@ struct BundleResourceServiceTests {
     
     // MARK: - Initialization Tests
     
-    @Test("BundleResourceService initializes with default main bundle")
-    func initializesWithDefaultBundle() async {
-        let service = BundleResourceService()
-        
-        let url = await service.getResourceURL(forResource: "nonexistent_file", withExtension: "json")
-        #expect(url == nil)
-    }
-    
     @Test("BundleResourceService initializes with custom bundle")
     func initializesWithCustomBundle() async {
         let service = BundleResourceService(bundle: Bundle.main)

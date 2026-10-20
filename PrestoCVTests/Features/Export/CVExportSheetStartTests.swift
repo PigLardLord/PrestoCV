@@ -22,6 +22,8 @@ struct CVExportSheetStartTests {
             preferencesStore: InMemoryExportPreferencesStore(stored: stored),
             documentLanguageSink: { _ in },
             exportPolicy: .standard,
+            documentLanguageDetector: englishDocumentLanguageDetector,
+            appLocale: Locale(identifier: "en"),
             previewDebounce: .zero
         )
     }

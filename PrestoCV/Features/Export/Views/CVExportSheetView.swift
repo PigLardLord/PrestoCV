@@ -544,15 +544,7 @@ private extension FontScheme {
     let adapter = CVDocumentAdapter()
     let mockCV = adapter.convertToCVModel(from: SampleCVData.complete)
 
-    return CVExportSheetView(
-        viewModel: CVExportSheetViewModel(
-            cv: mockCV,
-            exportService: CVExportService(),
-            preferencesStore: PreviewExportPreferencesStore(),
-            documentLanguageSink: { _ in },
-            exportPolicy: .standard
-        )
-    )
+    return CVExportSheetView(viewModel: PreviewDependencies.exportSheet(for: mockCV, sink: { _ in }))
 }
 #endif
 

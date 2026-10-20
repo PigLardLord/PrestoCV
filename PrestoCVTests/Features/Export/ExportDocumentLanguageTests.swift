@@ -35,6 +35,7 @@ struct ExportDocumentLanguageTests {
             documentLanguageSink: { _ in },
             exportPolicy: .standard,
             documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: [appLanguage], read: NaturalLanguageReader.read),
+            appLocale: Locale(identifier: "en"),
             previewDebounce: .zero
         )
         viewModel.selectedTemplateId = "professional"

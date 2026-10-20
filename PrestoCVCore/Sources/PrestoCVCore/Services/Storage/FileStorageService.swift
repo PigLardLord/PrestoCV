@@ -25,7 +25,7 @@ public actor FileStorageService: StorageServiceProtocol{
     private let fileExtension = "json"
     private let logger = Logger(subsystem: "com.PigLardLord.prestocv", category: "storage")
 
-    public init(fileManager: FileManager = .default, baseDirectory: URL) throws {
+    public init(fileManager: FileManager, baseDirectory: URL) throws {
         self.fileManager = fileManager
         self.baseDirectory = baseDirectory
 

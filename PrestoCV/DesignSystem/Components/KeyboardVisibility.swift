@@ -9,7 +9,7 @@ final class KeyboardVisibility: ObservableObject {
     private let notificationCenter: NotificationCenter
     private var observers: [NSObjectProtocol] = []
 
-    init(notificationCenter: NotificationCenter = .default) {
+    init(notificationCenter: NotificationCenter) {
         self.notificationCenter = notificationCenter
         let show = notificationCenter.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.isVisible = true }

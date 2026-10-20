@@ -1,6 +1,7 @@
 #if DEBUG
 import Foundation
 import PrestoCVCore
+import CVPDFExporter
 
 /// What the previews give the screens in place of the stores of the app: CVs, examples and an export choice kept in
 /// memory, so that a preview neither reads nor writes the device.
@@ -12,6 +13,53 @@ enum PreviewDependencies {
 
     /// The examples of a preview
     static let samples: SampleCVRepositoryProtocol = PreviewSampleCVRepository()
+
+    /// Reads the language of a preview's CV, and falls back to English
+    static let documentLanguageDetector = DocumentLanguageDetector(preferredLanguages: ["en"], read: NaturalLanguageReader.read)
+
+    /// The editor of a new CV
+    @MainActor
+    static func editor() -> CVEditorViewModel {
+        CVEditorViewModel(cvId: nil, cvManagementUseCase: cvManagement(), documentLanguageDetector: documentLanguageDetector, sleep: { _ in })
+    }
+
+    /// The export sheet of `cv`, which hands the language chosen to `sink`
+    @MainActor
+    static func exportSheet(for cv: CVModel, sink: @escaping DocumentLanguageSink) -> CVExportSheetViewModel {
+        CVExportSheetViewModel(
+            cv: cv,
+            exportService: CVExportService(
+                container: PDFExportDependencyContainer(),
+                fileNames: ExportFileName(titlePattern: { _ in "%@ – CV" }),
+                temporaryDirectory: FileManager.default.temporaryDirectory
+            ),
+            preferencesStore: PreviewExportPreferencesStore(),
+            documentLanguageSink: sink,
+            exportPolicy: .standard,
+            documentLanguageDetector: documentLanguageDetector,
+            appLocale: Locale(identifier: "en")
+        )
+    }
+
+    /// The list of `cvs`, told in English on a fixed day
+    @MainActor
+    static func list(of cvs: [CVModel]) -> CVListViewModel {
+        let management = cvManagement(cvs: cvs)
+        return CVListViewModel(
+            cvManagementUseCase: management,
+            storedCVChanges: .init(cvs: ManagedStoredCVs(cvs: management)),
+            locale: Locale(identifier: "en"),
+            now: { Date(timeIntervalSinceReferenceDate: 800_000_000) },
+            calendar: { Calendar(identifier: .gregorian) },
+            sleep: { _ in }
+        )
+    }
+
+    /// The ways to start a new CV, with the AI draft available
+    @MainActor
+    static func newCVChoices() -> NewCVChoicesViewModel {
+        NewCVChoicesViewModel(aiAvailability: { .available }, sampleRepository: samples, pause: {})
+    }
 }
 
 /// CVs kept in memory, listed by name.

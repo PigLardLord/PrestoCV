@@ -39,7 +39,7 @@ final class NewCVChoicesViewModel: ObservableObject {
     init(
         aiAvailability: @escaping AIAvailabilityProvider,
         sampleRepository: SampleCVRepositoryProtocol,
-        pause: @escaping AIAvailabilityPause = { try await Task.sleep(for: NewCVChoicesViewModel.downloadCheckInterval) },
+        pause: @escaping AIAvailabilityPause,
         isAIShipped: Bool = AIFeature.isShipped,
         platform: AIPlatform = .iPhoneOrIPad
     ) {

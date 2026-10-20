@@ -54,7 +54,7 @@ final class UnsavedEditsKeeper {
         claim: UnsavedEditsClaim? = nil,
         useCase: UnsavedEditsUseCaseProtocol,
         delay: Duration = UnsavedEditsKeeper.delay,
-        wait: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+        wait: @escaping (Duration) async throws -> Void
     ) {
         self.editing = editing
         self.heldClaim = Mutex(claim)

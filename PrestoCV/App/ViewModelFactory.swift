@@ -1,35 +1,63 @@
 import Foundation
 import PrestoCVCore
 import CVGeneratorAI
+import CVPDFExporter
+import struct PrestoCVApplication.ChangeStoredCV
 
+/// The composition root of the screens: it makes every view model, with the real services and the part of the device's
+/// environment each one needs. No view model makes a dependency of its own.
 final class ViewModelFactory {
     private let dependencyContainer: PrestoCVCore.DependencyContainerProtocol
     private let sampleRepository: SampleCVRepositoryProtocol
     private let cvManagementUseCase: CVManagementUseCaseProtocol
     private let unsavedEditsUseCase: UnsavedEditsUseCaseProtocol?
-    private let newEditingID: () -> UUID
+    private let environment: AppEnvironment
     /// The description typed on the AI screen, kept until a draft is made from it.
     private let aiDescriptionSession = AIDescriptionSession()
     
     /// - Parameters:
     ///   - unsavedEditsUseCase: Nil when the unsaved edits cannot be kept on this device: the editor works without them.
-    ///   - newEditingID: Names the editing of a CV that does not restore earlier edits.
+    ///   - environment: What the view models read from the device.
     init(
         dependencyContainer: PrestoCVCore.DependencyContainerProtocol,
         cvManagementUseCase: CVManagementUseCaseProtocol,
         unsavedEditsUseCase: UnsavedEditsUseCaseProtocol?,
-        newEditingID: @escaping () -> UUID = { UUID() }
+        environment: AppEnvironment
     ) throws {
         self.dependencyContainer = dependencyContainer
         self.sampleRepository = try dependencyContainer.makeSampleCVRepository()
         self.cvManagementUseCase = cvManagementUseCase
         self.unsavedEditsUseCase = unsavedEditsUseCase
-        self.newEditingID = newEditingID
+        self.environment = environment
     }
     
     @MainActor
     func makeOnboardingViewModel() throws -> OnboardingViewModel {
         return OnboardingViewModel(onboardingUseCase: try dependencyContainer.makeOnboardingUseCase())
+    }
+
+    /// The list of CVs, whose stored CVs are renamed and given a document language through PrestoCVApplication.
+    @MainActor
+    func makeCVListViewModel() -> CVListViewModel {
+        CVListViewModel(
+            cvManagementUseCase: cvManagementUseCase,
+            storedCVChanges: ChangeStoredCV(cvs: ManagedStoredCVs(cvs: cvManagementUseCase)),
+            locale: environment.appLocale,
+            now: environment.now,
+            calendar: environment.calendar,
+            sleep: environment.sleep
+        )
+    }
+
+    /// The offer to restore the edits an earlier run of the app left unsaved.
+    @MainActor
+    func makeUnsavedEditsOfferViewModel() -> UnsavedEditsOfferViewModel {
+        UnsavedEditsOfferViewModel(
+            useCase: unsavedEditsUseCase,
+            cvs: cvManagementUseCase,
+            locale: environment.appLocale,
+            timeZone: environment.timeZone
+        )
     }
     
     /// The editor of `request`. Restored edits go on being kept as the editing they belong to, with the claim the
@@ -65,10 +93,12 @@ final class ViewModelFactory {
     
     @MainActor
     func makeNewCVChoicesViewModel() -> NewCVChoicesViewModel {
+        let sleep = environment.sleep
         return NewCVChoicesViewModel(
             aiAvailability: makeAIAvailabilityProvider(),
             sampleRepository: sampleRepository,
-            platform: .current
+            pause: { try await sleep(NewCVChoicesViewModel.downloadCheckInterval) },
+            platform: environment.platform
         )
     }
 
@@ -81,9 +111,9 @@ final class ViewModelFactory {
                 languageOfText: DescriptionLanguageDetector.languageTag(of:)
             ),
             languageData: NaturalLanguageDataRequester(),
-            appLanguageCode: Bundle.main.preferredLocalizations.first,
+            appLanguageCode: environment.appLanguage,
             session: aiDescriptionSession,
-            platform: .current
+            platform: environment.platform
         )
     }
 
@@ -97,11 +127,23 @@ final class ViewModelFactory {
     ) -> CVExportSheetViewModel {
         CVExportSheetViewModel(
             cv: cv,
-            exportService: CVExportService(),
-            preferencesStore: FileExportPreferencesStore(),
+            exportService: CVExportService(
+                container: PDFExportDependencyContainer(),
+                fileNames: ExportFileName(titlePattern: DocumentTitlePatterns(bundle: environment.bundle).pattern(in:)),
+                temporaryDirectory: environment.temporaryDirectory
+            ),
+            preferencesStore: FileExportPreferencesStore(fileURL: environment.exportPreferencesFile),
             documentLanguageSink: documentLanguageSink,
-            exportPolicy: .standard
+            exportPolicy: .standard,
+            documentLanguageDetector: makeDocumentLanguageDetector(),
+            appLocale: environment.appLocale
         )
+    }
+
+    /// Reads the language a CV is written in with the system's recognizer, for the Automatic document language, and
+    /// falls back to the person's languages.
+    private func makeDocumentLanguageDetector() -> DocumentLanguageDetector {
+        DocumentLanguageDetector(preferredLanguages: environment.preferredLanguages(), read: NaturalLanguageReader.read)
     }
 
     @MainActor
@@ -117,16 +159,23 @@ final class ViewModelFactory {
             notice: notice,
             restoring: restored?.edits,
             cvManagementUseCase: cvManagementUseCase,
+            documentLanguageDetector: makeDocumentLanguageDetector(),
             unsavedEdits: unsavedEditsUseCase.map {
-                UnsavedEditsKeeper(editing: restored?.edits.id ?? newEditingID(), claim: restored?.takeClaim(), useCase: $0)
-            }
+                UnsavedEditsKeeper(
+                    editing: restored?.edits.id ?? environment.newEditingID(),
+                    claim: restored?.takeClaim(),
+                    useCase: $0,
+                    wait: environment.sleep
+                )
+            },
+            sleep: environment.sleep
         )
     }
 
     @MainActor
     private func makeAIAvailabilityProvider() -> AIAvailabilityProvider {
         #if DEBUG
-        if let forced = AIAvailabilityOverride.current() {
+        if let forced = AIAvailabilityOverride.current(arguments: environment.arguments) {
             return { forced }
         }
         #endif

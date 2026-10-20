@@ -62,6 +62,8 @@ final class CVExportSheetViewModel: ObservableObject {
     let exportPolicy: ExportPolicy
     /// The CV the sheet exports
     private let cv: CVModel
+    /// The language the app is shown in, which names the language of the PDF
+    private let appLocale: Locale
     private let exportService: any CVExportServiceProtocol
     private let preferencesStore: any ExportPreferencesStore
     private let documentLanguageSink: DocumentLanguageSink
@@ -99,7 +101,7 @@ final class CVExportSheetViewModel: ObservableObject {
 
     /// What the language of the PDF changes, in the language of the app: "Headings in English"
     var documentLanguageText: String {
-        String(format: String(localized: "export.language.headings"), documentLanguage.nameInAppLanguage)
+        String(format: String(localized: "export.language.headings"), documentLanguage.name(in: appLocale))
     }
 
     /// The automatic choice with the language it stands for: "Automatic (English)"
@@ -142,6 +144,8 @@ final class CVExportSheetViewModel: ObservableObject {
     ///   - preferencesStore: Keeps the design chosen last, for the next export.
     ///   - documentLanguageSink: Takes each language chosen in the sheet, for the CV to keep.
     ///   - exportPolicy: How the CV is exported, for the preview and the PDF alike.
+    ///   - documentLanguageDetector: Reads which language the CV is written in, for the Automatic document language.
+    ///   - appLocale: The language the app is shown in.
     ///   - previewDebounce: How long a selection must stay put before its preview is made, so that changing the
     ///     template, the palette and the font in quick succession makes one preview and one PDF
     init(
@@ -150,7 +154,8 @@ final class CVExportSheetViewModel: ObservableObject {
         preferencesStore: any ExportPreferencesStore,
         documentLanguageSink: @escaping DocumentLanguageSink,
         exportPolicy: ExportPolicy,
-        documentLanguageDetector: DocumentLanguageDetector = .onDevice,
+        documentLanguageDetector: DocumentLanguageDetector,
+        appLocale: Locale,
         previewDebounce: Duration = .milliseconds(250)
     ) {
         self.cv = cv
@@ -158,6 +163,7 @@ final class CVExportSheetViewModel: ObservableObject {
         self.preferencesStore = preferencesStore
         self.documentLanguageSink = documentLanguageSink
         self.exportPolicy = exportPolicy
+        self.appLocale = appLocale
         self.previewDebounce = previewDebounce
         selection = ExportSelection(
             templateId: nil,

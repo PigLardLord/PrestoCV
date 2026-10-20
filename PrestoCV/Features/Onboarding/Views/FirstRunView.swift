@@ -140,9 +140,7 @@ struct FirstRunView: View {
 
 #if DEBUG
 #Preview {
-    let viewModel = NewCVChoicesViewModel(aiAvailability: { .available }, sampleRepository: PreviewDependencies.samples)
-    
-    return FirstRunView(viewModel: viewModel)
+    FirstRunView(viewModel: PreviewDependencies.newCVChoices())
         .environmentObject(AppRouter())
 }
 #endif

@@ -186,7 +186,7 @@ struct CVExportSheetViewModelTests {
     ) -> CVExportSheetViewModel {
         let viewModel = CVExportSheetViewModel(
             cv: cv, exportService: service, preferencesStore: store, documentLanguageSink: { _ in }, exportPolicy: .standard,
-            previewDebounce: debounce
+            documentLanguageDetector: englishDocumentLanguageDetector, appLocale: Locale(identifier: "en"), previewDebounce: debounce
         )
         viewModel.selectedTemplateId = template
         return viewModel

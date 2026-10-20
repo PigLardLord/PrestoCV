@@ -183,10 +183,8 @@ struct TemplateSelectionView: View {
 
 #if DEBUG
 #Preview {
-    let viewModel = NewCVChoicesViewModel(aiAvailability: { .available }, sampleRepository: PreviewDependencies.samples)
-
-    return NavigationStack {
-        TemplateSelectionView(viewModel: viewModel)
+    NavigationStack {
+        TemplateSelectionView(viewModel: PreviewDependencies.newCVChoices())
     }
     .environmentObject(AppRouter())
 }

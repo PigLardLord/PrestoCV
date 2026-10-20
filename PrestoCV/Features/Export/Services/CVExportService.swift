@@ -20,12 +20,11 @@ actor CVExportService: CVExportServiceProtocol {
     private let fileNames: ExportFileName
     private let temporaryDirectory: URL
 
-    /// - Parameter temporaryDirectory: Where each export gets a folder of its own; the system's by default
-    init(
-        container: PDFExportDependencyContainer = PDFExportDependencyContainer(),
-        fileNames: ExportFileName = ExportFileName(titlePattern: DocumentTitlePatterns(bundle: .main).pattern(in:)),
-        temporaryDirectory: URL = FileManager.default.temporaryDirectory
-    ) {
+    /// - Parameters:
+    ///   - container: Makes the exporter's use cases.
+    ///   - fileNames: Names the PDF and its file, in the language it is printed in.
+    ///   - temporaryDirectory: Where each export gets a folder of its own.
+    init(container: PDFExportDependencyContainer, fileNames: ExportFileName, temporaryDirectory: URL) {
         self.container = container
         self.fileNames = fileNames
         self.temporaryDirectory = temporaryDirectory

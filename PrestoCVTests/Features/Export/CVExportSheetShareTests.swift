@@ -16,6 +16,8 @@ struct CVExportSheetShareTests {
             preferencesStore: InMemoryExportPreferencesStore(),
             documentLanguageSink: { _ in },
             exportPolicy: .standard,
+            documentLanguageDetector: englishDocumentLanguageDetector,
+            appLocale: Locale(identifier: "en"),
             previewDebounce: .zero
         )
         viewModel.selectedTemplateId = "modern"

@@ -18,6 +18,9 @@ import SwiftSyntax
 // 6. --packages: each package's declared target dependencies must be allowed imports.
 // 7. Test plans: every test target an .xctestplan runs has the rule with the sourceTreePath detector (R16), because
 //    the machines that run a plan have only the built products. Legacy targets are checked for the rules listed for them.
+// 8. Views and default arguments: a view holds no service and makes no view model, a view model imports no UI framework
+//    (R5), and a default argument makes no dependency and reads no ambient state (R17). The views of a target are
+//    collected from all its files first, so that an extension of a view in another file is part of the view.
 
 struct Config: Decodable {
     struct Target: Decodable {
@@ -34,6 +37,9 @@ struct Config: Decodable {
     let targets: [Target]
     let rules: [String: [String]]         // rule → detectors
     let infrastructureTypes: [String]
+    /// The suffixes of what a view may not hold (R5) and a default argument may not make (R17), without `Protocol`.
+    let serviceSuffixes: [String]?
+    let dependencySuffixes: [String]?
     let exceptions: [Exception]?
     let notYetImplemented: [String]?
 }
@@ -140,11 +146,23 @@ func isLegacyDeclaration(_ name: String, inManifest manifest: String) -> Bool {
     legacyTargets.contains { $0.name == name && owningManifest(of: $0.path) == manifest }
 }
 
-// A legacy target is exempt (ADR 0012) except from the rules listed for it: R16 for the legacy test targets a test plan runs.
+// A legacy target is exempt (ADR 0012) except from the rules listed for it: R16 for the legacy test targets a test plan runs,
+// R5 and R17 for the legacy app and PrestoCVCore (ADR 0025).
+var parsed: [(file: String, target: Config.Target, source: String, tree: SourceFileSyntax)] = []
 for (file, target) in assignment where target.kind != "legacy" || !target.rules.isEmpty {
     guard let source = try? String(contentsOf: root.appendingPathComponent(file), encoding: .utf8) else { problems.append("cannot read \(file)"); continue }
-    let tree = Parser.parse(source: source)
-    let scanner = Scanner(tree: tree, file: file, infrastructureTypes: Set(config.infrastructureTypes))
+    parsed.append((file, target, source, Parser.parse(source: source)))
+}
+var viewTypes: [String: Set<String>] = [:]
+var memberTypes: [String: [String: TypeMembers]] = [:]
+for entry in parsed {
+    viewTypes[entry.target.name, default: []].formUnion(Scanner.viewTypeNames(in: entry.tree))
+    for (type, members) in MemberIndex.members(in: entry.tree) { memberTypes[entry.target.name, default: [:]][type, default: TypeMembers()].merge(members) }
+}
+for (file, target, source, tree) in parsed {
+    let scanner = Scanner(tree: tree, file: file, infrastructureTypes: Set(config.infrastructureTypes), viewTypes: viewTypes[target.name] ?? [],
+                          memberTypes: memberTypes[target.name] ?? [:],
+                          serviceSuffixes: config.serviceSuffixes ?? [], dependencySuffixes: config.dependencySuffixes ?? [])
     scanner.walk(tree)
     var ordinals: [String: Int] = [:]
     func record(rule: String, detector: String, detail: String, node: String, line: Int) {

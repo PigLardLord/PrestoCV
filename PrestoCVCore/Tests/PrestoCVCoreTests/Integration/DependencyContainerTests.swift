@@ -18,7 +18,7 @@ struct DependencyContainerTests {
     
     @Test("DependencyContainer initializes without errors")
     func containerInitialization() {
-        let container = DependencyContainer()
+        let container = makeIsolatedContainer()
         #expect(type(of: container) == DependencyContainer.self)
     }
     
