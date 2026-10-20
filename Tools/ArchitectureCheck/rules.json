@@ -107,7 +107,9 @@
   "Features/",
   "DesignSystem/",
   "Platform/",
-  "Resources/"
+  "Resources/",
+  "PrestoCVImporting",
+  "PrestoCVImportingPDFKit"
  ],
  "targets": [
   {
