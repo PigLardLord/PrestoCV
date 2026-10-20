@@ -235,7 +235,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 
 ---
 
-## Xcode app target `PrestoCV` (iOS 26, macOS 26)
+## Xcode app target `PrestoCV` (iOS 26.5, macOS 26)
 
 A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-app.md)). The checker maps each folder as its own target.
 

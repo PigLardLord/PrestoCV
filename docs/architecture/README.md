@@ -48,7 +48,7 @@ CV optimisation will come later from external APIs, as a separate context. AI ta
 ## Target graph
 
 ```
-Xcode app target "PrestoCV" (iOS 26, macOS 26) — SwiftUI views, design system, platform views, @main
+Xcode app target "PrestoCV" (iOS 26.5, macOS 26) — SwiftUI views, design system, platform views, @main
    │
    ├──▶ PrestoCVPresentation ──▶ PrestoCVWorkflowPorts ──▶ PrestoCVApplication ──▶ PrestoCVDomain   (domain via internal import)
    └──▶ PrestoCVComposition ──▶ everything below, renderer chosen per platform
