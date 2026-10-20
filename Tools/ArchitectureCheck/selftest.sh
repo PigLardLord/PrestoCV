@@ -424,6 +424,21 @@ for form in $'struct V: View {\n    @State private var model: ListViewModel\n   
             $'struct Child: View {\n    init(factory: @escaping () -> String) {}\n    var body: some View { EmptyView() }\n}\nstruct V: View { var body: some View { Child(factory: { .init() }) } }'; do
   view_case "R5: allowed: ${form//$'\n'/⏎}" "$form" 0
 done
+# A variadic parameter takes no value, one or several, before or after the argument that makes the view model.
+variadic_child() { printf 'struct Child: View {\n    init(%s) {}\n    var body: some View { EmptyView() }\n}\n' "$1"; }
+for pair in 'model: ListViewModel, tags: String...|Child(model: .init())' \
+            'model: ListViewModel, tags: String...|Child(model: .init(), tags: "a", "b", "c")' \
+            'tags: String..., model: ListViewModel|Child(tags: "a", "b", model: .init())' \
+            '_ names: String..., model: ListViewModel|Child("a", "b", model: .init())' \
+            'models: ListViewModel...|Child(models: .init(), .init())'; do
+  view_case "R5: a view makes a view model through a variadic initialiser: ${pair#*|}" \
+    "$(variadic_child "${pair%%|*}")"$'\n'"struct V: View { var body: some View { ${pair#*|} } }" 1 "R5 viewDependency"
+done
+for pair in 'model: String, tags: String...|Child(model: .init(), tags: "a", "b")' \
+            'model: ListViewModel, tags: String...|Child(model: model, tags: .init(), .init())'; do
+  view_case "R5: allowed: a variadic initialiser: ${pair#*|}" \
+    "$(variadic_child "${pair%%|*}")"$'\n'"struct V: View { let model: ListViewModel; var body: some View { ${pair#*|} } }" 0
+done
 # The type a contextual `.init(…)` makes is found in another file of the target too.
 setup; only_rule R5; printf '%s\n' 'struct Child: View { let model: ChildViewModel; var body: some View { EmptyView() } }' > "$ROOT/Sources/Pure/C.swift"
 src 'struct V: View { var body: some View { Child(model: .init()) } }'

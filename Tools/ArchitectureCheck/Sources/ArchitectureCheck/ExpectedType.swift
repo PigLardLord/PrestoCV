@@ -13,6 +13,9 @@ struct Parameter: Hashable {
     let returns: String?
     /// Whether a call may leave it out: it has a default value, or it is a closure that a trailing closure may give
     let isOptional: Bool
+    /// Whether it takes any number of values, `tags: String...`: none, or the first with its label and the next ones
+    /// without one
+    var isVariadic = false
 }
 
 /// What a type of the target declares, from every file of the target
@@ -38,21 +41,23 @@ struct TypeMembers {
 }
 
 enum MemberIndex {
-    /// The parameters that a call's arguments go to, in order, when the call can take this parameter list; nil when it
-    /// cannot. An argument goes to the next parameter with its label, past parameters the call may leave out.
+    /// The parameter each of a call's arguments goes to, in order, when the call can take this parameter list; nil when
+    /// it cannot. An argument goes to the next parameter with its label, past parameters the call may leave out; a
+    /// variadic parameter takes no argument, or the one with its label and the unlabelled ones after it.
     static func match(_ labels: [String], _ parameters: [Parameter]) -> [Parameter]? {
         var matched: [Parameter] = []
-        var index = parameters.startIndex
-        for label in labels {
-            while index < parameters.endIndex, parameters[index].label != label {
-                guard parameters[index].isOptional else { return nil }
-                index += 1
+        var next = labels.startIndex
+        for parameter in parameters {
+            guard next < labels.endIndex, labels[next] == parameter.label else {
+                if parameter.isOptional || parameter.isVariadic { continue }
+                return nil
             }
-            guard index < parameters.endIndex else { return nil }
-            matched.append(parameters[index])
-            index += 1
+            repeat {
+                matched.append(parameter)
+                next += 1
+            } while parameter.isVariadic && next < labels.endIndex && labels[next] == "_"
         }
-        return parameters[index...].allSatisfy(\.isOptional) ? matched : nil
+        return next == labels.endIndex ? matched : nil
     }
 
     /// The labels of a call's arguments, "_" for an argument without one
@@ -96,8 +101,10 @@ enum MemberIndex {
             override func visit(_ node: InitializerDeclSyntax) -> SyntaxVisitorContinueKind {
                 guard let owner = Collector.owner(of: Syntax(node)) else { return .visitChildren }
                 let parameters = node.signature.parameterClause.parameters.map { parameter in
-                    Collector.parameter(label: Scanner.name(parameter.firstName), type: parameter.type,
-                                        isOptional: parameter.defaultValue != nil)
+                    var declared = Collector.parameter(label: Scanner.name(parameter.firstName), type: parameter.type,
+                                                       isOptional: parameter.defaultValue != nil)
+                    declared.isVariadic = parameter.ellipsis != nil
+                    return declared
                 }
                 types[owner, default: TypeMembers()].initializers.append(parameters)
                 return .visitChildren
