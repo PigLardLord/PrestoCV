@@ -28,6 +28,22 @@ struct LineNormalizerTests {
         #expect(LineNormalizer.normalize("#hashtag").markup == .none)
     }
 
+    @Test("A heading's closing hashes go; a hash at the end of a word stays, as in C#")
+    func closingHashes() {
+        #expect(LineNormalizer.normalize("# Skills ##").text == "Skills")
+        #expect(LineNormalizer.normalize("## Experience with C#").text == "Experience with C#")
+        #expect(LineNormalizer.normalize("### F# and C# ###").text == "F# and C#")
+    }
+
+    @Test("A day or a month before a date is the date's, not a numbered item's")
+    func dayBeforeADate() {
+        for raw in ["1. April 2020 – heute", "3. März 2019", "12. 2019 – 3. 2020"] {
+            let line = LineNormalizer.normalize(raw)
+            #expect(line.markup == .none, "\(raw)")
+            #expect(line.text == raw)
+        }
+    }
+
     @Test("List markers of chat answers, Word and plain text make a list item")
     func listItems() {
         for raw in ["- Led a team", "* Led a team", "• Led a team", "▪ Led a team", "– Led a team", "1. Led a team", "o\tLed a team", "\u{F0B7}\tLed a team"] {

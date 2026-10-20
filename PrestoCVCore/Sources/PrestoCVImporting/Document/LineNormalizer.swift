@@ -165,10 +165,12 @@ enum LineNormalizer {
         guard (1...6).contains(hashes.count) else { return nil }
         let rest = line.dropFirst(hashes.count)
         guard let first = rest.first, first == " " else { return nil }
-        // A closing run of hashes is part of the markup too
-        var text = rest.trimmingSpaces()
-        while text.hasSuffix("#") { text = text.dropLast() }
-        return (hashes.count, text.trimmingSpaces())
+        // A closing run of hashes after a space is part of the markup too; one that ends a word is the word's, as in C#
+        let text = rest.trimmingSpaces()
+        let closing = text.reversed().prefix { $0 == "#" }.count
+        let beforeClosing = text.dropLast(closing)
+        guard closing > 0, beforeClosing.isEmpty || beforeClosing.last == " " else { return (hashes.count, text) }
+        return (hashes.count, beforeClosing.trimmingSpaces())
     }
 
     /// The text of a list item without its marker: `- `, `* `, `• `, `1. `, Word's `o` followed by a tab, and the like.
@@ -181,12 +183,14 @@ enum LineNormalizer {
         }
         // Word's second-level bullet: a letter o followed by a tab
         if first == "o", rest.first == "\t" { return rest.trimmingSpaces() }
-        // A numbered item: 1. or 1)
+        // A numbered item: 1. or 1), unless the number is the day or the month of a date, as in "1. April 2020"
         let digits = line.prefix { $0.isASCII && $0.isNumber }
         if (1...2).contains(digits.count) {
             let afterDigits = line.dropFirst(digits.count)
             if let mark = afterDigits.first, mark == "." || mark == ")", afterDigits.dropFirst().first == " " {
-                return afterDigits.dropFirst().trimmingSpaces()
+                let rest = afterDigits.dropFirst().trimmingSpaces()
+                let text = String(rest)
+                if DateReader.periods(in: text).first?.range.lowerBound != text.startIndex { return rest }
             }
         }
         return nil
