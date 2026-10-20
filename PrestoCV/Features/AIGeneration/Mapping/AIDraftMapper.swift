@@ -19,8 +19,8 @@ struct AIDraftMapper {
     func map(_ cvData: CVGeneratorAI.CVData, writtenIn description: String) -> CVModel {
         let info = cvData.personalInfo
 
+        // No name of its own: the list calls the draft by its person, otherwise by its role (CVTitle), until it is renamed
         return CVModel(
-            name: labels.cvName(for: info.name),
             personalInfo: PrestoCVCore.PersonalInfo(
                 name: info.name ?? "",
                 title: info.title ?? "",
