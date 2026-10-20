@@ -164,9 +164,11 @@ struct LocalizationCatalogTests {
     /// The languages whose texts are written in sentence case.
     fileprivate static let sentenceCaseLanguages = ["es", "fr", "it", "pt"]
 
-    /// Words that promise a time, by language. Nothing tells when a model or its data will be ready, and the owner
-    /// decided that the AI texts promise nothing the app cannot deliver now (#255).
-    fileprivate static let timePromises: [String: [String]] = [
+    /// Words that promise future availability or readiness, by language: that the AI draft, a model or its data will
+    /// be there soon, in a moment, or not yet. Nothing tells when they will be ready, and the owner decided that the AI
+    /// texts promise no availability the app cannot deliver now (#255). The expected duration of a task that is already
+    /// running is not such a promise.
+    fileprivate static let availabilityPromises: [String: [String]] = [
         "en": ["soon", "shortly", "in a moment", "coming", "yet"],
         "de": ["bald", "gleich", "demnächst", "in Kürze", "noch nicht"],
         "es": ["pronto", "en un momento", "en breve", "todavía no", "aún no"],
@@ -175,9 +177,14 @@ struct LocalizationCatalogTests {
         "pt": ["em breve", "em instantes", "logo", "ainda não"],
     ]
 
-    /// The time promise in a text, if it makes one.
-    fileprivate static func timePromise(in text: String, language: String) -> String? {
-        (timePromises[language] ?? []).first { promise in
+    /// The AI texts that speak of time without promising availability, each with the reason it may.
+    fileprivate static let availabilityPromiseExceptions: [String: String] = [
+        "ai.generation.time_note": "the expected duration of a task already running, not a promise of availability",
+    ]
+
+    /// The promise of future availability or readiness in a text, if it makes one.
+    fileprivate static func availabilityPromise(in text: String, language: String) -> String? {
+        (availabilityPromises[language] ?? []).first { promise in
             text.range(of: "\\b\(NSRegularExpression.escapedPattern(for: promise))\\b", options: [.regularExpression, .caseInsensitive]) != nil
         }
     }
@@ -380,31 +387,42 @@ struct LocalizationCatalogTests {
         }
     }
 
-    @Test("The texts of AI drafting promise no time, in any language: nothing tells when a model or its data will be ready")
-    func aiTextsPromiseNoTime() throws {
+    @Test("The texts of AI drafting promise no future availability or readiness, in any language")
+    func aiTextsPromiseNoAvailability() throws {
         let catalog = try LocalizationCatalog.load()
         var promises: [String] = []
-        for key in catalog.keys where key.hasPrefix("ai.") {
+        for key in catalog.keys where key.hasPrefix("ai.") && Self.availabilityPromiseExceptions[key] == nil {
             for language in LocalizationCatalog.languages {
                 for text in catalog.texts(of: key, in: language) ?? [] {
-                    if let promise = Self.timePromise(in: text, language: language) {
+                    if let promise = Self.availabilityPromise(in: text, language: language) {
                         promises.append("\(key) (\(language)): \"\(promise)\" in \(text)")
                     }
                 }
             }
         }
 
-        #expect(promises.isEmpty, "Texts that promise a time: \(promises)")
+        #expect(promises.isEmpty, "Texts that promise future availability or readiness: \(promises)")
     }
 
-    @Test("A time promise is found as a word, in any case, and a text without one passes")
-    func timePromiseIsFoundAsAWord() {
-        #expect(Self.timePromise(in: "Getting ready, available soon", language: "en") == "soon")
-        #expect(Self.timePromise(in: "In preparazione, presto disponibile", language: "it") == "presto")
-        #expect(Self.timePromise(in: "Bald verfügbar", language: "de") == "bald")
-        #expect(Self.timePromise(in: "Downloading the model", language: "en") == nil)
-        #expect(Self.timePromise(in: "Not available right now", language: "en") == nil)
-        #expect(Self.timePromise(in: "Apple Intelligence is busy right now. Please try again.", language: "en") == nil)
+    @Test("A promise of availability is found as a word, in any case; a text without one, or a duration, passes")
+    func availabilityPromiseIsFoundAsAWord() {
+        #expect(Self.availabilityPromise(in: "Getting ready, available soon", language: "en") == "soon")
+        #expect(Self.availabilityPromise(in: "In preparazione, presto disponibile", language: "it") == "presto")
+        #expect(Self.availabilityPromise(in: "Bald verfügbar", language: "de") == "bald")
+        #expect(Self.availabilityPromise(in: "Downloading the model", language: "en") == nil)
+        #expect(Self.availabilityPromise(in: "Not available right now", language: "en") == nil)
+        #expect(Self.availabilityPromise(in: "Apple Intelligence is busy right now. Please try again.", language: "en") == nil)
+        #expect(Self.availabilityPromise(in: "This can take up to a minute.", language: "en") == nil, "A duration is not a promise of availability")
+    }
+
+    @Test("Each exception of the availability check is a key of the catalog, with its reason")
+    func availabilityExceptionsAreCatalogKeys() throws {
+        let catalog = try LocalizationCatalog.load()
+
+        for (key, reason) in Self.availabilityPromiseExceptions {
+            #expect(catalog.strings[key] != nil, "\(key) is not in the catalog: remove it from availabilityPromiseExceptions")
+            #expect(!reason.isEmpty, "\(key) needs the reason it is an exception")
+        }
     }
 
     @Test("The welcome speaks to everyone, not to a man or to a woman")
