@@ -1,6 +1,6 @@
 # 0027. Import a CV from its text with rules, in a portable core, every value traced to its source
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-20
 - **Supersedes:** ADR 0020, "Import an existing CV as a draft, checked against its own text" (Accepted on 2026-10-03 on the branch `chore/192-import-adr`, never merged)
 - **Related:** [ADR 0007](0007-each-package-owns-its-model.md), [ADR 0012](0012-legacy-targets-during-migration.md), [ADR 0022](0022-ship-legacy-app-as-v1.md), [ADR 0023](0023-ground-the-ai-draft-in-the-description.md), [ADR 0025](0025-hold-the-legacy-app-to-the-separation-rules.md), [ADR 0026](0026-keep-the-core-portable-to-android.md), [R1](../rules.md#r1-packages-are-isolated-contexts-depend-only-along-documented-edges), [R2](../rules.md#r2-pure-layers-read-no-ambient-state), [R3](../rules.md#r3-ports-belong-to-the-consumer-adapters-live-in-their-own-targets), [R5](../rules.md#r5-views-render-view-models-present-neither-decides), [R6](../rules.md#r6-the-domain-is-rich-and-keeps-its-invariants), [R8](../rules.md#r8-untrusted-input-enters-through-one-validating-boundary), [R11](../rules.md#r11-platform-code-lives-only-in-adapters), [R13](../rules.md#r13-localisation-happens-at-the-edges), [R18](../rules.md#r18-pure-targets-stay-portable-to-android), issues #265 and #275
@@ -13,6 +13,8 @@
   - the parsing core is a pure Swift target, tested on Linux, and a new ADR replaces ADR 0020;
   - fixtures are synthetic, never real CVs;
   - import works on every iPhone and iPad: rules alone segment and fill the CV, and the values the rules are unsure of are flagged for the person to check. Where the on-device model is available, it later improves the result by choosing among spans of the source text, never by writing text.
+
+  This ADR was accepted on 2026-10-21 on those decisions: the core first, rules alone on every iPhone, pasted text and PDFs in version 1. Placing the core in the `PrestoCVCore` package is a technical choice that follows from "the core first".
 - **#275 brings the first two forms into version 1:** pasted text and text PDFs (phases F0 and F1 of the analysis). The LinkedIn archive, the camera and scans, the model's help and Word files come later.
 - **ADR 0020 was written when a server was planned.** It grew AI Drafting into import, checked a model's draft against the text with `CVTailoring`'s content checks, and sent long texts to the server. `CVTailoring` is not in `main` ([ADR 0005](0005-remove-ai-tailoring-and-json-resume.md)), there is no server before version 2, and a rules-only import writes no text that a check would have to catch.
 - **The core must stay portable** to Android ([ADR 0026](0026-keep-the-core-portable-to-android.md), R18): no Apple-only import and no bundle in a pure target, and as few calls of the full Foundation as possible.
