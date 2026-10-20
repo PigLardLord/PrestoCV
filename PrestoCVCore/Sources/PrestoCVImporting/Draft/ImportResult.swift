@@ -8,6 +8,17 @@ public struct ImportResult: Hashable, Sendable {
     /// Text that fits no field, in reading order.
     public internal(set) var unplaced: [UnplacedText]
     public let leftOut: [LeftOutText]
+    /// The fields whose values the final gate refused, their text kept as text not imported. Always empty, unless a
+    /// rule has a defect: the contract table requires it empty.
+    public internal(set) var ungrounded: [String] = []
+
+    init(document: SourceDocument, cv: ImportedCV, language: CVLanguage?, unplaced: [UnplacedText], leftOut: [LeftOutText]) {
+        self.document = document
+        self.cv = cv
+        self.language = language
+        self.unplaced = unplaced
+        self.leftOut = leftOut
+    }
 
     /// The values the person should check, each with its reason, in the order of the CV.
     public var reviewList: [ReviewItem] { ReviewItem.items(of: cv) }

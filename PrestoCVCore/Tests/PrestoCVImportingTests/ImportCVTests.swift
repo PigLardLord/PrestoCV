@@ -48,7 +48,7 @@ struct ImportCVTests {
         #expect(result.unplaced.map(\.text) == ["Croce Rossa, dal 2015"])
         #expect(result.unplaced.first?.heading == "Volontariato")
         #expect(result.leftOut.map(\.reason) == [.chatter])
-        #expect(ImportGrounding.violations(in: result).isEmpty)
+        #expect(result.ungrounded.isEmpty)
     }
 
     @Test("An empty text, a text over the limit and a text without letters are typed errors")
@@ -87,14 +87,15 @@ struct ImportCVTests {
         await #expect(throws: CancellationError.self) { try await importer(ScriptedPDFReader(error: CancellationError())).importPDF(Data([1])) }
     }
 
-    @Test("The gate drops a value that is not the text of its spans, and keeps its text visible")
+    @Test("The gate drops a value that is not the text of its spans, keeps its text visible, and says so")
     func gate() throws {
         var result = try importer().importText("Giulia Bianchi\nInfermiera")
+        #expect(result.ungrounded.isEmpty)
         var tampered = result.cv
         tampered.person.title = Sourced(value: "Primaria", spans: try #require(result.cv.person.title?.spans))
         result.cv = tampered
-        #expect(ImportGrounding.violations(in: result) == ["title"])
         let enforced = ImportGrounding.enforced(result)
+        #expect(enforced.ungrounded == ["title"])
         #expect(enforced.cv.person.title == nil)
         #expect(enforced.unplaced.map(\.text) == ["Infermiera"])
     }

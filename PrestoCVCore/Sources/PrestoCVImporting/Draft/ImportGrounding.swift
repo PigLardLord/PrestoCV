@@ -5,17 +5,12 @@ import PrestoCVDomain
 /// text stays visible as text not imported instead.
 enum ImportGrounding {
 
-    /// What fails the gate, by field.
-    static func violations(in result: ImportResult) -> [String] {
-        var gate = Gate(document: result.document)
-        _ = gate.verified(result.cv)
-        return gate.violations
-    }
-
+    /// The result with only the values that pass the gate; the fields it refused are listed in `ungrounded`.
     static func enforced(_ result: ImportResult) -> ImportResult {
         var gate = Gate(document: result.document)
         var checked = result
         checked.cv = gate.verified(result.cv)
+        checked.ungrounded += gate.violations
         checked.unplaced += gate.dropped.map { UnplacedText(section: .unknown, heading: nil, text: result.document.text(of: $0), span: $0) }
         checked.unplaced.sort { $0.span < $1.span }
         return checked

@@ -115,7 +115,7 @@ struct ContractTableTests {
         var rows: [(Corpus.Entry, Score)] = []
         for entry in try Corpus.entries() {
             let result = try Corpus.importResult(of: entry)
-            #expect(ImportGrounding.violations(in: result).isEmpty, "\(entry.id): values not grounded in the text")
+            #expect(result.ungrounded.isEmpty, "\(entry.id): values the gate refused: \(result.ungrounded)")
             let score = Self.score(result, against: try Corpus.expected(of: entry))
             rows.append((entry, score))
         }
