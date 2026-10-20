@@ -82,7 +82,7 @@ Test targets and test-support targets are described below each package. The chec
 - **The use case, `ImportCV`:** pasted text, or a PDF through the port **`PDFTextExtracting`** (untyped `throws`, cancellable). Typed `ImportError`: empty, too large, too many pages, encrypted, unreadable, no text (a scan).
 - No platform condition, no Apple-only import, no bundle (R11, R18). It is built for Android with the rest of `PrestoCVCore`.
 
-**`PrestoCVImportingPDFKit`** implements `PDFTextExtracting` with PDFKit: each page's words with their box, font size and weight, in PDFKit's order, and nothing decided about the reading order, which the core decides. It checks the size, the page count and the encryption before it reads any text. Every file is wrapped in `#if canImport(PDFKit)`.
+**`PrestoCVImportingPDFKit`** implements `PDFTextExtracting` with PDFKit: each page's words with their box, font size and weight, in PDFKit's order, and nothing decided about the reading order, which the core decides. It checks the size, the page count and the encryption before it reads any text. `characterBounds(at:)` has no box for the line breaks of `PDFPage.string`, so the adapter walks the two together. Every file is wrapped in `#if canImport(PDFKit)`.
 
 **Test support and tests.**
 - **`PrestoCVImportingTests`** may import `PrestoCVImporting`, `PrestoCVDomain`, Testing, Foundation. It holds the unit tests of every rule and the **contract table**: the synthetic corpus under `PrestoCVCore/Tests/ImportFixtures/` (texts, recorded page layouts and their PDFs, each with the fields it states), measured per language and form. No real CV is ever committed.

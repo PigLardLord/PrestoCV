@@ -64,7 +64,8 @@
   "BundleHeadingTableSource",
   "IOSPDFRenderer",
   "MacPDFRenderer",
-  "FoundationModelsDrafter"
+  "FoundationModelsDrafter",
+  "PDFKitTextExtractor"
  ],
  "serviceSuffixes": [
   "UseCase",
@@ -107,8 +108,7 @@
   "Features/",
   "DesignSystem/",
   "Platform/",
-  "Resources/",
-  "PrestoCVImportingPDFKit"
+  "Resources/"
  ],
  "targets": [
   {
@@ -243,6 +243,40 @@
     "PrestoCVDomain"
    ],
    "rules": []
+  },
+  {
+   "name": "PrestoCVImportingPDFKit",
+   "path": "PrestoCVCore/Sources/PrestoCVImportingPDFKit",
+   "allowedImports": [
+    "PrestoCVImporting",
+    "PDFKit",
+    "UIKit",
+    "AppKit",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "PrestoCVImportingPDFKitTests",
+   "path": "PrestoCVCore/Tests/PrestoCVImportingPDFKitTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "PDFKit",
+    "PrestoCVImporting",
+    "PrestoCVImportingPDFKit"
+   ],
+   "rules": [
+    "R16"
+   ]
   },
   {
    "name": "CVDocumentModel",

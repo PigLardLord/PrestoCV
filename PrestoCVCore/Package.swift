@@ -22,6 +22,15 @@ var targets: [Target] = [
     .testTarget(name: "PrestoCVImportingTests", dependencies: ["PrestoCVImporting", "PrestoCVDomain"], resources: [.copy("../ImportFixtures")]),
 ]
 
+// Apple-only adapter (the platform column of docs/architecture/modules.md): not part of a Linux build.
+#if !os(Linux)
+products.append(.library(name: "PrestoCVImportingPDFKit", targets: ["PrestoCVImportingPDFKit"]))
+targets += [
+    .target(name: "PrestoCVImportingPDFKit", dependencies: ["PrestoCVImporting"]),
+    .testTarget(name: "PrestoCVImportingPDFKitTests", dependencies: ["PrestoCVImportingPDFKit", "PrestoCVImporting"], resources: [.copy("../ImportFixtures")]),
+]
+#endif
+
 // Legacy targets: declared only on Apple hosts, and deleted when their replacement is wired in (ADR 0012).
 #if !os(Linux)
 products.append(.library(name: "PrestoCVCore", targets: ["PrestoCVCore"]))
