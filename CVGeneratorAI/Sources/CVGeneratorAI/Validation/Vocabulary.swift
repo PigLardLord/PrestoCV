@@ -58,7 +58,11 @@ enum Vocabulary {
         let graduationFrame: Set<String>
         /// Words of negation, doubt or degree, wish or intention, future and condition ("never", "barely", "want", "will", "if"; "mai",
         /// "appena", "vorrei", "se"; "nie", "kaum", "möchte", "wenn"). They are in no other list: a clause that holds one backs
-        /// nothing and gives no entry, and prose keeps the ones of the clause that explains it.
+        /// nothing and gives no entry, and prose keeps the ones of the clause that explains it. A word written with its accents is
+        /// read as written, unfolded: German "würde" and "hätte" (Konjunktiv II) are no "wurde" and "hatte", Spanish "sería" is no
+        /// "seria" (serious). A wish that only a phrase says is written as its two words joined by "_" ("sogno_di"): the clause holds
+        /// it when the second word follows the first. Joined by "~", the two words may stand in either order, as German fronts
+        /// them ("wurde~gern": "Ich würde gern…", "Gerne würde ich…"), so "ich wurde geschult" holds none.
         let modality: Set<String>
         /// The present and past of "to be": a verb that says something done on its own ("am", "m", "was"; "sono", "era"; "bin", "war").
         /// Written as `Word.accented` writes a word, with accents: French "a" (has) is no "à" (at), and Portuguese "é" (is) no "e" (and).
@@ -110,13 +114,31 @@ enum Vocabulary {
         }
     }
 
-    /// Words that mean something else in another language, so that they are explained only when the description is in one of
-    /// the languages named: Portuguese "no" is "in the", but English and Spanish "no" is a negation, and Italian "mai" is "never"
-    /// where German and French "mai" is a month.
+    /// Words that mean one thing in the languages named and another in the rest. In a description in one of the languages named
+    /// they are words of their own: explained when a list of that language holds them, and no word of negation, doubt, wish, future,
+    /// condition or hedge. In a description in another language, or in one whose language is not known, they are the other
+    /// languages' words. Portuguese "no" is "in the", where English and Spanish "no" is a negation; German and French "mai" is a
+    /// month, where Italian "mai" is "never"; English "fast" is quick, where German "fast" is "almost"; Italian "casi" are cases,
+    /// where Spanish "casi" is "almost"; Spanish and French "se" is "oneself", where Italian and Portuguese "se" is "if".
     private static let onlyIn: [String: Set<Language>] = [
         "no": [.portuguese],
         "mai": [.german, .french],
+        "fast": [.english],
+        "falls": [.english],
+        "plan": [.spanish, .french],
+        "plans": [.french],
+        "plane": [.english, .italian, .spanish, .french, .portuguese],
+        "casi": [.italian],
+        "sera": [.italian],
+        "se": [.spanish, .french],
+        "si": [.italian, .portuguese],
     ]
+
+    /// Whether `word` is, in a description in `language`, a word of that language of its own, and not the word another language
+    /// writes the same (`onlyIn`): German "Mai" is a month, and no Italian "mai".
+    static func isOwnWord(_ word: String, in language: Language?) -> Bool {
+        language.map { onlyIn[word]?.contains($0) == true } ?? false
+    }
 
     private static let everyWord: Set<String> = union { $0.all }
 
@@ -132,17 +154,74 @@ enum Vocabulary {
 
     private static let everyLevelWord: Set<String> = union { $0.level }
 
-    /// The prepositions that introduce an employer, a school or a place of work, in the six languages ("at", "for", "with",
-    /// "da", "presso", "per", "bei", "für", "en", "para", "chez", "pour", "em", "na", "no" and the like). A quote that holds one
-    /// of them is about somebody's place, not about what a person did.
-    static let employerPrepositions: Set<String> = Set("""
-        agli ai al all alla alle allo am at au aux avec bei beim by chez com con da dagli dai dal dall dalla dalle dallo dans \
-        em en for from fuer fur mit na nas no nos num numa para pela pelo per por pour presso vom von with
-        """.split(whereSeparator: { $0.isWhitespace }).map(String.init))
+    /// The prepositions that introduce an employer, a school or a place of work, in each language ("at", "for", "with"; "da",
+    /// "presso", "per"; "bei", "für"; "en", "para"; "chez", "pour"; "em", "na", "no" and the like). A quote that holds one of them
+    /// is about somebody's place, not about what a person did.
+    private static let employerPrepositionsByLanguage: [Language: Set<String>] = [
+        .english: ["at", "by", "for", "from", "with"],
+        .italian: [
+            "agli", "ai", "al", "all", "alla", "alle", "allo", "con", "da", "dagli", "dai", "dal", "dall", "dalla", "dalle", "dallo", "per",
+            "presso",
+        ],
+        .german: ["am", "bei", "beim", "fuer", "fur", "mit", "vom", "von"],
+        .spanish: ["al", "con", "en", "para", "por"],
+        .french: ["au", "aux", "avec", "chez", "dans", "en", "pour"],
+        .portuguese: ["com", "em", "na", "nas", "no", "nos", "num", "numa", "para", "pela", "pelo", "por"],
+    ]
+
+    /// The employer prepositions of the six languages.
+    static let employerPrepositions: Set<String> = employerPrepositionsByLanguage.values.reduce(into: []) { $0.formUnion($1) }
+
+    /// The employer prepositions of a description in each language: its own, and those of the other languages that are no word of
+    /// its vocabulary. A preposition of another language that the description's language uses for something else is that word:
+    /// French "ai" (j'ai) is no Italian "ai", English "per" (per shift) no Italian "per", Portuguese "da" (of the) no Italian "da".
+    private static let employerPrepositionsOfADescription: [Language: Set<String>] = Dictionary(
+        uniqueKeysWithValues: Language.allCases.map { language in
+            let own = employerPrepositionsByLanguage[language] ?? []
+            let vocabulary = language.words.all
+            return (language, employerPrepositions.filter { own.contains($0) || !vocabulary.contains($0) })
+        }
+    )
+
+    /// Whether `word` introduces an employer in a description in `language`; with no language, whether it does in any of the six.
+    static func isEmployerPreposition(_ word: String, in language: Language?) -> Bool {
+        (language.flatMap { employerPrepositionsOfADescription[$0] } ?? employerPrepositions).contains(word)
+    }
 
     private static let everyModalityWord: Set<String> = union { $0.modality }
 
+    /// The phrases of the modality lists whose second word follows the first ("d_like"), by their first word.
+    private static let everyModalityPhrase = phrases(joinedBy: "_")
+
+    /// The phrases of the modality lists whose two words may stand in either order ("wurde~gern"), by their first word.
+    private static let everyModalityPhraseInAnyOrder = phrases(joinedBy: "~")
+
+    private static func phrases(joinedBy joiner: Character) -> [String: Set<String>] {
+        everyModalityWord.reduce(into: [:]) { phrases, entry in
+            let parts = entry.split(separator: joiner).map(String.init)
+            guard parts.count == 2 else { return }
+            phrases[parts[0], default: []].insert(parts[1])
+        }
+    }
+
     private static let everyBeForm: Set<String> = union { $0.beForms }
+
+    /// The pronouns that stand before the "d" of "'d": "I'd" is the words "i" and "d".
+    private static let beforeD: Set<String> = ["i", "we", "you", "he", "she", "they"]
+
+    /// Whether the word after an English "'d" makes it "had": "been", "had", or a verb of the English lists in a form that has no
+    /// form in "-s" beside it there ("worked", "used", "taught", "led", where "works" and "uses" mark "work" and "use" as base
+    /// forms). Before a base form, or any other word, "'d" is "would": "I'd like", "I'd work", "I'd be".
+    private static func makesAPast(_ word: String) -> Bool {
+        if word == "been" || word == "had" { return true }
+        let verbs = english.verbs.union(english.everydayVerbs)
+        guard verbs.contains(word) else { return false }
+        let thirdPerson = word.hasSuffix("y") ? String(word.dropLast()) + "ies" : word + "s"
+        return !verbs.contains(thirdPerson) && !verbs.contains(word + "es")
+    }
+
+    /// The forms of German "haben" whose clause ends with the "vor" of "vorhaben": "Ich habe vor", "das hatte ich vor".
+    private static let formsOfHaben: Set<String> = ["habe", "hast", "hat", "haben", "habt", "hatte", "hattest", "hatten", "hattet"]
 
     /// The words that stand before the "t" of "n't": "don't" is the words "don" and "t".
     private static let beforeNT: Set<String> = [
@@ -151,14 +230,34 @@ enum Vocabulary {
     ]
 
     /// Which of the words are words of negation, doubt or degree, wish or intention, future or condition (`Words.modality`), and
-    /// "n't" for a "t" after "don", "isn", "can"... Portuguese "no" is "in the", and German and French "mai" is a month.
+    /// "n't" for a "t" after "don", "isn", "can"..., and "'d" for a "d" after "I", "we", "you"... that a base form follows ("I'd
+    /// work"). A word that the description's language has of its own is none (`isOwnWord`): Portuguese "no" is "in the", German
+    /// and French "mai" is a month, English "fast" is quick. Nor is a word of intention used as a noun (`IntentionNouns`): "route
+    /// planning", "care plans", "einen Plan erstellt". German "vor" ends a clause that holds a form of "haben" as the intention
+    /// "vorhaben" ("Ich habe vor, Rust zu lernen", "das habe ich vor"), and no "vor" before a time ("vor 5 Jahren") is one. An entry
+    /// written with its accents is matched as written: "würde".
     static func modality(in words: [Word], language: Language? = nil) -> Set<String> {
         var found = Set<String>()
         for (index, word) in words.enumerated() {
-            if everyModalityWord.contains(word.folded) {
-                if !(language.map { onlyIn[word.folded]?.contains($0) } == true) { found.insert(word.folded) }
+            if everyModalityWord.contains(word.folded), !isOwnWord(word.folded, in: language),
+               !IntentionNouns.isANoun(at: index, in: words, language: language) {
+                found.insert(word.folded)
+            } else if word.accented != word.folded, everyModalityWord.contains(word.accented) {
+                found.insert(word.accented)
             } else if word.folded == "t", index > 0, beforeNT.contains(words[index - 1].folded) {
                 found.insert("n't")
+            } else if word.folded == "d", index > 0, beforeD.contains(words[index - 1].folded),
+                      !(index + 1 < words.count && makesAPast(words[index + 1].folded)) {
+                found.insert("'d")
+            } else if word.folded == "vor", language == .german || language == nil, index == words.count - 1 || word.endsWithABreak,
+                      words[..<index].contains(where: { formsOfHaben.contains($0.folded) }) {
+                found.insert("vor")
+            }
+            for second in everyModalityPhrase[word.folded] ?? [] where words[(index + 1)...].contains(where: { $0.folded == second }) {
+                found.insert(word.folded + "_" + second)
+            }
+            for second in everyModalityPhraseInAnyOrder[word.folded] ?? [] where words.contains(where: { $0.folded == second }) {
+                found.insert(word.folded + "~" + second)
             }
         }
         return found

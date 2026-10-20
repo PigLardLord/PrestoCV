@@ -66,3 +66,38 @@ extension LevelVocabulary where Level == LanguageProficiency {
         "a1": .a1, "a2": .a2, "b1": .b1, "b2": .b2, "c1": .c1, "c2": .c2,
     ]
 }
+
+/// How high a level is that a description states (#202). Denying a high level ("not an expert", "not fluent", "kein Experte")
+/// implies some knowledge of the item; denying a low one ("no basic knowledge", "keine Grundkenntnisse") implies none.
+enum LevelHeight: Sendable {
+    case low, high
+
+    /// The low levels, as the level vocabularies give them: a beginner's skill, an A1 or A2 language.
+    private static let lowPhrases: Set<String> = Set(
+        LevelVocabulary<SkillLevel>.skills.phrases.filter { $0.levels == [.beginner] }.map(\.phrase)
+            + LevelVocabulary<LanguageProficiency>.languages.phrases.filter { $0.levels.isSubset(of: [.a1, .a2]) }.map(\.phrase)
+            + ["a1", "a2"]
+    )
+
+    /// Every phrase of the level vocabularies, and the CEFR codes.
+    static let phrases: [String] = Array(Set(
+        LevelVocabulary<SkillLevel>.skills.phrases.map(\.phrase) + LevelVocabulary<LanguageProficiency>.languages.phrases.map(\.phrase)
+            + LevelVocabulary<LanguageProficiency>.codes.keys
+    )).sorted { $0.count > $1.count }
+
+    /// The height of the level that a phrase of the level vocabularies states at `index` of the folded words, or nil when none
+    /// starts there. The longest phrase wins: "upper intermediate" over "intermediate".
+    static func ofPhrase(at index: Int, in words: [String]) -> LevelHeight? {
+        for phrase in phrases {
+            let parts = phrase.split(separator: " ").map(String.init)
+            guard index + parts.count <= words.count, Array(words[index..<(index + parts.count)]) == parts else { continue }
+            return lowPhrases.contains(phrase) ? .low : .high
+        }
+        return nil
+    }
+
+    /// Whether the phrase is a low level.
+    static func isLow(_ phrase: String) -> Bool {
+        lowPhrases.contains(phrase)
+    }
+}
