@@ -1,0 +1,83 @@
+{
+ "id": "pt-mariana/latex",
+ "language": "pt",
+ "form": "latex",
+ "person": {
+  "name": "Mariana Costa",
+  "title": "Desenvolvedora de software",
+  "email": "mariana.costa@example.com",
+  "phone": "+351 912 000 101",
+  "location": "Lisboa, Portugal",
+  "links": [
+   "https://linkedin.com/in/mariana-costa-example"
+  ],
+  "summary": "Desenvolvedora com seis anos de experiência em aplicações móveis, apaixonada por acessibilidade e por equipas pequenas."
+ },
+ "experience": [
+  {
+   "role": "Desenvolvedora iOS",
+   "employer": "Exemplo Tecnologia Lda.",
+   "location": "Lisboa",
+   "details": 2,
+   "start": [
+    2020,
+    null
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Desenvolvedora web",
+   "employer": "Agência Exemplo",
+   "location": "Porto",
+   "details": 1,
+   "start": [
+    2017,
+    null
+   ],
+   "end": [
+    2020,
+    null
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "Licenciatura em Engenharia Informática",
+   "school": "Universidade de Lisboa",
+   "start": [
+    2013,
+    null
+   ],
+   "end": [
+    2017,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "Swift",
+  "SwiftUI",
+  "JavaScript"
+ ],
+ "languages": [
+  {
+   "name": "Português",
+   "level": "native"
+  },
+  {
+   "name": "Inglês",
+   "level": "c1"
+  }
+ ],
+ "certifications": [
+  {
+   "name": "Certificação Scrum",
+   "issuer": "Exemplo Academy",
+   "year": 2021
+  }
+ ],
+ "interests": [
+  "Surf",
+  "Leitura"
+ ]
+}

@@ -1,0 +1,80 @@
+{
+ "id": "pt-mariana/linkedin",
+ "language": "pt",
+ "form": "linkedin",
+ "person": {
+  "name": "Mariana Costa",
+  "title": "Desenvolvedora de software",
+  "email": "mariana.costa@example.com",
+  "phone": "+351 912 000 101",
+  "location": "Lisboa, Portugal",
+  "links": [
+   "https://www.linkedin.com/in/mariana-costa-example"
+  ],
+  "summary": "Desenvolvedora com seis anos de experiência em aplicações móveis, apaixonada por acessibilidade e por equipas pequenas."
+ },
+ "experience": [
+  {
+   "role": "Desenvolvedora iOS",
+   "employer": "Exemplo Tecnologia Lda.",
+   "location": "Lisboa, Portugal",
+   "details": 2,
+   "start": [
+    2020,
+    3
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Desenvolvedora web",
+   "employer": "Agência Exemplo",
+   "location": "Porto, Portugal",
+   "details": 1,
+   "start": [
+    2017,
+    7
+   ],
+   "end": [
+    2020,
+    2
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "Licenciatura em Engenharia Informática",
+   "school": "Universidade de Lisboa",
+   "start": [
+    2013,
+    null
+   ],
+   "end": [
+    2017,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "Swift",
+  "SwiftUI",
+  "JavaScript"
+ ],
+ "languages": [
+  {
+   "name": "Português",
+   "level": "native"
+  },
+  {
+   "name": "Inglês",
+   "level": null
+  }
+ ],
+ "certifications": [
+  {
+   "name": "Certificação Scrum",
+   "issuer": null,
+   "year": null
+  }
+ ],
+ "interests": []
+}

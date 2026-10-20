@@ -7,7 +7,7 @@ enum CertificationReader {
                 findings.leaveOut(block, .markup)
                 continue
             }
-            let cells = Piece.cells(of: block, in: findings.document)
+            let cells = section.cells(of: block, in: findings.document)
             guard let line = cells.first.map({ _ in cells }) else { continue }
             var year: Sourced<Int>?
             var parts: [Piece] = []

@@ -10,46 +10,54 @@ enum LanguageReader {
                 findings.leaveOut(block, .markup)
                 continue
             }
-            var cells = Piece.cells(of: block, in: findings.document)
+            var cells = section.cells(of: block, in: findings.document)
             var nativeLabel: Piece?
             if let first = cells.first, SectionVocabulary.isLanguageLabel(first.text) {
                 if isNative(first.text) { nativeLabel = first }
                 cells.removeFirst()
             }
-            for cell in cells {
-                read(cell, nativeLabel: nativeLabel, section: section, into: &findings)
+            let items = cells.flatMap { $0.split(by: [", ", "; ", " • ", " · ", " | ", "\t"]) }
+            read(items, nativeLabel: nativeLabel, section: section, into: &findings)
+        }
+    }
+
+    /// The items of one row: a language starts at its name, and the items after it in the row give its level. An item
+    /// with no language before it in the row is a level of the language of the rows before, as in a Europass grid.
+    /// - Parameter nativeLabel: The row's label, when it says the languages are mother tongues: it is their level's
+    ///   evidence.
+    private static func read(_ items: [Piece], nativeLabel: Piece?, section: Section, into findings: inout Findings) {
+        var current: Int?
+        for item in items {
+            if let name = languageName(in: item) {
+                var language = ImportedLanguage(name: name.quote())
+                if let nativeLabel {
+                    language.level = Sourced(value: .native, spans: [nativeLabel.span], reading: .languageLevel)
+                }
+                findings.cv.languages.append(language)
+                current = findings.cv.languages.count - 1
+                describe(findings.cv.languages.count - 1, with: item.removing([range(of: name, in: item)]), section: section, into: &findings)
+            } else if let current {
+                describe(current, with: [item], section: section, into: &findings)
+            } else if !attachLevel(item, into: &findings) {
+                // A grid of levels, or the words of a level, under the language before it; otherwise text not imported
+                findings.unplace(item, in: section)
             }
         }
     }
 
-    /// - Parameter nativeLabel: The row's label, when it says the languages are mother tongues: it is their level's
-    ///   evidence.
-    private static func read(_ cell: Piece, nativeLabel: Piece?, section: Section, into findings: inout Findings) {
-        let items = cell.split(by: [", ", "; ", " • ", " · ", " | ", "\t"])
-        for item in items {
-            guard let name = languageName(in: item) else {
-                // A grid of levels, or the words of a level, under the language before it
-                if !attachLevel(item, into: &findings) { findings.unplace(item, in: section) }
-                continue
-            }
-            var language = ImportedLanguage(name: name.quote())
-            let rest = item.removing([range(of: name, in: item)])
-            if let nativeLabel {
-                language.level = Sourced(value: .native, spans: [nativeLabel.span], reading: .languageLevel)
-            }
-            var leftover: [Piece] = []
-            for part in rest {
-                if let level = level(in: part) {
-                    language.level = level
-                } else if let words = levelWordsPiece(part) {
-                    if language.levelWords == nil { language.levelWords = words }
-                } else {
-                    leftover.append(part)
+    /// Gives a language the level its parts state, or the words of one; other parts stay visible.
+    private static func describe(_ index: Int, with parts: [Piece], section: Section, into findings: inout Findings) {
+        for part in parts {
+            if let level = level(in: part) {
+                findings.cv.languages[index].level = level
+                findings.cv.languages[index].levelWords = nil
+            } else if let words = levelWordsPiece(part) {
+                if findings.cv.languages[index].level == nil && findings.cv.languages[index].levelWords == nil {
+                    findings.cv.languages[index].levelWords = words
                 }
+            } else {
+                findings.unplace(part, in: section)
             }
-            if language.level != nil { language.levelWords = nil }
-            findings.cv.languages.append(language)
-            for part in leftover { findings.unplace(part, in: section) }
         }
     }
 
@@ -88,7 +96,7 @@ enum LanguageReader {
         "ukrainian", "ucraino", "ukrainisch", "ucraniano", "ukrainien",
         "albanian", "albanese", "albanisch", "albanés", "albanais", "albanês",
         "korean", "coreano", "koreanisch", "coréen",
-        "hindi", "galician", "gallego", "galego", "basque", "euskera", "danish", "danese", "dänisch", "danés", "danois",
+        "hindi", "galician", "gallego", "galego", "valenciano", "valencian", "valencià", "basque", "euskera", "danish", "danese", "dänisch", "danés", "danois",
         "norwegian", "norvegese", "norwegisch", "noruego", "norvégien", "finnish", "finlandese", "finnisch", "finlandés", "finnois",
         "hungarian", "ungherese", "ungarisch", "húngaro", "hongrois", "czech", "ceco", "tschechisch", "checo", "tchèque",
         "croatian", "croato", "kroatisch", "croata", "croate", "serbian", "serbo", "serbisch", "serbio", "serbe",

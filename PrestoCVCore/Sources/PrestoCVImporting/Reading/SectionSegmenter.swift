@@ -7,6 +7,13 @@ struct Section: Equatable {
     var blocks: [SourceBlock]
     /// The languages whose vocabulary the heading is from.
     var languages: Set<CVLanguage>
+
+    /// The cells of a block of the section: a heading row that also holds the section's first value, as the formato
+    /// europeo's "CAPACITÀ E COMPETENZE TECNICHE | …", gives only its value.
+    func cells(of block: SourceBlock, in document: SourceDocument) -> [Piece] {
+        let cells = Piece.cells(of: block, in: document)
+        return block.index == heading?.index ? Array(cells.dropFirst()) : cells
+    }
 }
 
 /// Splits the document into sections at its headings (ADR 0027).
@@ -15,19 +22,32 @@ enum SectionSegmenter {
     static func sections(of document: SourceDocument) -> [Section] {
         var sections: [Section] = [Section(kind: .header, heading: nil, blocks: [], languages: [])]
         var column = document.blocks.first?.column
-        for block in document.blocks {
+        for (position, block) in document.blocks.enumerated() {
             // A second column starts with its own head: a sidebar that opens with the contacts
             if block.column != column {
                 column = block.column
                 sections.append(Section(kind: .header, heading: nil, blocks: [], languages: []))
             }
             let firstCell = document.text(ofCell: 0, in: block)
-            if block.cells.count > 1, SectionVocabulary.isLanguageLabel(firstCell) {
+            // LinkedIn's PDF copied as text gives its sidebar first: the profile starts at the name, a few lines before
+            // its summary or experience
+            if sidebarKinds.contains(sections[sections.count - 1].kind), block.cells.count == 1, HeaderReader.looksLikeName(firstCell),
+               startsProfile(after: position, in: document) {
+                sections.append(Section(kind: .header, heading: nil, blocks: [block], languages: []))
+                continue
+            }
+            if SectionVocabulary.isLanguageLabel(firstCell) {
                 // A Europass row such as "Madrelingua | Italiano" opens the languages and stays in them
                 if sections[sections.count - 1].kind != .languages {
                     sections.append(Section(kind: .languages, heading: nil, blocks: [], languages: []))
                 }
                 sections[sections.count - 1].blocks.append(block)
+                continue
+            }
+            if block.cells.count > 1, block.kind != .listItem, block.kind != .tableHeader,
+               let match = SectionVocabulary.kind(ofHeading: firstCell), firstCell.words.count <= 7 {
+                // A heading in the first cell of a row, its section's first value in the others
+                sections.append(Section(kind: match.kind, heading: block, blocks: [block], languages: match.languages))
                 continue
             }
             if let match = heading(block, in: document, isFirst: sections.count == 1 && sections[0].blocks.isEmpty) {
@@ -37,6 +57,16 @@ enum SectionSegmenter {
             sections[sections.count - 1].blocks.append(block)
         }
         return sections.filter { $0.heading != nil || !$0.blocks.isEmpty }
+    }
+
+    private static let sidebarKinds: Set<SectionKind> = [.personal, .skills, .languages, .certifications]
+
+    /// Whether a summary or an experience heading follows within four blocks.
+    private static func startsProfile(after position: Int, in document: SourceDocument) -> Bool {
+        document.blocks.dropFirst(position + 1).prefix(4).contains { block in
+            guard block.cells.count == 1, let kind = SectionVocabulary.kind(ofHeading: document.text(of: block.span))?.kind else { return false }
+            return kind == .summary || kind == .experience
+        }
     }
 
     /// The section a block opens, if it is a heading: a heading of the vocabulary, alone in its block; or one the
@@ -50,6 +80,8 @@ enum SectionSegmenter {
             return match
         }
         guard !isFirst, isMarkedAsHeading(block, text: text) else { return nil }
+        // The name at the top of a chat answer, after its opening sentence
+        if case .heading(1) = block.kind, HeaderReader.looksLikeName(text) { return nil }
         return SectionVocabulary.Match(kind: .unknown, languages: [])
     }
 

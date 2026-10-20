@@ -46,7 +46,7 @@ enum CVReader {
 
     /// The summary: the lines of its section, in order.
     private static func readSummary(_ section: Section, into findings: inout Findings) {
-        let pieces = section.blocks.filter { !findings.consumedBlocks.contains($0.index) }.flatMap { Piece.cells(of: $0, in: findings.document) }
+        let pieces = section.blocks.filter { !findings.consumedBlocks.contains($0.index) }.flatMap { section.cells(of: $0, in: findings.document) }
         guard !pieces.isEmpty else { return }
         if let existing = findings.cv.person.summary, existing.check == nil {
             findings.cv.person.summary = Sourced(value: existing.value + "\n" + pieces.map(\.text).joined(separator: "\n"), spans: existing.spans + pieces.map(\.span))

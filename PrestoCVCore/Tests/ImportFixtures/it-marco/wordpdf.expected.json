@@ -1,0 +1,82 @@
+{
+ "id": "it-marco/wordpdf",
+ "language": "it",
+ "form": "wordpdf",
+ "person": {
+  "name": "Marco Esposito",
+  "title": "Sviluppatore software",
+  "email": "marco.esposito@example.org",
+  "phone": "+39 347 000 0202",
+  "location": "Via Esempio 12, 40121 Bologna",
+  "links": [],
+  "summary": "Sviluppatore con otto anni di esperienza in applicazioni web e mobili, appassionato di accessibilità e di codice pulito."
+ },
+ "experience": [
+  {
+   "role": "Senior Developer",
+   "employer": "Esempio Software S.r.l.",
+   "location": "Bologna",
+   "details": 2,
+   "start": [
+    2020,
+    1
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Sviluppatore web",
+   "employer": "Agenzia Esempio",
+   "location": "Modena",
+   "details": 1,
+   "start": [
+    2016,
+    6
+   ],
+   "end": [
+    2019,
+    12
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "Laurea in Informatica",
+   "school": "Università di Bologna",
+   "start": [
+    2012,
+    null
+   ],
+   "end": [
+    2016,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "Swift",
+  "Kotlin",
+  "TypeScript",
+  "Git"
+ ],
+ "languages": [
+  {
+   "name": "Italiano",
+   "level": "native"
+  },
+  {
+   "name": "Inglese",
+   "level": "c1"
+  }
+ ],
+ "certifications": [
+  {
+   "name": "Scrum Master",
+   "issuer": "Scrum Alliance",
+   "year": 2022
+  }
+ ],
+ "interests": [
+  "Ciclismo",
+  "Musica jazz"
+ ]
+}

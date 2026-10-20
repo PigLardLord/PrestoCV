@@ -1,0 +1,81 @@
+{
+ "id": "en-james/wordpdf",
+ "language": "en",
+ "form": "wordpdf",
+ "person": {
+  "name": "James O'Neill",
+  "title": "Data Analyst",
+  "email": "james.oneill@example.org",
+  "phone": "+44 7700 900456",
+  "location": "4 Sample Road, Dublin",
+  "links": [],
+  "summary": "Data analyst who turns messy spreadsheets into dashboards people use, with a background in logistics."
+ },
+ "experience": [
+  {
+   "role": "Data Analyst",
+   "employer": "Example Logistics Ltd",
+   "location": "Dublin",
+   "details": 2,
+   "start": [
+    2021,
+    6
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Operations Coordinator",
+   "employer": "Acme Freight Ltd",
+   "location": "Cork",
+   "details": 1,
+   "start": [
+    2017,
+    9
+   ],
+   "end": [
+    2021,
+    5
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "MSc in Business Analytics",
+   "school": "University College Dublin",
+   "start": [
+    2016,
+    null
+   ],
+   "end": [
+    2017,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "SQL",
+  "Python",
+  "Power BI"
+ ],
+ "languages": [
+  {
+   "name": "English",
+   "level": "native"
+  },
+  {
+   "name": "Spanish",
+   "level": null
+  }
+ ],
+ "certifications": [
+  {
+   "name": "Microsoft Certified: Power BI Data Analyst Associate",
+   "issuer": "Microsoft",
+   "year": 2022
+  }
+ ],
+ "interests": [
+  "Hiking",
+  "Chess"
+ ]
+}

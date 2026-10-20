@@ -32,7 +32,14 @@ enum ListReader {
                 findings.leaveOut(block, .markup)
                 continue
             }
-            for cell in Piece.cells(of: block, in: findings.document) {
+            var cells = section.cells(of: block, in: findings.document)
+            // A row's first cell that labels a group of skills: "Fachlich:", or a short label before a list
+            if cells.count >= 2, let first = cells.first,
+               first.text.hasSuffix(":") || (first.words.count <= 3 && cells[1].text.contains(",")) {
+                findings.leaveOut(first, .categoryLabel)
+                cells.removeFirst()
+            }
+            for cell in cells {
                 var content = cell
                 if let colon = cell.text.firstIndex(of: ":") {
                     let label = cell.sub(cell.text.startIndex..<colon).trimmed()

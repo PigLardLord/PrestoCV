@@ -15,6 +15,14 @@ struct RawLine: Equatable {
     var textStart: Double?
     /// The largest font size of the line, in a PDF.
     var fontSize: Double?
+    /// In a PDF: where the line's last cell starts and whether it is bold, whether its first cell is bold, how wide its
+    /// first word is, and the right edge of its column. A line was wrapped when the next one's first word would not
+    /// have fitted after it.
+    var lastCellX: Double?
+    var lastCellBold = false
+    var firstCellBold = false
+    var firstWordWidth: Double?
+    var columnRight: Double?
 
     init(text: String, page: Int? = nil, frame: Rect? = nil, column: Int? = nil,
          isEmphasized: Bool = false, followsGap: Bool = false, textStart: Double? = nil, fontSize: Double? = nil) {
@@ -74,6 +82,9 @@ enum DocumentBuilder {
         var column: Int?
         var textStart: Double?
         var fontSize: Double?
+        var lastCellX: Double?
+        var lastCellBold: Bool
+        var columnRight: Double?
     }
 
     static func build(lines: [RawLine], format: SourceFormat) -> (SourceDocument, [LeftOutText]) {
@@ -121,7 +132,8 @@ enum DocumentBuilder {
             pending.append(Pending(
                 cells: line.cells, kind: kind, isEmphasized: line.isBold || raw.isEmphasized, followsGap: followsGap,
                 endsWithHyphen: line.endsWithHyphen, page: raw.page, frame: raw.frame, column: raw.column,
-                textStart: raw.textStart, fontSize: raw.fontSize
+                textStart: raw.textStart, fontSize: raw.fontSize, lastCellX: raw.lastCellX, lastCellBold: raw.lastCellBold,
+                columnRight: raw.columnRight
             ))
         }
         return (layOut(pending, format: format), leftOut)
@@ -133,6 +145,17 @@ enum DocumentBuilder {
     /// by a hyphen, a wrapped line that goes on in lower case after a list item or prose, or, in a PDF, a line
     /// indented under a list item's text.
     private static func continues(_ block: Pending, with line: NormalizedLine, raw: RawLine, followsGap: Bool) -> Bool {
+        // In a PDF, a line the layout wrapped goes on in the next line that starts where its last cell starts, in the
+        // same style
+        // Only a table's cell or prose wraps: a list in a narrow column looks the same, line by line
+        let isProse = (block.cells.last?.words.count ?? 0) >= 6
+        if !followsGap, line.markup == .none, line.cells.count == 1, block.column == raw.column, block.cells.count >= 2 || isProse,
+           let lastCellX = block.lastCellX, let frame = raw.frame, abs(frame.x - lastCellX) < 2,
+           let blockFrame = block.frame, let right = block.columnRight, let firstWord = raw.firstWordWidth,
+           blockFrame.maxX + 0.3 * (raw.fontSize ?? 10) + firstWord > right + 1,
+           block.lastCellBold == raw.firstCellBold, block.kind == .line || block.kind == .listItem {
+            return true
+        }
         guard !followsGap, line.markup == .none, block.cells.count == 1, line.cells.count == 1,
               block.column == raw.column, block.kind == .line || block.kind == .listItem,
               let previous = block.cells.last, let next = line.cells.first else { return false }
@@ -140,8 +163,13 @@ enum DocumentBuilder {
         // A line that opens with emphasis, or is built of parts between bars, is a line of its own
         let rawStart = raw.text.trimmingSpaces()
         if rawStart.hasPrefix("**") || rawStart.hasPrefix("__") || next.contains(" | ") { return false }
-        let goesOn = next.words.first.map { word in word.allSatisfy { !$0.isLetter || $0.isLowercase } && word.first?.isLetter == true } ?? false
+        // The next line goes on in lower case with a word, not with an address or a number
+        let goesOn = next.split(separator: " ").first.map { token in
+            token.first?.isLetter == true && token.allSatisfy { ($0.isLetter && $0.isLowercase) || "-'’,;.".contains($0) }
+        } ?? false
         if block.endsWithHyphen && goesOn { return true }
+        // A bracket left open, as a period wrapped at its dash: "(2012 -" and "2015)"
+        if previous.filter({ $0 == "(" }).count > previous.filter({ $0 == ")" }).count { return true }
         if goesOn && (block.kind == .listItem || previous.words.count >= 6) { return true }
         if block.kind == .listItem, let textStart = block.textStart, let frame = raw.frame,
            abs(frame.x - textStart) < 3, !line.isBold {
@@ -161,7 +189,13 @@ enum DocumentBuilder {
         }
         block.cells[block.cells.count - 1] = joined
         block.endsWithHyphen = line.endsWithHyphen
-        if let frame = raw.frame { block.frame = block.frame.map { $0.union(frame) } ?? frame }
+        // The block's frame ends where its last line ends, so a wrapped line is told from the line it wrapped
+        if let frame = raw.frame, let old = block.frame {
+            let united = old.union(frame)
+            block.frame = Rect(x: united.x, y: united.y, width: frame.maxX - united.x, height: united.height)
+        } else if let frame = raw.frame {
+            block.frame = frame
+        }
     }
 
     // MARK: A chat assistant's sentences
@@ -175,13 +209,13 @@ enum DocumentBuilder {
             let line = lines[index]
             if case .heading = line.markup { break }
             let text = line.text
-            let folded = text.folded
+            let folded = String(text.folded.drop { !$0.isLetter })
             let introduces = text.hasSuffix(":") || text.hasSuffix("!") || documentWords.contains { folded.contains($0) }
             guard openingPhrases.contains(where: { folded.hasPrefix($0) }), introduces, text.words.count >= 3 else { break }
             found.insert(index)
         }
         for index in content.suffix(3).reversed() {
-            let folded = lines[index].text.folded
+            let folded = String(lines[index].text.folded.drop { !$0.isLetter })
             guard closingPhrases.contains(where: { folded.hasPrefix($0) }), lines[index].text.words.count >= 4 else { break }
             found.insert(index)
         }

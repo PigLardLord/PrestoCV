@@ -1,0 +1,13 @@
+{
+ "id": "traps/bars-it", "language": "it", "form": "trap",
+ "person": {"name": "FRANCESCA ROSSI", "title": "Grafica", "email": "francesca.rossi@example.net", "phone": "+39 340 000 0303",
+            "location": "Napoli", "links": [], "summary": null},
+ "experience": [
+  {"role": "Grafica junior", "employer": "Studio Esempio", "location": "Napoli", "start": [2021, null], "end": "current", "details": 1},
+  {"role": "Stagista", "employer": "Tipografia Esempio", "location": "Salerno", "start": [2020, null], "end": [2021, null], "details": 0}
+ ],
+ "education": [{"degree": "Diploma in Grafica pubblicitaria", "school": "Istituto d'Arte Esempio", "start": [2015, null], "end": [2020, null]}],
+ "skills": ["Photoshop", "Illustrator", "InDesign"],
+ "languages": [{"name": "Italiano", "level": null}, {"name": "Inglese", "level": null}],
+ "certifications": [], "interests": []
+}

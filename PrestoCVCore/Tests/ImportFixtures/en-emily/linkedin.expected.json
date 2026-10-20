@@ -1,0 +1,80 @@
+{
+ "id": "en-emily/linkedin",
+ "language": "en",
+ "form": "linkedin",
+ "person": {
+  "name": "Emily Carter",
+  "title": "Marketing Manager",
+  "email": "emily.carter@example.com",
+  "phone": "+44 7700 900123",
+  "location": "Manchester, United Kingdom",
+  "links": [
+   "https://www.linkedin.com/in/emily-carter-example"
+  ],
+  "summary": "Marketing manager with nine years of experience in retail and consumer brands, focused on clear campaigns and measurable results."
+ },
+ "experience": [
+  {
+   "role": "Marketing Manager",
+   "employer": "Acme Retail Ltd",
+   "location": "Manchester, United Kingdom",
+   "details": 2,
+   "start": [
+    2020,
+    2
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Marketing Executive",
+   "employer": "Example Brands plc",
+   "location": "Leeds, United Kingdom",
+   "details": 1,
+   "start": [
+    2016,
+    5
+   ],
+   "end": [
+    2020,
+    1
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "BA in Marketing",
+   "school": "University of Leeds",
+   "start": [
+    2012,
+    null
+   ],
+   "end": [
+    2015,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "Brand strategy",
+  "Google Analytics",
+  "Copywriting"
+ ],
+ "languages": [
+  {
+   "name": "English",
+   "level": "native"
+  },
+  {
+   "name": "French",
+   "level": null
+  }
+ ],
+ "certifications": [
+  {
+   "name": "Google Analytics Certification",
+   "issuer": null,
+   "year": null
+  }
+ ],
+ "interests": []
+}

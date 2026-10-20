@@ -1,0 +1,520 @@
+[
+ {
+  "id": "it-giulia/chat",
+  "language": "it",
+  "form": "chat",
+  "kind": "text",
+  "expected": "it-giulia/chat.expected.json",
+  "source": "it-giulia/chat.txt"
+ },
+ {
+  "id": "it-giulia/word",
+  "language": "it",
+  "form": "word",
+  "kind": "text",
+  "expected": "it-giulia/word.expected.json",
+  "source": "it-giulia/word.txt"
+ },
+ {
+  "id": "it-giulia/latex",
+  "language": "it",
+  "form": "latex",
+  "kind": "text",
+  "expected": "it-giulia/latex.expected.json",
+  "source": "it-giulia/latex.txt"
+ },
+ {
+  "id": "it-giulia/europass",
+  "language": "it",
+  "form": "europass",
+  "kind": "text",
+  "expected": "it-giulia/europass.expected.json",
+  "source": "it-giulia/europass.txt"
+ },
+ {
+  "id": "it-giulia/linkedin",
+  "language": "it",
+  "form": "linkedin",
+  "kind": "layout",
+  "expected": "it-giulia/linkedin.expected.json",
+  "source": "it-giulia/linkedin.layout.json",
+  "pdf": "it-giulia/linkedin.pdf"
+ },
+ {
+  "id": "it-giulia/europasspdf",
+  "language": "it",
+  "form": "europasspdf",
+  "kind": "layout",
+  "expected": "it-giulia/europasspdf.expected.json",
+  "source": "it-giulia/europasspdf.layout.json",
+  "pdf": "it-giulia/europasspdf.pdf"
+ },
+ {
+  "id": "it-marco/chat",
+  "language": "it",
+  "form": "chat",
+  "kind": "text",
+  "expected": "it-marco/chat.expected.json",
+  "source": "it-marco/chat.txt"
+ },
+ {
+  "id": "it-marco/word",
+  "language": "it",
+  "form": "word",
+  "kind": "text",
+  "expected": "it-marco/word.expected.json",
+  "source": "it-marco/word.txt"
+ },
+ {
+  "id": "it-marco/latex",
+  "language": "it",
+  "form": "latex",
+  "kind": "text",
+  "expected": "it-marco/latex.expected.json",
+  "source": "it-marco/latex.txt"
+ },
+ {
+  "id": "it-marco/europass",
+  "language": "it",
+  "form": "europass",
+  "kind": "text",
+  "expected": "it-marco/europass.expected.json",
+  "source": "it-marco/europass.txt"
+ },
+ {
+  "id": "it-marco/wordpdf",
+  "language": "it",
+  "form": "wordpdf",
+  "kind": "layout",
+  "expected": "it-marco/wordpdf.expected.json",
+  "source": "it-marco/wordpdf.layout.json",
+  "pdf": "it-marco/wordpdf.pdf"
+ },
+ {
+  "id": "de-lena/chat",
+  "language": "de",
+  "form": "chat",
+  "kind": "text",
+  "expected": "de-lena/chat.expected.json",
+  "source": "de-lena/chat.txt"
+ },
+ {
+  "id": "de-lena/word",
+  "language": "de",
+  "form": "word",
+  "kind": "text",
+  "expected": "de-lena/word.expected.json",
+  "source": "de-lena/word.txt"
+ },
+ {
+  "id": "de-lena/latex",
+  "language": "de",
+  "form": "latex",
+  "kind": "text",
+  "expected": "de-lena/latex.expected.json",
+  "source": "de-lena/latex.txt"
+ },
+ {
+  "id": "de-lena/lebenslauf",
+  "language": "de",
+  "form": "lebenslauf",
+  "kind": "text",
+  "expected": "de-lena/lebenslauf.expected.json",
+  "source": "de-lena/lebenslauf.txt"
+ },
+ {
+  "id": "de-lena/linkedin",
+  "language": "de",
+  "form": "linkedin",
+  "kind": "layout",
+  "expected": "de-lena/linkedin.expected.json",
+  "source": "de-lena/linkedin.layout.json",
+  "pdf": "de-lena/linkedin.pdf"
+ },
+ {
+  "id": "de-lena/lebenslaufpdf",
+  "language": "de",
+  "form": "lebenslaufpdf",
+  "kind": "layout",
+  "expected": "de-lena/lebenslaufpdf.expected.json",
+  "source": "de-lena/lebenslaufpdf.layout.json",
+  "pdf": "de-lena/lebenslaufpdf.pdf"
+ },
+ {
+  "id": "de-jonas/chat",
+  "language": "de",
+  "form": "chat",
+  "kind": "text",
+  "expected": "de-jonas/chat.expected.json",
+  "source": "de-jonas/chat.txt"
+ },
+ {
+  "id": "de-jonas/word",
+  "language": "de",
+  "form": "word",
+  "kind": "text",
+  "expected": "de-jonas/word.expected.json",
+  "source": "de-jonas/word.txt"
+ },
+ {
+  "id": "de-jonas/latex",
+  "language": "de",
+  "form": "latex",
+  "kind": "text",
+  "expected": "de-jonas/latex.expected.json",
+  "source": "de-jonas/latex.txt"
+ },
+ {
+  "id": "de-jonas/lebenslauf",
+  "language": "de",
+  "form": "lebenslauf",
+  "kind": "text",
+  "expected": "de-jonas/lebenslauf.expected.json",
+  "source": "de-jonas/lebenslauf.txt"
+ },
+ {
+  "id": "de-jonas/wordpdf",
+  "language": "de",
+  "form": "wordpdf",
+  "kind": "layout",
+  "expected": "de-jonas/wordpdf.expected.json",
+  "source": "de-jonas/wordpdf.layout.json",
+  "pdf": "de-jonas/wordpdf.pdf"
+ },
+ {
+  "id": "en-emily/chat",
+  "language": "en",
+  "form": "chat",
+  "kind": "text",
+  "expected": "en-emily/chat.expected.json",
+  "source": "en-emily/chat.txt"
+ },
+ {
+  "id": "en-emily/word",
+  "language": "en",
+  "form": "word",
+  "kind": "text",
+  "expected": "en-emily/word.expected.json",
+  "source": "en-emily/word.txt"
+ },
+ {
+  "id": "en-emily/latex",
+  "language": "en",
+  "form": "latex",
+  "kind": "text",
+  "expected": "en-emily/latex.expected.json",
+  "source": "en-emily/latex.txt"
+ },
+ {
+  "id": "en-emily/linkedin",
+  "language": "en",
+  "form": "linkedin",
+  "kind": "layout",
+  "expected": "en-emily/linkedin.expected.json",
+  "source": "en-emily/linkedin.layout.json",
+  "pdf": "en-emily/linkedin.pdf"
+ },
+ {
+  "id": "en-james/chat",
+  "language": "en",
+  "form": "chat",
+  "kind": "text",
+  "expected": "en-james/chat.expected.json",
+  "source": "en-james/chat.txt"
+ },
+ {
+  "id": "en-james/word",
+  "language": "en",
+  "form": "word",
+  "kind": "text",
+  "expected": "en-james/word.expected.json",
+  "source": "en-james/word.txt"
+ },
+ {
+  "id": "en-james/latex",
+  "language": "en",
+  "form": "latex",
+  "kind": "text",
+  "expected": "en-james/latex.expected.json",
+  "source": "en-james/latex.txt"
+ },
+ {
+  "id": "en-james/wordpdf",
+  "language": "en",
+  "form": "wordpdf",
+  "kind": "layout",
+  "expected": "en-james/wordpdf.expected.json",
+  "source": "en-james/wordpdf.layout.json",
+  "pdf": "en-james/wordpdf.pdf"
+ },
+ {
+  "id": "es-lucia/chat",
+  "language": "es",
+  "form": "chat",
+  "kind": "text",
+  "expected": "es-lucia/chat.expected.json",
+  "source": "es-lucia/chat.txt"
+ },
+ {
+  "id": "es-lucia/word",
+  "language": "es",
+  "form": "word",
+  "kind": "text",
+  "expected": "es-lucia/word.expected.json",
+  "source": "es-lucia/word.txt"
+ },
+ {
+  "id": "es-lucia/latex",
+  "language": "es",
+  "form": "latex",
+  "kind": "text",
+  "expected": "es-lucia/latex.expected.json",
+  "source": "es-lucia/latex.txt"
+ },
+ {
+  "id": "es-lucia/linkedin",
+  "language": "es",
+  "form": "linkedin",
+  "kind": "layout",
+  "expected": "es-lucia/linkedin.expected.json",
+  "source": "es-lucia/linkedin.layout.json",
+  "pdf": "es-lucia/linkedin.pdf"
+ },
+ {
+  "id": "es-javier/chat",
+  "language": "es",
+  "form": "chat",
+  "kind": "text",
+  "expected": "es-javier/chat.expected.json",
+  "source": "es-javier/chat.txt"
+ },
+ {
+  "id": "es-javier/word",
+  "language": "es",
+  "form": "word",
+  "kind": "text",
+  "expected": "es-javier/word.expected.json",
+  "source": "es-javier/word.txt"
+ },
+ {
+  "id": "es-javier/latex",
+  "language": "es",
+  "form": "latex",
+  "kind": "text",
+  "expected": "es-javier/latex.expected.json",
+  "source": "es-javier/latex.txt"
+ },
+ {
+  "id": "es-javier/wordpdf",
+  "language": "es",
+  "form": "wordpdf",
+  "kind": "layout",
+  "expected": "es-javier/wordpdf.expected.json",
+  "source": "es-javier/wordpdf.layout.json",
+  "pdf": "es-javier/wordpdf.pdf"
+ },
+ {
+  "id": "fr-camille/chat",
+  "language": "fr",
+  "form": "chat",
+  "kind": "text",
+  "expected": "fr-camille/chat.expected.json",
+  "source": "fr-camille/chat.txt"
+ },
+ {
+  "id": "fr-camille/word",
+  "language": "fr",
+  "form": "word",
+  "kind": "text",
+  "expected": "fr-camille/word.expected.json",
+  "source": "fr-camille/word.txt"
+ },
+ {
+  "id": "fr-camille/latex",
+  "language": "fr",
+  "form": "latex",
+  "kind": "text",
+  "expected": "fr-camille/latex.expected.json",
+  "source": "fr-camille/latex.txt"
+ },
+ {
+  "id": "fr-camille/linkedin",
+  "language": "fr",
+  "form": "linkedin",
+  "kind": "layout",
+  "expected": "fr-camille/linkedin.expected.json",
+  "source": "fr-camille/linkedin.layout.json",
+  "pdf": "fr-camille/linkedin.pdf"
+ },
+ {
+  "id": "fr-thomas/chat",
+  "language": "fr",
+  "form": "chat",
+  "kind": "text",
+  "expected": "fr-thomas/chat.expected.json",
+  "source": "fr-thomas/chat.txt"
+ },
+ {
+  "id": "fr-thomas/word",
+  "language": "fr",
+  "form": "word",
+  "kind": "text",
+  "expected": "fr-thomas/word.expected.json",
+  "source": "fr-thomas/word.txt"
+ },
+ {
+  "id": "fr-thomas/latex",
+  "language": "fr",
+  "form": "latex",
+  "kind": "text",
+  "expected": "fr-thomas/latex.expected.json",
+  "source": "fr-thomas/latex.txt"
+ },
+ {
+  "id": "fr-thomas/wordpdf",
+  "language": "fr",
+  "form": "wordpdf",
+  "kind": "layout",
+  "expected": "fr-thomas/wordpdf.expected.json",
+  "source": "fr-thomas/wordpdf.layout.json",
+  "pdf": "fr-thomas/wordpdf.pdf"
+ },
+ {
+  "id": "pt-mariana/chat",
+  "language": "pt",
+  "form": "chat",
+  "kind": "text",
+  "expected": "pt-mariana/chat.expected.json",
+  "source": "pt-mariana/chat.txt"
+ },
+ {
+  "id": "pt-mariana/word",
+  "language": "pt",
+  "form": "word",
+  "kind": "text",
+  "expected": "pt-mariana/word.expected.json",
+  "source": "pt-mariana/word.txt"
+ },
+ {
+  "id": "pt-mariana/latex",
+  "language": "pt",
+  "form": "latex",
+  "kind": "text",
+  "expected": "pt-mariana/latex.expected.json",
+  "source": "pt-mariana/latex.txt"
+ },
+ {
+  "id": "pt-mariana/linkedin",
+  "language": "pt",
+  "form": "linkedin",
+  "kind": "layout",
+  "expected": "pt-mariana/linkedin.expected.json",
+  "source": "pt-mariana/linkedin.layout.json",
+  "pdf": "pt-mariana/linkedin.pdf"
+ },
+ {
+  "id": "pt-joao/chat",
+  "language": "pt",
+  "form": "chat",
+  "kind": "text",
+  "expected": "pt-joao/chat.expected.json",
+  "source": "pt-joao/chat.txt"
+ },
+ {
+  "id": "pt-joao/word",
+  "language": "pt",
+  "form": "word",
+  "kind": "text",
+  "expected": "pt-joao/word.expected.json",
+  "source": "pt-joao/word.txt"
+ },
+ {
+  "id": "pt-joao/latex",
+  "language": "pt",
+  "form": "latex",
+  "kind": "text",
+  "expected": "pt-joao/latex.expected.json",
+  "source": "pt-joao/latex.txt"
+ },
+ {
+  "id": "pt-joao/wordpdf",
+  "language": "pt",
+  "form": "wordpdf",
+  "kind": "layout",
+  "expected": "pt-joao/wordpdf.expected.json",
+  "source": "pt-joao/wordpdf.layout.json",
+  "pdf": "pt-joao/wordpdf.pdf"
+ },
+ {
+  "id": "traps/bars-it",
+  "language": "it",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/bars-it.expected.json",
+  "source": "traps/bars-it.txt"
+ },
+ {
+  "id": "traps/colon-dates-fr",
+  "language": "fr",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/colon-dates-fr.expected.json",
+  "source": "traps/colon-dates-fr.txt"
+ },
+ {
+  "id": "traps/consent-it",
+  "language": "it",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/consent-it.expected.json",
+  "source": "traps/consent-it.txt"
+ },
+ {
+  "id": "traps/datos-personales-es",
+  "language": "es",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/datos-personales-es.expected.json",
+  "source": "traps/datos-personales-es.txt"
+ },
+ {
+  "id": "traps/employer-first-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/employer-first-en.expected.json",
+  "source": "traps/employer-first-en.txt"
+ },
+ {
+  "id": "traps/linkedin-text-pt",
+  "language": "pt",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/linkedin-text-pt.expected.json",
+  "source": "traps/linkedin-text-pt.txt"
+ },
+ {
+  "id": "traps/references-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/references-en.expected.json",
+  "source": "traps/references-en.txt"
+ },
+ {
+  "id": "traps/seit-de",
+  "language": "de",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/seit-de.expected.json",
+  "source": "traps/seit-de.txt"
+ },
+ {
+  "id": "traps/us-style-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/us-style-en.expected.json",
+  "source": "traps/us-style-en.txt"
+ }
+]

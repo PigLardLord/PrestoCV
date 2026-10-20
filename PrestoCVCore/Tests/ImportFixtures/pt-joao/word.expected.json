@@ -1,0 +1,83 @@
+{
+ "id": "pt-joao/word",
+ "language": "pt",
+ "form": "word",
+ "person": {
+  "name": "João Pereira",
+  "title": "Eletricista",
+  "email": "joao.pereira@example.net",
+  "phone": "+351 932 000 202",
+  "location": "Avenida Exemplo 40, 4000-001 Porto",
+  "links": [
+   "https://linkedin.com/in/joao-pereira-example"
+  ],
+  "summary": "Eletricista com doze anos de experiência em instalações residenciais e industriais, cuidadoso com a segurança."
+ },
+ "experience": [
+  {
+   "role": "Eletricista",
+   "employer": "Exemplo Instalações Lda.",
+   "location": "Porto",
+   "details": 2,
+   "start": [
+    2018,
+    5
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Ajudante de eletricista",
+   "employer": "Eletro Exemplo",
+   "location": "Braga",
+   "details": 1,
+   "start": [
+    2013,
+    2
+   ],
+   "end": [
+    2018,
+    4
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "Curso profissional de eletricidade",
+   "school": "Escola Profissional do Porto",
+   "start": [
+    2010,
+    null
+   ],
+   "end": [
+    2013,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "Quadros elétricos",
+  "Domótica",
+  "Leitura de esquemas"
+ ],
+ "languages": [
+  {
+   "name": "Português",
+   "level": "native"
+  },
+  {
+   "name": "Espanhol",
+   "level": null
+  }
+ ],
+ "certifications": [
+  {
+   "name": "Técnico de segurança elétrica",
+   "issuer": "Exemplo Formação",
+   "year": 2019
+  }
+ ],
+ "interests": [
+  "Futebol",
+  "Pesca"
+ ]
+}

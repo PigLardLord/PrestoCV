@@ -1,0 +1,13 @@
+{
+ "id": "traps/seit-de", "language": "de", "form": "trap",
+ "person": {"name": "Mehmet Yilmaz", "title": "Kaufmann im Einzelhandel", "email": "mehmet.yilmaz@example.com", "phone": "0176 0000303",
+            "location": "Beispielallee 8, 50667 Köln", "links": [], "summary": null},
+ "experience": [
+  {"role": "Filialleiter", "employer": "Supermarkt Beispiel GmbH", "location": "Köln", "start": [2019, null], "end": "current", "details": 0},
+  {"role": "Verkäufer", "employer": "Beispiel Handel KG", "location": "Bonn", "start": [2014, null], "end": [2019, null], "details": 0}
+ ],
+ "education": [{"degree": "Ausbildung zum Kaufmann im Einzelhandel", "school": "Berufskolleg Köln", "start": [2011, null], "end": [2014, null]}],
+ "skills": [],
+ "languages": [{"name": "Türkisch", "level": "native"}, {"name": "Deutsch", "level": "native"}, {"name": "Englisch", "level": "b1"}],
+ "certifications": [], "interests": []
+}

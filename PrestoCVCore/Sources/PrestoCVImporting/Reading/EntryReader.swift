@@ -38,7 +38,8 @@ enum EntryReader {
     }
 
     static func read(_ section: Section, kind: Kind, into findings: inout Findings) {
-        let lines = section.blocks.filter { !findings.consumedBlocks.contains($0.index) }.map { line($0, in: findings.document) }
+        let lines = section.blocks.filter { !findings.consumedBlocks.contains($0.index) }
+            .map { line($0, cells: section.cells(of: $0, in: findings.document)) }
         for line in lines where line.isDurationOnly {
             findings.leaveOut(line.block, .computedDuration)
         }
@@ -59,12 +60,14 @@ enum EntryReader {
 
     // MARK: Lines
 
-    static func line(_ block: SourceBlock, in document: SourceDocument) -> Line {
-        let cells = Piece.cells(of: block, in: document)
+    static func line(_ block: SourceBlock, cells: [Piece]) -> Line {
         let text = cells.map(\.text).joined(separator: " ")
-        let words = text.words.count
+        let words = text.words
         let isBullet = block.kind == .listItem
-        let isProse = !isBullet && (words > 16 || (text.hasSuffix(".") && words > 8 && !block.isEmphasized))
+        // A sentence: long, or ended by a full stop with words in lower case, as a description is
+        let lowerCaseWords = words.filter { $0.first?.isLowercase == true }.count
+        let isProse = !isBullet && !block.isEmphasized
+            && (words.count > 16 || (text.hasSuffix(".") && words.count >= 4 && lowerCaseWords >= 2))
         var line = Line(block: block, cells: cells, isBullet: isBullet, isProse: isProse)
         line.isDurationOnly = DurationReader.isDurationOnly(text)
         if !isProse {
@@ -237,7 +240,7 @@ enum EntryReader {
             if let period = line.period?.piece { removed.append(period) }
             for cell in line.cells {
                 let ranges = removed.filter { cell.span.contains($0.span) }.map { cellRange(of: $0, in: cell) }
-                for piece in cell.removing(ranges).flatMap({ $0.split(by: Separators.strong) }) {
+                for piece in cell.removing(ranges).flatMap({ $0.split(by: Separators.strong + [" - "]) }) {
                     segments += split(piece, kind: kind)
                 }
             }
@@ -252,8 +255,18 @@ enum EntryReader {
         return lower..<upper
     }
 
-    /// A segment split at a role's connector ("Developer at Acme") or at its commas, each part classified.
+    /// A segment split at a role's connector ("Developer at Acme") or at its commas, each part classified. A place in
+    /// brackets at the end, "Tienda Ejemplo S.L. (Madrid)", is a part of its own.
     private static func split(_ piece: Piece, kind: Kind) -> [Segment] {
+        if piece.text.hasSuffix(")"), let open = piece.text.lastIndex(of: "("), open > piece.text.startIndex {
+            let inside = piece.sub(piece.text.index(after: open)..<piece.text.index(before: piece.text.endIndex)).trimmed()
+            let before = piece.sub(piece.text.startIndex..<open).trimmed()
+            let looksLikePlace = (1...3).contains(inside.words.count) && inside.text.first?.isUppercase == true
+                && !inside.text.contains(where: \.isNumber) && EntryVocabulary.isOrganisation(before.text)
+            if !before.isEmpty, Places.isKnownPlace(inside.text) || Places.isCountryOrRegion(inside.text) || looksLikePlace {
+                return split(before, kind: kind) + [Segment(piece: inside, part: .location, isMarked: true)]
+            }
+        }
         if kind == .experience {
             for connector in EntryVocabulary.roleEmployerConnectors {
                 guard let range = piece.text.firstRange(of: connector) else { continue }
@@ -267,7 +280,14 @@ enum EntryReader {
                     }
             }
         }
-        return piece.split(by: [", "]).map { classify($0, kind: kind) }
+        let parts = piece.split(by: [", "])
+        // "Leeds, United Kingdom": short capitalised parts that end with a known country or region are one place
+        if parts.count >= 2, let last = parts.last, Places.isCountryOrRegion(last.text),
+           parts.allSatisfy({ $0.words.count <= 3 && $0.text.first?.isUppercase == true && !EntryVocabulary.isOrganisation($0.text)
+               && !EntryVocabulary.isRole($0.text) && !EntryVocabulary.isSchool($0.text) && !EntryVocabulary.isDegree($0.text) }) {
+            return [Segment(piece: piece, part: .location, isMarked: true)]
+        }
+        return parts.map { classify($0, kind: kind) }
     }
 
     static func classify(_ piece: Piece, kind: Kind) -> Segment {

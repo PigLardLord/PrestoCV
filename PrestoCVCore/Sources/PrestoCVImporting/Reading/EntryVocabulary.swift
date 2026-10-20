@@ -15,7 +15,7 @@ enum EntryVocabulary {
     private static let roleWords: Set<String> = Set([
         "developer", "engineer", "manager", "nurse", "consultant", "assistant", "designer", "analyst", "intern", "trainee", "teacher",
         "lead", "head", "director", "coordinator", "specialist", "technician", "electrician", "accountant", "architect", "officer",
-        "administrator", "owner", "founder", "cofounder", "co-founder", "chef", "cook", "waiter", "waitress", "barista", "cashier",
+        "administrator", "executive", "owner", "founder", "cofounder", "co-founder", "chef", "cook", "waiter", "waitress", "barista", "cashier",
         "clerk", "secretary", "receptionist", "driver", "mechanic", "operator", "supervisor", "advisor", "adviser", "scientist",
         "researcher", "professor", "lecturer", "tutor", "programmer", "tester", "editor", "writer", "translator", "interpreter",
         "pharmacist", "physician", "doctor", "therapist", "caregiver", "carer", "midwife", "paramedic", "salesperson", "agent",
@@ -76,7 +76,9 @@ enum EntryVocabulary {
     /// Whether a piece reads as a school or a university.
     static func isSchool(_ text: String) -> Bool {
         let words = text.words.map { $0.folded }
-        return words.contains { schoolWords.contains($0) || schoolStems.contains(where: $0.hasPrefix) }
+        return words.contains { word in
+            schoolWords.contains(word) || schoolStems.contains(where: word.hasPrefix) || (word.hasSuffix("schule") && word.count > 6)
+        }
     }
 
     /// Whether a piece reads as a degree or a qualification.
@@ -97,6 +99,7 @@ enum EntryVocabulary {
         "hospital", "ospedale", "krankenhaus", "klinik", "klinikum", "clinica", "clínica", "clinique", "hôpital", "hospital",
         "bank", "banca", "banco", "banque", "studio", "agency", "agenzia", "agentur", "agencia", "agence", "agência",
         "hotel", "restaurant", "ristorante", "restaurante", "café", "cafe", "bar", "pizzeria", "bäckerei", "panificio",
+        "cabinet", "kanzlei", "étude", "eletro", "elettro", "atelier", "werkstatt", "officina", "taller", "oficina",
         "labs", "solutions", "systems", "services", "consulting", "technologies", "partners",
         "stiftung", "fondazione", "fundación", "fondation", "fundação", "foundation", "verein", "associazione", "asociación",
         "association", "associação", "comune", "stadt", "ayuntamiento", "mairie", "câmara", "ministry", "ministero", "ministerium",
@@ -155,7 +158,7 @@ enum EntryVocabulary {
         let groups: [(EntryLabel, [String])] = [
             (.period, ["date (da – a)", "date da a", "date", "dates (from – to)", "dates from to", "dates", "periodo", "zeitraum", "datum",
                        "fechas", "fechas de – a", "período", "dates (de – à)", "dates de a", "datas", "datas de a", "da a", "from to"]),
-            (.employer, ["nome e indirizzo del datore di lavoro", "name and address of employer", "datore di lavoro", "employer",
+            (.employer, ["nome e indirizzo del datore di lavoro", "nome e indirizzo del datore", "name and address of employer", "datore di lavoro", "employer",
                          "arbeitgeber", "name und adresse des arbeitgebers", "nombre y dirección del empleador", "empleador",
                          "employeur", "nom et adresse de l'employeur", "nome e endereço do empregador", "empregador",
                          "azienda", "company", "unternehmen", "firma", "empresa", "entreprise", "organisation", "organization"]),
@@ -164,11 +167,11 @@ enum EntryVocabulary {
             (.role, ["tipo di impiego", "occupation or position held", "posizione", "ruolo", "funzione", "mansione", "position",
                      "role", "job title", "beruf oder funktion", "funktion", "puesto", "cargo", "poste", "fonction", "função",
                      "cargo ocupado", "posizione ricoperta", "profilo ricoperto", "tätigkeit", "titolo della posizione"]),
-            (.duties, ["principali mansioni e responsabilità", "main activities and responsibilities", "aufgaben", "tätigkeiten",
+            (.duties, ["principali mansioni e responsabilità", "principali mansioni", "main activities and responsibilities", "aufgaben", "tätigkeiten",
                        "principales actividades y responsabilidades", "activités et responsabilités principales",
                        "principais atividades e responsabilidades", "mansioni", "responsabilità", "responsibilities", "aufgabenbereich",
                        "attività", "activities"]),
-            (.school, ["nome e tipo di istituto di istruzione o formazione", "name and type of organisation providing education and training",
+            (.school, ["nome e tipo di istituto di istruzione o formazione", "nome e tipo di istituto", "name and type of organisation providing education and training",
                        "istituto", "scuola", "università", "institution", "school", "schule", "hochschule", "centro",
                        "établissement", "instituição", "bildungseinrichtung", "nombre y tipo del centro de estudios",
                        "nom et type de l'établissement d'enseignement", "nome e tipo da organização de ensino"]),
@@ -239,6 +242,7 @@ enum EntryVocabulary {
 
     private static let documentTitles: Set<String> = Set([
         "curriculum vitae", "curriculum", "cv", "lebenslauf", "tabellarischer lebenslauf", "resume", "résumé", "europass",
+        "formato europeo per il", "formato europeo",
         "curriculum vitae europass", "europass curriculum vitae", "formato europeo per il curriculum vitae", "currículum vitae",
         "currículum", "currículo", "curriculum vitae et studiorum", "cv europass", "mein lebenslauf", "my cv", "il mio cv",
         "il mio curriculum", "mi currículum", "mon cv", "o meu currículo", "meu currículo",

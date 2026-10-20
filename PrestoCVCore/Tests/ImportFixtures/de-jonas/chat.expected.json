@@ -1,0 +1,87 @@
+{
+ "id": "de-jonas/chat",
+ "language": "de",
+ "form": "chat",
+ "person": {
+  "name": "Jonas Becker",
+  "title": "Pflegefachmann",
+  "email": "jonas.becker@example.net",
+  "phone": "+49 151 0000202",
+  "location": "Hamburg, Deutschland",
+  "links": [
+   "https://linkedin.com/in/jonas-becker-example"
+  ],
+  "summary": "Pflegefachmann mit Erfahrung in der Altenpflege und auf der Intensivstation, ruhig in stressigen Situationen."
+ },
+ "experience": [
+  {
+   "role": "Pflegefachmann",
+   "employer": "Klinikum Beispiel",
+   "location": "Hamburg",
+   "details": 2,
+   "start": [
+    2018,
+    4
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Altenpfleger",
+   "employer": "Pflegeheim Sonnenhof Beispiel",
+   "location": "Lübeck",
+   "details": 1,
+   "start": [
+    2014,
+    8
+   ],
+   "end": [
+    2018,
+    3
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "Ausbildung zum Gesundheits- und Krankenpfleger",
+   "school": "Pflegeschule Hamburg",
+   "start": [
+    2011,
+    8
+   ],
+   "end": [
+    2014,
+    7
+   ]
+  }
+ ],
+ "skills": [
+  "Intensivpflege",
+  "Wundversorgung",
+  "Dokumentation"
+ ],
+ "languages": [
+  {
+   "name": "Deutsch",
+   "level": "native"
+  },
+  {
+   "name": "Englisch",
+   "level": null
+  },
+  {
+   "name": "Türkisch",
+   "level": "a2"
+  }
+ ],
+ "certifications": [
+  {
+   "name": "Praxisanleiter",
+   "issuer": "Bildungszentrum Beispiel",
+   "year": 2019
+  }
+ ],
+ "interests": [
+  "Fußball",
+  "Kochen"
+ ]
+}

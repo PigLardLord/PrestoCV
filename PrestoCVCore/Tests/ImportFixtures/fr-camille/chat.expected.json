@@ -1,0 +1,88 @@
+{
+ "id": "fr-camille/chat",
+ "language": "fr",
+ "form": "chat",
+ "person": {
+  "name": "Camille Laurent",
+  "title": "Développeuse web",
+  "email": "camille.laurent@example.com",
+  "phone": "+33 6 39 98 01 01",
+  "location": "Lyon, France",
+  "links": [
+   "https://linkedin.com/in/camille-laurent-example"
+  ],
+  "summary": "Développeuse web depuis six ans, à l'aise sur le front comme sur le back, attachée à l'accessibilité des interfaces."
+ },
+ "experience": [
+  {
+   "role": "Développeuse full stack",
+   "employer": "Exemple SAS",
+   "location": "Lyon",
+   "details": 2,
+   "start": [
+    2021,
+    9
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Développeuse front-end",
+   "employer": "Agence Exemple",
+   "location": "Grenoble",
+   "details": 1,
+   "start": [
+    2018,
+    10
+   ],
+   "end": [
+    2021,
+    8
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "Master en informatique",
+   "school": "Université Lyon 1",
+   "start": [
+    2016,
+    null
+   ],
+   "end": [
+    2018,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "JavaScript",
+  "React",
+  "PHP",
+  "Accessibilité"
+ ],
+ "languages": [
+  {
+   "name": "Français",
+   "level": "native"
+  },
+  {
+   "name": "Anglais",
+   "level": "c1"
+  },
+  {
+   "name": "Espagnol",
+   "level": null
+  }
+ ],
+ "certifications": [
+  {
+   "name": "Opquast Qualité Web",
+   "issuer": "Opquast",
+   "year": 2020
+  }
+ ],
+ "interests": [
+  "Escalade",
+  "Cinéma"
+ ]
+}

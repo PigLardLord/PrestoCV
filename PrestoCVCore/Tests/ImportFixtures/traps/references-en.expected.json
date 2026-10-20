@@ -1,0 +1,12 @@
+{
+ "id": "traps/references-en", "language": "en", "form": "trap",
+ "person": {"name": "Daniel Brooks", "title": "Warehouse Supervisor", "email": "daniel.brooks@example.com", "phone": "+44 7700 900789",
+            "location": "Bristol, UK", "links": [],
+            "summary": "Warehouse supervisor with eight years in distribution centres, calm under pressure and good with people."},
+ "experience": [
+  {"role": "Warehouse Supervisor", "employer": "Example Distribution Ltd", "location": "Bristol", "start": [2018, 3], "end": "current", "details": 2},
+  {"role": "Forklift Driver", "employer": "Acme Logistics Ltd", "location": "Swindon", "start": [2014, 6], "end": [2018, 2], "details": 0}
+ ],
+ "education": [{"degree": "NVQ Level 3 in Warehousing", "school": "Bristol College", "start": [2016, null], "end": null}],
+ "skills": [], "languages": [], "certifications": [], "interests": []
+}

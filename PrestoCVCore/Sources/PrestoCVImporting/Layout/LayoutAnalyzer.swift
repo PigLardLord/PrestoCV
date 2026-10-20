@@ -25,8 +25,9 @@ enum LayoutAnalyzer {
                     continue
                 }
                 // A row of a table stays a row; a line across a sidebar's gutter splits into one line per column
-                let left = line.cells.filter { $0.frame.maxX <= split.gutter }
-                let right = line.cells.filter { $0.frame.maxX > split.gutter }
+                // A cell belongs to the column it starts in: a long address may run past the gutter
+                let left = line.cells.filter { $0.frame.x < split.gutter }
+                let right = line.cells.filter { $0.frame.x >= split.gutter }
                 if split.isTable {
                     ordered.append((0, pageIndex, line))
                 } else {
@@ -38,6 +39,12 @@ enum LayoutAnalyzer {
         }
         ordered.sort { ($0.column, $0.page, $0.line.frame.y, $0.line.frame.x) < ($1.column, $1.page, $1.line.frame.y, $1.line.frame.x) }
 
+        // The right edge of each column of each page: a line that reaches it was wrapped there
+        var rightEdges: [String: Double] = [:]
+        for entry in ordered {
+            let key = "\(entry.column)-\(entry.page)"
+            rightEdges[key] = max(rightEdges[key] ?? 0, entry.line.frame.maxX)
+        }
         var raw: [RawLine] = []
         var previous: (column: Int, page: Int, line: PageLine)?
         for entry in ordered {
@@ -48,12 +55,18 @@ enum LayoutAnalyzer {
             } else if previous != nil {
                 followsGap = true
             }
-            raw.append(RawLine(
+            var rawLine = RawLine(
                 text: line.cells.map(\.text).joined(separator: "\t"), page: line.page, frame: line.frame,
                 column: split == nil ? nil : entry.column,
                 isEmphasized: line.isBold || line.fontSize >= bodySize * 1.15, followsGap: followsGap,
                 textStart: line.textStart, fontSize: line.fontSize
-            ))
+            )
+            rawLine.lastCellX = line.cells.last?.frame.x
+            rawLine.lastCellBold = line.cells.last?.isBold ?? false
+            rawLine.firstCellBold = line.cells.first?.isBold ?? false
+            rawLine.firstWordWidth = line.cells.first?.words.first?.frame.width
+            rawLine.columnRight = rightEdges["\(entry.column)-\(entry.page)"]
+            raw.append(rawLine)
             previous = entry
         }
         return Analysis(lines: raw, leftOut: leftOut)
@@ -181,8 +194,10 @@ enum LayoutAnalyzer {
         guard let gutter = best?.gutter else { return nil }
         let left = cells.filter { $0.frame.maxX <= gutter }
         let right = cells.filter { $0.frame.x >= gutter }
-        let dated = left.filter { !DateReader.periods(in: $0.text).isEmpty }.count
-        if Double(dated) >= Double(left.count) * 0.5 {
+        // A table's left column holds dates and labels; a sidebar's holds a flow of its own. Headings count for neither.
+        let content = left.filter { SectionVocabulary.kind(ofHeading: $0.text) == nil }
+        let labels = content.filter { isLabelOrDate($0.text) }.count
+        if !content.isEmpty, Double(labels) >= Double(content.count) * 0.5 {
             return ColumnSplit(gutter: gutter, isTable: true, main: .left)
         }
         let largestLeft = left.map(\.fontSize).max() ?? 0
@@ -194,6 +209,16 @@ enum LayoutAnalyzer {
             main = gutter > width / 2 ? .left : .right
         }
         return ColumnSplit(gutter: gutter, isTable: false, main: main)
+    }
+
+    /// A date, or the label of a row: a personal detail, a Europass row, a language, a document's title, a bullet row.
+    private static func isLabelOrDate(_ text: String) -> Bool {
+        if !DateReader.periods(in: text).isEmpty || text.hasSuffix(":") || text.hasPrefix("•") { return true }
+        if EntryVocabulary.personalLabel(text) != nil || EntryVocabulary.entryLabel(text) != nil || EntryVocabulary.isDocumentTitle(text) {
+            return true
+        }
+        let piece = Piece(text: text, span: SourceSpan(0, text.unicodeScalars.count))
+        return SectionVocabulary.isLanguageLabel(text) || (LanguageReader.languageName(in: piece) != nil && text.words.count <= 2)
     }
 
     private static func median(_ values: [Double]) -> Double? {

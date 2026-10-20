@@ -1,0 +1,42 @@
+Gerne! Hier ist dein Lebenslauf in einer übersichtlichen Form:
+
+# Jonas Becker
+**Pflegefachmann**
+📍 Hamburg, Deutschland | 📞 +49 151 0000202 | ✉️ jonas.becker@example.net | 🔗 linkedin.com/in/jonas-becker-example
+
+---
+
+## Profil
+Pflegefachmann mit Erfahrung in der Altenpflege und auf der Intensivstation, ruhig in stressigen Situationen.
+
+## Berufserfahrung
+**Pflegefachmann** | Klinikum Beispiel | Hamburg | April 2018 – heute
+- Pflege von Patienten auf der Intensivstation
+- Einarbeitung neuer Kolleginnen und Kollegen
+
+**Altenpfleger** | Pflegeheim Sonnenhof Beispiel | Lübeck | August 2014 – März 2018
+- Grundpflege und Medikamentengabe
+
+## Ausbildung
+### Ausbildung zum Gesundheits- und Krankenpfleger
+Pflegeschule Hamburg, Hamburg | August 2011 – Juli 2014
+
+## Kenntnisse
+- Intensivpflege, Wundversorgung, Dokumentation
+
+## Sprachen
+| Language | Level |
+|---|---|
+| Deutsch | Muttersprache |
+| Englisch | gute Kenntnisse |
+| Türkisch | A2 |
+
+## Weiterbildungen
+- Praxisanleiter – Bildungszentrum Beispiel (2019)
+
+## Interessen
+Fußball, Kochen
+
+---
+
+Wenn du möchtest, kann ich ihn auch kürzen oder ins Englische übersetzen.

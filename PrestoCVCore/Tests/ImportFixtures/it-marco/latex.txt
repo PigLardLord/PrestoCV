@@ -1,0 +1,34 @@
+Marco Esposito
+Sviluppatore software
+ +39 347 000 0202    marco.esposito@example.org    linkedin.com/in/marco-esposito-example
+ Bologna, Italia
+
+Sommario
+Sviluppatore con otto anni di esperienza in applicazioni
+web e mobili, appassionato di accessibilità e di codice
+pulito.
+
+Esperienza
+2020–Oggi   Senior Developer, Esempio Software S.r.l., Bologna
+• Sviluppo di app iOS e Android per il settore bancario
+• Guida di un gruppo di quattro sviluppatori
+2016–2019   Sviluppatore web, Agenzia Esempio, Modena
+• Siti e negozi online per clienti locali
+
+Studi
+2012–2016   Laurea in Informatica, Università di Bologna
+
+Competenze
+Competenze   Swift, Kotlin, TypeScript, Git
+
+Lingue
+Italiano   madrelingua
+Inglese   C1
+
+Attestati
+2022   Scrum Master, Scrum Alliance
+
+Interessi
+Ciclismo, Musica jazz
+
+1

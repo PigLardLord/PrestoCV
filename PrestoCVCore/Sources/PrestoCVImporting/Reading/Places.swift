@@ -14,6 +14,21 @@ enum Places {
         return hasPostalCode(text)
     }
 
+    /// Whether a piece names a country or a region, as the last part of "Leeds, United Kingdom" does.
+    static func isCountryOrRegion(_ text: String) -> Bool {
+        let key = text.words.map { $0.folded }.joined(separator: " ")
+        return regions.contains(key)
+    }
+
+    private static let regions: Set<String> = Set((countries + others + states).map { $0.words.map { $0.folded }.joined(separator: " ") })
+
+    /// The codes of the states of the United States, as in "Boston, MA".
+    private static let states = [
+        "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA",
+        "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN",
+        "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC",
+    ]
+
     /// A postal code: four or five digits next to a word, as in "04109 Leipzig", "10121 Torino", "1000-001 Lisboa".
     static func hasPostalCode(_ text: String) -> Bool {
         let words = text.split(whereSeparator: { $0 == " " || $0 == "," })
