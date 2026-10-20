@@ -187,4 +187,16 @@ struct CVExportServiceTests {
         #expect(!FileManager.default.fileExists(atPath: strayFile.path))
         #expect(FileManager.default.fileExists(atPath: neighbour.path))
     }
+
+    // MARK: - Designs
+
+    @Test("the designs on offer are the ones that ship with the app", .timeLimit(.minutes(2)))
+    func offersTheBundledDesigns() async throws {
+        let environment = try await ExportTestEnvironment.make()
+        defer { environment.cleanUp() }
+
+        let designs = try await environment.makeService().availableTemplates()
+
+        #expect(Set(designs.map(\.id)) == ["professional", "modern", "minimal"])
+    }
 }

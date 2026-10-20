@@ -167,4 +167,14 @@ struct ViewModelFactoryTests {
         #expect(editor.documentLanguageSelection == .french)
         #expect(editor.cv.documentLanguage == "fr")
     }
+
+    @Test("The description typed on the AI screen is there again when the screen is opened anew")
+    func aiDescriptionOutlivesItsScreen() throws {
+        let factory = try makeFactory()
+        factory.makeAIGenerationViewModel().prompt = "Ward nurse with ten years in intensive care"
+
+        let reopened = factory.makeAIGenerationViewModel()
+
+        #expect(reopened.prompt == "Ward nurse with ten years in intensive care")
+    }
 }
