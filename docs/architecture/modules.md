@@ -22,7 +22,7 @@ Test targets and test-support targets are described below each package. The chec
 |---|---|---|---|
 | `PrestoCVDomain` | domain | iOS, macOS, Linux ✓ | Foundation |
 | `PrestoCVApplication` | application | iOS, macOS, Linux ✓ | `PrestoCVDomain`, Foundation |
-| `PrestoCVPersistence` | outbound adapter | iOS, macOS, Linux ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Glibc, Darwin |
+| `PrestoCVPersistence` | outbound adapter | iOS, macOS, Linux ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Glibc, Darwin, Android |
 
 **`PrestoCVDomain`**
 - **`CV`**, the aggregate:
@@ -63,7 +63,7 @@ Test targets and test-support targets are described below each package. The chec
 - `FileCVRepository`:
   - one `CVFileV1` file per CV, named from its id;
   - atomic writes with `complete` protection, and a read-back check before every write;
-  - every mutation under an exclusive `flock` on the store;
+  - every mutation under an exclusive `flock` on the store, from the C library of the platform: `Glibc`, `Darwin` or `Android` ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md));
   - reads classified as described in R12;
   - `Quarantine/` with validated restore, erase and purge.
 - `DirectorySampleCVSource`: sample CVs from an injected directory, in the same v1 format and through the store's own reader. They are kept in `PrestoCV/Resources/Samples/`, and the app ships them from the switch to the new stack on (version 1 ships the legacy samples).
@@ -84,7 +84,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 |---|---|---|---|
 | `CVDocumentModel` | published language | iOS, macOS, Linux ✓ | Foundation |
 | `CVDesignCatalog` | domain + application | iOS, macOS, Linux ✓ | Foundation |
-| `CVDesignCatalogFileStore` | outbound adapter | iOS, macOS, Linux ✓ | `CVDesignCatalog`, Foundation, Glibc, Darwin |
+| `CVDesignCatalogFileStore` | outbound adapter | iOS, macOS, Linux ✓ | `CVDesignCatalog`, Foundation, Glibc, Darwin, Android |
 | `CVBundledDesigns` | outbound adapter + resources | iOS, macOS, Linux ✓ | `CVDesignCatalog`, Foundation |
 | `CVRendering` | application | iOS, macOS, Linux ✓ | `CVDocumentModel`, `CVDesignCatalog`, Foundation |
 | `CVRenderingWebKitSupport` | adapter support | iOS, macOS | `CVRendering`, WebKit, Foundation |
@@ -116,7 +116,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - **`InstallDesign`**: validate the raw bytes, then `DesignRenderingGate.verify`, then `DesignStore.save`. Nothing is stored unless both checks pass.
 - **Ports:** `DesignStore`, `BundledDesignSource` (raw bytes), and **`DesignRenderingGate`**. The catalog owns the gate; `CVRendering` implements it, along the allowed Rendering → Catalog edge.
 
-**`CVDesignCatalogFileStore`** holds `FileDesignStore`: the directory is injected, the index is written atomically under a lock (`flock`), and one instance serves the process. Every read validates the file again, so only validated designs leave the store.
+**`CVDesignCatalogFileStore`** holds `FileDesignStore`: the directory is injected, the index is written atomically under a lock (`flock`, from `Glibc`, `Darwin` or `Android`), and one instance serves the process. Every read validates the file again, so only validated designs leave the store.
 
 **`CVBundledDesigns`** holds the bundled `.mcvt` files as resources, served as raw bytes through `Bundle.module`.
 

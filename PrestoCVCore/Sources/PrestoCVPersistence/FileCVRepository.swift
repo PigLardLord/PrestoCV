@@ -1,6 +1,8 @@
 import Foundation
 #if canImport(Glibc)   // outbound adapter: platform code is allowed here (R11)
 import Glibc
+#elseif canImport(Android)
+import Android
 #elseif canImport(Darwin)
 import Darwin
 #endif
