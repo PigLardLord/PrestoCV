@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1787
+    static let rowsWhenWritten = 1788
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -3688,7 +3688,8 @@ enum GroundingRows {
     /// closes no quote: the quote runs to a mark that closes it for sure, after a punctuation mark, or, with none, to the end of the
     /// line of the last mark that may. An apostrophe outside a quote still claims as usual ("I'm", "l'inglese", "dell'università",
     /// "clients' apps"). A quote that such a mark closes takes the rest of its line with it, and so does an apostrophe that starts a
-    /// word when a later one may close it ("the '90s"): accepted losses.
+    /// word when a later one may close it ("the '90s"), and every line up to the last mark that may close a quote, though that mark
+    /// closes another quote: accepted losses.
     private static func singleMarksAfterAWord() -> [GroundingRow] {
         typealias Passage = (id: String, language: String, description: String, name: String)
         var passages: [Passage] = []
@@ -3769,6 +3770,10 @@ enum GroundingRows {
                         "I grew up in the '90s.\nI built my clients' apps with Swift.\nI speak French.",
                         CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]),
                         .exactly(CVData(languages: [Language(name: "French")]))))
+        rows.append(row("a-line-between-two-quotes-that-a-word-may-close-is-an-accepted-loss",
+                        "the first quote runs to the last mark that may close it, on the third line: the line between goes, French with it, an accepted loss",
+                        "I use 'clean code'.\nI speak French.\nI use 'unit tests'.", CVData(languages: [Language(name: "French")]),
+                        .exactly(CVData())))
         return rows
     }
 
