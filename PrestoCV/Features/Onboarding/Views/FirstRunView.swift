@@ -107,15 +107,15 @@ struct FirstRunView: View {
         }
     }
     
-    /// The AI draft, dimmed, with the line that says why. A tap shows the full explanation, which VoiceOver reads with
-    /// the title, in one stop.
+    /// The AI draft, dimmed, with the line that says why. A tap, or an activation by VoiceOver, Voice Control or Switch
+    /// Control, shows the full explanation.
     private func unavailableAIDraft(_ reason: AIEntry.Reason) -> some View {
         VStack(spacing: DesignTokens.Spacing.xs) {
             SecondaryButton.text(title: "onboarding.ai.button".localized, icon: "sparkles") {
                 explainedReason = reason
             }
             .opacity(DesignTokens.Opacity.subtle)
-            .readAsDimmedAIDraft(title: "onboarding.ai.button".localized, reason: reason)
+            .announcedAsUnavailableAIDraft(title: "onboarding.ai.button".localized, reason: reason)
             
             Text(reason.lineKey.localized)
                 .typography(.caption1)

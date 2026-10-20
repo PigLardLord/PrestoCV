@@ -51,14 +51,14 @@ final class FirstRunLargeTextUITests: XCTestCase {
         launchAtTheLargestTextSize(aiAvailability: "deviceNotEligible")
 
         assertOnScreenWithoutScrolling([blank, examples, aiDraft])
-        XCTAssertFalse(app.buttons[aiDraft].isEnabled, "The AI draft should be dimmed on a device that cannot run the model")
+        XCTAssertEqual(app.buttons[aiDraft].value as? String, DimmedAIDraft.deviceNotEligible.announcement, "The AI draft should be unavailable")
     }
 
     func testTheWaysToStartAreOnScreenWhenTheReasonIsUnknown() throws {
         launchAtTheLargestTextSize(aiAvailability: "unknown")
 
         assertOnScreenWithoutScrolling([blank, examples, aiDraft])
-        XCTAssertFalse(app.buttons[aiDraft].isEnabled, "The AI draft should be dimmed when the reason is unknown")
+        XCTAssertEqual(app.buttons[aiDraft].value as? String, DimmedAIDraft.unknown.announcement, "The AI draft should be unavailable")
     }
 
     /// The German titles are the longest: the dimmed AI draft still fits the width of the screen, below the ways to
@@ -73,12 +73,12 @@ final class FirstRunLargeTextUITests: XCTestCase {
         app.scrollTo(aiDraftButton)
 
         XCTAssertTrue(aiDraftButton.isHittable, "The AI draft should be on screen once scrolled to")
-        XCTAssertFalse(aiDraftButton.isEnabled, "The AI draft should be dimmed")
+        XCTAssertTrue(aiDraftButton.isEnabled, "The dimmed AI draft should still be activated to explain itself")
         let screen = app.windows.firstMatch.frame
         XCTAssertGreaterThanOrEqual(aiDraftButton.frame.minX, screen.minX, "The AI draft should not run off the left of the screen")
         XCTAssertLessThanOrEqual(aiDraftButton.frame.maxX, screen.maxX, "The AI draft should not run off the right of the screen")
         XCTAssertFalse(aiDraftButton.frame.intersects(examplesButton.frame), "The AI draft should not cover the examples")
-        XCTAssertEqual(aiDraftButton.value as? String, Self.notOnThisDeviceInGerman, "VoiceOver should read why, after the title")
+        XCTAssertEqual(aiDraftButton.value as? String, "Nicht verfügbar. " + Self.notOnThisDeviceInGerman, "VoiceOver should read that it is unavailable, and why")
         add(app.keptScreenshot(named: "First run, German, largest text, device not eligible"))
 
         aiDraftButton.tap()

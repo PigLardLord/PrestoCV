@@ -56,6 +56,13 @@ final class FirstRunUITests: XCTestCase {
         checkTheDimmedAIDraft(.unknown)
     }
 
+    func testVoiceControlAndSwitchControlCanOpenTheExplanation() throws {
+        launch(aiAvailability: DimmedAIDraft.deviceNotEligible.override)
+        XCTAssertTrue(aiDraft.waitForExistence(timeout: 20), "The first run should show the AI draft")
+
+        app.activateAsAnAssistiveTechnology(aiDraft, says: .deviceNotEligible)
+    }
+
     /// The AI draft is there, dimmed, after the ways to start that work; a tap explains it; the welcome promises no
     /// AI draft.
     private func checkTheDimmedAIDraft(_ draft: DimmedAIDraft, file: StaticString = #filePath, line: UInt = #line) {

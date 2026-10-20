@@ -121,14 +121,14 @@ struct TemplateSelectionView: View {
         }
     }
 
-    /// The AI card, dimmed, with the line that says why in place of what the AI draft does. A tap shows the full
-    /// explanation, which VoiceOver reads with the title, in one stop.
+    /// The AI card, dimmed, with the line that says why in place of what the AI draft does. A tap, or an activation by
+    /// VoiceOver, Voice Control or Switch Control, shows the full explanation.
     private func disabledAIGenerationCard(_ reason: AIEntry.Reason) -> some View {
         aiGenerationCard(line: reason.lineKey.localized) {
             explainedReason = reason
         }
         .opacity(DesignTokens.Opacity.subtle)
-        .readAsDimmedAIDraft(title: "ai.card.title".localized, reason: reason)
+        .announcedAsUnavailableAIDraft(title: "ai.card.title".localized, reason: reason)
     }
 
     /// The AI card, with `line` under its title.

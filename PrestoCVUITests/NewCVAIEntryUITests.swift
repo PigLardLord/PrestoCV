@@ -34,6 +34,19 @@ final class NewCVAIEntryUITests: XCTestCase {
         checkTheDimmedAICard(.unknown)
     }
 
+    func testVoiceControlAndSwitchControlCanOpenTheExplanation() throws {
+        app.launchArguments += [
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage",
+            "-AIAvailabilityOverride", DimmedAIDraft.deviceNotEligible.override,
+        ]
+        app.launch()
+        app.openTheNewCVScreen()
+        let aiCard = card("AI CV Generation")
+        XCTAssertTrue(aiCard.waitForExistence(timeout: 10), "The New CV screen should show the AI card")
+
+        app.activateAsAnAssistiveTechnology(aiCard, says: .deviceNotEligible)
+    }
+
     func testTheAICardThatIsDimmedFitsTheScreenInGermanAtTheLargestTextSize() throws {
         // A first launch saves a CV, so that the list of a later launch offers the New CV screen
         let storage = ["-PrestoCVUITestsStorage", UUID().uuidString, "-AIAvailabilityOverride", "deviceNotEligible"]
@@ -57,11 +70,11 @@ final class NewCVAIEntryUITests: XCTestCase {
         app.scrollTo(aiCard)
 
         XCTAssertTrue(aiCard.isHittable, "The AI card should be on screen once scrolled to")
-        XCTAssertFalse(aiCard.isEnabled, "The AI card should be dimmed")
+        XCTAssertTrue(aiCard.isEnabled, "The dimmed AI card should still be activated to explain itself")
         let screen = app.windows.firstMatch.frame
         XCTAssertGreaterThanOrEqual(aiCard.frame.minX, screen.minX, "The AI card should not run off the left of the screen")
         XCTAssertLessThanOrEqual(aiCard.frame.maxX, screen.maxX, "The AI card should not run off the right of the screen")
-        XCTAssertEqual(aiCard.value as? String, Self.notOnThisDeviceInGerman, "VoiceOver should read why, after the card")
+        XCTAssertEqual(aiCard.value as? String, "Nicht verfügbar. " + Self.notOnThisDeviceInGerman, "VoiceOver should read that it is unavailable, and why")
         add(app.keptScreenshot(named: "New CV, German, largest text, device not eligible"))
 
         aiCard.tap()

@@ -6,8 +6,11 @@ struct DimmedAIDraft {
     let override: String
     /// The line shown in place.
     let line: String
-    /// The full explanation that a tap shows and that VoiceOver reads.
+    /// The full explanation that a tap shows.
     let explanation: String
+
+    /// What VoiceOver reads after the title: that the AI draft is unavailable, and why.
+    var announcement: String { "Unavailable. \(explanation)" }
 
     static let modelNotReady = DimmedAIDraft(
         override: "modelNotReady",
@@ -38,11 +41,12 @@ extension XCUIApplication {
         staticTexts.matching(NSPredicate(format: "label == %@", label)).firstMatch
     }
 
-    /// Checks that `entry` is the dimmed AI draft of `draft` as VoiceOver reads it, that a tap on it shows the line
-    /// and the full explanation, and that Done closes them.
+    /// Checks that `entry` is the dimmed AI draft of `draft` as VoiceOver reads it, that it can be activated, that a
+    /// tap on it shows the line and the full explanation, and that Done closes them.
     func checkDimmedAIDraft(_ entry: XCUIElement, says draft: DimmedAIDraft, file: StaticString = #filePath, line: UInt = #line) {
-        XCTAssertFalse(entry.isEnabled, "VoiceOver should read the AI draft as dimmed", file: file, line: line)
-        XCTAssertEqual(entry.value as? String, draft.explanation, "VoiceOver should read why, after the title", file: file, line: line)
+        XCTAssertEqual(entry.elementType, .button, "Assistive technologies should find a button", file: file, line: line)
+        XCTAssertTrue(entry.isEnabled, "Voice Control and Switch Control should be able to activate the AI draft", file: file, line: line)
+        XCTAssertEqual(entry.value as? String, draft.announcement, "VoiceOver should read that it is unavailable, and why", file: file, line: line)
         let explanation = text(draft.explanation)
         XCTAssertFalse(explanation.exists, "The full explanation should wait for a tap", file: file, line: line)
 
@@ -53,5 +57,17 @@ extension XCUIApplication {
         navigationBars.buttons["Done"].tap()
         let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: explanation)
         XCTAssertEqual(XCTWaiter().wait(for: [closed], timeout: 10), .completed, "Done should close the explanation", file: file, line: line)
+    }
+
+    /// Activates `entry` at its activation point, the middle of its element, where Voice Control and Switch Control act
+    /// on a button they found in the accessibility tree, and checks that the explanation opens. A disabled control would
+    /// be read as dimmed and could not be activated.
+    func activateAsAnAssistiveTechnology(_ entry: XCUIElement, says draft: DimmedAIDraft, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertEqual(entry.elementType, .button, "Assistive technologies should find a button", file: file, line: line)
+        XCTAssertTrue(entry.isEnabled, "An assistive technology can activate only an enabled element", file: file, line: line)
+
+        entry.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
+        XCTAssertTrue(text(draft.explanation).waitForExistence(timeout: 10), "The activation should show the explanation", file: file, line: line)
     }
 }

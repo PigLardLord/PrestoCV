@@ -46,14 +46,14 @@ extension View {
         }
     }
 
-    /// Reads the dimmed AI draft to VoiceOver as a dimmed button: its title, then the full explanation, then "dimmed",
-    /// in one stop. On screen the entry still takes a tap, which shows the explanation.
-    func readAsDimmedAIDraft(title: String, reason: AIEntry.Reason) -> some View {
-        accessibilityRepresentation {
-            SecondaryButton.text(title: title) {}
-                .disabled(true)
-                .accessibilityValue(reason.explanationKey.localized)
-        }
+    /// Announces the dimmed AI draft as unavailable, with its full explanation: VoiceOver reads its title, "Unavailable"
+    /// and why, in one stop. It stays an enabled button, so that VoiceOver, Voice Control and Switch Control can activate
+    /// it as a tap does, and see the explanation.
+    func announcedAsUnavailableAIDraft(title: String, reason: AIEntry.Reason) -> some View {
+        let unavailable = "ai.entry.unavailable".localized
+        let explanation = reason.explanationKey.localized
+        return accessibilityLabel(title)
+            .accessibilityValue("\(unavailable). \(explanation)")
     }
 }
 
