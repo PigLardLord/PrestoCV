@@ -43,7 +43,11 @@ struct Piece: Equatable {
             piece = piece.sub(start..<piece.text.index(after: last))
             let opens = piece.text.filter { $0 == "(" || $0 == "[" }.count
             let closes = piece.text.filter { $0 == ")" || $0 == "]" }.count
-            if let first = piece.text.first, first == "(" || first == "[", opens > closes {
+            if let lastCharacter = piece.text.last, lastCharacter == "(" || lastCharacter == "[" {
+                piece = piece.sub(piece.text.startIndex..<piece.text.index(before: piece.text.endIndex))
+            } else if let first = piece.text.first, first == ")" || first == "]" {
+                piece = piece.sub(piece.text.index(after: piece.text.startIndex)..<piece.text.endIndex)
+            } else if let first = piece.text.first, first == "(" || first == "[", opens > closes {
                 piece = piece.sub(piece.text.index(after: piece.text.startIndex)..<piece.text.endIndex)
             } else if let lastCharacter = piece.text.last, lastCharacter == ")" || lastCharacter == "]", closes > opens {
                 piece = piece.sub(piece.text.startIndex..<piece.text.index(before: piece.text.endIndex))
