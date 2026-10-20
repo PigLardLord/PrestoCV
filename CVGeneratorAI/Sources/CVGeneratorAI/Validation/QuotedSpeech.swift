@@ -8,8 +8,8 @@ import Foundation
 /// bracket, a dash, a colon or another mark, and before a character that is no space (but for « and ‹, which French writes with a
 /// space after them) or at the end of its line, where the quote goes on with the next line ("Mon collègue a écrit '", then "Je parle
 /// français.'"). It closes only before the end, a space or a punctuation mark, and after a character that is no space (but for » and ›,
-/// which French writes with a space before them). So an apostrophe inside a word ("I’m", "l’inglese", "don't") is never a mark, and an
-/// inch mark after a number opens no quote.
+/// which French writes with a space before them, and for a mark alone on its line). So an apostrophe inside a word ("I’m", "l’inglese",
+/// "don't") is never a mark, and an inch mark after a number opens no quote.
 ///
 /// - A single mark right after a letter or a digit may end a word rather than the quote, whatever follows it: a possessive
 ///   ("patients' records", "Hans’ Team"), an elision ("un po'", "jusqu' à") or a prime ("a 5' de la oficina"). It closes no quote for
@@ -99,7 +99,8 @@ enum QuotedSpeech {
             let next = text[index + 1]
             guard !next.isLetter, !next.isNumber else { return false }
         }
-        return !text[index - 1].isWhitespace || spacedClosings.contains(text[index])
+        let isAlone = text[index - 1] == "\n" && (index + 1 == text.count || text[index + 1] == "\n")
+        return !text[index - 1].isWhitespace || spacedClosings.contains(text[index]) || isAlone
     }
 
     /// Whether the closing mark at `index` may end a word rather than a quote: a single mark right after a letter or a digit.

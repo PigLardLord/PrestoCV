@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1800
+    static let rowsWhenWritten = 1801
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -3662,7 +3662,7 @@ enum GroundingRows {
 
     /// A mark at the end of a line opens a quote that goes on with the next lines (#202), when a mark may close it there: a speech
     /// introduced without a colon, its words on the next line ("Mon collègue a écrit '", then "Je parle français.'"), claims nothing.
-    /// With nothing to close it, the mark opens nothing, and the next line claims as usual.
+    /// With nothing to close it, the mark opens nothing, and the next line claims as usual. A mark alone on its line closes the quote.
     private static func marksAtTheEndOfALine() -> [GroundingRow] {
         typealias Speech = (language: String, description: String, name: String)
         var speeches: [Speech] = []
@@ -3689,6 +3689,11 @@ enum GroundingRows {
         rows.append(row("a-possessive-at-the-end-of-a-line-opens-nothing",
                         "the mark after James is a possessive, no opening mark: French stays",
                         "I studied at St. James'\nI speak French.", CVData(languages: [Language(name: "French")]), .unchanged))
+        rows.append(row("a-mark-alone-on-its-line-closes-the-quote",
+                        "the mark alone on the third line closes the colleague's quote: Swift goes, and French, on the next line, stays",
+                        "My colleague wrote \"\nI use Swift.\n\"\nI speak French.\nI use \"clean code\".",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]),
+                        .exactly(CVData(languages: [Language(name: "French")]))))
         return rows
     }
 
