@@ -164,6 +164,24 @@ struct LocalizationCatalogTests {
     /// The languages whose texts are written in sentence case.
     fileprivate static let sentenceCaseLanguages = ["es", "fr", "it", "pt"]
 
+    /// Words that promise a time, by language. Nothing tells when a model or its data will be ready, and the owner
+    /// decided that the AI texts promise nothing the app cannot deliver now (#255).
+    fileprivate static let timePromises: [String: [String]] = [
+        "en": ["soon", "shortly", "in a moment", "coming", "yet"],
+        "de": ["bald", "gleich", "demnächst", "in Kürze", "noch nicht"],
+        "es": ["pronto", "en un momento", "en breve", "todavía no", "aún no"],
+        "fr": ["bientôt", "dans un instant", "sous peu", "pas encore"],
+        "it": ["presto", "tra un attimo", "fra poco", "a breve", "non ancora"],
+        "pt": ["em breve", "em instantes", "logo", "ainda não"],
+    ]
+
+    /// The time promise in a text, if it makes one.
+    fileprivate static func timePromise(in text: String, language: String) -> String? {
+        (timePromises[language] ?? []).first { promise in
+            text.range(of: "\\b\(NSRegularExpression.escapedPattern(for: promise))\\b", options: [.regularExpression, .caseInsensitive]) != nil
+        }
+    }
+
     // MARK: Defects
 
     /// What is wrong with a key, before any exemption.
@@ -360,6 +378,33 @@ struct LocalizationCatalogTests {
             let welcome = catalog.texts(of: "welcome.title", in: language) ?? []
             #expect(welcome.count == 1 && welcome[0].contains("PrestoCV"), "welcome.title does not name PrestoCV in \(language)")
         }
+    }
+
+    @Test("The texts of AI drafting promise no time, in any language: nothing tells when a model or its data will be ready")
+    func aiTextsPromiseNoTime() throws {
+        let catalog = try LocalizationCatalog.load()
+        var promises: [String] = []
+        for key in catalog.keys where key.hasPrefix("ai.") {
+            for language in LocalizationCatalog.languages {
+                for text in catalog.texts(of: key, in: language) ?? [] {
+                    if let promise = Self.timePromise(in: text, language: language) {
+                        promises.append("\(key) (\(language)): \"\(promise)\" in \(text)")
+                    }
+                }
+            }
+        }
+
+        #expect(promises.isEmpty, "Texts that promise a time: \(promises)")
+    }
+
+    @Test("A time promise is found as a word, in any case, and a text without one passes")
+    func timePromiseIsFoundAsAWord() {
+        #expect(Self.timePromise(in: "Getting ready, available soon", language: "en") == "soon")
+        #expect(Self.timePromise(in: "In preparazione, presto disponibile", language: "it") == "presto")
+        #expect(Self.timePromise(in: "Bald verfügbar", language: "de") == "bald")
+        #expect(Self.timePromise(in: "Downloading the model", language: "en") == nil)
+        #expect(Self.timePromise(in: "Not available right now", language: "en") == nil)
+        #expect(Self.timePromise(in: "Apple Intelligence is busy right now. Please try again.", language: "en") == nil)
     }
 
     @Test("The welcome speaks to everyone, not to a man or to a woman")

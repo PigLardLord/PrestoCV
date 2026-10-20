@@ -14,8 +14,9 @@ struct DimmedAIDraft {
 
     static let modelNotReady = DimmedAIDraft(
         override: "modelNotReady",
-        line: "Getting ready, available soon",
-        explanation: "The Apple Intelligence model is still downloading. Try again later."
+        line: "Downloading the model",
+        explanation: "Apple Intelligence is downloading its model. The AI draft becomes available by itself when the "
+            + "download is complete."
     )
     static let appleIntelligenceNotEnabled = DimmedAIDraft(
         override: "appleIntelligenceNotEnabled",

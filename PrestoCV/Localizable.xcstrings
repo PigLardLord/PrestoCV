@@ -745,37 +745,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wird vorbereitet, bald verfügbar"
+            "value" : "Modell wird geladen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Getting ready, available soon"
+            "value" : "Downloading the model"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparándose, disponible pronto"
+            "value" : "Descargando el modelo"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En préparation, bientôt disponible"
+            "value" : "Téléchargement du modèle"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "In preparazione, presto disponibile"
+            "value" : "Download del modello in corso"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Em preparação, disponível em breve"
+            "value" : "Baixando o modelo"
           }
         }
       }
@@ -950,37 +950,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence ist gerade beschäftigt. Bitte versuchen Sie es gleich noch einmal."
+            "value" : "Apple Intelligence ist gerade beschäftigt. Bitte versuchen Sie es erneut."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence is busy right now. Please try again in a moment."
+            "value" : "Apple Intelligence is busy right now. Please try again."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence está ocupado ahora mismo. Inténtalo de nuevo en un momento."
+            "value" : "Apple Intelligence está ocupado ahora mismo. Inténtalo de nuevo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence est occupé pour le moment. Réessayez dans un instant."
+            "value" : "Apple Intelligence est occupé pour le moment. Réessayez."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence è occupato in questo momento. Riprova tra un attimo."
+            "value" : "Apple Intelligence è occupato in questo momento. Riprova."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Apple Intelligence está ocupado agora. Tente novamente em instantes."
+            "value" : "O Apple Intelligence está ocupado agora. Tente novamente."
           }
         }
       }
@@ -1688,37 +1688,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Sprachdaten für den Entwurf werden vorbereitet. Versuchen Sie es gleich noch einmal."
+            "value" : "Die Sprachdaten für den Entwurf werden vorbereitet. Versuchen Sie es später noch einmal."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparing language data for the draft. Try again in a moment."
+            "value" : "Preparing language data for the draft. Try again later."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparando los datos de idioma para el borrador. Inténtalo de nuevo en un momento."
+            "value" : "Preparando los datos de idioma para el borrador. Inténtalo de nuevo más tarde."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Préparation des données linguistiques pour le brouillon. Réessayez dans un instant."
+            "value" : "Préparation des données linguistiques pour le brouillon. Réessayez plus tard."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparazione dei dati linguistici per la bozza. Riprova tra un attimo."
+            "value" : "Preparazione dei dati linguistici per la bozza. Riprova più tardi."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparando os dados de idioma para o rascunho. Tente novamente em instantes."
+            "value" : "Preparando os dados de idioma para o rascunho. Tente novamente mais tarde."
           }
         }
       }
@@ -1729,37 +1729,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das Apple-Intelligence-Modell wird noch geladen. Versuchen Sie es später noch einmal."
+            "value" : "Das Apple-Intelligence-Modell wird geladen. Der KI-Entwurf ist von selbst verfügbar, sobald der Download abgeschlossen ist."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The Apple Intelligence model is still downloading. Try again later."
+            "value" : "Apple Intelligence is downloading its model. The AI draft becomes available by itself when the download is complete."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El modelo de Apple Intelligence aún se está descargando. Inténtalo de nuevo más tarde."
+            "value" : "Apple Intelligence está descargando su modelo. El borrador con IA estará disponible automáticamente cuando termine la descarga."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le modèle d'Apple Intelligence est encore en cours de téléchargement. Réessayez plus tard."
+            "value" : "Apple Intelligence télécharge son modèle. Le brouillon rédigé par l'IA sera disponible automatiquement une fois le téléchargement terminé."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il modello di Apple Intelligence è ancora in download. Riprova più tardi."
+            "value" : "Apple Intelligence sta scaricando il suo modello. La bozza con l'IA sarà disponibile automaticamente al termine del download."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O modelo do Apple Intelligence ainda está sendo baixado. Tente novamente mais tarde."
+            "value" : "O Apple Intelligence está baixando o modelo. O rascunho com IA ficará disponível automaticamente quando o download terminar."
           }
         }
       }
