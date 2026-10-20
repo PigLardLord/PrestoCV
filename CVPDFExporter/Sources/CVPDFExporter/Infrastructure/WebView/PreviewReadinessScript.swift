@@ -49,10 +49,11 @@ public enum PreviewReadinessScript {
 
     public static let awaitReady: String = "window.__cvPreview && window.__cvPreview.awaitReady ? window.__cvPreview.awaitReady() : Promise.resolve(true);"
 
-    /// The body of a function that resolves once the page's document, fonts and images are ready, for
+    /// The body of a function that resolves to true once the page's document, fonts and images are ready, for
     /// `callAsyncJavaScript`, which waits on the promise a function body returns. It leaves out the animation frames that
     /// `awaitReady` waits for after them: a web view that is not shown may never run them.
-    static let awaitContentFunctionBody: String = "return window.__cvPreview && window.__cvPreview.awaitContent ? window.__cvPreview.awaitContent() : true;"
+    static let awaitContentFunctionBody: String =
+        "return (window.__cvPreview && window.__cvPreview.awaitContent ? window.__cvPreview.awaitContent() : Promise.resolve()).then(() => true);"
 
     public static let scalingBootstrap: String = """
         (function() {

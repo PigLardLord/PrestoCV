@@ -11,7 +11,8 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
     // MARK: - Properties
 
     private let logger = Logger(subsystem: "CVPDFExporter", category: "PDFRenderer")
-    private var webView: WKWebView?
+    /// The web view of the render in progress, if any.
+    private(set) var webView: WKWebView?
     private var loadContinuation: CheckedContinuation<Void, Error>?
     private var loadTimeout: Task<Void, Never>?
     private let pageBreakManager: PageBreakManager
@@ -66,7 +67,10 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
             try await awaitContentReadiness(in: webView)
 
             let renderer = try await paginate(webView, options: options)
+            try Task.checkCancellation()
             return try generatePDF(with: renderer, options: options)
+        } catch is CancellationError {
+            throw CancellationError()
         } catch let error as PDFExportError {
             logger.error("PDF generation failed: \(error.localizedDescription)")
             throw error
@@ -207,32 +211,49 @@ private extension EnhancedWKWebViewPDFRenderer {
     }
 
     /// Waits for the page to report that its document, fonts and images are ready, but not longer than
-    /// `readinessTimeout`; past it, `onReadinessTimeout` says whether the PDF is drawn without waiting any longer or the
-    /// render fails. The web view is never put in a window, so the wait leaves out the animation frames the preview
-    /// waits for: a page that is not shown may never run them.
+    /// `readinessTimeout`; past it, or when the page cannot answer, `onReadinessTimeout` says whether the PDF is drawn
+    /// without waiting any longer or the render fails. A cancellation ends the wait at once, in `CancellationError`.
+    /// The web view is never put in a window, so the wait leaves out the animation frames the preview waits for: a page
+    /// that is not shown may never run them.
     func awaitContentReadiness(in webView: WKWebView) async throws {
         let gate = ReadinessGate()
         let timeout = readinessTimeout
 
+        // WebKit cannot cancel a script, so the call is left behind once the gate opens
         let readiness = Task { @MainActor in
-            _ = try? await webView.callAsyncJavaScript(
-                PreviewReadinessScript.awaitContentFunctionBody,
-                arguments: [:],
-                in: nil,
-                contentWorld: .page
-            )
-            gate.open(ready: true)
+            do {
+                _ = try await webView.callAsyncJavaScript(
+                    PreviewReadinessScript.awaitContentFunctionBody,
+                    arguments: [:],
+                    in: nil,
+                    contentWorld: .page
+                )
+                gate.open(.ready)
+            } catch {
+                gate.open(.notReady)
+            }
         }
         let deadline = Task { @MainActor in
-            try? await Task.sleep(for: timeout)
-            gate.open(ready: false)
+            do { try await Task.sleep(for: timeout) } catch { return }
+            gate.open(.notReady)
         }
 
-        let ready = await gate.wait()
+        let outcome = await withTaskCancellationHandler {
+            await gate.wait()
+        } onCancel: {
+            Task { @MainActor in gate.open(.cancelled) }
+        }
         readiness.cancel()
         deadline.cancel()
-        if !ready, onReadinessTimeout == .fail {
-            throw PDFExportError.renderingFailed("The page was not ready within \(timeout)")
+        switch outcome {
+        case .ready:
+            return
+        case .cancelled:
+            throw CancellationError()
+        case .notReady:
+            if onReadinessTimeout == .fail {
+                throw PDFExportError.renderingFailed("The page was not ready within \(timeout)")
+            }
         }
     }
 
@@ -369,23 +390,25 @@ private final class PagePrintRenderer: UIPrintPageRenderer {
 
 // MARK: - Readiness Gate
 
-/// Lets a waiter continue as soon as either of two racing tasks opens it, and only once. The first to open it says
-/// whether the page was ready.
+/// Lets a waiter continue as soon as the page, the deadline or a cancellation opens it, and only once. The first to
+/// open it says how the wait ended.
 @MainActor
 private final class ReadinessGate {
 
-    private var opened: Bool?
-    private var waiter: CheckedContinuation<Bool, Never>?
+    enum Outcome { case ready, notReady, cancelled }
 
-    func wait() async -> Bool {
+    private var opened: Outcome?
+    private var waiter: CheckedContinuation<Outcome, Never>?
+
+    func wait() async -> Outcome {
         if let opened { return opened }
         return await withCheckedContinuation { waiter = $0 }
     }
 
-    func open(ready: Bool) {
+    func open(_ outcome: Outcome) {
         guard opened == nil else { return }
-        opened = ready
-        waiter?.resume(returning: ready)
+        opened = outcome
+        waiter?.resume(returning: outcome)
         waiter = nil
     }
 }
