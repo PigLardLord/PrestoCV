@@ -38,6 +38,48 @@
     2020,
     null
    ]
+  },
+  {
+   "role": "Marketing Assistant",
+   "employer": "Acme Media Ltd",
+   "location": "Sheffield",
+   "details": 3,
+   "start": [
+    2014,
+    null
+   ],
+   "end": [
+    2016,
+    null
+   ]
+  },
+  {
+   "role": "Sales Assistant",
+   "employer": "Example Department Store Ltd",
+   "location": "York",
+   "details": 3,
+   "start": [
+    2012,
+    null
+   ],
+   "end": [
+    2014,
+    null
+   ]
+  },
+  {
+   "role": "Events Volunteer",
+   "employer": "Example Arts Festival",
+   "location": "York",
+   "details": 2,
+   "start": [
+    2011,
+    null
+   ],
+   "end": [
+    2012,
+    null
+   ]
   }
  ],
  "education": [

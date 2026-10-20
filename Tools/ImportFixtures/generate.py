@@ -351,7 +351,7 @@ EN_MONTHS = LANGUAGES["en"]["months"]
 def linkedin(p):
     """LinkedIn's "Save to PDF": a sidebar on the left, the profile on the right, English headings, page numbers."""
     layout = Layout()
-    side_x, main_x, main_width, bottom = 36, 220, 340, 780
+    side_x, main_x, main_width, bottom = 36, 220, 340, 640
     y = 60
 
     def side(text, size=10, bold=False, gap=0):

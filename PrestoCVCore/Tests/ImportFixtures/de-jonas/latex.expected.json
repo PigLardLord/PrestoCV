@@ -38,6 +38,48 @@
     2018,
     null
    ]
+  },
+  {
+   "role": "Pflegehelfer",
+   "employer": "Pflegedienst Beispiel",
+   "location": "Kiel",
+   "details": 3,
+   "start": [
+    2012,
+    null
+   ],
+   "end": [
+    2014,
+    null
+   ]
+  },
+  {
+   "role": "Rettungssanitäter",
+   "employer": "Rettungsdienst Beispiel e.V.",
+   "location": "Kiel",
+   "details": 3,
+   "start": [
+    2010,
+    null
+   ],
+   "end": [
+    2011,
+    null
+   ]
+  },
+  {
+   "role": "Bundesfreiwilligendienst",
+   "employer": "Krankenhaus Beispiel",
+   "location": "Flensburg",
+   "details": 2,
+   "start": [
+    2009,
+    null
+   ],
+   "end": [
+    2010,
+    null
+   ]
   }
  ],
  "education": [

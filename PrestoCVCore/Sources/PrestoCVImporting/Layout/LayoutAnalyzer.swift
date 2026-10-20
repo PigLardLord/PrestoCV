@@ -39,11 +39,10 @@ enum LayoutAnalyzer {
         }
         ordered.sort { ($0.column, $0.page, $0.line.frame.y, $0.line.frame.x) < ($1.column, $1.page, $1.line.frame.y, $1.line.frame.x) }
 
-        // The right edge of each column of each page: a line that reaches it was wrapped there
-        var rightEdges: [String: Double] = [:]
+        // The right edge of each column, over all the pages: a line that reaches it may have been wrapped there
+        var rightEdges: [Int: Double] = [:]
         for entry in ordered {
-            let key = "\(entry.column)-\(entry.page)"
-            rightEdges[key] = max(rightEdges[key] ?? 0, entry.line.frame.maxX)
+            rightEdges[entry.column] = max(rightEdges[entry.column] ?? 0, entry.line.frame.maxX)
         }
         var raw: [RawLine] = []
         var previous: (column: Int, page: Int, line: PageLine)?
@@ -65,7 +64,7 @@ enum LayoutAnalyzer {
             rawLine.lastCellBold = line.cells.last?.isBold ?? false
             rawLine.firstCellBold = line.cells.first?.isBold ?? false
             rawLine.firstWordWidth = line.cells.first?.words.first?.frame.width
-            rawLine.columnRight = rightEdges["\(entry.column)-\(entry.page)"]
+            rawLine.columnRight = rightEdges[entry.column]
             raw.append(rawLine)
             previous = entry
         }
