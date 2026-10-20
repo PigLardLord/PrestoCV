@@ -47,29 +47,32 @@ struct CVEditorView: View {
                 .foregroundColor(DesignTokens.Colors.accent)
             }
             
-            if chrome.exportsFromNavigationBar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    BarButton(
-                        title: "export.button.title".localized, systemImage: "square.and.arrow.up",
-                        screenTextSize: dynamicTypeSize
-                    ) {
-                        showingExportSheet = true
-                    }
-                    .disabled(!viewModel.canExport)
-                }
-            }
-
-            // Trailing: Save button with smart state and visual indicator
+            // Trailing, in one capsule: export, in every layout, then Save with its unsaved-changes dot. Both show their
+            // symbols, which leave the title its room in every language, also in portrait on an iPhone
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: DesignTokens.Spacing.xs) {
+                    Button {
+                        showingExportSheet = true
+                    } label: {
+                        Label("export.button.title".localized, systemImage: "square.and.arrow.up")
+                            .labelStyle(.iconOnly)
+                    }
+                    .disabled(!viewModel.canExport)
+                    .accessibilityShowsLargeContentViewer {
+                        Label("export.button.title".localized, systemImage: "square.and.arrow.up")
+                    }
+
                     UnsavedChangesIndicator.warning(isVisible: viewModel.hasUnsavedChanges)
-                    BarButton(
-                        title: "common.save".localized, systemImage: "checkmark", screenTextSize: dynamicTypeSize,
-                        action: handleSaveTap
-                    )
+                    Button(action: handleSaveTap) {
+                        Label("common.save".localized, systemImage: "checkmark")
+                            .labelStyle(.iconOnly)
+                    }
                     .disabled(!viewModel.isSaveButtonEnabled)
                     .foregroundColor(saveButtonColor)
                     .fontWeight(.semibold)
+                    .accessibilityShowsLargeContentViewer {
+                        Label("common.save".localized, systemImage: "checkmark")
+                    }
                 }
             }
         }
@@ -172,25 +175,6 @@ struct CVEditorView: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel("editor.title".localized)
             .accessibilityHint("accessibility.editor_hint".localized)
-
-            // The tab bar and the export button give the space back to the form while someone types
-            if !keyboard.isVisible && !chrome.exportsFromNavigationBar {
-                Divider()
-
-                PrimaryButton.large(
-                    title: String(localized: "export.button.title"),
-                    icon: "square.and.arrow.up",
-                    isDisabled: !viewModel.canExport
-                ) {
-                    showingExportSheet = true
-                }
-                // The button keeps a readable size at the largest text sizes instead of taking a fifth of the screen
-                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-                .frame(maxWidth: DesignTokens.Layout.readableContentWidth)
-                .padding(DesignTokens.Spacing.lg)
-                .frame(maxWidth: .infinity)
-                .background(DesignTokens.Colors.background)
-            }
         }
     }
     

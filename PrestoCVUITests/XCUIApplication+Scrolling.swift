@@ -2,9 +2,8 @@ import XCTest
 
 extension XCUIApplication {
     /// Scrolls the form, a little at a time, until the element can be tapped and sits in the upper half of the screen,
-    /// clear of the tab bar and the export button that float over the lower part, and of the strip of the keyboard
-    /// toolbar above the keyboard, which takes the taps in its whole width. `upwards` scrolls back towards the top of
-    /// the form instead.
+    /// clear of the tab bar that floats over the lower part, and of the strip of the keyboard toolbar above the
+    /// keyboard, which takes the taps in its whole width. `upwards` scrolls back towards the top of the form instead.
     ///
     /// A swipe is too long a step: at large text sizes it carries a row past the strip where it can be tapped. The
     /// drag also stays above the middle of the screen, so that it does not land on the keyboard when that is up.

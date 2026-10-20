@@ -1,6 +1,6 @@
 import XCTest
 
-/// The keyboard of the editor can be closed from a text view, and gives the form its space while it is up.
+/// The keyboard of the editor can be closed from a text view, and the tab bar gives the form its space while it is up.
 final class EditorKeyboardUITests: XCTestCase {
 
     private var app: XCUIApplication!
@@ -38,20 +38,20 @@ final class EditorKeyboardUITests: XCTestCase {
         XCTAssertEqual(summary.value as? String, "Ten years of emergency care.", "Closing the keyboard keeps what was typed")
     }
 
-    func testTheTabBarAndTheExportButtonMakeWayWhileTypingAndComeBack() throws {
-        let export = app.buttons["Preview & export"]
+    func testTheTabBarMakesWayWhileTypingAndTheExportControlStaysInTheNavigationBar() throws {
+        let export = app.navigationBars.buttons["Preview & export"]
         let experienceTab = app.buttons["Experience"].firstMatch
-        XCTAssertTrue(export.waitForExistence(timeout: 10), "The editor should offer to preview and export")
+        XCTAssertTrue(export.waitForExistence(timeout: 10), "The navigation bar should offer to preview and export")
         XCTAssertTrue(experienceTab.exists, "The editor should show its tabs")
 
         app.textFields["Full Name"].tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), XCUIApplication.noSoftwareKeyboard)
-        XCTAssertTrue(waitUntil(export, exists: false), "The export button should make way for the keyboard")
         XCTAssertTrue(waitUntil(experienceTab, exists: false), "The tab bar should make way for the keyboard")
+        XCTAssertTrue(export.exists, "The export control should stay in the navigation bar while typing")
 
         app.toolbars.buttons["Done"].tap()
-        XCTAssertTrue(waitUntil(export, exists: true), "The export button should come back with the keyboard gone")
         XCTAssertTrue(waitUntil(experienceTab, exists: true), "The tab bar should come back with the keyboard gone")
+        XCTAssertTrue(export.exists, "The export control should still be in the navigation bar")
     }
 
     func testReturnEndsTheEntryOfAFieldInsteadOfAddingALine() throws {
