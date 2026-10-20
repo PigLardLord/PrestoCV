@@ -280,13 +280,13 @@ Every dependency of a type is a parameter of its initialiser, or of the function
 
 ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md))
 
-The pure targets, the ones R2 names (domain, application, published language, integration, presentation and workflow ports), build for Android, where the core will run under a Kotlin interface. In them:
+The pure targets, which R2 holds too (the domain, application, published-language, integration, presentation and workflow-port targets), build for Android, where the core will run under a Kotlin interface. In them:
 
 - **No module that only Apple platforms have** is imported, in any form: SwiftUI, UIKit, AppKit, WatchKit, Combine, CryptoKit, `os` and OSLog, NaturalLanguage, FoundationModels, PDFKit, WebKit, Vision, CoreGraphics, UniformTypeIdentifiers, Darwin and the other Apple frameworks. Code that needs one belongs in an adapter, behind a port.
 - **No bundle is read:** no `Bundle`, not even `Bundle.module`, and no `#bundle`. An Android app has no SwiftPM resource bundle, and the accessor SwiftPM generates there stops the process when the bundle is missing. The edge reads the resources and passes them in through a port, as `HeadingTableSource` does for the heading tables.
 - **An API that needs the full Foundation warns.** The full Foundation, with ICU, weighs tens of megabytes for each ABI of an Android app; `FoundationEssentials` does not have these: `NSRegularExpression`, `NSRange`, `.regularExpression`, `folding`, `replacingOccurrences`, `trimmingCharacters`, `JSONSerialization`, `NSString`, `String(format:)`, Foundation's formatters and the localised comparisons. Whether the core gives up the full Foundation is the owner's decision, after the measurements of the spike in #267. Until then each use is listed as a warning, which never fails and never enters the baseline. Where the standard library does the same, prefer it: Swift `Regex`, `Codable`.
 
-**Why.** The owner's direction for Android (2026-10-20, #267) keeps one core, in Swift. On that day the core cross-compiled for Android except where it imported the C library as `Glibc` and where it read a bundle, and nothing kept the next Apple-only import or the next `Bundle.module` out of it.
+**Why.** The owner's direction for Android (2026-10-20, #267) keeps one core, in Swift. On that day the core cross-compiled for Android except the file stores, which imported the C library as `Glibc`, while the rendering read its headings from a bundle that an Android app does not have. Nothing kept the next Apple-only import or the next `Bundle.module` out of the core.
 
 **Enforced by:**
 - **checker:** the detectors `appleOnlyImport` and `bundleAccess`, and `fullFoundation` as a warning (`warningDetectors` in `rules.json`), in every target whose rules list R18. A module-qualified name, such as `Foundation.Bundle`, is checked like a bare one.
