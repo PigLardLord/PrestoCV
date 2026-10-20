@@ -33,7 +33,8 @@
 
 - **An Apple-only import or a bundle in a pure target fails the checker**, on GitHub Actions and on Xcode Cloud. A target that stops building for Android fails the Android job, on every pull request.
 - **The Android job costs a few minutes** on a public repository's free runners. The action caches the host toolchain; the SDK and the build are not cached, because a build restored on fresh sources is rebuilt anyway.
-- **The warnings stay visible** in every run of the checker, until the owner decides whether the core keeps the full Foundation.
+- **The warnings stay visible** in every run of the checker, until the owner decides whether the core keeps the full Foundation. There are 29 in the pure targets today: 18 `trimmingCharacters`, 6 regular expressions, 2 `replacingOccurrences`, 2 `JSONSerialization` and 1 `folding`. The file stores and the legacy grounding, which R18 does not cover, have more.
+- **No R18 finding is in the baseline.** The only errors on the tree were the two reads of `Bundle.module` in `HeadingsCatalog`, which the port removed.
 - **`Bundle.module` stays allowed in adapters**, such as `CVBundledDesigns` and `CVBundledHeadings`: they are the edges that read the platform's resources. R2 keeps its rule for the other ambient state.
 - **A new platform condition is allowed only in an adapter** (R11). The `canImport(Android)` branches are in the file stores, which are adapters.
 - **Not decided here, and listed for later:**

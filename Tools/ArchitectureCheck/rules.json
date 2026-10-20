@@ -47,8 +47,16 @@
   ],
   "R17": [
    "defaultDependency"
+  ],
+  "R18": [
+   "appleOnlyImport",
+   "bundleAccess",
+   "fullFoundation"
   ]
  },
+ "warningDetectors": [
+  "fullFoundation"
+ ],
  "infrastructureTypes": [
   "FileCVRepository",
   "FileDesignStore",
@@ -117,7 +125,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -136,7 +145,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -216,7 +226,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -234,7 +245,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -289,7 +301,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -492,7 +505,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -529,7 +543,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -554,7 +569,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -577,7 +593,8 @@
     "R13",
     "R14",
     "R5",
-    "R17"
+    "R17",
+    "R18"
    ],
    "requiredImportAccess": {
     "PrestoCVDomain": "internal",

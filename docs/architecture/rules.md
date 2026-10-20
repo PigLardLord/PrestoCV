@@ -34,7 +34,7 @@ The checker applies to **production targets**: domain, application, integration,
 
 Domain, application, integration, presentation and workflow-port targets must not use:
 
-- `Bundle` (except `Bundle.module`, a package's own resources), `FileManager`, `UserDefaults`, `ProcessInfo`, `NotificationCenter`;
+- `Bundle`, `FileManager`, `UserDefaults`, `ProcessInfo`, `NotificationCenter`. `Bundle.module`, a package's own resources, is no exception: [R18](#r18-pure-targets-stay-portable-to-android) refuses it, so that the core builds for Android;
 - `Locale.current`, `TimeZone.current`, `Calendar.current` and their `autoupdatingCurrent` forms;
 - `String(localized:)`, `NSLocalizedString`, `LocalizedStringResource`, `LocalizedStringKey`;
 - `Date()`, `Date.init()`, `Date.now`, `.now` or `UUID()` / `UUID.init()` to create values. Inject a `TimeSource` or an `IDGenerator` instead;
@@ -275,3 +275,18 @@ Every dependency of a type is a parameter of its initialiser, or of the function
 **Why.** Initialisers made their own services and read the clock, the locale, the main bundle and the launch arguments when the caller passed nothing. A test that forgot an argument used the device's, so it passed on one machine and failed on another (#247), and a view could make a whole export stack without anyone seeing it (#251, #256).
 
 **Enforced by:** checker (detector `defaultDependency`, in every production target, and in the legacy app and `PrestoCVCore`, [ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)) and review, for a dependency that the name of its type does not show.
+
+## R18. Pure targets stay portable to Android
+
+([ADR 0026](adr/0026-keep-the-core-portable-to-android.md))
+
+The pure targets, the ones R2 names (domain, application, published language, integration, presentation and workflow ports), build for Android, where the core will run under a Kotlin interface. In them:
+
+- **No module that only Apple platforms have** is imported, in any form: SwiftUI, UIKit, AppKit, WatchKit, Combine, CryptoKit, `os` and OSLog, NaturalLanguage, FoundationModels, PDFKit, WebKit, Vision, CoreGraphics, UniformTypeIdentifiers, Darwin and the other Apple frameworks. Code that needs one belongs in an adapter, behind a port.
+- **No bundle is read:** no `Bundle`, not even `Bundle.module`, and no `#bundle`. An Android app has no SwiftPM resource bundle, and the accessor SwiftPM generates there stops the process when the bundle is missing. The edge reads the resources and passes them in through a port, as `HeadingTableSource` does for the heading tables.
+- **An API that needs the full Foundation warns.** The full Foundation, with ICU, weighs tens of megabytes for each ABI of an Android app; `FoundationEssentials` does not have these: `NSRegularExpression`, `NSRange`, `.regularExpression`, `folding`, `replacingOccurrences`, `trimmingCharacters`, `JSONSerialization`, `NSString`, `String(format:)`, Foundation's formatters and the localised comparisons. Whether the core gives up the full Foundation is the owner's decision, after the measurements of the spike in #267. Until then each use is listed as a warning, which never fails and never enters the baseline. Where the standard library does the same, prefer it: Swift `Regex`, `Codable`.
+
+**Why.** The owner's direction for Android (2026-10-20, #267) keeps one core, in Swift. On that day the core cross-compiled for Android except where it imported the C library as `Glibc` and where it read a bundle, and nothing kept the next Apple-only import or the next `Bundle.module` out of it.
+
+**Enforced by:**
+- **checker:** the detectors `appleOnlyImport` and `bundleAccess`, and `fullFoundation` as a warning (`warningDetectors` in `rules.json`), in every target whose rules list R18. A module-qualified name, such as `Foundation.Bundle`, is checked like a bare one.
