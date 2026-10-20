@@ -137,8 +137,12 @@ enum DocumentBuilder {
               block.column == raw.column, block.kind == .line || block.kind == .listItem,
               let previous = block.cells.last, let next = line.cells.first else { return false }
         if previous.hasSuffix(":") { return false }
-        if block.endsWithHyphen && next.startsInLowerCase { return true }
-        if next.startsInLowerCase && (block.kind == .listItem || previous.words.count >= 6) { return true }
+        // A line that opens with emphasis, or is built of parts between bars, is a line of its own
+        let rawStart = raw.text.trimmingSpaces()
+        if rawStart.hasPrefix("**") || rawStart.hasPrefix("__") || next.contains(" | ") { return false }
+        let goesOn = next.words.first.map { word in word.allSatisfy { !$0.isLetter || $0.isLowercase } && word.first?.isLetter == true } ?? false
+        if block.endsWithHyphen && goesOn { return true }
+        if goesOn && (block.kind == .listItem || previous.words.count >= 6) { return true }
         if block.kind == .listItem, let textStart = block.textStart, let frame = raw.frame,
            abs(frame.x - textStart) < 3, !line.isBold {
             return true
