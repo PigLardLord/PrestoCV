@@ -290,3 +290,4 @@ The pure targets, the ones R2 names (domain, application, published language, in
 
 **Enforced by:**
 - **checker:** the detectors `appleOnlyImport` and `bundleAccess`, and `fullFoundation` as a warning (`warningDetectors` in `rules.json`), in every target whose rules list R18. A module-qualified name, such as `Foundation.Bundle`, is checked like a bare one.
+- **CI:** the Android job on GitHub Actions builds every target that builds on Linux for `aarch64-unknown-linux-android28`, with the Swift SDK for Android. It catches what no detector sees, such as a C library imported under one platform's name: the file stores import `Glibc`, `Darwin` or `Android`.

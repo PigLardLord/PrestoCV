@@ -54,3 +54,50 @@ jobs:
           done
           swift test --package-path PrestoCVCore
           swift test --package-path CVPDFExporter
+
+  android:
+    name: Android · build of the portable targets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # The Swift SDK for Android must match the host toolchain exactly. 6.4.0 is the Swift of Xcode 27.0, which Xcode
+      # Cloud builds with, and of the Linux job (ADR 0026). Both downloads are checked against these checksums.
+      SWIFT_VERSION: 6.4.0
+      SWIFT_TOOLCHAIN_SHA256: 69f7b2b4dbce6090b6c92194b71149a057e16269093b5a9dded38afc4a05094e
+      SWIFT_ANDROID_SDK_SHA256: 21fb555122a3d801ad943d48df7ebffdd8824de61c25c180bb792d3edaee0b43
+      # The NDK r30 of the ubuntu-24.04 runner image, the version the SDK asks for.
+      ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/30.0.16248370
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Cache the Swift toolchain
+        id: toolchain
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/swift-toolchain
+          key: swift-${{ env.SWIFT_VERSION }}-ubuntu24.04-${{ env.SWIFT_TOOLCHAIN_SHA256 }}
+      - name: Install Swift and its SDK for Android
+        # The setup documented on swift.org: the toolchain, the SDK installed with its checksum, then the SDK linked to
+        # the NDK.
+        env:
+          TOOLCHAIN_CACHED: ${{ steps.toolchain.outputs.cache-hit }}
+        run: |
+          release="swift-$SWIFT_VERSION-RELEASE"
+          base="https://download.swift.org/swift-$SWIFT_VERSION-release"
+          if [ "$TOOLCHAIN_CACHED" != "true" ]; then
+            curl -fsSL --retry 5 -o "$RUNNER_TEMP/swift.tar.gz" "$base/ubuntu2404/$release/$release-ubuntu24.04.tar.gz"
+            echo "$SWIFT_TOOLCHAIN_SHA256  $RUNNER_TEMP/swift.tar.gz" | sha256sum -c -
+            mkdir -p ~/swift-toolchain
+            tar -xzf "$RUNNER_TEMP/swift.tar.gz" -C ~/swift-toolchain --strip-components 1
+            rm "$RUNNER_TEMP/swift.tar.gz"
+          fi
+          ~/swift-toolchain/usr/bin/swift sdk install --swift-sdks-path ~/swift-sdks \
+            "$base/android-sdk/$release/${release}_android.artifactbundle.tar.gz" --checksum "$SWIFT_ANDROID_SDK_SHA256"
+          ~/swift-sdks/"${release}_android.artifactbundle"/swift-android/scripts/setup-android-sdk.sh
+      - name: Build the portable targets for Android
+        # On a Linux host the manifests declare only the targets that build on Linux (ADR 0012), and every one of them
+        # must build for Android too: arm64, API level 28. The tests do not run on an emulator yet.
+        run: |
+          for package in PrestoCVCore CVPDFExporter CVGeneratorAI PrestoCVApp; do
+            ~/swift-toolchain/usr/bin/swift build --package-path "$package" \
+              --swift-sdks-path ~/swift-sdks --swift-sdk aarch64-unknown-linux-android28
+          done

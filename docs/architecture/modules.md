@@ -10,7 +10,7 @@ A new target, or a new edge between targets, changes this file in the same pull 
 
 Notation:
 - **May import** lists every module the target may `import`. Swift and Foundation are always allowed; in domain targets only as value types (R2).
-- The platform column reads iOS / macOS / Linux. **Linux ✓** means the target must build and pass its tests on Linux in CI.
+- The platform column reads iOS / macOS / Linux / Android. **Linux ✓** means the target must build and pass its tests on Linux in CI. **Android ✓** means it must also build for Android (arm64, API level 28) in CI; its tests do not run there yet ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md)).
 
 Test targets and test-support targets are described below each package. The checker applies only its import allow-lists to them.
 
@@ -20,9 +20,9 @@ Test targets and test-support targets are described below each package. The chec
 
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
-| `PrestoCVDomain` | domain | iOS, macOS, Linux ✓ | Foundation |
-| `PrestoCVApplication` | application | iOS, macOS, Linux ✓ | `PrestoCVDomain`, Foundation |
-| `PrestoCVPersistence` | outbound adapter | iOS, macOS, Linux ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Glibc, Darwin, Android |
+| `PrestoCVDomain` | domain | iOS, macOS, Linux ✓, Android ✓ | Foundation |
+| `PrestoCVApplication` | application | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVDomain`, Foundation |
+| `PrestoCVPersistence` | outbound adapter | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Glibc, Darwin, Android |
 
 **`PrestoCVDomain`**
 - **`CV`**, the aggregate:
@@ -82,12 +82,12 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
-| `CVDocumentModel` | published language | iOS, macOS, Linux ✓ | Foundation |
-| `CVDesignCatalog` | domain + application | iOS, macOS, Linux ✓ | Foundation |
-| `CVDesignCatalogFileStore` | outbound adapter | iOS, macOS, Linux ✓ | `CVDesignCatalog`, Foundation, Glibc, Darwin, Android |
-| `CVBundledDesigns` | outbound adapter + resources | iOS, macOS, Linux ✓ | `CVDesignCatalog`, Foundation |
-| `CVRendering` | application | iOS, macOS, Linux ✓ | `CVDocumentModel`, `CVDesignCatalog`, Foundation |
-| `CVBundledHeadings` | outbound adapter + resources | iOS, macOS, Linux ✓ | `CVRendering`, Foundation |
+| `CVDocumentModel` | published language | iOS, macOS, Linux ✓, Android ✓ | Foundation |
+| `CVDesignCatalog` | domain + application | iOS, macOS, Linux ✓, Android ✓ | Foundation |
+| `CVDesignCatalogFileStore` | outbound adapter | iOS, macOS, Linux ✓, Android ✓ | `CVDesignCatalog`, Foundation, Glibc, Darwin, Android |
+| `CVBundledDesigns` | outbound adapter + resources | iOS, macOS, Linux ✓, Android ✓ | `CVDesignCatalog`, Foundation |
+| `CVRendering` | application | iOS, macOS, Linux ✓, Android ✓ | `CVDocumentModel`, `CVDesignCatalog`, Foundation |
+| `CVBundledHeadings` | outbound adapter + resources | iOS, macOS, Linux ✓, Android ✓ | `CVRendering`, Foundation |
 | `CVRenderingWebKitSupport` | adapter support | iOS, macOS | `CVRendering`, WebKit, Foundation |
 | `CVRenderingIOS` | outbound adapter | iOS | `CVRenderingWebKitSupport`, `CVRendering`, WebKit, UIKit, Foundation |
 | `CVRenderingMacOS` | outbound adapter | macOS | `CVRenderingWebKitSupport`, `CVRendering`, WebKit, AppKit, Foundation |
@@ -174,7 +174,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
-| `CVDrafting` | domain + application | iOS, macOS, Linux ✓ | Foundation |
+| `CVDrafting` | domain + application | iOS, macOS, Linux ✓, Android ✓ | Foundation |
 | `CVDraftingFoundationModels` | outbound adapter | iOS 26, macOS 26 | `CVDrafting`, FoundationModels, Foundation |
 
 **`CVDrafting`**
@@ -197,9 +197,9 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
-| `PrestoCVWorkflowPorts` | app ports | iOS, macOS, Linux ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation |
-| `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, Foundation |
-| `PrestoCVPresentation` | inbound adapter | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain` (both `internal import`), Observation, Foundation |
+| `PrestoCVWorkflowPorts` | app ports | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation |
+| `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, Foundation |
+| `PrestoCVPresentation` | inbound adapter | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain` (both `internal import`), Observation, Foundation |
 | `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVBundledHeadings`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels` |
 
 **`PrestoCVWorkflowPorts`**

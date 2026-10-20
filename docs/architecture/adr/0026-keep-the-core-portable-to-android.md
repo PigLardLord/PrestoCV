@@ -20,7 +20,8 @@
 **The owner decided on 2026-10-20** to adopt the cheap guardrails now ("Sì, adesso": yes, now). The bigger ones the analysis lists are follow-ups (below).
 
 1. **CI builds the portable targets for Android.** A job on GitHub Actions, next to the Linux job, cross-compiles for `aarch64-unknown-linux-android28` every target that builds on Linux: the packages `PrestoCVCore`, `CVPDFExporter`, `CVGeneratorAI` and `PrestoCVApp`, whose manifests leave out the Apple-only and legacy targets on a Linux host ([ADR 0012](0012-legacy-targets-during-migration.md)). It builds, without the tests; the tests do not run on an emulator yet.
-   - **Every version is pinned:** Swift 6.4.0, the toolchain of Xcode 27.0; its SDK for Android; the NDK r30 (30.0.16248370) of the runner image; and the action that installs them, `skiptools/swift-android-action` 2.9.5, by commit.
+   - **Every version is pinned:** Swift 6.4.0, the toolchain of Xcode 27.0, and its SDK for Android, each checked against its checksum; the NDK r30 (30.0.16248370) of the `ubuntu-24.04` runner image; and the actions, by commit.
+   - **It follows the setup documented on swift.org**, the same commands a developer runs, rather than a third-party action.
    - **The Linux job runs the same Swift 6.4.0.** Linux, Android and Xcode Cloud build with one compiler, and a toolchain update changes all three in one pull request.
 2. **R18: pure targets stay portable to Android.** It applies to the targets that R2 calls pure: domain, application, published language, integration, presentation and workflow ports. The checker:
    - **refuses** an import of a module that only Apple platforms have (SwiftUI, UIKit, AppKit, Combine, CryptoKit, `os`, NaturalLanguage, FoundationModels, PDFKit, WebKit, Vision and others), in any form;
@@ -32,7 +33,7 @@
 ## Consequences
 
 - **An Apple-only import or a bundle in a pure target fails the checker**, on GitHub Actions and on Xcode Cloud. A target that stops building for Android fails the Android job, on every pull request.
-- **The Android job costs a few minutes** on a public repository's free runners. The action caches the host toolchain; the SDK and the build are not cached, because a build restored on fresh sources is rebuilt anyway.
+- **The Android job takes a few minutes** on a public repository's free runners. Its steps, run on a Linux machine from an empty home, took 97 seconds with the toolchain to download and 39 seconds with it cached. The job caches the host toolchain; the SDK and the build are not cached, because the SDK downloads in seconds and a build restored on fresh sources is rebuilt anyway.
 - **The warnings stay visible** in every run of the checker, until the owner decides whether the core keeps the full Foundation. There are 29 in the pure targets today: 18 `trimmingCharacters`, 6 regular expressions, 2 `replacingOccurrences`, 2 `JSONSerialization` and 1 `folding`. The file stores and the legacy grounding, which R18 does not cover, have more.
 - **No R18 finding is in the baseline.** The only errors on the tree were the two reads of `Bundle.module` in `HeadingsCatalog`, which the port removed.
 - **`Bundle.module` stays allowed in adapters**, such as `CVBundledDesigns` and `CVBundledHeadings`: they are the edges that read the platform's resources. R2 keeps its rule for the other ambient state.
@@ -55,5 +56,6 @@
 - **A `portable` flag per target in `rules.json`**, as the analysis proposed. A rule mapped to targets is the mechanism the checker already has, with the same effect.
 - **Build only `PrestoCVDomain` and `PrestoCVApplication` for Android.** It saves seconds, but the targets that failed were the file stores, and the targets that build on Linux are the ones the Android app reuses.
 - **Run the tests on an emulator now.** Booting an emulator adds minutes to every pull request. It comes later, as a nightly job.
+- **`skiptools/swift-android-action`** installs the same toolchain and SDK, and can run the tests on an emulator. It verifies no checksum, and its build adds flags of its own. It is the natural choice for the nightly emulator job.
 - **Pass the heading tables to the catalog as a value.** It works too, but a port is how the catalog already receives its bundled designs, and it lets each platform's edge read the files when they are needed.
 - **Pin the Android job to Swift 6.3, as the Linux job was.** The SDK must match the toolchain exactly, and the iOS app builds with 6.4.0 on Xcode Cloud; one version for all three removes a difference instead of choosing which one to keep.
