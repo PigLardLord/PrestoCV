@@ -60,7 +60,13 @@ enum EntryVocabulary {
     ].map(\.folded))
 
     private static let roleStems = ["projektleit", "softwareentwick", "pflegefach", "ingegner", "infermier", "sviluppat", "desarroll", "développ", "desenvolv"].map(\.folded)
-    private static let roleSuffixes = ["entwickler", "entwicklerin", "leiter", "leiterin", "berater", "beraterin", "techniker", "technikerin", "manager", "engineer", "developer", "elektriker", "elektrikerin", "kraft", "kauffrau", "kaufmann"].map(\.folded)
+    /// German compounds end with their role: "Altenpfleger", "Pflegehelferin", "Rettungssanitäter".
+    private static let roleSuffixes = [
+        "entwickler", "entwicklerin", "leiter", "leiterin", "berater", "beraterin", "techniker", "technikerin", "manager", "engineer",
+        "developer", "elektriker", "elektrikerin", "kraft", "kauffrau", "kaufmann", "pfleger", "pflegerin", "helfer", "helferin",
+        "sanitäter", "sanitäterin", "arbeiter", "arbeiterin", "fahrer", "fahrerin", "verkäufer", "verkäuferin", "erzieher",
+        "erzieherin", "ingenieur", "ingenieurin", "meister", "meisterin", "referent", "referentin", "assistent", "assistentin",
+    ].map(\.folded)
 
     // MARK: Organisations and schools
 

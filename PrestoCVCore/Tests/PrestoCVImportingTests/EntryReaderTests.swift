@@ -202,6 +202,18 @@ struct EntryReaderTests {
         #expect(found.cv.experience[1].check == .roleOrEmployerByOrder)
     }
 
+    @Test("German compound roles are roles, so an entry with a marked employer is not flagged")
+    func germanCompoundRoles() throws {
+        let found = read("""
+        Berufserfahrung
+        Altenpfleger | Pflegeheim Sonnenhof Beispiel | Lübeck | 2014 – 2018
+        Rettungssanitäterin | Rettungsdienst Beispiel e.V. | Kiel | 2010 – 2011
+        Pflegehelfer | Pflegedienst Beispiel | Kiel | 2012 – 2014
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == ["Altenpfleger", "Rettungssanitäterin", "Pflegehelfer"])
+        #expect(found.cv.experience.allSatisfy { $0.check == nil })
+    }
+
     @Test("An end before the start, and a range with no end, are flagged")
     func unreadablePeriods() throws {
         let found = read("""
