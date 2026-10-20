@@ -34,7 +34,7 @@ The checker applies to **production targets**: domain, application, integration,
 
 Domain, application, integration, presentation and workflow-port targets must not use:
 
-- `Bundle` (except `Bundle.module`, a package's own resources), `FileManager`, `UserDefaults`, `ProcessInfo`, `NotificationCenter`;
+- `Bundle`, `FileManager`, `UserDefaults`, `ProcessInfo`, `NotificationCenter`. `Bundle.module`, a package's own resources, is no exception: [R18](#r18-pure-targets-stay-portable-to-android) refuses it, so that the core builds for Android;
 - `Locale.current`, `TimeZone.current`, `Calendar.current` and their `autoupdatingCurrent` forms;
 - `String(localized:)`, `NSLocalizedString`, `LocalizedStringResource`, `LocalizedStringKey`;
 - `Date()`, `Date.init()`, `Date.now`, `.now` or `UUID()` / `UUID.init()` to create values. Inject a `TimeSource` or an `IDGenerator` instead;
@@ -210,7 +210,7 @@ A platform-only target wraps **every file** entirely in its platform condition. 
   - the views of the app target (UI strings);
   - rendering, for document headings in the **document's** language.
 - **Every other target returns codes, values, typed errors and status enums.** For example, `SaveStatus.conflict`. A duplicated CV's title is composed by presentation, which knows the language. This also keeps those targets building on Linux, where `String(localized:)` does not exist.
-- **Packages that render text own their translations.** They are JSON resource files, one per language, plus an index, loaded through `Bundle.module`. A test fails if any language lacks a key or has an empty value.
+- **Packages that render text own their translations.** They are JSON files, one per language, plus an index. An adapter target of the package ships them as resources and reads them through `Bundle.module` (`CVBundledHeadings`); the rendering receives them through a port, as bytes, and reads no bundle itself ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md)). A test fails if any language lacks a key or has an empty value.
 - **Language lookup uses BCP 47:** the full tag, then the full primary language subtag. An unsupported language is a typed error, never a silent fallback to English.
 - **The app catalog** marks an entry translated only when it is.
 
@@ -275,3 +275,19 @@ Every dependency of a type is a parameter of its initialiser, or of the function
 **Why.** Initialisers made their own services and read the clock, the locale, the main bundle and the launch arguments when the caller passed nothing. A test that forgot an argument used the device's, so it passed on one machine and failed on another (#247), and a view could make a whole export stack without anyone seeing it (#251, #256).
 
 **Enforced by:** checker (detector `defaultDependency`, in every production target, and in the legacy app and `PrestoCVCore`, [ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)) and review, for a dependency that the name of its type does not show.
+
+## R18. Pure targets stay portable to Android
+
+([ADR 0026](adr/0026-keep-the-core-portable-to-android.md))
+
+The pure targets, which R2 holds too (the domain, application, published-language, integration, presentation and workflow-port targets), build for Android, where the core will run under a Kotlin interface. In them:
+
+- **No module that only Apple platforms have** is imported, in any form: SwiftUI, UIKit, AppKit, WatchKit, Combine, CryptoKit, `os` and OSLog, NaturalLanguage, FoundationModels, PDFKit, WebKit, Vision, CoreGraphics, UniformTypeIdentifiers, Darwin and the other Apple frameworks. Code that needs one belongs in an adapter, behind a port.
+- **No bundle is read:** no `Bundle`, not even `Bundle.module`, and no `#bundle`. An Android app has no SwiftPM resource bundle, and the accessor SwiftPM generates there stops the process when the bundle is missing. The edge reads the resources and passes them in through a port, as `HeadingTableSource` does for the heading tables.
+- **An API that needs the full Foundation warns.** The full Foundation, with ICU, weighs tens of megabytes for each ABI of an Android app; `FoundationEssentials` does not have these: `NSRegularExpression`, `NSRange`, `.regularExpression`, `folding`, `replacingOccurrences`, `trimmingCharacters`, `JSONSerialization`, `NSString`, `String(format:)`, Foundation's formatters and the localised comparisons. Whether the core gives up the full Foundation is the owner's decision, after the measurements of the spike in #267. Until then each use is listed as a warning, which never fails and never enters the baseline. Where the standard library does the same, prefer it: Swift `Regex`, `Codable`.
+
+**Why.** The owner's direction for Android (2026-10-20, #267) keeps one core, in Swift. On that day the core cross-compiled for Android except the file stores, which imported the C library as `Glibc`, while the rendering read its headings from a bundle that an Android app does not have. Nothing kept the next Apple-only import or the next `Bundle.module` out of the core.
+
+**Enforced by:**
+- **checker:** the detectors `appleOnlyImport` and `bundleAccess`, and `fullFoundation` as a warning (`warningDetectors` in `rules.json`), in every target whose rules list R18. A module-qualified name, such as `Foundation.Bundle`, is checked like a bare one.
+- **CI:** the Android job on GitHub Actions builds every target that builds on Linux for `aarch64-unknown-linux-android28`, with the Swift SDK for Android. It catches what no detector sees, such as a C library imported under one platform's name: the file stores import `Glibc`, `Darwin` or `Android`.

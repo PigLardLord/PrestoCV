@@ -2,6 +2,7 @@ import Foundation
 import CVDocumentModel
 import CVDesignCatalog
 import CVRendering
+import CVBundledHeadings
 
 /// The document the native renderers' contract runs print, shared by the iOS and macOS tests (R10). It exercises every
 /// section: a current period and one that ended on an unknown date, a rated and an unrated skill, a native level, a
@@ -35,6 +36,6 @@ public enum ContractFixture {
     /// The fixture as the builder renders it: the HTML and the text nodes the PDF must contain.
     public static func rendered(css: String? = nil) throws -> RenderedDocument {
         let sheet = try css.map { try stylesheet($0) } ?? stylesheet()
-        return DocumentHTMLBuilder().render(document, stylesheet: sheet, palette: palette, headings: try HeadingsCatalog.headings(for: "it"))
+        return DocumentHTMLBuilder().render(document, stylesheet: sheet, palette: palette, headings: try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: "it"))
     }
 }

@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Architecture (target)
-- The target architecture and its rules are in `docs/architecture/`: start from `docs/architecture/README.md`, then `rules.md` (R1–R17) and `modules.md` (targets and allowed imports). Decisions are recorded as ADRs in `docs/architecture/adr/`.
+- The target architecture and its rules are in `docs/architecture/`: start from `docs/architecture/README.md`, then `rules.md` (R1–R18) and `modules.md` (targets and allowed imports). Decisions are recorded as ADRs in `docs/architecture/adr/`.
 - New code follows the target architecture, not the current structure described below. The migration is in progress (see the migration strategy in `docs/architecture/README.md`); where this file and `docs/architecture/` disagree, `docs/architecture/` wins.
 - A change that needs a new target or a new dependency between targets updates `modules.md` in the same pull request. A permanent exception to a rule is an entry in the checker's `rules.json` that cites an ADR; a temporary one is a baseline entry, and the baseline may only shrink.
 - Proposed ADRs describe the target and guide new code; a rule becomes binding when its ADR is Accepted and merged.
@@ -19,7 +19,7 @@
 - `Tools/ArchitectureCheck/check.sh` runs the architecture checker on the whole repository (see `Tools/ArchitectureCheck/README.md`).
 - `swift test --package-path Tools/SourceChecks` runs the checks of source text: the string catalog, the rules the app's views follow, release hygiene. They read the repository, so they are not in the test plans.
 - CI runs on every pull request:
-  - on GitHub Actions (`.github/workflows/ci.yml`), on Linux: the architecture check (with the baseline compared to the base branch), its self-test and the source checks;
+  - on GitHub Actions (`.github/workflows/ci.yml`), on Linux: the architecture check (with the baseline compared to the base branch), its self-test and the source checks; and, in a job of its own, the build of every Linux target for Android with the Swift SDK for Android (ADR 0026);
   - on Xcode Cloud, on macOS (ADR 0024): the architecture check and its self-test, the package tests, the source checks, the builds of `PrestoCVApp` and `CVPDFExporterExamples`, and the `CI` test plan (the app tests and the exporter's simulator tests) on an iPhone and an iPad simulator, on machines that have only the built products. Xcode Cloud also builds and uploads releases to TestFlight; its settings are in `docs/release/xcode-cloud.md`.
 - `open PrestoCV.xcodeproj` launches Xcode with the configured schemes; prefer running previews via the `PrestoCV` scheme.
 

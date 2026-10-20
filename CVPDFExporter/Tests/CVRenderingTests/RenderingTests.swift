@@ -4,6 +4,7 @@ import CVDocumentModel
 import CVDesignCatalog
 @testable import CVRendering
 import CVRenderingTestSupport
+import CVBundledHeadings
 
 let cleanCSS = ".cv-name{color:var(--color-primary)}.cv-entry-title{font-weight:600}.cv-section-title{text-transform:uppercase}"
 
@@ -17,6 +18,9 @@ func stylesheet(_ css: String = cleanCSS) throws -> ValidatedStylesheet {
 }
 
 let palette = Palette(primary: HexColor("#1F3A5F")!, text: HexColor("#111111")!, background: HexColor("#FFFFFF")!)!
+
+/// The heading tables the package ships, read through the bundled adapter (ADR 0026).
+let headingsCatalog = HeadingsCatalog(source: BundleHeadingTableSource())
 
 let fixture = CVDocument(language: "it", person: Person(name: "Ada <Lovelace>", professionalTitle: "Engineer", email: "ada@example.com",
                                                         phone: "+39 06 1234567", location: "Roma", website: "https://ada.example"), sections: [
@@ -36,7 +40,7 @@ let fixture = CVDocument(language: "it", person: Person(name: "Ada <Lovelace>", 
 struct BuilderTests {
     @Test("every field lands in its own section; no parent-context leak (#2)")
     func fieldsInPlace() throws {
-        let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "it"))
+        let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
         #expect(html.contains(#"<p class="cv-entry-subtitle">Babbage &amp; Co</p>"#))
         #expect(html.contains(#"<h3 class="cv-entry-title">Mathematics</h3>"#))
         #expect(html.contains(#"<p class="cv-entry-subtitle">Home</p>"#))
@@ -47,7 +51,7 @@ struct BuilderTests {
 
     @Test("user text is escaped and never re-parsed as template syntax (#21, R8)")
     func escaping() throws {
-        let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "it"))
+        let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
         #expect(html.contains("Writes {{title}} literally &amp; &lt;script&gt;alert(1)&lt;/script&gt;"))
         #expect(!html.contains("<script>"))
         #expect(html.contains("Ada &lt;Lovelace&gt;"))
@@ -62,7 +66,7 @@ struct BuilderTests {
     ])
     func linkSchemes(url: String) throws {
         let doc = CVDocument(language: "en", person: Person(name: "A"), sections: [.profiles([ProfileLink(platform: "P", url: url)])])
-        let html = DocumentHTMLBuilder().build(doc, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "en"))
+        let html = DocumentHTMLBuilder().build(doc, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "en"))
         #expect(!html.contains("<a "))
     }
 
@@ -71,7 +75,7 @@ struct BuilderTests {
     ])
     func safeLinks(url: String) throws {
         let doc = CVDocument(language: "en", person: Person(name: "A"), sections: [.profiles([ProfileLink(platform: "P", url: url)])])
-        let html = DocumentHTMLBuilder().build(doc, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "en"))
+        let html = DocumentHTMLBuilder().build(doc, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "en"))
         #expect(startTags(in: html).contains { $0.name == "a" && $0.attributes["href"] == url })
     }
 
@@ -86,40 +90,40 @@ struct BuilderTests {
     @Test("an invalid language tag becomes 'und' instead of reaching an attribute")
     func languageTag() throws {
         let doc = CVDocument(language: "en\" onload=\"x", person: Person(name: "A"), sections: [])
-        let html = DocumentHTMLBuilder().build(doc, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "en"))
+        let html = DocumentHTMLBuilder().build(doc, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "en"))
         #expect(html.contains(#"<html lang="und">"#))
     }
 
     @Test("headings and dates follow the document language, not the device (R13)")
     func headings() throws {
-        let it = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: fixture.language))
+        let it = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: fixture.language))
         #expect(it.contains(#"<html lang="it">"#))
         #expect(it.contains("Esperienza professionale"))
         #expect(it.contains("03/2019 – Oggi"))
         #expect(it.contains("2010 – 2014"))
         #expect(it.contains("Madrelingua"))
-        #expect(try HeadingsCatalog.headings(for: "en-GB").experience == "Work experience")
+        #expect(try headingsCatalog.headings(for: "en-GB").experience == "Work experience")
     }
 
     @Test("an ended period with no end date is never printed as current (review: H1)")
     func unspecifiedEnd() throws {
-        let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "it"))
+        let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
         #expect(html.contains(#"<p class="cv-entry-period">2015</p>"#))
         #expect(!html.contains("2015 – Oggi"))
     }
 
     @Test("unsupported languages are an error, never English; matching uses the whole primary subtag", arguments: ["ja", "fil", "fi", "e", "en_GB", "en-\n"])
     func unsupportedLanguage(tag: String) {
-        #expect(throws: HeadingsCatalog.Failure.self) { _ = try HeadingsCatalog.headings(for: tag) }
+        #expect(throws: HeadingsCatalog.Failure.self) { _ = try headingsCatalog.headings(for: tag) }
     }
 
     @Test("every supported language has a complete heading table")
     func headingTablesComplete() throws {
-        let languages = try HeadingsCatalog.supportedLanguages()
+        let languages = try headingsCatalog.supportedLanguages()
         #expect(languages == ["en", "it", "de", "es", "fr", "pt"])
         for tag in languages {
-            _ = try HeadingsCatalog.headings(for: tag)
-            let table = try #require(try HeadingsCatalog.table(tag))
+            _ = try headingsCatalog.headings(for: tag)
+            let table = try #require(try headingsCatalog.table(tag))
             #expect(Set(table.keys) == Set(HeadingsCatalog.keys), "\(tag) has unknown or missing keys")
         }
     }
@@ -128,7 +132,7 @@ struct BuilderTests {
           arguments: [("de-CH", "Berufserfahrung"), ("es-419", "Experiencia laboral"), ("fr-CA", "Expérience professionnelle"),
                       ("pt-BR", "Experiência profissional"), ("pt-PT", "Experiência profissional")])
     func regionalTags(tag: String, experience: String) throws {
-        #expect(try HeadingsCatalog.headings(for: tag).experience == experience)
+        #expect(try headingsCatalog.headings(for: tag).experience == experience)
     }
 
     @Test("a document in each new language prints its own headings, period end and native level (#81)",
@@ -136,7 +140,7 @@ struct BuilderTests {
                       ("fr", "Expérience professionnelle", "Aujourd’hui", "Langue maternelle"), ("pt", "Experiência profissional", "Presente", "Língua materna")])
     func newLanguages(tag: String, experience: String, present: String, native: String) throws {
         let doc = CVDocument(language: tag, person: fixture.person, sections: fixture.sections)
-        let html = DocumentHTMLBuilder().build(doc, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: tag))
+        let html = DocumentHTMLBuilder().build(doc, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: tag))
         #expect(html.contains(#"<html lang="\#(tag)">"#))
         #expect(html.contains(#"<h2 class="cv-section-title">\#(experience)</h2>"#))
         #expect(html.contains("03/2019 – \(present)"))
@@ -147,7 +151,7 @@ struct BuilderTests {
     /// UPDATE_GOLDEN=1, run once, and review the diff of Golden/fixture-it.html like code.
     @Test("golden output: the fixture renders exactly to the reviewed HTML")
     func golden() throws {
-        let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "it"))
+        let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
         try GoldenFile.updateIfRequested("fixture-it.html", with: html)
         let url = try #require(Bundle.module.url(forResource: "Golden/fixture-it", withExtension: "html"))
         #expect(html == (try String(contentsOf: url, encoding: .utf8)))
@@ -155,7 +159,7 @@ struct BuilderTests {
 
     @Test("contact fields, certifications and links are rendered in their contract classes; links print their destination (review rounds 2, 3)")
     func contactAndCertifications() throws {
-        let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "it"))
+        let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
         for needle in [#"<p class="cv-phone">+39 06 1234567</p>"#, #"<p class="cv-location">Roma</p>"#, #"<a class="cv-website" href="https://ada.example">https://ada.example</a>"#,
                        #"<section class="cv-section" data-section="certifications"><h2 class="cv-section-title">Certificazioni</h2>"#,
                        #"<h3 class="cv-entry-title">Swift Certified</h3><p class="cv-entry-subtitle">Apple</p><p class="cv-entry-period">2021</p>"#,
@@ -173,7 +177,7 @@ struct BuilderTests {
                          ExperienceItem(role: "Dev", company: "A", period: DocumentPeriod(start: DocumentDate(year: 2015), end: .date(DocumentDate(year: 2018))))]),
             .skills([SkillItem(name: "Swift"), SkillItem(name: "Git")]),
         ])
-        let rendered = DocumentHTMLBuilder().render(doc, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "en"))
+        let rendered = DocumentHTMLBuilder().render(doc, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "en"))
         let full = rendered.textNodes.joined(separator: "\n")
         #expect(DocumentCompleteness.missing(in: full.uppercased(), expected: rendered.textNodes).isEmpty)          // case-insensitive
         // The Swift skill removed: "Swift" still appears in the summary, but one occurrence is missing.
@@ -214,7 +218,7 @@ struct BuilderTests {
 
     @Test("an experience's location and an education's description are rendered (final gate)")
     func locationAndEducationDescription() throws {
-        let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "it"))
+        let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
         #expect(html.contains(#"<p class="cv-entry-subtitle">Babbage &amp; Co</p><p class="cv-entry-location">London</p>"#))
         #expect(html.contains(#"<p class="cv-entry-description">Tutored</p>"#))
     }
@@ -226,7 +230,7 @@ struct BuilderTests {
             .profiles([ProfileLink(platform: "GitHub", url: "https://github.com/ada"), ProfileLink(platform: "LinkedIn", url: "https://linkedin.com/in/ada")]),
             .interests(["Chess", "Running"]),
         ])
-        let rendered = DocumentHTMLBuilder().render(doc, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "en"))
+        let rendered = DocumentHTMLBuilder().render(doc, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "en"))
         let body = String(rendered.html[rendered.html.range(of: "<body>")!.upperBound...])
         let visible = body.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
         for phrase in ["Swift Git", "GitHub https://github.com/ada LinkedIn https://linkedin.com/in/ada", "Chess Running"] {
@@ -237,7 +241,7 @@ struct BuilderTests {
 
     @Test("a PDF that keeps link labels but loses their destinations is incomplete (review round 3)")
     func completenessLinkDestinations() throws {
-        let rendered = DocumentHTMLBuilder().render(fixture, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "it"))
+        let rendered = DocumentHTMLBuilder().render(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
         let full = rendered.textNodes.joined(separator: "\n")
         #expect(DocumentCompleteness.missing(in: full, expected: rendered.textNodes).isEmpty)
         let noDestinations = ["https://ada.example", "https://cert.example/1", "https://github.com/ada"]
@@ -305,10 +309,10 @@ struct DocumentContractTests {
 @Suite("ADR 0003 · PDFRendering contract")
 struct ContractTests {
     func fixtureHTML() throws -> String {
-        DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "it"))
+        DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
     }
     var expected: [String] { get throws {
-        DocumentHTMLBuilder().render(fixture, stylesheet: try stylesheet(), palette: palette, headings: try HeadingsCatalog.headings(for: "it")).textNodes
+        DocumentHTMLBuilder().render(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it")).textNodes
     } }
 
     @Test("the fake renderer passes the contract, checked by reading the PDF it wrote")
@@ -430,7 +434,7 @@ func startTags(in html: String) -> [(name: String, attributes: [String: String])
 struct InstallTests {
     func gate(_ renderer: any PDFRendering) throws -> FixtureRenderingGate {
         FixtureRenderingGate(renderer: renderer, inspector: MinimalPDFInspector(), fixture: fixture,
-                             headings: try HeadingsCatalog.headings(for: "it"), palette: palette)
+                             headings: try headingsCatalog.headings(for: "it"), palette: palette)
     }
     @Test("a valid design that renders completely is stored")
     func installs() async throws {
@@ -455,5 +459,65 @@ struct InstallTests {
         let store = InMemoryDesignStore()
         await #expect(throws: DesignPackageRejected.self) { _ = try await InstallDesign(gate: try gate(Unreachable()), store: store)(designData(".cv{display:none}", id: "bad")) }
         #expect(try await store.design(id: "bad") == nil)
+    }
+}
+
+/// Heading tables held in memory, as an Android app's edge passes them from its assets (ADR 0026).
+struct InMemoryHeadingTables: HeadingTableSource {
+    struct Unreadable: Error {}
+    /// nil: the index cannot be read.
+    var indexData: Data?
+    var tables: [String: Data]
+    /// The tags whose table cannot be read.
+    var unreadable: Set<String> = []
+    func index() throws -> Data {
+        guard let indexData else { throw Unreadable() }
+        return indexData
+    }
+    func table(_ tag: String) throws -> Data? {
+        if unreadable.contains(tag) { throw Unreadable() }
+        return tables[tag]
+    }
+}
+
+@Suite("ADR 0026 · the rendering reads its heading tables through a port")
+struct HeadingTableSourceTests {
+    static let italian = Data(#"{"experience":"Esperienze","education":"Studi","skills":"Competenze","languages":"Lingue","certifications":"Certificazioni","profiles":"Profili","interests":"Interessi","summary":"Profilo","present":"Oggi","native":"Madrelingua"}"#.utf8)
+
+    @Test("the catalog reads the tables of the source it is given, not a bundle")
+    func injected() throws {
+        let catalog = HeadingsCatalog(source: InMemoryHeadingTables(indexData: Data(#"["it"]"#.utf8), tables: ["it": Self.italian]))
+        #expect(try catalog.headings(for: "it-CH").experience == "Esperienze")
+        #expect(try catalog.supportedLanguages() == ["it"])
+    }
+
+    @Test("a language the source has no table for is unsupported")
+    func missing() {
+        let catalog = HeadingsCatalog(source: InMemoryHeadingTables(indexData: nil, tables: ["it": Self.italian]))
+        #expect(throws: HeadingsCatalog.Failure.unsupportedLanguage("de-AT")) { _ = try catalog.headings(for: "de-AT") }
+    }
+
+    @Test("a table or an index the source cannot read, or that is not a table, is corrupt, never a missing language (R7)")
+    func unreadable() {
+        let catalog = HeadingsCatalog(source: InMemoryHeadingTables(indexData: nil, tables: ["pt": Data("not json".utf8)], unreadable: ["it"]))
+        #expect(throws: HeadingsCatalog.Failure.corruptTable("it")) { _ = try catalog.headings(for: "it") }
+        #expect(throws: HeadingsCatalog.Failure.corruptTable("pt")) { _ = try catalog.headings(for: "pt-BR") }
+        #expect(throws: HeadingsCatalog.Failure.corruptTable("index")) { _ = try catalog.supportedLanguages() }
+    }
+
+    @Test("only a tag that reads as BCP 47 reaches the source, so a source may name a file after it", arguments: ["../it", "it/../en", "it\n", ""])
+    func validatedTag(tag: String) {
+        // Every read of this source fails, so a tag that reached it would be reported as a corrupt table.
+        let catalog = HeadingsCatalog(source: InMemoryHeadingTables(indexData: nil, tables: [:], unreadable: [tag, "it", "en"]))
+        #expect(throws: HeadingsCatalog.Failure.unsupportedLanguage(tag)) { _ = try catalog.headings(for: tag) }
+        #expect(throws: HeadingsCatalog.Failure.corruptTable("it")) { _ = try catalog.headings(for: "it") }
+    }
+
+    @Test("the bundled source serves the index and the tables the package ships, and no table for a language it does not ship")
+    func bundled() throws {
+        let source = BundleHeadingTableSource()
+        #expect(try JSONDecoder().decode([String].self, from: source.index()) == ["en", "it", "de", "es", "fr", "pt"])
+        #expect(try source.table("it") != nil)
+        #expect(try source.table("ja") == nil)
     }
 }

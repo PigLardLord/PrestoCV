@@ -6,7 +6,7 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 
 | Document | Contents |
 |---|---|
-| [rules.md](rules.md) | The rules (R1–R17), why each exists, and how each is enforced |
+| [rules.md](rules.md) | The rules (R1–R18), why each exists, and how each is enforced |
 | [modules.md](modules.md) | Every package and target: responsibility, allowed dependencies, platforms |
 | [glossary.md](glossary.md) | The vocabulary used in code, UI copy and tickets |
 | [markup-contract.md](../../CVPDFExporter/Docs/markup-contract.md) | The HTML structure designs may style, versioned |
@@ -57,14 +57,14 @@ PrestoCVApp package                    │
   PrestoCVIntegration ─────────────────┼──▶ PrestoCVWorkflowPorts, PrestoCVApplication, PrestoCVDomain
                                    ├──▶ CVDocumentModel, CVDesignCatalog, CVRendering
                                    └──▶ CVDrafting
-  PrestoCVComposition ──▶ PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns,
+  PrestoCVComposition ──▶ PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns, CVBundledHeadings,
                       CVRenderingWebKitSupport, CVRenderingIOS (iOS) / CVRenderingMacOS (macOS),
                       CVRenderingPDFKitInspector, CVDraftingFoundationModels
 
 PrestoCVCore package        PrestoCVDomain ◀── PrestoCVApplication ◀── PrestoCVPersistence
 CVPDFExporter package   CVDocumentModel ◀── CVRendering ──▶ CVDesignCatalog ◀── CVDesignCatalogFileStore, CVBundledDesigns
                         CVRendering ◀── CVRenderingWebKitSupport ◀── CVRenderingIOS / CVRenderingMacOS
-                        CVRendering ◀── CVRenderingPDFKitInspector
+                        CVRendering ◀── CVRenderingPDFKitInspector, CVBundledHeadings
 CVGeneratorAI package   CVDrafting ◀── CVDraftingFoundationModels
 ```
 
@@ -89,17 +89,19 @@ Dependencies point inwards only. The domain knows nothing about storage, UI, loc
 
 ## Platforms
 
-| Module group | iOS | macOS | Linux |
-|---|---|---|---|
-| Domain, application, persistence, design catalog, rendering core, drafting core, integration, presentation | ✓ | ✓ | ✓ must build and test |
-| `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector` | ✓ | ✓ | |
-| `CVRenderingIOS` | ✓ | | |
-| `CVRenderingMacOS` | | ✓ | |
-| Test-support targets | ✓ | ✓ | ✓ |
-| `CVDraftingFoundationModels` | ✓ 26 | ✓ 26 | |
-| Xcode app target | ✓ 26 | ✓ 26 | |
+| Module group | iOS | macOS | Linux | Android |
+|---|---|---|---|---|
+| Domain, application, persistence, design catalog, rendering core, drafting core, integration, presentation | ✓ | ✓ | ✓ must build and test | ✓ must build |
+| `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector` | ✓ | ✓ | | |
+| `CVRenderingIOS` | ✓ | | | |
+| `CVRenderingMacOS` | | ✓ | | |
+| Test-support targets | ✓ | ✓ | ✓ | ✓ must build |
+| `CVDraftingFoundationModels` | ✓ 26 | ✓ 26 | | |
+| Xcode app target | ✓ 26 | ✓ 26 | | |
 
 Linux support is not a nice-to-have. It is what proves that platform code stayed in the adapters ([R11](rules.md#r11-platform-code-lives-only-in-adapters)), and it is where the renderer for a backend will run.
+
+Android support keeps the core reusable under the Android app's Kotlin interface. CI builds every Linux target for Android too, and [R18](rules.md#r18-pure-targets-stay-portable-to-android) keeps Apple-only modules and bundles out of the pure targets ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md)).
 
 ## Migration strategy
 
@@ -115,7 +117,7 @@ The current code is not refactored in place. The new structure is built next to 
 6. **AI Drafting.** Port with its own draft model, availability port, validation on every path (#16, #17, #18, #35).
 7. **Delete the old code** and close the issues the refactor made obsolete.
 
-Each step lands behind green CI on iOS, macOS and Linux. On Linux only the new targets exist ([ADR 0012](adr/0012-legacy-targets-during-migration.md)). The Linux checks run on GitHub Actions and the Apple checks on Xcode Cloud ([ADR 0024](adr/0024-run-apple-ci-and-releases-on-xcode-cloud.md)).
+Each step lands behind green CI on iOS, macOS and Linux. On Linux only the new targets exist ([ADR 0012](adr/0012-legacy-targets-during-migration.md)). The Linux checks and the Android build run on GitHub Actions and the Apple checks on Xcode Cloud ([ADR 0024](adr/0024-run-apple-ci-and-releases-on-xcode-cloud.md)).
 
 ### Porting from the validation prototype
 

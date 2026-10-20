@@ -47,12 +47,21 @@
   ],
   "R17": [
    "defaultDependency"
+  ],
+  "R18": [
+   "appleOnlyImport",
+   "bundleAccess",
+   "fullFoundation"
   ]
  },
+ "warningDetectors": [
+  "fullFoundation"
+ ],
  "infrastructureTypes": [
   "FileCVRepository",
   "FileDesignStore",
   "BundleDesignSource",
+  "BundleHeadingTableSource",
   "IOSPDFRenderer",
   "MacPDFRenderer",
   "FoundationModelsDrafter"
@@ -116,7 +125,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -135,7 +145,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -146,7 +157,8 @@
     "PrestoCVDomain",
     "Foundation",
     "Glibc",
-    "Darwin"
+    "Darwin",
+    "Android"
    ],
    "rules": [
     "R1",
@@ -178,6 +190,7 @@
     "Foundation",
     "Glibc",
     "Darwin",
+    "Android",
     "PrestoCVDomain",
     "PrestoCVApplication",
     "PrestoCVPersistence",
@@ -213,7 +226,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -231,7 +245,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -241,7 +256,8 @@
     "CVDesignCatalog",
     "Foundation",
     "Glibc",
-    "Darwin"
+    "Darwin",
+    "Android"
    ],
    "rules": [
     "R1",
@@ -283,6 +299,23 @@
     "R7",
     "R9",
     "R11",
+    "R13",
+    "R14",
+    "R17",
+    "R18"
+   ]
+  },
+  {
+   "name": "CVBundledHeadings",
+   "path": "CVPDFExporter/Sources/CVBundledHeadings",
+   "allowedImports": [
+    "CVRendering",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
     "R13",
     "R14",
     "R17"
@@ -367,6 +400,7 @@
     "CVRendering",
     "CVDocumentModel",
     "CVDesignCatalog",
+    "CVBundledHeadings",
     "Foundation"
    ],
    "rules": [
@@ -384,7 +418,8 @@
     "CVDesignCatalog",
     "CVRendering",
     "CVRenderingTestSupport",
-    "CVBundledDesigns"
+    "CVBundledDesigns",
+    "CVBundledHeadings"
    ],
    "rules": [
     "R16"
@@ -433,7 +468,8 @@
     "CVDesignCatalogFileStore",
     "CVRenderingTestSupport",
     "Glibc",
-    "Darwin"
+    "Darwin",
+    "Android"
    ],
    "rules": [
     "R16"
@@ -469,7 +505,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -506,7 +543,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -531,7 +569,8 @@
     "R11",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R18"
    ]
   },
   {
@@ -554,7 +593,8 @@
     "R13",
     "R14",
     "R5",
-    "R17"
+    "R17",
+    "R18"
    ],
    "requiredImportAccess": {
     "PrestoCVDomain": "internal",
@@ -575,6 +615,7 @@
     "CVDesignCatalog",
     "CVDesignCatalogFileStore",
     "CVBundledDesigns",
+    "CVBundledHeadings",
     "CVRendering",
     "CVRenderingWebKitSupport",
     "CVRenderingIOS",
