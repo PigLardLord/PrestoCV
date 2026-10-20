@@ -43,12 +43,12 @@ Create the three workflows with these settings. Anything not listed keeps its de
 | General | Name: `Pull Request` |
 | Environment | Xcode: Latest Release (Xcode 27). macOS: Latest Release. |
 | Start condition | Pull Request Changes. Source branch: All Branches. Destination branch: `main`. Auto-cancel builds: on. |
-| Action 1 | Test. Scheme `PrestoCV`, test plan `CI`, platform iOS. Destinations: iPhone 17 Pro and iPad Pro 13-inch (M5), both on iOS 27.0. Requirement: Required to pass. |
+| Action 1 | Test. Scheme `PrestoCV`, test plan `CI`, platform iOS. Destinations: iPhone 17 Pro and iPad Pro 13-inch (M5), both on the latest iOS release of the selected Xcode. Requirement: Required to pass. |
 | Post-actions | None. |
 
 GitHub shows the result in the pull request.
 
-The destinations name an iOS release rather than the latest one. The exporter's WebKit tests record what WebKit does, and that changes between releases: on iOS 26.2 the content rules let a page's `object` and `embed` loads through, which they block on iOS 26.5 and 27.0. A destination that follows the latest release would change the result of the gate without a change of the code. Moving to another release is a change of its own: run the `CI` plan on the new release first (see [Reproducing a test run on a Mac](#reproducing-a-test-run-on-a-mac)), and update the tables of `SecureWebViewTests` where WebKit changed, in the same pull request as this page.
+The tests do not depend on the iOS release, so the gate runs on the newest one. When a new release fails it, the platform changed under the app, and the fix goes in a pull request of its own; the failure is not noise to retry. The oldest release the app supports, iOS 26.5, runs on a Mac once per pull request, because Xcode Cloud has no iOS 26 simulators.
 
 ### Main
 
@@ -57,7 +57,7 @@ The destinations name an iOS release rather than the latest one. The exporter's 
 | General | Name: `Main` |
 | Environment | Xcode: Latest Release (Xcode 27). macOS: Latest Release. |
 | Start condition | Branch Changes. Branch: `main` only. |
-| Action 1 | Test. Same as the Pull Request workflow: scheme `PrestoCV`, test plan `CI`, iPhone 17 Pro and iPad Pro 13-inch (M5) on iOS 27.0. Requirement: Required to pass. |
+| Action 1 | Test. Same as the Pull Request workflow: scheme `PrestoCV`, test plan `CI`, iPhone 17 Pro and iPad Pro 13-inch (M5) on the latest iOS release. Requirement: Required to pass. |
 | Action 2 | Archive. Scheme `PrestoCV`, platform iOS. The scheme archives with the Release configuration. Deployment preparation: TestFlight (Internal Testing Only). |
 | Post-actions | TestFlight Internal Testing, with the group of internal testers. |
 
@@ -70,7 +70,7 @@ A build from `main` is for the internal testers only. It cannot be submitted to 
 | General | Name: `Release` |
 | Environment | Xcode: Latest Release (Xcode 27). macOS: Latest Release. |
 | Start conditions | Two, and either one starts the workflow. Tag Changes: custom, the tag name begins with `v`. Branch Changes: custom, the branch name begins with `release/`. |
-| Action 1 | Test. Same as the Pull Request workflow: scheme `PrestoCV`, test plan `CI`, iPhone 17 Pro and iPad Pro 13-inch (M5) on iOS 27.0. Requirement: Required to pass. |
+| Action 1 | Test. Same as the Pull Request workflow: scheme `PrestoCV`, test plan `CI`, iPhone 17 Pro and iPad Pro 13-inch (M5) on the latest iOS release. Requirement: Required to pass. |
 | Action 2 | Archive. Scheme `PrestoCV`, platform iOS. The scheme archives with the Release configuration. Deployment preparation: TestFlight and App Store. |
 | Post-actions | TestFlight Internal Testing, with the group of internal testers. |
 
@@ -118,7 +118,7 @@ xcodebuild build-for-testing -scheme PrestoCV -project PrestoCV.xcodeproj \
   CODE_SIGN_IDENTITY=- AD_HOC_CODE_SIGNING_ALLOWED=YES COMPILER_INDEX_STORE_ENABLE=NO
 ```
 
-`xcrun simctl list devices available` gives the ids. Take the simulators of iOS 27.0, the release the workflows name; if it has none of that model, create one with `xcrun simctl create "iPhone 17 Pro" "iPhone 17 Pro" <runtime id>`, the runtime id from `xcrun simctl list runtimes`. To run the tests as well, use `test` instead of `build-for-testing`: that runs them next to the sources, which the test machines do not have (see the next section).
+`xcrun simctl list devices available` gives the ids. Take the simulators of the latest iOS runtime, which the workflows use, and of iOS 26.5, the oldest the app supports; if a runtime has none of that model, create one with `xcrun simctl create "iPhone 17 Pro" "iPhone 17 Pro" <runtime id>`, the runtime id from `xcrun simctl list runtimes`. To run the tests as well, use `test` instead of `build-for-testing`: that runs them next to the sources, which the test machines do not have (see the next section).
 
 | Argument | Why |
 |---|---|

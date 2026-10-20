@@ -54,13 +54,13 @@ final class ConnectionCounter: Sendable {
 }
 
 /// Every kind of load a page can start, pointing at the test listener, and whether a web view without the rules makes
-/// it offscreen. Recorded on iOS 26.5, iOS 27.0, macOS 26 and macOS 27, and so tied to the iOS release the CI gate
-/// names (docs/release/xcode-cloud.md): on iOS 26.2 the rules let the object and embed loads through. The kinds marked
-/// false are not loaded even without the rules (a favicon, a prefetch hint, ftp:, which WebKit no longer supports, and
-/// media: on iOS an offscreen web view does not fetch it even when a script starts muted, inline playback). None of
-/// these can enter the document: the builder's closed tag set has no media, link or icon elements, and a link must be
-/// http(s) (R8). If WebKit starts to make one of these loads, the control fails and the kind moves to the loaded ones,
-/// where the rules are then proven against it.
+/// it offscreen. Recorded on iOS 26.5, iOS 27.0, macOS 26 and macOS 27: the table holds on every release the app
+/// supports; iOS 26.2, below the minimum, lets the object and embed loads through the rules. The kinds marked false are
+/// not loaded even without the rules (a favicon, a prefetch hint, ftp:, which WebKit no longer supports, and media: on
+/// iOS an offscreen web view does not fetch it even when a script starts muted, inline playback). None of these can
+/// enter the document: the builder's closed tag set has no media, link or icon elements, and a link must be http(s)
+/// (R8). If WebKit starts to make one of these loads, the control fails and the kind moves to the loaded ones, where
+/// the rules are then proven against it.
 let pageLoads: [(kind: String, html: @Sendable (_ base: String, _ port: String) -> String, loadedWithoutRules: Bool)] = [
     ("image", { b, _ in "<img src=\"\(b)/i.png\">" }, true),
     ("stylesheet", { b, _ in "<link rel=\"stylesheet\" href=\"\(b)/s.css\">" }, true),
