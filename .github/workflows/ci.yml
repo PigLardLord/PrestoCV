@@ -13,7 +13,8 @@ jobs:
   linux:
     name: Linux · architecture check
     runs-on: ubuntu-latest
-    container: swift:6.3
+    # Swift 6.4.0, the Swift of Xcode 27.0 that Xcode Cloud builds with (ADR 0026).
+    container: swift:6.4.0
     steps:
       - name: Install the self-test's dependencies
         run: apt-get update -qq && apt-get install -y -qq git python3 > /dev/null
@@ -24,8 +25,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: Tools/ArchitectureCheck/.build
-          key: checker-linux-${{ hashFiles('Tools/ArchitectureCheck/Package.resolved', 'Tools/ArchitectureCheck/Sources/**') }}
-          restore-keys: checker-linux-
+          key: checker-linux-swift-6.4.0-${{ hashFiles('Tools/ArchitectureCheck/Package.resolved', 'Tools/ArchitectureCheck/Sources/**') }}
+          restore-keys: checker-linux-swift-6.4.0-
       - name: Architecture check
         env:
           BASE_REF: ${{ github.base_ref }}
