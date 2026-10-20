@@ -76,7 +76,7 @@ enum DocumentBuilder {
         var kind: SourceBlock.Kind
         var isEmphasized: Bool
         var followsGap: Bool
-        var endsWithHyphen: Bool
+        var lineEnd: NormalizedLine.LineEnd
         var page: Int?
         var frame: Rect?
         var column: Int?
@@ -131,7 +131,7 @@ enum DocumentBuilder {
             }
             pending.append(Pending(
                 cells: line.cells, kind: kind, isEmphasized: line.isBold || raw.isEmphasized, followsGap: followsGap,
-                endsWithHyphen: line.endsWithHyphen, page: raw.page, frame: raw.frame, column: raw.column,
+                lineEnd: line.lineEnd, page: raw.page, frame: raw.frame, column: raw.column,
                 textStart: raw.textStart, fontSize: raw.fontSize, lastCellX: raw.lastCellX, lastCellBold: raw.lastCellBold,
                 columnRight: raw.columnRight
             ))
@@ -167,7 +167,7 @@ enum DocumentBuilder {
         let goesOn = next.split(separator: " ").first.map { token in
             token.first?.isLetter == true && token.allSatisfy { ($0.isLetter && $0.isLowercase) || "-'’,;.".contains($0) }
         } ?? false
-        if block.endsWithHyphen && goesOn { return true }
+        if block.lineEnd != .plain && goesOn { return true }
         // A bracket left open, as a period wrapped at its dash: "(2012 -" and "2015)"
         if previous.filter({ $0 == "(" }).count > previous.filter({ $0 == ")" }).count { return true }
         if goesOn && (block.kind == .listItem || previous.words.count >= 6) { return true }
@@ -181,14 +181,19 @@ enum DocumentBuilder {
     private static func join(_ block: inout Pending, with line: NormalizedLine, raw: RawLine) {
         guard let previous = block.cells.last, let next = line.cells.first else { return }
         let joined: String
-        if block.endsWithHyphen {
-            // A hyphen before a lower-case letter only broke the word; before a capital it is part of the word
-            joined = next.startsInLowerCase ? String(previous.dropLast()) + next : previous + next
-        } else {
+        switch block.lineEnd {
+        case .softHyphen:
+            // The soft hyphen is already gone: the word's two parts meet
+            joined = previous + next
+        case .hyphen:
+            // A visible hyphen before a lower-case letter only broke the word; before a capital it is part of the word
+            let brokeTheWord = next.startsInLowerCase && (previous.hasSuffix("-") || previous.hasSuffix("‐"))
+            joined = brokeTheWord ? String(previous.dropLast()) + next : previous + next
+        case .plain:
             joined = previous + " " + next
         }
         block.cells[block.cells.count - 1] = joined
-        block.endsWithHyphen = line.endsWithHyphen
+        block.lineEnd = line.lineEnd
         // The block's frame ends where its last line ends, so a wrapped line is told from the line it wrapped
         if let frame = raw.frame, let old = block.frame {
             let united = old.union(frame)

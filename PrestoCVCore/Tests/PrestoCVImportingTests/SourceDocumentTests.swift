@@ -47,6 +47,12 @@ struct SourceDocumentTests {
         #expect(texts(document) == ["Verantwortung als Projektleiter für drei Teams", "Schulung von Mitarbei-", "Tern"])
     }
 
+    @Test("A soft hyphen at a line's end joins the word without losing a letter; a visible one goes when it broke the word")
+    func softHyphen() {
+        let (document, _) = build("- Entwick\u{AD}\nlung von Apps\n- Projekt-\nleitung\n- E-Mail-Marketing")
+        #expect(texts(document) == ["Entwicklung von Apps", "Projektleitung", "E-Mail-Marketing"])
+    }
+
     @Test("A wrapped line of a list item or of prose goes on in the same block")
     func wrappedLines() {
         let (document, _) = build("- Led the migration of the app to SwiftUI and\nshipped it to 2 million people\nSkills\nswift")

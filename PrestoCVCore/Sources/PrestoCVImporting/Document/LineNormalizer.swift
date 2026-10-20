@@ -3,6 +3,14 @@
 /// A line after the closed rules of normalisation (ADR 0027): characters, then the markup of chat assistants and of
 /// plain text. What it removes is markup or invisible; what it keeps is the source's text.
 struct NormalizedLine: Equatable {
+    enum LineEnd: Equatable {
+        case plain
+        /// A soft hyphen, removed from the text: the word goes on with nothing to take away.
+        case softHyphen
+        /// A visible hyphen, kept in the text until the next line shows whether it only broke the word.
+        case hyphen
+    }
+
     enum Markup: Equatable {
         case none
         case heading(level: Int)
@@ -17,8 +25,8 @@ struct NormalizedLine: Equatable {
     var markup: Markup
     /// The whole line was bold (`**…**` or `__…__`).
     var isBold: Bool
-    /// The line ended with a hyphen or a soft hyphen right after a letter: a word may go on in the next line.
-    var endsWithHyphen: Bool
+    /// How the line ends: a word may go on in the next line after a hyphen right after a letter.
+    var lineEnd: LineEnd
 
     var text: String { cells.joined(separator: "\t") }
     var isEmpty: Bool { cells.allSatisfy(\.isEmpty) }
@@ -33,16 +41,19 @@ enum LineNormalizer {
         var markup = NormalizedLine.Markup.none
 
         if isRule(line) {
-            return NormalizedLine(cells: [], markup: .rule, isBold: false, endsWithHyphen: false)
+            return NormalizedLine(cells: [], markup: .rule, isBold: false, lineEnd: .plain)
         }
         if let cells = tableCells(line) {
             if cells.allSatisfy(isTableSeparatorCell) {
-                return NormalizedLine(cells: [], markup: .tableSeparator, isBold: false, endsWithHyphen: false)
+                return NormalizedLine(cells: [], markup: .tableSeparator, isBold: false, lineEnd: .plain)
             }
             let inline = cells.map { stripInlineMarkup(Substring($0)).trimmingSpaces() }
-            return NormalizedLine(cells: inline.map(collapsingSpaces), markup: .none, isBold: false, endsWithHyphen: false)
+            return NormalizedLine(cells: inline.map(collapsingSpaces), markup: .none, isBold: false, lineEnd: .plain)
         }
-        while line.hasPrefix(">") { line = line.dropFirst().trimmingSpaces() }
+        // A quote's marker is followed by a space; ">5 years" is the person's text
+        while line.hasPrefix(">"), line.dropFirst().first.map({ $0 == " " || $0 == ">" }) ?? true {
+            line = line.dropFirst().trimmingSpaces()
+        }
         if let (level, rest) = headingMarker(line) {
             markup = .heading(level: level)
             line = rest
@@ -53,12 +64,12 @@ enum LineNormalizer {
         let isBold = isWhollyBold(line)
         let text = stripInlineMarkup(line)
         let cells = splitsColumns ? columnCells(text) : [text]
-        let endsWithHyphen = cleaned.endsWithSoftHyphen || endsWithWordHyphen(text)
+        let lineEnd: NormalizedLine.LineEnd = cleaned.endsWithSoftHyphen ? .softHyphen : endsWithWordHyphen(text) ? .hyphen : .plain
         return NormalizedLine(
             cells: cells.map { collapsingSpaces($0.trimmingSpaces()) }.filter { !$0.isEmpty },
             markup: markup,
             isBold: isBold,
-            endsWithHyphen: endsWithHyphen
+            lineEnd: lineEnd
         )
     }
 
@@ -197,8 +208,8 @@ enum LineNormalizer {
     static func stripInlineMarkup(_ line: Substring) -> String {
         var text = replacingLinks(String(line))
         for mark in ["**", "__", "`"] { text = removingPairs(of: mark, in: text) }
-        text = removingPairs(of: "*", in: text)
-        text = removingUnderscoreEmphasis(in: text)
+        text = removingEmphasis(marked: "*", in: text)
+        text = removingEmphasis(marked: "_", in: text)
         return removingEscapes(in: text)
     }
 
@@ -239,18 +250,18 @@ enum LineNormalizer {
         return result + rest
     }
 
-    /// `_emphasis_` between word boundaries; an underscore inside a word or an address stays.
-    private static func removingUnderscoreEmphasis(in text: String) -> String {
+    /// `_emphasis_` or `*emphasis*` between word boundaries; a mark inside a word, an address or a rating ("4*") stays.
+    private static func removingEmphasis(marked mark: Character, in text: String) -> String {
         let characters = Array(text)
         var drop = Set<Int>()
         var index = 0
         while index < characters.count {
-            if characters[index] == "_", index == 0 || !isWordCharacter(characters[index - 1]),
+            if characters[index] == mark, index == 0 || !isWordCharacter(characters[index - 1]),
                index + 1 < characters.count, characters[index + 1] != " " {
                 var end = index + 1
-                while end < characters.count, characters[end] != "_" { end += 1 }
+                while end < characters.count, characters[end] != mark { end += 1 }
                 if end < characters.count, characters[end - 1] != " ",
-                   end + 1 == characters.count || !isWordCharacter(characters[end + 1]) {
+                   end + 1 == characters.count || !(characters[end + 1].isLetter || characters[end + 1].isNumber) {
                     drop.insert(index)
                     drop.insert(end)
                     index = end
@@ -265,11 +276,13 @@ enum LineNormalizer {
         character.isLetter || character.isNumber || character == "@" || character == "." || character == "/"
     }
 
+    /// A backslash escapes only ASCII punctuation, as in Markdown; before anything else it is the person's text.
     private static func removingEscapes(in text: String) -> String {
         var result = ""
         var escaping = false
         for character in text {
             if escaping {
+                if !(character.isASCII && (character.isPunctuation || character.isSymbol)) { result.append("\\") }
                 result.append(character)
                 escaping = false
             } else if character == "\\" {

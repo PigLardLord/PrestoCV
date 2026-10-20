@@ -47,6 +47,18 @@ struct LineNormalizerTests {
         #expect(LineNormalizer.normalize("5 * 3 = 15").text == "5 * 3 = 15")
     }
 
+    @Test("Only Markdown's escapes lose their backslash; any other backslash is the person's text")
+    func escapes() {
+        #expect(LineNormalizer.normalize("C\\# and F\\# on C:\\Users\\lena").text == "C# and F# on C:\\Users\\lena")
+    }
+
+    @Test("A star or a quote's mark that is the person's text stays")
+    func contentMarks() {
+        #expect(LineNormalizer.normalize("Hotel 4* e 5* a Rimini, *Acme*.").text == "Hotel 4* e 5* a Rimini, Acme.")
+        #expect(LineNormalizer.normalize(">5 years in C++").text == ">5 years in C++")
+        #expect(LineNormalizer.normalize("> Quoted").text == "Quoted")
+    }
+
     @Test("A line wholly in bold is marked bold")
     func boldLine() {
         #expect(LineNormalizer.normalize("**Esperienza**").isBold)
@@ -74,10 +86,12 @@ struct LineNormalizerTests {
         #expect(LineNormalizer.normalize("Torino, Italia  ·  +39").cells == ["Torino, Italia · +39"])
     }
 
-    @Test("A hyphen right after a letter at the end marks a word broken across lines")
+    @Test("A hyphen right after a letter at the end marks a word broken across lines; a soft one is told from a visible one")
     func hyphenAtTheEnd() {
-        #expect(LineNormalizer.normalize("Verantwortung als Projekt-").endsWithHyphen)
-        #expect(LineNormalizer.normalize("Verantwortung als Projekt\u{AD}").endsWithHyphen)
-        #expect(LineNormalizer.normalize("2019 -").endsWithHyphen == false)
+        #expect(LineNormalizer.normalize("Verantwortung als Projekt\u{AD}").text == "Verantwortung als Projekt")
+        #expect(LineNormalizer.normalize("Verantwortung als Projekt").lineEnd == .plain)
+        #expect(LineNormalizer.normalize("Verantwortung als Projekt-").lineEnd == .hyphen)
+        #expect(LineNormalizer.normalize("Verantwortung als Projekt\u{AD}").lineEnd == .softHyphen)
+        #expect(LineNormalizer.normalize("2019 -").lineEnd == .plain)
     }
 }
