@@ -21,7 +21,8 @@ public struct PDFFileName: Sendable {
     /// Where the name goes in a pattern
     public static let placeholder = "%@"
 
-    private static let forbiddenCharacters: Set<Character> = ["/", "\\", ":", "*", "?", "\"", "<", ">", "|"]
+    /// The scalars that file systems reject in a name, or read as a path separator
+    private static let forbiddenScalars: Set<Unicode.Scalar> = ["/", "\\", ":", "*", "?", "\"", "<", ">", "|"]
 
     /// The scalars that reorder text on screen, so that a name can look like another one: bidirectional controls
     private static let bidirectionalControls: ClosedRange<Unicode.Scalar> = "\u{202A}"..."\u{202E}"
@@ -59,10 +60,17 @@ public struct PDFFileName: Sendable {
 
     private static func cleaned(_ name: String) -> String {
         let withoutForbidden = name.precomposedStringWithCanonicalMapping.filter { character in
-            !forbiddenCharacters.contains(character) && !character.unicodeScalars.contains(where: isInvisibleControl)
+            !holdsForbiddenScalar(character) && !character.unicodeScalars.contains(where: isInvisibleControl)
         }
         let singleSpaced = withoutForbidden.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        return String(singleSpaced.drop(while: { $0 == "." }))
+        return String(singleSpaced.drop(while: { $0.unicodeScalars.first == "." }))
+    }
+
+    /// Whether a character holds a scalar that file systems reject, in either canonical form: the marks that combine
+    /// with a slash do not make it harmless, and "≮" is "<" with a mark once decomposed. Such a character goes whole,
+    /// with its marks.
+    private static func holdsForbiddenScalar(_ character: Character) -> Bool {
+        String(character).decomposedStringWithCanonicalMapping.unicodeScalars.contains(where: forbiddenScalars.contains)
     }
 
     /// The longest start of the name that has at most `maxNameLength` characters and `budget` bytes in UTF-8.

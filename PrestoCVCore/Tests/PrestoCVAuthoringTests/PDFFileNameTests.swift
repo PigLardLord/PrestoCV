@@ -46,6 +46,21 @@ struct PDFFileNameTests {
         #expect(english.fileName(personName: name, cvName: "") == "\(cleaned) – CV.pdf")
     }
 
+    @Test("a character that file systems reject goes with the marks that combine with it", arguments: [
+        ("Lena/\u{0301}Hartmann", "LenaHartmann"), ("Lena\\\u{0301}Hartmann", "LenaHartmann"),
+        ("Lena:\u{0308}Hartmann", "LenaHartmann"), ("Lena*\u{0301}Hartmann", "LenaHartmann"),
+        ("Lena?\u{0300}Hartmann", "LenaHartmann"), ("Lena\"\u{0301}Hartmann", "LenaHartmann"),
+        ("Lena<\u{0338}Hartmann", "LenaHartmann"), ("Lena>\u{0338}Hartmann", "LenaHartmann"),
+        ("Lena|\u{0301}Hartmann", "LenaHartmann"), ("../\u{0301}../\u{0308}etc", "etc"),
+        ("Lena/\u{0301}\u{0302}\u{0303}Hartmann", "LenaHartmann"), (".\u{0301}hidden", "hidden"),
+    ])
+    func forbiddenCharactersWithCombiningMarksAreRemoved(name: String, cleaned: String) {
+        let fileName = english.fileName(personName: name, cvName: "")
+
+        #expect(fileName == "\(cleaned) – CV.pdf")
+        #expect(!fileName.unicodeScalars.contains { "/\\:*?\"<>|".unicodeScalars.contains($0) })
+    }
+
     @Test("line breaks and tabs separate words, other control characters disappear", arguments: [
         ("Ada\nLovelace", "Ada Lovelace"), ("Ada\r\nLovelace", "Ada Lovelace"), ("Ada\t\tLovelace", "Ada Lovelace"),
         ("Ada\u{0007}Lovelace", "AdaLovelace"), ("Ada\u{0000}Lovelace", "AdaLovelace"), ("Ada\u{202E}fdp.exe", "Adafdp.exe"),
