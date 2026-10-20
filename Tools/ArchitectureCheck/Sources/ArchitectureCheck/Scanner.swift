@@ -43,6 +43,26 @@ final class Scanner: SyntaxVisitor {
     static let escapeCalls: Set<String> = ["fatalError", "precondition", "preconditionFailure", "unsafeBitCast"]
     static let printCalls: Set<String> = ["print", "debugPrint", "NSLog", "dump"]
 
+    /// Modules that only Apple platforms have: a pure target that imports one does not build for Android (R18).
+    static let appleOnlyModules: Set<String> = [
+        "SwiftUI", "UIKit", "AppKit", "WatchKit", "Combine", "CryptoKit", "os", "OSLog", "NaturalLanguage", "FoundationModels", "PDFKit",
+        "WebKit", "Vision", "VisionKit", "CoreGraphics", "CoreImage", "CoreText", "CoreML", "QuickLook", "QuickLookThumbnailing",
+        "UniformTypeIdentifiers", "LinkPresentation", "MapKit", "Photos", "PhotosUI", "AVFoundation", "AVKit", "StoreKit", "Security",
+        "LocalAuthentication", "CoreData", "SwiftData", "CloudKit", "Contacts", "EventKit", "UserNotifications", "Network", "CoreLocation",
+        "MessageUI", "SafariServices", "AuthenticationServices", "Accelerate", "Metal", "QuartzCore", "ImageIO", "CoreServices",
+        "MobileCoreServices", "SystemConfiguration", "CoreTransferable", "Translation", "Speech", "ObjectiveC", "Darwin",
+    ]
+    /// The Foundation types and members that only the full Foundation has, with ICU; FoundationEssentials does not (R18).
+    static let fullFoundationTypes: Set<String> = [
+        "NSRegularExpression", "NSRange", "JSONSerialization", "NSString", "NSMutableString", "DateFormatter", "NumberFormatter",
+        "ISO8601DateFormatter", "DateComponentsFormatter", "DateIntervalFormatter", "RelativeDateTimeFormatter", "ListFormatter",
+        "ByteCountFormatter", "MeasurementFormatter", "PersonNameComponentsFormatter",
+    ]
+    static let fullFoundationMembers: Set<String> = [
+        "trimmingCharacters", "folding", "replacingOccurrences", "regularExpression", "localizedCompare",
+        "localizedCaseInsensitiveCompare", "localizedStandardCompare",
+    ]
+
     init(tree: SourceFileSyntax, file: String, infrastructureTypes: Set<String>, viewTypes: Set<String> = [],
          memberTypes: [String: TypeMembers] = [:], serviceSuffixes: [String] = [], dependencySuffixes: [String] = []) {
         converter = SourceLocationConverter(fileName: file, tree: tree)
@@ -107,6 +127,9 @@ final class Scanner: SyntaxVisitor {
         imports.append((Self.name(first.name), node.startLocation(converter: converter).line, "import " + Self.name(first.name), access))
         if node.attributes.contains(where: { $0.as(AttributeSyntax.self)?.attributeName.trimmedDescription == "_exported" }) {
             hit("exportedImport", "@_exported import", node)
+        }
+        if Self.appleOnlyModules.contains(Self.name(first.name)) {
+            hit("appleOnlyImport", "\(Self.name(first.name)) exists only on Apple platforms, and a pure target builds for Android too", node)
         }
         return .skipChildren
     }
@@ -198,6 +221,7 @@ final class Scanner: SyntaxVisitor {
         if member == nil, Self.escapeCalls.contains(callee) { hit("escapeHatch", callee + "()", node) }
         if member == nil, Self.printCalls.contains(callee) { hit("printing", callee + "()", node) }
         if callee == "NSLocalizedString" || (callee == "String" && args.first?.label?.text == "localized") { hit("localization", "localized string", node) }
+        if callee == "String", isInit, args.first?.label?.text == "format" { hit("fullFoundation", Self.needsFullFoundation("String(format:)"), node) }
         if callee == "DispatchSemaphore" { hit("escapeHatch", "DispatchSemaphore", node) }
         if isInit, infrastructureTypes.contains(callee) { hit("infrastructureConstruction", callee + "(...)", node) }
         if callee == "unsafeFlags" { hit("unsafeFlags", "unsafeFlags", node) }
@@ -213,6 +237,11 @@ final class Scanner: SyntaxVisitor {
         if member == "assumeIsolated" { hit("escapeHatch", "assumeIsolated", node) }
         if member == "swiftLanguageMode" || member == "swiftLanguageVersion" || member == "v5" || member == "v4" || member == "v4_2" {
             if member.hasPrefix("v") { hit("swift5Mode", "." + member, node) }
+        }
+        if Self.fullFoundationMembers.contains(member) { hit("fullFoundation", Self.needsFullFoundation(member), node.declName) }
+        // A module-qualified type (`Foundation.Bundle.module`) is checked like a bare one.
+        if let base = node.base?.as(DeclReferenceExprSyntax.self), Self.moduleQualifiers.contains(Self.name(base.baseName)) {
+            checkPortability(member, node)
         }
         return .visitChildren
     }
@@ -232,6 +261,7 @@ final class Scanner: SyntaxVisitor {
         if Self.ambientTypes.contains(n), !ownResources { hit("ambientEnvironment", n, node) }
         if n == "LocalizedStringResource" || n == "LocalizedStringKey" { hit("localization", n, node) }
         if Self.isTestDoubleName(n) { hit("testDouble", n, node) }
+        checkPortability(n, node)
         checkViewReference(n, node)
         return .visitChildren
     }
@@ -256,6 +286,22 @@ final class Scanner: SyntaxVisitor {
         if n == "LocalizedStringResource" || n == "LocalizedStringKey" { hit("localization", n, node) }
         if n == "DispatchSemaphore" { hit("escapeHatch", n, node) }
         if Self.isTestDoubleName(n) { hit("testDouble", n, node) }
+        checkPortability(n, node)
+    }
+
+    // MARK: Portability (R18)
+
+    /// A pure target reads no bundle, not even its own (`Bundle.module`): an Android app has no SwiftPM resource bundle,
+    /// so the edge reads the resources and passes them in through a port. A type that only the full Foundation has warns.
+    private func checkPortability(_ n: String, _ node: some SyntaxProtocol) {
+        if n == "Bundle" { hit("bundleAccess", Self.readsBundle, node) }
+        if Self.fullFoundationTypes.contains(n) { hit("fullFoundation", Self.needsFullFoundation(n), node) }
+    }
+
+    static let readsBundle = "a pure target reads no bundle, not even Bundle.module: the edge reads the resources and passes them in through a port"
+
+    static func needsFullFoundation(_ api: String) -> String {
+        "\(api) needs the full Foundation, with ICU; FoundationEssentials alone does not have it"
     }
 
     // MARK: Resource bundles
@@ -282,6 +328,7 @@ final class Scanner: SyntaxVisitor {
     /// `onlyForwardsLocation`.
     override func visit(_ node: MacroExpansionExprSyntax) -> SyntaxVisitorContinueKind {
         let name = Self.name(node.macroName)
+        if name == "bundle" { hit("bundleAccess", Self.readsBundle, node) }
         guard name == "filePath" || name == "file" else { return .visitChildren }
         let parameter = node.parent?.as(InitializerClauseSyntax.self)?.parent?.as(FunctionParameterSyntax.self)
         if let parameter, parameter.type.trimmedDescription == "StaticString" {

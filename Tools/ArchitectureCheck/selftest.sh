@@ -20,7 +20,8 @@ P
 {"rules":{"R1":["exportedImport"],"R2":["wallClock","randomIdentity","ambientEnvironment","localization","printing"],
   "R4":["singleton","infrastructureConstruction"],"R7":["swallowedError"],"R9":["escapeHatch"],"R11":["platformCondition"],
   "R14":["testDouble"],"R9m":["swift5Mode","unsafeFlags"],"R15":["bundleLayout"],"R16":["sourceTreePath"],
-  "R5":["viewDependency","viewModelImport"],"R17":["defaultDependency"]},
+  "R5":["viewDependency","viewModelImport"],"R17":["defaultDependency"],"R18":["appleOnlyImport","bundleAccess","fullFoundation"]},
+ "warningDetectors":["fullFoundation"],
  "infrastructureTypes":["FileStore"],
  "serviceSuffixes":["UseCase","Repository","Service","Container"],
  "dependencySuffixes":["UseCase","Repository","Service","Container","Store","Detector","Provider","Factory"],
@@ -486,6 +487,60 @@ legacy_tests "R17"; printf '%s\n' 'init(now: @escaping () -> Date = { Date() }) 
 expect "R17: a legacy target with R17 is checked for it, and only for it" 1 "Tests/Old/OldTests.swift:4: R17 defaultDependency"
 if grep -qE "R1 import|wallClock" "$ROOT/out.txt"; then fail=$((fail+1)); echo "FAIL a legacy target with R17 was checked for more"; sed 's/^/     /' "$ROOT/out.txt"
 else pass=$((pass+1)); echo "ok   a legacy target with R17 is checked for nothing else"; fi
+# --- R18: a pure target stays portable to Android: no Apple-only module and no bundle; an API that needs the full
+# Foundation, with ICU, warns without failing (#267)
+only_portable() {   # the Pure target has only R18 and may import every module a case names, so a case shows R18 alone
+  python3 - "$ROOT/rules.json" <<'PY'
+import json, sys
+p = sys.argv[1]; r = json.load(open(p)); t = next(t for t in r["targets"] if t["name"] == "Pure")
+t["rules"] = ["R18"]
+t["allowedImports"] += ["SwiftUI", "UIKit", "AppKit", "Combine", "CryptoKit", "os", "OSLog", "NaturalLanguage", "FoundationModels", "PDFKit",
+                        "WebKit", "Vision", "Darwin", "FoundationEssentials", "Observation", "Synchronization", "Other"]
+json.dump(r, open(p, "w"))
+PY
+}
+portable_case() { setup; only_portable; src "$2"; expect "$1" "$3" "${4:-}"; }
+for form in 'import SwiftUI' 'import UIKit' 'import AppKit' 'import Combine' 'import CryptoKit' 'import os' 'import os.log' 'import OSLog' \
+            'import NaturalLanguage' 'import FoundationModels' 'import PDFKit' 'import WebKit' 'import Vision' 'import Darwin' \
+            'import struct CryptoKit.Insecure' '@preconcurrency import Combine' 'internal import UIKit' $'#if canImport(UIKit)\nimport UIKit\n#endif'; do
+  portable_case "R18: ${form//$'\n'/⏎} in a pure target" "$form" 1 "R18 appleOnlyImport"
+done
+for form in 'import Foundation' 'import FoundationEssentials' 'import Observation' 'import Synchronization' 'import Other' 'let os = 1'; do
+  portable_case "R18: '$form' is portable" "$form" 0
+done
+for form in 'let u = Bundle.module.url(forResource: "x", withExtension: "json")' 'let b = Bundle.main' 'let b = Bundle(path: "/")' \
+            'init(bundle: Bundle) {}' 'func f(_ b: Bundle = .module) {}' 'let b: Foundation.Bundle? = nil' 'let u = Foundation.Bundle.module' \
+            'let b = #bundle'; do
+  portable_case "R18: '$form' reads a bundle" "$form" 1 "R18 bundleAccess"
+done
+for form in '// Bundle.module' 'let s = "Bundle.module"' 'struct DesignBundle {}' 'let b = designs.bundle'; do
+  portable_case "R18: '$form' reads no bundle" "$form" 0
+done
+for form in 'let t = s.trimmingCharacters(in: .whitespaces)' 'let r = s.range(of: "a+", options: .regularExpression)' \
+            'let x = try NSRegularExpression(pattern: "a")' 'let r: NSRange? = nil' 'let f = s.folding(options: .diacriticInsensitive, locale: nil)' \
+            'let t = s.replacingOccurrences(of: "a", with: "b")' 'let o = try JSONSerialization.jsonObject(with: d)' \
+            'let o = try Foundation.JSONSerialization.jsonObject(with: d)' 'let n = NSString(string: s)' 'let t = String(format: "%d", 1)' \
+            'let f = DateFormatter()' 'let f = NumberFormatter()' 'let f = ISO8601DateFormatter()' 'let o = a.localizedCompare(b)' \
+            'let o = a.localizedStandardCompare(b)' 'let o = a.localizedCaseInsensitiveCompare(b)'; do
+  portable_case "R18: '$form' warns and passes" "$form" 0 "warning: Sources/Pure/P.swift:1: R18 fullFoundation"
+done
+for form in 'let t = s.split(separator: " ")' 'let r = s.firstMatch(of: /a+/)' 'let d = try JSONDecoder().decode(Int.self, from: data)'; do
+  portable_case "R18: '$form' needs no full Foundation" "$form" 0
+  if grep -q "fullFoundation" "$ROOT/out.txt"; then fail=$((fail+1)); echo "FAIL R18: '$form' warned"; else pass=$((pass+1)); echo "ok   R18: '$form' does not warn"; fi
+done
+setup; only_portable; src 'let t = s.trimmingCharacters(in: .whitespaces)'
+"$CHECK" "$ROOT" --rules "$ROOT/rules.json" --baseline "$ROOT/baseline.json" --adr-dir "$ROOT/adr" --write-baseline > "$ROOT/out.txt" 2>&1
+if grep -q "wrote 0 entries" "$ROOT/out.txt" && [[ "$(cat "$ROOT/baseline.json")" == "[]" ]]; then pass=$((pass+1)); echo "ok   R18: a warning never enters the baseline"
+else fail=$((fail+1)); echo "FAIL R18: a warning entered the baseline"; sed 's/^/     /' "$ROOT/out.txt"; fi
+setup; src 'let t = s.trimmingCharacters(in: .whitespaces)'; expect "R18: a target without R18 gets no warning" 0 ""
+if grep -q "fullFoundation" "$ROOT/out.txt"; then fail=$((fail+1)); echo "FAIL R18: a target without R18 warned"; else pass=$((pass+1)); echo "ok   R18: the warning belongs to R18 only"; fi
+# Android is the C library of the Swift SDK for Android, as Glibc is Linux's: modules.md names it like the others.
+setup; src 'let x = 1'
+python3 - "$ROOT/rules.json" <<'PY'
+import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"][0]["allowedImports"] += ["Glibc", "Darwin", "Android"]; json.dump(r,open(p,"w"))
+PY
+printf '| Target | Layer | Platforms | May import |\n|---|---|---|---|\n| `Pure` | adapter | all | Foundation, Glibc, Darwin, Android |\n| `Other` | x | all | Foundation |\n' > "$ROOT/modules.md"
+expect "modules.md: Android is a module name, as Glibc and Darwin are" 0 "" --modules "$ROOT/modules.md"
 # --- baseline: occurrences, stability, monotonicity
 setup; src 'func a() { fatalError("x") }'
 "$CHECK" "$ROOT" --rules "$ROOT/rules.json" --baseline "$ROOT/baseline.json" --adr-dir "$ROOT/adr" --write-baseline >/dev/null
