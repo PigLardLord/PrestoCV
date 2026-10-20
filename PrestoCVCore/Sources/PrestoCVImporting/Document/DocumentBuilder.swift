@@ -13,9 +13,11 @@ struct RawLine: Equatable {
     var followsGap: Bool = false
     /// Where the line's text starts, past a list marker, in a PDF: a wrapped line of a list item starts there too.
     var textStart: Double?
+    /// The largest font size of the line, in a PDF.
+    var fontSize: Double?
 
     init(text: String, page: Int? = nil, frame: Rect? = nil, column: Int? = nil,
-         isEmphasized: Bool = false, followsGap: Bool = false, textStart: Double? = nil) {
+         isEmphasized: Bool = false, followsGap: Bool = false, textStart: Double? = nil, fontSize: Double? = nil) {
         self.text = text
         self.page = page
         self.frame = frame
@@ -23,6 +25,7 @@ struct RawLine: Equatable {
         self.isEmphasized = isEmphasized
         self.followsGap = followsGap
         self.textStart = textStart
+        self.fontSize = fontSize
     }
 }
 
@@ -70,6 +73,7 @@ enum DocumentBuilder {
         var frame: Rect?
         var column: Int?
         var textStart: Double?
+        var fontSize: Double?
     }
 
     static func build(lines: [RawLine], format: SourceFormat) -> (SourceDocument, [LeftOutText]) {
@@ -117,7 +121,7 @@ enum DocumentBuilder {
             pending.append(Pending(
                 cells: line.cells, kind: kind, isEmphasized: line.isBold || raw.isEmphasized, followsGap: followsGap,
                 endsWithHyphen: line.endsWithHyphen, page: raw.page, frame: raw.frame, column: raw.column,
-                textStart: raw.textStart
+                textStart: raw.textStart, fontSize: raw.fontSize
             ))
         }
         return (layOut(pending, format: format), leftOut)
@@ -225,7 +229,7 @@ enum DocumentBuilder {
             }
             blocks.append(SourceBlock(
                 index: index, span: SourceSpan(start, offset), cells: cells, kind: block.kind, isEmphasized: block.isEmphasized,
-                followsGap: block.followsGap, page: block.page, frame: block.frame, column: block.column
+                followsGap: block.followsGap, page: block.page, frame: block.frame, column: block.column, fontSize: block.fontSize
             ))
         }
         return SourceDocument(format: format, text: String(text), blocks: blocks)

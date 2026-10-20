@@ -88,8 +88,9 @@ public struct SourceBlock: Hashable, Sendable {
     public let isEmphasized: Bool
     /// A blank line, or a wider gap than between lines, comes before it.
     public let followsGap: Bool
-    /// From a PDF: the page (from 1), the box and the column (0 for the main one).
+    /// From a PDF: the page (from 1), the box, the column (0 for the main one) and the largest font size.
     public let page: Int?
     public let frame: Rect?
     public let column: Int?
+    public let fontSize: Double?
 }
