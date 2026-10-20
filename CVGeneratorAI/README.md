@@ -52,15 +52,15 @@ are its planned replacement and are still empty.
     ("Spanisch zu lernen, davon träume ich"); "can", "mostly" and "partly" still claim ("I can speak French"), and a
     negation that governs a high level denies only the level ("I am not an expert in Swift" keeps Swift), while one of a
     low level or of the ability denies the item ("I have no basic knowledge of German", "I cannot speak German even at a
-    basic level"). A question claims nothing ("Do I speak French?"), nor do the words inside quotation marks (a single mark
-    after a letter or a digit may be an apostrophe, "patients' records", "un po'", and closes none: a quote that only such a
-    mark may close runs to the end of its line), nor the line after a colon line that another person speaks ("My
-    colleague wrote:"), nor what follows a relative that brings in another subject ("I work with a colleague who speaks
-    French"); "which I use", "che uso", "tengo que hablar" and an item before the relative still claim, and a word that only
-    ends like an infinitive keeps no person ("qui prépare", "che appare"). "plan", "plans" and "planning" withdraw only as
-    verbs ("I am planning to learn Rust"), not as nouns ("route planning", "care plans", "einen Plan erstellt"); an
-    intention said by a phrase withdraws like a wish ("Ho intenzione di", "J'ai l'intention d'", "Ich plane", "Ich habe
-    vor, …").
+    basic level"). A question claims nothing ("Do I speak French?"), nor do the words inside quotation marks (a mark at the
+    end of a line opens a quote on the next one; a single mark after a letter or a digit may be an apostrophe, "patients'
+    records", "un po'", and closes none: a quote that only such a mark may close runs to the end of its line), nor the line
+    after a colon line that another person speaks ("My colleague wrote:"), nor what follows a relative that brings in
+    another subject ("I work with a colleague who speaks French"); "which I use", "che uso", "tengo que hablar" and an item
+    before the relative still claim, and a word that only ends like an infinitive keeps no person ("qui prépare", "che
+    appare"). "plan", "plans" and "planning" withdraw only as verbs ("I am planning to learn Rust"), not as nouns ("route
+    planning", "care plans", "einen Plan erstellt"); an intention said by a phrase withdraws like a wish ("Ho intenzione
+    di", "J'ai l'intention d'", "Ich plane", "Ich habe vor, …").
   - A skill that is also one of the draft's interests, and that the person mentions only as leisure ("In my free time I like
     chess and hiking"), is a hobby, and is dropped; the interest stays. A skill the person claims anywhere else ("proficient
     in Python", a job's clause, a list of skills) stays. Another person's clause ("My sister teaches chess") counts for

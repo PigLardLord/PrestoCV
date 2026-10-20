@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1778
+    static let rowsWhenWritten = 1787
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -3647,6 +3647,39 @@ enum GroundingRows {
                         "the skill stands only inside quotation marks: Swift goes, an accepted loss",
                         "I work with “Swift” every day.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData())))
         rows += singleMarksAfterAWord()
+        rows += marksAtTheEndOfALine()
+        return rows
+    }
+
+    /// A mark at the end of a line opens a quote that goes on with the next lines (#202), when a mark may close it there: a speech
+    /// introduced without a colon, its words on the next line ("Mon collègue a écrit '", then "Je parle français.'"), claims nothing.
+    /// With nothing to close it, the mark opens nothing, and the next line claims as usual.
+    private static func marksAtTheEndOfALine() -> [GroundingRow] {
+        typealias Speech = (language: String, description: String, name: String)
+        var speeches: [Speech] = []
+        speeches.append(("en", "My colleague wrote \"\nI speak French.\"", "French"))
+        speeches.append(("it", "Il mio collega ha scritto “\nParlo francese.”", "francese"))
+        speeches.append(("de", "Mein Kollege schrieb „\nIch spreche Französisch.“", "Französisch"))
+        speeches.append(("es", "Mi colega escribió \"\nHablo francés.\"", "francés"))
+        speeches.append(("fr", "Mon collègue a écrit '\nJe parle français.'", "français"))
+        speeches.append(("pt", "O meu colega escreveu ‘\nFalo francês.’", "francês"))
+
+        var rows: [GroundingRow] = []
+        for v in speeches {
+            rows.append(row("a-mark-at-the-end-of-a-line-opens-a-quote-\(v.language)",
+                            "the mark ends the colleague's line and the next line closes it: the quote is the colleague's, and no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("a-mark-at-the-end-of-a-line-opens-a-quote-that-only-a-word-may-close",
+                        "the mark ends the colleague's line and only the possessive may close it: the next line is quoted to its end, and no language",
+                        "My colleague wrote '\nI manage patients' records. I speak French.", CVData(languages: [Language(name: "French")]),
+                        .exactly(CVData())))
+        rows.append(row("a-mark-at-the-end-of-a-line-that-nothing-closes-opens-nothing",
+                        "no mark closes the one that ends the first line: it opens nothing, and both languages stay",
+                        "I speak French “\nI speak German.", CVData(languages: [Language(name: "French"), Language(name: "German")]), .unchanged))
+        rows.append(row("a-possessive-at-the-end-of-a-line-opens-nothing",
+                        "the mark after James is a possessive, no opening mark: French stays",
+                        "I studied at St. James'\nI speak French.", CVData(languages: [Language(name: "French")]), .unchanged))
         return rows
     }
 

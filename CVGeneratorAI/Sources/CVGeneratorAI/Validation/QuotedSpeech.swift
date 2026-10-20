@@ -4,11 +4,12 @@ import Foundation
 /// nothing for the person (see `Grounding`).
 ///
 /// A quote opens with a mark of the six languages and closes with the mark that pairs with it: «…», »…«, ‹…›, ›…‹, “…”, „…“, „…”,
-/// ‚…‘, ‚…’, ‘…’, "…" and '…'. It may run over two sentences. A mark opens only at the start or after a space, a bracket, a dash, a
-/// colon or another mark, and before a character that is no space (but for « and ‹, which French writes with a space after them). It
-/// closes only before the end, a space or a punctuation mark, and after a character that is no space (but for » and ›, which French
-/// writes with a space before them). So an apostrophe inside a word ("I’m", "l’inglese", "don't") is never a mark, and an inch mark
-/// after a number opens no quote.
+/// ‚…‘, ‚…’, ‘…’, "…" and '…'. It may run over two sentences, and over lines. A mark opens only at the start or after a space, a
+/// bracket, a dash, a colon or another mark, and before a character that is no space (but for « and ‹, which French writes with a
+/// space after them) or at the end of its line, where the quote goes on with the next line ("Mon collègue a écrit '", then "Je parle
+/// français.'"). It closes only before the end, a space or a punctuation mark, and after a character that is no space (but for » and ›,
+/// which French writes with a space before them). So an apostrophe inside a word ("I’m", "l’inglese", "don't") is never a mark, and an
+/// inch mark after a number opens no quote.
 ///
 /// - A single mark right after a letter or a digit may end a word rather than the quote, whatever follows it: a possessive
 ///   ("patients' records", "Hans’ Team"), an elision ("un po'", "jusqu' à") or a prime ("a 5' de la oficina"). It closes no quote for
@@ -81,13 +82,16 @@ enum QuotedSpeech {
         return ends
     }
 
+    /// Whether the mark at `index` opens a quote. A line break after it ends its line: in `offsets(in:lineStarts:)` the sentences are
+    /// joined by line breaks, and a sentence ends with a mark only where its line does.
     private static func opens(at index: Int, in text: [Character]) -> Bool {
         guard index + 1 < text.count else { return false }
         if index > 0 {
             let previous = text[index - 1]
             guard previous.isWhitespace || beforeAnOpening.contains(previous) || pairs[previous] != nil else { return false }
         }
-        return !text[index + 1].isWhitespace || spacedOpenings.contains(text[index])
+        let next = text[index + 1]
+        return !next.isWhitespace || next == "\n" || spacedOpenings.contains(text[index])
     }
 
     private static func closes(at index: Int, in text: [Character]) -> Bool {
