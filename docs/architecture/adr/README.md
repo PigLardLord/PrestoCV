@@ -26,5 +26,6 @@ Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected*
 | [0023](0023-ground-the-ai-draft-in-the-description.md) | Ground the AI draft by quoting the description and explaining every word | Accepted |
 | [0024](0024-run-apple-ci-and-releases-on-xcode-cloud.md) | Run the Apple CI and the releases on Xcode Cloud | Accepted |
 | [0025](0025-hold-the-legacy-app-to-the-separation-rules.md) | Hold the legacy app to the separation of views, view models and rules | Accepted |
+| [0026](0026-keep-the-core-portable-to-android.md) | Keep the core portable to Android | Accepted |
 
 New ADRs copy [template.md](template.md).
