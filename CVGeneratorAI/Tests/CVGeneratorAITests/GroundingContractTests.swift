@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1788
+    static let rowsWhenWritten = 1800
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -428,6 +428,14 @@ enum GroundingRows {
         "the-title-of-a-person-the-claim-names-is-not-the-persons-en", "the-title-of-a-person-the-claim-names-is-not-the-persons-it",
         "the-title-of-a-person-the-claim-names-is-not-the-persons-de", "the-title-of-a-person-the-claim-names-is-not-the-persons-es",
         "the-title-of-a-person-the-claim-names-is-not-the-persons-fr", "the-title-of-a-person-the-claim-names-is-not-the-persons-pt",
+        // Whose verb follows a relative of the person, and the relatives of place: open residual risks of ADR 0023 that #249 must
+        // close before release.
+        "a-noun-before-a-relative-of-the-person-is-another-subject-en", "a-noun-before-a-relative-of-the-person-is-another-subject-it",
+        "a-noun-before-a-relative-of-the-person-is-another-subject-de", "a-noun-before-a-relative-of-the-person-is-another-subject-es",
+        "a-noun-before-a-relative-of-the-person-is-another-subject-fr", "a-noun-before-a-relative-of-the-person-is-another-subject-pt",
+        "a-relative-of-place-brings-in-another-subject-en", "a-relative-of-place-brings-in-another-subject-it",
+        "a-relative-of-place-brings-in-another-subject-es", "a-relative-of-place-brings-in-another-subject-fr",
+        "a-relative-of-place-brings-in-another-subject-pt",
     ]
 
     /// Rows whose desired output the sanitiser does not give, and whose leak the owner accepts as a residual risk (ADR 0023,
@@ -503,6 +511,7 @@ enum GroundingRows {
         rows += speechAfterALineOfAnotherPerson()
         rows += relativeClausesOfAnotherSubject()
         rows += titlesOfAnotherPersonInAClaim()
+        rows += subjectsAroundARelative()
         rows += intentionWordsAsNouns()
         rows += intentionsInAPhrase()
         rows += everyFactIsThePersons()
@@ -3971,6 +3980,42 @@ enum GroundingRows {
                 "the person works with a nurse: the title is the nurse's, and goes", v.description,
                 CVData(personalInfo: person(title: v.title)), .exactly(CVData()), language: v.language)
         }
+    }
+
+    /// Two readings of a relative that the word rules do not build (ADR 0023, Consequences), open residual risks that #249 must close
+    /// (`notImplementedYet`): a noun subject before a relative that keeps the person ("The team that I lead uses Kotlin") gives the
+    /// person the noun's verb after it, and the relatives of place ("where", "dove", "où", "donde", "onde") are not in the relative
+    /// list ("Trabajo en una empresa donde todo el mundo habla inglés"). German writes a comma before "wo", and the clause it splits
+    /// off has a subject of its own: its row holds.
+    private static func subjectsAroundARelative() -> [GroundingRow] {
+        typealias Variant = (language: String, description: String, item: String)
+        var teams: [Variant] = []
+        teams.append(("en", "The team that I lead uses Kotlin.", "Kotlin"))
+        teams.append(("it", "Il team che dirigo usa Kotlin.", "Kotlin"))
+        teams.append(("de", "Das Team, das ich leite, nutzt Kotlin.", "Kotlin"))
+        teams.append(("es", "El equipo que dirijo usa Kotlin.", "Kotlin"))
+        teams.append(("fr", "L'équipe que je dirige utilise Kotlin.", "Kotlin"))
+        teams.append(("pt", "A equipe que eu coordeno usa Kotlin.", "Kotlin"))
+        var places: [Variant] = []
+        places.append(("en", "I work in a company where everyone speaks French.", "French"))
+        places.append(("it", "Lavoro in un'azienda dove tutti parlano francese.", "francese"))
+        places.append(("de", "Ich arbeite in einer Firma, wo alle Französisch sprechen.", "Französisch"))
+        places.append(("es", "Trabajo en una empresa donde todo el mundo habla inglés.", "inglés"))
+        places.append(("fr", "Je travaille dans une entreprise où tout le monde parle anglais.", "anglais"))
+        places.append(("pt", "Trabalho numa empresa onde todos falam francês.", "francês"))
+
+        var rows: [GroundingRow] = []
+        for v in teams {
+            rows.append(row("a-noun-before-a-relative-of-the-person-is-another-subject-\(v.language)",
+                            "the person leads the team, and the team uses Kotlin: the skill is the team's, and goes",
+                            v.description, CVData(skills: [Skill(name: v.item)]), .exactly(CVData()), language: v.language))
+        }
+        for v in places {
+            rows.append(row("a-relative-of-place-brings-in-another-subject-\(v.language)",
+                            "everyone at the company speaks the language, not the person: no language",
+                            v.description, CVData(languages: [Language(name: v.item)]), .exactly(CVData()), language: v.language))
+        }
+        return rows
     }
 
     /// "plan", "plans" and "planning" say an intention only as verbs (#202): with "to", "on", an article or a possessive after them, or a
