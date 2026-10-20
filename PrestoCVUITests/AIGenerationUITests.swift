@@ -12,7 +12,7 @@ final class AIGenerationUITests: XCTestCase {
         // The simulator cannot run the model: the debug override offers the AI card all the same
         app.launchArguments += [
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage",
-            "-AIAvailabilityOverride", "available",
+            "-AIAvailabilityOverride", "available", "-PrestoCVUITestsKeepSavedConfirmation",
         ]
         app.launch()
     }
@@ -39,11 +39,13 @@ final class AIGenerationUITests: XCTestCase {
         XCTAssertTrue(description.waitForExistence(timeout: 10), "The AI screen should have a description to type into")
         description.tap()
         description.typeText("I have been a nurse at San Camillo hospital in Rome since 2015.")
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), "Typing should show the keyboard")
+        XCTAssertTrue(description.waitForKeyboardFocus(true), "Typing should give the description the keyboard focus")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), XCUIApplication.noSoftwareKeyboard)
 
         let done = app.toolbars.buttons["Done"]
         XCTAssertTrue(done.waitForExistence(timeout: 10), "The keyboard should offer a Done button")
         done.tap()
+        XCTAssertTrue(description.waitForKeyboardFocus(false), "Done should take the keyboard focus from the description")
         XCTAssertTrue(waitUntil(app.keyboards.firstMatch, exists: false), "Done should close the keyboard")
 
         let generate = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Generate CV with AI")).firstMatch

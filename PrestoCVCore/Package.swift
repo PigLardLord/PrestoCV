@@ -28,7 +28,7 @@ targets += [
 
 let package = Package(
     name: "PrestoCVCore",
-    platforms: [.iOS("26.0"), .macOS("26.0")],
+    platforms: [.iOS("26.5"), .macOS("26.0")],
     products: products,
     targets: targets
 )

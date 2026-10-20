@@ -182,7 +182,7 @@ struct AppLaunchViewModelTests {
         )
 
         let starting = Task { await viewModel.start() }
-        let checkedWhileTemplatesWereBlocked = await receives(checkStarted.stream, within: .seconds(5))
+        let checkedWhileTemplatesWereBlocked = await receives(checkStarted.stream, within: patience)
         templatesReleased.continuation.yield()
         await starting.value
 

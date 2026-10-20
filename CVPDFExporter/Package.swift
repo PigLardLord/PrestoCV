@@ -69,7 +69,7 @@ targets += [
 
 let package = Package(
     name: "CVPDFExporter",
-    platforms: [.iOS("26.0"), .macOS("26.0")],
+    platforms: [.iOS("26.5"), .macOS("26.0")],
     products: products,
     dependencies: dependencies,
     targets: targets

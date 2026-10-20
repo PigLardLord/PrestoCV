@@ -9,7 +9,7 @@ final class NewCVExamplesUITests: XCTestCase {
         continueAfterFailure = false
         executionTimeAllowance = 240
         app = XCUIApplication()
-        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage"]
+        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage", "-PrestoCVUITestsKeepSavedConfirmation"]
         app.launch()
     }
 

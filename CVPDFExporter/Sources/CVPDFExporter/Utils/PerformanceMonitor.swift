@@ -91,9 +91,13 @@ public actor PerformanceMonitor {
 
     private var measurements: [PerformanceMeasurement] = []
     private var thresholds: [String: TimeInterval] = [:]
-    private var activeMeasurements: [UUID: (label: String, start: CFAbsoluteTime, memoryBefore: Int?)] = [:]
+    private var activeMeasurements: [UUID: (label: String, start: TimeInterval, memoryBefore: Int?)] = [:]
+    private let now: @Sendable () -> TimeInterval
 
-    public init() {}
+    /// - Parameter now: The clock durations are measured on, in seconds.
+    public init(now: @escaping @Sendable () -> TimeInterval = { CFAbsoluteTimeGetCurrent() }) {
+        self.now = now
+    }
 
     // MARK: - Public Properties
 
@@ -109,9 +113,9 @@ public actor PerformanceMonitor {
         label: String,
         operation: () async throws -> T
     ) async rethrows -> T {
-        let start = CFAbsoluteTimeGetCurrent()
+        let start = now()
         let result = try await operation()
-        let duration = CFAbsoluteTimeGetCurrent() - start
+        let duration = now() - start
 
         let measurement = PerformanceMeasurement(
             label: label,
@@ -128,9 +132,9 @@ public actor PerformanceMonitor {
         operation: () async throws -> T
     ) async rethrows -> T {
         let memoryBefore = getCurrentMemoryUsage()
-        let start = CFAbsoluteTimeGetCurrent()
+        let start = now()
         let result = try await operation()
-        let duration = CFAbsoluteTimeGetCurrent() - start
+        let duration = now() - start
         let memoryAfter = getCurrentMemoryUsage()
 
         let measurement = PerformanceMeasurement(
@@ -149,9 +153,9 @@ public actor PerformanceMonitor {
         label: String,
         operation: () async throws -> T
     ) async rethrows -> (result: T, alert: ThresholdAlert) {
-        let start = CFAbsoluteTimeGetCurrent()
+        let start = now()
         let result = try await operation()
-        let duration = CFAbsoluteTimeGetCurrent() - start
+        let duration = now() - start
 
         let measurement = PerformanceMeasurement(
             label: label,
@@ -173,7 +177,7 @@ public actor PerformanceMonitor {
     public func startMeasurement(operation: String, trackMemory: Bool = false) -> UUID {
         let id = UUID()
         let memory = trackMemory ? getCurrentMemoryUsage() : nil
-        activeMeasurements[id] = (label: operation, start: CFAbsoluteTimeGetCurrent(), memoryBefore: memory)
+        activeMeasurements[id] = (label: operation, start: now(), memoryBefore: memory)
         return id
     }
 
@@ -181,7 +185,7 @@ public actor PerformanceMonitor {
     public func endMeasurement(id: UUID) {
         guard let active = activeMeasurements.removeValue(forKey: id) else { return }
 
-        let duration = CFAbsoluteTimeGetCurrent() - active.start
+        let duration = now() - active.start
         let measurement = PerformanceMeasurement(
             label: active.label,
             duration: duration,

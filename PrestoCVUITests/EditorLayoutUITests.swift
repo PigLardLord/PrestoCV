@@ -76,10 +76,11 @@ final class EditorLayoutUITests: XCTestCase {
         email.tap()
         email.typeText("ada.lovelace@analytical-engine.example")
 
-        let deadline = Date().addingTimeInterval(10)
-        while email.frame.height <= heightBefore && Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.5)
-        }
+        let grown = XCTNSPredicateExpectation(
+            predicate: NSPredicate { element, _ in ((element as? XCUIElement)?.frame.height ?? 0) > heightBefore },
+            object: email
+        )
+        XCTWaiter().wait(for: [grown], timeout: 60)
         XCTAssertGreaterThan(email.frame.height, heightBefore, "The email field should grow to show the whole address")
     }
 

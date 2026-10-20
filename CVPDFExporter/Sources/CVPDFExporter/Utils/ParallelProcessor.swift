@@ -50,15 +50,19 @@ public actor ParallelProcessor {
     private let trackPerformance: Bool
     private let cache: TemplateCache?
     private var metrics: ProcessingMetrics?
+    private let now: @Sendable () -> TimeInterval
 
+    /// - Parameter now: The clock the processing time is measured on, in seconds.
     public init(
         maxConcurrency: Int = ProcessInfo.processInfo.processorCount,
         trackPerformance: Bool = false,
-        cache: TemplateCache? = nil
+        cache: TemplateCache? = nil,
+        now: @escaping @Sendable () -> TimeInterval = { CFAbsoluteTimeGetCurrent() }
     ) {
         self.maxConcurrency = max(1, maxConcurrency)
         self.trackPerformance = trackPerformance
         self.cache = cache
+        self.now = now
     }
 
     // MARK: - Render All Templates
@@ -81,7 +85,7 @@ public actor ParallelProcessor {
             return [html]
         }
 
-        let startTime = CFAbsoluteTimeGetCurrent()
+        let startTime = now()
         var results: [String] = []
         var successCount = 0
         var failureCount = 0
@@ -119,7 +123,7 @@ public actor ParallelProcessor {
 
         // Track metrics if enabled
         if trackPerformance {
-            let totalTime = CFAbsoluteTimeGetCurrent() - startTime
+            let totalTime = now() - startTime
             metrics = ProcessingMetrics(
                 totalTime: totalTime,
                 averageTime: totalTime / Double(templates.count),
@@ -142,7 +146,7 @@ public actor ParallelProcessor {
     ) async throws -> [String] {
         guard !documents.isEmpty else { return [] }
 
-        let startTime = CFAbsoluteTimeGetCurrent()
+        let startTime = now()
         var results: [String] = []
 
         // Process documents concurrently
@@ -171,7 +175,7 @@ public actor ParallelProcessor {
 
         // Track metrics if enabled
         if trackPerformance {
-            let totalTime = CFAbsoluteTimeGetCurrent() - startTime
+            let totalTime = now() - startTime
             metrics = ProcessingMetrics(
                 totalTime: totalTime,
                 averageTime: totalTime / Double(documents.count),

@@ -26,12 +26,14 @@ final class EditorKeyboardUITests: XCTestCase {
         }
         summary.tap()
         summary.typeText("Ten years of emergency care.")
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), "Typing should show the keyboard")
+        XCTAssertTrue(summary.waitForKeyboardFocus(true), "Typing should give the text view the keyboard focus")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), XCUIApplication.noSoftwareKeyboard)
 
         let done = app.toolbars.buttons["Done"]
         XCTAssertTrue(done.waitForExistence(timeout: 10), "The keyboard should offer a Done button")
         done.tap()
 
+        XCTAssertTrue(summary.waitForKeyboardFocus(false), "Done should take the keyboard focus from the text view")
         XCTAssertTrue(waitUntil(app.keyboards.firstMatch, exists: false), "Done should close the keyboard")
         XCTAssertEqual(summary.value as? String, "Ten years of emergency care.", "Closing the keyboard keeps what was typed")
     }
@@ -43,6 +45,7 @@ final class EditorKeyboardUITests: XCTestCase {
         XCTAssertTrue(experienceTab.exists, "The editor should show its tabs")
 
         app.textFields["Full Name"].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), XCUIApplication.noSoftwareKeyboard)
         XCTAssertTrue(waitUntil(export, exists: false), "The export button should make way for the keyboard")
         XCTAssertTrue(waitUntil(experienceTab, exists: false), "The tab bar should make way for the keyboard")
 
@@ -55,8 +58,10 @@ final class EditorKeyboardUITests: XCTestCase {
         let name = app.textFields["Full Name"]
         XCTAssertTrue(name.waitForExistence(timeout: 10), "The Basics tab should have a full name to type into")
         name.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), XCUIApplication.noSoftwareKeyboard)
         name.typeText("Maria Rossi\n")
 
+        XCTAssertTrue(name.waitForKeyboardFocus(false), "Return should end the entry of the name")
         XCTAssertTrue(waitUntil(app.keyboards.firstMatch, exists: false), "Return should close the keyboard")
         XCTAssertEqual(name.value as? String, "Maria Rossi", "Return should not add a line to the name")
     }

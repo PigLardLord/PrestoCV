@@ -14,7 +14,10 @@ final class UnsavedEditsUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         app = XCUIApplication()
         // A folder of its own that the launches of this test share, as an installation keeps its data between them
-        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsStorage", UUID().uuidString]
+        app.launchArguments += [
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsStorage", UUID().uuidString,
+            "-PrestoCVUITestsKeepSavedConfirmation",
+        ]
     }
 
     /// Types a name into a new CV, sends the app to the background and lets iOS end it.

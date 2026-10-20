@@ -123,7 +123,7 @@ availability and errors (`FoundationModelsServiceTests`) needs macOS 26 with the
 
 ## Requirements
 
-- iOS 26 / macOS 26 with Apple Intelligence for generation
+- iOS 26.5 / macOS 26 with Apple Intelligence for generation
 - Swift 6 language mode
 
 ## License

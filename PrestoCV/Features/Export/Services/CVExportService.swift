@@ -60,6 +60,8 @@ actor CVExportService: CVExportServiceProtocol {
             options: documentOptions
         )
 
+        // A cancelled export leaves nothing behind, whatever the renderer handed back
+        try Task.checkCancellation()
         let url = try writePDF(result.pdfData, fileName: fileNames.fileName(for: cv))
         let thumbnail = await PDFThumbnail.pngData(from: result.pdfData)
         return ExportedPDF(url: url, pageCount: result.pageCount, thumbnail: thumbnail)

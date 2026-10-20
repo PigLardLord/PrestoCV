@@ -11,21 +11,42 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
     // MARK: - Properties
 
     private let logger = Logger(subsystem: "CVPDFExporter", category: "PDFRenderer")
-    private var webView: WKWebView?
+    /// The web view of the render in progress, if any.
+    private(set) var webView: WKWebView?
     private var loadContinuation: CheckedContinuation<Void, Error>?
     private var loadTimeout: Task<Void, Never>?
     private let pageBreakManager: PageBreakManager
     private let onePageFit: OnePageFit
 
     // Configuration
-    private let pageLoadTimeout: Duration = .seconds(30)
-    private let readinessTimeout: Duration = .seconds(5)
+    private let pageLoadTimeout: Duration
+    private let readinessTimeout: Duration
+    private let onReadinessTimeout: ReadinessTimeoutPolicy
+
+    /// What a render does when the page has not said that its fonts and images are ready within the readiness timeout.
+    public enum ReadinessTimeoutPolicy: Sendable {
+        /// The PDF is drawn all the same, so that an export never waits on a page for ever.
+        case drawAnyway
+        /// The render fails, so that a slow run fails instead of drawing the PDF of a page that may not be ready.
+        case fail
+    }
 
     // MARK: - Initialization
 
-    public override init() {
+    /// - Parameters:
+    ///   - pageLoadTimeout: How long the HTML may take to load before the render fails.
+    ///   - readinessTimeout: How long the page may take to say that its fonts and images are ready.
+    ///   - onReadinessTimeout: What happens when it takes longer.
+    public init(
+        pageLoadTimeout: Duration = .seconds(30),
+        readinessTimeout: Duration = .seconds(5),
+        onReadinessTimeout: ReadinessTimeoutPolicy = .drawAnyway
+    ) {
         self.pageBreakManager = PageBreakManager()
         self.onePageFit = OnePageFit()
+        self.pageLoadTimeout = pageLoadTimeout
+        self.readinessTimeout = readinessTimeout
+        self.onReadinessTimeout = onReadinessTimeout
         super.init()
     }
 
@@ -43,10 +64,13 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
             }
 
             try await loadHTML(enhancedHTML, in: webView)
-            await awaitContentReadiness(in: webView)
+            try await awaitContentReadiness(in: webView)
 
             let renderer = try await paginate(webView, options: options)
+            try Task.checkCancellation()
             return try generatePDF(with: renderer, options: options)
+        } catch is CancellationError {
+            throw CancellationError()
         } catch let error as PDFExportError {
             logger.error("PDF generation failed: \(error.localizedDescription)")
             throw error
@@ -186,30 +210,51 @@ private extension EnhancedWKWebViewPDFRenderer {
         continuation.resume(with: result)
     }
 
-    /// Waits for the page to report that its fonts and images are ready, but not longer than `readinessTimeout`.
-    /// The web view is never put in a window, and a page that is not shown may not run its animation frames,
-    /// which the readiness script waits for; the PDF is then drawn without waiting any longer.
-    func awaitContentReadiness(in webView: WKWebView) async {
+    /// Waits for the page to report that its document, fonts and images are ready, but not longer than
+    /// `readinessTimeout`; past it, or when the page cannot answer, `onReadinessTimeout` says whether the PDF is drawn
+    /// without waiting any longer or the render fails. A cancellation ends the wait at once, in `CancellationError`.
+    /// The web view is never put in a window, so the wait leaves out the animation frames the preview waits for: a page
+    /// that is not shown may never run them.
+    func awaitContentReadiness(in webView: WKWebView) async throws {
         let gate = ReadinessGate()
         let timeout = readinessTimeout
 
+        // WebKit cannot cancel a script, so the call is left behind once the gate opens
         let readiness = Task { @MainActor in
-            _ = try? await webView.callAsyncJavaScript(
-                PreviewReadinessScript.awaitReady,
-                arguments: [:],
-                in: nil,
-                contentWorld: .page
-            )
-            gate.open()
+            do {
+                _ = try await webView.callAsyncJavaScript(
+                    PreviewReadinessScript.awaitContentFunctionBody,
+                    arguments: [:],
+                    in: nil,
+                    contentWorld: .page
+                )
+                gate.open(.ready)
+            } catch {
+                gate.open(.notReady)
+            }
         }
         let deadline = Task { @MainActor in
-            try? await Task.sleep(for: timeout)
-            gate.open()
+            do { try await Task.sleep(for: timeout) } catch { return }
+            gate.open(.notReady)
         }
 
-        await gate.wait()
+        let outcome = await withTaskCancellationHandler {
+            await gate.wait()
+        } onCancel: {
+            Task { @MainActor in gate.open(.cancelled) }
+        }
         readiness.cancel()
         deadline.cancel()
+        switch outcome {
+        case .ready:
+            return
+        case .cancelled:
+            throw CancellationError()
+        case .notReady:
+            if onReadinessTimeout == .fail {
+                throw PDFExportError.renderingFailed("The page was not ready within \(timeout)")
+            }
+        }
     }
 
     /// The pages of the CV as its design lays them out, or with the design's spacing tightened when that brings a CV
@@ -345,21 +390,25 @@ private final class PagePrintRenderer: UIPrintPageRenderer {
 
 // MARK: - Readiness Gate
 
-/// Lets a waiter continue as soon as either of two racing tasks opens it, and only once
+/// Lets a waiter continue as soon as the page, the deadline or a cancellation opens it, and only once. The first to
+/// open it says how the wait ended.
 @MainActor
 private final class ReadinessGate {
 
-    private var isOpen = false
-    private var waiter: CheckedContinuation<Void, Never>?
+    enum Outcome { case ready, notReady, cancelled }
 
-    func wait() async {
-        guard !isOpen else { return }
-        await withCheckedContinuation { waiter = $0 }
+    private var opened: Outcome?
+    private var waiter: CheckedContinuation<Outcome, Never>?
+
+    func wait() async -> Outcome {
+        if let opened { return opened }
+        return await withCheckedContinuation { waiter = $0 }
     }
 
-    func open() {
-        isOpen = true
-        waiter?.resume()
+    func open(_ outcome: Outcome) {
+        guard opened == nil else { return }
+        opened = outcome
+        waiter?.resume(returning: outcome)
         waiter = nil
     }
 }

@@ -168,7 +168,7 @@ final class ViewModelFactory {
                     wait: environment.sleep
                 )
             },
-            sleep: environment.sleep
+            sleep: LaunchEnvironment.savedConfirmationWait(arguments: environment.arguments, sleep: environment.sleep)
         )
     }
 
