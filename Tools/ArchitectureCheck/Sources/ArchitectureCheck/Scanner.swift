@@ -24,9 +24,9 @@ final class Scanner: SyntaxVisitor {
     private let infrastructureTypes: Set<String>
     /// The views of the file's target, from every file of it: an extension of a view in another file is part of the view.
     private let viewTypes: Set<String>
-    /// The declared types of the stored properties and initialiser parameters of each type of the file's target, by
-    /// type name and then by property name or argument label: what a contextual `.init(…)` makes there.
-    private let memberTypes: [String: [String: String]]
+    /// What each type of the file's target declares, from every file of it: the properties and initialisers that tell
+    /// what a contextual `.init(…)` makes (`MemberIndex`).
+    let memberTypes: [String: TypeMembers]
     /// The suffixes of the names of services a view may not hold (R5), and of the dependencies a default argument may not
     /// make (R17). A trailing `Protocol` does not count.
     private let serviceSuffixes: [String], dependencySuffixes: [String]
@@ -44,7 +44,7 @@ final class Scanner: SyntaxVisitor {
     static let printCalls: Set<String> = ["print", "debugPrint", "NSLog", "dump"]
 
     init(tree: SourceFileSyntax, file: String, infrastructureTypes: Set<String>, viewTypes: Set<String> = [],
-         memberTypes: [String: [String: String]] = [:], serviceSuffixes: [String] = [], dependencySuffixes: [String] = []) {
+         memberTypes: [String: TypeMembers] = [:], serviceSuffixes: [String] = [], dependencySuffixes: [String] = []) {
         converter = SourceLocationConverter(fileName: file, tree: tree)
         self.infrastructureTypes = infrastructureTypes
         self.viewTypes = viewTypes
@@ -341,8 +341,10 @@ final class Scanner: SyntaxVisitor {
         } ?? false
     }
 
-    /// The name of a plain or member type (`View`, `SwiftUI.View`, `Outer.Inner` gives "Inner"); nil for any other type.
+    /// The name of a plain or member type (`View`, `SwiftUI.View`, `Outer.Inner` gives "Inner"), through the attributes of a
+    /// parameter (`@escaping`, `inout`); nil for any other type.
     static func typeName(_ type: TypeSyntax) -> String? {
+        if let t = type.as(AttributedTypeSyntax.self) { return typeName(t.baseType) }
         if let t = type.as(IdentifierTypeSyntax.self) { return name(t.name) }
         if let t = type.as(MemberTypeSyntax.self) { return name(t.name) }
         return nil
@@ -418,123 +420,6 @@ final class Scanner: SyntaxVisitor {
         guard path.last == "init" else { return false }
         if path.count >= 2, !path[path.count - 2].isEmpty { return Self.isViewModelName(path[path.count - 2]) }
         return expectedType(of: ExprSyntax(call)).map(Self.isViewModelName) ?? false
-    }
-
-    /// The property wrappers whose `wrappedValue:` is the value of the property they wrap
-    static let propertyWrappers: Set<String> = ["StateObject", "ObservedObject", "State", "Bindable"]
-
-    /// The type the context of an expression expects, as far as the syntax tells it: the type of the argument it is
-    /// passed as, of the property it is assigned to (through a property wrapper's `wrappedValue:`), of the value it
-    /// returns, or of the binding it initialises. Nil when the syntax does not tell.
-    private func expectedType(of expr: ExprSyntax) -> String? {
-        guard let parent = expr.parent else { return nil }
-        if let argument = parent.as(LabeledExprSyntax.self), let call = argument.parent?.parent?.as(FunctionCallExprSyntax.self) {
-            return expectedType(ofArgument: argument, in: call)
-        }
-        if let list = parent.as(ExprListSyntax.self), let sequence = list.parent?.as(SequenceExprSyntax.self) {
-            return assignedType(in: sequence, value: expr)
-        }
-        if parent.is(ReturnStmtSyntax.self) { return returnType(around: parent) }
-        if let item = parent.as(CodeBlockItemSyntax.self), let items = item.parent?.as(CodeBlockItemListSyntax.self), items.count == 1 {
-            if let type = returnType(around: items) { return type }
-        }
-        // The value of a binding, however deep in it: `let model: ListViewModel = .init()`
-        var current: Syntax? = parent
-        while let n = current {
-            if let binding = n.as(PatternBindingSyntax.self) { return binding.typeAnnotation.flatMap { Self.typeName($0.type) } }
-            current = n.parent
-        }
-        return nil
-    }
-
-    /// The type of the parameter an argument is passed as: the `wrappedValue:` of a property wrapper takes the type of
-    /// the property, a parameter of a type of the target is the type it declares, and a label that names a view model
-    /// (`viewModel:`) is one.
-    private func expectedType(ofArgument argument: LabeledExprSyntax, in call: FunctionCallExprSyntax) -> String? {
-        let label = argument.label.map(Self.name) ?? ""
-        let path = Self.unqualifiedPath(call.calledExpression) ?? []
-        let callee = path.last == "init" ? path.dropLast().last : path.last
-        if let callee, Self.propertyWrappers.contains(callee), label == "wrappedValue" { return expectedType(of: ExprSyntax(call)) }
-        if let callee, let type = memberTypes[callee]?[label] { return type }
-        return label.lowercased().hasSuffix("viewmodel") ? "ViewModel" : nil
-    }
-
-    /// The declared type of the property that `lhs = value` assigns: `model`, `self.model`, or `_model`, the storage of
-    /// a wrapped property, in the type the assignment is in.
-    private func assignedType(in sequence: SequenceExprSyntax, value: ExprSyntax) -> String? {
-        let elements = Array(sequence.elements)
-        guard elements.count == 3, elements[1].is(AssignmentExprSyntax.self), elements[2].id == value.id,
-              let path = Self.unqualifiedPath(elements[0]) else { return nil }
-        let names = path.first == "self" ? Array(path.dropFirst()) : path
-        guard names.count == 1, var property = names.first else { return nil }
-        if property.hasPrefix("_") { property.removeFirst() }
-        return enclosingTypeName(of: Syntax(sequence)).flatMap { memberTypes[$0]?[property] }
-    }
-
-    /// The return type of the function or getter whose body is `node`, or holds the `return` that `node` is
-    private func returnType(around node: some SyntaxProtocol) -> String? {
-        var current = node.parent
-        while let n = current {
-            if let function = n.as(FunctionDeclSyntax.self) { return function.signature.returnClause.flatMap { Self.typeName($0.type) } }
-            if let binding = n.as(PatternBindingSyntax.self) { return binding.typeAnnotation.flatMap { Self.typeName($0.type) } }
-            if n.is(ClosureExprSyntax.self) || n.is(InitializerDeclSyntax.self) { return nil }
-            current = n.parent
-        }
-        return nil
-    }
-
-    /// The name of the type, or of the extended type, that a node is declared in
-    private func enclosingTypeName(of node: Syntax) -> String? {
-        var current = node.parent
-        while let n = current {
-            if let d = n.as(StructDeclSyntax.self) { return Self.name(d.name) }
-            if let d = n.as(ClassDeclSyntax.self) { return Self.name(d.name) }
-            if let d = n.as(EnumDeclSyntax.self) { return Self.name(d.name) }
-            if let d = n.as(ActorDeclSyntax.self) { return Self.name(d.name) }
-            if let e = n.as(ExtensionDeclSyntax.self) { return Self.typeName(e.extendedType) }
-            current = n.parent
-        }
-        return nil
-    }
-
-    /// The declared types of the stored properties and initialiser parameters of each type a file declares or extends
-    static func memberTypes(in tree: SourceFileSyntax) -> [String: [String: String]] {
-        final class Collector: SyntaxVisitor {
-            var types: [String: [String: String]] = [:]
-            override func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {
-                guard let owner = Collector.owner(of: Syntax(node)) else { return .visitChildren }
-                for binding in node.bindings {
-                    guard let name = binding.pattern.as(IdentifierPatternSyntax.self).map({ Scanner.name($0.identifier) }),
-                          let type = binding.typeAnnotation.flatMap({ Scanner.typeName($0.type) }) else { continue }
-                    types[owner, default: [:]][name] = type
-                }
-                return .visitChildren
-            }
-            override func visit(_ node: InitializerDeclSyntax) -> SyntaxVisitorContinueKind {
-                guard let owner = Collector.owner(of: Syntax(node)) else { return .visitChildren }
-                for parameter in node.signature.parameterClause.parameters where parameter.firstName.tokenKind != .wildcard {
-                    if let type = Scanner.typeName(parameter.type) { types[owner, default: [:]][Scanner.name(parameter.firstName)] = type }
-                }
-                return .visitChildren
-            }
-            /// The type a member is declared in, when it is a member of one and not a local of a function
-            static func owner(of node: Syntax) -> String? {
-                var current = node.parent
-                while let n = current {
-                    if n.is(CodeBlockSyntax.self) || n.is(ClosureExprSyntax.self) || n.is(AccessorBlockSyntax.self) { return nil }
-                    if let d = n.as(StructDeclSyntax.self) { return Scanner.name(d.name) }
-                    if let d = n.as(ClassDeclSyntax.self) { return Scanner.name(d.name) }
-                    if let d = n.as(EnumDeclSyntax.self) { return Scanner.name(d.name) }
-                    if let d = n.as(ActorDeclSyntax.self) { return Scanner.name(d.name) }
-                    if let e = n.as(ExtensionDeclSyntax.self) { return Scanner.typeName(e.extendedType) }
-                    current = n.parent
-                }
-                return nil
-            }
-        }
-        let collector = Collector(viewMode: .sourceAccurate)
-        collector.walk(tree)
-        return collector.types
     }
 
     override func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {

@@ -399,6 +399,31 @@ for form in 'struct V: View { var body: some View { Child(title: .init()) } }' \
             'final class ViewModelFactory { func make() -> ListViewModel { .init() }; func list() -> PrestoCVPresentation.ListViewModel { .init() } }'; do
   view_case "R5: allowed: ${form//$'\n'/⏎}" "$form" 0
 done
+# Overloaded initialisers are told apart by the labels of the call and of the `.init(…)`, in either declaration order;
+# a local that shadows a property is not the property, unless `self.` names it; a closure's return type is read.
+vm_decl=$'final class ListViewModel { init(useCase: Any) {} }'
+for order in $'    init(model: ListViewModel) {}\n    init(model: String) {}' $'    init(model: String) {}\n    init(model: ListViewModel) {}'; do
+  child=$"struct Child: View {\n$order\n    var body: some View { EmptyView() }\n}"
+  view_case "R5: an overload of an initialiser that takes a view model: ${order//$'\n'/⏎}" \
+    "$vm_decl"$'\n'"$child"$'\nstruct V: View { let injected = 0; var body: some View { Child(model: .init(useCase: injected)) } }' 1 "R5 viewDependency"
+  view_case "R5: allowed: an overload of an initialiser that takes a String: ${order//$'\n'/⏎}" \
+    "$vm_decl"$'\n'"$child"$'\nstruct V: View { var body: some View { Child(model: .init(repeating: "x", count: 2)) } }' 0
+done
+for form in $'struct V: View {\n    @State private var model: ListViewModel\n    func reset() { let model = ""; self.model = .init(); _ = model }\n    var body: some View { EmptyView() }\n}' \
+            $'struct V: View {\n    func make() { var model: ListViewModel; model = .init(); _ = model }\n    var body: some View { EmptyView() }\n}' \
+            $'struct V: View { let injected = 0; var body: some View { Child(factory: { () -> ListViewModel in return .init(useCase: injected) }) } }' \
+            $'struct V: View { let injected = 0; var body: some View { Child(factory: { () -> ListViewModel in .init(useCase: injected) }) } }' \
+            $'struct Child: View {\n    init(factory: @escaping () -> ListViewModel) {}\n    var body: some View { EmptyView() }\n}\nstruct V: View { var body: some View { Child(factory: { .init() }) } }' \
+            $'struct V: View {\n    var body: some View {\n        #if DEBUG\n        EmptyView()\n        #else\n        Child(factory: { () -> ListViewModel in .init() })\n        #endif\n    }\n}'; do
+  view_case "R5: a view makes a view model: ${form//$'\n'/⏎}" "$form" 1 "R5 viewDependency"
+done
+for form in $'struct V: View {\n    @State private var model: ListViewModel\n    func reset() { var model = ""; model = .init(); _ = model }\n    var body: some View { EmptyView() }\n}' \
+            $'struct V: View {\n    @State private var model: ListViewModel\n    func reset(_ model: inout String) { model = .init() }\n    var body: some View { EmptyView() }\n}' \
+            $'struct V: View {\n    @State private var model: ListViewModel\n    func reset(names: [String]) { for model in names { var copy = model; copy = .init(); _ = copy } }\n    var body: some View { EmptyView() }\n}' \
+            $'struct V: View { var body: some View { Child(factory: { () -> String in .init() }) } }' \
+            $'struct Child: View {\n    init(factory: @escaping () -> String) {}\n    var body: some View { EmptyView() }\n}\nstruct V: View { var body: some View { Child(factory: { .init() }) } }'; do
+  view_case "R5: allowed: ${form//$'\n'/⏎}" "$form" 0
+done
 # The type a contextual `.init(…)` makes is found in another file of the target too.
 setup; only_rule R5; printf '%s\n' 'struct Child: View { let model: ChildViewModel; var body: some View { EmptyView() } }' > "$ROOT/Sources/Pure/C.swift"
 src 'struct V: View { var body: some View { Child(model: .init()) } }'

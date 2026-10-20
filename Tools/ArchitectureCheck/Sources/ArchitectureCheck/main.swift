@@ -154,10 +154,10 @@ for (file, target) in assignment where target.kind != "legacy" || !target.rules.
     parsed.append((file, target, source, Parser.parse(source: source)))
 }
 var viewTypes: [String: Set<String>] = [:]
-var memberTypes: [String: [String: [String: String]]] = [:]
+var memberTypes: [String: [String: TypeMembers]] = [:]
 for entry in parsed {
     viewTypes[entry.target.name, default: []].formUnion(Scanner.viewTypeNames(in: entry.tree))
-    memberTypes[entry.target.name, default: [:]].merge(Scanner.memberTypes(in: entry.tree)) { $0.merging($1) { first, _ in first } }
+    for (type, members) in MemberIndex.members(in: entry.tree) { memberTypes[entry.target.name, default: [:]][type, default: TypeMembers()].merge(members) }
 }
 for (file, target, source, tree) in parsed {
     let scanner = Scanner(tree: tree, file: file, infrastructureTypes: Set(config.infrastructureTypes), viewTypes: viewTypes[target.name] ?? [],
