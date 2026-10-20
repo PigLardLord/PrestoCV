@@ -177,11 +177,6 @@ struct LocalizationCatalogTests {
         "pt": ["em breve", "em instantes", "logo", "ainda não"],
     ]
 
-    /// The AI texts that speak of time without promising availability, each with the reason it may.
-    fileprivate static let availabilityPromiseExceptions: [String: String] = [
-        "ai.generation.time_note": "the expected duration of a task already running, not a promise of availability",
-    ]
-
     /// The promise of future availability or readiness in a text, if it makes one.
     fileprivate static func availabilityPromise(in text: String, language: String) -> String? {
         (availabilityPromises[language] ?? []).first { promise in
@@ -391,7 +386,7 @@ struct LocalizationCatalogTests {
     func aiTextsPromiseNoAvailability() throws {
         let catalog = try LocalizationCatalog.load()
         var promises: [String] = []
-        for key in catalog.keys where key.hasPrefix("ai.") && Self.availabilityPromiseExceptions[key] == nil {
+        for key in catalog.keys where key.hasPrefix("ai.") {
             for language in LocalizationCatalog.languages {
                 for text in catalog.texts(of: key, in: language) ?? [] {
                     if let promise = Self.availabilityPromise(in: text, language: language) {
@@ -413,16 +408,6 @@ struct LocalizationCatalogTests {
         #expect(Self.availabilityPromise(in: "Not available right now", language: "en") == nil)
         #expect(Self.availabilityPromise(in: "Apple Intelligence is busy right now. Please try again.", language: "en") == nil)
         #expect(Self.availabilityPromise(in: "This can take up to a minute.", language: "en") == nil, "A duration is not a promise of availability")
-    }
-
-    @Test("Each exception of the availability check is a key of the catalog, with its reason")
-    func availabilityExceptionsAreCatalogKeys() throws {
-        let catalog = try LocalizationCatalog.load()
-
-        for (key, reason) in Self.availabilityPromiseExceptions {
-            #expect(catalog.strings[key] != nil, "\(key) is not in the catalog: remove it from availabilityPromiseExceptions")
-            #expect(!reason.isEmpty, "\(key) needs the reason it is an exception")
-        }
     }
 
     @Test("The welcome speaks to everyone, not to a man or to a woman")
