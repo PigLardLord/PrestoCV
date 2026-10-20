@@ -42,11 +42,11 @@ Create the three workflows with these settings. Anything not listed keeps its de
 |---|---|
 | General | Name: `Pull Request` |
 | Environment | Xcode: Latest Release (Xcode 27). macOS: Latest Release. |
-| Start condition | Pull Request Changes. Source branch: All Branches. Destination branch: `main`. Auto-cancel builds: on. |
+| Start condition | Pull Request Changes. Source branch: All Branches. Destination branch: `main`. Auto-cancel builds: on. Files and Folders: don't start a build if all changed files match `docs/` or `*.md`. |
 | Action 1 | Test. Scheme `PrestoCV`, test plan `CI`, platform iOS. Destinations: iPhone 17 Pro and iPad Pro 13-inch (M5), both on the latest iOS release of the selected Xcode. Requirement: Required to pass. |
 | Post-actions | None. |
 
-GitHub shows the result in the pull request.
+GitHub shows the result in the pull request. A pull request that changes only documentation starts no build; the Linux job of the `CI` GitHub workflow still checks it.
 
 The tests do not depend on the iOS release, so the gate runs on the newest one. When a new release fails it, the platform changed under the app, and the fix goes in a pull request of its own; the failure is not noise to retry. The oldest release the app supports, iOS 26.5, runs on a Mac once per pull request, because Xcode Cloud has no iOS 26 simulators.
 
@@ -57,11 +57,10 @@ The tests do not depend on the iOS release, so the gate runs on the newest one. 
 | General | Name: `Main` |
 | Environment | Xcode: Latest Release (Xcode 27). macOS: Latest Release. |
 | Start condition | Branch Changes. Branch: `main` only. |
-| Action 1 | Test. Same as the Pull Request workflow: scheme `PrestoCV`, test plan `CI`, iPhone 17 Pro and iPad Pro 13-inch (M5) on the latest iOS release. Requirement: Required to pass. |
-| Action 2 | Archive. Scheme `PrestoCV`, platform iOS. The scheme archives with the Release configuration. Deployment preparation: TestFlight (Internal Testing Only). |
+| Action 1 | Archive. Scheme `PrestoCV`, platform iOS. The scheme archives with the Release configuration. Deployment preparation: TestFlight (Internal Testing Only). |
 | Post-actions | TestFlight Internal Testing, with the group of internal testers. |
 
-A build from `main` is for the internal testers only. It cannot be submitted to App Review.
+A build from `main` is for the internal testers only. It cannot be submitted to App Review. Main has no Test action: a pull request merges only when its branch contains the latest `main` and the Pull Request workflow is green on that exact head, so the tree that reaches `main` has already been tested.
 
 ### Release
 
@@ -87,7 +86,9 @@ The Release workflow tests the exact commit it archives. Its Test action is requ
 
 A pull request then cannot merge until the tests pass on the iPhone and the iPad and the architecture check passes.
 
-Check once that a failing test stops a build: open a pull request that breaks one test, and confirm that the Pull Request workflow fails. In the Main and Release workflows, the Test action must show Required to pass in the workflow editor; then the archive is never distributed after a failed test.
+To merge a pull request, bring the latest `main` onto its branch locally (a rebase), resolve the conflicts, run the tests again on a Mac, then push the branch once, wait for the Pull Request workflow to be green on that head, and merge. Every push to an open pull request starts a build, so the branch is pushed when it is ready, not while it is worked on.
+
+Check once that a failing test stops a build: open a pull request that breaks one test, and confirm that the Pull Request workflow fails. In the Release workflow, the Test action must show Required to pass in the workflow editor; then the archive is never distributed after a failed test.
 
 ## One-time setup
 
