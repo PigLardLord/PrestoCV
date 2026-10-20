@@ -210,7 +210,7 @@ A platform-only target wraps **every file** entirely in its platform condition. 
   - the views of the app target (UI strings);
   - rendering, for document headings in the **document's** language.
 - **Every other target returns codes, values, typed errors and status enums.** For example, `SaveStatus.conflict`. A duplicated CV's title is composed by presentation, which knows the language. This also keeps those targets building on Linux, where `String(localized:)` does not exist.
-- **Packages that render text own their translations.** They are JSON resource files, one per language, plus an index, loaded through `Bundle.module`. A test fails if any language lacks a key or has an empty value.
+- **Packages that render text own their translations.** They are JSON files, one per language, plus an index. An adapter target of the package ships them as resources and reads them through `Bundle.module` (`CVBundledHeadings`); the rendering receives them through a port, as bytes, and reads no bundle itself ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md)). A test fails if any language lacks a key or has an empty value.
 - **Language lookup uses BCP 47:** the full tag, then the full primary language subtag. An unsupported language is a typed error, never a silent fallback to English.
 - **The app catalog** marks an entry translated only when it is.
 

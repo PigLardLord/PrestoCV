@@ -57,14 +57,14 @@ PrestoCVApp package                    │
   PrestoCVIntegration ─────────────────┼──▶ PrestoCVWorkflowPorts, PrestoCVApplication, PrestoCVDomain
                                    ├──▶ CVDocumentModel, CVDesignCatalog, CVRendering
                                    └──▶ CVDrafting
-  PrestoCVComposition ──▶ PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns,
+  PrestoCVComposition ──▶ PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns, CVBundledHeadings,
                       CVRenderingWebKitSupport, CVRenderingIOS (iOS) / CVRenderingMacOS (macOS),
                       CVRenderingPDFKitInspector, CVDraftingFoundationModels
 
 PrestoCVCore package        PrestoCVDomain ◀── PrestoCVApplication ◀── PrestoCVPersistence
 CVPDFExporter package   CVDocumentModel ◀── CVRendering ──▶ CVDesignCatalog ◀── CVDesignCatalogFileStore, CVBundledDesigns
                         CVRendering ◀── CVRenderingWebKitSupport ◀── CVRenderingIOS / CVRenderingMacOS
-                        CVRendering ◀── CVRenderingPDFKitInspector
+                        CVRendering ◀── CVRenderingPDFKitInspector, CVBundledHeadings
 CVGeneratorAI package   CVDrafting ◀── CVDraftingFoundationModels
 ```
 

@@ -87,6 +87,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 | `CVDesignCatalogFileStore` | outbound adapter | iOS, macOS, Linux ✓ | `CVDesignCatalog`, Foundation, Glibc, Darwin, Android |
 | `CVBundledDesigns` | outbound adapter + resources | iOS, macOS, Linux ✓ | `CVDesignCatalog`, Foundation |
 | `CVRendering` | application | iOS, macOS, Linux ✓ | `CVDocumentModel`, `CVDesignCatalog`, Foundation |
+| `CVBundledHeadings` | outbound adapter + resources | iOS, macOS, Linux ✓ | `CVRendering`, Foundation |
 | `CVRenderingWebKitSupport` | adapter support | iOS, macOS | `CVRendering`, WebKit, Foundation |
 | `CVRenderingIOS` | outbound adapter | iOS | `CVRenderingWebKitSupport`, `CVRendering`, WebKit, UIKit, Foundation |
 | `CVRenderingMacOS` | outbound adapter | macOS | `CVRenderingWebKitSupport`, `CVRendering`, WebKit, AppKit, Foundation |
@@ -126,13 +127,15 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - validates the language tag;
   - keeps only `WebLink`s, and prints each link's destination as its text;
   - formats dates in the document language.
-- **`HeadingsCatalog`:** JSON heading tables per language plus an index, matched by BCP 47. An unsupported language is a typed error.
+- **`HeadingsCatalog`:** JSON heading tables per language plus an index, matched by BCP 47. An unsupported language is a typed error. It reads the tables as raw bytes through **`HeadingTableSource`**, its outbound port, and decodes them itself; only a tag that reads as BCP 47 reaches the source ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md)).
 - **`PDFRendering`**, the outbound port: `render(html:page:) async throws -> RenderedPDF`, with `data`, `pageCount` and `requiredPages`. `truncated` is derived from those.
 - **`PDFInspecting`**, the outbound port that reads the page count and text of a PDF.
 - **`RenderedDocument`:** the builder's output, meaning the HTML plus the exact text nodes it contains.
 - **`DocumentCompleteness`:** every text node needs its own span of the PDF text, which no other node uses, ignoring case and spacing.
 - **`FixtureRenderingGate`:** implements the catalog's `DesignRenderingGate`. It renders a fixture that uses every section with the candidate design, and requires a complete, untruncated PDF.
 - **Policy:** the required fields and page limit, shared by preview and export.
+
+**`CVBundledHeadings`** holds the heading tables as resources, served as raw bytes through `Bundle.module` by `BundleHeadingTableSource`. An Android app ships no SwiftPM bundle: its edge reads the same files from the app's assets and passes them through the same port ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md)).
 
 **`CVRenderingWebKitSupport`**
 - `SecureWebViewConfiguration.compileRules()` is called once by the composition root: a block rule per network scheme, plus a block on every subresource type. `make(rules:)` then builds each configuration: JavaScript off for content, non-persistent store, media only on user action.
@@ -152,7 +155,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - `PDFInspecting` on PDFKit, used by the export workflow and by the native contract tests. Every file is wrapped in `#if canImport(PDFKit)`.
 
 **Test support and tests.**
-- **`CVRenderingTestSupport`** may import `CVRendering`, `CVDocumentModel`, `CVDesignCatalog`, Foundation. It holds `InMemoryDesignStore`, the **`DesignStore` contract suite** that it and `FileDesignStore` pass, and:
+- **`CVRenderingTestSupport`** may import `CVRendering`, `CVDocumentModel`, `CVDesignCatalog`, `CVBundledHeadings` (the contract fixture prints the shipped Italian headings), Foundation. It holds `InMemoryDesignStore`, the **`DesignStore` contract suite** that it and `FileDesignStore` pass, and:
   - the **`PDFRendering` contract suite**:
     - the fixture must fit and contain every field;
     - page count per the inspector;
@@ -197,7 +200,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 | `PrestoCVWorkflowPorts` | app ports | iOS, macOS, Linux ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation |
 | `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, Foundation |
 | `PrestoCVPresentation` | inbound adapter | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain` (both `internal import`), Observation, Foundation |
-| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels` |
+| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVBundledHeadings`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels` |
 
 **`PrestoCVWorkflowPorts`**
 - The ports that view models consume: `CVEditing` (new, save, load) and `CVExporting` (untyped `throws`, so cancellation passes through).
@@ -271,7 +274,7 @@ PrestoCV (app) ─▶ PrestoCVPresentation ─▶ PrestoCVWorkflowPorts ─▶ P
      │                     PrestoCVIntegration ┴─▶ CVRendering ─┬─▶ CVDocumentModel
      │                                    │                └─▶ CVDesignCatalog
      │                                    └─▶ CVDrafting
-     └────▶ PrestoCVComposition ─▶ (all of the above) + PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns,
+     └────▶ PrestoCVComposition ─▶ (all of the above) + PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns, CVBundledHeadings,
                                 CVRenderingWebKitSupport, CVRenderingIOS | CVRenderingMacOS,
                                 CVRenderingPDFKitInspector, CVDraftingFoundationModels
 
