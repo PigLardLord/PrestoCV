@@ -536,7 +536,7 @@ private actor EndedAfterStoringNewCV: CVManagementUseCaseProtocol {
     func createCV(from template: CVModel) async throws -> CVModel { try await cvs.createCV(from: template) }
     func updateCV(_ cv: CVModel) async throws -> CVModel { try await cvs.updateCV(cv) }
     func deleteCV(id: UUID) async throws { try await cvs.deleteCV(id: id) }
-    func duplicateCV(id: UUID) async throws -> CVModel { try await cvs.duplicateCV(id: id) }
+    func duplicateCV(id: UUID, named name: String) async throws -> CVModel { try await cvs.duplicateCV(id: id, named: name) }
     func getCV(by id: UUID) async throws -> CVModel? { try await cvs.getCV(by: id) }
 }
 
@@ -593,7 +593,7 @@ private struct StoringFails: CVManagementUseCaseProtocol {
     func storeNewCV(_ cv: CVModel) async throws -> CVModel { throw AppError.fileSystemError("disk full") }
     func updateCV(_ cv: CVModel) async throws -> CVModel { throw AppError.fileSystemError("disk full") }
     func createCV(from template: CVModel) async throws -> CVModel { throw AppError.fileSystemError("disk full") }
-    func duplicateCV(id: UUID) async throws -> CVModel { throw AppError.fileSystemError("disk full") }
+    func duplicateCV(id: UUID, named name: String) async throws -> CVModel { throw AppError.fileSystemError("disk full") }
     func getAllCVs() async throws -> [CVModel] { try await cvs.getAllCVs() }
     func deleteCV(id: UUID) async throws { try await cvs.deleteCV(id: id) }
     func getCV(by id: UUID) async throws -> CVModel? { try await cvs.getCV(by: id) }

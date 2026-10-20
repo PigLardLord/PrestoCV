@@ -58,6 +58,24 @@ struct CVTitleTests {
         #expect(CVTitle(name: name, person: person, role: role) == .untitled)
     }
 
+    @Test("a copy is called by the title its CV is shown with, marked as a copy in the words of the app", arguments: [
+        (CVTitle.person("John Smith"), "Untitled CV", "(Copy)", "John Smith (Copy)"),                // en
+        (.role("Infermiera"), "CV senza titolo", "(Copia)", "Infermiera (Copia)"),                   // it
+        (.person("Lena Hartmann"), "Ohne Titel", "(Kopie)", "Lena Hartmann (Kopie)"),               // de
+        (.name("Candidature Lyon"), "CV sans titre", "(Copie)", "Candidature Lyon (Copie)"),         // fr
+        (.untitled, "CV sin título", "(Copia)", "CV sin título (Copia)"),                           // es
+        (.person("João da Silva"), "Currículo sem título", " (Cópia) ", "João da Silva (Cópia)"),    // pt
+    ])
+    func copyName(title: CVTitle, untitled: String, copySuffix: String, copy: String) {
+        #expect(title.copyName(untitled: untitled, copySuffix: copySuffix) == copy)
+    }
+
+    @Test("two copies of one CV are numbered, as any titles that read alike")
+    func copiesAreNumbered() {
+        let copy = CVTitle.person("Lena Hartmann").copyName(untitled: "Ohne Titel", copySuffix: "(Kopie)")
+        #expect(CVTitle.numbers(for: [("1", .name(copy)), ("2", .name(copy)), ("3", .person("Lena Hartmann"))]) == ["2": 2])
+    }
+
     @Test("CVs whose titles read alike are numbered from the second, in the order of their identities")
     func numbers() {
         let titles: [(id: String, title: CVTitle)] = [

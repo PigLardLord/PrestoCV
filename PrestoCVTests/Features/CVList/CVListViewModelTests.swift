@@ -24,7 +24,6 @@ enum ListChange: CaseIterable {
 struct CVListViewModelTests {
     
     private let copySuffix = "action.copy_suffix".localized
-    private let untitled = "cv.untitled".localized
     
     private func makeViewModel(repository: InMemoryCVRepository) -> CVListViewModel {
         let useCase = CVManagementUseCase(cvRepository: repository, sampleRepository: UnusedSampleCVRepository())
@@ -309,16 +308,34 @@ struct CVListViewModelTests {
         #expect(viewModel.actionError == nil)
     }
     
-    @Test("The duplicate of an unnamed CV is called Untitled CV with the copy suffix")
-    func duplicateOfUnnamedCVIsUntitledCopy() async {
-        let original = CVModel(name: "")
+    @Test("The duplicate of an unnamed CV is named after the title the list shows it with",
+          arguments: [(PersonalInfo(name: "Lena Hartmann", title: "Pflegefachkraft"), "Lena Hartmann"),
+                      (PersonalInfo(title: "Pflegefachkraft"), "Pflegefachkraft"), (PersonalInfo(email: "lena@example.com"), "cv.untitled".localized)])
+    func duplicateOfUnnamedCVIsNamedAfterItsTitle(person: PersonalInfo, shownTitle: String) async {
+        let original = CVModel(name: "", personalInfo: person)
         let repository = InMemoryCVRepository(cvs: [original])
         let viewModel = makeViewModel(repository: repository)
         await viewModel.loadCVs()
-        
+        #expect(viewModel.title(of: original) == shownTitle)
+
         await viewModel.duplicateCV(withId: original.id)
-        
-        #expect(viewModel.cvs.map(\.name).sorted() == ["", "\(untitled) \(copySuffix)"])
+
+        #expect(viewModel.cvs.map(\.name).sorted() == ["", "\(shownTitle) \(copySuffix)"])
+    }
+
+    @Test("Two copies of one CV are numbered in the list, as any titles that read alike")
+    func copiesOfOneCVAreNumbered() async throws {
+        let original = CVModel(name: "", personalInfo: PersonalInfo(name: "Lena Hartmann"))
+        let repository = InMemoryCVRepository(cvs: [original])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+
+        await viewModel.duplicateCV(withId: original.id)
+        await viewModel.duplicateCV(withId: original.id)
+
+        let titles = viewModel.cvs.map(viewModel.title(of:)).sorted()
+        let copy = "Lena Hartmann \(copySuffix)"
+        #expect(titles == ["Lena Hartmann", copy, "cv.title.numbered".localizedWithArgs(copy, 2)].sorted())
     }
     
     // MARK: - Rename

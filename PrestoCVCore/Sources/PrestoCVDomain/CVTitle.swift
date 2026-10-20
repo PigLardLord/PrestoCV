@@ -33,6 +33,23 @@ public enum CVTitle: Hashable, Sendable {
         }
     }
 
+    /// The title in words: the name, the person or the role; for a CV with none, `untitled`, in the words of the app
+    public func text(untitled: String) -> String {
+        switch self {
+        case .name(let text), .person(let text), .role(let text):
+            return text
+        case .untitled:
+            return untitled
+        }
+    }
+
+    /// What a copy of the CV is called: the title the CV is shown with, followed by `copySuffix`, the words of the app
+    /// for a copy, as "Lena Hartmann (Copy)". Copies whose names read alike are numbered by `numbers(for:)`, as any
+    /// titles are.
+    public func copyName(untitled: String, copySuffix: String) -> String {
+        "\(text(untitled: untitled)) \(copySuffix.trimmingCharacters(in: .whitespacesAndNewlines))"
+    }
+
     /// The numbers that tell apart CVs whose titles read alike, so that no two rows of a list read the same: the first
     /// of them, in the order of their identities, keeps its title, and the next ones are numbered from 2. Case, accents
     /// and spaces around a title do not make it different. CVs whose title is unique have no number.

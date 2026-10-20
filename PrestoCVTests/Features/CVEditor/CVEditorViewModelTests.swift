@@ -109,13 +109,13 @@ actor MockCVManagementUseCase: CVManagementUseCaseProtocol {
         return Array(storedCVs.values)
     }
 
-    func duplicateCV(id: UUID) async throws -> CVModel {
+    func duplicateCV(id: UUID, named name: String) async throws -> CVModel {
         guard let original = storedCVs[id] else {
             throw AppError.notFound("CV with id \(id)")
         }
         var duplicate = original
         duplicate.id = UUID()
-        duplicate.name = "\(original.name) Copy"
+        duplicate.name = name
         storedCVs[duplicate.id] = duplicate
         return duplicate
     }
@@ -192,7 +192,7 @@ actor GatedCVManagementUseCase: CVManagementUseCaseProtocol {
     func getCV(by id: UUID) async throws -> CVModel? { storedCV }
     func getAllCVs() async throws -> [CVModel] { [] }
     func deleteCV(id: UUID) async throws {}
-    func duplicateCV(id: UUID) async throws -> CVModel { throw AppError.notFound("CV with id \(id)") }
+    func duplicateCV(id: UUID, named name: String) async throws -> CVModel { throw AppError.notFound("CV with id \(id)") }
 }
 
 private extension ViewState {

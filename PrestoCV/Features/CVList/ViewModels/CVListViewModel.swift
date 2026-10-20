@@ -180,9 +180,11 @@ final class CVListViewModel: ObservableObject {
         }
     }
     
+    /// Stores a copy of a listed CV, named after the title the list shows it with, as "Lena Hartmann (Copy)"
     func duplicateCV(withId id: UUID) async {
+        guard let name = cvs.first(where: { $0.id == id })?.copyName else { return }
         await perform {
-            .added(try await self.cvManagementUseCase.duplicateCV(id: id))
+            .added(try await self.cvManagementUseCase.duplicateCV(id: id, named: name))
         }
     }
     

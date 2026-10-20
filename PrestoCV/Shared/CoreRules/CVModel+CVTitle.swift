@@ -7,6 +7,11 @@ extension CVModel {
         CVTitle(name: name, person: personalInfo.name, role: personalInfo.title)
     }
 
+    /// What a copy of the CV is called: the title it is shown with, marked as a copy in the words of the app
+    var copyName: String {
+        cvTitle.copyName(untitled: "cv.untitled".localized, copySuffix: "action.copy_suffix".localized)
+    }
+
     /// What the editor of the CV, and the offer to restore its edits, call it: its title; for a CV with none, "New CV"
     /// until it is stored, and "Untitled CV", as the list calls it, once it is.
     func editorTitle(isStored: Bool) -> String {
@@ -18,11 +23,6 @@ extension CVModel {
 extension CVTitle {
     /// The title in the words of the app: "Untitled CV" for a CV with none of a name, a person and a role
     var text: String {
-        switch self {
-        case .name(let text), .person(let text), .role(let text):
-            return text
-        case .untitled:
-            return "cv.untitled".localized
-        }
+        text(untitled: "cv.untitled".localized)
     }
 }
