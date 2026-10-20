@@ -67,21 +67,27 @@ public enum CVTitle: Hashable, Sendable {
         let texts = titles.map { (id: $0.id, text: $0.title.text(untitled: untitled)) }.sorted { $0.id < $1.id }
         // Every title the list shows is taken from the start, so that a number never repeats one further down
         var taken = Set(texts.map { comparable($0.text) })
-        var kept: Set<String> = []
+        // The next number to try for each title: each number is tried once, so the work grows with the list, not with
+        // the square of the CVs that share a title
+        var nextNumber: [String: Int] = [:]
+        // A broken pattern that leaves the number out could never give a free label: the search stops there
+        let lastNumber = 2 * texts.count + 2
         var labels: [ID: String] = [:]
         for entry in texts {
-            if kept.insert(comparable(entry.text)).inserted {
+            let key = comparable(entry.text)
+            guard let start = nextNumber[key] else {
+                nextNumber[key] = 2
                 labels[entry.id] = entry.text
                 continue
             }
-            // At most twice as many labels as rows are taken, so a free number comes before this bound
-            var number = 2
+            var number = start
             var label = numbered(entry.text, number)
-            while taken.contains(comparable(label)), number < 2 * texts.count + 2 {
+            while taken.contains(comparable(label)), number < lastNumber {
                 number += 1
                 label = numbered(entry.text, number)
             }
             taken.insert(comparable(label))
+            nextNumber[key] = number + 1
             labels[entry.id] = label
         }
         return labels

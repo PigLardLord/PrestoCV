@@ -9,7 +9,9 @@ import enum PrestoCVApplication.StoredCVChangeError
 final class CVListViewModel: ObservableObject {
     
     // MARK: - Published Properties
-    @Published var viewState: ViewState<[CVModel]> = .idle
+    @Published var viewState: ViewState<[CVModel]> = .idle {
+        didSet { rowLabels = Self.rowLabels(of: cvs) }
+    }
     @Published private(set) var unreadableCount = 0
     /// When each CV of the list was last saved, for the CVs that are known to have a time.
     @Published private(set) var lastSavedAt: [UUID: Date] = [:]
@@ -41,6 +43,9 @@ final class CVListViewModel: ObservableObject {
     private var documentLanguageSaves: Set<UUID> = []
     /// The language last chosen for a CV and not yet being saved; nil is automatic.
     private var pendingDocumentLanguages: [UUID: DocumentLanguage?] = [:]
+    /// The label of each row, by identity, made once each time the list changes rather than each time a row is drawn.
+    /// The words in it change only with the app's language, and iOS starts the app again for that.
+    private var rowLabels: [String: String] = [:]
     
     // MARK: - Computed Properties
     var cvs: [CVModel] {
@@ -94,12 +99,15 @@ final class CVListViewModel: ObservableObject {
     /// otherwise the role it is for, and "Untitled CV" only without any of them. A CV whose title reads like another's
     /// in the list is numbered, with a number that gives a label no other row shows.
     func title(of cv: CVModel) -> String {
-        let labels = CVTitle.labels(
+        rowLabels[cv.id.uuidString] ?? cv.cvTitle.text
+    }
+
+    private static func rowLabels(of cvs: [CVModel]) -> [String: String] {
+        CVTitle.labels(
             for: cvs.map { (id: $0.id.uuidString, title: $0.cvTitle) },
             untitled: "cv.untitled".localized,
             numbered: { "cv.title.numbered".localizedWithArgs($0, $1) }
         )
-        return labels[cv.id.uuidString] ?? cv.cvTitle.text
     }
     
     /// The line under the title of a CV's row, by the rule of PrestoCVDomain: who the CV is about, without what its

@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 import PrestoCVDomain
 
 /// What a CV is called, with the names and roles people write in the six languages of the app.
@@ -106,6 +107,44 @@ struct CVTitleTests {
                 == ["a": title, "b": "\(title) (3)", "c": "\(title) (2)"])
         #expect(labels([("a", .name(title)), ("b", .name(title)), ("c", .person(title)), ("d", .name("\(title.uppercased()) (3)"))])
                 == ["a": title, "b": "\(title) (2)", "c": "\(title) (4)", "d": "\(title.uppercased()) (3)"])
+    }
+
+    @Test("a thousand CVs with one title are numbered with one formatting each, not one per number tried")
+    func manyDuplicatesCostOneFormattingEach() {
+        let titles = (1...1_000).map { (id: String(format: "%04d", $0), title: CVTitle.name("Backend")) }
+        var formattings = 0
+
+        let labels = CVTitle.labels(for: titles, untitled: "Untitled CV") { title, number in
+            formattings += 1
+            return Self.numbered(title, number)
+        }
+
+        #expect(formattings == 999)
+        #expect(Set(labels.values).count == 1_000)
+        #expect(labels["1000"] == "Backend (1000)")
+    }
+
+    @Test("numbered titles the person typed are skipped, and never shown twice, whatever their place in the list", arguments: [
+        "Backend", "Infermiera", "Pflegefachkraft", "Développeuse", "Enfermero", "Engenheiro de software",
+    ])
+    func typedNumbersNeverCollide(title: String) {
+        let duplicates = (1...20).map { (id: String(format: "b%02d", $0), title: CVTitle.name(title)) }
+        let typed: [(id: String, title: CVTitle)] = [
+            ("a1", .name("\(title) (2)")), ("c1", .name("\(title.uppercased()) (3)")), ("z1", .role("\(title) (7)")),
+            ("a2", .name("\(title) (21)")),
+        ]
+        var formattings = 0
+
+        let labels = CVTitle.labels(for: duplicates + typed, untitled: "Untitled CV") { title, number in
+            formattings += 1
+            return Self.numbered(title, number)
+        }
+
+        let comparable = labels.values.map { $0.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) }
+        #expect(Set(comparable).count == labels.count)
+        #expect(labels["a1"] == "\(title) (2)" && labels["z1"] == "\(title) (7)" && labels["a2"] == "\(title) (21)")
+        #expect(labels["b02"] == "\(title) (4)" && labels["b20"] == "\(title) (24)")
+        #expect(formattings <= duplicates.count + typed.count)
     }
 
     @Test("an untitled CV and one named with the app's words for an untitled CV are told apart", arguments: [
