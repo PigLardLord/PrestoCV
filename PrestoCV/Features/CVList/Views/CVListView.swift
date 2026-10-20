@@ -126,7 +126,7 @@ struct CVListView<EmptyState: View>: View {
         DeletableList(items: viewModel.cvs) { cv in
             CVRowView(
                 title: viewModel.title(of: cv),
-                subtitle: viewModel.personLine(of: cv),
+                subtitle: viewModel.subtitle(of: cv),
                 caption: viewModel.lastSavedLine(of: cv),
                 onTap: {
                     router.select(.stored(cvId: cv.id.uuidString))

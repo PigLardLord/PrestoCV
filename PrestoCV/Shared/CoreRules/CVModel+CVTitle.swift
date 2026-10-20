@@ -1,10 +1,16 @@
 import PrestoCVCore
 import enum PrestoCVDomain.CVTitle
+import enum PrestoCVDomain.CVSubtitle
 
 extension CVModel {
     /// What the CV is called, by `CVTitle`: its name, otherwise the name of its person, otherwise their professional title
     var cvTitle: CVTitle {
         CVTitle(name: name, person: personalInfo.name, role: personalInfo.title)
+    }
+
+    /// The line under the title of the CV's row, by `CVSubtitle`: who the CV is about, without what its title says
+    var rowSubtitle: String? {
+        CVSubtitle.text(name: name, person: personalInfo.name, role: personalInfo.title)
     }
 
     /// What a copy of the CV is called: the title it is shown with, marked as a copy in the words of the app

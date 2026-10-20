@@ -99,13 +99,10 @@ final class CVListViewModel: ObservableObject {
         return "cv.title.numbered".localizedWithArgs(cv.cvTitle.text, number)
     }
     
-    /// The person a CV is about, for the line under its name: the name of the person and the job title, or the one
-    /// of them that is there. It tells apart CVs that have no name of their own. Nil when the CV has neither.
-    func personLine(of cv: CVModel) -> String? {
-        let parts = [cv.personalInfo.name, cv.personalInfo.title]
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    /// The line under the title of a CV's row, by the rule of PrestoCVDomain: who the CV is about, without what its
+    /// title already says. Nil when nothing is left to say.
+    func subtitle(of cv: CVModel) -> String? {
+        cv.rowSubtitle
     }
     
     /// When a CV was last saved, in words, for its row. Nil while that is not known.
