@@ -1641,47 +1641,6 @@
         }
       }
     },
-    "ai.unavailable.device_not_eligible" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieses Gerät unterstützt Apple Intelligence nicht."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device doesn't support Apple Intelligence."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este dispositivo no es compatible con Apple Intelligence."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil n'est pas compatible avec Apple Intelligence."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Questo dispositivo non supporta Apple Intelligence."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este dispositivo não é compatível com o Apple Intelligence."
-          }
-        }
-      }
-    },
     "ai.unavailable.language_data_not_ready" : {
       "extractionState" : "manual",
       "localizations" : {

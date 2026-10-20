@@ -22,6 +22,7 @@ final class AIGenerationViewModel: ObservableObject {
     private let mapper: AIDraftMapper
     private let languageData: LanguageDataRequesting
     private let appLanguageCode: String?
+    private let platform: AIPlatform
     /// Where the description of this creation is kept, until a draft is made from it. The screen then lets go of it for
     /// good: its own text stays, to adjust and generate again, but nothing it does reaches the next creation.
     private var session: AIDescriptionSession?
@@ -36,14 +37,17 @@ final class AIGenerationViewModel: ObservableObject {
         let request: CVGenerationRequest
     }
 
+    /// - Parameter platform: Where the app runs, for the words of an unavailable model. The factory gives the platform of
+    ///   the process; the default keeps the tests the same on every machine.
     init(
         cvGenerationUseCase: CVGeneratorUseCase, mapper: AIDraftMapper, languageData: LanguageDataRequesting, appLanguageCode: String?,
-        session: AIDescriptionSession
+        session: AIDescriptionSession, platform: AIPlatform = .iPhoneOrIPad
     ) {
         self.cvGenerationUseCase = cvGenerationUseCase
         self.mapper = mapper
         self.languageData = languageData
         self.appLanguageCode = appLanguageCode
+        self.platform = platform
         self.session = session
         self.prompt = session.text
     }
@@ -138,7 +142,7 @@ final class AIGenerationViewModel: ObservableObject {
 
     private func message(for error: Error) -> String {
         // An error the generator did not type comes from the system, not from the description
-        let key = (error as? CVGenerationError)?.messageKey ?? CVGenerationError.serviceFailed.messageKey
+        let key = ((error as? CVGenerationError) ?? .serviceFailed).messageKey(on: platform)
         return key.localized
     }
 }

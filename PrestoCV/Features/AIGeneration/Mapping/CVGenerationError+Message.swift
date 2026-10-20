@@ -1,12 +1,13 @@
 import CVGeneratorAI
 
 extension CVGenerationError {
-    /// Catalog key of the sentence telling the person what went wrong.
+    /// Catalog key of the sentence telling the person what went wrong on `platform`. An unavailable model is explained
+    /// as the AI entry explains it, so a Mac never reads the wording of an iPhone.
     ///
     /// The system's own error text is never shown: it is English and written for developers.
-    var messageKey: String {
+    func messageKey(on platform: AIPlatform) -> String {
         switch self {
-        case .unavailable(let reason): return reason.explanationKey
+        case .unavailable(let reason): return AIEntry.Reason(reason, platform: platform).explanationKey
         case .descriptionTooShort: return "ai.error.too_short"
         case .descriptionTooLong: return "ai.error.too_long"
         case .contentNotAllowed: return "ai.error.content_not_allowed"

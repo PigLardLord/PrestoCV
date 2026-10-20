@@ -27,14 +27,15 @@ struct AIGenerationViewModelTests {
 
     private func makeViewModel(
         appLanguageCode: String? = "it", session: AIDescriptionSession = AIDescriptionSession(),
-        lexicalClasses: FakeLexicalTagger = .english
+        lexicalClasses: FakeLexicalTagger = .english, platform: AIPlatform = .iPhoneOrIPad
     ) -> AIGenerationViewModel {
         AIGenerationViewModel(
             cvGenerationUseCase: CVGeneratorUseCase(service: service, sanitizer: CVDataSanitizer(lexicalClasses: lexicalClasses)),
             mapper: AIDraftMapper(labels: labels, languageOfText: { _ in "pt-PT" }),
             languageData: languageData,
             appLanguageCode: appLanguageCode,
-            session: session
+            session: session,
+            platform: platform
         )
     }
 
@@ -184,6 +185,22 @@ struct AIGenerationViewModelTests {
         #expect(!viewModel.isGenerating)
     }
 
+    @Test("A model that cannot run is explained for the platform: on a Mac, where to turn it on in System Settings",
+          arguments: zip(
+              [AIPlatform.iPhoneOrIPad, .mac],
+              ["ai.unavailable.not_on_this_device", "ai.unavailable.not_enabled.mac"]
+          ))
+    func unavailableIsExplainedForThePlatform(platform: AIPlatform, key: String) async {
+        service.availabilityResult = .unavailable(.deviceNotEligible)
+        let viewModel = makeViewModel(platform: platform)
+        viewModel.prompt = validPrompt
+
+        await viewModel.generateCV()
+
+        #expect(viewModel.errorMessage == key.localized)
+        #expect(viewModel.draft == nil)
+    }
+
     // MARK: - Language data
 
     @Test("A description whose language data the device has not got asks the system for it, and says the draft is being prepared")
@@ -252,7 +269,7 @@ struct AIGenerationViewModelTests {
 
         await viewModel.generateCV()
 
-        #expect(viewModel.errorMessage == error.messageKey.localized)
+        #expect(viewModel.errorMessage == error.messageKey(on: .iPhoneOrIPad).localized)
         #expect(viewModel.draft == nil)
         #expect(!viewModel.isGenerating)
     }

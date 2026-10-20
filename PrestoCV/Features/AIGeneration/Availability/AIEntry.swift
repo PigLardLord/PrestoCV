@@ -25,6 +25,24 @@ enum AIEntry: Equatable {
 
         var id: Self { self }
 
+        /// Why the AI draft cannot be used when the system gives `reason` on `platform`. The entry and the AI screen
+        /// both say it this way.
+        init(_ reason: AIAvailability.Reason, platform: AIPlatform) {
+            switch (reason, platform) {
+            case (.modelNotReady, _):
+                self = .modelStillDownloading
+            case (.appleIntelligenceNotEnabled, .iPhoneOrIPad):
+                self = .turnOnAppleIntelligence
+            case (.deviceNotEligible, .iPhoneOrIPad):
+                self = .notOnThisDevice
+            // Every Mac that runs the app can run Apple Intelligence: there the device is never the reason
+            case (.appleIntelligenceNotEnabled, .mac), (.deviceNotEligible, .mac):
+                self = .turnOnAppleIntelligenceInSystemSettings
+            case (.unknown, _):
+                self = .notAvailableRightNow
+            }
+        }
+
         /// Catalog key of the line shown in place, with the dimmed entry.
         var lineKey: String {
             switch self {
@@ -52,20 +70,11 @@ enum AIEntry: Equatable {
             self = .hidden
             return
         }
-        switch (availability, platform) {
-        case (.available, _):
+        switch availability {
+        case .available:
             self = .available
-        case (.unavailable(.modelNotReady), _):
-            self = .disabled(.modelStillDownloading)
-        case (.unavailable(.appleIntelligenceNotEnabled), .iPhoneOrIPad):
-            self = .disabled(.turnOnAppleIntelligence)
-        case (.unavailable(.deviceNotEligible), .iPhoneOrIPad):
-            self = .disabled(.notOnThisDevice)
-        // Every Mac that runs the app can run Apple Intelligence: there the device is never the reason
-        case (.unavailable(.appleIntelligenceNotEnabled), .mac), (.unavailable(.deviceNotEligible), .mac):
-            self = .disabled(.turnOnAppleIntelligenceInSystemSettings)
-        case (.unavailable(.unknown), _):
-            self = .disabled(.notAvailableRightNow)
+        case .unavailable(let reason):
+            self = .disabled(Reason(reason, platform: platform))
         }
     }
 

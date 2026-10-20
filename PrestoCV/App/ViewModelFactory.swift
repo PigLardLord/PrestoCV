@@ -82,7 +82,8 @@ final class ViewModelFactory {
             ),
             languageData: NaturalLanguageDataRequester(),
             appLanguageCode: Bundle.main.preferredLocalizations.first,
-            session: aiDescriptionSession
+            session: aiDescriptionSession,
+            platform: .current
         )
     }
 
