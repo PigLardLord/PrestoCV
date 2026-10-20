@@ -1,7 +1,8 @@
 import SwiftUI
 import PrestoCVCore
 
-/// The "New CV" screen: start from an AI draft where the device can run it, from a blank CV, or from an example.
+/// The "New CV" screen: start from an AI draft where the device can run it, from a blank CV, from an example, or from
+/// a CV the person already has.
 /// Choosing the design of the PDF happens in the export sheet.
 struct TemplateSelectionView: View {
     @EnvironmentObject var router: AppRouter
@@ -66,6 +67,8 @@ struct TemplateSelectionView: View {
             createNewCard
         case .example:
             exampleCard
+        case .importCV:
+            importCard
         }
     }
 
@@ -93,6 +96,20 @@ struct TemplateSelectionView: View {
             )
         }
         .buttonStyle(CardButtonStyle())
+    }
+
+    private var importCard: some View {
+        Button(action: {
+            router.navigate(to: .importCV)
+        }) {
+            plainCard(
+                icon: "doc.on.clipboard",
+                title: "template.import.title".localized,
+                description: "template.import.description".localized
+            )
+        }
+        .buttonStyle(CardButtonStyle())
+        .accessibilityIdentifier("newcv.import")
     }
 
     /// A card with a plain picture of a symbol, a title and a line that says what the choice does

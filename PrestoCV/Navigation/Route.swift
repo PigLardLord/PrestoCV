@@ -8,4 +8,5 @@ enum Route: Hashable, Sendable {
     case cvEditor(EditorRequest)
     case templateSelection
     case aiGeneration
+    case importCV
 }

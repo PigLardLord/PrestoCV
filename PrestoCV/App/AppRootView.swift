@@ -34,6 +34,10 @@ struct AppRootView: View {
             .navigationDestination(for: Route.self) { route in
                 destinationView(for: router.destination(for: route))
             }
+            // A PDF opened in the app from the share sheet or Files goes to the import
+            .onOpenURL { url in
+                router.openImport(of: url)
+            }
             // At launch, and each time the root shows again, edits an earlier run left unsaved are offered
             .task {
                 await unsavedEditsOffer.checkForEditsToRestore()
@@ -91,6 +95,8 @@ struct AppRootView: View {
             TemplateSelectionView(viewModel: viewModelFactory.makeNewCVChoicesViewModel())
         case .aiGeneration:
             AIGenerationView(viewModel: viewModelFactory.makeAIGenerationViewModel())
+        case .importCV:
+            ImportView(viewModel: viewModelFactory.makeImportViewModel())
         case .cvEditor(let request):
             CVEditorView(
                 viewModel: viewModelFactory.makeCVEditorViewModel(for: request),

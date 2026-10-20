@@ -30,6 +30,7 @@ extension AppEnvironment {
             newEditingID: newEditingID,
             temporaryDirectory: FileManager.default.temporaryDirectory,
             exportPreferencesFile: FileManager.default.temporaryDirectory.appendingPathComponent("export-preferences-\(UUID().uuidString).json"),
+            importInbox: FileManager.default.temporaryDirectory.appendingPathComponent("Inbox-\(UUID().uuidString)"),
             arguments: [],
             bundle: Bundle(for: AppRouter.self),
             platform: .iPhoneOrIPad

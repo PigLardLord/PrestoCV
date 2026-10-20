@@ -48,7 +48,7 @@
 
 **5. Version 1 uses the core from the legacy app** ([ADR 0022](0022-ship-legacy-app-as-v1.md), [ADR 0025](0025-hold-the-legacy-app-to-the-separation-rules.md)).
 - New CV and the first run offer a third way to start, "Paste or import a CV", next to the blank CV and the examples, in the six languages.
-- The import screen takes pasted text or a PDF from Files (`fileImporter`). Its view model calls the use case; the factory makes it with the PDFKit adapter. The views hold no rule (R5).
+- The import screen takes pasted text or a PDF: from Files (`fileImporter`), pasted after "Copy" in Files (the same `PasteButton` takes text or a PDF), or opened in the app from the share sheet ("Open in PrestoCV": the app declares PDFs at the alternate rank, copied, never opened in place, and deletes the copy once read). Its view model calls the use case; the factory makes it with the PDFKit adapter. The views hold no rule (R5).
 - A mapper in the app turns the `ImportedCV` into an unsaved `CVModel`, as the AI draft's mapper does. The editor opens it as a new CV, as it opens an example, with a notice that shows the values to check and the text not imported, ready to copy. A language without a CEFR level has no place in the legacy model, which requires one: it goes to the text not imported, with its words, and is listed for the review.
 - The provenance serves the review and is not saved with the CV.
 
@@ -57,7 +57,7 @@
 | Phase | Content | When |
 |---|---|---|
 | **F0** | This ADR; the core's types; the fixture corpus and the contract table | #275, version 1 |
-| **F1** | Pasted text and text PDFs; the review in the editor; "Open in PrestoCV" from the share sheet if it is cheap | #275, version 1 |
+| **F1** | Pasted text and text PDFs, from Files, the clipboard or "Open in PrestoCV"; the review in the editor | #275, version 1 |
 | F2 | LinkedIn's data archive (ZIP of CSV files, a ZIP reader under MIT that builds on Linux), the XML a Europass PDF carries, JSON Resume | after version 1 |
 | F3 | The camera, photos, scans and screenshots: VisionKit's document camera in the app's `Platform/` folder, Vision's `RecognizeDocumentsRequest` in an adapter of its own; OCR for a PDF without text | after version 1 |
 | F4 | The on-device model: a port that chooses among the candidate spans of one entry at a time, never writing text | after version 1 |

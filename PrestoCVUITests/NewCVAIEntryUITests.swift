@@ -43,6 +43,8 @@ final class NewCVAIEntryUITests: XCTestCase {
         app.openTheNewCVScreen()
         let aiCard = card("AI CV Generation")
         XCTAssertTrue(aiCard.waitForExistence(timeout: 10), "The New CV screen should show the AI card")
+        // A dimmed AI card comes last, after the import, below the fold of an iPhone
+        app.scrollTo(aiCard)
 
         app.activateAsAnAssistiveTechnology(aiCard, says: .deviceNotEligible)
     }

@@ -588,3 +588,38 @@ private final class LeavableEditorSpy: LeavableEditor {
         return leaving == .allowed
     }
 }
+
+// MARK: - Import
+
+@MainActor
+@Suite("AppRouter - the import of a CV")
+struct AppRouterImportTests {
+
+    @Test("An imported CV opens in the editor as a new CV, with the notice of its review")
+    func importedCVOpensWithItsReview() {
+        let router = AppRouter(isAIShipped: false)
+        let review = ImportReview(items: [ImportReview.Item(field: .name, reason: .byPosition, text: "Lena Hartmann")], notImported: "")
+        let cv = CVModel(personalInfo: PersonalInfo(name: "Lena Hartmann"))
+
+        router.navigate(to: .importCV)
+        router.navigateToEditorWithImport(ImportedDraft(cv: cv, review: review))
+
+        #expect(router.currentRoute == .cvEditor(.new(template: cv, notice: .imported(review))))
+        #expect(router.navigationPath.count == 2)
+    }
+
+    @Test("A PDF opened in the app opens the import on it once; an import on screen reads it in place")
+    func openedPDFGoesToTheImport() {
+        let router = AppRouter(isAIShipped: false)
+        let file = URL(fileURLWithPath: "/tmp/Inbox/cv.pdf")
+
+        router.openImport(of: file)
+        #expect(router.currentRoute == .importCV)
+        #expect(router.navigationPath.count == 1)
+
+        router.openImport(of: file)
+        #expect(router.navigationPath.count == 1, "The import on screen reads the next PDF itself")
+        #expect(router.takePendingImportFile() == file)
+        #expect(router.takePendingImportFile() == nil, "A PDF is given once")
+    }
+}

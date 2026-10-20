@@ -22,6 +22,9 @@ final class AppRouter: ObservableObject {
     /// are discarded, and is dropped when the person keeps editing.
     private(set) var pendingSelection: EditorRequest?
 
+    /// A PDF the system opened in the app, from "Open in PrestoCV", that the import screen has not read yet.
+    @Published private(set) var pendingImportFile: URL?
+
     // MARK: - Private Properties
     private let isAIShipped: Bool
     private weak var shownEditor: (any LeavableEditor)?
@@ -53,6 +56,25 @@ final class AppRouter: ObservableObject {
     /// Opens an unsaved CV drafted by AI, with a notice asking the person to check it before saving
     func navigateToEditorWithAIDraft(_ draft: CVModel) {
         navigate(to: .cvEditor(.new(template: draft, notice: .aiDraft)))
+    }
+
+    /// Opens the import screen on a PDF the system opened in the app, from the share sheet or Files. A screen already on
+    /// the import reads it there; nothing else on screen is left.
+    func openImport(of file: URL) {
+        pendingImportFile = file
+        if currentRoute != .importCV { navigate(to: .importCV) }
+    }
+
+    /// The PDF the import screen should read now, if any. It is given once.
+    func takePendingImportFile() -> URL? {
+        defer { pendingImportFile = nil }
+        return pendingImportFile
+    }
+
+    /// Opens an unsaved CV read from the person's text or PDF, as an example opens, with a notice that leads to what to
+    /// check and to the text that was not imported
+    func navigateToEditorWithImport(_ draft: ImportedDraft) {
+        navigate(to: .cvEditor(.new(template: draft.cv, notice: .imported(draft.review))))
     }
 
     func navigateBack() {

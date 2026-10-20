@@ -19,6 +19,8 @@ struct ReleaseHygieneTests {
         "CVGeneratorAI": "CVGeneratorAI/Sources/CVGeneratorAI",
         "PrestoCVDomain": "PrestoCVCore/Sources/PrestoCVDomain",
         "PrestoCVApplication": "PrestoCVCore/Sources/PrestoCVApplication",
+        "PrestoCVImporting": "PrestoCVCore/Sources/PrestoCVImporting",
+        "PrestoCVImportingPDFKit": "PrestoCVCore/Sources/PrestoCVImportingPDFKit",
     ]
 
     /// The sources whose code ships with the app.

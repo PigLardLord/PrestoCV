@@ -12,6 +12,7 @@ struct RouteDestinationTests {
         (.cvList, .list),
         (.templateSelection, .templateSelection),
         (.aiGeneration, .aiGeneration),
+        (.importCV, .importCV),
         (.cvEditor(RouteDestinationTests.blankCV), .cvEditor(RouteDestinationTests.blankCV)),
         (.cvEditor(.stored(cvId: "saved")), .cvEditor(.stored(cvId: "saved"))),
     ])
@@ -26,6 +27,7 @@ struct RouteDestinationTests {
 
     @Test("With AI drafting not shipped, the other routes still show their own screen", arguments: [
         (Route.templateSelection, RouteDestination.templateSelection),
+        (.importCV, .importCV),
         (.cvEditor(RouteDestinationTests.blankCV), .cvEditor(RouteDestinationTests.blankCV)),
         (.cvList, .list),
     ])

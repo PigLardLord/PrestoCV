@@ -8,4 +8,6 @@ enum NewCVChoice: Hashable {
     case blank
     /// One of the example CVs, with the details of its person left blank.
     case example
+    /// A CV the person already has, pasted or from a PDF, read into a new one.
+    case importCV
 }

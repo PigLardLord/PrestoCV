@@ -14,7 +14,8 @@ typealias AIAvailabilityProvider = @MainActor () -> AIAvailability
 typealias AIAvailabilityPause = @MainActor () async throws -> Void
 
 /// The ways to start a new CV that the first run and the "New CV" screen offer: an AI draft, which is dimmed with the
-/// reason where it cannot be made now, a blank CV, and the example CVs.
+/// reason where it cannot be made now, a blank CV, the example CVs, and a CV the person already has, pasted or from a
+/// PDF.
 @MainActor
 final class NewCVChoicesViewModel: ObservableObject {
 
@@ -53,10 +54,10 @@ final class NewCVChoicesViewModel: ObservableObject {
 
     // MARK: - Choices
 
-    /// The ways to start, in the order the screens show them: the AI draft where `aiEntry` puts it, a blank CV, and
-    /// the examples once they are loaded.
+    /// The ways to start, in the order the screens show them: the AI draft where `aiEntry` puts it, a blank CV, the
+    /// examples once they are loaded, and the import, on every device.
     var choices: [NewCVChoice] {
-        let others: [NewCVChoice] = samples.isEmpty ? [.blank] : [.blank, .example]
+        let others: [NewCVChoice] = samples.isEmpty ? [.blank, .importCV] : [.blank, .example, .importCV]
         guard let ai = aiChoice, let position = aiEntry.position else { return others }
         switch position {
         case .first: return [ai] + others

@@ -2,7 +2,7 @@ import SwiftUI
 import PrestoCVCore
 
 /// What the user sees before having any CV: it fills the empty state of the CV list. Where the device can run it, the
-/// AI draft leads; a blank CV and the examples follow. At the accessibility sizes and in landscape on an iPhone the
+/// AI draft leads; a blank CV, the examples and the import of a CV the person already has follow. At the accessibility sizes and in landscape on an iPhone the
 /// ways to start come before the welcome (see `FirstRunLayout`).
 struct FirstRunView: View {
     @StateObject private var viewModel: NewCVChoicesViewModel
@@ -104,6 +104,11 @@ struct FirstRunView: View {
             SecondaryButton.text(title: "onboarding.start_from_example".localized) {
                 showingExamples = true
             }
+        case .importCV:
+            SecondaryButton.text(title: "onboarding.import.button".localized, icon: "doc.on.clipboard") {
+                router.navigate(to: .importCV)
+            }
+            .accessibilityIdentifier("firstrun.import")
         }
     }
     

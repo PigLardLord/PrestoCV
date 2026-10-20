@@ -2,6 +2,8 @@ import Foundation
 import PrestoCVCore
 import CVGeneratorAI
 import CVPDFExporter
+import PrestoCVImporting
+import PrestoCVImportingPDFKit
 import struct PrestoCVApplication.ChangeStoredCV
 
 /// The composition root of the screens: it makes every view model, with the real services and the part of the device's
@@ -114,6 +116,19 @@ final class ViewModelFactory {
             appLanguageCode: environment.appLanguage,
             session: aiDescriptionSession,
             platform: environment.platform
+        )
+    }
+
+    /// The import of a CV the person already has: pasted text, or a PDF read with PDFKit, both on the device.
+    @MainActor
+    func makeImportViewModel() -> ImportViewModel {
+        let limits = ImportLimits.standard
+        return ImportViewModel(
+            importer: ImportCV(pdfReader: PDFKitTextExtractor(), limits: limits),
+            mapper: ImportedCVMapper(),
+            readFile: { [inbox = environment.importInbox] url in
+                try await ChosenFileReader(maximumBytes: limits.maximumPDFBytes, inbox: inbox).read(url)
+            }
         )
     }
 

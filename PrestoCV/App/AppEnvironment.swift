@@ -23,6 +23,8 @@ struct AppEnvironment {
     let temporaryDirectory: URL
     /// Where the design chosen last is kept: a file and not `UserDefaults`, which would need a privacy manifest entry
     let exportPreferencesFile: URL
+    /// Where the system copies a PDF opened in the app ("Open in PrestoCV"): the import deletes each copy once read
+    let importInbox: URL
     /// The arguments the app was launched with
     let arguments: [String]
     /// The app's bundle, which holds its texts in each language
@@ -50,6 +52,7 @@ extension AppEnvironment {
             newEditingID: { UUID() },
             temporaryDirectory: FileManager.default.temporaryDirectory,
             exportPreferencesFile: URL.applicationSupportDirectory.appendingPathComponent("PrestoCV/export-preferences.json"),
+            importInbox: URL.documentsDirectory.appendingPathComponent("Inbox"),
             arguments: ProcessInfo.processInfo.arguments,
             bundle: .main,
             platform: .current

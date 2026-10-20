@@ -95,13 +95,13 @@ struct NewCVChoicesViewModelTests {
             if count == 3 { availability.current = .available }
         }
         let viewModel = makeViewModel(availability, pauses: pauses)
-        #expect(viewModel.choices == [.blank, .aiDraftUnavailable(.modelStillDownloading)])
+        #expect(viewModel.choices == [.blank, .importCV, .aiDraftUnavailable(.modelStillDownloading)])
         #expect(viewModel.aiEntry.welcomeKey == "welcome.description")
 
         await viewModel.followAIAvailability()
 
         #expect(viewModel.aiEntry == .available)
-        #expect(viewModel.choices == [.aiDraft, .blank], "The AI draft leads once it works")
+        #expect(viewModel.choices == [.aiDraft, .blank, .importCV], "The AI draft leads once it works")
         #expect(viewModel.aiEntry.welcomeKey == "welcome.description.ai", "The welcome promises it once it works")
         #expect(pauses.count == 3, "The reads stop once the card works")
         #expect(availability.reads == 4)

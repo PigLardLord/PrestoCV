@@ -23,11 +23,11 @@ struct NewCVChoicesTests {
         return viewModel
     }
 
-    @Test("Where the device can run the model, the AI draft leads, before a blank CV and the examples, and the welcome promises it")
+    @Test("Where the device can run the model, the AI draft leads, before a blank CV, the examples and the import, and the welcome promises it")
     func availableLeadsWithTheAIDraft() async {
         let viewModel = await makeViewModel(.available)
 
-        #expect(viewModel.choices == [.aiDraft, .blank, .example])
+        #expect(viewModel.choices == [.aiDraft, .blank, .example, .importCV])
         #expect(viewModel.aiEntry.welcomeKey == "welcome.description.ai")
     }
 
@@ -44,7 +44,7 @@ struct NewCVChoicesTests {
     func unavailableComesLastWithItsReason(availability: AIAvailability, reason: AIEntry.Reason) async {
         let viewModel = await makeViewModel(availability)
 
-        #expect(viewModel.choices == [.blank, .example, .aiDraftUnavailable(reason)])
+        #expect(viewModel.choices == [.blank, .example, .importCV, .aiDraftUnavailable(reason)])
         #expect(viewModel.aiEntry.welcomeKey == "welcome.description")
     }
 
@@ -52,11 +52,11 @@ struct NewCVChoicesTests {
     func theMacPointsToSystemSettings() async {
         let viewModel = await makeViewModel(.unavailable(.deviceNotEligible), platform: .mac)
 
-        #expect(viewModel.choices == [.blank, .example, .aiDraftUnavailable(.turnOnAppleIntelligenceInSystemSettings)])
+        #expect(viewModel.choices == [.blank, .example, .importCV, .aiDraftUnavailable(.turnOnAppleIntelligenceInSystemSettings)])
         #expect(viewModel.aiEntry.explanationKey == "ai.unavailable.not_enabled.mac")
     }
 
-    @Test("A release that does not ship AI drafting offers a blank CV and the examples only, and does not promise AI",
+    @Test("A release that does not ship AI drafting offers a blank CV, the examples and the import, and does not promise AI",
           arguments: [
               AIAvailability.available,
               .unavailable(.deviceNotEligible),
@@ -67,7 +67,7 @@ struct NewCVChoicesTests {
     func notShippedOffersNoAI(availability: AIAvailability) async {
         let viewModel = await makeViewModel(availability, isAIShipped: false)
 
-        #expect(viewModel.choices == [.blank, .example])
+        #expect(viewModel.choices == [.blank, .example, .importCV])
         #expect(viewModel.aiEntry.welcomeKey == "welcome.description")
     }
 
@@ -78,6 +78,7 @@ struct NewCVChoicesTests {
 
         #expect(!viewModel.choices.contains(.example))
         #expect(viewModel.choices.contains(.blank))
+        #expect(viewModel.choices.contains(.importCV), "A CV the person has can be imported without examples")
     }
 
     /// An availability that a test can change between two reads, as turning Apple Intelligence on does.
@@ -98,6 +99,6 @@ struct NewCVChoicesTests {
         availability.current = .available
         viewModel.refreshAIAvailability()
 
-        #expect(viewModel.choices == [.aiDraft, .blank, .example])
+        #expect(viewModel.choices == [.aiDraft, .blank, .example, .importCV])
     }
 }
