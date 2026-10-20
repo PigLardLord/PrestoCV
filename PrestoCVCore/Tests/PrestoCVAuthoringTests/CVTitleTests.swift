@@ -73,7 +73,17 @@ struct CVTitleTests {
     @Test("two copies of one CV are numbered, as any titles that read alike")
     func copiesAreNumbered() {
         let copy = CVTitle.person("Lena Hartmann").copyName(untitled: "Ohne Titel", copySuffix: "(Kopie)")
-        #expect(CVTitle.numbers(for: [("1", .name(copy)), ("2", .name(copy)), ("3", .person("Lena Hartmann"))]) == ["2": 2])
+        #expect(labels([("1", .name(copy)), ("2", .name(copy)), ("3", .person("Lena Hartmann"))], untitled: "Ohne Titel")
+                == ["1": copy, "2": "\(copy) (2)", "3": "Lena Hartmann"])
+    }
+
+    // MARK: - The labels of a list
+
+    /// How the app numbers a title, in each of its languages: "%1$@ (%2$lld)"
+    private static let numbered: @Sendable (String, Int) -> String = { "\($0) (\($1))" }
+
+    private func labels(_ titles: [(id: String, title: CVTitle)], untitled: String = "Untitled CV") -> [String: String] {
+        CVTitle.labels(for: titles, untitled: untitled, numbered: Self.numbered)
     }
 
     @Test("CVs whose titles read alike are numbered from the second, in the order of their identities")
@@ -82,20 +92,41 @@ struct CVTitleTests {
             ("c", .untitled), ("a", .untitled), ("b", .name("Backend")), ("e", .role("backend")), ("d", .untitled),
             ("f", .name("Frontend")), ("h", .person("Lena Hartmann")), ("g", .person("Lena Hartmann")),
         ]
-        #expect(CVTitle.numbers(for: titles) == ["c": 2, "d": 3, "e": 2, "h": 2])
+        #expect(labels(titles) == [
+            "a": "Untitled CV", "c": "Untitled CV (2)", "d": "Untitled CV (3)", "b": "Backend", "e": "backend (2)",
+            "f": "Frontend", "g": "Lena Hartmann", "h": "Lena Hartmann (2)",
+        ])
+    }
+
+    @Test("a number never gives a label the list already shows: it skips to the next free one", arguments: [
+        "Backend", "Infermiera", "Pflegefachkraft", "Développeuse", "Enfermero", "Engenheiro de software",
+    ])
+    func numberSkipsTakenLabels(title: String) {
+        #expect(labels([("a", .name(title)), ("b", .role(title)), ("c", .name("\(title) (2)"))])
+                == ["a": title, "b": "\(title) (3)", "c": "\(title) (2)"])
+        #expect(labels([("a", .name(title)), ("b", .name(title)), ("c", .person(title)), ("d", .name("\(title.uppercased()) (3)"))])
+                == ["a": title, "b": "\(title) (2)", "c": "\(title) (4)", "d": "\(title.uppercased()) (3)"])
+    }
+
+    @Test("an untitled CV and one named with the app's words for an untitled CV are told apart", arguments: [
+        "Untitled CV", "CV senza titolo", "Ohne Titel", "CV sans titre", "CV sin título", "Currículo sem título",
+    ])
+    func untitledAndNamedLikeIt(untitled: String) {
+        let titles: [(id: String, title: CVTitle)] = [("a", .untitled), ("b", .name(untitled)), ("c", .name(untitled.uppercased()))]
+        #expect(labels(titles, untitled: untitled) == ["a": untitled, "b": "\(untitled) (2)", "c": "\(untitled.uppercased()) (3)"])
     }
 
     @Test("titles that differ only in case, accents or spaces around them read alike",
           arguments: [(CVTitle.name("Enfermera"), CVTitle.role("enfermera")), (.name("Développeur"), .name("developpeur")),
                       (.role("Pflegefachkraft"), .name(" PFLEGEFACHKRAFT")), (.person("José García"), .name("jose garcia"))])
     func alike(first: CVTitle, second: CVTitle) {
-        #expect(CVTitle.numbers(for: [("1", first), ("2", second)]) == ["2": 2])
+        #expect(labels([("1", first), ("2", second)])["2"] == "\(second.text(untitled: "Untitled CV")) (2)")
     }
 
-    @Test("a single CV, and CVs with different titles, have no number")
+    @Test("a single CV, and CVs with different titles, keep their titles")
     func noNumbers() {
-        #expect(CVTitle.numbers(for: [("1", .untitled)]).isEmpty)
-        #expect(CVTitle.numbers(for: [("1", .name("Analyst")), ("2", .role("Analista")), ("3", .person("Ana Sousa")),
-                                      ("4", .untitled)]).isEmpty)
+        #expect(labels([("1", .untitled)]) == ["1": "Untitled CV"])
+        #expect(labels([("1", .name("Analyst")), ("2", .role("Analista")), ("3", .person("Ana Sousa")), ("4", .untitled)])
+                == ["1": "Analyst", "2": "Analista", "3": "Ana Sousa", "4": "Untitled CV"])
     }
 }

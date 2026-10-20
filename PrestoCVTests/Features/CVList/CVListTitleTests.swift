@@ -47,4 +47,26 @@ struct CVListTitleTests {
         #expect(list.title(of: second) == "cv.title.numbered".localizedWithArgs("cv.untitled".localized, 2))
         #expect(list.title(of: named) == "Backend Engineer")
     }
+
+    @Test("No two rows read the same: a number skips a title the list shows, and an untitled CV is told from one named like it")
+    func rowLabelsAreUnique() async {
+        let ids = (1...5).compactMap { UUID(uuidString: "00000000-0000-0000-0000-00000000000\($0)") }
+        let untitled = "cv.untitled".localized
+        let cvs = [
+            CVModel(id: ids[0], name: "Backend"), CVModel(id: ids[1], name: "Backend"),
+            CVModel(id: ids[2], name: "cv.title.numbered".localizedWithArgs("Backend", 2)),
+            CVModel(id: ids[3]), CVModel(id: ids[4], name: untitled),
+        ]
+        let useCase = MockCVManagementUseCase()
+        for cv in cvs {
+            await useCase.storeCV(cv)
+        }
+        let list = CVListViewModel(cvManagementUseCase: useCase)
+        await list.loadCVs()
+
+        #expect(cvs.map(list.title(of:)) == [
+            "Backend", "cv.title.numbered".localizedWithArgs("Backend", 3), "cv.title.numbered".localizedWithArgs("Backend", 2),
+            untitled, "cv.title.numbered".localizedWithArgs(untitled, 2),
+        ])
+    }
 }

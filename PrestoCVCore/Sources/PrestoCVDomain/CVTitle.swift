@@ -50,26 +50,45 @@ public enum CVTitle: Hashable, Sendable {
         "\(text(untitled: untitled)) \(copySuffix.trimmingCharacters(in: .whitespacesAndNewlines))"
     }
 
-    /// The numbers that tell apart CVs whose titles read alike, so that no two rows of a list read the same: the first
-    /// of them, in the order of their identities, keeps its title, and the next ones are numbered from 2. Case, accents
-    /// and spaces around a title do not make it different. CVs whose title is unique have no number.
-    public static func numbers<ID: Hashable & Comparable>(for titles: [(id: ID, title: CVTitle)]) -> [ID: Int] {
-        var numbers: [ID: Int] = [:]
-        for group in Dictionary(grouping: titles, by: { $0.title.comparable }).values where group.count > 1 {
-            for (index, entry) in group.sorted(by: { $0.id < $1.id }).enumerated().dropFirst() {
-                numbers[entry.id] = index + 1
+    /// The labels of the rows of a list, so that no two read the same: each CV is called by its title in the words of
+    /// the app, and a CV whose title reads like the title of one before it, in the order of their identities, gets the
+    /// first number from 2 that gives a label no other row shows. Case, accents and spaces around a title do not make
+    /// it different, so an untitled CV and a CV named with the app's words for an untitled one read alike.
+    /// - Parameters:
+    ///   - titles: The CVs of the list, by identity.
+    ///   - untitled: What the app calls a CV with no title, as "Untitled CV".
+    ///   - numbered: How the app numbers a title, as "Backend (2)".
+    /// - Returns: The label of each identity.
+    public static func labels<ID: Hashable & Comparable>(
+        for titles: [(id: ID, title: CVTitle)],
+        untitled: String,
+        numbered: (String, Int) -> String
+    ) -> [ID: String] {
+        let texts = titles.map { (id: $0.id, text: $0.title.text(untitled: untitled)) }.sorted { $0.id < $1.id }
+        // Every title the list shows is taken from the start, so that a number never repeats one further down
+        var taken = Set(texts.map { comparable($0.text) })
+        var kept: Set<String> = []
+        var labels: [ID: String] = [:]
+        for entry in texts {
+            if kept.insert(comparable(entry.text)).inserted {
+                labels[entry.id] = entry.text
+                continue
             }
+            // At most twice as many labels as rows are taken, so a free number comes before this bound
+            var number = 2
+            var label = numbered(entry.text, number)
+            while taken.contains(comparable(label)), number < 2 * texts.count + 2 {
+                number += 1
+                label = numbered(entry.text, number)
+            }
+            taken.insert(comparable(label))
+            labels[entry.id] = label
         }
-        return numbers
+        return labels
     }
 
-    /// The title as it is compared: untitled CVs all read alike
-    private var comparable: String? {
-        switch self {
-        case .name(let text), .person(let text), .role(let text):
-            return text.trimmingCharacters(in: .whitespacesAndNewlines).folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
-        case .untitled:
-            return nil
-        }
+    /// A title as it is compared: case, accents and the spaces around it do not count
+    private static func comparable(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines).folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
     }
 }

@@ -92,11 +92,14 @@ final class CVListViewModel: ObservableObject {
     
     /// What the list calls a CV, by the title rule of PrestoCVDomain: its name, otherwise the name of its person,
     /// otherwise the role it is for, and "Untitled CV" only without any of them. A CV whose title reads like another's
-    /// in the list is numbered, so that no two rows read alike.
+    /// in the list is numbered, with a number that gives a label no other row shows.
     func title(of cv: CVModel) -> String {
-        let numbers = CVTitle.numbers(for: cvs.map { (id: $0.id.uuidString, title: $0.cvTitle) })
-        guard let number = numbers[cv.id.uuidString] else { return cv.cvTitle.text }
-        return "cv.title.numbered".localizedWithArgs(cv.cvTitle.text, number)
+        let labels = CVTitle.labels(
+            for: cvs.map { (id: $0.id.uuidString, title: $0.cvTitle) },
+            untitled: "cv.untitled".localized,
+            numbered: { "cv.title.numbered".localizedWithArgs($0, $1) }
+        )
+        return labels[cv.id.uuidString] ?? cv.cvTitle.text
     }
     
     /// The line under the title of a CV's row, by the rule of PrestoCVDomain: who the CV is about, without what its
