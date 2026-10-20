@@ -108,7 +108,6 @@
   "DesignSystem/",
   "Platform/",
   "Resources/",
-  "PrestoCVImporting",
   "PrestoCVImportingPDFKit"
  ],
  "targets": [
@@ -210,6 +209,37 @@
     "PrestoCVDomain",
     "PrestoCVApplication",
     "PrestoCVCoreTestSupport"
+   ],
+   "rules": []
+  },
+  {
+   "name": "PrestoCVImporting",
+   "path": "PrestoCVCore/Sources/PrestoCVImporting",
+   "allowedImports": [
+    "PrestoCVDomain",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "PrestoCVImportingTests",
+   "path": "PrestoCVCore/Tests/PrestoCVImportingTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "PrestoCVImporting",
+    "PrestoCVDomain"
    ],
    "rules": []
   },
