@@ -37,11 +37,11 @@ final class EditorPhoneHintUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: 5), .completed, "A phone with a digit should lose the hint")
     }
 
-    /// Leaves the field for the name above it, as the person does when they move on
+    /// Leaves the field as the person does when they close the keyboard: with the Done button above it
     private func leave(_ field: XCUIElement) {
-        let name = app.textFields["Full Name"]
-        app.scrollTo(name, upwards: true)
-        name.tap()
+        let done = app.toolbars.buttons["Done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5), "The keyboard should offer a Done button")
+        done.tap()
         app.scrollTo(field)
     }
 }
