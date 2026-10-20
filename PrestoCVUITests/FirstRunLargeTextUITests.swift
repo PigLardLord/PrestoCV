@@ -1,7 +1,8 @@
 import XCTest
 
 /// At the largest text size the welcome alone used to fill the first screen, and every way to start was below it.
-/// The person reaches them without scrolling, whatever the device can do with AI.
+/// The person reaches them without scrolling, whatever the device can do with AI. The dimmed AI draft fits the screen
+/// and explains itself in German too, where the words are long.
 final class FirstRunLargeTextUITests: XCTestCase {
 
     private var app: XCUIApplication!
@@ -15,9 +16,9 @@ final class FirstRunLargeTextUITests: XCTestCase {
 
     /// Launches on an empty store at the largest text size, with the availability the debug override reports: the
     /// simulator cannot run the model itself.
-    private func launchAtTheLargestTextSize(aiAvailability: String) {
+    private func launchAtTheLargestTextSize(aiAvailability: String, language: String = "en", locale: String = "en_US") {
         app.launchArguments += [
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage",
+            "-AppleLanguages", "(\(language))", "-AppleLocale", locale, "-PrestoCVUITestsEmptyStorage",
             "-AIAvailabilityOverride", aiAvailability,
             "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
         ]
@@ -49,9 +50,46 @@ final class FirstRunLargeTextUITests: XCTestCase {
     func testTheWaysToStartAreOnScreenWhereTheDeviceCannotRunTheModel() throws {
         launchAtTheLargestTextSize(aiAvailability: "deviceNotEligible")
 
-        assertOnScreenWithoutScrolling([blank, examples])
-        XCTAssertFalse(app.buttons[aiDraft].exists, "A device that cannot run the model should not be offered the AI draft")
+        assertOnScreenWithoutScrolling([blank, examples, aiDraft])
+        XCTAssertEqual(app.buttons[aiDraft].value as? String, DimmedAIDraft.deviceNotEligible.announcement, "The AI draft should be unavailable")
     }
+
+    func testTheWaysToStartAreOnScreenWhenTheReasonIsUnknown() throws {
+        launchAtTheLargestTextSize(aiAvailability: "unknown")
+
+        assertOnScreenWithoutScrolling([blank, examples, aiDraft])
+        XCTAssertEqual(app.buttons[aiDraft].value as? String, DimmedAIDraft.unknown.announcement, "The AI draft should be unavailable")
+    }
+
+    /// The German titles are the longest: the dimmed AI draft still fits the width of the screen, below the ways to
+    /// start that work, reads its explanation, and a tap shows it.
+    func testTheDimmedAIDraftFitsTheScreenInGerman() throws {
+        launchAtTheLargestTextSize(aiAvailability: "deviceNotEligible", language: "de", locale: "de_DE")
+        let examplesButton = app.buttons["Mit einem Beispiel beginnen"]
+        XCTAssertTrue(examplesButton.waitForExistence(timeout: 20), "The first run should offer the examples")
+        let aiDraftButton = app.buttons["Meinen Lebenslauf mit KI entwerfen"]
+        XCTAssertTrue(aiDraftButton.exists, "The first run should show the AI draft")
+
+        app.scrollTo(aiDraftButton)
+
+        XCTAssertTrue(aiDraftButton.isHittable, "The AI draft should be on screen once scrolled to")
+        XCTAssertTrue(aiDraftButton.isEnabled, "The dimmed AI draft should still be activated to explain itself")
+        let screen = app.windows.firstMatch.frame
+        XCTAssertGreaterThanOrEqual(aiDraftButton.frame.minX, screen.minX, "The AI draft should not run off the left of the screen")
+        XCTAssertLessThanOrEqual(aiDraftButton.frame.maxX, screen.maxX, "The AI draft should not run off the right of the screen")
+        XCTAssertFalse(aiDraftButton.frame.intersects(examplesButton.frame), "The AI draft should not cover the examples")
+        XCTAssertEqual(aiDraftButton.value as? String, "Nicht verfügbar. " + Self.notOnThisDeviceInGerman, "VoiceOver should read that it is unavailable, and why")
+        add(app.keptScreenshot(named: "First run, German, largest text, device not eligible"))
+
+        aiDraftButton.tap()
+
+        XCTAssertTrue(app.text(Self.notOnThisDeviceInGerman).waitForExistence(timeout: 10), "A tap should show the full explanation")
+        add(app.keptScreenshot(named: "First run, German, largest text, device not eligible, explanation"))
+        app.navigationBars.buttons["Fertig"].tap()
+    }
+
+    private static let notOnThisDeviceInGerman = "Dieses Gerät unterstützt keine KI-Entwürfe. "
+        + "Sie können Ihren Lebenslauf selbst erstellen oder mit einem Beispiel beginnen."
 
     /// Each way to start can be tapped where the first screen shows it. The examples are offered once they are
     /// loaded, so the check waits for them; the welcome is still there, after them.

@@ -65,7 +65,11 @@ final class ViewModelFactory {
     
     @MainActor
     func makeNewCVChoicesViewModel() -> NewCVChoicesViewModel {
-        return NewCVChoicesViewModel(aiAvailability: makeAIAvailabilityProvider(), sampleRepository: sampleRepository)
+        return NewCVChoicesViewModel(
+            aiAvailability: makeAIAvailabilityProvider(),
+            sampleRepository: sampleRepository,
+            platform: .current
+        )
     }
 
     @MainActor
@@ -78,7 +82,8 @@ final class ViewModelFactory {
             ),
             languageData: NaturalLanguageDataRequester(),
             appLanguageCode: Bundle.main.preferredLocalizations.first,
-            session: aiDescriptionSession
+            session: aiDescriptionSession,
+            platform: .current
         )
     }
 

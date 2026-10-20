@@ -13,8 +13,8 @@ typealias AIAvailabilityProvider = @MainActor () -> AIAvailability
 /// The wait between two reads of an availability that is still changing. It throws when the wait is cancelled.
 typealias AIAvailabilityPause = @MainActor () async throws -> Void
 
-/// The ways to start a new CV that the first run and the "New CV" screen offer: an AI draft where the device can run
-/// it, a blank CV, and the example CVs.
+/// The ways to start a new CV that the first run and the "New CV" screen offer: an AI draft, which is dimmed with the
+/// reason where it cannot be made now, a blank CV, and the example CVs.
 @MainActor
 final class NewCVChoicesViewModel: ObservableObject {
 
@@ -26,53 +26,57 @@ final class NewCVChoicesViewModel: ObservableObject {
     private let aiAvailability: AIAvailabilityProvider
     private let pause: AIAvailabilityPause
     private let isAIShipped: Bool
+    private let platform: AIPlatform
     private let sampleRepository: SampleCVRepositoryProtocol
 
     /// How long the screen waits before it reads again whether the model has finished downloading.
     nonisolated static let downloadCheckInterval: Duration = .seconds(5)
 
     // MARK: - Initialization
+
+    /// - Parameter platform: Where the app runs. The factory gives the platform of the process; the default keeps the
+    ///   tests and the previews the same on every machine.
     init(
         aiAvailability: @escaping AIAvailabilityProvider,
         sampleRepository: SampleCVRepositoryProtocol,
         pause: @escaping AIAvailabilityPause = { try await Task.sleep(for: NewCVChoicesViewModel.downloadCheckInterval) },
-        isAIShipped: Bool = AIFeature.isShipped
+        isAIShipped: Bool = AIFeature.isShipped,
+        platform: AIPlatform = .iPhoneOrIPad
     ) {
         self.aiAvailability = aiAvailability
         self.sampleRepository = sampleRepository
         self.pause = pause
         self.isAIShipped = isAIShipped
-        self.aiEntry = AIEntry(availability: aiAvailability(), isShipped: isAIShipped)
+        self.platform = platform
+        self.aiEntry = AIEntry(availability: aiAvailability(), platform: platform, isShipped: isAIShipped)
     }
 
     // MARK: - Choices
 
-    /// The ways to start, in the order the screens show them. The AI draft leads where it works. Where it does not
-    /// work yet, it follows the choices that do, with the sentence that says what to do. The examples are there once
-    /// they are loaded.
+    /// The ways to start, in the order the screens show them: the AI draft where `aiEntry` puts it, a blank CV, and
+    /// the examples once they are loaded.
     var choices: [NewCVChoice] {
         let others: [NewCVChoice] = samples.isEmpty ? [.blank] : [.blank, .example]
-        switch aiEntry {
-        case .available:
-            return [.aiDraft] + others
-        case .disabled(let explanation):
-            return others + [.aiDraftUnavailable(explanation)]
-        case .hidden:
-            return others
+        guard let ai = aiChoice, let position = aiEntry.position else { return others }
+        switch position {
+        case .first: return [ai] + others
+        case .last: return others + [ai]
         }
     }
 
-    /// Whether the screens may speak of AI drafting: only where the device can make a draft, now or once the person
-    /// has turned Apple Intelligence on or the model has finished downloading.
-    var offersAI: Bool {
-        aiEntry != .hidden
+    private var aiChoice: NewCVChoice? {
+        switch aiEntry {
+        case .available: return .aiDraft
+        case .disabled(let reason): return .aiDraftUnavailable(reason)
+        case .hidden: return nil
+        }
     }
 
     // MARK: - AI Drafting
 
     /// Reads whether AI drafting can run again, for example after the person turned Apple Intelligence on in Settings.
     func refreshAIAvailability() {
-        aiEntry = AIEntry(availability: aiAvailability(), isShipped: isAIShipped)
+        aiEntry = AIEntry(availability: aiAvailability(), platform: platform, isShipped: isAIShipped)
     }
 
     /// Reads the availability again after each pause for as long as the model is still downloading, so that the card

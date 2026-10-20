@@ -8,6 +8,8 @@ struct FirstRunView: View {
     @StateObject private var viewModel: NewCVChoicesViewModel
     @EnvironmentObject var router: AppRouter
     @State private var showingExamples = false
+    /// The reason of the dimmed AI draft while its full explanation is shown.
+    @State private var explainedReason: AIEntry.Reason?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     
@@ -41,6 +43,7 @@ struct FirstRunView: View {
         .exampleSelection(isPresented: $showingExamples, from: viewModel) { draft in
             router.navigateToEditorWithTemplate(draft)
         }
+        .aiEntryExplanation(for: $explainedReason)
     }
     
     // MARK: - View Sections
@@ -65,8 +68,7 @@ struct FirstRunView: View {
                 .foregroundColor(DesignTokens.Colors.primary)
                 .multilineTextAlignment(.center)
             
-            // The welcome promises the AI draft only where the device can make it
-            Text(viewModel.offersAI ? "welcome.description.ai".localized : "welcome.description".localized)
+            Text(viewModel.aiEntry.welcomeKey.localized)
                 .typography(.body)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)
@@ -90,8 +92,8 @@ struct FirstRunView: View {
         switch choice {
         case .aiDraft:
             PrimaryButton(title: "onboarding.ai.button".localized, icon: "sparkles", action: openAIDraft)
-        case .aiDraftUnavailable(let explanation):
-            unavailableAIDraft(explanation)
+        case .aiDraftUnavailable(let reason):
+            unavailableAIDraft(reason)
         case .blank:
             if leads {
                 PrimaryButton(title: "onboarding.create.button".localized, icon: "plus.circle.fill", action: openBlankCV)
@@ -105,18 +107,21 @@ struct FirstRunView: View {
         }
     }
     
-    /// The AI draft, dimmed and off, with the sentence that says what to do before it can be used
-    private func unavailableAIDraft(_ explanation: AIEntry.Explanation) -> some View {
+    /// The AI draft, dimmed, with the line that says why. A tap, or an activation by VoiceOver, Voice Control or Switch
+    /// Control, shows the full explanation.
+    private func unavailableAIDraft(_ reason: AIEntry.Reason) -> some View {
         VStack(spacing: DesignTokens.Spacing.xs) {
-            SecondaryButton.text(title: "onboarding.ai.button".localized, icon: "sparkles", action: openAIDraft)
-                .disabled(true)
-                .opacity(DesignTokens.Opacity.subtle)
-                .accessibilityHint(explanation.key.localized)
+            SecondaryButton.text(title: "onboarding.ai.button".localized, icon: "sparkles") {
+                explainedReason = reason
+            }
+            .opacity(DesignTokens.Opacity.subtle)
+            .announcedAsUnavailableAIDraft(title: "onboarding.ai.button".localized, reason: reason)
             
-            Text(explanation.key.localized)
+            Text(reason.lineKey.localized)
                 .typography(.caption1)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)
+                .accessibilityHidden(true)
         }
     }
     

@@ -739,43 +739,248 @@
         }
       }
     },
+    "ai.entry.line.model_not_ready" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modell wird geladen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading the model"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargando el modelo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Téléchargement du modèle"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download del modello in corso"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Baixando o modelo"
+          }
+        }
+      }
+    },
+    "ai.entry.line.not_enabled" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence einschalten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on Apple Intelligence"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa Apple Intelligence"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activez Apple Intelligence"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attiva Apple Intelligence"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ative o Apple Intelligence"
+          }
+        }
+      }
+    },
+    "ai.entry.line.not_on_this_device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erfordert Apple Intelligence"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Needs Apple Intelligence"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requiere Apple Intelligence"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nécessite Apple Intelligence"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Richiede Apple Intelligence"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requer o Apple Intelligence"
+          }
+        }
+      }
+    },
+    "ai.entry.line.unknown" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Derzeit nicht verfügbar"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available right now"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No disponible en este momento"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indisponible pour le moment"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non disponibile al momento"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indisponível no momento"
+          }
+        }
+      }
+    },
+    "ai.entry.unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht verfügbar"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unavailable"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No disponible"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indisponible"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non disponibile"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indisponível"
+          }
+        }
+      }
+    },
     "ai.error.busy" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence ist gerade beschäftigt. Bitte versuchen Sie es gleich noch einmal."
+            "value" : "Apple Intelligence ist gerade beschäftigt. Bitte versuchen Sie es erneut."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence is busy right now. Please try again in a moment."
+            "value" : "Apple Intelligence is busy right now. Please try again."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence está ocupado ahora mismo. Inténtalo de nuevo en un momento."
+            "value" : "Apple Intelligence está ocupado ahora mismo. Inténtalo de nuevo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence est occupé pour le moment. Réessayez dans un instant."
+            "value" : "Apple Intelligence est occupé pour le moment. Réessayez."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence è occupato in questo momento. Riprova tra un attimo."
+            "value" : "Apple Intelligence è occupato in questo momento. Riprova."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Apple Intelligence está ocupado agora. Tente novamente em instantes."
+            "value" : "O Apple Intelligence está ocupado agora. Tente novamente."
           }
         }
       }
@@ -1477,84 +1682,43 @@
         }
       }
     },
-    "ai.unavailable.device_not_eligible" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieses Gerät unterstützt Apple Intelligence nicht."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This device doesn't support Apple Intelligence."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este dispositivo no es compatible con Apple Intelligence."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appareil n'est pas compatible avec Apple Intelligence."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Questo dispositivo non supporta Apple Intelligence."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este dispositivo não é compatível com o Apple Intelligence."
-          }
-        }
-      }
-    },
     "ai.unavailable.language_data_not_ready" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Sprachdaten für den Entwurf werden vorbereitet. Versuchen Sie es gleich noch einmal."
+            "value" : "Die Sprachdaten für den Entwurf werden vorbereitet. Versuchen Sie es später noch einmal."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparing language data for the draft. Try again in a moment."
+            "value" : "Preparing language data for the draft. Try again later."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparando los datos de idioma para el borrador. Inténtalo de nuevo en un momento."
+            "value" : "Preparando los datos de idioma para el borrador. Inténtalo de nuevo más tarde."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Préparation des données linguistiques pour le brouillon. Réessayez dans un instant."
+            "value" : "Préparation des données linguistiques pour le brouillon. Réessayez plus tard."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparazione dei dati linguistici per la bozza. Riprova tra un attimo."
+            "value" : "Preparazione dei dati linguistici per la bozza. Riprova più tardi."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparando os dados de idioma para o rascunho. Tente novamente em instantes."
+            "value" : "Preparando os dados de idioma para o rascunho. Tente novamente mais tarde."
           }
         }
       }
@@ -1565,37 +1729,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das Apple-Intelligence-Modell wird noch geladen. Versuchen Sie es später noch einmal."
+            "value" : "Das Apple-Intelligence-Modell wird geladen. Der KI-Entwurf ist von selbst verfügbar, sobald der Download abgeschlossen ist."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The Apple Intelligence model is still downloading. Try again later."
+            "value" : "Apple Intelligence is downloading its model. The AI draft becomes available by itself when the download is complete."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El modelo de Apple Intelligence aún se está descargando. Inténtalo de nuevo más tarde."
+            "value" : "Apple Intelligence está descargando su modelo. El borrador con IA estará disponible automáticamente cuando termine la descarga."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le modèle d'Apple Intelligence est encore en cours de téléchargement. Réessayez plus tard."
+            "value" : "Apple Intelligence télécharge son modèle. Le brouillon rédigé par l'IA sera disponible automatiquement une fois le téléchargement terminé."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il modello di Apple Intelligence è ancora in download. Riprova più tardi."
+            "value" : "Apple Intelligence sta scaricando il suo modello. La bozza con l'IA sarà disponibile automaticamente al termine del download."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O modelo do Apple Intelligence ainda está sendo baixado. Tente novamente mais tarde."
+            "value" : "O Apple Intelligence está baixando o modelo. O rascunho com IA ficará disponível automaticamente quando o download terminar."
           }
         }
       }
@@ -1637,6 +1801,88 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "O Apple Intelligence está desativado. Para usá-lo, abra Ajustes, toque em Apple Intelligence e Siri e ative o Apple Intelligence."
+          }
+        }
+      }
+    },
+    "ai.unavailable.not_enabled.mac" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence ist ausgeschaltet. Öffnen Sie dafür die Systemeinstellungen, klicken Sie auf „Apple Intelligence & Siri“ und schalten Sie Apple Intelligence ein."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence is turned off. To use this, open System Settings, click Apple Intelligence & Siri, and turn on Apple Intelligence."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence está desactivado. Para usarlo, abre Ajustes del Sistema, haz clic en Apple Intelligence y Siri y activa Apple Intelligence."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence est désactivé. Pour l'utiliser, ouvrez Réglages Système, cliquez sur Apple Intelligence et Siri, puis activez Apple Intelligence."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence è disattivato. Per usarlo, apri Impostazioni di Sistema, fai clic su Apple Intelligence e Siri e attiva Apple Intelligence."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Apple Intelligence está desativado. Para usá-lo, abra Ajustes do Sistema, clique em Apple Intelligence e Siri e ative o Apple Intelligence."
+          }
+        }
+      }
+    },
+    "ai.unavailable.not_on_this_device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Gerät unterstützt keine KI-Entwürfe. Sie können Ihren Lebenslauf selbst erstellen oder mit einem Beispiel beginnen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device doesn't support AI drafts. You can create your CV by hand or start from an example."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este dispositivo no es compatible con los borradores con IA. Puedes crear tu CV a mano o empezar con un ejemplo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n'est pas compatible avec les brouillons rédigés par l'IA. Vous pouvez créer votre CV vous-même ou commencer avec un exemple."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo dispositivo non supporta le bozze con l'IA. Puoi creare il tuo CV a mano o partire da un esempio."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este dispositivo não é compatível com os rascunhos com IA. Você pode criar seu currículo manualmente ou começar com um exemplo."
           }
         }
       }

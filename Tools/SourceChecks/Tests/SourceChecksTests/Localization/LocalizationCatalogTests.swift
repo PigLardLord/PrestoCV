@@ -143,8 +143,11 @@ struct LocalizationCatalogTests {
     /// Keys that the code builds from other values, so that no literal names them.
     fileprivate static let dynamicKeyPrefixes = ["language.level."]
 
-    /// Names that keep their capital letter inside a sentence: Apple Intelligence, Siri and the Settings app.
-    fileprivate static let properNames: Set<String> = ["Apple", "Intelligence", "Siri", "Ajustes", "Réglages", "Impostazioni"]
+    /// Names that keep their capital letter inside a sentence: Apple Intelligence, Siri, and the Settings app of the
+    /// iPhone and of the Mac ("Ajustes del Sistema", "Réglages Système", "Impostazioni di Sistema").
+    fileprivate static let properNames: Set<String> = [
+        "Apple", "Intelligence", "Siri", "Ajustes", "Réglages", "Impostazioni", "Sistema", "Système",
+    ]
 
     /// Keys whose text is the name of a person in every language.
     fileprivate static let personNames: Set<String> = ["export.font_preview_name"]
@@ -160,6 +163,26 @@ struct LocalizationCatalogTests {
 
     /// The languages whose texts are written in sentence case.
     fileprivate static let sentenceCaseLanguages = ["es", "fr", "it", "pt"]
+
+    /// Words that promise future availability or readiness, by language: that the AI draft, a model or its data will
+    /// be there soon, in a moment, or not yet. Nothing tells when they will be ready, and the owner decided that the AI
+    /// texts promise no availability the app cannot deliver now (#255). The expected duration of a task that is already
+    /// running is not such a promise.
+    fileprivate static let availabilityPromises: [String: [String]] = [
+        "en": ["soon", "shortly", "in a moment", "coming", "yet"],
+        "de": ["bald", "gleich", "demnächst", "in Kürze", "noch nicht"],
+        "es": ["pronto", "en un momento", "en breve", "todavía no", "aún no"],
+        "fr": ["bientôt", "dans un instant", "sous peu", "pas encore"],
+        "it": ["presto", "tra un attimo", "fra poco", "a breve", "non ancora"],
+        "pt": ["em breve", "em instantes", "logo", "ainda não"],
+    ]
+
+    /// The promise of future availability or readiness in a text, if it makes one.
+    fileprivate static func availabilityPromise(in text: String, language: String) -> String? {
+        (availabilityPromises[language] ?? []).first { promise in
+            text.range(of: "\\b\(NSRegularExpression.escapedPattern(for: promise))\\b", options: [.regularExpression, .caseInsensitive]) != nil
+        }
+    }
 
     // MARK: Defects
 
@@ -357,6 +380,34 @@ struct LocalizationCatalogTests {
             let welcome = catalog.texts(of: "welcome.title", in: language) ?? []
             #expect(welcome.count == 1 && welcome[0].contains("PrestoCV"), "welcome.title does not name PrestoCV in \(language)")
         }
+    }
+
+    @Test("The texts of AI drafting promise no future availability or readiness, in any language")
+    func aiTextsPromiseNoAvailability() throws {
+        let catalog = try LocalizationCatalog.load()
+        var promises: [String] = []
+        for key in catalog.keys where key.hasPrefix("ai.") {
+            for language in LocalizationCatalog.languages {
+                for text in catalog.texts(of: key, in: language) ?? [] {
+                    if let promise = Self.availabilityPromise(in: text, language: language) {
+                        promises.append("\(key) (\(language)): \"\(promise)\" in \(text)")
+                    }
+                }
+            }
+        }
+
+        #expect(promises.isEmpty, "Texts that promise future availability or readiness: \(promises)")
+    }
+
+    @Test("A promise of availability is found as a word, in any case; a text without one, or a duration, passes")
+    func availabilityPromiseIsFoundAsAWord() {
+        #expect(Self.availabilityPromise(in: "Getting ready, available soon", language: "en") == "soon")
+        #expect(Self.availabilityPromise(in: "In preparazione, presto disponibile", language: "it") == "presto")
+        #expect(Self.availabilityPromise(in: "Bald verfügbar", language: "de") == "bald")
+        #expect(Self.availabilityPromise(in: "Downloading the model", language: "en") == nil)
+        #expect(Self.availabilityPromise(in: "Not available right now", language: "en") == nil)
+        #expect(Self.availabilityPromise(in: "Apple Intelligence is busy right now. Please try again.", language: "en") == nil)
+        #expect(Self.availabilityPromise(in: "This can take up to a minute.", language: "en") == nil, "A duration is not a promise of availability")
     }
 
     @Test("The welcome speaks to everyone, not to a man or to a woman")
