@@ -291,13 +291,14 @@ struct UnsavedEditsOfferViewModelTests {
         #expect(offer.restoresAsCopy == false)
     }
 
-    @Test("A CV without a name is called by the person's name, or as the editor calls it")
-    func cvWithoutANameIsCalledAsTheEditorCallsIt() async throws {
+    @Test("A CV is called as its editor calls it: its name, its person's, its role, or New CV or Untitled CV without any")
+    func cvIsCalledAsTheEditorCallsIt() async throws {
         let cases: [(cv: CVModel, base: CVModel?, title: String)] = [
             (CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi")), nil, "Ward nurse"),
-            (CVModel(personalInfo: PersonalInfo(name: "Marta Rinaldi")), nil, "Marta Rinaldi"),
-            (CVModel(personalInfo: PersonalInfo(title: "Nurse")), nil, "editor.new_cv".localized),
-            (CVModel(personalInfo: PersonalInfo(title: "Nurse")), CVModel(), "cv.untitled".localized),
+            (CVModel(personalInfo: PersonalInfo(name: "Marta Rinaldi", title: "Nurse")), nil, "Marta Rinaldi"),
+            (CVModel(personalInfo: PersonalInfo(title: "Nurse")), nil, "Nurse"),
+            (CVModel(personalInfo: PersonalInfo(email: "marta@example.com")), nil, "editor.new_cv".localized),
+            (CVModel(personalInfo: PersonalInfo(email: "marta@example.com")), CVModel(), "cv.untitled".localized),
         ]
         for (cv, base, title) in cases {
             let repository = InMemoryUnsavedEditsRepository()

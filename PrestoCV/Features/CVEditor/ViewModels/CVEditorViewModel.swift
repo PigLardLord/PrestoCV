@@ -48,11 +48,11 @@ final class CVEditorViewModel: ObservableObject {
         saveError ?? ""
     }
     
-    /// The title of the screen, by the title rule of PrestoCVDomain: the name of the CV, otherwise the role it is for.
-    /// Without either, a CV that was never stored is "New CV", and a stored one "Untitled CV", as the list calls it.
+    /// The title of the screen, by the title rule of PrestoCVDomain: the name of the CV, otherwise the name of its
+    /// person, otherwise the role it is for. Without any of them, a CV that was never stored is "New CV", and a stored
+    /// one "Untitled CV", as the list calls it.
     var screenTitle: String {
-        guard case .untitled = cv.cvTitle else { return cv.cvTitle.text }
-        return savedSnapshot == nil ? "editor.new_cv".localized : "cv.untitled".localized
+        cv.editorTitle(isStored: savedSnapshot != nil)
     }
     
     /// Whether the CV has enough content to be saved, by the save rule of PrestoCVDomain
@@ -486,13 +486,10 @@ final class CVEditorViewModel: ObservableObject {
         await keepUnsavedEdits()
     }
 
-    /// What a copy made of restored edits is called: the name of the CV they were made on, or of the person, marked
-    /// as recovered.
+    /// What a copy made of restored edits is called: the title of the CV they were made on, marked as recovered.
     private static func recoveredName(of cv: CVModel) -> String {
-        let names = [cv.name, cv.personalInfo.name].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        let name = names.first { !$0.isEmpty } ?? "cv.untitled".localized
         let recovered = "unsaved_edits.recovered_suffix".localized
-        return "\(name) \(recovered)"
+        return "\(cv.cvTitle.text) \(recovered)"
     }
 
     @MainActor

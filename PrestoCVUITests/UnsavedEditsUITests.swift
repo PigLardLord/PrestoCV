@@ -52,7 +52,7 @@ final class UnsavedEditsUITests: XCTestCase {
         XCTAssertEqual(app.alerts.count, 0, "Saving should not stop the person with a dialog")
         app.navigationBars.buttons["Done"].tap()
 
-        // A CV without a name of its own is listed as "Untitled CV", with the name of the person under it
+        // A CV without a name of its own is listed under the name of its person
         let row = app.buttons.matching(NSPredicate(format: "value CONTAINS %@", "Marta Rinaldi"))
         XCTAssertTrue(row.firstMatch.waitForExistence(timeout: 10), "The list should show the saved CV")
         XCTAssertEqual(row.count, 1, "The CV should be stored once")

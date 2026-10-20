@@ -14,14 +14,20 @@ struct CVListTitleTests {
         #expect(viewModel.title(of: CVModel(name: "Backend Engineer")) == "Backend Engineer")
     }
 
-    @Test("A CV without a name is listed under the role it is for", arguments: ["", "   ", " \n "])
-    func unnamedCVIsListedUnderItsRole(name: String) {
-        #expect(viewModel.title(of: CVModel(name: name, personalInfo: PersonalInfo(title: "Infermiera"))) == "Infermiera")
+    @Test("A CV without a name is listed under the name of its person, before the role it is for", arguments: ["", "   ", " \n "])
+    func unnamedCVIsListedUnderItsPerson(name: String) {
+        let cv = CVModel(name: name, personalInfo: PersonalInfo(name: "Lena Hartmann", title: "Pflegefachkraft"))
+        #expect(viewModel.title(of: cv) == "Lena Hartmann")
     }
 
-    @Test("A CV with neither a name nor a role, or only white space, is listed as Untitled CV", arguments: ["", "   ", " \n "])
+    @Test("A CV without a name or a person is listed under the role it is for", arguments: ["", "   ", " \n "])
+    func unnamedCVIsListedUnderItsRole(name: String) {
+        #expect(viewModel.title(of: CVModel(name: name, personalInfo: PersonalInfo(name: name, title: "Infermiera"))) == "Infermiera")
+    }
+
+    @Test("A CV with none of a name, a person and a role, or only white space, is listed as Untitled CV", arguments: ["", "   ", " \n "])
     func unnamedCVIsListedAsUntitled(name: String) {
-        #expect(viewModel.title(of: CVModel(name: name, personalInfo: PersonalInfo(title: name))) == "cv.untitled".localized)
+        #expect(viewModel.title(of: CVModel(name: name, personalInfo: PersonalInfo(name: name, title: name))) == "cv.untitled".localized)
     }
 
     @Test("Rows whose titles read alike are numbered, so that no two read the same")

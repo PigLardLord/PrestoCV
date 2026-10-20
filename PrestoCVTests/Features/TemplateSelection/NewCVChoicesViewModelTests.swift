@@ -284,7 +284,7 @@ struct NewCVChoicesViewModelTests {
         let draft = makeViewModel(sampleRepository: MockSampleCVRepository()).makeDraft(from: sample)
 
         #expect(draft.id != sample.id)
-        #expect(draft.name.isEmpty, "The list shows an unnamed CV as Untitled CV")
+        #expect(draft.name.isEmpty, "Without a name of its own, the CV is called by the name of its person or its role")
     }
 
     @Test("A draft leaves the details of the person of the sample blank")

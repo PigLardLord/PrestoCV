@@ -90,8 +90,9 @@ final class CVListViewModel: ObservableObject {
     
     // MARK: - Row Text
     
-    /// What the list calls a CV, by the title rule of PrestoCVDomain: its name, otherwise the role it is for, otherwise
-    /// "Untitled CV". A CV whose title reads like another's in the list is numbered, so that no two rows read alike.
+    /// What the list calls a CV, by the title rule of PrestoCVDomain: its name, otherwise the name of its person,
+    /// otherwise the role it is for, and "Untitled CV" only without any of them. A CV whose title reads like another's
+    /// in the list is numbered, so that no two rows read alike.
     func title(of cv: CVModel) -> String {
         let numbers = CVTitle.numbers(for: cvs.map { (id: $0.id.uuidString, title: $0.cvTitle) })
         guard let number = numbers[cv.id.uuidString] else { return cv.cvTitle.text }

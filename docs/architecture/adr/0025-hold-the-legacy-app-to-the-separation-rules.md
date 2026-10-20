@@ -25,7 +25,7 @@
    - **Version 1's export rules** (the A4 page, its 43-point margin, the 10-page limit, and what a CV needs before it is exported) are in `PrestoCVDomain` while the app exports through the legacy exporter. When the app switches to the new export workflow (migration step 5), the rendering policy of `CVRendering` takes their place, as R6 and [modules.md](../modules.md) describe.
 2. **The owner's rules join them** (UX decisions of 2026-10-19), pure and tested on Linux, and wired into the screens as they are:
    - **Field checks:** an e-mail address and a web address are what `EmailAddress` and `WebLink` accept, and a phone number has a digit. The editor checks a field when the person leaves it, not at every key.
-   - **The title of a CV:** its name, otherwise the role it is for, otherwise "Untitled CV". The rows, the rename, the delete confirmation and the editor use it, and the list numbers titles that read alike.
+   - **The title of a CV:** its name, otherwise the name of its person ("Lena Hartmann"), otherwise the role it is for, as an example's. "Untitled CV" is left only for a CV with none of the three, such as a blank CV with only a summary. The rows, the rename, the delete confirmation and the editor use it, and the list numbers titles that read alike.
    - **The PDF's file name** follows the language the CV is printed in.
    - **`ExportReadiness`:** only the name is required. A missing e-mail address or phone number warns, and the export sheet says which field to fix. The legacy exporter stops refusing a document without an e-mail address: this changes a legacy target for a product decision, which ADR 0012 did not foresee.
 3. **Every dependency comes in through the initialiser** (R17).

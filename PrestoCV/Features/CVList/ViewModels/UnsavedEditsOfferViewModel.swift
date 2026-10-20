@@ -143,14 +143,10 @@ final class UnsavedEditsOfferViewModel: ObservableObject {
         }
     }
 
-    /// The CV the edits change, as the person would recognise it: its name, the name of the person in it, or what
-    /// the editor calls a CV without either.
+    /// The CV the edits change, as its editor calls it: by the title rule of PrestoCVDomain, or "New CV" for a CV that
+    /// has no title and was never stored.
     private func title(of edits: UnsavedEdits) -> String {
-        let candidates = [edits.cv.name, edits.cv.personalInfo.name].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        if let title = candidates.first(where: { !$0.isEmpty }) {
-            return title
-        }
-        return edits.base == nil ? "editor.new_cv".localized : "cv.untitled".localized
+        edits.cv.editorTitle(isStored: edits.base != nil)
     }
 
     /// When the edits were last kept, as "today at 11:10" or a date, in the middle of a sentence.
