@@ -18,11 +18,6 @@ private let launchLogger = Logger(subsystem: "com.PigLardLord.prestocv", categor
 struct PrestoCVApp: App {
     private static let environment = AppEnvironment.device()
     private static let storage = LaunchEnvironment.storage(arguments: environment.arguments)
-    /// The unsaved edits of the whole app, made once and shared by every window, so that each set of edits has one
-    /// holder at a time, and is never offered while an editor holds it.
-    private static let unsavedEdits = Result {
-        try DependencyContainer.makeUnsavedEditsUseCase(in: storage.unsavedEdits())
-    }
 
     var body: some Scene {
         WindowGroup {
@@ -32,7 +27,13 @@ struct PrestoCVApp: App {
                 AppLaunchView(
                     viewModel: AppLaunchViewModel(
                         makeDependencyContainer: { DependencyContainer(storageDirectory: Self.storage.cvs) },
-                        makeUnsavedEdits: { try Self.unsavedEdits.get() },
+                        makeLeftoverEdits: { cvs in
+                            try DependencyContainer.makeLeftoverEditsImport(
+                                in: Self.storage.unsavedEdits(),
+                                cvs: cvs,
+                                recoveredName: Self.recoveredName
+                            )
+                        },
                         environment: Self.environment,
                         bootstrapTemplates: { await Self.installBundledTemplates() }
                     )
@@ -49,5 +50,14 @@ struct PrestoCVApp: App {
         } catch {
             launchLogger.error("Bundled templates were not installed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// What a copy made of leftover edits is called: the name of the CV they were made on, or of the person, marked as
+    /// recovered.
+    nonisolated private static func recoveredName(of cv: CVModel) -> String {
+        let names = [cv.name, cv.personalInfo.name].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let name = names.first { !$0.isEmpty } ?? String(localized: "cv.untitled")
+        let recovered = String(localized: "unsaved_edits.recovered_suffix")
+        return "\(name) \(recovered)"
     }
 }

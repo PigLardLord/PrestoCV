@@ -18,8 +18,9 @@ func waitUntilCancelled(_ duration: Duration) async throws {
 let englishDocumentLanguageDetector = DocumentLanguageDetector(preferredLanguages: ["en"], read: NaturalLanguageReader.read)
 
 extension AppEnvironment {
-    /// A device in English, on a fixed day in UTC, whose waits end only when cancelled
-    static func fixed(newEditingID: @escaping () -> UUID = { UUID() }) -> AppEnvironment {
+    /// A device in English, on a fixed day in UTC, whose waits end only when cancelled, and whose clock moves only when
+    /// a test moves it
+    static func fixed(clock: any Clock<Duration> = ManualClock()) -> AppEnvironment {
         AppEnvironment(
             now: { testDay },
             calendar: { gregorianUTC },
@@ -27,7 +28,7 @@ extension AppEnvironment {
             appLanguage: "en",
             preferredLanguages: { ["en"] },
             sleep: waitUntilCancelled,
-            newEditingID: newEditingID,
+            clock: clock,
             temporaryDirectory: FileManager.default.temporaryDirectory,
             exportPreferencesFile: FileManager.default.temporaryDirectory.appendingPathComponent("export-preferences-\(UUID().uuidString).json"),
             arguments: [],
@@ -45,34 +46,32 @@ let gregorianUTC: Calendar = {
 }()
 
 extension CVEditorViewModel {
-    /// An editor whose Automatic document language falls back to English. To give it another detector, use the
-    /// initialiser that takes every dependency.
+    /// An editor as the tests open it: `cvId` opens a stored CV; otherwise `initialCV`, or a blank CV, opens as a new
+    /// CV, or as a draft when it comes with the AI notice. Its Automatic document language falls back to English. Its
+    /// pause before a save ends only when the test moves `clock`, so a test that does not move it sees what `saveNow()`
+    /// and leaving store.
     convenience init(
         cvId: String?,
         initialCV: CVModel? = nil,
         notice: EditorNotice? = nil,
-        restoring restoredEdits: UnsavedEdits? = nil,
         cvManagementUseCase: CVManagementUseCaseProtocol,
-        unsavedEdits: UnsavedEditsKeeper? = nil,
-        sleep: @escaping (Duration) async throws -> Void = waitUntilCancelled
+        documentLanguageDetector: DocumentLanguageDetector = englishDocumentLanguageDetector,
+        clock: any Clock<Duration> = ManualClock()
     ) {
+        let request: EditorRequest
+        if let cvId {
+            request = .stored(cvId: cvId)
+        } else if notice == .aiDraft {
+            request = .draft(initialCV ?? CVModel())
+        } else {
+            request = .new(template: initialCV ?? CVModel())
+        }
         self.init(
-            cvId: cvId,
-            initialCV: initialCV,
-            notice: notice,
-            restoring: restoredEdits,
+            request: request,
             cvManagementUseCase: cvManagementUseCase,
-            documentLanguageDetector: englishDocumentLanguageDetector,
-            unsavedEdits: unsavedEdits,
-            sleep: sleep
+            documentLanguageDetector: documentLanguageDetector,
+            clock: clock
         )
-    }
-}
-
-extension UnsavedEditsKeeper {
-    /// A keeper whose waits after a change end only when cancelled
-    convenience init(editing: UUID, claim: UnsavedEditsClaim? = nil, useCase: UnsavedEditsUseCaseProtocol) {
-        self.init(editing: editing, claim: claim, useCase: useCase, wait: waitUntilCancelled)
     }
 }
 
@@ -92,13 +91,6 @@ extension CVListViewModel {
             calendar: calendar,
             sleep: sleep
         )
-    }
-}
-
-extension UnsavedEditsOfferViewModel {
-    /// An offer that tells its time in English, in UTC
-    convenience init(useCase: UnsavedEditsUseCaseProtocol?, cvs: CVManagementUseCaseProtocol) {
-        self.init(useCase: useCase, cvs: cvs, locale: Locale(identifier: "en"), timeZone: .gmt)
     }
 }
 

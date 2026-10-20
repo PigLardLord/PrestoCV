@@ -17,8 +17,8 @@ struct AppEnvironment {
     let preferredLanguages: () -> [String]
     /// How the app waits
     let sleep: @Sendable (Duration) async throws -> Void
-    /// Names an editing of a CV that does not restore earlier edits
-    let newEditingID: () -> UUID
+    /// The clock the editors measure the pause before they save on
+    let clock: any Clock<Duration>
     /// Where each export gets a folder of its own
     let temporaryDirectory: URL
     /// Where the design chosen last is kept: a file and not `UserDefaults`, which would need a privacy manifest entry
@@ -47,7 +47,7 @@ extension AppEnvironment {
             appLanguage: Bundle.main.preferredLocalizations.first,
             preferredLanguages: { Locale.preferredLanguages },
             sleep: { try await Task.sleep(for: $0) },
-            newEditingID: { UUID() },
+            clock: ContinuousClock(),
             temporaryDirectory: FileManager.default.temporaryDirectory,
             exportPreferencesFile: URL.applicationSupportDirectory.appendingPathComponent("PrestoCV/export-preferences.json"),
             arguments: ProcessInfo.processInfo.arguments,

@@ -3,7 +3,7 @@ import PrestoCVCore
 
 /// What the app takes from the way it was launched.
 enum LaunchEnvironment {
-    /// Where the app keeps what the person makes: the CVs, and the edits the editor has not saved yet.
+    /// Where the app keeps what the person makes: the CVs, and what earlier versions kept of editor work nobody saved.
     struct Storage {
         let cvs: @Sendable () throws -> URL
         let unsavedEdits: @Sendable () throws -> URL
@@ -44,30 +44,7 @@ enum LaunchEnvironment {
     /// a value, so that an argument after it is not read as its value.
     static let unitTestHostArgument = "-PrestoCVUnitTestHost"
 
-    /// How the editor waits before the confirmation of a save goes: as the app waits, `sleep`. A UI test can ask for the
-    /// confirmation to stay until the next edit, so that it finds it however slow the simulator is. Release builds ignore
-    /// the request.
-    static func savedConfirmationWait(
-        arguments: [String],
-        sleep: @escaping @Sendable (Duration) async throws -> Void
-    ) -> @Sendable (Duration) async throws -> Void {
-        #if DEBUG
-        if arguments.contains("-PrestoCVUITestsKeepSavedConfirmation") {
-            return { _ in try await untilCancelled() }
-        }
-        #endif
-        return sleep
-    }
-
     #if DEBUG
-    /// Returns only by throwing `CancellationError`, when the task that waits is cancelled.
-    private static func untilCancelled() async throws {
-        let (never, keepsItOpen) = AsyncStream<Void>.makeStream()
-        for await _ in never {}
-        withExtendedLifetime(keepsItOpen) {}
-        throw CancellationError()
-    }
-
     /// The name of the folder a UI test asked for, if it asked for one.
     private static func uiTestFolder(arguments: [String]) -> String? {
         if arguments.contains("-PrestoCVUITestsEmptyStorage") {

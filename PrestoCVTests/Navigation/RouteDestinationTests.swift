@@ -5,7 +5,7 @@ import PrestoCVCore
 @Suite("RouteDestination Tests - the screen each route shows, and the release switch of AI drafting")
 struct RouteDestinationTests {
 
-    static let blankCV = EditorRequest.new(template: CVModel(), notice: nil)
+    static let blankCV = EditorRequest.new(template: CVModel())
 
     @Test("With AI drafting shipped, every route shows its own screen", arguments: [
         (Route.onboarding, RouteDestination.list),

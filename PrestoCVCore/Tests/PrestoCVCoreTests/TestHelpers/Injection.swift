@@ -37,10 +37,3 @@ extension FileStorageService {
         try self.init(fileManager: .default, baseDirectory: baseDirectory)
     }
 }
-
-extension UnsavedEditsUseCase {
-    /// Unsaved edits whose claims get random tokens
-    init(repository: UnsavedEditsRepositoryProtocol, now: @escaping @Sendable () -> Date) {
-        self.init(repository: repository, now: now, makeToken: { UUID() })
-    }
-}

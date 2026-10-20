@@ -104,8 +104,8 @@ struct CVEditorRowDeletionTests {
         #expect(viewModel.cv.skills.map(\.name) == ["Swift", "Rust"])
     }
 
-    @Test("Removing a confirmed row of a stored CV counts as an unsaved change")
-    func confirmedRemovalIsAnUnsavedChange() async throws {
+    @Test("Removing a confirmed row of a stored CV is stored like any other change")
+    func confirmedRemovalIsStored() async throws {
         let mockUseCase = MockCVManagementUseCase()
         let storedCV = CVModel(
             id: UUID(),
@@ -116,12 +116,12 @@ struct CVEditorRowDeletionTests {
         await mockUseCase.storeCV(storedCV)
         let viewModel = CVEditorViewModel(cvId: storedCV.id.uuidString, cvManagementUseCase: mockUseCase)
         await viewModel.loadCV()
-        #expect(viewModel.hasUnsavedChanges == false)
 
         viewModel.requestRemoval(of: .skills, at: 0)
         viewModel.confirmDeletion(try #require(viewModel.pendingDeletion))
+        await viewModel.saveNow()
 
-        #expect(viewModel.hasUnsavedChanges == true)
+        #expect(await mockUseCase.updatedCVs.map(\.skills.count) == [0])
     }
 
     // MARK: - Guards

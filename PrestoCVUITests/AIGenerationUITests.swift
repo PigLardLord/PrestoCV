@@ -12,7 +12,7 @@ final class AIGenerationUITests: XCTestCase {
         // The simulator cannot run the model: the debug override offers the AI card all the same
         app.launchArguments += [
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage",
-            "-AIAvailabilityOverride", "available", "-PrestoCVUITestsKeepSavedConfirmation",
+            "-AIAvailabilityOverride", "available",
         ]
         app.launch()
     }
@@ -63,7 +63,7 @@ final class AIGenerationUITests: XCTestCase {
         description.tap()
         description.typeText(typed)
 
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.backButton.tap()
         let card = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "AI CV Generation")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 10), "Back should return to the New CV screen")
         card.tap()

@@ -58,7 +58,7 @@ Test targets and test-support targets are described below each package. The chec
   - list (by last change), rename, duplicate, delete, start from a sample, determine onboarding;
   - `ChangeStoredCV`: renames a stored CV (trimmed, never blank) or sets the language of its PDF, reading it again just before it is stored, so nothing else changes. It works through the `StoredCVs` port, generic over the store's own CV, which the legacy app implements over its stored CVs until the migration replaces them ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)).
 - **Listing** returns the healthy CVs plus `StoreIssue`s: `corrupt`, `upgradeRequired`, `unreadable`, `tooLarge`, `quarantineFailed`.
-- **`Autosave`**: when an editor writes what it shows. A second after the last change, at once on a flush (the app leaving the foreground, the editor being left); never when the content equals what is stored, so its edit time stays; a CV the store does not hold yet only once it is worth storing. A failed write leaves the content in memory and a `failed` status until a write succeeds. The write and the clock are given by the caller.
+- **`Autosave`**: when an editor writes what it shows. A second after the last change, at once on a flush (the app leaving the foreground, the editor being left); never when the content equals what is stored, so its edit time stays; a CV the store does not hold yet only once it is worth storing. A failed write leaves the content in memory and a `failed` status until a write succeeds. The write and the clock are given by the caller; the legacy app's editor uses it ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)).
 
 **`PrestoCVPersistence`**
 - `FileCVRepository`:

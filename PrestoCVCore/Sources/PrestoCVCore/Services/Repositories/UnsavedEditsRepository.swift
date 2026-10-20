@@ -1,7 +1,7 @@
 import Foundation
 
-/// Keeps each editing's unsaved edits in a file of its own, in a storage of its own: the storage of the CVs reads
-/// every file it holds as a CV.
+/// The unsaved edits earlier versions kept, each editing's in a file of its own, in a storage of its own: the storage
+/// of the CVs reads every file it holds as a CV.
 public final class UnsavedEditsRepository: UnsavedEditsRepositoryProtocol, Sendable {
     private let storageService: StorageServiceProtocol
 
@@ -9,16 +9,8 @@ public final class UnsavedEditsRepository: UnsavedEditsRepositoryProtocol, Senda
         self.storageService = storageService
     }
 
-    public func keep(_ edits: UnsavedEdits) async throws {
-        try await storageService.save(edits, to: Self.identifier(for: edits.id))
-    }
-
     public func allKept() async throws -> [UnsavedEdits] {
         try await storageService.loadAll(UnsavedEdits.self)
-    }
-
-    public func kept(editing id: UUID) async throws -> UnsavedEdits? {
-        try await storageService.load(UnsavedEdits.self, from: Self.identifier(for: id))
     }
 
     public func discard(editing id: UUID) async throws {

@@ -2,7 +2,6 @@ import SwiftUI
 import PrestoCVCore
 
 struct CVEditorView: View {
-    @EnvironmentObject var router: AppRouter
     @StateObject private var viewModel: CVEditorViewModel
     private let makeExportSheet: @MainActor (CVEditorViewModel) -> CVExportSheetViewModel
     @State private var showingExportSheet = false
@@ -35,49 +34,19 @@ struct CVEditorView: View {
             editorView
         }
         .screenTitle(viewModel.screenTitle)
-        // Back and the edge swipe would leave without the discard confirmation that Cancel asks for
-        .navigationBarBackButtonHidden(true)
+        // The quiet proof that the editor saves by itself, and that the CV stays on the device
+        .navigationSubtitle(viewModel.showsSavedOnDevice ? "editor.saved".localized : "")
         .toolbar {
-            // Leading: Cancel, with confirmation if there are unsaved changes, or Done once everything is saved
-            ToolbarItem(placement: .navigationBarLeading) {
-                BarButton(
-                    title: exitTitle, systemImage: "xmark", screenTextSize: dynamicTypeSize,
-                    action: handleCancelTap
-                )
-                .foregroundColor(DesignTokens.Colors.accent)
-            }
-            
-            // Trailing, in one capsule: export, in every layout, then Save with its unsaved-changes dot. Both show their
-            // symbols, which leave the title its room in every language, also in portrait on an iPhone
+            // Leading: the standard Back button. Trailing: export, in every layout, as its symbol, which leaves the
+            // title its room in every language
             ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: DesignTokens.Spacing.xs) {
-                    Button {
-                        showingExportSheet = true
-                    } label: {
-                        Label("export.button.title".localized, systemImage: "square.and.arrow.up")
-                            .labelStyle(.iconOnly)
-                    }
-                    .disabled(!viewModel.canExport)
-                    .accessibilityShowsLargeContentViewer {
-                        Label("export.button.title".localized, systemImage: "square.and.arrow.up")
-                    }
-
-                    UnsavedChangesIndicator.warning(isVisible: viewModel.hasUnsavedChanges)
-                    Button(action: handleSaveTap) {
-                        Label("common.save".localized, systemImage: "checkmark")
-                            .labelStyle(.iconOnly)
-                    }
-                    .disabled(!viewModel.isSaveButtonEnabled)
-                    .foregroundColor(saveButtonColor)
-                    .fontWeight(.semibold)
-                    .accessibilityShowsLargeContentViewer {
-                        Label("common.save".localized, systemImage: "checkmark")
-                    }
+                Button {
+                    showingExportSheet = true
+                } label: {
+                    Label("export.button.title".localized, systemImage: "square.and.arrow.up")
                 }
+                .disabled(!viewModel.canExport)
             }
-        }
-        .onAppear {
-            router.editorAppeared(viewModel)
         }
         .task {
             // Load CV data when the view appears
@@ -86,21 +55,14 @@ struct CVEditorView: View {
         .onChange(of: scenePhase) { _, phase in
             Task { await viewModel.sceneDidChange(isActive: phase == .active) }
         }
-        .onChange(of: viewModel.showsSavedConfirmation) { _, isShown in
-            if isShown {
-                AccessibilityNotification.Announcement("editor.saved".localized).post()
+        // Leaving the editor stores what it shows at once
+        .onDisappear {
+            Task { await viewModel.saveNow() }
+        }
+        .onChange(of: viewModel.showsSaveFailure) { _, failed in
+            if failed {
+                AccessibilityNotification.Announcement("editor.save_failed".localized).post()
             }
-        }
-        .alert("common.error".localized, isPresented: .constant(viewModel.isShowingError)) {
-            Button("common.ok".localized, action: viewModel.clearError)
-        } message: {
-            Text(viewModel.errorMessage)
-        }
-        .alert("dialog.discard_changes.title".localized, isPresented: $viewModel.showingCancelConfirmation) {
-            Button("common.discard".localized, role: .destructive, action: handleDiscardChanges)
-            Button("editor.keep_editing".localized, role: .cancel) { router.keepEditing() }
-        } message: {
-            Text("dialog.discard_changes.message".asLoclizedKey)
         }
         .environment(\.rowDeletionAnchor, deletionAnchor)
         .anchoredConfirmationDialog(
@@ -128,11 +90,16 @@ struct CVEditorView: View {
     
     private var editorView: some View {
         VStack(spacing: 0) {
+            if viewModel.showsSaveFailure {
+                InlineNotice(message: "editor.save_failed".localized, actionTitle: "common.retry".localized) {
+                    Task { await viewModel.retrySaving() }
+                }
+            }
+
             if let notice = viewModel.notice {
                 EditorNoticeBanner(notice: notice)
             }
 
-            // Each tab shows the confirmation of a save itself, below the tab bar that iPad shows at the top
             TabView {
                 PersonalInfoSection(
                     cv: $viewModel.cv,
@@ -148,7 +115,6 @@ struct CVEditorView: View {
                     .keyboardDoneButton()
                     .keepsClearOfTheKeyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
-                    .savedConfirmation(isShown: viewModel.showsSavedConfirmation)
                     .tabItem {
                         Label("section.basics".localized, systemImage: "person.circle")
                     }
@@ -157,7 +123,6 @@ struct CVEditorView: View {
                     .keyboardDoneButton()
                     .keepsClearOfTheKeyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
-                    .savedConfirmation(isShown: viewModel.showsSavedConfirmation)
                     .tabItem {
                         Label("section.experience".localized, systemImage: "briefcase")
                     }
@@ -166,7 +131,6 @@ struct CVEditorView: View {
                     .keyboardDoneButton()
                     .keepsClearOfTheKeyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
-                    .savedConfirmation(isShown: viewModel.showsSavedConfirmation)
                     .tabItem {
                         Label("section.details".localized, systemImage: "list.bullet.circle")
                     }
@@ -181,17 +145,6 @@ struct CVEditorView: View {
         }
     }
     
-    private var saveButtonColor: Color {
-        viewModel.isSaveButtonEnabled ? DesignTokens.Colors.accent : DesignTokens.Colors.disabledButtonForeground
-    }
-    
-    private var exitTitle: String {
-        switch viewModel.exit {
-        case .cancel: return "common.cancel".localized
-        case .done: return "common.done".localized
-        }
-    }
-    
     private var isShowingDeleteConfirmation: Binding<Bool> {
         Binding(
             get: { viewModel.pendingDeletion != nil },
@@ -202,25 +155,6 @@ struct CVEditorView: View {
                 }
             }
         )
-    }
-    
-    // MARK: - Action Handlers
-    
-    private func handleCancelTap() {
-        if viewModel.requestLeaving() {
-            router.closeEditor()
-        }
-    }
-    
-    private func handleSaveTap() {
-        Task {
-            await viewModel.handleSaveButtonTap()
-        }
-    }
-    
-    private func handleDiscardChanges() {
-        viewModel.confirmCancel()
-        router.closeEditor()
     }
 }
 
@@ -234,7 +168,6 @@ struct CVEditorView_Previews: PreviewProvider {
                 PreviewDependencies.exportSheet(for: editor.cv, sink: { editor.documentLanguageSelection = $0 })
             }
         }
-        .environmentObject(AppRouter())
     }
 }
 #endif

@@ -31,10 +31,9 @@ struct SavedCVAppearsInListTests {
 
         editor.cv.name = "iOS Developer"
         editor.cv.personalInfo.name = "John Doe"
-        let saved = await editor.saveCV()
+        await editor.saveNow()
         await list.loadCVs()
 
-        #expect(saved == true)
         #expect(list.cvs.count == 1)
         #expect(list.cvs.first?.name == "iOS Developer")
     }
@@ -45,10 +44,10 @@ struct SavedCVAppearsInListTests {
         let list = CVListViewModel(cvManagementUseCase: useCase)
         let editor = CVEditorViewModel(cvId: nil, cvManagementUseCase: useCase)
         editor.cv.personalInfo.name = "John Doe"
-        _ = await editor.saveCV()
+        await editor.saveNow()
 
         editor.cv.personalInfo.email = "john@example.com"
-        _ = await editor.saveCV()
+        await editor.saveNow()
         await list.loadCVs()
 
         #expect(list.cvs.count == 1, "The second save must update the CV, not add a copy of it")

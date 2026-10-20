@@ -40,13 +40,20 @@ public final class DependencyContainer: DependencyContainerProtocol {
         self.storageDirectory = storageDirectory
     }
 
-    /// The unsaved edits of the app, over the folder that holds them, dated by the clock of the device.
+    /// The import of what earlier versions of the app kept of unsaved editor work, over the folder that holds it.
+    /// - Parameters:
+    ///   - cvs: The CVs the edits go into.
+    ///   - recoveredName: The name of the copy made when the stored CV changed after the edits were made on it.
     /// - Throws: AppError if the folder cannot be made
-    public static func makeUnsavedEditsUseCase(in directory: URL) throws -> UnsavedEditsUseCase {
-        UnsavedEditsUseCase(
-            repository: UnsavedEditsRepository(storageService: try FileStorageService(fileManager: .default, baseDirectory: directory)),
-            now: { Date() },
-            makeToken: { UUID() }
+    public static func makeLeftoverEditsImport(
+        in directory: URL,
+        cvs: CVManagementUseCaseProtocol,
+        recoveredName: @escaping @Sendable (CVModel) -> String
+    ) throws -> LeftoverEditsImport {
+        LeftoverEditsImport(
+            leftovers: UnsavedEditsRepository(storageService: try FileStorageService(fileManager: .default, baseDirectory: directory)),
+            cvs: cvs,
+            recoveredName: recoveredName
         )
     }
 

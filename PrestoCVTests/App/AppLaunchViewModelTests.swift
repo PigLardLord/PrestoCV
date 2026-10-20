@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Synchronization
 @testable import PrestoCV
 @testable import PrestoCVCore
 
@@ -80,10 +81,33 @@ private final class ContainerSupplier {
 
 private let storageFailure = DependencyError.serviceCreationFailed("StorageService", AppError.unknown("disk full"))
 
-/// The unsaved edits of the app, kept in memory.
+/// The order in which the launch did its work.
+private final class LaunchLog: Sendable {
+    private let entries = Mutex<[String]>([])
+
+    func record(_ entry: String) {
+        entries.withLock { $0.append(entry) }
+    }
+
+    var all: [String] {
+        entries.withLock { $0 }
+    }
+}
+
+/// An import of leftover edits that writes in the log when it runs.
+private struct LeftoverEditsSpy: LeftoverEditsImportProtocol {
+    var log = LaunchLog()
+
+    func importLeftovers() async -> LeftoverEditsImportReport {
+        log.record("import")
+        return LeftoverEditsImportReport(imported: 1)
+    }
+}
+
+/// Nothing left by earlier versions.
 @MainActor
-private func inMemoryUnsavedEdits() -> UnsavedEditsUseCaseProtocol {
-    UnsavedEditsUseCase(repository: InMemoryUnsavedEditsRepository(), now: { Date() })
+private func noLeftovers(_ cvs: CVManagementUseCaseProtocol) -> LeftoverEditsImportProtocol {
+    LeftoverEditsSpy()
 }
 
 /// Waits for the first element of the stream; false when the timeout passes first.
@@ -115,7 +139,7 @@ struct AppLaunchViewModelTests {
     func containerThatBuildsGivesDependencies() {
         let supplier = ContainerSupplier(failures: [nil])
 
-        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeUnsavedEdits: inMemoryUnsavedEdits, environment: .fixed(), bootstrapTemplates: {})
+        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeLeftoverEdits: noLeftovers, environment: .fixed(), bootstrapTemplates: {})
 
         guard case .ready = viewModel.phase else {
             Issue.record("Expected the ready phase")
@@ -127,7 +151,7 @@ struct AppLaunchViewModelTests {
     func containerThatFailsGivesTheReason() {
         let supplier = ContainerSupplier(failures: [storageFailure])
 
-        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeUnsavedEdits: inMemoryUnsavedEdits, environment: .fixed(), bootstrapTemplates: {})
+        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeLeftoverEdits: noLeftovers, environment: .fixed(), bootstrapTemplates: {})
 
         guard case .failed(let message) = viewModel.phase else {
             Issue.record("Expected the failed phase")
@@ -141,7 +165,7 @@ struct AppLaunchViewModelTests {
     @Test("Retry asks for a new container and recovers when it builds")
     func retryAsksForNewContainerAndRecovers() {
         let supplier = ContainerSupplier(failures: [storageFailure, nil])
-        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeUnsavedEdits: inMemoryUnsavedEdits, environment: .fixed(), bootstrapTemplates: {})
+        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeLeftoverEdits: noLeftovers, environment: .fixed(), bootstrapTemplates: {})
 
         viewModel.retry()
 
@@ -155,7 +179,7 @@ struct AppLaunchViewModelTests {
     @Test("Retry keeps showing the failure while the container still cannot be built")
     func retryKeepsFailureWhileStillFailing() {
         let supplier = ContainerSupplier(failures: [storageFailure, storageFailure])
-        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeUnsavedEdits: inMemoryUnsavedEdits, environment: .fixed(), bootstrapTemplates: {})
+        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeLeftoverEdits: noLeftovers, environment: .fixed(), bootstrapTemplates: {})
 
         viewModel.retry()
 
@@ -172,7 +196,7 @@ struct AppLaunchViewModelTests {
         let onboardingUseCase = StubOnboardingUseCase(onCheck: { checkStarted.continuation.yield() })
         let viewModel = AppLaunchViewModel(
             makeDependencyContainer: { StubDependencyContainer(onboardingUseCase: onboardingUseCase) },
-            makeUnsavedEdits: inMemoryUnsavedEdits,
+            makeLeftoverEdits: noLeftovers,
             environment: .fixed(),
             bootstrapTemplates: {
                 for await _ in templatesReleased.stream {
@@ -195,7 +219,7 @@ struct AppLaunchViewModelTests {
         let supplier = ContainerSupplier(failures: [nil])
         let viewModel = AppLaunchViewModel(
             makeDependencyContainer: supplier.next,
-            makeUnsavedEdits: inMemoryUnsavedEdits,
+            makeLeftoverEdits: noLeftovers,
             environment: .fixed(),
             bootstrapTemplates: { await installs.increment() }
         )
@@ -210,26 +234,39 @@ struct AppLaunchViewModelTests {
         #expect(dependencies.onboardingViewModel.onboardingState == .firstTime)
     }
 
-    @Test("Unsaved edits that cannot be kept do not stop the launch: the CVs and the editor work without them")
-    func launchGoesOnWithoutUnsavedEdits() async {
+    @Test("Leftover edits whose folder cannot be reached do not stop the launch: the CVs and the editor work without them")
+    func launchGoesOnWithoutLeftoverEdits() async {
         struct NoFolder: Error {}
         let viewModel = AppLaunchViewModel(
             makeDependencyContainer: { StubDependencyContainer() },
-            makeUnsavedEdits: { throw NoFolder() },
+            makeLeftoverEdits: { _ in throw NoFolder() },
             environment: .fixed(),
             bootstrapTemplates: {}
         )
 
         guard case .ready(let dependencies) = viewModel.phase else {
-            Issue.record("The app must open when only its unsaved edits cannot be kept")
+            Issue.record("The app must open when only the leftover edits cannot be reached")
             return
         }
-        await dependencies.unsavedEditsOfferViewModel.checkForEditsToRestore()
-        #expect(dependencies.unsavedEditsOfferViewModel.offer == nil)
-        let editor = dependencies.viewModelFactory.makeCVEditorViewModel(for: .new(template: CVModel(), notice: nil))
-        editor.cv.personalInfo.name = "Marta Rinaldi"
-        #expect(await editor.keepUnsavedEdits() == nil, "Keeping unsaved edits is off")
-        #expect(await editor.saveCV(), "The editor saves as before")
+        #expect(dependencies.leftoverEdits == nil)
+        await viewModel.start()
+        #expect(dependencies.onboardingViewModel.onboardingState == .firstTime)
+    }
+
+    @Test("start stores the leftover edits of earlier versions once, before the CVs are checked")
+    func startImportsLeftoversFirst() async {
+        let log = LaunchLog()
+        let onboardingUseCase = StubOnboardingUseCase(onCheck: { log.record("check") })
+        let viewModel = AppLaunchViewModel(
+            makeDependencyContainer: { StubDependencyContainer(onboardingUseCase: onboardingUseCase) },
+            makeLeftoverEdits: { _ in LeftoverEditsSpy(log: log) },
+            environment: .fixed(),
+            bootstrapTemplates: {}
+        )
+
+        await viewModel.start()
+
+        #expect(log.all == ["import", "check"], "A CV left by an earlier version is in the list the first screen shows")
     }
 
     @Test("start does nothing when the dependencies could not be built")
@@ -238,7 +275,7 @@ struct AppLaunchViewModelTests {
         let supplier = ContainerSupplier(failures: [storageFailure])
         let viewModel = AppLaunchViewModel(
             makeDependencyContainer: supplier.next,
-            makeUnsavedEdits: inMemoryUnsavedEdits,
+            makeLeftoverEdits: noLeftovers,
             environment: .fixed(),
             bootstrapTemplates: { await installs.increment() }
         )

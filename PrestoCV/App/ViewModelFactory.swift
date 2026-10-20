@@ -10,24 +10,19 @@ final class ViewModelFactory {
     private let dependencyContainer: PrestoCVCore.DependencyContainerProtocol
     private let sampleRepository: SampleCVRepositoryProtocol
     private let cvManagementUseCase: CVManagementUseCaseProtocol
-    private let unsavedEditsUseCase: UnsavedEditsUseCaseProtocol?
     private let environment: AppEnvironment
     /// The description typed on the AI screen, kept until a draft is made from it.
     private let aiDescriptionSession = AIDescriptionSession()
     
-    /// - Parameters:
-    ///   - unsavedEditsUseCase: Nil when the unsaved edits cannot be kept on this device: the editor works without them.
-    ///   - environment: What the view models read from the device.
+    /// - Parameter environment: What the view models read from the device.
     init(
         dependencyContainer: PrestoCVCore.DependencyContainerProtocol,
         cvManagementUseCase: CVManagementUseCaseProtocol,
-        unsavedEditsUseCase: UnsavedEditsUseCaseProtocol?,
         environment: AppEnvironment
     ) throws {
         self.dependencyContainer = dependencyContainer
         self.sampleRepository = try dependencyContainer.makeSampleCVRepository()
         self.cvManagementUseCase = cvManagementUseCase
-        self.unsavedEditsUseCase = unsavedEditsUseCase
         self.environment = environment
     }
     
@@ -49,29 +44,15 @@ final class ViewModelFactory {
         )
     }
 
-    /// The offer to restore the edits an earlier run of the app left unsaved.
-    @MainActor
-    func makeUnsavedEditsOfferViewModel() -> UnsavedEditsOfferViewModel {
-        UnsavedEditsOfferViewModel(
-            useCase: unsavedEditsUseCase,
-            cvs: cvManagementUseCase,
-            locale: environment.appLocale,
-            timeZone: environment.timeZone
-        )
-    }
-    
-    /// The editor of `request`. Restored edits go on being kept as the editing they belong to, with the claim the
-    /// window took on them; any other editing gets a new one.
+    /// The editor of `request`, which saves what it shows by itself.
     @MainActor
     func makeCVEditorViewModel(for request: EditorRequest) -> CVEditorViewModel {
-        switch request {
-        case .stored(let cvId):
-            return makeCVEditorViewModel(cvId: cvId)
-        case .new(let template, let notice):
-            return makeCVEditorViewModel(initialCV: template, notice: notice)
-        case .restoring(let restored):
-            return makeCVEditorViewModel(restoring: restored)
-        }
+        CVEditorViewModel(
+            request: request,
+            cvManagementUseCase: cvManagementUseCase,
+            documentLanguageDetector: makeDocumentLanguageDetector(),
+            clock: environment.clock
+        )
     }
     
     /// The export sheet of a CV of the list: the language chosen in it is stored with the CV.
@@ -82,8 +63,8 @@ final class ViewModelFactory {
         }
     }
     
-    /// The export sheet of the CV an editor shows: the language chosen in it goes into the form, which saves it with
-    /// the rest of the edits.
+    /// The export sheet of the CV an editor shows: the language chosen in it goes into the form, which saves it by
+    /// itself.
     @MainActor
     func makeExportSheetViewModel(editing editor: CVEditorViewModel) -> CVExportSheetViewModel {
         makeExportSheetViewModel(cv: editor.cv) { language in
@@ -144,32 +125,6 @@ final class ViewModelFactory {
     /// falls back to the person's languages.
     private func makeDocumentLanguageDetector() -> DocumentLanguageDetector {
         DocumentLanguageDetector(preferredLanguages: environment.preferredLanguages(), read: NaturalLanguageReader.read)
-    }
-
-    @MainActor
-    private func makeCVEditorViewModel(
-        cvId: String? = nil,
-        initialCV: CVModel? = nil,
-        notice: EditorNotice? = nil,
-        restoring restored: RestoredUnsavedEdits? = nil
-    ) -> CVEditorViewModel {
-        CVEditorViewModel(
-            cvId: cvId,
-            initialCV: initialCV,
-            notice: notice,
-            restoring: restored?.edits,
-            cvManagementUseCase: cvManagementUseCase,
-            documentLanguageDetector: makeDocumentLanguageDetector(),
-            unsavedEdits: unsavedEditsUseCase.map {
-                UnsavedEditsKeeper(
-                    editing: restored?.edits.id ?? environment.newEditingID(),
-                    claim: restored?.takeClaim(),
-                    useCase: $0,
-                    wait: environment.sleep
-                )
-            },
-            sleep: LaunchEnvironment.savedConfirmationWait(arguments: environment.arguments, sleep: environment.sleep)
-        )
     }
 
     @MainActor
