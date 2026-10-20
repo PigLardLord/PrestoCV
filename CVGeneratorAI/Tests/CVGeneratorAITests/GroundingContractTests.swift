@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1801
+    static let rowsWhenWritten = 1802
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list.
@@ -436,6 +436,8 @@ enum GroundingRows {
         "a-relative-of-place-brings-in-another-subject-en", "a-relative-of-place-brings-in-another-subject-it",
         "a-relative-of-place-brings-in-another-subject-es", "a-relative-of-place-brings-in-another-subject-fr",
         "a-relative-of-place-brings-in-another-subject-pt",
+        // A mark alone on its line inside a quote: an open residual risk of ADR 0023 that #249 must close before release.
+        "a-mark-alone-on-its-line-inside-a-quote-closes-nothing",
     ]
 
     /// Rows whose desired output the sanitiser does not give, and whose leak the owner accepts as a residual risk (ADR 0023,
@@ -3662,7 +3664,8 @@ enum GroundingRows {
 
     /// A mark at the end of a line opens a quote that goes on with the next lines (#202), when a mark may close it there: a speech
     /// introduced without a colon, its words on the next line ("Mon collègue a écrit '", then "Je parle français.'"), claims nothing.
-    /// With nothing to close it, the mark opens nothing, and the next line claims as usual. A mark alone on its line closes the quote.
+    /// With nothing to close it, the mark opens nothing, and the next line claims as usual. A mark alone on its line closes the quote,
+    /// though the quote may hold it as a symbol: an open residual risk that #249 must close (`notImplementedYet`).
     private static func marksAtTheEndOfALine() -> [GroundingRow] {
         typealias Speech = (language: String, description: String, name: String)
         var speeches: [Speech] = []
@@ -3694,6 +3697,10 @@ enum GroundingRows {
                         "My colleague wrote \"\nI use Swift.\n\"\nI speak French.\nI use \"clean code\".",
                         CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]),
                         .exactly(CVData(languages: [Language(name: "French")]))))
+        rows.append(row("a-mark-alone-on-its-line-inside-a-quote-closes-nothing",
+                        "the mark alone on the third line is the colleague's ditto symbol, and the quote runs to the last line: no language",
+                        "My colleague wrote \"\nIn my table, the ditto symbol is:\n\"\nI speak French.\nEnd of my message.\"",
+                        CVData(languages: [Language(name: "French")]), .exactly(CVData())))
         return rows
     }
 
