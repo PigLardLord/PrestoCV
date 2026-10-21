@@ -21,13 +21,16 @@ BASE='<key>CFBundleIdentifier</key><string>com.PigLardLord.prestocv</string>
 <key>ITSAppUsesNonExemptEncryption</key><false/>
 <key>CFBundleIcons</key><dict><key>CFBundlePrimaryIcon</key><dict><key>CFBundleIconName</key><string>AppIcon</string></dict></dict>'
 
+# document_type_with <role> <rank> <the value of LSItemContentTypes>
+document_type_with() {
+  printf '<dict><key>CFBundleTypeName</key><string>PDF</string><key>CFBundleTypeRole</key><string>%s</string>' "$1"
+  printf '<key>LSHandlerRank</key><string>%s</string><key>LSItemContentTypes</key>%s</dict>' "$2" "$3"
+}
 # document_type <role> <rank> <content type>...
 document_type() {
-  local role="$1" rank="$2"; shift 2
-  printf '<dict><key>CFBundleTypeName</key><string>PDF</string><key>CFBundleTypeRole</key><string>%s</string>' "$role"
-  printf '<key>LSHandlerRank</key><string>%s</string><key>LSItemContentTypes</key><array>' "$rank"
-  printf '<string>%s</string>' "$@"
-  printf '</array></dict>'
+  local role="$1" rank="$2" types=""; shift 2
+  for type in "$@"; do types+="<string>$type</string>"; done
+  document_type_with "$role" "$rank" "<array>$types</array>"
 }
 document_types() { printf '<key>CFBundleDocumentTypes</key><array>%s</array>' "$*"; }
 in_place() { printf '<key>LSSupportsOpeningDocumentsInPlace</key><%s/>' "$1"; }
@@ -78,7 +81,18 @@ for rank in Default Owner None; do
     "$(document_types "$(document_type Viewer "$rank" com.adobe.pdf)")" "$COPIED"
 done
 
+# A value of the wrong plist type reads the same as the right one in text, and the app reads it as nothing at all.
+check "document types as a dictionary with the key 0" "CFBundleDocumentTypes is not an array" \
+  "<key>CFBundleDocumentTypes</key><dict><key>0</key>$PDF</dict>" "$COPIED"
+check "a document type that is not a dictionary" "the document type is not a dictionary" \
+  "$(document_types "<string>com.adobe.pdf</string>")" "$COPIED"
+check "content types as a dictionary with the key 0" "the document type's content types are not an array" \
+  "$(document_types "$(document_type_with Viewer Alternate "<dict><key>0</key><string>com.adobe.pdf</string></dict>")")" "$COPIED"
 check "opened in place" "LSSupportsOpeningDocumentsInPlace is true, not false" "$VALID_TYPES" "$(in_place true)"
+check "in place as the string false" "LSSupportsOpeningDocumentsInPlace is not a boolean" "$VALID_TYPES" \
+  "<key>LSSupportsOpeningDocumentsInPlace</key><string>false</string>"
+check "in place as the number 0" "LSSupportsOpeningDocumentsInPlace is not a boolean" "$VALID_TYPES" \
+  "<key>LSSupportsOpeningDocumentsInPlace</key><integer>0</integer>"
 check "no in-place key" "LSSupportsOpeningDocumentsInPlace is missing" "$VALID_TYPES"
 
 for key in UTExportedTypeDeclarations UTImportedTypeDeclarations; do
