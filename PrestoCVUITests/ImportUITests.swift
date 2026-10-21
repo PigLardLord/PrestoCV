@@ -63,7 +63,8 @@ final class ImportUITests: XCTestCase {
         add(app.keptScreenshot(named: "Import - what to check"))
         app.buttons["Done"].tap()
 
-        app.tabBars.buttons["Experience"].tap()
+        // The tab, wherever the device puts the tabs: a tab bar on an iPhone, the bar at the top of an iPad
+        app.buttons["Experience"].firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "value == 'Klinikum Beispiel'")).firstMatch.waitForExistence(timeout: 10),
                       "The first job's employer should be read")
         add(app.keptScreenshot(named: "Import - experience"))
