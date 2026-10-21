@@ -412,6 +412,42 @@ struct AutosaveTests {
         #expect(autosave.status == .upToDate)
     }
 
+    @Test("a scheduled write the store cancels is tried again after the next pause, without another change or flush")
+    func cancelledScheduledWriteIsTriedAgain() async throws {
+        let autosave = autosave()
+        store.failure = CancellationError()
+        let change = autosave.changed(to: "Ada L")
+
+        clock.advance(by: .seconds(1))
+        await finish(change)
+        #expect(store.writes.isEmpty)
+        #expect(diagnostics.causes.isEmpty, "A cancellation is no failure")
+        #expect(autosave.status == .pending, "The content waits for the next pause")
+        #expect(autosave.scheduledWrite != nil)
+
+        store.failure = nil
+        clock.advance(by: .seconds(1))
+        await finish(autosave.scheduledWrite)
+        #expect(store.writes == ["Ada L"])
+        #expect(autosave.status == .upToDate)
+    }
+
+    @Test("a flush the store cancels leaves a pause waiting, which writes the content if nobody flushes again")
+    func cancelledFlushLeavesAPauseWaiting() async throws {
+        let autosave = autosave()
+        store.failure = CancellationError()
+        autosave.changed(to: "Ada L")
+
+        await #expect(throws: CancellationError.self) { try await autosave.flush() }
+        #expect(autosave.scheduledWrite != nil, "The content is not left in memory for ever")
+
+        store.failure = nil
+        clock.advance(by: .seconds(1))
+        await finish(autosave.scheduledWrite)
+        #expect(store.writes == ["Ada L"])
+        #expect(autosave.status == .upToDate)
+    }
+
     @Test("a write the store cancels after a failure leaves the failure shown")
     func cancelledRetryKeepsTheFailure() async throws {
         let autosave = autosave()

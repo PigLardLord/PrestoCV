@@ -11,8 +11,8 @@ import Foundation
 /// - **If a write fails:** the content stays in memory, the status says so, the cause goes to the diagnostic boundary,
 ///   and the next change or `flush()` tries again. The failure goes when the content returns to what the store holds,
 ///   because nothing is left to retry.
-/// - **If a write is cancelled:** that is no failure. The content stays to be written, and `flush()` passes the
-///   cancellation on.
+/// - **If a write is cancelled:** that is no failure. The content stays to be written, a pause starts so that it is
+///   written without another change, and `flush()` passes the cancellation on.
 ///
 /// The rule is the timing. The write is a port the editor gives, and so is the clock, so that tests move time by hand.
 @MainActor
@@ -137,17 +137,25 @@ public final class Autosave<Content: Equatable & Sendable> {
     ///   written, and the status does not say `failed`.
     public func flush() async throws(CancellationError) {
         flushes += 1
-        defer { flushes -= 1 }
-        while true {
+        var wasCancelled = false
+        loop: while true {
             cancelThePause()
             switch await writeOnce() {
             case .written:
                 continue
             case .nothingToWrite, .failed:
-                return
+                break loop
             case .cancelled:
-                throw CancellationError()
+                wasCancelled = true
+                break loop
             }
+        }
+        flushes -= 1
+        if wasCancelled {
+            // Nobody has asked for another write: the pause does, so that the content is not left in memory for ever
+            writeAgainIfTheContentIsNotStored()
+            updateStatus()
+            throw CancellationError()
         }
     }
 
@@ -193,7 +201,9 @@ public final class Autosave<Content: Equatable & Sendable> {
             let outcome = await self.attempt(snapshot)
             // Cleared before the task ends, so a write waiting for this one finds the way free
             self.running = nil
-            self.writeAgainIfTheContentMovedOn(after: outcome)
+            if outcome == .written || outcome == .cancelled, self.flushes == 0 {
+                self.writeAgainIfTheContentIsNotStored()
+            }
             self.updateStatus()
             return outcome
         }
@@ -218,10 +228,12 @@ public final class Autosave<Content: Equatable & Sendable> {
         }
     }
 
-    /// The form may differ from what a write stored: a change made while it ran, or one that undid it, and that no pause
-    /// is waiting for. A flush in progress writes it itself; otherwise a pause starts now.
-    private func writeAgainIfTheContentMovedOn(after outcome: WriteOutcome) {
-        guard outcome == .written, flushes == 0, scheduledWrite == nil, hasChangesToWrite else { return }
+    /// The store may not hold what the form shows after a write: a change made while it ran, or one that undid it, or a
+    /// write that was cancelled. When no pause is waiting and no failure is shown, one starts now, so that the content is
+    /// written without another change or flush. A failure waits for the next change, or for Try Again, instead.
+    /// A flush in progress writes it itself.
+    private func writeAgainIfTheContentIsNotStored() {
+        guard scheduledWrite == nil, !lastWriteFailed, hasChangesToWrite else { return }
         _ = startThePause()
     }
 
