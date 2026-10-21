@@ -44,15 +44,15 @@ Characters are Unicode characters; keywords are counted in UTF-8 bytes, which is
 <!-- counts:start -->
 | Locale | Name (30) | Subtitle (30) | Keywords (100 bytes) | Promotional text (170) | Description (4000) | Captions (longest title / line) | What's New (4000) |
 |---|---|---|---|---|---|---|---|
-| en-US | 27 | 29 | 98 | 166 | 2324 | 23 / 63 (6 captions) | 184 |
-| en-GB | 27 | 29 | 98 | 166 | 2315 | 23 / 63 (6 captions) | 184 |
-| de-DE | 30 | 30 | 96 | 163 | 2724 | 26 / 72 (6 captions) | 230 |
-| it | 24 | 29 | 99 | 170 | 2511 | 23 / 62 (6 captions) | 209 |
-| es-ES | 28 | 26 | 93 | 163 | 2555 | 25 / 64 (6 captions) | 213 |
-| es-MX | 28 | 26 | 97 | 162 | 2529 | 25 / 64 (6 captions) | 210 |
-| fr-FR | 25 | 28 | 91 | 168 | 2685 | 25 / 73 (6 captions) | 220 |
-| pt-PT | 30 | 29 | 94 | 168 | 2609 | 27 / 61 (6 captions) | 215 |
-| pt-BR | 28 | 29 | 95 | 162 | 2543 | 27 / 61 (6 captions) | 205 |
+| en-US | 27 | 29 | 98 | 166 | 2411 | 23 / 63 (6 captions) | 184 |
+| en-GB | 27 | 29 | 98 | 166 | 2402 | 23 / 63 (6 captions) | 184 |
+| de-DE | 30 | 30 | 96 | 163 | 2834 | 26 / 72 (6 captions) | 230 |
+| it | 24 | 29 | 99 | 170 | 2616 | 23 / 62 (6 captions) | 209 |
+| es-ES | 28 | 26 | 93 | 163 | 2657 | 25 / 64 (6 captions) | 213 |
+| es-MX | 28 | 26 | 97 | 162 | 2631 | 25 / 64 (6 captions) | 210 |
+| fr-FR | 25 | 28 | 91 | 168 | 2795 | 25 / 73 (6 captions) | 220 |
+| pt-PT | 30 | 29 | 94 | 168 | 2702 | 27 / 61 (6 captions) | 215 |
+| pt-BR | 28 | 29 | 95 | 162 | 2635 | 27 / 61 (6 captions) | 205 |
 
 Notes for App Review: 3988 characters (4000).
 <!-- counts:end -->
@@ -136,7 +136,7 @@ WRITE AND EDIT
 • Sections for your profile, work experience, education, skills, languages, certifications, interests and links.
 • Language levels from A1 to C2, plus native.
 • Keep several CVs, and duplicate one to adapt it for another job.
-• Every change is saved on your device as you type: if iOS closes the app, nothing is lost.
+• Changes are saved on your device a moment after you stop typing, and when you leave the editor or the app. If one can't be saved, PrestoCV tells you and keeps it in the editor.
 
 EXPORT TO PDF
 • Three designs, three font styles and four color palettes, with a preview of the PDF and its page count.
@@ -215,7 +215,7 @@ WRITE AND EDIT
 • Sections for your profile, work experience, education, skills, languages, certifications, interests and links.
 • Language levels from A1 to C2, plus native.
 • Keep several CVs, and duplicate one to tailor it to another job.
-• Every change is saved on your device as you type: if iOS closes the app, nothing is lost.
+• Changes are saved on your device a moment after you stop typing, and when you leave the editor or the app. If one can't be saved, PrestoCV tells you and keeps it in the editor.
 
 EXPORT TO PDF
 • Three designs, three font styles and four colour palettes, with a preview of the PDF and its page count.
@@ -294,7 +294,7 @@ SCHREIBEN UND BEARBEITEN
 • Abschnitte für Kurzprofil, Berufserfahrung, Ausbildung, Fähigkeiten, Sprachen, Zertifikate, Interessen und Links.
 • Sprachniveaus von A1 bis C2 sowie Muttersprache.
 • Mehrere Lebensläufe verwalten und einen duplizieren, um ihn an eine andere Stelle anzupassen.
-• Jede Änderung wird beim Tippen auf Ihrem Gerät gespeichert: Schließt iOS die App, geht nichts verloren.
+• Änderungen werden einen Moment nach dem Tippen auf Ihrem Gerät gespeichert, außerdem beim Verlassen des Editors oder der App. Lässt sich eine Änderung nicht speichern, meldet PrestoCV das und behält sie im Editor.
 
 ALS PDF EXPORTIEREN
 • Drei Designs, drei Schriftstile und vier Farbpaletten, mit PDF-Vorschau und Seitenzahl.
@@ -373,7 +373,7 @@ SCRIVI E MODIFICA
 • Sezioni per profilo professionale, esperienza lavorativa, formazione, competenze, lingue, certificazioni, interessi e link.
 • Livelli di lingua da A1 a C2, più madrelingua.
 • Tieni più CV e duplicane uno per adattarlo a un'altra offerta di lavoro.
-• Ogni modifica viene salvata sul tuo dispositivo mentre scrivi: se iOS chiude l'app, non perdi nulla.
+• Le modifiche vengono salvate sul tuo dispositivo un attimo dopo che smetti di scrivere, e quando esci dall'editor o dall'app. Se una modifica non si può salvare, PrestoCV te lo dice e la tiene nell'editor.
 
 ESPORTA IN PDF
 • Tre design, tre stili di carattere e quattro palette di colori, con l'anteprima del PDF e il numero di pagine.
@@ -452,7 +452,7 @@ ESCRIBE Y EDITA
 • Secciones para perfil profesional, experiencia laboral, formación, competencias, idiomas, certificaciones, intereses y enlaces.
 • Niveles de idioma de A1 a C2, además de lengua materna.
 • Guarda varios CV y duplica uno para adaptarlo a otra oferta.
-• Cada cambio se guarda en tu dispositivo mientras escribes: si iOS cierra la app, no pierdes nada.
+• Los cambios se guardan en tu dispositivo un instante después de que dejes de escribir, y al salir del editor o de la app. Si uno no se puede guardar, PrestoCV te lo indica y lo mantiene en el editor.
 
 EXPORTA A PDF
 • Tres diseños, tres estilos de fuente y cuatro paletas de colores, con vista previa del PDF y su número de páginas.
@@ -531,7 +531,7 @@ ESCRIBE Y EDITA
 • Secciones para perfil profesional, experiencia laboral, formación, competencias, idiomas, certificaciones, intereses y enlaces.
 • Niveles de idioma de A1 a C2, además de lengua materna.
 • Guarda varios CV y duplica uno para adaptarlo a otra vacante.
-• Cada cambio se guarda en tu dispositivo mientras escribes: si iOS cierra la app, no pierdes nada.
+• Los cambios se guardan en tu dispositivo un instante después de que dejes de escribir, y al salir del editor o de la app. Si uno no se puede guardar, PrestoCV te lo indica y lo mantiene en el editor.
 
 EXPORTA A PDF
 • Tres diseños, tres estilos de fuente y cuatro paletas de colores, con vista previa del PDF y su número de páginas.
@@ -610,7 +610,7 @@ RÉDIGER ET MODIFIER
 • Des rubriques pour le profil, l'expérience professionnelle, la formation, les compétences, les langues, les certifications, les centres d'intérêt et les liens.
 • Niveaux de langue de A1 à C2, et langue maternelle.
 • Gérez plusieurs CV et dupliquez-en un pour l'adapter à une autre offre.
-• Chaque modification est enregistrée sur votre appareil pendant que vous écrivez : si iOS ferme l'app, rien n'est perdu.
+• Les modifications sont enregistrées sur votre appareil un instant après que vous avez cessé d'écrire, et quand vous quittez l'éditeur ou l'app. Si l'une d'elles ne peut pas l'être, PrestoCV vous le dit et la garde dans l'éditeur.
 
 EXPORTER EN PDF
 • Trois mises en page, trois styles de police et quatre palettes de couleurs, avec un aperçu du PDF et son nombre de pages.
@@ -689,7 +689,7 @@ ESCREVER E EDITAR
 • Secções para perfil profissional, experiência profissional, formação, competências, idiomas, certificações, interesses e ligações.
 • Níveis de língua de A1 a C2, e língua materna.
 • Guarde vários currículos e duplique um para o adaptar a outra oferta de emprego.
-• Cada alteração é guardada no seu dispositivo enquanto escreve: se o iOS fechar a app, nada se perde.
+• As alterações são guardadas no seu dispositivo um instante depois de parar de escrever e quando sai do editor ou da app. Se uma não puder ser guardada, o PrestoCV avisa-o e mantém-na no editor.
 
 EXPORTAR EM PDF
 • Três designs, três estilos de letra e quatro paletas de cores, com pré-visualização do PDF e o número de páginas.
@@ -768,7 +768,7 @@ ESCREVA E EDITE
 • Seções para perfil profissional, experiência profissional, formação, competências, idiomas, certificações, interesses e links.
 • Níveis de idioma de A1 a C2, e língua materna.
 • Tenha vários currículos e duplique um para adaptá-lo a outra vaga.
-• Cada alteração é salva no seu aparelho enquanto você digita: se o iOS fechar o app, nada se perde.
+• As alterações são salvas no seu aparelho um instante depois que você para de digitar e quando você sai do editor ou do app. Se uma não puder ser salva, o PrestoCV avisa e a mantém no editor.
 
 EXPORTE EM PDF
 • Três designs, três estilos de fonte e quatro paletas de cores, com pré-visualização do PDF e o número de páginas.
