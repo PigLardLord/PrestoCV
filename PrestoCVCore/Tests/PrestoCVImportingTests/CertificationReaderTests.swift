@@ -205,6 +205,40 @@ struct CertificationReaderTests {
         #expect(result.ungrounded.isEmpty)
     }
 
+    @Test("In a PDF, a regular-weight line under a bold title is the next certification when it has an address or names an issuer", arguments: [
+        ("Swift Basics https://academy.example/swift", "Swift Basics", nil as String?, true),
+        ("Swift Basics – academy.dev/swift", "Swift Basics", nil, true),
+        ("Swift Basics – Example Academy", "Swift Basics", "Example Academy", false),
+        ("Swift Basics | Beispiel Institut", "Swift Basics", "Beispiel Institut", false),
+    ])
+    func regularLineUnderBoldTitle(line: String, name: String, issuer: String?, hasLink: Bool) async throws {
+        var sketch = PageSketch()
+        sketch.put("Giulia Bianchi", x: 46, y: 50, size: 20, bold: true)
+        sketch.put("iOS Developer", x: 46, y: 80)
+        sketch.put("Certifications", x: 88, y: 150, size: 9, bold: true)
+        sketch.put("First Certificate", x: 172, y: 150, size: 9.5, bold: true)
+        sketch.put(line, x: 172, y: 164, size: 9.5)
+        let result = try await importedPDF(sketch)
+        #expect(result.cv.certifications.map(\.name.value) == ["First Certificate", name])
+        #expect(result.cv.certifications.map { $0.description == nil } == [true, true])
+        #expect(result.cv.certifications.last?.issuer?.value == issuer)
+        #expect(result.cv.certifications.map { $0.link != nil } == [false, hasLink])
+        #expect(result.unplaced.isEmpty)
+    }
+
+    @Test("A sentence that holds a web address is still the description of the certification before it")
+    func sentenceWithAddress() throws {
+        let found = read("""
+        Certifications
+        First Certificate – Example Academy (2023)
+        See the syllabus at https://academy.example/syllabus for the full list of topics.
+        """)
+        let certification = try #require(found.cv.certifications.first)
+        #expect(found.cv.certifications.count == 1)
+        #expect(certification.link == nil)
+        #expect(certification.description?.value == "See the syllabus at https://academy.example/syllabus for the full list of topics.")
+    }
+
     @Test("The gate refuses a link or a description that is not the text of its spans, and keeps that text visible")
     func gate() throws {
         var result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText("""

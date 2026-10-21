@@ -94,10 +94,10 @@ enum CertificationReader {
         case description
     }
 
-    /// A line goes on with the certification before it when it is a plain line of one cell that is a web address with at
-    /// most the label of a link, or states no date and is a sentence, or is in the regular weight under a title that stood
-    /// out. Anything else, such as a short line in a list of plain lines, or a title with its address, is a certification
-    /// of its own.
+    /// A line goes on with the certification before it when it is a plain line of one cell and either is a web address with
+    /// at most the label of a link, or states no date and is a sentence, or states no date, no address and no issuer and is
+    /// in the regular weight under a title that stood out. Anything else, such as a short line in a list of plain lines, or
+    /// a title with its address or its issuer, is a certification of its own.
     private static func continuation(of block: SourceBlock, cells: [Piece], after open: Open) -> Continuation? {
         guard block.kind == .line, cells.count == 1, let cell = cells.first else { return nil }
         let addresses = ContactReader.webAddresses(in: cell)
@@ -106,8 +106,14 @@ enum CertificationReader {
             return .link(addresses: addresses, labels: around)
         }
         guard !around.contains(where: { !DateReader.periods(in: $0.text).isEmpty }) else { return nil }
-        let isDescription = EntryReader.readsAsProse(block, text: cell.text) || (open.isEmphasized && !block.isEmphasized)
-        return isDescription ? .description : nil
+        if EntryReader.readsAsProse(block, text: cell.text) { return .description }
+        guard addresses.isEmpty, !namesIssuer(cell) else { return nil }
+        return open.isEmphasized && !block.isEmphasized ? .description : nil
+    }
+
+    /// Whether a part of the line after its first is an organisation or a school: "Swift Basics – Example Academy".
+    private static func namesIssuer(_ cell: Piece) -> Bool {
+        cell.split(by: Separators.strong + [" - ", ", "]).dropFirst().contains { EntryVocabulary.isOrganisation($0.text) || EntryVocabulary.isSchool($0.text) }
     }
 
     /// What labels the web address of a certification, in the six languages: "Credential URL: https://…". A closed list of
