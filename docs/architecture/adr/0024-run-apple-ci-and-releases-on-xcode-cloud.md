@@ -31,6 +31,7 @@
 | The app tests on the iOS simulator | the Test action, `CI` test plan, on an iPhone and now also an iPad |
 | The exporter's native renderer contract on the iOS simulator | the same action and plan, which holds the exporter's simulator test targets |
 | The archive checks of `Tools/Release/check-archive.sh` | `ci_scripts/ci_post_xcodebuild.sh`, after an archive; a failure stops the build before TestFlight |
+| The self-test of the archive checks, on fake archives | `ci_scripts/ci_post_xcodebuild.sh`, after `build-for-testing`, so a pull request finds a wrong rule before main's archive does |
 | The Linux checks | GitHub Actions, unchanged |
 
 The post script runs every step and fails at the end. The app is iOS only in version 1 (ADR 0022), so no job builds it for macOS, as the self-hosted job did not either.
