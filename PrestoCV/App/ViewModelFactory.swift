@@ -126,9 +126,7 @@ final class ViewModelFactory {
         return ImportViewModel(
             importer: ImportCV(pdfReader: PDFKitTextExtractor(), limits: limits),
             mapper: ImportedCVMapper(),
-            readFile: { [inbox = environment.importInbox] url in
-                try await ChosenFileReader(maximumBytes: limits.maximumPDFBytes, inbox: inbox).read(url)
-            }
+            fileReader: ChosenFileReader(maximumBytes: limits.maximumPDFBytes, inbox: environment.importInbox)
         )
     }
 

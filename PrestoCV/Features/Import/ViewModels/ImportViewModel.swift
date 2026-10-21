@@ -2,8 +2,13 @@ import Combine
 import Foundation
 import PrestoCVImporting
 
-/// Reads the bytes of a file the person chose, within a size, from wherever the system lets the app read it.
-typealias ImportFileReader = @Sendable (URL) async throws -> Data
+/// Reads the bytes of a file the person chose, within a size, from wherever the system lets the app read it, and lets
+/// the file go once the import is done with it.
+protocol ImportFileReading: Sendable {
+    func read(_ url: URL) async throws -> Data
+    /// The import is done with the file, with a CV or without one.
+    func release(_ url: URL)
+}
 
 /// Why an import produced no CV, as the import screen tells it.
 enum ImportFailure: Equatable {
@@ -55,12 +60,13 @@ final class ImportViewModel: ObservableObject {
 
     private let importer: ImportCV
     private let mapper: ImportedCVMapper
-    private let readFile: ImportFileReader
+    private let fileReader: any ImportFileReading
+    private var importing: Task<Void, Never>?
 
-    init(importer: ImportCV, mapper: ImportedCVMapper, readFile: @escaping ImportFileReader) {
+    init(importer: ImportCV, mapper: ImportedCVMapper, fileReader: any ImportFileReading) {
         self.importer = importer
         self.mapper = mapper
-        self.readFile = readFile
+        self.fileReader = fileReader
     }
 
     /// Whether there is text to import, and no import running.
@@ -87,32 +93,54 @@ final class ImportViewModel: ObservableObject {
         }
     }
 
-    /// Imports the PDF the person chose in Files. Nothing of the file is kept.
-    func importFile(at url: URL) async {
-        guard !isImporting else { return }
-        isImporting = true
-        failure = nil
-        defer { isImporting = false }
-        let data: Data
-        do {
-            data = try await readFile(url)
-        } catch let error as ImportError {
-            failure = ImportFailure(error)
-            return
-        } catch {
-            failure = .fileNotRead
-            return
+    /// Imports the PDF the person chose in Files, or opened in the app, in a task of the screen's own: the task that
+    /// hands the file over may end, as the file it was given is cleared, long before the reading does. Nothing of the
+    /// file is kept, and the file is let go only once the import is done with it.
+    /// - Returns: The import's task, or nil when another import is running and the file is let go unread.
+    @discardableResult
+    func importFile(at url: URL) -> Task<Void, Never>? {
+        guard !isImporting else {
+            fileReader.release(url)
+            return nil
         }
-        await read(data)
+        return start {
+            defer { self.fileReader.release(url) }
+            let data: Data
+            do {
+                data = try await self.fileReader.read(url)
+            } catch let error as ImportError {
+                self.failure = ImportFailure(error)
+                return
+            } catch {
+                self.failure = .fileNotRead
+                return
+            }
+            await self.read(data)
+        }
     }
 
     /// Imports a PDF the person copied, in Files for example, and pasted.
-    func importPDF(_ data: Data) async {
-        guard !isImporting else { return }
+    /// - Returns: The import's task, or nil when another import is running.
+    @discardableResult
+    func importPDF(_ data: Data) -> Task<Void, Never>? {
+        guard !isImporting else { return nil }
+        return start { await self.read(data) }
+    }
+
+    /// The screen went away: the import running stops, with nothing to tell.
+    func cancelImport() {
+        importing?.cancel()
+    }
+
+    private func start(_ work: @escaping @MainActor () async -> Void) -> Task<Void, Never> {
         isImporting = true
         failure = nil
-        defer { isImporting = false }
-        await read(data)
+        let task = Task {
+            await work()
+            self.isImporting = false
+        }
+        importing = task
+        return task
     }
 
     private func read(_ data: Data) async {

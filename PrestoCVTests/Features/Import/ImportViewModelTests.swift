@@ -11,9 +11,19 @@ struct ImportViewModelTests {
 
     private func makeViewModel(
         reader: ScriptedPDFReader = ScriptedPDFReader(),
-        readFile: @escaping ImportFileReader = { _ in Data([1]) }
+        fileReader: ScriptedFileReader = ScriptedFileReader()
     ) -> ImportViewModel {
-        ImportViewModel(importer: ImportCV(pdfReader: reader, limits: .standard), mapper: ImportedCVMapper(), readFile: readFile)
+        ImportViewModel(importer: ImportCV(pdfReader: reader, limits: .standard), mapper: ImportedCVMapper(), fileReader: fileReader)
+    }
+
+    /// An Inbox with the copy of a PDF opened in the app, as the system leaves it.
+    private func inboxCopy() throws -> (root: URL, inbox: URL, copy: URL) {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let inbox = root.appendingPathComponent("Inbox")
+        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        let copy = inbox.appendingPathComponent("cv.pdf")
+        try Data([1]).write(to: copy)
+        return (root, inbox, copy)
     }
 
     /// A PDF page with a name, a title and a job, as a reader sees it.
@@ -73,7 +83,7 @@ struct ImportViewModelTests {
     func tooLong() {
         let viewModel = ImportViewModel(
             importer: ImportCV(pdfReader: ScriptedPDFReader(), limits: ImportLimits(maximumPDFBytes: 10, maximumPages: 1, maximumCharacters: 20)),
-            mapper: ImportedCVMapper(), readFile: { _ in Data() }
+            mapper: ImportedCVMapper(), fileReader: ScriptedFileReader()
         )
         viewModel.text = "Giulia Bianchi, Infermiera a Torino"
         viewModel.importText()
@@ -85,7 +95,7 @@ struct ImportViewModelTests {
     @Test("A PDF from Files is read and imported, and the screen is busy meanwhile only")
     func pdfFromFiles() async {
         let viewModel = makeViewModel(reader: ScriptedPDFReader(layout: .pages([page])))
-        await viewModel.importFile(at: URL(fileURLWithPath: "/tmp/cv.pdf"))
+        await viewModel.importFile(at: URL(fileURLWithPath: "/tmp/cv.pdf"))?.value
 
         #expect(!viewModel.isImporting)
         #expect(viewModel.failure == nil)
@@ -96,7 +106,7 @@ struct ImportViewModelTests {
     @Test("A pasted PDF is imported as a chosen one is")
     func pastedPDF() async {
         let viewModel = makeViewModel(reader: ScriptedPDFReader(layout: .pages([page])))
-        await viewModel.importPDF(Data([1]))
+        await viewModel.importPDF(Data([1]))?.value
 
         #expect(viewModel.imported?.cv.personalInfo.name == "Lena Hartmann")
     }
@@ -112,12 +122,9 @@ struct ImportViewModelTests {
     func failures(readerError: ImportError?, fileError: ImportError?, expected: ImportFailure) async {
         let viewModel = makeViewModel(
             reader: ScriptedPDFReader(error: readerError),
-            readFile: { _ in
-                if let fileError { throw fileError }
-                return Data([1])
-            }
+            fileReader: ScriptedFileReader(error: fileError)
         )
-        await viewModel.importFile(at: URL(fileURLWithPath: "/tmp/cv.pdf"))
+        await viewModel.importFile(at: URL(fileURLWithPath: "/tmp/cv.pdf"))?.value
 
         #expect(viewModel.failure == expected)
         #expect(viewModel.imported == nil)
@@ -126,12 +133,76 @@ struct ImportViewModelTests {
 
     @Test("A file the system does not let the app read is told apart from a PDF that cannot be read")
     func fileNotRead() async {
-        let viewModel = makeViewModel(readFile: { _ in throw UnreadableFile() })
-        await viewModel.importFile(at: URL(fileURLWithPath: "/tmp/cv.pdf"))
+        let viewModel = makeViewModel(fileReader: ScriptedFileReader(error: UnreadableFile()))
+        await viewModel.importFile(at: URL(fileURLWithPath: "/tmp/cv.pdf"))?.value
 
         #expect(viewModel.failure == .fileNotRead)
         viewModel.clearFailure()
         #expect(viewModel.failure == nil)
+    }
+
+    @Test("A PDF opened in the app is read to the end, slow as it may be, after the pending file is cleared; its Inbox copy goes only then")
+    func openedInTheApp() async throws {
+        let (root, inbox, copy) = try inboxCopy()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sleeps = HeldSleeps()
+        let viewModel = ImportViewModel(
+            importer: ImportCV(pdfReader: SlowPDFReader(sleeps: sleeps, layout: .pages([page])), limits: .standard),
+            mapper: ImportedCVMapper(),
+            fileReader: ChosenFileReader(maximumBytes: 100, inbox: inbox)
+        )
+        let router = AppRouter(isAIShipped: false)
+        router.openImport(of: copy)
+
+        // The screen's task, which SwiftUI cancels as the pending file it is keyed on is cleared
+        let screenTask = Task { @MainActor in router.takePendingImportFile().flatMap { viewModel.importFile(at: $0) } }
+        screenTask.cancel()
+        let importing = try #require(await screenTask.value)
+        await sleeps.waitUntilStarted(1)
+        #expect(router.pendingImportFile == nil)
+        #expect(viewModel.isImporting)
+        #expect(FileManager.default.fileExists(atPath: copy.path), "The copy stays while the PDF is read")
+        await sleeps.endAll()
+        await importing.value
+
+        #expect(viewModel.imported?.cv.personalInfo.name == "Lena Hartmann")
+        #expect(!viewModel.isImporting)
+        #expect(!FileManager.default.fileExists(atPath: copy.path))
+    }
+
+    @Test("A PDF opened in the app that holds no CV lets its Inbox copy go too")
+    func openedInTheAppWithoutText() async throws {
+        let (root, inbox, copy) = try inboxCopy()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let viewModel = ImportViewModel(
+            importer: ImportCV(pdfReader: ScriptedPDFReader(error: ImportError.noText), limits: .standard),
+            mapper: ImportedCVMapper(),
+            fileReader: ChosenFileReader(maximumBytes: 100, inbox: inbox)
+        )
+
+        await viewModel.importFile(at: copy)?.value
+
+        #expect(viewModel.failure == .scan)
+        #expect(!FileManager.default.fileExists(atPath: copy.path))
+    }
+
+    @Test("Leaving the screen stops the import running, with nothing to tell")
+    func leavingStopsTheImport() async throws {
+        let sleeps = HeldSleeps()
+        let viewModel = ImportViewModel(
+            importer: ImportCV(pdfReader: SlowPDFReader(sleeps: sleeps, layout: .pages([page])), limits: .standard),
+            mapper: ImportedCVMapper(),
+            fileReader: ScriptedFileReader()
+        )
+        let importing = try #require(viewModel.importPDF(Data([1])))
+        await sleeps.waitUntilStarted(1)
+
+        viewModel.cancelImport()
+        await importing.value
+
+        #expect(viewModel.imported == nil)
+        #expect(viewModel.failure == nil)
+        #expect(!viewModel.isImporting)
     }
 
     @Test("Once the draft opens, coming back to the screen does not open it again")
@@ -148,6 +219,31 @@ struct ImportViewModelTests {
     }
 }
 
+/// A file reader that hands over a byte, or throws.
+struct ScriptedFileReader: ImportFileReading {
+    var error: (any Error & Sendable)?
+
+    func read(_ url: URL) async throws -> Data {
+        if let error { throw error }
+        return Data([1])
+    }
+
+    func release(_ url: URL) {}
+}
+
+/// A PDF reader that takes its time, as a long PDF does: it reads once the test ends its sleep, and stops if its task
+/// is cancelled meanwhile, as the PDFKit reader does between pages.
+private struct SlowPDFReader: PDFTextExtracting {
+    let sleeps: HeldSleeps
+    let layout: ExtractedLayout
+
+    func layout(ofPDF data: Data, limits: ImportLimits) async throws -> ExtractedLayout {
+        try await sleeps.sleep(for: .seconds(5))
+        try Task.checkCancellation()
+        return layout
+    }
+}
+
 @Suite("ChosenFileReader - a PDF from Files or from Open in PrestoCV, read once and not kept")
 struct ChosenFileReaderTests {
 
@@ -158,7 +254,7 @@ struct ChosenFileReaderTests {
         return url
     }
 
-    @Test("The copy the system leaves in the Inbox is deleted once read; a file chosen in Files is left alone")
+    @Test("The copy the system leaves in the Inbox is deleted once let go, not when read; a file chosen in Files is left alone")
     func inboxCopyIsDeleted() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -167,10 +263,13 @@ struct ChosenFileReaderTests {
 
         let copy = try file(in: inbox, bytes: 10)
         #expect(try await reader.read(copy).count == 10)
+        #expect(FileManager.default.fileExists(atPath: copy.path))
+        reader.release(copy)
         #expect(!FileManager.default.fileExists(atPath: copy.path))
 
         let chosen = try file(in: root.appendingPathComponent("Files"), bytes: 10)
         #expect(try await reader.read(chosen).count == 10)
+        reader.release(chosen)
         #expect(FileManager.default.fileExists(atPath: chosen.path))
     }
 

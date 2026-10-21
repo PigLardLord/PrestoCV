@@ -44,7 +44,7 @@ struct ImportView: View {
         }
         .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.pdf], allowsMultipleSelection: false) { result in
             if case .success(let urls) = result, let url = urls.first {
-                Task { await viewModel.importFile(at: url) }
+                viewModel.importFile(at: url)
             }
         }
         .alert(
@@ -55,12 +55,14 @@ struct ImportView: View {
         } message: {
             Text(viewModel.failure?.messageKey.localized ?? "")
         }
-        // A PDF opened in the app from the share sheet or Files
+        // A PDF opened in the app from the share sheet or Files: the view model's task reads it, so clearing the
+        // pending file, which ends this task, does not stop the reading
         .task(id: router.pendingImportFile) {
             if let file = router.takePendingImportFile() {
-                await viewModel.importFile(at: file)
+                viewModel.importFile(at: file)
             }
         }
+        .onDisappear(perform: viewModel.cancelImport)
         .onChange(of: viewModel.imported) { _, draft in
             if let draft {
                 viewModel.draftOpened()
@@ -76,7 +78,7 @@ struct ImportView: View {
         if let pdf = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.pdf.identifier) }) {
             pdf.loadDataRepresentation(forTypeIdentifier: UTType.pdf.identifier) { data, _ in
                 guard let data else { return }
-                Task { @MainActor in await viewModel.importPDF(data) }
+                Task { @MainActor in viewModel.importPDF(data) }
             }
             return
         }

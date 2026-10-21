@@ -50,7 +50,7 @@
 
 **5. Version 1 uses the core from the legacy app** ([ADR 0022](0022-ship-legacy-app-as-v1.md), [ADR 0025](0025-hold-the-legacy-app-to-the-separation-rules.md)).
 - New CV and the first run offer a third way to start, "Paste or import a CV", next to the blank CV and the examples, in the six languages.
-- The import screen takes pasted text or a PDF: from Files (`fileImporter`), pasted after "Copy" in Files (the same `PasteButton` takes text or a PDF), or opened in the app from the share sheet ("Open in PrestoCV": the app declares PDFs at the alternate rank, copied, never opened in place, and deletes the copy once read). Its view model calls the use case; the factory makes it with the PDFKit adapter. The views hold no rule (R5).
+- The import screen takes pasted text or a PDF: from Files (`fileImporter`), pasted after "Copy" in Files (the same `PasteButton` takes text or a PDF), or opened in the app from the share sheet ("Open in PrestoCV": the app declares PDFs at the alternate rank, copied, never opened in place, and deletes the copy once the import is done with it, with a CV or without). Its view model calls the use case in a task of its own, which the screen cancels when it goes away; the factory makes it with the PDFKit adapter. The views hold no rule (R5).
 - A mapper in the app turns the `ImportedCV` into an unsaved `CVModel`, as the AI draft's mapper does. The editor opens it as a new CV, as it opens an example, with a notice that shows the values to check and the text not imported, ready to copy. A language without a CEFR level has no place in the legacy model, which requires one: it goes to the text not imported, with its words, and is listed for the review.
 - The provenance serves the review and is not saved with the CV.
 
