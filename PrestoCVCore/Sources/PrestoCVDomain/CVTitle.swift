@@ -54,6 +54,10 @@ public enum CVTitle: Hashable, Sendable {
     /// the app, and a CV whose title reads like the title of one before it, in the order of their identities, gets the
     /// first number from 2 that gives a label no other row shows. Case, accents and spaces around a title do not make
     /// it different, so an untitled CV and a CV named with the app's words for an untitled one read alike.
+    ///
+    /// A CV with no title, such as a new one the editor stored before it was given a name, is called as the platform
+    /// calls an untitled document: "Untitled CV", then "Untitled CV 2" (`untitledNumbered`). It is a placeholder: once
+    /// the CV is named, or has a person or a role, it is called by that.
     /// - Parameters:
     ///   - titles: The CVs of the list, by identity.
     ///   - untitled: What the app calls a CV with no title, as "Untitled CV".
@@ -64,7 +68,9 @@ public enum CVTitle: Hashable, Sendable {
         untitled: String,
         numbered: (String, Int) -> String
     ) -> [ID: String] {
-        let texts = titles.map { (id: $0.id, text: $0.title.text(untitled: untitled)) }.sorted { $0.id < $1.id }
+        let texts = titles
+            .map { (id: $0.id, text: $0.title.text(untitled: untitled), isUntitled: $0.title == .untitled) }
+            .sorted { $0.id < $1.id }
         // Every title the list shows is taken from the start, so that a number never repeats one further down
         var taken = Set(texts.map { comparable($0.text) })
         // The next number to try for each title: each number is tried once, so the work grows with the list, not with
@@ -80,17 +86,26 @@ public enum CVTitle: Hashable, Sendable {
                 labels[entry.id] = entry.text
                 continue
             }
+            func numberedLabel(_ number: Int) -> String {
+                entry.isUntitled ? untitledNumbered(entry.text, number) : numbered(entry.text, number)
+            }
             var number = start
-            var label = numbered(entry.text, number)
+            var label = numberedLabel(number)
             while taken.contains(comparable(label)), number < lastNumber {
                 number += 1
-                label = numbered(entry.text, number)
+                label = numberedLabel(number)
             }
             taken.insert(comparable(label))
             nextNumber[key] = number + 1
             labels[entry.id] = label
         }
         return labels
+    }
+
+    /// The label of the `number`th CV with no title, as the platform numbers untitled documents: "Untitled CV 2",
+    /// "CV senza titolo 2", "Lebenslauf ohne Titel 2".
+    public static func untitledNumbered(_ untitled: String, _ number: Int) -> String {
+        "\(untitled) \(number)"
     }
 
     /// A title as it is compared: case, accents and the spaces around it do not count

@@ -62,7 +62,7 @@ struct CVTitleTests {
     @Test("a copy is called by the title its CV is shown with, marked as a copy in the words of the app", arguments: [
         (CVTitle.person("John Smith"), "Untitled CV", "(Copy)", "John Smith (Copy)"),                // en
         (.role("Infermiera"), "CV senza titolo", "(Copia)", "Infermiera (Copia)"),                   // it
-        (.person("Lena Hartmann"), "Ohne Titel", "(Kopie)", "Lena Hartmann (Kopie)"),               // de
+        (.person("Lena Hartmann"), "Lebenslauf ohne Titel", "(Kopie)", "Lena Hartmann (Kopie)"),    // de
         (.name("Candidature Lyon"), "CV sans titre", "(Copie)", "Candidature Lyon (Copie)"),         // fr
         (.untitled, "CV sin título", "(Copia)", "CV sin título (Copia)"),                           // es
         (.person("João da Silva"), "Currículo sem título", " (Cópia) ", "João da Silva (Cópia)"),    // pt
@@ -73,8 +73,8 @@ struct CVTitleTests {
 
     @Test("two copies of one CV are numbered, as any titles that read alike")
     func copiesAreNumbered() {
-        let copy = CVTitle.person("Lena Hartmann").copyName(untitled: "Ohne Titel", copySuffix: "(Kopie)")
-        #expect(labels([("1", .name(copy)), ("2", .name(copy)), ("3", .person("Lena Hartmann"))], untitled: "Ohne Titel")
+        let copy = CVTitle.person("Lena Hartmann").copyName(untitled: "Lebenslauf ohne Titel", copySuffix: "(Kopie)")
+        #expect(labels([("1", .name(copy)), ("2", .name(copy)), ("3", .person("Lena Hartmann"))], untitled: "Lebenslauf ohne Titel")
                 == ["1": copy, "2": "\(copy) (2)", "3": "Lena Hartmann"])
     }
 
@@ -94,9 +94,33 @@ struct CVTitleTests {
             ("f", .name("Frontend")), ("h", .person("Lena Hartmann")), ("g", .person("Lena Hartmann")),
         ]
         #expect(labels(titles) == [
-            "a": "Untitled CV", "c": "Untitled CV (2)", "d": "Untitled CV (3)", "b": "Backend", "e": "backend (2)",
+            "a": "Untitled CV", "c": "Untitled CV 2", "d": "Untitled CV 3", "b": "Backend", "e": "backend (2)",
             "f": "Frontend", "g": "Lena Hartmann", "h": "Lena Hartmann (2)",
         ])
+    }
+
+    @Test("CVs with no title are called as the platform calls an untitled document, numbered from the second", arguments: [
+        "Untitled CV", "CV senza titolo", "Lebenslauf ohne Titel", "CV sans titre", "CV sin título", "Currículo sem título",
+    ])
+    func untitledCVsAreNumberedAsDocuments(untitled: String) {
+        let titles: [(id: String, title: CVTitle)] = [("b", .untitled), ("a", .untitled), ("c", .person("Lena Hartmann")), ("d", .untitled)]
+
+        #expect(labels(titles, untitled: untitled) == [
+            "a": untitled, "b": "\(untitled) 2", "c": "Lena Hartmann", "d": "\(untitled) 3",
+        ])
+    }
+
+    @Test("an untitled CV never takes a label the list already shows, even one the person typed")
+    func untitledNumberSkipsTakenLabels() {
+        let titles: [(id: String, title: CVTitle)] = [("a", .untitled), ("b", .untitled), ("c", .name("Untitled CV 2"))]
+
+        #expect(labels(titles) == ["a": "Untitled CV", "b": "Untitled CV 3", "c": "Untitled CV 2"])
+    }
+
+    @Test("a CV the person names takes the placeholder's place: its own title, with no number")
+    func namingAnUntitledCVReplacesThePlaceholder() {
+        #expect(labels([("a", .untitled), ("b", .untitled)]) == ["a": "Untitled CV", "b": "Untitled CV 2"])
+        #expect(labels([("a", .untitled), ("b", .name("Clinica Bologna"))]) == ["a": "Untitled CV", "b": "Clinica Bologna"])
     }
 
     @Test("a number never gives a label the list already shows: it skips to the next free one", arguments: [
@@ -148,7 +172,7 @@ struct CVTitleTests {
     }
 
     @Test("an untitled CV and one named with the app's words for an untitled CV are told apart", arguments: [
-        "Untitled CV", "CV senza titolo", "Ohne Titel", "CV sans titre", "CV sin título", "Currículo sem título",
+        "Untitled CV", "CV senza titolo", "Lebenslauf ohne Titel", "CV sans titre", "CV sin título", "Currículo sem título",
     ])
     func untitledAndNamedLikeIt(untitled: String) {
         let titles: [(id: String, title: CVTitle)] = [("a", .untitled), ("b", .name(untitled)), ("c", .name(untitled.uppercased()))]
