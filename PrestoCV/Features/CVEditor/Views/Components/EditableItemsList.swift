@@ -7,6 +7,7 @@ struct EditableItemsList<Item, RowContent: View>: View {
     @Binding var items: [Item]
     let rowContent: (Binding<Item>, @escaping () -> Void) -> RowContent
     let onRemove: (Int) -> Void
+    @Environment(\.newRowFocus) private var newRowFocus
     
     var body: some View {
         ForEach(items.indices, id: \.self) { index in
@@ -17,6 +18,7 @@ struct EditableItemsList<Item, RowContent: View>: View {
                     { animatedRemove(at: index) }
                 )
                 .environment(\.rowIndex, index)
+                .id(newRowFocus?.identity(ofRow: index))
             }
         }
         .onDelete(perform: animatedDelete)

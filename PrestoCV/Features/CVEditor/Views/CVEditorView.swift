@@ -154,6 +154,7 @@ struct CVEditorView: View {
                     }
 
                 ExperienceSection(viewModel: viewModel)
+                    .bringsNewRowsIntoView()
                     .keyboardDoneButton()
                     .keepsClearOfTheKeyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
@@ -163,6 +164,7 @@ struct CVEditorView: View {
                     }
 
                 DetailsSection(viewModel: viewModel)
+                    .bringsNewRowsIntoView()
                     .keyboardDoneButton()
                     .keepsClearOfTheKeyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
