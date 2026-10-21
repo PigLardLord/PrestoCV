@@ -73,11 +73,11 @@ WITHOUT THE AI DRAFT (any iPhone or iPad)
 
 THE AI DRAFT
 - It needs a device that supports Apple Intelligence: iPhone 15 Pro, iPhone 15 Pro Max, iPhone 16 models or later, iPhone Air, iPad models with M1 or later, or iPad mini (A17 Pro). Apple Intelligence must be turned on (Settings > Apple Intelligence & Siri) and its model downloaded, with the device language and the Siri language set to the same supported language.
-- On such a device, the first launch leads with "Draft My CV with AI". Later, choose "AI CV Generation" on the New CV screen.
+- On such a device, the first launch offers "Draft My CV with AI" right after "Paste or import a CV". Later, choose "AI CV Generation" on the New CV screen, which also lists it right after "Paste or import a CV".
 - Type a description of at least 10 characters. The screen shows an example under "Example"; this is the same text, ready to paste:
 I'm Maria Rossi, a primary school teacher from Bologna. Since 2016 I have taught at the Don Milani school, where I trained 3 new teachers. Before that, from 2012 to 2016, I worked as an assistant in a nursery. I studied Education Sciences at the University of Bologna and graduated in 2012. I speak Italian (native) and English (B2). In my free time I like chess and hiking.
 - Tap "Generate CV with AI". It can take up to a minute. The draft opens in the editor with a notice. Every value it fills in occurs in the description, and anything the description does not mention is left blank. It can still put a detail in the wrong place, which is why the notice asks the person to check every field. Save it, then export it as above.
-- If the AI draft can't run, the AI option is shown dimmed and last, with a short reason, and tapping it shows the full text: where to turn Apple Intelligence on (Settings; System Settings on a Mac), that its model is still downloading (the option then turns on by itself), or that the device doesn't support AI drafts and the CV can be created by hand or from an example. The rest of the app works the same.
+- If the AI draft can't run, the AI option is shown dimmed, right after "Paste or import a CV", with a short reason, and tapping it shows the full text: where to turn Apple Intelligence on (Settings; System Settings on a Mac), that its model is still downloading (the option then turns on by itself), or that the device doesn't support AI drafts and the CV can be created by hand or from an example. The rest of the app works the same.
 - For an English or German description, the draft also needs the system's language data for that language. If iOS has not downloaded it yet, the screen says the data is being prepared and the app asks iOS to download it; the next try works once it is there.
 
 NETWORK AND DATA

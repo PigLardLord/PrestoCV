@@ -1,8 +1,8 @@
 import XCTest
 
-/// Where the AI draft cannot be made now, the "New CV" screen shows the AI card dimmed and last, with a line that says
-/// why in place of what the card does; a tap shows the full explanation. The card fits the screen in German at the
-/// largest text size.
+/// The "New CV" screen offers the import first, then the AI card, the examples and the empty CV. Where the AI draft
+/// cannot be made now, the AI card is dimmed in the same place, with a line that says why in place of what the card
+/// does; a tap shows the full explanation. The card fits the screen in German at the largest text size.
 final class NewCVAIEntryUITests: XCTestCase {
 
     private var app: XCUIApplication!
@@ -18,19 +18,31 @@ final class NewCVAIEntryUITests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
     }
 
-    func testTheAICardIsDimmedLastAndExplainsWhileTheModelDownloads() throws {
+    func testTheAICardFollowsTheImportWhereTheDeviceCanDraft() throws {
+        app.launchArguments += [
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage",
+            "-AIAvailabilityOverride", "available",
+        ]
+        app.launch()
+        app.openTheNewCVScreen()
+        XCTAssertTrue(app.navigationBars["New CV"].waitForExistence(timeout: 10), "The New CV screen should open")
+
+        checkTheOrderOfTheCards()
+    }
+
+    func testTheAICardIsDimmedAfterTheImportAndExplainsWhileTheModelDownloads() throws {
         checkTheDimmedAICard(.modelNotReady)
     }
 
-    func testTheAICardIsDimmedLastAndExplainsWhereAppleIntelligenceIsOff() throws {
+    func testTheAICardIsDimmedAfterTheImportAndExplainsWhereAppleIntelligenceIsOff() throws {
         checkTheDimmedAICard(.appleIntelligenceNotEnabled)
     }
 
-    func testTheAICardIsDimmedLastAndExplainsWhereTheDeviceCannotRunIt() throws {
+    func testTheAICardIsDimmedAfterTheImportAndExplainsWhereTheDeviceCannotRunIt() throws {
         checkTheDimmedAICard(.deviceNotEligible)
     }
 
-    func testTheAICardIsDimmedLastAndExplainsWhenTheReasonIsUnknown() throws {
+    func testTheAICardIsDimmedAfterTheImportAndExplainsWhenTheReasonIsUnknown() throws {
         checkTheDimmedAICard(.unknown)
     }
 
@@ -43,7 +55,7 @@ final class NewCVAIEntryUITests: XCTestCase {
         app.openTheNewCVScreen()
         let aiCard = card("AI CV Generation")
         XCTAssertTrue(aiCard.waitForExistence(timeout: 10), "The New CV screen should show the AI card")
-        // A dimmed AI card comes last, after the import, below the fold of an iPhone
+        // The AI card is the second, and the import above it may leave it partly below the fold of an iPhone
         app.scrollTo(aiCard)
 
         app.activateAsAnAssistiveTechnology(aiCard, says: .deviceNotEligible)
@@ -86,7 +98,21 @@ final class NewCVAIEntryUITests: XCTestCase {
         app.navigationBars.buttons["Fertig"].tap()
     }
 
-    /// The AI card is there, dimmed, after the cards that work, and a tap explains it.
+    /// The cards of the screen, from the top: the import, the AI card, the examples, the empty CV.
+    private func checkTheOrderOfTheCards(file: StaticString = #filePath, line: UInt = #line) {
+        let inOrder = [
+            ("the import", app.buttons["newcv.import"]), ("the AI card", card("AI CV Generation")),
+            ("the examples", card("Example CV")), ("the empty CV", card("Empty CV")),
+        ]
+        for (name, element) in inOrder {
+            XCTAssertTrue(element.waitForExistence(timeout: 10), "The New CV screen should offer \(name)", file: file, line: line)
+        }
+        for ((above, upper), (below, lower)) in zip(inOrder, inOrder.dropFirst()) {
+            XCTAssertLessThan(upper.frame.minY, lower.frame.minY, "\(above) should come before \(below)", file: file, line: line)
+        }
+    }
+
+    /// The AI card is there, dimmed, after the import and before the examples, and a tap explains it.
     private func checkTheDimmedAICard(_ draft: DimmedAIDraft, file: StaticString = #filePath, line: UInt = #line) {
         app.launchArguments += [
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage",
@@ -96,12 +122,9 @@ final class NewCVAIEntryUITests: XCTestCase {
         app.openTheNewCVScreen()
         XCTAssertTrue(app.navigationBars["New CV"].waitForExistence(timeout: 10), "The New CV screen should open", file: file, line: line)
 
-        let example = card("Example CV")
-        XCTAssertTrue(example.waitForExistence(timeout: 10), "The New CV screen should offer the examples", file: file, line: line)
-        let aiCard = card("AI CV Generation")
-        XCTAssertTrue(aiCard.waitForExistence(timeout: 10), "The New CV screen should show the AI card", file: file, line: line)
-        XCTAssertLessThan(example.frame.minY, aiCard.frame.minY, "The AI card should come last", file: file, line: line)
+        checkTheOrderOfTheCards(file: file, line: line)
 
+        let aiCard = card("AI CV Generation")
         app.checkDimmedAIDraft(aiCard, says: draft, file: file, line: line)
     }
 

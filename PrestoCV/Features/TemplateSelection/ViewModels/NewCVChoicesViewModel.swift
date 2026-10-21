@@ -13,9 +13,9 @@ typealias AIAvailabilityProvider = @MainActor () -> AIAvailability
 /// The wait between two reads of an availability that is still changing. It throws when the wait is cancelled.
 typealias AIAvailabilityPause = @MainActor () async throws -> Void
 
-/// The ways to start a new CV that the first run and the "New CV" screen offer: an AI draft, which is dimmed with the
-/// reason where it cannot be made now, a blank CV, the example CVs, and a CV the person already has, pasted or from a
-/// PDF.
+/// The ways to start a new CV that the first run and the "New CV" screen offer: a CV the person already has, pasted or
+/// from a PDF, an AI draft, which is dimmed with the reason where it cannot be made now, the example CVs, and a blank
+/// CV.
 @MainActor
 final class NewCVChoicesViewModel: ObservableObject {
 
@@ -54,15 +54,14 @@ final class NewCVChoicesViewModel: ObservableObject {
 
     // MARK: - Choices
 
-    /// The ways to start, in the order the screens show them: the AI draft where `aiEntry` puts it, a blank CV, the
-    /// examples once they are loaded, and the import, on every device.
+    /// The ways to start, in the order the screens show them: the import of a CV the person already has, the AI draft
+    /// where `aiEntry` shows it, the examples once they are loaded, and a blank CV last.
     var choices: [NewCVChoice] {
-        let others: [NewCVChoice] = samples.isEmpty ? [.blank, .importCV] : [.blank, .example, .importCV]
-        guard let ai = aiChoice, let position = aiEntry.position else { return others }
-        switch position {
-        case .first: return [ai] + others
-        case .last: return others + [ai]
-        }
+        var choices: [NewCVChoice] = [.importCV]
+        if let ai = aiChoice { choices.append(ai) }
+        if !samples.isEmpty { choices.append(.example) }
+        choices.append(.blank)
+        return choices
     }
 
     private var aiChoice: NewCVChoice? {

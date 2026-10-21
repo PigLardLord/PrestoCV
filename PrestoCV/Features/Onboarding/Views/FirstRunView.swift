@@ -1,9 +1,9 @@
 import SwiftUI
 import PrestoCVCore
 
-/// What the user sees before having any CV: it fills the empty state of the CV list. Where the device can run it, the
-/// AI draft leads; a blank CV, the examples and the import of a CV the person already has follow. At the accessibility sizes and in landscape on an iPhone the
-/// ways to start come before the welcome (see `FirstRunLayout`).
+/// What the user sees before having any CV: it fills the empty state of the CV list. The import of a CV the person
+/// already has leads; the AI draft, where the device shows it, the examples and a blank CV follow. At the accessibility
+/// sizes and in landscape on an iPhone the ways to start come before the welcome (see `FirstRunLayout`).
 struct FirstRunView: View {
     @StateObject private var viewModel: NewCVChoicesViewModel
     @EnvironmentObject var router: AppRouter
@@ -76,11 +76,11 @@ struct FirstRunView: View {
         }
     }
     
-    /// The choices in the order of the view model. The one that leads is the primary button.
+    /// The choices in the order of the view model. The import leads, and is the primary button.
     private var actionSection: some View {
         VStack(spacing: DesignTokens.Spacing.lg) {
             ForEach(viewModel.choices, id: \.self) { choice in
-                action(for: choice, leads: choice == viewModel.choices.first)
+                action(for: choice)
             }
         }
         .frame(maxWidth: DesignTokens.Layout.standaloneButtonWidth)
@@ -88,27 +88,23 @@ struct FirstRunView: View {
     }
     
     @ViewBuilder
-    private func action(for choice: NewCVChoice, leads: Bool) -> some View {
+    private func action(for choice: NewCVChoice) -> some View {
         switch choice {
+        case .importCV:
+            PrimaryButton(title: "onboarding.import.button".localized, icon: "doc.on.clipboard") {
+                router.navigate(to: .importCV)
+            }
+            .accessibilityIdentifier("firstrun.import")
         case .aiDraft:
-            PrimaryButton(title: "onboarding.ai.button".localized, icon: "sparkles", action: openAIDraft)
+            SecondaryButton.text(title: "onboarding.ai.button".localized, icon: "sparkles", action: openAIDraft)
         case .aiDraftUnavailable(let reason):
             unavailableAIDraft(reason)
-        case .blank:
-            if leads {
-                PrimaryButton(title: "onboarding.create.button".localized, icon: "plus.circle.fill", action: openBlankCV)
-            } else {
-                SecondaryButton.text(title: "onboarding.create.button".localized, action: openBlankCV)
-            }
         case .example:
             SecondaryButton.text(title: "onboarding.start_from_example".localized) {
                 showingExamples = true
             }
-        case .importCV:
-            SecondaryButton.text(title: "onboarding.import.button".localized, icon: "doc.on.clipboard") {
-                router.navigate(to: .importCV)
-            }
-            .accessibilityIdentifier("firstrun.import")
+        case .blank:
+            SecondaryButton.text(title: "onboarding.create.button".localized, action: openBlankCV)
         }
     }
     
