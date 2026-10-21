@@ -9,8 +9,12 @@ public final class UnsavedEditsRepository: UnsavedEditsRepositoryProtocol, Senda
         self.storageService = storageService
     }
 
-    public func allKept() async throws -> [UnsavedEdits] {
-        try await storageService.loadAll(UnsavedEdits.self)
+    public func allKept() async throws -> StorageLoadReport<UnsavedEdits> {
+        try await storageService.loadAllReporting(UnsavedEdits.self)
+    }
+
+    public func acknowledgeUnreadable() async throws {
+        try await storageService.acknowledgeQuarantined()
     }
 
     public func discard(editing id: UUID) async throws {

@@ -66,7 +66,12 @@ final class AppLaunchViewModel: ObservableObject {
         let bootstrapTemplates = bootstrapTemplates
         async let templatesInstalled: Void = bootstrapTemplates()
         if let leftoverEdits = dependencies.leftoverEdits {
-            Self.log(await leftoverEdits.importLeftovers())
+            do {
+                Self.log(try await leftoverEdits.importLeftovers())
+            } catch {
+                // Cancelled with the launch: what is not stored yet stays for the next launch
+                return
+            }
         }
         await dependencies.onboardingViewModel.checkOnboardingStatus()
         await templatesInstalled
@@ -116,12 +121,17 @@ final class AppLaunchViewModel: ObservableObject {
         }
     }
 
+    /// Logs what the import could not do, with its step and cause, so that a full disk, a locked file and a file nobody
+    /// can read are told apart.
     private static func log(_ report: LeftoverEditsImportReport) {
-        if report.unreadable {
-            launchLogger.error("Leftover unsaved edits could not be listed")
+        for failure in report.failures {
+            launchLogger.error("Leftover unsaved edits: \(String(describing: failure.step), privacy: .public) failed: \(failure.cause.localizedDescription, privacy: .private)")
         }
-        if report.kept > 0 {
-            launchLogger.error("\(report.kept, privacy: .public) leftover unsaved edits could not be stored, and stay for the next launch")
+        if report.keptCount > 0 {
+            launchLogger.error("\(report.keptCount, privacy: .public) leftover unsaved edits stay for the next launch")
+        }
+        if report.unreadableFiles > 0 {
+            launchLogger.error("\(report.unreadableFiles, privacy: .public) leftover files could not be read as edits, and are kept")
         }
     }
 }

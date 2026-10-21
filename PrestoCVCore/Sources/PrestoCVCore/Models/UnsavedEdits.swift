@@ -3,7 +3,7 @@ import Foundation
 
 /// The edits of a CV that the editor of an earlier version had not saved, kept on the device so that they outlived the
 /// app when iOS ended it. The editor saves by itself now: `LeftoverEditsImport` stores what is left of them.
-public struct UnsavedEdits: Codable, Sendable, Equatable, Identifiable {
+public struct UnsavedEdits: Codable, Sendable, Equatable, Identifiable, StorageIdentified {
     /// The editing that kept them: one editor, from the moment it opens to the moment it is left.
     public let id: UUID
     /// The CV as the editor showed it. Its id is the one the CV is stored under, or will be: a new CV gets it when its
@@ -20,6 +20,11 @@ public struct UnsavedEdits: Codable, Sendable, Equatable, Identifiable {
         self.cv = cv
         self.base = base
         self.keptAt = keptAt
+    }
+
+    /// The file name the edits are kept under, so that the storage can tell a file kept under another one.
+    public var storageIdentifier: String {
+        UnsavedEditsRepository.identifier(for: id)
     }
 }
 

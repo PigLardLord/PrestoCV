@@ -94,12 +94,14 @@ private final class LaunchLog: Sendable {
     }
 }
 
-/// An import of leftover edits that writes in the log when it runs.
+/// An import of leftover edits that writes in the log when it runs, and that can be cancelled.
 private struct LeftoverEditsSpy: LeftoverEditsImportProtocol {
     var log = LaunchLog()
+    var isCancelled = false
 
-    func importLeftovers() async -> LeftoverEditsImportReport {
+    func importLeftovers() async throws(CancellationError) -> LeftoverEditsImportReport {
         log.record("import")
+        if isCancelled { throw CancellationError() }
         return LeftoverEditsImportReport(imported: 1)
     }
 }
@@ -267,6 +269,22 @@ struct AppLaunchViewModelTests {
         await viewModel.start()
 
         #expect(log.all == ["import", "check"], "A CV left by an earlier version is in the list the first screen shows")
+    }
+
+    @Test("start ends when the import of the leftovers is cancelled, and the leftovers stay for the next launch")
+    func startEndsWhenTheImportIsCancelled() async {
+        let log = LaunchLog()
+        let onboardingUseCase = StubOnboardingUseCase(onCheck: { log.record("check") })
+        let viewModel = AppLaunchViewModel(
+            makeDependencyContainer: { StubDependencyContainer(onboardingUseCase: onboardingUseCase) },
+            makeLeftoverEdits: { _ in LeftoverEditsSpy(log: log, isCancelled: true) },
+            environment: .fixed(),
+            bootstrapTemplates: {}
+        )
+
+        await viewModel.start()
+
+        #expect(log.all == ["import"], "A cancelled launch checks nothing more")
     }
 
     @Test("start does nothing when the dependencies could not be built")

@@ -52,9 +52,15 @@ public protocol CVRepositoryProtocol: Sendable {
 
 /// The edits that earlier versions of the app kept of editor work nobody saved, one set per editing.
 public protocol UnsavedEditsRepositoryProtocol: Sendable {
-    /// Everything that is kept, in no particular order. Kept edits that cannot be read are left out.
+    /// Everything that is kept, in no particular order, and how many files of the folder could not be read as edits.
+    /// A file that cannot be read is never deleted: it stays where it is, to be read again next time, or is set aside
+    /// until `acknowledgeUnreadable()`.
     /// - Throws: AppError if the kept edits cannot be listed
-    func allKept() async throws -> [UnsavedEdits]
+    func allKept() async throws -> StorageLoadReport<UnsavedEdits>
+
+    /// Marks the files that were set aside as seen, so that `allKept()` stops counting them. They are kept, not deleted.
+    /// - Throws: AppError if the files cannot be moved
+    func acknowledgeUnreadable() async throws
     
     /// Removes the edits kept for an editing. Removing edits that are not kept is not an error.
     /// - Throws: AppError if they cannot be removed

@@ -36,6 +36,20 @@ struct LeftoverEditsImportTests {
             return edits
         }
 
+        /// Puts a file in the folder of the leftovers as a failing disk or an interrupted write could leave it.
+        func plant(_ data: Data, named name: String) throws {
+            try FileManager.default.createDirectory(at: unsavedEdits, withIntermediateDirectories: true)
+            try data.write(to: unsavedEdits.appendingPathComponent(name))
+        }
+
+        /// The contents of every file the folder set aside, whether or not the person was told.
+        func setAsideContents() throws -> [Data] {
+            let quarantine = unsavedEdits.appendingPathComponent("Quarantine", isDirectory: true)
+            guard let files = FileManager.default.enumerator(at: quarantine, includingPropertiesForKeys: [.isRegularFileKey]) else { return [] }
+            return try files.compactMap { $0 as? URL }.filter { try $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true }
+                .map { try Data(contentsOf: $0) }
+        }
+
         func leftoverFiles() throws -> [String] {
             guard FileManager.default.fileExists(atPath: unsavedEdits.path) else { return [] }
             return try FileManager.default.contentsOfDirectory(atPath: unsavedEdits.path).filter { $0.hasSuffix(".json") }
@@ -153,12 +167,104 @@ struct LeftoverEditsImportTests {
         try await installation.leave(cv)
 
         let failed = try await installation.leftoverImport(into: RefusingCVs(cvs: try installation.cvManagement())).importLeftovers()
-        #expect(failed == LeftoverEditsImportReport(kept: 1))
+        #expect(failed.imported == 0)
+        #expect(failed.failures.map(\.step) == [.storing])
         #expect(try installation.leftoverFiles().count == 1)
 
         let next = try await installation.leftoverImport().importLeftovers()
         #expect(next == LeftoverEditsImportReport(imported: 1))
         #expect(try await installation.cvManagement().getAllCVs() == [cv])
+    }
+
+    // MARK: - What went wrong, and what was not looked at
+
+    @Test("A leftover that cannot be stored is reported with the step that failed and its cause")
+    func failureNamesTheStepAndTheCause() async throws {
+        let installation = Installation()
+        defer { installation.remove() }
+        try await installation.leave(CVTestDataBuilder.minimalCV().withName("Ward nurse").build())
+        let refusing = RefusingCVs(cvs: try installation.cvManagement(), refusal: AppError.fileSystemError("disk full"))
+
+        let report = try await installation.leftoverImport(into: refusing).importLeftovers()
+
+        #expect(report.failures == [.init(step: .storing, cause: .fileSystemError("disk full"))])
+        #expect(report.imported == 0)
+        #expect(report.keptCount == 1)
+    }
+
+    @Test("A leftover that is stored but cannot be removed is reported as a removal, and the next launch stores nothing twice")
+    func removalFailureIsNamedAndNothingIsStoredTwice() async throws {
+        let installation = Installation()
+        defer { installation.remove() }
+        let cv = CVTestDataBuilder.minimalCV().withName("Ward nurse").build()
+        try await installation.leave(cv)
+        let cvs = try installation.cvManagement()
+        let locked = LeftoverEditsImport(
+            leftovers: LockedLeftovers(leftovers: UnsavedEditsRepository(storageService: try FileStorageService(baseDirectory: installation.unsavedEdits))),
+            cvs: cvs,
+            recoveredName: { "\($0.name) (recovered)" }
+        )
+
+        let first = try await locked.importLeftovers()
+
+        #expect(first.failures == [.init(step: .removing, cause: .fileSystemError("locked"))])
+        #expect(try await cvs.getAllCVs() == [cv], "The edits are stored; only their removal failed")
+        let second = try await installation.leftoverImport(into: cvs).importLeftovers()
+        #expect(second == LeftoverEditsImportReport(imported: 1))
+        #expect(try await cvs.getAllCVs() == [cv], "The leftover that stayed is not stored a second time")
+        #expect(try installation.leftoverFiles().isEmpty)
+    }
+
+    @Test("A folder of leftovers that cannot be listed is reported with its cause, and nothing is stored")
+    func listingFailureIsReported() async throws {
+        let installation = Installation()
+        defer { installation.remove() }
+        let cvs = try installation.cvManagement()
+        let unlistable = LeftoverEditsImport(
+            leftovers: LockedLeftovers(leftovers: nil, listingError: AppError.fileSystemError("denied")),
+            cvs: cvs,
+            recoveredName: { $0.name }
+        )
+
+        let report = try await unlistable.importLeftovers()
+
+        #expect(report.failures == [.init(step: .listing, cause: .fileSystemError("denied"))])
+        #expect(try await cvs.getAllCVs().isEmpty)
+    }
+
+    @Test("A cancellation ends the import and is passed on unchanged: it is no failure, and the leftover stays")
+    func cancellationIsPassedOn() async throws {
+        let installation = Installation()
+        defer { installation.remove() }
+        try await installation.leave(CVTestDataBuilder.minimalCV().withName("Ward nurse").build())
+        let cancelling = RefusingCVs(cvs: try installation.cvManagement(), refusal: CancellationError())
+
+        await #expect(throws: CancellationError.self) {
+            _ = try await installation.leftoverImport(into: cancelling).importLeftovers()
+        }
+
+        #expect(try installation.leftoverFiles().count == 1)
+        let next = try await installation.leftoverImport().importLeftovers()
+        #expect(next == LeftoverEditsImportReport(imported: 1), "The next launch stores it")
+    }
+
+    @Test("A leftover file that cannot be read is set aside, reported once, and its bytes are kept")
+    func unreadableLeftoverIsReportedOnceAndKept() async throws {
+        let installation = Installation()
+        defer { installation.remove() }
+        let cv = CVTestDataBuilder.minimalCV().withName("Ward nurse").build()
+        try await installation.leave(cv)
+        let corrupt = Data("{ \"cv\": not a recovery copy".utf8)
+        try installation.plant(corrupt, named: "edits_\(UUID().uuidString).json")
+
+        let first = try await installation.leftoverImport().importLeftovers()
+
+        #expect(first.imported == 1, "The readable leftover is stored")
+        #expect(first.unreadableFiles == 1, "The one that cannot be read is not lost without a trace")
+        #expect(try installation.setAsideContents() == [corrupt], "Its bytes are kept")
+        let second = try await installation.leftoverImport().importLeftovers()
+        #expect(second.unreadableFiles == 0, "It is reported once, not at every launch")
+        #expect(try installation.setAsideContents() == [corrupt], "and kept")
     }
 
     @Test("With nothing left, the import stores nothing and finds nothing wrong")
@@ -191,14 +297,29 @@ struct LeftoverEditsImportTests {
 private struct RefusingCVs: CVManagementUseCaseProtocol {
     struct Refused: Error {}
     let cvs: CVManagementUseCaseProtocol
+    var refusal: any Error = Refused()
 
     func getAllCVs() async throws -> [CVModel] { try await cvs.getAllCVs() }
     func getCVListing() async throws -> CVListing { try await cvs.getCVListing() }
     func acknowledgeUnreadableCVs() async throws { try await cvs.acknowledgeUnreadableCVs() }
-    func createCV(from template: CVModel) async throws -> CVModel { throw Refused() }
-    func storeNewCV(_ cv: CVModel) async throws -> CVModel { throw Refused() }
-    func updateCV(_ cv: CVModel) async throws -> CVModel { throw Refused() }
-    func deleteCV(id: UUID) async throws { throw Refused() }
-    func duplicateCV(id: UUID, named name: String) async throws -> CVModel { throw Refused() }
+    func createCV(from template: CVModel) async throws -> CVModel { throw refusal }
+    func storeNewCV(_ cv: CVModel) async throws -> CVModel { throw refusal }
+    func updateCV(_ cv: CVModel) async throws -> CVModel { throw refusal }
+    func deleteCV(id: UUID) async throws { throw refusal }
+    func duplicateCV(id: UUID, named name: String) async throws -> CVModel { throw refusal }
     func getCV(by id: UUID) async throws -> CVModel? { try await cvs.getCV(by: id) }
+}
+
+/// The leftovers, whose removal fails as when the file is locked, or which cannot be listed at all.
+private struct LockedLeftovers: UnsavedEditsRepositoryProtocol {
+    let leftovers: UnsavedEditsRepositoryProtocol?
+    var listingError: AppError?
+
+    func allKept() async throws -> StorageLoadReport<UnsavedEdits> {
+        if let listingError { throw listingError }
+        return try await leftovers?.allKept() ?? StorageLoadReport(items: [], unreadableCount: 0)
+    }
+
+    func acknowledgeUnreadable() async throws { try await leftovers?.acknowledgeUnreadable() }
+    func discard(editing id: UUID) async throws { throw AppError.fileSystemError("locked") }
 }
