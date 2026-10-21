@@ -268,6 +268,41 @@ struct ImportViewModelTests {
         #expect(released.urls == [copy], "The import lets the file go once, when it is done with it")
     }
 
+    @Test("A PDF opened again through a link to its folder is the PDF being read: its copy stays until that import is done, then goes once",
+          arguments: [false, true])
+    func openedAgainThroughALink(readThroughTheLink: Bool) async throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let copy = try fixture.copyInTemporaryInbox()
+        let link = fixture.root.appendingPathComponent("Link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: fixture.container)
+        let viaLink = link.appendingPathComponent("tmp/\(AppContainerFixture.bundleIdentifier)-Inbox/\(copy.lastPathComponent)")
+        let (reading, delivered) = readThroughTheLink ? (viaLink, copy) : (copy, viaLink)
+        let removed = RemovedFiles()
+        let copies = OpenedFileCopies(container: fixture.container, removeFile: { url in
+            removed.add(url)
+            try FileManager.default.removeItem(at: url)
+        })
+        let sleeps = HeldSleeps()
+        let viewModel = ImportViewModel(
+            importer: ImportCV(pdfReader: SlowPDFReader(sleeps: sleeps, layout: .pages([page])), limits: .standard),
+            mapper: ImportedCVMapper(),
+            fileReader: ChosenFileReader(maximumBytes: 100, copies: copies)
+        )
+        let importing = try #require(viewModel.importFile(at: reading))
+        await sleeps.waitUntilStarted(1)
+
+        #expect(viewModel.importFile(at: delivered) == nil)
+
+        #expect(removed.urls.isEmpty, "The import running has still to let the copy go")
+        #expect(FileManager.default.fileExists(atPath: copy.path))
+        await sleeps.endAll()
+        await importing.value
+        #expect(viewModel.imported?.cv.personalInfo.name == "Lena Hartmann")
+        #expect(removed.urls.count == 1, "The copy goes once, when its import is done")
+        #expect(!FileManager.default.fileExists(atPath: copy.path))
+    }
+
     @Test("A PDF opened again once its import is done is a new PDF: it is read and let go")
     func openedAgainAfterItsImport() async throws {
         let sleeps = HeldSleeps()

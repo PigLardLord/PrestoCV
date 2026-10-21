@@ -23,12 +23,8 @@ struct OpenedFileCopies: Sendable {
     /// is `/private/var` on a device, or with `..`.
     private func isInContainer(_ url: URL) -> Bool {
         guard url.isFileURL else { return false }
-        let root = Self.resolved(container).pathComponents
-        let path = Self.resolved(url).pathComponents
+        let root = container.resolvedFileURL.pathComponents
+        let path = url.resolvedFileURL.pathComponents
         return path.count > root.count && path.starts(with: root)
-    }
-
-    private static func resolved(_ url: URL) -> URL {
-        url.resolvingSymlinksInPath().standardizedFileURL
     }
 }

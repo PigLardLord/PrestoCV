@@ -103,7 +103,7 @@ final class ImportViewModel: ObservableObject {
     @discardableResult
     func importFile(at url: URL) -> Task<Void, Never>? {
         guard !isImporting else {
-            if url.standardizedFileURL != importingFile?.standardizedFileURL {
+            if url.resolvedFileURL != importingFile?.resolvedFileURL {
                 fileReader.release(url)
             }
             return nil
