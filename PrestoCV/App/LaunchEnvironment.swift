@@ -3,7 +3,7 @@ import PrestoCVCore
 
 /// What the app takes from the way it was launched.
 enum LaunchEnvironment {
-    /// Where the app keeps what the person makes: the CVs, and the edits the editor has not saved yet.
+    /// Where the app keeps what the person makes: the CVs, and what earlier versions kept of editor work nobody saved.
     struct Storage {
         let cvs: @Sendable () throws -> URL
         let unsavedEdits: @Sendable () throws -> URL
@@ -29,6 +29,22 @@ enum LaunchEnvironment {
         )
     }
 
+    /// The CVs as the app reads and writes them. A UI test can ask for the first writes of a CV to fail, as on a full
+    /// disk, with `-PrestoCVUITestsFailingWrites <count>`, so that it reaches what the editor shows then. Release builds
+    /// ignore the request.
+    static func cvs(_ cvs: CVManagementUseCaseProtocol, arguments: [String]) -> CVManagementUseCaseProtocol {
+        #if DEBUG
+        if let index = arguments.firstIndex(of: failingWritesArgument), arguments.indices.contains(index + 1),
+           let count = Int(arguments[index + 1]), count > 0 {
+            return FailingWrites(cvs: cvs, failures: count)
+        }
+        #endif
+        return cvs
+    }
+
+    /// The launch argument with which a UI test makes the first writes of a CV fail.
+    static let failingWritesArgument = "-PrestoCVUITestsFailingWrites"
+
     /// Whether the app was launched to host the unit tests, which the test plans ask for. The tests build what they need,
     /// so the app then composes nothing: it neither reads nor changes the simulator's data, and does no work beside the
     /// tests. Release builds ignore the request.
@@ -44,28 +60,40 @@ enum LaunchEnvironment {
     /// a value, so that an argument after it is not read as its value.
     static let unitTestHostArgument = "-PrestoCVUnitTestHost"
 
-    /// How the editor waits before the confirmation of a save goes: as the app waits, `sleep`. A UI test can ask for the
-    /// confirmation to stay until the next edit, so that it finds it however slow the simulator is. Release builds ignore
-    /// the request.
-    static func savedConfirmationWait(
-        arguments: [String],
-        sleep: @escaping @Sendable (Duration) async throws -> Void
-    ) -> @Sendable (Duration) async throws -> Void {
-        #if DEBUG
-        if arguments.contains("-PrestoCVUITestsKeepSavedConfirmation") {
-            return { _ in try await untilCancelled() }
-        }
-        #endif
-        return sleep
-    }
-
     #if DEBUG
-    /// Returns only by throwing `CancellationError`, when the task that waits is cancelled.
-    private static func untilCancelled() async throws {
-        let (never, keepsItOpen) = AsyncStream<Void>.makeStream()
-        for await _ in never {}
-        withExtendedLifetime(keepsItOpen) {}
-        throw CancellationError()
+    /// CVs whose first `failures` writes fail, as on a full disk, and whose later writes are stored.
+    private actor FailingWrites: CVManagementUseCaseProtocol {
+        private let cvs: CVManagementUseCaseProtocol
+        private var failures: Int
+
+        init(cvs: CVManagementUseCaseProtocol, failures: Int) {
+            self.cvs = cvs
+            self.failures = failures
+        }
+
+        func getAllCVs() async throws -> [CVModel] { try await cvs.getAllCVs() }
+        func getCVListing() async throws -> CVListing { try await cvs.getCVListing() }
+        func acknowledgeUnreadableCVs() async throws { try await cvs.acknowledgeUnreadableCVs() }
+        func createCV(from template: CVModel) async throws -> CVModel { try await cvs.createCV(from: template) }
+        func deleteCV(id: UUID) async throws { try await cvs.deleteCV(id: id) }
+        func duplicateCV(id: UUID, named name: String) async throws -> CVModel { try await cvs.duplicateCV(id: id, named: name) }
+        func getCV(by id: UUID) async throws -> CVModel? { try await cvs.getCV(by: id) }
+
+        func storeNewCV(_ cv: CVModel) async throws -> CVModel {
+            try failIfAsked()
+            return try await cvs.storeNewCV(cv)
+        }
+
+        func updateCV(_ cv: CVModel) async throws -> CVModel {
+            try failIfAsked()
+            return try await cvs.updateCV(cv)
+        }
+
+        private func failIfAsked() throws {
+            guard failures > 0 else { return }
+            failures -= 1
+            throw CocoaError(.fileWriteOutOfSpace)
+        }
     }
 
     /// The name of the folder a UI test asked for, if it asked for one.

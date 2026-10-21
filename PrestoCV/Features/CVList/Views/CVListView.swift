@@ -129,7 +129,7 @@ struct CVListView<EmptyState: View>: View {
                 subtitle: viewModel.subtitle(of: cv),
                 caption: viewModel.lastSavedLine(of: cv),
                 onTap: {
-                    router.select(.stored(cvId: cv.id.uuidString))
+                    router.openEditor(.stored(cvId: cv.id.uuidString))
                 },
                 onDuplicate: {
                     Task { await viewModel.duplicateCV(withId: cv.id) }

@@ -26,7 +26,6 @@ struct CVEditorCanExportTests {
         let viewModel = editor(cv)
 
         #expect(viewModel.canExport)
-        #expect(viewModel.hasUnsavedChanges)
     }
 
     @Test("Emptying the form takes the export away")

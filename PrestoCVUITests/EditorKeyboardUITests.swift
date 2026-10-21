@@ -39,19 +39,19 @@ final class EditorKeyboardUITests: XCTestCase {
     }
 
     func testTheTabBarMakesWayWhileTypingAndTheExportControlStaysInTheNavigationBar() throws {
-        let export = app.navigationBars.buttons["Preview & export"]
+        let export = app.barButton("Preview & export")
         let experienceTab = app.buttons["Experience"].firstMatch
-        XCTAssertTrue(export.waitForExistence(timeout: 10), "The navigation bar should offer to preview and export")
+        XCTAssertTrue(export.waitForExistence(timeout: 10), "The bar should offer to preview and export")
         XCTAssertTrue(experienceTab.exists, "The editor should show its tabs")
 
         app.textFields["Full Name"].tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), XCUIApplication.noSoftwareKeyboard)
         XCTAssertTrue(waitUntil(experienceTab, exists: false), "The tab bar should make way for the keyboard")
-        XCTAssertTrue(export.exists, "The export control should stay in the navigation bar while typing")
+        XCTAssertTrue(export.exists, "The export control should stay in the bar while typing")
 
         app.toolbars.buttons["Done"].tap()
         XCTAssertTrue(waitUntil(experienceTab, exists: true), "The tab bar should come back with the keyboard gone")
-        XCTAssertTrue(export.exists, "The export control should still be in the navigation bar")
+        XCTAssertTrue(export.exists, "The export control should still be in the bar")
     }
 
     func testReturnEndsTheEntryOfAFieldInsteadOfAddingALine() throws {

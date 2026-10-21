@@ -23,24 +23,24 @@ final class GermanTitlesUITests: XCTestCase {
         app.launch()
     }
 
-    /// Between Cancel and Save, at the normal text size.
+    /// Between Back and the export control, at the normal text size.
     func testTheTitleOfANewCVIsWhole() throws {
         openANewCV()
 
         assertTheTitleIsWhole(font: Self.inlineTitleFont)
     }
 
-    /// A CV that is saved without a name of its own or of the person in it.
+    /// A CV that is saved without a name of its own or of the person in it. The line under the title says it is saved.
     func testTheTitleOfACVWithoutANameIsWhole() throws {
         openANewCV()
         let jobTitle = app.textFields["Berufsbezeichnung"]
         XCTAssertTrue(jobTitle.waitForExistence(timeout: 10), "The editor should ask for the job title")
         jobTitle.tap()
         jobTitle.typeText("Pflegefachmann\n")
-        app.navigationBars.buttons["Speichern"].tap()
-        XCTAssertTrue(app.navigationBars.buttons["Fertig"].waitForExistence(timeout: 10), "A saved CV should be left with Done")
+        let saved = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Auf diesem Gerät gespeichert")).firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 10), "The editor should save the CV by itself")
 
-        assertTheTitleIsWhole(font: Self.inlineTitleFont)
+        assertTheTitleIsWhole(font: Self.subtitledTitleFont)
     }
 
     /// The large title above the description of the AI draft.
@@ -58,6 +58,10 @@ final class GermanTitlesUITests: XCTestCase {
 
     /// The title of a bar at the normal text size: the headline, semibold.
     private static let inlineTitleFont = UIFont.preferredFont(forTextStyle: .headline)
+    /// The title of a bar with a line under it: the subheadline size, semibold.
+    private static let subtitledTitleFont = UIFont.systemFont(
+        ofSize: UIFont.preferredFont(forTextStyle: .subheadline).pointSize, weight: .semibold
+    )
     /// A large title at the normal text size: the large title style, bold.
     private static let largeTitleFont = UIFont.systemFont(
         ofSize: UIFont.preferredFont(forTextStyle: .largeTitle).pointSize, weight: .bold
@@ -67,7 +71,7 @@ final class GermanTitlesUITests: XCTestCase {
         let start = app.buttons["Meinen ersten Lebenslauf erstellen"]
         XCTAssertTrue(start.waitForExistence(timeout: 20), "The first run should offer to create a CV")
         start.tap()
-        XCTAssertTrue(app.navigationBars.buttons["Abbrechen"].waitForExistence(timeout: 10), "A new CV should offer to cancel")
+        XCTAssertTrue(app.backButton.waitForExistence(timeout: 10), "A new CV should go back to the list")
     }
 
     /// The title of the bar, which the bar is named after, is drawn as wide as its text needs. A bar with a large

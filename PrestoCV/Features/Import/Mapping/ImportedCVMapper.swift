@@ -3,7 +3,7 @@ import PrestoCVCore
 import PrestoCVImporting
 import enum PrestoCVDomain.LanguageProficiency
 
-/// A CV read from the person's text, unsaved, and what the editor shows about it.
+/// A CV read from the person's text, not stored yet, and what the editor shows about it.
 struct ImportedDraft: Equatable, Sendable {
     let cv: CVModel
     let review: ImportReview

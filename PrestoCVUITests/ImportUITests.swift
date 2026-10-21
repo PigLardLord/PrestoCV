@@ -11,7 +11,7 @@ final class ImportUITests: XCTestCase {
         executionTimeAllowance = 300
         app = XCUIApplication()
         app.launchArguments += [
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage", "-PrestoCVUITestsKeepSavedConfirmation",
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage",
         ]
         app.launch()
     }
@@ -81,6 +81,27 @@ final class ImportUITests: XCTestCase {
         XCTAssertEqual(name.value as? String, "Emily Carter")
         XCTAssertEqual(app.textFields["Email"].value as? String, "emily.carter@example.com")
         add(app.keptScreenshot(named: "Import - PDF in the editor"))
+    }
+
+    /// The imported CV is stored as it is: Back at once leaves it in the list, and lands on the list, not on the import.
+    func testAnImportedCVIsInTheListAfterBack() throws {
+        UIPasteboard.general.string = String(decoding: try fixture("chat", "txt"), as: UTF8.self)
+        openTheImport()
+        XCTAssertTrue(pasteButton.waitForExistence(timeout: 10))
+        pasteButton.tap()
+        let importText = app.buttons["Import this text"]
+        XCTAssertTrue(importText.waitForExistence(timeout: 10))
+        app.scrollTo(importText)
+        importText.tap()
+        XCTAssertTrue(app.textFields["Full Name"].waitForExistence(timeout: 10), "The imported CV should open in the editor")
+
+        XCTAssertTrue(app.backButton.waitForExistence(timeout: 10), "The editor should go back with the Back button")
+        app.backButton.tap()
+
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Jonas Becker")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "The list should show the imported CV")
+        XCTAssertFalse(app.staticTexts["Bring the CV you already have"].exists, "Back should land on the list, not on the import")
+        XCTAssertEqual(app.alerts.count, 0, "Leaving should not ask anything")
     }
 
     func testTheNewCVScreenOffersTheImport() throws {

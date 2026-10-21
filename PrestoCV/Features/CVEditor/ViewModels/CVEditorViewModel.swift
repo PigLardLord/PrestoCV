@@ -1,10 +1,10 @@
 import Foundation
 import PrestoCVCore
 import Combine
-import enum PrestoCVDomain.CVTitle
+import class PrestoCVApplication.Autosave
 
-/// The editor of one CV. It runs on the main actor, as its form does: every change of the form is kept on the device
-/// a few seconds later, so the change and the keeping happen in order.
+/// The editor of one CV. It runs on the main actor, as its form does. What the form shows is stored by itself, a
+/// second after the last change and at once when the editor is left or the app leaves the foreground (`Autosave`).
 @MainActor
 final class CVEditorViewModel: ObservableObject {
     
@@ -13,40 +13,25 @@ final class CVEditorViewModel: ObservableObject {
         didSet { formChanged() }
     }
     @Published var viewState: ViewState<CVModel> = .idle
-    @Published private(set) var isSaving = false
-    @Published var saveError: String?
-    /// The short, inline confirmation that the CV was saved. It goes after a few seconds, or at the next edit.
-    @Published private(set) var showsSavedConfirmation = false
-    @Published var showingCancelConfirmation = false
+    /// Where the CV stands with the store.
+    @Published private(set) var saveStatus: Autosave<CVModel>.Status = .upToDate
     @Published private(set) var pendingDeletion: PendingDeletion?
     /// What each contact field said when the person last left it: its check, which typing does not change.
     @Published private(set) var leftContactText: [ContactField: String] = [:]
     /// The message shown above a new CV, set by the screen that opened it.
     let notice: EditorNotice?
     
-    /// How long the confirmation of a save stays.
-    static let savedConfirmationDuration = Duration.seconds(3)
-    
     // MARK: - Private Properties
     private let cvManagementUseCase: CVManagementUseCaseProtocol
     let documentLanguageDetector: DocumentLanguageDetector
-    private let cvId: String?
-    /// The CV as last read from or written to storage; nil until the first load or save.
+    private let request: EditorRequest
+    private let clock: any Clock<Duration>
+    /// The CV as last read from or written to storage; nil while the store does not hold it.
     private var savedSnapshot: CVModel?
-    /// What the save that is running stores; nil when no save is running.
-    private var savingCV: CVModel?
-    private var cancellables = Set<AnyCancellable>()
-    /// Edits that an earlier run of the app kept and the person chose to restore.
-    private let restoredEdits: UnsavedEdits?
-    private let unsavedEdits: UnsavedEditsKeeper?
-    private let wait: (Duration) async throws -> Void
-    private var savedConfirmationTimer: Task<Void, Never>?
+    /// Writes the form to the store; nil until the form shows a CV.
+    private var autosave: Autosave<CVModel>?
     
     // MARK: - Computed Properties
-    
-    var errorMessage: String {
-        saveError ?? ""
-    }
     
     /// The title of the screen, by the title rule of PrestoCVDomain: the name of the CV, otherwise the name of its
     /// person, otherwise the role it is for. Without any of them, a CV that was never stored is "New CV", and a stored
@@ -60,213 +45,114 @@ final class CVEditorViewModel: ObservableObject {
         cv.allowsSaving
     }
     
-    /// Indicates if there are unsaved changes: a CV that was never stored has them once it holds
-    /// meaningful content, a stored one when it differs from what was last stored.
-    var hasUnsavedChanges: Bool {
-        guard let savedSnapshot else {
-            return hasMeaningfulContent
-        }
-        return cv != savedSnapshot
-    }
-    
-    /// What the button that leaves the editor offers: to cancel the edits, or, once the CV is stored and nothing
-    /// is unsaved, to be done with it.
-    var exit: EditorExit {
-        savedSnapshot != nil && !hasUnsavedChanges ? .done : .cancel
-    }
-    
-    /// Whether the CV can be exported: one with nothing in it has nothing to put in a PDF. Unsaved edits are exported
-    /// as they are.
+    /// Whether the CV can be exported: one with nothing in it has nothing to put in a PDF. Edits are exported as they
+    /// are shown.
     var canExport: Bool {
         hasMeaningfulContent
     }
     
-    /// Computed property for save button enabled state
-    var isSaveButtonEnabled: Bool {
-        hasMeaningfulContent && hasUnsavedChanges && !isSaving
+    /// Whether the line under the title says that the CV is saved on this device: the store holds it, and the last
+    /// write did not fail.
+    var showsSavedOnDevice: Bool {
+        savedSnapshot != nil && saveStatus != .failed
     }
     
-    /// Computed property for error alert binding
-    var isShowingError: Bool {
-        saveError != nil
+    /// The line under the title: "Saved on this device" while the store holds the CV and the last write did not fail;
+    /// nothing for a CV not stored yet, or while a failed change waits for the next write.
+    var subtitle: String {
+        showsSavedOnDevice ? "editor.saved".localized : ""
+    }
+
+    /// Whether the last change could not be saved: it is only in memory until a write succeeds.
+    var showsSaveFailure: Bool {
+        saveStatus == .failed
+    }
+
+    /// What VoiceOver says when a save fails, or succeeds again after a failure.
+    var saveStatusAnnouncement: String {
+        showsSaveFailure ? "editor.save_failed".localized : "editor.saved".localized
     }
     
     // MARK: - Initialization
     /// - Parameters:
-    ///   - initialCV: What a new CV starts from. The CV gets an id of its own, which its saves store it under.
-    ///   - notice: The message shown above a new CV, such as the one that asks to check an AI draft.
-    ///   - restoring: Edits an earlier run of the app kept. They are shown over the CV stored under their id once it
-    ///     is loaded, or as a new CV when there is none.
+    ///   - request: What the editor opens on. A new CV gets an id of its own, which its writes store it under.
     ///   - documentLanguageDetector: Reads which language the CV is written in, for the Automatic document language.
-    ///   - unsavedEdits: Keeps what the editor has not saved, so that it outlives the app.
-    ///   - sleep: How the editor waits before the confirmation of a save goes.
+    ///   - clock: The clock the pause before a write is measured on.
     init(
-        cvId: String?,
-        initialCV: CVModel? = nil,
-        notice: EditorNotice? = nil,
-        restoring restoredEdits: UnsavedEdits? = nil,
+        request: EditorRequest,
         cvManagementUseCase: CVManagementUseCaseProtocol,
         documentLanguageDetector: DocumentLanguageDetector,
-        unsavedEdits: UnsavedEditsKeeper? = nil,
-        sleep: @escaping (Duration) async throws -> Void
+        clock: any Clock<Duration>
     ) {
-        self.cvId = cvId
-        self.notice = notice
+        self.request = request
         self.cvManagementUseCase = cvManagementUseCase
         self.documentLanguageDetector = documentLanguageDetector
-        self.restoredEdits = restoredEdits
-        self.unsavedEdits = unsavedEdits
-        self.wait = sleep
+        self.clock = clock
 
-        // A new CV starts from the template, or empty, with the id its saves store it under from the start
-        if cvId == nil, restoredEdits == nil {
-            self.cv = (initialCV ?? CVModel()).copy()
-            viewState = .loaded(self.cv)
+        switch request {
+        case .stored:
+            self.notice = nil
+        case .new(let template, let notice):
+            self.notice = notice
+            // A new CV gets an id of its own. An AI draft or an imported CV is stored as it is, without waiting for a
+            // change; a blank CV or an example once it is changed, so one left untouched leaves nothing behind
+            let cv = template.copy()
+            begin(showing: cv, unchangedFrom: request.storesAsItIs ? nil : cv, isStored: false)
         }
     }
-    
     
     // MARK: - Public Methods
     @MainActor
     func loadCV() async {
-        if let restoredEdits {
-            await loadRestoring(restoredEdits)
+        // A new CV is shown from the start; a CV that is already loaded stays as it is: reading it again would drop
+        // the edits made since
+        guard case .stored(let cvId) = request, viewState.data == nil else { return }
+        guard let uuid = UUID(uuidString: cvId) else {
+            viewState = .error(AppError.notFound("error.subject.cv".localized).localizedDescription)
             return
         }
 
-        // If no CV ID, we're creating a new CV, so leave the default empty CV
-        guard let cvId = cvId,
-              let uuid = UUID(uuidString: cvId) else { 
-            // For new CVs, set state to loaded with empty CV
-            viewState = .loaded(cv)
-            return 
-        }
-
-        // A CV that is already loaded stays as it is: reading it again would drop the edits made since.
-        guard savedSnapshot == nil, viewState.data == nil else { return }
-        
         viewState = .loading
-        
         do {
-            try await loadExistingCV(with: uuid)
-            viewState = .loaded(cv)
+            guard let loadedCV = try await cvManagementUseCase.getCV(by: uuid) else {
+                throw AppError.notFound("error.subject.cv".localized)
+            }
+            savedSnapshot = loadedCV
+            begin(showing: loadedCV, unchangedFrom: loadedCV, isStored: true)
         } catch {
             let appError = error as? AppError ?? AppError.unknown(error.localizedDescription)
             viewState = .error(appError.localizedDescription)
         }
     }
     
+    /// Stores what the form shows at once, if it changed: the app is leaving the foreground, and iOS may end it, or the
+    /// editor is being left.
     @MainActor
-    func saveCV() async -> Bool {
-        // Don't save if no meaningful content
-        guard hasMeaningfulContent else {
-            return false
-        }
-
-        // Don't save if there are no changes
-        guard hasUnsavedChanges else {
-            return false
-        }
-
-        // A second save while one is running would store the same new CV twice
-        guard !isSaving else {
-            return false
-        }
-
-        isSaving = true
-        saveError = nil
-        defer { isSaving = false }
-
-        // The form stays editable while the store works, so what is submitted is not what is on screen when it returns
-        let submittedCV = cv
-
-        // The kept edits say what this save stores before it does: if the app is ended before they are removed,
-        // restoring them finds that CV and updates it, instead of storing it a second time
-        savingCV = submittedCV
-        if await keepUnsavedEdits() == false, keepsOtherEdits(of: submittedCV) {
-            // What is kept could not be brought up to date, and holds other edits of this CV: once it is stored, a
-            // restore would take them for edits on an older version of it. Removing them could leave nothing of the
-            // edits that outlives the app, so nothing is stored, and they stay as they are.
-            savingCV = nil
-            saveError = "editor.save_error.not_kept".localized
-            return false
-        }
-
-        do {
-            let savedCV: CVModel
-            if savedSnapshot == nil {
-                // Never stored: store it under the id it got when its editing began
-                savedCV = try await cvManagementUseCase.storeNewCV(submittedCV)
-            } else {
-                // Already stored: update it
-                savedCV = try await cvManagementUseCase.updateCV(submittedCV)
-            }
-            adoptStored(savedCV, submitted: submittedCV)
-            savingCV = nil
-            await keepUnsavedEdits()
-            return true
-        } catch {
-            saveError = error.localizedAppErrorDescription
-            // Nothing was stored: the kept edits go back to the CV they were made on
-            savingCV = nil
-            await keepUnsavedEdits()
-            return false
-        }
-    }
-    
-    @MainActor
-    func handleSaveButtonTap() async {
-        guard await saveCV() else {
-            return
-        }
-        // Edits made while the store worked are not saved yet: saying that the CV is saved would not be true.
-        if !hasUnsavedChanges {
-            showSavedConfirmation()
-        }
-    }
-    
-    /// Keeps what the editor has not saved, at once: the app is leaving the foreground, and iOS may end it.
-    /// - Returns: Whether what is kept is what the editor has not saved, or nil when nothing is kept at all.
-    @MainActor
-    @discardableResult
-    func keepUnsavedEdits() async -> Bool? {
-        guard viewState.data != nil, let unsavedEdits else { return nil }
-        return await unsavedEdits.keepNow(currentUnsavedEdits)
+    func saveNow() async {
+        await autosave?.flush()
     }
     
     /// The app came to the foreground or left it. On its way to the background the app can be ended by iOS at any
-    /// moment: what is not saved is kept now.
+    /// moment: what the form shows is stored now.
     @MainActor
     func sceneDidChange(isActive: Bool) async {
         guard !isActive else { return }
-        await keepUnsavedEdits()
+        await saveNow()
     }
     
-    /// The question every way out of the editor asks first: Cancel, or Done once everything is saved.
-    /// True when leaving would lose nothing. Otherwise the user is asked what to do, or, while a save is
-    /// running, has to wait for it, since it would finish after the editor is gone.
+    /// Tries again to store the change that could not be saved.
     @MainActor
-    func requestLeaving() -> Bool {
-        guard !isSaving else {
-            return false
-        }
-        guard hasUnsavedChanges else {
-            stopKeepingUnsavedEdits()
-            return true
-        }
-        showingCancelConfirmation = true
-        return false
+    func retrySaving() async {
+        await saveNow()
     }
-    
-    /// The edits are discarded: the copy kept on the device goes with them.
+
+    /// Stores what the form shows at once, before another screen takes the editor's place.
+    /// - Returns: Whether the store holds what the form shows, or there is nothing to store; false when the write
+    ///   failed, and the edits are only in the form.
     @MainActor
-    func confirmCancel() {
-        stopKeepingUnsavedEdits()
-    }
-    
-    @MainActor
-    func clearError() {
-        saveError = nil
+    func saveBeforeLeaving() async -> Bool {
+        await saveNow()
+        return saveStatus != .failed
     }
 
     /// The person left a contact field: what it says now is checked, until they leave it again.
@@ -379,126 +265,44 @@ final class CVEditorViewModel: ObservableObject {
 
     // MARK: - Private Methods
 
-    /// What the editor has not saved, as it is kept on the device, over what is stored, or over what the save that is
-    /// running stores; nil when everything is saved.
-    private var currentUnsavedEdits: UnsavedEditsKeeper.Edits? {
-        hasUnsavedChanges ? UnsavedEditsKeeper.Edits(cv: cv, base: savingCV ?? savedSnapshot) : nil
-    }
-
-    /// Whether the edits kept on the device are edits of `cv` other than `cv` itself. Until the keeper has written, what
-    /// is kept is what an earlier run kept: the edits the editor restored, or nothing for a new editing.
-    private func keepsOtherEdits(of cv: CVModel) -> Bool {
-        guard let unsavedEdits else { return false }
-        let keptCV: CVModel?
-        switch unsavedEdits.written {
-        case .some(let written):
-            keptCV = written?.cv
-        case .none:
-            keptCV = restoredEdits?.cv
-        }
-        guard let keptCV else { return false }
-        return keptCV.id == cv.id && keptCV != cv
-    }
-
-    /// The form changed: a confirmation of the last save no longer holds, and the edits are kept soon. A form that is
-    /// not shown, because the CV is still loading or could not be, has nothing of the person's to keep.
-    private func formChanged() {
-        if showsSavedConfirmation {
-            showsSavedConfirmation = false
-        }
-        guard viewState.data != nil else { return }
-        unsavedEdits?.keepSoon { self.currentUnsavedEdits }
-    }
-
-
-    /// The editor is left: whatever it kept goes, and it keeps nothing more. A form that was never shown leaves
-    /// alone what an earlier run kept.
-    @MainActor
-    private func stopKeepingUnsavedEdits() {
-        guard viewState.data != nil, let unsavedEdits else { return }
-        Task { await unsavedEdits.close() }
-    }
-
-    @MainActor
-    private func showSavedConfirmation() {
-        showsSavedConfirmation = true
-        savedConfirmationTimer?.cancel()
-        savedConfirmationTimer = Task {
-            do {
-                try await wait(Self.savedConfirmationDuration)
-            } catch {
-                return
+    /// Shows `cv` in the form, and from then on stores what the form shows as it changes.
+    /// - Parameters:
+    ///   - baseline: What counts as unchanged: the stored CV, or the template a new one starts from. Nil makes `cv`
+    ///     itself the change, as for a draft.
+    ///   - isStored: Whether the store holds the CV already.
+    private func begin(showing cv: CVModel, unchangedFrom baseline: CVModel?, isStored: Bool) {
+        let autosave = Autosave(
+            content: cv,
+            unchangedFrom: baseline,
+            isStored: isStored,
+            isWorthStoring: { $0.allowsSaving },
+            clock: clock,
+            write: { [weak self] cv in
+                guard let self else { return }
+                try await self.store(cv)
             }
-            showsSavedConfirmation = false
-        }
-    }
-
-    /// Records `storedCV` as what is in storage. A form that was not edited during the save takes the stored
-    /// values as they are. One that was edited keeps its edits and only adopts the identity of the stored CV,
-    /// so those edits still count as unsaved and the next save updates the same CV.
-    @MainActor
-    private func adoptStored(_ storedCV: CVModel, submitted submittedCV: CVModel) {
-        savedSnapshot = storedCV
-        if cv == submittedCV {
-            cv = storedCV
-        } else {
-            cv.id = storedCV.id
-        }
-    }
-
-    /// Shows restored edits, as their plan says, once the CVs stored under their id and under the id of their copy are
-    /// read, and keeps them at once. A CV that cannot be read leaves them as they are and lets go of them, so that they
-    /// are offered again; a retry takes them back, unless another window holds them by then.
-    @MainActor
-    private func loadRestoring(_ edits: UnsavedEdits) async {
-        guard viewState.data == nil else { return }
-        if let unsavedEdits, await unsavedEdits.reclaim(edits) == false {
-            viewState = .error("unsaved_edits.unavailable.message".localized)
-            return
-        }
-        viewState = .loading
-        do {
-            let stored = try await cvManagementUseCase.getCV(by: edits.cv.id)
-            let storedCopy = try await cvManagementUseCase.getCV(by: edits.copyID)
-            switch edits.restorePlan(over: stored, copy: storedCopy) {
-            case .restoredAsCopy(let copy):
-                // Restored as this copy before: it opens as it is stored, with nothing unsaved, so the edits go
-                savedSnapshot = copy
-                cv = copy
-            case .alreadySaved, .update:
-                savedSnapshot = stored
-                cv = edits.cv
-            case .create:
-                // Nothing is stored under the edits' id, never or no longer: a save stores them under it
-                cv = edits.cv
-            case .copy:
-                // The stored CV was saved again after these edits: they become a CV of their own, so nothing newer is
-                // replaced. Its id comes from the edits, so restoring them again finds it
-                cv = edits.cv.copy(newId: edits.copyID, nameModifier: { _ in Self.recoveredName(of: edits.cv) })
-            }
-        } catch {
-            await unsavedEdits?.release()
-            let appError = error as? AppError ?? AppError.unknown(error.localizedDescription)
-            viewState = .error(appError.localizedDescription)
-            return
-        }
+        )
+        autosave.onStatusChange = { [weak self] status in self?.saveStatus = status }
+        self.autosave = autosave
+        self.cv = cv
         viewState = .loaded(cv)
-        await keepUnsavedEdits()
     }
 
-    /// What a copy made of restored edits is called: the title of the CV they were made on, marked as recovered.
-    private static func recoveredName(of cv: CVModel) -> String {
-        let recovered = "unsaved_edits.recovered_suffix".localized
-        return "\(cv.cvTitle.text) \(recovered)"
+    /// The form changed: it is stored once the pause after the last change has passed. A form that is not shown,
+    /// because the CV is still loading or could not be, has nothing of the person's to store.
+    private func formChanged() {
+        autosave?.changed(to: cv)
     }
 
+    /// Writes `cv` to the store: the first write of a new CV creates it, under the id it got when its editing began.
     @MainActor
-    private func loadExistingCV(with uuid: UUID) async throws {
-        guard let loadedCV = try await cvManagementUseCase.getCV(by: uuid) else {
-            throw AppError.notFound("error.subject.cv".localized)
+    private func store(_ cv: CVModel) async throws {
+        if savedSnapshot == nil {
+            _ = try await cvManagementUseCase.storeNewCV(cv)
+        } else {
+            _ = try await cvManagementUseCase.updateCV(cv)
         }
-        cv = loadedCV
-        savedSnapshot = loadedCV
+        savedSnapshot = cv
     }
 
     private func row(of section: EditorSection, at index: Int) -> (any EditorRow)? {

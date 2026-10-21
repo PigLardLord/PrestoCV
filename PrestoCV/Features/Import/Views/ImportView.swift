@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// The screen that brings in a CV the person already has: a text pasted from a chat assistant, Word, an e-mail or
-/// LinkedIn, or a PDF from Files. The CV it reads opens in the editor, unsaved, with what to check.
+/// LinkedIn, or a PDF from Files. The CV it reads opens in the editor, which stores it as it is, with what to check.
 struct ImportView: View {
     @EnvironmentObject var router: AppRouter
     @StateObject private var viewModel: ImportViewModel

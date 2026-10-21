@@ -6,13 +6,11 @@ struct AppRootView: View {
     @StateObject private var router: AppRouter
     @ObservedObject private var onboardingViewModel: OnboardingViewModel
     @ObservedObject private var cvListViewModel: CVListViewModel
-    @ObservedObject private var unsavedEditsOffer: UnsavedEditsOfferViewModel
     private let viewModelFactory: ViewModelFactory
     
     init(dependencies: RootDependencies) {
         self.onboardingViewModel = dependencies.onboardingViewModel
         self.cvListViewModel = dependencies.cvListViewModel
-        self.unsavedEditsOffer = dependencies.unsavedEditsOfferViewModel
         self.viewModelFactory = dependencies.viewModelFactory
         self._router = StateObject(wrappedValue: dependencies.viewModelFactory.makeAppRouter())
     }
@@ -35,47 +33,13 @@ struct AppRootView: View {
             .navigationDestination(for: Route.self) { route in
                 destinationView(for: router.destination(for: route))
             }
-            // A PDF opened in the app from the share sheet or Files goes to the import
+            // A PDF opened in the app from the share sheet or Files goes to the import, once the editor on screen, if
+            // any, is saved
             .onOpenURL { url in
-                router.openImport(of: url)
+                Task { await router.openImport(of: url) }
             }
-            // At launch, and each time the root shows again, edits an earlier run left unsaved are offered
-            .task {
-                await unsavedEditsOffer.checkForEditsToRestore()
-            }
-            .alert(
-                "unsaved_edits.restore.title".localized,
-                isPresented: $unsavedEditsOffer.isShowingOffer,
-                presenting: unsavedEditsOffer.offer
-            ) { _ in
-                Button(restoreActionTitle, action: restoreUnsavedEdits)
-                    .keyboardShortcut(.defaultAction)
-                Button("common.discard".localized, role: .destructive) {
-                    Task { await unsavedEditsOffer.discard() }
-                }
-            } message: { _ in
-                Text(unsavedEditsOffer.message ?? "")
-            }
-        }
-        // Apart from the offer: the two alerts follow one another
-        .alert("unsaved_edits.unavailable.title".localized, isPresented: $unsavedEditsOffer.isShowingNoLongerAvailable) {
-            Button("common.ok".localized) { }
-        } message: {
-            Text("unsaved_edits.unavailable.message".localized)
         }
         .environmentObject(router)
-    }
-    
-    private var restoreActionTitle: String {
-        unsavedEditsOffer.restoresAsCopy ? "unsaved_edits.restore.as_copy".localized : "unsaved_edits.restore.action".localized
-    }
-    
-    private func restoreUnsavedEdits() {
-        Task {
-            if let restored = await unsavedEditsOffer.restore() {
-                router.navigateToEditor(restoring: restored)
-            }
-        }
     }
     
     private var listView: some View {

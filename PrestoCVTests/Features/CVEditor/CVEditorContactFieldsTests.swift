@@ -75,10 +75,14 @@ struct CVEditorContactFieldsTests {
 
     @Test("A phone without a digit gets a warning, which does not stop the save")
     func phoneWithoutDigitsWarns() async {
-        let viewModel = left(PersonalInfo(name: "Ada Lovelace", phone: "call me"))
+        let viewModel = editor(PersonalInfo(name: "Ada Lovelace"))
+        viewModel.cv.personalInfo.phone = "call me"
+        viewModel.fieldWasLeft(.phone)
 
         #expect(viewModel.phoneStatus == FieldStatus(validity: .warning, isRequired: false, note: .phoneWithoutDigits))
-        #expect(await viewModel.saveCV())
+        await viewModel.saveNow()
+        #expect(!viewModel.showsSaveFailure)
+        #expect(viewModel.showsSavedOnDevice)
     }
 
     // MARK: - Web address
