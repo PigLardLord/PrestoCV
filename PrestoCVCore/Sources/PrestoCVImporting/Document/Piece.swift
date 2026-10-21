@@ -76,13 +76,17 @@ struct Piece: Equatable {
     }
 
     /// The pieces between the separators, trimmed, without the empty ones. A separator of letters only splits
-    /// between whole words.
+    /// between whole words, and none splits inside a pair of brackets: "Course (Pro, Advanced)" is one piece.
     func split(by separators: [String]) -> [Piece] {
         var pieces: [Piece] = []
         var start = text.startIndex
         var index = text.startIndex
+        var bracketed = bracketedRanges()[...]
         while index < text.endIndex {
-            if let separator = separators.first(where: { matches($0, at: index) }) {
+            if let range = bracketed.first, range.lowerBound == index {
+                index = range.upperBound
+                bracketed = bracketed.dropFirst()
+            } else if let separator = separators.first(where: { matches($0, at: index) }) {
                 pieces.append(sub(start..<index))
                 index = text.index(index, offsetBy: separator.count)
                 start = index
@@ -92,6 +96,28 @@ struct Piece: Equatable {
         }
         pieces.append(sub(start..<text.endIndex))
         return pieces.map { $0.trimmed() }.filter { !$0.isEmpty }
+    }
+
+    /// The outermost ranges of the text between a bracket and the one that closes it, brackets included, in order: "("
+    /// with ")" and "[" with "]". A bracket that is never closed, or never opened, bounds nothing.
+    func bracketedRanges() -> [Range<String.Index>] {
+        var ranges: [Range<String.Index>] = []
+        var open: [(character: Character, index: String.Index)] = []
+        var index = text.startIndex
+        while index < text.endIndex {
+            let character = text[index]
+            if character == "(" || character == "[" {
+                open.append((character, index))
+            } else if character == ")" || character == "]", let last = open.last, last.character == (character == ")" ? "(" : "[") {
+                open.removeLast()
+                let range = last.index..<text.index(after: index)
+                // A pair closes after the pairs it holds: they are inside it, and give way to it
+                while let inner = ranges.last, range.contains(inner.lowerBound) { ranges.removeLast() }
+                ranges.append(range)
+            }
+            index = text.index(after: index)
+        }
+        return ranges
     }
 
     private func matches(_ separator: String, at index: String.Index) -> Bool {
