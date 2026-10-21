@@ -24,21 +24,25 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
         guard document.pageCount > 0 else { throw ImportError.empty }
         guard document.pageCount <= limits.maximumPages else { throw ImportError.tooManyPages }
         var pages: [ExtractedPage] = []
-        var characters = 0
-        var words = 0
+        var budget = Budget(characters: limits.maximumCharacters, words: limits.maximumWords)
         for index in 0..<document.pageCount {
             try Task.checkCancellation()
             guard let page = document.page(at: index) else { continue }
-            let extracted = Self.words(of: page)
-            characters += extracted.words.reduce(0) { $0 + $1.text.count }
-            words += extracted.words.count
-            guard characters <= limits.maximumCharacters, words <= limits.maximumWords else { throw ImportError.tooLarge }
-            pages.append(extracted)
+            pages.append(try Self.words(of: page, budget: &budget))
         }
         return .pages(pages)
     }
 
     // MARK: Words
+
+    /// What the pages still to read may hold: the characters and the words left of the limits.
+    struct Budget {
+        var characters: Int
+        var words: Int
+    }
+
+    /// The characters read between two checks for the task's cancellation.
+    private static let charactersBetweenChecks = 256
 
     /// The words of a page: runs of characters without white space, split where PDFKit puts a space or a line
     /// break, or where a gap wider than a third of the font size separates two glyphs.
@@ -48,11 +52,20 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
     /// boxes are walked together, and a line break takes no box. A space takes one, whether the PDF draws it or PDFKit
     /// adds it across a gap. A box is a glyph's ink; a word gets the ink's width and a height from its font size, so that
     /// lines of digits and of capitals stand as tall as any other.
-    static func words(of page: PDFPage) -> ExtractedPage {
+    ///
+    /// A few kilobytes of a PDF's stream can hold a million characters (R8). The page's text, spaces and line breaks
+    /// included, is counted as a pasted text is, in UTF-16 units, and a page over the characters left is refused before
+    /// its style and its glyphs are read. Its words are counted as they are read, and the reading stops once its task
+    /// is cancelled.
+    /// - Throws: `ImportError.tooLarge` over the characters or the words left; `CancellationError`.
+    static func words(of page: PDFPage, budget: inout Budget) throws -> ExtractedPage {
         let bounds = page.bounds(for: .cropBox)
         let size = page.rotation % 180 == 0 ? bounds.size : CGSize(width: bounds.height, height: bounds.width)
         guard let string = page.string else { return ExtractedPage(width: size.width, height: size.height, words: []) }
         let text = string as NSString
+        guard text.length <= budget.characters else { throw ImportError.tooLarge }
+        budget.characters -= text.length
+        try Task.checkCancellation()
         let attributed = page.attributedString
         let styled = attributed?.length == text.length
 
@@ -61,8 +74,10 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
         var ink = CGRect.null
         var fontSize = 0.0
         var isBold = true
-        func close() {
+        let wordsLeft = budget.words
+        func close() throws {
             if !current.isEmpty, !ink.isNull {
+                guard words.count < wordsLeft else { throw ImportError.tooLarge }
                 // Page space has its origin at the bottom left; the core's at the top left
                 let middle = bounds.maxY - ink.midY
                 let height = 0.925 * fontSize
@@ -79,19 +94,22 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
 
         var index = 0
         var glyph = 0
+        var read = 0
         while index < text.length {
+            read += 1
+            if read % charactersBetweenChecks == 0 { try Task.checkCancellation() }
             let unit = text.character(at: index)
             let length = CFStringIsSurrogateHighCharacter(unit) && index + 1 < text.length ? 2 : 1
             let character = text.substring(with: NSRange(location: index, length: length))
             if character == "\n" || character == "\r" || character == "\u{2028}" {
                 // A line break PDFKit adds: no glyph
-                close()
+                try close()
                 index += length
                 continue
             }
             if character.allSatisfy(\.isWhitespace) {
                 // A space has a box, whether the PDF draws it or PDFKit adds it across a gap
-                close()
+                try close()
                 glyph += length
                 index += length
                 continue
@@ -102,7 +120,7 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
                 let gap = box.minX - ink.maxX
                 let reach = max(style.size, fontSize)
                 let sameLine = abs(box.midY - ink.midY) < reach * 0.6
-                if gap > reach / 3 || gap < -reach || !sameLine { close() }
+                if gap > reach / 3 || gap < -reach || !sameLine { try close() }
             }
             if !box.isEmpty {
                 current += character
@@ -113,7 +131,8 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
             glyph += length
             index += length
         }
-        close()
+        try close()
+        budget.words -= words.count
         return ExtractedPage(width: size.width, height: size.height, words: words)
     }
 

@@ -272,7 +272,8 @@
     "Foundation",
     "PDFKit",
     "PrestoCVImporting",
-    "PrestoCVImportingPDFKit"
+    "PrestoCVImportingPDFKit",
+    "CoreText"
    ],
    "rules": [
     "R16"
