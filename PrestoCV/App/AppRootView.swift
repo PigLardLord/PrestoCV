@@ -3,7 +3,7 @@ import PrestoCVCore
 import CVPDFExporter
 
 struct AppRootView: View {
-    @StateObject private var router = AppRouter()
+    @StateObject private var router: AppRouter
     @ObservedObject private var onboardingViewModel: OnboardingViewModel
     @ObservedObject private var cvListViewModel: CVListViewModel
     @ObservedObject private var unsavedEditsOffer: UnsavedEditsOfferViewModel
@@ -14,6 +14,7 @@ struct AppRootView: View {
         self.cvListViewModel = dependencies.cvListViewModel
         self.unsavedEditsOffer = dependencies.unsavedEditsOfferViewModel
         self.viewModelFactory = dependencies.viewModelFactory
+        self._router = StateObject(wrappedValue: dependencies.viewModelFactory.makeAppRouter())
     }
     
     var body: some View {

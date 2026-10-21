@@ -16,7 +16,7 @@ final class ViewModelFactory {
     private let environment: AppEnvironment
     /// The description typed on the AI screen, kept until a draft is made from it.
     private let aiDescriptionSession = AIDescriptionSession()
-    /// The copies the system makes of the PDFs opened in the app, which the import lets go.
+    /// The copies the system makes of the PDFs opened in the app, which the import and the router let go.
     private var openedFileCopies: OpenedFileCopies {
         OpenedFileCopies(container: environment.container, removeFile: environment.removeFile)
     }
@@ -132,6 +132,12 @@ final class ViewModelFactory {
             mapper: ImportedCVMapper(),
             fileReader: ChosenFileReader(maximumBytes: limits.maximumPDFBytes, copies: openedFileCopies)
         )
+    }
+
+    /// The router of the screens. It lets go of a PDF opened in the app that no import will read.
+    @MainActor
+    func makeAppRouter() -> AppRouter {
+        AppRouter(releaseFile: openedFileCopies.release)
     }
 
     // MARK: - Private Composition Root

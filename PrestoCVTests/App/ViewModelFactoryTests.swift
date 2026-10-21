@@ -182,6 +182,21 @@ struct ViewModelFactoryTests {
         #expect(reopened.prompt == "Ward nurse with ten years in intensive care")
     }
 
+    @Test("The router lets go of a PDF opened in the app that the import never read, in the app's own container")
+    func routerLetsGoOfAnUnreadPDF() throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let router = try makeFactory(container: fixture.container).makeAppRouter()
+        let unread = try fixture.copyInTemporaryInbox(named: "unread.pdf")
+        let latest = try fixture.copyInTemporaryInbox(named: "latest.pdf")
+
+        router.openImport(of: unread)
+        router.openImport(of: latest)
+
+        #expect(!FileManager.default.fileExists(atPath: unread.path))
+        #expect(FileManager.default.fileExists(atPath: latest.path), "The import still has to read it")
+    }
+
     @Test("The import reads a PDF opened in the app and lets its copy go")
     func importLetsGoOfTheCopyItRead() async throws {
         let fixture = try AppContainerFixture()

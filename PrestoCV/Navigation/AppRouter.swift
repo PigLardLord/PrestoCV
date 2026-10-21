@@ -20,18 +20,33 @@ final class AppRouter: ObservableObject {
 
     /// The CV the person picked while the editor on screen was asking whether to discard its edits. It opens once they
     /// are discarded, and is dropped when the person keeps editing.
-    private(set) var pendingSelection: EditorRequest?
+    var pendingSelection: EditorRequest? {
+        if case .editor(let request) = waitingForEditor { request } else { nil }
+    }
 
     /// A PDF the system opened in the app, from "Open in PrestoCV", that the import screen has not read yet.
     @Published private(set) var pendingImportFile: URL?
 
     // MARK: - Private Properties
+
+    /// What opens once the editor on screen is left. The latest request replaces the one before.
+    private enum Opening: Equatable {
+        case editor(EditorRequest)
+        case importFile(URL)
+    }
+
     private let isAIShipped: Bool
+    private let releaseFile: (URL) -> Void
     private weak var shownEditor: (any LeavableEditor)?
+    /// What waits while the editor on screen asks the person whether to discard its edits.
+    private var waitingForEditor: Opening?
 
     // MARK: - Initialization
-    init(isAIShipped: Bool = AIFeature.isShipped) {
+    /// - Parameter releaseFile: Lets go of a PDF opened in the app that no import will read, so that nothing of it is
+    ///   kept.
+    init(isAIShipped: Bool = AIFeature.isShipped, releaseFile: @escaping (URL) -> Void = { _ in }) {
         self.isAIShipped = isAIShipped
+        self.releaseFile = releaseFile
     }
 
     // MARK: - Navigation Methods
@@ -59,10 +74,10 @@ final class AppRouter: ObservableObject {
     }
 
     /// Opens the import screen on a PDF the system opened in the app, from the share sheet or Files. A screen already on
-    /// the import reads it there; nothing else on screen is left.
+    /// the import reads it there. An editor on screen is asked first, as when another CV is picked: the import waits
+    /// until the person discards the edits, and the PDF is let go when they keep editing.
     func openImport(of file: URL) {
-        pendingImportFile = file
-        if currentRoute != .importCV { navigate(to: .importCV) }
+        open(.importFile(file))
     }
 
     /// The PDF the import screen should read now, if any. It is given once.
@@ -91,9 +106,9 @@ final class AppRouter: ObservableObject {
     func closeEditor() {
         shownEditor = nil
         navigateToRoot()
-        if let pendingSelection {
-            self.pendingSelection = nil
-            navigate(to: .cvEditor(pendingSelection))
+        if let opening = waitingForEditor {
+            waitingForEditor = nil
+            show(opening)
         }
     }
 
@@ -112,20 +127,46 @@ final class AppRouter: ObservableObject {
     /// Opens the editor on `request` in place of the editor on screen, if any. An editor that has unsaved edits is
     /// asked first, and the new one waits until they are discarded; while a save is running, nothing opens.
     func select(_ request: EditorRequest) {
+        open(.editor(request))
+    }
+
+    /// The person keeps editing instead of discarding the edits: the CV picked meanwhile does not open, and the PDF
+    /// opened meanwhile is let go.
+    func keepEditing() {
+        wait(for: nil)
+    }
+
+    // MARK: - Private Methods
+
+    /// Shows `opening` in place of the editor on screen, if any, once the editor can be left.
+    private func open(_ opening: Opening) {
         guard let shownEditor else {
-            navigate(to: .cvEditor(request))
+            show(opening)
             return
         }
-        pendingSelection = request
+        wait(for: opening)
         if shownEditor.requestLeaving() {
             closeEditor()
         } else if !shownEditor.showingCancelConfirmation {
-            pendingSelection = nil
+            wait(for: nil)
         }
     }
 
-    /// The person keeps editing instead of discarding the edits: the CV picked meanwhile does not open.
-    func keepEditing() {
-        pendingSelection = nil
+    private func show(_ opening: Opening) {
+        switch opening {
+        case .editor(let request):
+            navigate(to: .cvEditor(request))
+        case .importFile(let file):
+            if let unread = pendingImportFile, unread != file { releaseFile(unread) }
+            pendingImportFile = file
+            if currentRoute != .importCV { navigate(to: .importCV) }
+        }
+    }
+
+    /// Makes `opening` the one that waits for the editor, or none. What waited before does not open: a PDF is let go,
+    /// unless it is the one that waits now.
+    private func wait(for opening: Opening?) {
+        if case .importFile(let file) = waitingForEditor, waitingForEditor != opening { releaseFile(file) }
+        waitingForEditor = opening
     }
 }
