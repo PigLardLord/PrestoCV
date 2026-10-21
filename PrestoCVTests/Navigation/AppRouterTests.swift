@@ -623,6 +623,30 @@ struct AppRouterImportTests {
         #expect(router.takePendingImportFile() == nil, "A PDF is given once")
     }
 
+    @Test("A PDF opened in the app opens the import again after the import screen was left")
+    func openedPDFReopensALeftImport() {
+        let router = AppRouter(isAIShipped: false)
+        router.navigate(to: .importCV)
+        router.navigateBack()
+
+        router.openImport(of: URL(fileURLWithPath: "/tmp/Inbox/cv.pdf"))
+
+        #expect(router.navigationPath.count == 1)
+    }
+
+    @Test("A PDF opened in the app opens the import again after another screen was opened over the import")
+    func openedPDFReopensACoveredImport() {
+        let router = AppRouter(isAIShipped: false)
+        router.navigate(to: .importCV)
+        router.navigate(to: .cvEditor(.stored(cvId: "first")))
+        router.navigateToRoot()
+
+        router.openImport(of: URL(fileURLWithPath: "/tmp/Inbox/cv.pdf"))
+
+        #expect(router.currentRoute == .importCV)
+        #expect(router.navigationPath.count == 1)
+    }
+
     @Test("A PDF opened in the app before the import read the one opened earlier lets the earlier one go")
     func openedPDFReplacesAnUnreadOne() {
         let released = RemovedFiles()

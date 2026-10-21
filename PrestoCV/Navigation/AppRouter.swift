@@ -40,6 +40,9 @@ final class AppRouter: ObservableObject {
     private weak var shownEditor: (any LeavableEditor)?
     /// What waits while the editor on screen asks the person whether to discard its edits.
     private var waitingForEditor: Opening?
+    /// The depth of the path at which the import screen was pushed, while nothing has been pushed since. The screen can be
+    /// left without the router knowing, by the back button.
+    private var importDepth: Int?
 
     // MARK: - Initialization
     /// - Parameter releaseFile: Lets go of a PDF opened in the app that no import will read, so that nothing of it is
@@ -56,6 +59,7 @@ final class AppRouter: ObservableObject {
         guard route != .aiGeneration || isAIShipped else { return }
         currentRoute = route
         navigationPath.append(route)
+        importDepth = route == .importCV ? navigationPath.count : nil
     }
 
     /// Opens the editor on edits a window took to restore. The editor reads what is stored under their CV's id and
@@ -159,7 +163,7 @@ final class AppRouter: ObservableObject {
         case .importFile(let file):
             if let unread = pendingImportFile, unread != file { releaseFile(unread) }
             pendingImportFile = file
-            if currentRoute != .importCV { navigate(to: .importCV) }
+            if importDepth != navigationPath.count { navigate(to: .importCV) }
         }
     }
 
