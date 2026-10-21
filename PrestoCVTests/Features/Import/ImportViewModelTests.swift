@@ -16,16 +16,6 @@ struct ImportViewModelTests {
         ImportViewModel(importer: ImportCV(pdfReader: reader, limits: .standard), mapper: ImportedCVMapper(), fileReader: fileReader)
     }
 
-    /// An Inbox with the copy of a PDF opened in the app, as the system leaves it.
-    private func inboxCopy() throws -> (root: URL, inbox: URL, copy: URL) {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let inbox = root.appendingPathComponent("Inbox")
-        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
-        let copy = inbox.appendingPathComponent("cv.pdf")
-        try Data([1]).write(to: copy)
-        return (root, inbox, copy)
-    }
-
     /// A PDF page with a name, a title and a job, as a reader sees it.
     private var page: ExtractedPage {
         var words: [ExtractedWord] = []
@@ -144,15 +134,16 @@ struct ImportViewModelTests {
         #expect(viewModel.failure == nil)
     }
 
-    @Test("A PDF opened in the app is read to the end, slow as it may be, after the pending file is cleared; its Inbox copy goes only then")
+    @Test("A PDF opened in the app is read to the end, slow as it may be, after the pending file is cleared; its copy goes only then")
     func openedInTheApp() async throws {
-        let (root, inbox, copy) = try inboxCopy()
-        defer { try? FileManager.default.removeItem(at: root) }
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let copy = try fixture.copyInTemporaryInbox()
         let sleeps = HeldSleeps()
         let viewModel = ImportViewModel(
             importer: ImportCV(pdfReader: SlowPDFReader(sleeps: sleeps, layout: .pages([page])), limits: .standard),
             mapper: ImportedCVMapper(),
-            fileReader: ChosenFileReader(maximumBytes: 100, inbox: inbox)
+            fileReader: fixture.reader()
         )
         let router = AppRouter(isAIShipped: false)
         router.openImport(of: copy)
@@ -173,20 +164,85 @@ struct ImportViewModelTests {
         #expect(!FileManager.default.fileExists(atPath: copy.path))
     }
 
-    @Test("A PDF opened in the app that holds no CV lets its Inbox copy go too")
+    @Test("A PDF opened in the app that holds no CV lets its copy go too")
     func openedInTheAppWithoutText() async throws {
-        let (root, inbox, copy) = try inboxCopy()
-        defer { try? FileManager.default.removeItem(at: root) }
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let copy = try fixture.copyInTemporaryInbox()
         let viewModel = ImportViewModel(
             importer: ImportCV(pdfReader: ScriptedPDFReader(error: ImportError.noText), limits: .standard),
             mapper: ImportedCVMapper(),
-            fileReader: ChosenFileReader(maximumBytes: 100, inbox: inbox)
+            fileReader: fixture.reader()
         )
 
         await viewModel.importFile(at: copy)?.value
 
         #expect(viewModel.failure == .scan)
         #expect(!FileManager.default.fileExists(atPath: copy.path))
+    }
+
+    @Test("A PDF opened in the app that is over the size lets its copy go, unread")
+    func openedInTheAppTooLarge() async throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let copy = try fixture.copyInTemporaryInbox(bytes: 101)
+        let viewModel = ImportViewModel(
+            importer: ImportCV(pdfReader: ScriptedPDFReader(layout: .pages([page])), limits: .standard),
+            mapper: ImportedCVMapper(),
+            fileReader: fixture.reader()
+        )
+
+        await viewModel.importFile(at: copy)?.value
+
+        #expect(viewModel.failure == .tooLarge)
+        #expect(!FileManager.default.fileExists(atPath: copy.path))
+    }
+
+    @Test("A PDF opened in the app whose import is cancelled lets its copy go")
+    func openedInTheAppThenCancelled() async throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let copy = try fixture.copyInTemporaryInbox()
+        let sleeps = HeldSleeps()
+        let viewModel = ImportViewModel(
+            importer: ImportCV(pdfReader: SlowPDFReader(sleeps: sleeps, layout: .pages([page])), limits: .standard),
+            mapper: ImportedCVMapper(),
+            fileReader: fixture.reader()
+        )
+        let importing = try #require(viewModel.importFile(at: copy))
+        await sleeps.waitUntilStarted(1)
+
+        viewModel.cancelImport()
+        await importing.value
+
+        #expect(viewModel.imported == nil)
+        #expect(viewModel.failure == nil)
+        #expect(!FileManager.default.fileExists(atPath: copy.path))
+    }
+
+    @Test("A PDF opened in the app while another import runs is let go unread, and the import running goes on")
+    func openedWhileImporting() async throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let first = try fixture.copyInTemporaryInbox(named: "first.pdf")
+        let second = try fixture.copyInTemporaryInbox(named: "second.pdf")
+        let sleeps = HeldSleeps()
+        let viewModel = ImportViewModel(
+            importer: ImportCV(pdfReader: SlowPDFReader(sleeps: sleeps, layout: .pages([page])), limits: .standard),
+            mapper: ImportedCVMapper(),
+            fileReader: fixture.reader()
+        )
+        let importing = try #require(viewModel.importFile(at: first))
+        await sleeps.waitUntilStarted(1)
+
+        #expect(viewModel.importFile(at: second) == nil)
+
+        #expect(!FileManager.default.fileExists(atPath: second.path))
+        #expect(FileManager.default.fileExists(atPath: first.path), "The copy of the PDF being read stays")
+        await sleeps.endAll()
+        await importing.value
+        #expect(viewModel.imported?.cv.personalInfo.name == "Lena Hartmann")
+        #expect(!FileManager.default.fileExists(atPath: first.path))
     }
 
     @Test("Leaving the screen stops the import running, with nothing to tell")
@@ -247,30 +303,143 @@ private struct SlowPDFReader: PDFTextExtracting {
     }
 }
 
+@Suite("OpenedFileCopies - the copy of a PDF opened in the app goes, wherever the system put it; the person's files stay")
+struct OpenedFileCopiesTests {
+
+    @Test("The copy the system leaves in the app, wherever it puts it, is deleted",
+          arguments: [AppContainerFixture.Place.temporaryInbox, .documentsInbox])
+    func copyIsDeleted(place: AppContainerFixture.Place) throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let copy = try fixture.file(at: place, bytes: 10)
+
+        fixture.copies().release(copy)
+
+        #expect(!FileManager.default.fileExists(atPath: copy.path))
+    }
+
+    @Test("A file chosen in Files, outside the app's container, stays")
+    func fileOutsideTheContainerStays() throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let chosen = try fixture.file(at: .files, bytes: 10)
+
+        fixture.copies().release(chosen)
+
+        #expect(FileManager.default.fileExists(atPath: chosen.path))
+    }
+
+    @Test("A folder beside the container, whose name starts with the container's, is not the container")
+    func siblingFolderStays() throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let sibling = try fixture.file(at: .besideTheContainer, bytes: 10)
+
+        fixture.copies().release(sibling)
+
+        #expect(FileManager.default.fileExists(atPath: sibling.path))
+    }
+
+    @Test("The container itself is not a copy")
+    func containerStays() throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+
+        fixture.copies().release(fixture.container)
+
+        #expect(FileManager.default.fileExists(atPath: fixture.container.path))
+    }
+
+    @Test("A path that climbs out of the container with .. is outside it")
+    func climbingOutStays() throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let chosen = try fixture.file(at: .files, bytes: 10)
+        let climbing = fixture.container.appendingPathComponent("tmp/../../Files/\(chosen.lastPathComponent)")
+
+        fixture.copies().release(climbing)
+
+        #expect(FileManager.default.fileExists(atPath: chosen.path))
+    }
+
+    @Test("A copy is found in the container whether the path to it goes through a symbolic link or not, as /var is /private/var on a device")
+    func containerBehindASymbolicLink() throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let copy = try fixture.file(at: .temporaryInbox, bytes: 10)
+        let link = fixture.root.appendingPathComponent("Link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: fixture.container)
+        let viaLink = link.appendingPathComponent("tmp/\(AppContainerFixture.bundleIdentifier)-Inbox/\(copy.lastPathComponent)")
+
+        fixture.copies().release(viaLink)
+
+        #expect(!FileManager.default.fileExists(atPath: copy.path))
+    }
+
+    @Test("A link in the container to a file of the person's leads outside it: the file stays")
+    func linkOutOfTheContainerStays() throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let chosen = try fixture.file(at: .files, bytes: 10)
+        let folder = fixture.folder(at: .temporaryInbox)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let link = folder.appendingPathComponent("cv.pdf")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: chosen)
+
+        fixture.copies().release(link)
+
+        #expect(FileManager.default.fileExists(atPath: chosen.path))
+    }
+
+    @Test("A URL that is no file is not a copy")
+    func noFileURLStays() throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let removed = RemovedFiles()
+        let copies = OpenedFileCopies(container: fixture.container, removeFile: { removed.add($0) })
+
+        copies.release(URL(string: "https://example.com\(fixture.container.path)/tmp/cv.pdf")!)
+
+        #expect(removed.urls.isEmpty)
+    }
+
+    @Test("A copy that cannot be deleted is left, without a word: the next copy of the same name replaces it")
+    func failedRemovalIsLeft() throws {
+        struct Stuck: Error {}
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let copy = try fixture.copyInTemporaryInbox()
+        let copies = OpenedFileCopies(container: fixture.container, removeFile: { _ in throw Stuck() })
+
+        copies.release(copy)
+
+        #expect(FileManager.default.fileExists(atPath: copy.path))
+    }
+}
+
 @Suite("ChosenFileReader - a PDF from Files or from Open in PrestoCV, read once and not kept")
 struct ChosenFileReaderTests {
 
-    private func file(in folder: URL, bytes: Int) throws -> URL {
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let url = folder.appendingPathComponent("cv.pdf")
-        try Data(repeating: 0x25, count: bytes).write(to: url)
-        return url
-    }
+    @Test("A copy the system left in the app is read as it is, and deleted once let go, not when read")
+    func copyIsDeletedOnceLetGo() async throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let reader = fixture.reader()
+        let copy = try fixture.copyInTemporaryInbox()
 
-    @Test("The copy the system leaves in the Inbox is deleted once let go, not when read; a file chosen in Files is left alone")
-    func inboxCopyIsDeleted() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let inbox = root.appendingPathComponent("Inbox")
-        let reader = ChosenFileReader(maximumBytes: 100, inbox: inbox)
-
-        let copy = try file(in: inbox, bytes: 10)
         #expect(try await reader.read(copy).count == 10)
         #expect(FileManager.default.fileExists(atPath: copy.path))
         reader.release(copy)
         #expect(!FileManager.default.fileExists(atPath: copy.path))
+    }
 
-        let chosen = try file(in: root.appendingPathComponent("Files"), bytes: 10)
+    @Test("A file chosen in Files is read and left alone when let go")
+    func chosenFileStays() async throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let reader = fixture.reader()
+        let chosen = try fixture.file(at: .files, bytes: 10)
+
         #expect(try await reader.read(chosen).count == 10)
         reader.release(chosen)
         #expect(FileManager.default.fileExists(atPath: chosen.path))
@@ -278,10 +447,85 @@ struct ChosenFileReaderTests {
 
     @Test("A file over the size is refused before it is read")
     func tooLarge() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let reader = ChosenFileReader(maximumBytes: 100, inbox: root.appendingPathComponent("Inbox"))
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let reader = fixture.reader()
+        let large = try fixture.file(at: .files, bytes: 101)
 
-        await #expect(throws: ImportError.tooLarge) { try await reader.read(try file(in: root, bytes: 101)) }
+        await #expect(throws: ImportError.tooLarge) { try await reader.read(large) }
+    }
+}
+
+/// The files a test removed, in the order they went.
+final class RemovedFiles: @unchecked Sendable {
+    private let lock = NSLock()
+    private var removed: [URL] = []
+
+    var urls: [URL] {
+        lock.withLock { removed }
+    }
+
+    func add(_ url: URL) {
+        lock.withLock { removed.append(url) }
+    }
+}
+
+/// The app's container as the system lays it out, in a folder of its own, with the places a file can come from: the
+/// folders where the system copies a file opened in the app, and Files, which lies outside the container.
+struct AppContainerFixture {
+    static let bundleIdentifier = "com.example.app"
+
+    enum Place: CaseIterable {
+        /// Where current versions of iOS copy a file opened in the app
+        case temporaryInbox
+        /// Where earlier versions did
+        case documentsInbox
+        /// The person's own folders, outside the app's container
+        case files
+        /// A folder whose name starts with the container's
+        case besideTheContainer
+    }
+
+    let root: URL
+    let container: URL
+
+    init() throws {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        container = root.appendingPathComponent("Container")
+        try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+    }
+
+    func folder(at place: Place) -> URL {
+        switch place {
+        case .temporaryInbox: container.appendingPathComponent("tmp/\(Self.bundleIdentifier)-Inbox")
+        case .documentsInbox: container.appendingPathComponent("Documents/Inbox")
+        case .files: root.appendingPathComponent("Files")
+        case .besideTheContainer: root.appendingPathComponent("Container-backup")
+        }
+    }
+
+    @discardableResult
+    func file(at place: Place, named name: String = "cv.pdf", bytes: Int) throws -> URL {
+        let folder = folder(at: place)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let url = folder.appendingPathComponent(name)
+        try Data(repeating: 0x25, count: bytes).write(to: url)
+        return url
+    }
+
+    func copyInTemporaryInbox(named name: String = "cv.pdf", bytes: Int = 10) throws -> URL {
+        try file(at: .temporaryInbox, named: name, bytes: bytes)
+    }
+
+    func copies() -> OpenedFileCopies {
+        OpenedFileCopies(container: container, removeFile: { try FileManager.default.removeItem(at: $0) })
+    }
+
+    func reader(maximumBytes: Int = 100) -> ChosenFileReader {
+        ChosenFileReader(maximumBytes: maximumBytes, copies: copies())
+    }
+
+    func remove() {
+        try? FileManager.default.removeItem(at: root)
     }
 }

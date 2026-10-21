@@ -16,6 +16,10 @@ final class ViewModelFactory {
     private let environment: AppEnvironment
     /// The description typed on the AI screen, kept until a draft is made from it.
     private let aiDescriptionSession = AIDescriptionSession()
+    /// The copies the system makes of the PDFs opened in the app, which the import lets go.
+    private var openedFileCopies: OpenedFileCopies {
+        OpenedFileCopies(container: environment.container, removeFile: environment.removeFile)
+    }
     
     /// - Parameters:
     ///   - unsavedEditsUseCase: Nil when the unsaved edits cannot be kept on this device: the editor works without them.
@@ -126,7 +130,7 @@ final class ViewModelFactory {
         return ImportViewModel(
             importer: ImportCV(pdfReader: PDFKitTextExtractor(), limits: limits),
             mapper: ImportedCVMapper(),
-            fileReader: ChosenFileReader(maximumBytes: limits.maximumPDFBytes, inbox: environment.importInbox)
+            fileReader: ChosenFileReader(maximumBytes: limits.maximumPDFBytes, copies: openedFileCopies)
         )
     }
 

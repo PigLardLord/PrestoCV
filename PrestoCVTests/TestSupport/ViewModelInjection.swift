@@ -19,7 +19,10 @@ let englishDocumentLanguageDetector = DocumentLanguageDetector(preferredLanguage
 
 extension AppEnvironment {
     /// A device in English, on a fixed day in UTC, whose waits end only when cancelled
-    static func fixed(newEditingID: @escaping () -> UUID = { UUID() }) -> AppEnvironment {
+    static func fixed(
+        newEditingID: @escaping () -> UUID = { UUID() },
+        container: URL = FileManager.default.temporaryDirectory.appendingPathComponent("Container-\(UUID().uuidString)")
+    ) -> AppEnvironment {
         AppEnvironment(
             now: { testDay },
             calendar: { gregorianUTC },
@@ -30,7 +33,8 @@ extension AppEnvironment {
             newEditingID: newEditingID,
             temporaryDirectory: FileManager.default.temporaryDirectory,
             exportPreferencesFile: FileManager.default.temporaryDirectory.appendingPathComponent("export-preferences-\(UUID().uuidString).json"),
-            importInbox: FileManager.default.temporaryDirectory.appendingPathComponent("Inbox-\(UUID().uuidString)"),
+            container: container,
+            removeFile: { try FileManager.default.removeItem(at: $0) },
             arguments: [],
             bundle: Bundle(for: AppRouter.self),
             platform: .iPhoneOrIPad
