@@ -106,7 +106,8 @@ enum CertificationReader {
             return .link(addresses: addresses, labels: around)
         }
         guard !around.contains(where: { !DateReader.periods(in: $0.text).isEmpty }) else { return nil }
-        if EntryReader.readsAsProse(block, text: cell.text) { return .description }
+        // The words of an address are no words of a sentence: only the text around the addresses counts
+        if EntryReader.readsAsProse(block, text: around.map(\.text).joined(separator: " ")) { return .description }
         guard addresses.isEmpty, !namesIssuer(cell) else { return nil }
         return open.isEmphasized && !block.isEmphasized ? .description : nil
     }

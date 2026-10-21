@@ -226,6 +226,27 @@ struct CertificationReaderTests {
         #expect(result.unplaced.isEmpty)
     }
 
+    @Test("The length of an address is no sentence: a short title with a long address is a certification of its own")
+    func longAddressIsNoSentence() async throws {
+        let address = "https://academy.example/certificates/professional/swift/development/advanced/concurrency/networking/testing/security/performance/design/patterns/credential"
+        let found = read("Certifications\nFirst Certificate\nSwift Basics \(address)")
+        #expect(found.cv.certifications.map(\.name.value) == ["First Certificate", "Swift Basics"])
+        #expect(found.cv.certifications.map { $0.link?.value.value }  == [nil, address])
+        #expect(found.cv.certifications.allSatisfy { $0.description == nil })
+
+        // The same through the whole import, gate included, from a PDF with a bold title before it
+        var sketch = PageSketch()
+        sketch.put("Giulia Bianchi", x: 46, y: 50, size: 20, bold: true)
+        sketch.put("Certifications", x: 88, y: 150, size: 9, bold: true)
+        sketch.put("First Certificate", x: 172, y: 150, size: 9.5, bold: true)
+        sketch.put("Swift Basics \(address)", x: 172, y: 164, size: 9.5)
+        let result = try await importedPDF(sketch)
+        #expect(result.cv.certifications.map(\.name.value) == ["First Certificate", "Swift Basics"])
+        #expect(result.cv.certifications.map { $0.link?.value.value } == [nil, address])
+        #expect(result.ungrounded.isEmpty)
+        #expect(result.unplaced.isEmpty)
+    }
+
     @Test("A sentence that holds a web address is still the description of the certification before it")
     func sentenceWithAddress() throws {
         let found = read("""
