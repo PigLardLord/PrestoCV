@@ -10,12 +10,12 @@ One word, one meaning, in code, UI copy, tickets and translations. Today "templa
 | **Entry** | One item of a section: an experience, an education, a skill, a language, a certification, a profile link. | — | Authoring |
 | **Period** | A structured start (month or year precision) and an end that is a date, "current", or "ended, date unknown". Never free text, never an invented date. | — | Authoring |
 | **Sample CV** | Example content a user can start from. | Design (formerly both were called "template") | Authoring |
-| **Draft** | A CV proposed by AI Drafting. Not saved until the user reviews and saves it. | Unsaved CV | Drafting → Authoring |
+| **Draft** | A CV proposed by AI Drafting. The editor stores it as it is, and the person checks it before sending it. | Unsaved CV | Drafting → Authoring |
 | **Import** | Turning a CV someone already has (pasted text, a text PDF) into a draft by rules, every value quoted from the text. Not saved until the user saves it. | Draft (written by AI) | Import → Authoring |
 | **Source document** | `SourceDocument`: the imported text in reading order, with its blocks and, from a PDF, their page, box and style. Every value of an import points to a span of it. | Document (`CVDocument`) | Import |
 | **Review list** | The values of an import that the rules are unsure of, each with its reason, for the user to check. | — | Import |
 | **Text not imported** | The text of an imported document that fits no field. It is shown to the user, ready to copy, never dropped. | — | Import |
-| **Unsaved CV** | A CV created in the editor that has never been saved (revision 0). In code: `NewCV`. | Draft | Authoring |
+| **Unsaved CV** | A CV created in the editor that has never been saved (revision 0): a blank CV or an example until its first change, which the editor stores by itself (`Autosave`). In code: `NewCV`. | Draft | Authoring |
 | **Design** | The visual look of an exported CV: layout, CSS, typography. What the UI calls it. | Sample CV | Design Catalog |
 | **Design package** | The `.mcvt` file that carries a design: manifest, CSS, preview image. | — | Design Catalog |
 | **Bundled design** | A design package shipped inside `CVBundledDesigns`. | Installed design | Design Catalog |
