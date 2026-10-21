@@ -152,7 +152,8 @@ public final class Autosave<Content: Equatable & Sendable> {
         }
         flushes -= 1
         if wasCancelled {
-            // Nobody has asked for another write: the pause does, so that the content is not left in memory for ever
+            // Nobody has asked for another write: the pause does, so that the content is not left in memory for ever, once no
+            // other flush or write is going on
             writeAgainIfTheContentIsNotStored()
             updateStatus()
             throw CancellationError()
@@ -201,7 +202,7 @@ public final class Autosave<Content: Equatable & Sendable> {
             let outcome = await self.attempt(snapshot)
             // Cleared before the task ends, so a write waiting for this one finds the way free
             self.running = nil
-            if outcome == .written || outcome == .cancelled, self.flushes == 0 {
+            if outcome == .written || outcome == .cancelled {
                 self.writeAgainIfTheContentIsNotStored()
             }
             self.updateStatus()
@@ -229,11 +230,11 @@ public final class Autosave<Content: Equatable & Sendable> {
     }
 
     /// The store may not hold what the form shows after a write: a change made while it ran, or one that undid it, or a
-    /// write that was cancelled. When no pause is waiting and no failure is shown, one starts now, so that the content is
-    /// written without another change or flush. A failure waits for the next change, or for Try Again, instead.
-    /// A flush in progress writes it itself.
+    /// write that was cancelled. When nothing else is going on (no flush, which writes by itself, and no other write), no
+    /// pause is waiting and no failure is shown, one starts now, so that the content is written without another change or
+    /// flush. A failure waits for the next change, or for Try Again, instead.
     private func writeAgainIfTheContentIsNotStored() {
-        guard scheduledWrite == nil, !lastWriteFailed, hasChangesToWrite else { return }
+        guard flushes == 0, running == nil, scheduledWrite == nil, !lastWriteFailed, hasChangesToWrite else { return }
         _ = startThePause()
     }
 

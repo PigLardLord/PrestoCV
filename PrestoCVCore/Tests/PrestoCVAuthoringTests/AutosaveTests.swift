@@ -15,6 +15,8 @@ final class EditorStoreSpy {
     private(set) var mostWritesAtOnce = 0
     /// What every write throws, when set: a full disk, or a cancellation.
     var failure: (any Error)?
+    /// What the next writes throw, one error each, before `failure` is read.
+    var failuresInOrder: [any Error] = []
     var fails: Bool {
         get { failure != nil }
         set { failure = newValue ? Failure() : nil }
@@ -57,6 +59,7 @@ final class EditorStoreSpy {
         if !isOpen {
             await withCheckedContinuation { heldWrites.append($0) }
         }
+        if !failuresInOrder.isEmpty { throw failuresInOrder.removeFirst() }
         if let failure { throw failure }
         writes.append(content)
         storedBeforeEachWrite.append(isStored)
@@ -446,6 +449,29 @@ struct AutosaveTests {
         await finish(autosave.scheduledWrite)
         #expect(store.writes == ["Ada L"])
         #expect(autosave.status == .upToDate)
+    }
+
+    @Test("two flushes that wait for one write the store cancels start no pause that the write after it, which fails, would leave behind")
+    func overlappingFlushesLeaveNoPauseAfterAFailure() async throws {
+        let autosave = autosave()
+        store.close()
+        autosave.changed(to: "Ada L")
+        let first = Task { try await autosave.flush() }
+        await store.waitUntilWriting()
+        let second = Task { try await autosave.flush() }
+        // The write both flushes wait for is cancelled; the one the second flush then makes fails
+        store.failuresInOrder = [CancellationError(), EditorStoreSpy.Failure()]
+        store.open()
+
+        await #expect(throws: CancellationError.self) { try await first.value }
+        try await second.value
+
+        #expect(autosave.status == .failed)
+        #expect(autosave.scheduledWrite == nil, "A failed write waits for the next change, or for Try Again")
+        #expect(diagnostics.causes.count == 1)
+        clock.advance(by: .seconds(2))
+        await Task.yield()
+        #expect(store.writes.isEmpty, "Nothing writes again on its own after a failure")
     }
 
     @Test("a write the store cancels after a failure leaves the failure shown")
