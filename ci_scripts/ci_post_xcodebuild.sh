@@ -3,9 +3,9 @@
 # script fails at the end, so one build shows all that is wrong.
 #   archive            checks the archive, so one that is wrong never reaches TestFlight;
 #   build-for-testing  runs what ADR 0006 needs on a Mac beyond the app tests: the package tests, the architecture check
-#                      and its self-test (they see the Apple-only branches of the manifests), and the builds of PrestoCVApp
-#                      and CVPDFExporterExamples. It also runs the source checks, which read the repository: the machines
-#                      that then run the test plan have only the built products.
+#                      and its self-test (they see the Apple-only branches of the manifests), the self-test of the archive
+#                      check, and the builds of PrestoCVApp and CVPDFExporterExamples. It also runs the source checks, which
+#                      read the repository: the machines that then run the test plan have only the built products.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -38,6 +38,8 @@ case "$ACTION" in
     fi
     step "$ROOT/Tools/ArchitectureCheck/check.sh" ${check_args[@]+"${check_args[@]}"}
     step "$ROOT/Tools/ArchitectureCheck/selftest.sh"
+    # The archive check itself runs on the archive, after the merge; its self-test runs here, on every pull request.
+    step "$ROOT/Tools/Release/check-archive-selftest.sh"
     # PrestoCVApp has no tests until step 5 (#88); building it checks its targets and cross-package dependencies.
     step swift build --package-path "$ROOT/PrestoCVApp"
     # The demos and the template viewer, apart from the library (R14); they use the legacy exporter, Apple hosts only.
