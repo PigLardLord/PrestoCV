@@ -105,11 +105,20 @@ struct PDFKitTextExtractorTests {
         await #expect(throws: ImportError.encrypted) { try await importer.importPDF(try Data(contentsOf: locked)) }
     }
 
-    @Test("A PDF over the page limit is refused before its text is read")
-    func pageLimit() async throws {
-        let limits = ImportLimits(maximumPDFBytes: 1_000_000, maximumPages: 1, maximumCharacters: 100_000)
+    @Test("A PDF over the page limit is refused before its text is read, and one over the word limit as its words are")
+    func limits() async throws {
+        func limits(pages: Int, words: Int) -> ImportLimits {
+            ImportLimits(
+                maximumPDFBytes: 1_000_000, maximumPages: pages, maximumCharacters: 100_000,
+                maximumWords: words, maximumLines: 2_000, maximumCells: 4_000, maximumAnalysisSteps: 10_000_000
+            )
+        }
+        let linkedIn = try pdf("en-emily/linkedin.pdf")
         await #expect(throws: ImportError.tooManyPages) {
-            try await PDFKitTextExtractor().layout(ofPDF: try pdf("en-emily/linkedin.pdf"), limits: limits)
+            try await PDFKitTextExtractor().layout(ofPDF: linkedIn, limits: limits(pages: 1, words: 20_000))
+        }
+        await #expect(throws: ImportError.tooLarge) {
+            try await PDFKitTextExtractor().layout(ofPDF: linkedIn, limits: limits(pages: 10, words: 10))
         }
     }
 }

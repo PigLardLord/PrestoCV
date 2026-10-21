@@ -82,7 +82,10 @@ struct ImportViewModelTests {
     @Test("A text over the limit is refused with its message")
     func tooLong() {
         let viewModel = ImportViewModel(
-            importer: ImportCV(pdfReader: ScriptedPDFReader(), limits: ImportLimits(maximumPDFBytes: 10, maximumPages: 1, maximumCharacters: 20)),
+            importer: ImportCV(pdfReader: ScriptedPDFReader(), limits: ImportLimits(
+                maximumPDFBytes: 10, maximumPages: 1, maximumCharacters: 20,
+                maximumWords: 10, maximumLines: 10, maximumCells: 10, maximumAnalysisSteps: 1_000
+            )),
             mapper: ImportedCVMapper(), fileReader: ScriptedFileReader()
         )
         viewModel.text = "Giulia Bianchi, Infermiera a Torino"

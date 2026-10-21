@@ -1,6 +1,10 @@
 /// The page analysis of a PDF, in the core so that it is tested on Linux (ADR 0027): the words a reader saw become
 /// lines and cells; headers and footers repeated on every page and page numbers are left out; a sidebar is told from
 /// a table by what its left column holds; and the lines are put in reading order, the main column first.
+///
+/// A PDF's geometry is untrusted input (R8). Its words, lines and cells are bounded before the passes over them, every
+/// pass is a sweep over sorted values, and each counts its steps in an `AnalysisWork`, which stops the analysis past
+/// its budget or once its task is cancelled.
 enum LayoutAnalyzer {
 
     struct Analysis {
@@ -8,15 +12,31 @@ enum LayoutAnalyzer {
         var leftOut: [LeftOutText]
     }
 
-    static func analyze(_ pages: [ExtractedPage]) -> Analysis {
+    /// - Throws: `ImportError.tooLarge` over the limits of words, lines, cells or steps; `CancellationError`.
+    static func analyze(_ pages: [ExtractedPage], limits: ImportLimits, work: inout AnalysisWork) throws -> Analysis {
+        let wordCount = pages.reduce(0) { $0 + $1.words.count }
+        guard wordCount <= limits.maximumWords else { throw ImportError.tooLarge }
+        try work.count(wordCount)
         var leftOut: [LeftOutText] = []
-        var pageLines: [[PageLine]] = pages.enumerated().map { index, page in lines(of: page, number: index + 1) }
+        var pageLines: [[PageLine]] = []
+        var lineCount = 0
+        var cellCount = 0
+        for (index, page) in pages.enumerated() {
+            let found = try lines(of: page, number: index + 1, work: &work)
+            lineCount += found.count
+            cellCount += found.reduce(0) { $0 + $1.cells.count }
+            guard lineCount <= limits.maximumLines, cellCount <= limits.maximumCells else { throw ImportError.tooLarge }
+            pageLines.append(found)
+        }
+        try work.count(2 * lineCount)
         removeRepeated(&pageLines, pages: pages, leftOut: &leftOut)
 
         let allCells = pageLines.flatMap { $0.flatMap(\.cells) }
+        try work.count(AnalysisWork.sortSteps(wordCount))
         let bodySize = median(pages.flatMap { $0.words.map(\.fontSize) }) ?? 10
-        let split = columns(of: allCells, width: pages.first?.width ?? 595)
+        let split = try columns(of: allCells, width: pages.first?.width ?? 595, work: &work)
 
+        try work.count(lineCount + cellCount)
         var ordered: [(column: Int, page: Int, line: PageLine)] = []
         for (pageIndex, lines) in pageLines.enumerated() {
             for line in lines {
@@ -37,6 +57,7 @@ enum LayoutAnalyzer {
                 }
             }
         }
+        try work.count(3 * AnalysisWork.sortSteps(ordered.count))
         ordered.sort { ($0.column, $0.page, $0.line.frame.y, $0.line.frame.x) < ($1.column, $1.page, $1.line.frame.y, $1.line.frame.x) }
 
         // The right edge of each column, over all the pages: a line that reaches it may have been wrapped there
@@ -75,7 +96,14 @@ enum LayoutAnalyzer {
 
     struct Cell {
         let words: [ExtractedWord]
-        var frame: Rect { words.dropFirst().reduce(words[0].frame) { $0.union($1.frame) } }
+        let frame: Rect
+
+        /// - Parameter words: At least one word.
+        init(words: [ExtractedWord]) {
+            self.words = words
+            frame = words.dropFirst().reduce(words[0].frame) { $0.union($1.frame) }
+        }
+
         var text: String { words.map(\.text).joined(separator: " ") }
         var fontSize: Double { words.map(\.fontSize).max() ?? 0 }
         var isBold: Bool { words.allSatisfy(\.isBold) }
@@ -84,7 +112,15 @@ enum LayoutAnalyzer {
     struct PageLine {
         let page: Int
         let cells: [Cell]
-        var frame: Rect { cells.dropFirst().reduce(cells[0].frame) { $0.union($1.frame) } }
+        let frame: Rect
+
+        /// - Parameter cells: At least one cell.
+        init(page: Int, cells: [Cell]) {
+            self.page = page
+            self.cells = cells
+            frame = cells.dropFirst().reduce(cells[0].frame) { $0.union($1.frame) }
+        }
+
         var text: String { cells.map(\.text).joined(separator: "\t") }
         var fontSize: Double { cells.map(\.fontSize).max() ?? 0 }
         var isBold: Bool { cells.allSatisfy(\.isBold) }
@@ -99,18 +135,27 @@ enum LayoutAnalyzer {
 
     private static let bulletMarks: Set<String> = ["•", "-", "–", "▪", "◦", "●", "■", "►", "➢", "*", "·", "o", "\u{F0B7}"]
 
-    /// The words of a page grouped into lines by their height on the page, and each line into cells at its wide gaps.
-    static func lines(of page: ExtractedPage, number: Int) -> [PageLine] {
-        let words = page.words.filter { !$0.text.allSatisfy(\.isWhitespace) }.sorted { ($0.frame.y, $0.frame.x) < ($1.frame.y, $1.frame.x) }
+    /// The words of a page grouped into lines by their height on the page, and each line into cells at its wide gaps. A
+    /// word without a box on the page, one not finite or of a negative size, cannot be placed and is no text.
+    static func lines(of page: ExtractedPage, number: Int, work: inout AnalysisWork) throws -> [PageLine] {
+        let words = page.words.filter { !$0.text.allSatisfy(\.isWhitespace) && isPlaceable($0.frame) }
+            .sorted { ($0.frame.y, $0.frame.x) < ($1.frame.y, $1.frame.x) }
+        try work.count(2 * AnalysisWork.sortSteps(page.words.count))
         var groups: [[ExtractedWord]] = []
         var frames: [Rect] = []
+        // The lines a word may still join, oldest first. The words come from the top down: a line that ends above a
+        // word ends above every word after it, and is closed.
+        var open: [Int] = []
         for word in words {
-            if let index = frames.indices.last(where: { overlaps(frames[$0], word.frame) }) {
+            try work.count(2 * open.count + 1)
+            open.removeAll { frames[$0].maxY < word.frame.y }
+            if let index = open.last(where: { overlaps(frames[$0], word.frame) }) {
                 groups[index].append(word)
                 frames[index] = frames[index].union(word.frame)
             } else {
                 groups.append([word])
                 frames.append(word.frame)
+                open.append(groups.count - 1)
             }
         }
         return groups.map { group in
@@ -126,6 +171,10 @@ enum LayoutAnalyzer {
             }
             return PageLine(page: number, cells: cells.map(Cell.init))
         }.sorted { ($0.frame.y, $0.frame.x) < ($1.frame.y, $1.frame.x) }
+    }
+
+    private static func isPlaceable(_ frame: Rect) -> Bool {
+        [frame.x, frame.y, frame.width, frame.height].allSatisfy(\.isFinite) && frame.width >= 0 && frame.height >= 0
     }
 
     /// Two boxes on the same line: they share at least half the height of the smaller.
@@ -176,21 +225,32 @@ enum LayoutAnalyzer {
     }
 
     /// An empty corridor that runs down the pages with text on both sides: a sidebar, or the date column of a table.
-    private static func columns(of cells: [Cell], width: Double) -> ColumnSplit? {
+    ///
+    /// Every cell's right edge is a candidate gutter. The cells' starts and ends are sorted once, and each candidate
+    /// counts the cells on its left, on its right and across it with binary searches in them.
+    private static func columns(of cells: [Cell], width: Double, work: inout AnalysisWork) throws -> ColumnSplit? {
         guard cells.count >= 6 else { return nil }
+        try work.count(4 * AnalysisWork.sortSteps(cells.count))
+        let ends = cells.map(\.frame.maxX).sorted()
+        let starts = cells.map(\.frame.x).sorted()
+        // A cell is wholly left of a gutter once the gutter is past its start and not before its end
+        let wholly = cells.map { Passing(at: max($0.frame.x, $0.frame.maxX), strictly: $0.frame.x >= $0.frame.maxX) }.sorted()
+        let candidates = Set(ends.map { ($0 * 2).rounded() / 2 }).filter { $0 > width * 0.12 && $0 < width * 0.8 }.sorted()
         var best: (gutter: Double, corridor: Double)?
-        let candidates = Set(cells.map { ($0.frame.maxX * 2).rounded() / 2 }).filter { $0 > width * 0.12 && $0 < width * 0.8 }
         for edge in candidates {
+            try work.count(3 * (Int.bitWidth - cells.count.leadingZeroBitCount))
             let gutter = edge + 0.5
-            let crossing = cells.filter { $0.frame.x < gutter && $0.frame.maxX > gutter }.count
-            let left = cells.filter { $0.frame.maxX <= gutter }
-            let right = cells.filter { $0.frame.x >= gutter }
-            guard Double(crossing) <= Double(cells.count) * 0.03, left.count * 7 >= cells.count, right.count * 7 >= cells.count,
-                  let leftEdge = left.map(\.frame.maxX).max(), let rightEdge = right.map(\.frame.x).min() else { continue }
-            let corridor = rightEdge - leftEdge
-            if corridor >= 12, corridor > (best?.corridor ?? 0) { best = (leftEdge + corridor / 2, corridor) }
+            let leftCount = firstIndex(in: ends) { $0 > gutter }
+            let startsBefore = firstIndex(in: starts) { $0 >= gutter }
+            let rightCount = cells.count - startsBefore
+            let crossing = startsBefore - firstIndex(in: wholly) { !$0.isPassed(by: gutter) }
+            guard Double(crossing) <= Double(cells.count) * 0.03, leftCount * 7 >= cells.count, rightCount * 7 >= cells.count,
+                  leftCount > 0, startsBefore < starts.count else { continue }
+            let corridor = starts[startsBefore] - ends[leftCount - 1]
+            if corridor >= 12, corridor > (best?.corridor ?? 0) { best = (ends[leftCount - 1] + corridor / 2, corridor) }
         }
         guard let gutter = best?.gutter else { return nil }
+        try work.count(3 * cells.count)
         let left = cells.filter { $0.frame.maxX <= gutter }
         let right = cells.filter { $0.frame.x >= gutter }
         // A table's left column holds dates and labels; a sidebar's holds a flow of its own. Headings count for neither.
@@ -218,6 +278,31 @@ enum LayoutAnalyzer {
         }
         let piece = Piece(text: text, span: SourceSpan(0, text.unicodeScalars.count))
         return SectionVocabulary.isLanguageLabel(text) || (LanguageReader.languageName(in: piece) != nil && text.words.count <= 2)
+    }
+
+    /// Where a gutter passes a cell wholly: at the point, or only past it.
+    private struct Passing: Comparable {
+        let at: Double
+        let strictly: Bool
+
+        func isPassed(by gutter: Double) -> Bool {
+            strictly ? at < gutter : at <= gutter
+        }
+
+        static func < (a: Passing, b: Passing) -> Bool {
+            (a.at, a.strictly ? 1 : 0) < (b.at, b.strictly ? 1 : 0)
+        }
+    }
+
+    /// The first index of a sorted array where `isPast` holds, or its count: `isPast` must hold from some index on.
+    private static func firstIndex<Value>(in sorted: [Value], where isPast: (Value) -> Bool) -> Int {
+        var low = 0
+        var high = sorted.count
+        while low < high {
+            let middle = (low + high) / 2
+            if isPast(sorted[middle]) { high = middle } else { low = middle + 1 }
+        }
+        return low
     }
 
     private static func median(_ values: [Double]) -> Double? {

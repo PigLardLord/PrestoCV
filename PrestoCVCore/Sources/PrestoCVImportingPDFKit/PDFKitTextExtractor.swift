@@ -25,12 +25,14 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
         guard document.pageCount <= limits.maximumPages else { throw ImportError.tooManyPages }
         var pages: [ExtractedPage] = []
         var characters = 0
+        var words = 0
         for index in 0..<document.pageCount {
             try Task.checkCancellation()
             guard let page = document.page(at: index) else { continue }
             let extracted = Self.words(of: page)
             characters += extracted.words.reduce(0) { $0 + $1.text.count }
-            guard characters <= limits.maximumCharacters else { throw ImportError.tooLarge }
+            words += extracted.words.count
+            guard characters <= limits.maximumCharacters, words <= limits.maximumWords else { throw ImportError.tooLarge }
             pages.append(extracted)
         }
         return .pages(pages)

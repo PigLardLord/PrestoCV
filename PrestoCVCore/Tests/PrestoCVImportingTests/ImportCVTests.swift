@@ -16,7 +16,10 @@ struct ScriptedPDFReader: PDFTextExtracting {
 @Suite("Importing a CV")
 struct ImportCVTests {
 
-    private let limits = ImportLimits(maximumPDFBytes: 1_000, maximumPages: 3, maximumCharacters: 5_000)
+    private let limits = ImportLimits(
+        maximumPDFBytes: 1_000, maximumPages: 3, maximumCharacters: 5_000,
+        maximumWords: 1_000, maximumLines: 200, maximumCells: 400, maximumAnalysisSteps: 1_000_000
+    )
 
     private func importer(_ reader: ScriptedPDFReader = ScriptedPDFReader()) -> ImportCV {
         ImportCV(pdfReader: reader, limits: limits)

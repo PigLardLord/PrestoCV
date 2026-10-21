@@ -11,28 +11,49 @@ public protocol PDFTextExtracting: Sendable {
 
 // MARK: - Limits and errors
 
-/// The bounds of an import's input, checked before it is read (R8).
+/// The bounds of an import's input, checked before it is read (R8). A PDF's geometry is bounded too: its words before
+/// the page analysis, its lines and cells before the columns are looked for, and the analysis's work as it goes.
 public struct ImportLimits: Hashable, Sendable {
     public let maximumPDFBytes: Int
     public let maximumPages: Int
     /// Characters of a pasted text, or of a PDF's text.
     public let maximumCharacters: Int
+    /// Words of a PDF, over all its pages.
+    public let maximumWords: Int
+    /// Lines of a PDF, over all its pages.
+    public let maximumLines: Int
+    /// Cells of a PDF's lines, over all its pages.
+    public let maximumCells: Int
+    /// Steps of a PDF's page analysis: each pass over its words, lines or cells counts its steps.
+    public let maximumAnalysisSteps: Int
 
-    public init(maximumPDFBytes: Int, maximumPages: Int, maximumCharacters: Int) {
+    public init(
+        maximumPDFBytes: Int, maximumPages: Int, maximumCharacters: Int,
+        maximumWords: Int, maximumLines: Int, maximumCells: Int, maximumAnalysisSteps: Int
+    ) {
         self.maximumPDFBytes = maximumPDFBytes
         self.maximumPages = maximumPages
         self.maximumCharacters = maximumCharacters
+        self.maximumWords = maximumWords
+        self.maximumLines = maximumLines
+        self.maximumCells = maximumCells
+        self.maximumAnalysisSteps = maximumAnalysisSteps
     }
 
-    /// Ten pages and a hundred thousand characters hold any CV; a PDF of a CV is rarely over a few megabytes.
-    public static let standard = ImportLimits(maximumPDFBytes: 20_000_000, maximumPages: 10, maximumCharacters: 100_000)
+    /// Ten pages and a hundred thousand characters hold any CV; a PDF of a CV is rarely over a few megabytes. A dense
+    /// page holds some 800 words in 80 lines of a few cells each: the bounds on a PDF's geometry are well above ten such
+    /// pages, and the analysis of a PDF within them takes a fraction of its budget.
+    public static let standard = ImportLimits(
+        maximumPDFBytes: 20_000_000, maximumPages: 10, maximumCharacters: 100_000,
+        maximumWords: 20_000, maximumLines: 2_000, maximumCells: 4_000, maximumAnalysisSteps: 10_000_000
+    )
 }
 
 /// Why an import produced nothing. The app words each one (R13).
 public enum ImportError: Error, Equatable, Sendable {
     /// No text at all.
     case empty
-    /// Over the bytes or characters of `ImportLimits`.
+    /// Over the bytes, characters, words, lines, cells or analysis steps of `ImportLimits`.
     case tooLarge
     case tooManyPages
     /// A PDF that needs a password.
@@ -82,21 +103,24 @@ public struct ImportCV: Sendable {
         return try read(layout)
     }
 
-    /// Reads what a PDF reader saw.
-    func read(_ layout: ExtractedLayout) throws(ImportError) -> ImportResult {
+    /// Reads what a PDF reader saw. Lets `CancellationError` through; every other failure is an `ImportError`.
+    func read(_ layout: ExtractedLayout) throws -> ImportResult {
         guard case .pages(let pages) = layout else {
             if case .text(let lines) = layout { return try importText(lines.joined(separator: "\n")) }
-            throw .unreadable
+            throw ImportError.unreadable
         }
-        guard pages.count <= limits.maximumPages else { throw .tooManyPages }
+        guard pages.count <= limits.maximumPages else { throw ImportError.tooManyPages }
+        guard pages.reduce(0, { $0 + $1.words.count }) <= limits.maximumWords else { throw ImportError.tooLarge }
         let characters = pages.reduce(0) { $0 + $1.words.reduce(0) { $0 + $1.text.unicodeScalars.count } }
-        guard characters <= limits.maximumCharacters else { throw .tooLarge }
+        guard characters <= limits.maximumCharacters else { throw ImportError.tooLarge }
         // A scan has no text layer, or only a few stray characters
         let letters = pages.reduce(0) { $0 + $1.words.reduce(0) { $0 + $1.text.filter(\.isLetter).count } }
-        guard letters >= 20 else { throw .noText }
-        let analysis = LayoutAnalyzer.analyze(pages)
+        guard letters >= 20 else { throw ImportError.noText }
+        var work = AnalysisWork(budget: limits.maximumAnalysisSteps)
+        let analysis = try LayoutAnalyzer.analyze(pages, limits: limits, work: &work)
         let (document, leftOut) = DocumentBuilder.build(lines: analysis.lines, format: .pdf)
-        guard !document.blocks.isEmpty else { throw .noText }
+        guard !document.blocks.isEmpty else { throw ImportError.noText }
+        try Task.checkCancellation()
         return CVReader.read(document, leftOut: analysis.leftOut + leftOut)
     }
 }
