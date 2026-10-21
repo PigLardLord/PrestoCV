@@ -62,6 +62,8 @@ final class ImportViewModel: ObservableObject {
     private let mapper: ImportedCVMapper
     private let fileReader: any ImportFileReading
     private var importing: Task<Void, Never>?
+    /// The file being read, from the moment it is handed over until the import is done with it.
+    private var importingFile: URL?
 
     init(importer: ImportCV, mapper: ImportedCVMapper, fileReader: any ImportFileReading) {
         self.importer = importer
@@ -96,15 +98,22 @@ final class ImportViewModel: ObservableObject {
     /// Imports the PDF the person chose in Files, or opened in the app, in a task of the screen's own: the task that
     /// hands the file over may end, as the file it was given is cleared, long before the reading does. Nothing of the
     /// file is kept, and the file is let go only once the import is done with it.
-    /// - Returns: The import's task, or nil when another import is running and the file is let go unread.
+    /// - Returns: The import's task, or nil when another import is running: the file is let go unread, unless it is the
+    ///   file being read, which that import lets go itself.
     @discardableResult
     func importFile(at url: URL) -> Task<Void, Never>? {
         guard !isImporting else {
-            fileReader.release(url)
+            if url.standardizedFileURL != importingFile?.standardizedFileURL {
+                fileReader.release(url)
+            }
             return nil
         }
+        importingFile = url
         return start {
-            defer { self.fileReader.release(url) }
+            defer {
+                self.importingFile = nil
+                self.fileReader.release(url)
+            }
             let data: Data
             do {
                 data = try await self.fileReader.read(url)

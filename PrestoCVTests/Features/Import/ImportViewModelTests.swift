@@ -245,6 +245,52 @@ struct ImportViewModelTests {
         #expect(!FileManager.default.fileExists(atPath: first.path))
     }
 
+    @Test("A PDF opened again while its own import runs is not let go: the import running has still to read it")
+    func openedAgainWhileItsImportRuns() async throws {
+        let sleeps = HeldSleeps()
+        let released = RemovedFiles()
+        let viewModel = ImportViewModel(
+            importer: ImportCV(pdfReader: ScriptedPDFReader(layout: .pages([page])), limits: .standard),
+            mapper: ImportedCVMapper(),
+            fileReader: SlowFileReader(sleeps: sleeps, released: released)
+        )
+        let copy = URL(fileURLWithPath: "/tmp/Inbox/cv.pdf")
+        let importing = try #require(viewModel.importFile(at: copy))
+        await sleeps.waitUntilStarted(1)
+
+        #expect(viewModel.importFile(at: copy) == nil)
+        #expect(viewModel.importFile(at: URL(fileURLWithPath: "/tmp/Inbox/./cv.pdf")) == nil, "However the path is written")
+        #expect(released.urls.isEmpty, "The first read may not have opened the file yet")
+
+        await sleeps.endAll()
+        await importing.value
+        #expect(viewModel.imported?.cv.personalInfo.name == "Lena Hartmann")
+        #expect(released.urls == [copy], "The import lets the file go once, when it is done with it")
+    }
+
+    @Test("A PDF opened again once its import is done is a new PDF: it is read and let go")
+    func openedAgainAfterItsImport() async throws {
+        let sleeps = HeldSleeps()
+        let released = RemovedFiles()
+        let viewModel = ImportViewModel(
+            importer: ImportCV(pdfReader: ScriptedPDFReader(layout: .pages([page])), limits: .standard),
+            mapper: ImportedCVMapper(),
+            fileReader: SlowFileReader(sleeps: sleeps, released: released)
+        )
+        let copy = URL(fileURLWithPath: "/tmp/Inbox/cv.pdf")
+        let first = try #require(viewModel.importFile(at: copy))
+        await sleeps.waitUntilStarted(1)
+        await sleeps.endAll()
+        await first.value
+
+        let second = try #require(viewModel.importFile(at: copy))
+        await sleeps.waitUntilStarted(2)
+        await sleeps.endAll()
+        await second.value
+
+        #expect(released.urls == [copy, copy])
+    }
+
     @Test("Leaving the screen stops the import running, with nothing to tell")
     func leavingStopsTheImport() async throws {
         let sleeps = HeldSleeps()
@@ -288,6 +334,22 @@ struct ScriptedFileReader: ImportFileReading {
     }
 
     func release(_ url: URL) {}
+}
+
+/// A file reader whose reading lasts until the test ends its sleep, as the reading of a slow disk does, and that notes the
+/// files it is told to let go.
+private struct SlowFileReader: ImportFileReading {
+    let sleeps: HeldSleeps
+    let released: RemovedFiles
+
+    func read(_ url: URL) async throws -> Data {
+        try await sleeps.sleep(for: .seconds(5))
+        return Data([1])
+    }
+
+    func release(_ url: URL) {
+        released.add(url)
+    }
 }
 
 /// A PDF reader that takes its time, as a long PDF does: it reads once the test ends its sleep, and stops if its task
