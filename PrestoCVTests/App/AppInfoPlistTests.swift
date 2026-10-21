@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import PrestoCV
 
+/// `Tools/Release/check-archive.sh` enforces the same rule on the archive before it is uploaded: change both together.
 @Suite("App Info.plist Tests")
 struct AppInfoPlistTests {
 
