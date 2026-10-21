@@ -104,14 +104,29 @@ struct CertificationReaderTests {
         #expect(found.unplaced.isEmpty)
     }
 
-    @Test("A label before a web address is left out as structure, and the address is the link")
-    func labelledLink() throws {
-        let found = read("Certifications\nSwift Basics – Example Academy, 2023\nCredential: https://academy.example/c/123")
+    @Test("A label of the link, in any of the six languages, is left out as structure, and the address is the link", arguments: [
+        "Credential: https://academy.example/c/123", "Link: https://academy.example/c/123", "Verifica online: https://academy.example/c/123",
+        "Zertifikat https://academy.example/c/123", "Enlace: https://academy.example/c/123", "Lien : https://academy.example/c/123",
+        "Verificar https://academy.example/c/123", "https://academy.example/c/123 (credential)",
+    ])
+    func labelledLink(line: String) throws {
+        let found = read("Certifications\nSwift Basics – Example Academy, 2023\n\(line)")
         let certification = try #require(found.cv.certifications.first)
         #expect(found.cv.certifications.count == 1)
         #expect(certification.link?.value.value == "https://academy.example/c/123")
-        #expect(found.leftOut.map(\.text) == ["Credential"])
-        #expect(found.leftOut.map(\.reason) == [.categoryLabel])
+        #expect(found.leftOut.map(\.reason).allSatisfy { $0 == .categoryLabel })
+        #expect(found.unplaced.isEmpty)
+    }
+
+    @Test("A short certification with a web address in its line is a certification of its own, not the label and link of the one before", arguments: [
+        "Swift Basics https://academy.example/swift", "Swift Basics (2023) https://academy.example/swift",
+        "Swift Basics 2023 https://academy.example/swift", "Swift Basics – academy.dev/swift", "Swift Basics: https://academy.example/swift",
+    ])
+    func titledAddressIsAnEntry(line: String) throws {
+        let found = read("Certifications\nFirst Certificate\n\(line)")
+        #expect(found.cv.certifications.map(\.name.value) == ["First Certificate", "Swift Basics"])
+        #expect(found.cv.certifications.map { $0.link != nil } == [false, true])
+        #expect(found.leftOut.isEmpty)
         #expect(found.unplaced.isEmpty)
     }
 

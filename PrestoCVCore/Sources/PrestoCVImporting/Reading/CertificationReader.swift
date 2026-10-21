@@ -95,19 +95,33 @@ enum CertificationReader {
     }
 
     /// A line goes on with the certification before it when it is a plain line of one cell that is a web address with at
-    /// most a label, or states no date and is a sentence, or is in the regular weight under a title that stood out.
-    /// Anything else, such as a short line in a list of plain lines, is a certification of its own.
+    /// most the label of a link, or states no date and is a sentence, or is in the regular weight under a title that stood
+    /// out. Anything else, such as a short line in a list of plain lines, or a title with its address, is a certification
+    /// of its own.
     private static func continuation(of block: SourceBlock, cells: [Piece], after open: Open) -> Continuation? {
         guard block.kind == .line, cells.count == 1, let cell = cells.first else { return nil }
         let addresses = ContactReader.webAddresses(in: cell)
         let around = cell.removing(addresses.map(\.range))
-        if !addresses.isEmpty, around.reduce(0, { $0 + $1.words.count }) <= 3 {
+        if !addresses.isEmpty, around.allSatisfy({ linkLabels.contains(SectionVocabulary.key($0.text)) }) {
             return .link(addresses: addresses, labels: around)
         }
         guard !around.contains(where: { !DateReader.periods(in: $0.text).isEmpty }) else { return nil }
         let isDescription = EntryReader.readsAsProse(block, text: cell.text) || (open.isEmphasized && !block.isEmphasized)
         return isDescription ? .description : nil
     }
+
+    /// What labels the web address of a certification, in the six languages: "Credential: https://…". A closed list, so
+    /// that a short title with its address is never taken for a label.
+    private static let linkLabels: Set<String> = Set([
+        "link", "url", "web", "website", "credential", "credential url", "credential link", "certificate", "certificate link",
+        "certificate url", "verify", "verify at", "verification", "verification link", "verification url", "view credential",
+        "view certificate", "see credential", "badge", "digital badge", "details", "more info", "more information", "online",
+        "collegamento", "sito", "sito web", "verifica", "verifica online", "credenziale", "attestato", "certificato", "dettagli",
+        "maggiori informazioni", "verknüpfung", "zertifikat", "zertifikatslink", "nachweis", "verifizieren", "überprüfen",
+        "überprüfung", "anmeldedaten", "weitere informationen", "webseite", "enlace", "sitio web", "verificar", "verificación",
+        "credencial", "certificado", "detalles", "más información", "lien", "site web", "vérifier", "vérification", "attestation",
+        "certificat", "détails", "plus d'informations", "ligação", "site", "verificação", "mais informações",
+    ].map(SectionVocabulary.key))
 
     private static func add(_ continuation: Continuation, from line: Piece, to index: Int, in section: Section, into findings: inout Findings) {
         switch continuation {
