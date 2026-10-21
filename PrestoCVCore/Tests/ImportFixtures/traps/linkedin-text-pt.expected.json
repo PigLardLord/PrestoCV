@@ -1,0 +1,14 @@
+{
+ "id": "traps/linkedin-text-pt", "language": "pt", "form": "trap",
+ "person": {"name": "Ana Silva", "title": "Gestora de projetos na Exemplo Consultoria", "email": "ana.silva@example.com", "phone": null,
+            "location": "Coimbra, Portugal", "links": ["https://www.linkedin.com/in/ana-silva-example"],
+            "summary": "Gestora de projetos com oito anos de experiência em consultoria, focada em prazos realistas e equipas motivadas."},
+ "experience": [
+  {"role": "Gestora de projetos", "employer": "Exemplo Consultoria", "location": "Coimbra, Portugal", "start": [2020, 1], "end": "current", "details": 1},
+  {"role": "Analista", "employer": "Exemplo Serviços Lda.", "location": "Aveiro, Portugal", "start": [2016, 9], "end": [2019, 12], "details": 0}
+ ],
+ "education": [{"degree": "Mestrado em Gestão", "school": "Universidade de Coimbra", "start": [2014, null], "end": [2016, null]}],
+ "skills": ["Gestão de projetos", "Excel", "Comunicação"],
+ "languages": [{"name": "Português", "level": "native"}, {"name": "Inglês", "level": null}],
+ "certifications": [], "interests": []
+}

@@ -19,7 +19,11 @@ The checker applies to **production targets**: domain, application, integration,
 ## R1. Packages are isolated; contexts depend only along documented edges
 
 - **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI` never import one another. Translation between them happens only in `PrestoCVIntegration`.
-- **Inside a package, contexts depend only along the edges listed in [modules.md](modules.md).** There is exactly one such edge today: in `CVPDFExporter`, Document Rendering is downstream of Design Catalog (`CVRendering` imports `CVDesignCatalog`). The reverse is forbidden.
+- **Inside a package, contexts depend only along the edges listed in [modules.md](modules.md).** There are two such edges today, and each goes one way:
+  - in `CVPDFExporter`, Document Rendering is downstream of Design Catalog (`CVRendering` imports `CVDesignCatalog`);
+  - in `PrestoCVCore`, CV Import is downstream of CV Authoring (`PrestoCVImporting` imports `PrestoCVDomain`), so that it reads the CV's value objects and period rule instead of copying them ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)).
+
+  The reverse of either is forbidden.
 - **Any other edge** between contexts needs an ADR and an update to [modules.md](modules.md).
 - **`@_exported import` is banned.** It would re-export a module to every importer.
 
@@ -117,7 +121,7 @@ Only `PrestoCVComposition` creates infrastructure: repositories, stores, rendere
 
 ## R8. Untrusted input enters through one validating boundary
 
-Untrusted input is: design packages, AI output, persisted files, and on a backend every request. Each kind enters through one anti-corruption layer that validates it into domain types or rejects it.
+Untrusted input is: design packages, AI output, persisted files, imported documents (pasted text, PDFs) and the text read from them, and on a backend every request. Each kind enters through one anti-corruption layer that validates it into domain types or rejects it.
 
 - **Design packages** ([ADR 0011](adr/0011-typed-html-builder.md)):
   - validated on the raw bytes: size cap first, then strict decoding (unknown keys and any `htmlContent` key are rejected), identifier `[a-z0-9-]{1,64}`, the supported markup contract version, and a PNG preview within size;
@@ -134,6 +138,7 @@ Untrusted input is: design packages, AI output, persisted files, and on a backen
 - **Completeness.** Every export is checked against its own document. Every text node the builder produced (fields, headings, dates, levels) needs **its own span of the PDF text**, ignoring case and spacing, that no other node uses; longer nodes are placed first. So removing one of two identical entries is detected, so is removing a value that also appears inside another one (a skill named in the summary), and so is a value that only appears across the boundary of two others ("Greg" + "Officer" contains "go"). Link destinations are printed as text ([markup contract](../../CVPDFExporter/Docs/markup-contract.md)), so losing one is detected too, even when the clickable annotation is not part of the PDF. A shortfall fails the export.
 - **Installing a design.** A design is stored only after it has been validated and has rendered a fixture document completely. The fixture exercises every section; a truncated render is a failure. The catalog owns the rendering-gate port, and `CVRendering` implements it. The renderer contract runs the same check.
 - **Native evidence.** The native renderers must also pass a geometric check: each field inside the page, and legible. It is pending until they exist ([ADR 0003](adr/0003-one-pdf-renderer-per-platform.md)).
+- **Imported documents** ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)) enter through `ImportCV`. A PDF's bytes and pages are bounded before any text is read, the characters of a pasted or extracted text before it is analysed, and an empty, encrypted or unreadable document, or one without text, is a typed error. The values it yields are quotes of the text, checked against their spans, and e-mail addresses, phone numbers and links are kept only as the domain's value objects.
 - **Documents** arriving as JSON (backend) pass `CVDocumentValidator`: supported version, required name, bounded text and counts, valid dates and ratings.
 - **Persisted files**: see R12.
 

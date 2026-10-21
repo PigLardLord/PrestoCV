@@ -1,0 +1,87 @@
+{
+ "id": "it-giulia/chat",
+ "language": "it",
+ "form": "chat",
+ "person": {
+  "name": "Giulia Bianchi",
+  "title": "Infermiera professionale",
+  "email": "giulia.bianchi@example.com",
+  "phone": "+39 333 000 0101",
+  "location": "Torino, Italia",
+  "links": [
+   "https://linkedin.com/in/giulia-bianchi-example"
+  ],
+  "summary": "Infermiera con sette anni di esperienza in terapia intensiva e cardiologia, attenta al paziente e al lavoro di squadra."
+ },
+ "experience": [
+  {
+   "role": "Infermiera",
+   "employer": "Ospedale Esempio",
+   "location": "Torino",
+   "details": 2,
+   "start": [
+    2019,
+    3
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Infermiera",
+   "employer": "Clinica Esempio",
+   "location": "Milano",
+   "details": 1,
+   "start": [
+    2016,
+    9
+   ],
+   "end": [
+    2019,
+    2
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "Laurea in Infermieristica",
+   "school": "Università degli Studi di Torino",
+   "start": [
+    2013,
+    null
+   ],
+   "end": [
+    2016,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "Terapia intensiva",
+  "Gestione dei turni",
+  "Cartella clinica elettronica"
+ ],
+ "languages": [
+  {
+   "name": "Italiano",
+   "level": "native"
+  },
+  {
+   "name": "Inglese",
+   "level": "b2"
+  },
+  {
+   "name": "Francese",
+   "level": null
+  }
+ ],
+ "certifications": [
+  {
+   "name": "BLSD",
+   "issuer": "Croce Rossa Italiana",
+   "year": 2021
+  }
+ ],
+ "interests": [
+  "Trekking",
+  "Fotografia"
+ ]
+}

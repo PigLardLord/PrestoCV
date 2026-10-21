@@ -1,0 +1,96 @@
+/// Finds the blocks that are no part of the CV and leaves them out with their reason: the Italian consent to data
+/// processing, a template's explanations and footers, page numbers, and the place, date and name of a signature.
+enum NoiseReader {
+
+    static func read(into findings: inout Findings) {
+        let document = findings.document
+        for block in document.blocks {
+            let text = document.text(of: block.span)
+            let folded = text.folded
+            if text.words.count >= 6, consentMarkers.contains(where: { folded.contains($0) }) {
+                findings.leaveOut(block, .consent)
+            } else if templateMarkers.contains(where: { folded.hasPrefix($0) || folded.contains($0) }) {
+                findings.leaveOut(block, .templateText)
+            } else if isPageNumber(text) {
+                findings.leaveOut(block, .pageNumber)
+            }
+        }
+        readSignature(into: &findings)
+    }
+
+    // MARK: Page numbers
+
+    /// "Page 2 of 3", "Seite 2 von 3", "Pagina 2 di 3", "2 / 3", "- 2 -", or a number alone.
+    static func isPageNumber(_ text: String) -> Bool {
+        let words = text.folded.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
+        guard !words.isEmpty, words.count <= 5 else { return false }
+        let numbers = words.filter { $0.allSatisfy(\.isNumber) }
+        guard (1...2).contains(numbers.count), numbers.allSatisfy({ $0.count <= 3 }) else { return false }
+        let others = words.filter { !$0.allSatisfy(\.isNumber) }
+        return others.allSatisfy { pageWords.contains($0) }
+    }
+
+    private static let pageWords: Set<String> = ["page", "pages", "of", "pagina", "di", "seite", "von", "pagina", "de", "sur", "p", "pag", "s", "pg"]
+
+    // MARK: Signature
+
+    /// Among the last blocks of the main column, a line of a place and a full date ("Berlin, 12.03.2026"), the labels of
+    /// a signature, and the name signed under them.
+    private static func readSignature(into findings: inout Findings) {
+        let document = findings.document
+        let main = document.blocks.filter { ($0.column ?? 0) == 0 && !findings.consumedBlocks.contains($0.index) }
+        let last = Array(main.suffix(4))
+        var signed = false
+        for block in last {
+            let text = document.text(of: block.span)
+            let key = SectionVocabulary.key(text)
+            if signatureLabels.contains(key) || signatureLabels.contains(where: { key.hasPrefix($0 + " ") }) && text.words.count <= 6 {
+                findings.leaveOut(block, .signature)
+                signed = true
+            } else if isPlaceAndDate(text) {
+                findings.leaveOut(block, .signature)
+                signed = true
+            } else if signed, HeaderReader.looksLikeName(text) {
+                findings.leaveOut(block, .signature)
+            }
+        }
+    }
+
+    /// A short line with one full date and at most a place before it.
+    static func isPlaceAndDate(_ text: String) -> Bool {
+        guard text.words.count <= 7 else { return false }
+        let dates = DateReader.periods(in: text)
+        guard dates.count == 1, let date = dates.first, date.period.end == nil, date.period.start.month != nil else { return false }
+        let dateText = text[date.range]
+        let numbers = dateText.split(whereSeparator: { !$0.isNumber })
+        let hasDay = numbers.count >= 3 || text[..<date.range.lowerBound].last.map(\.isNumber) == true
+            || text[..<date.range.lowerBound].trimmingSpaces().split(separator: " ").last.map { $0.allSatisfy { $0.isNumber || $0 == "." } } == true
+        let before = text[..<date.range.lowerBound]
+        let beforeWords = before.words.filter { !$0.allSatisfy(\.isNumber) }
+        return hasDay && beforeWords.count <= 3 && text[date.range.upperBound...].trimmingSpaces().isEmpty
+    }
+
+    private static let signatureLabels: Set<String> = Set([
+        "ort datum", "ort und datum", "luogo e data", "luogo data", "lugar y fecha", "lugar fecha", "lieu et date", "lieu date",
+        "local e data", "local data", "place and date", "place date", "firma", "unterschrift", "signature", "assinatura",
+        "in fede", "fait à", "fait a",
+    ].map(SectionVocabulary.key))
+
+    // MARK: Markers
+
+    private static let consentMarkers = [
+        "autorizzo il trattamento", "trattamento dei dati personali", "trattamento dei miei dati", "d.lgs. 196", "d. lgs. 196",
+        "dlgs 196", "196/2003", "regolamento ue 2016/679", "reg. ue 2016/679", "gdpr 679/16", "ai sensi del gdpr",
+        "dsgvo", "datenschutzgrundverordnung", "einwilligung zur verarbeitung", "protección de datos", "lopd", "rgpd",
+        "protection des données", "tratamento dos meus dados", "autorizo o tratamento", "i consent to the processing",
+        "consent to the processing of my personal data",
+    ].map(\.folded)
+
+    private static let templateMarkers = [
+        "acquisite nel corso della vita e della carriera", "[ indicare", "[indicare", "indicare la madrelingua",
+        "descrivere tali competenze", "inserire qui ogni altra informazione", "se pertinente, enumerare", "per ulteriori informazioni sul cedefop",
+        "pagina - curriculum vitae di", "europass.cedefop.europa.eu", "© unione europea", "© european union", "© union européenne",
+        "© europäische union", "© unión europea", "© união europeia", "acquired in the course of life and career",
+        "pour plus d'informations sur europass", "per maggiori informazioni su europass",
+    ].map(\.folded)
+}

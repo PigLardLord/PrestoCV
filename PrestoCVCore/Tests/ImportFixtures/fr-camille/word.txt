@@ -1,0 +1,38 @@
+Camille Laurent
+Développeuse web
+10 rue Exemple, 69002 Lyon
+Téléphone: +33 6 39 98 01 01
+E-mail: camille.laurent@example.com
+linkedin.com/in/camille-laurent-example
+
+PROFIL
+Développeuse web depuis six ans, à l'aise sur le front comme sur le back, attachée à l'accessibilité des interfaces.
+
+PARCOURS PROFESSIONNEL
+Développeuse full stack
+Exemple SAS, Lyon
+Septembre 2021 – aujourd'hui
+• Refonte du site de réservation
+• Mise en place des tests automatisés
+
+Développeuse front-end
+Agence Exemple, Grenoble
+Octobre 2018 – août 2021
+• Sites pour des collectivités locales
+
+ÉTUDES
+2016 – 2018: Master en informatique, Université Lyon 1
+
+COMPÉTENCES TECHNIQUES
+JavaScript, React, PHP, Accessibilité
+
+COMPÉTENCES LINGUISTIQUES
+Français – langue maternelle
+Anglais – C1
+Espagnol – notions
+
+CERTIFICATS
+Opquast Qualité Web, Opquast, 2020
+
+LOISIRS
+Escalade, Cinéma

@@ -1,0 +1,125 @@
+{
+ "id": "en-emily/latex",
+ "language": "en",
+ "form": "latex",
+ "person": {
+  "name": "Emily Carter",
+  "title": "Marketing Manager",
+  "email": "emily.carter@example.com",
+  "phone": "+44 7700 900123",
+  "location": "Manchester, United Kingdom",
+  "links": [
+   "https://linkedin.com/in/emily-carter-example"
+  ],
+  "summary": "Marketing manager with nine years of experience in retail and consumer brands, focused on clear campaigns and measurable results."
+ },
+ "experience": [
+  {
+   "role": "Marketing Manager",
+   "employer": "Acme Retail Ltd",
+   "location": "Manchester",
+   "details": 2,
+   "start": [
+    2020,
+    null
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Marketing Executive",
+   "employer": "Example Brands plc",
+   "location": "Leeds",
+   "details": 1,
+   "start": [
+    2016,
+    null
+   ],
+   "end": [
+    2020,
+    null
+   ]
+  },
+  {
+   "role": "Marketing Assistant",
+   "employer": "Acme Media Ltd",
+   "location": "Sheffield",
+   "details": 3,
+   "start": [
+    2014,
+    null
+   ],
+   "end": [
+    2016,
+    null
+   ]
+  },
+  {
+   "role": "Sales Assistant",
+   "employer": "Example Department Store Ltd",
+   "location": "York",
+   "details": 3,
+   "start": [
+    2012,
+    null
+   ],
+   "end": [
+    2014,
+    null
+   ]
+  },
+  {
+   "role": "Events Volunteer",
+   "employer": "Example Arts Festival",
+   "location": "York",
+   "details": 2,
+   "start": [
+    2011,
+    null
+   ],
+   "end": [
+    2012,
+    null
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "BA in Marketing",
+   "school": "University of Leeds",
+   "start": [
+    2012,
+    null
+   ],
+   "end": [
+    2015,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "Brand strategy",
+  "Google Analytics",
+  "Copywriting"
+ ],
+ "languages": [
+  {
+   "name": "English",
+   "level": "native"
+  },
+  {
+   "name": "French",
+   "level": "b1"
+  }
+ ],
+ "certifications": [
+  {
+   "name": "Google Analytics Certification",
+   "issuer": "Google",
+   "year": 2021
+  }
+ ],
+ "interests": [
+  "Running",
+  "Baking"
+ ]
+}

@@ -2,6 +2,8 @@ import Foundation
 import PrestoCVCore
 import CVGeneratorAI
 import CVPDFExporter
+import PrestoCVImporting
+import PrestoCVImportingPDFKit
 import struct PrestoCVApplication.ChangeStoredCV
 
 /// The composition root of the screens: it makes every view model, with the real services and the part of the device's
@@ -14,6 +16,10 @@ final class ViewModelFactory {
     private let environment: AppEnvironment
     /// The description typed on the AI screen, kept until a draft is made from it.
     private let aiDescriptionSession = AIDescriptionSession()
+    /// The copies the system makes of the PDFs opened in the app, which the import and the router let go.
+    private var openedFileCopies: OpenedFileCopies {
+        OpenedFileCopies(container: environment.container, removeFile: environment.removeFile)
+    }
     
     /// - Parameters:
     ///   - unsavedEditsUseCase: Nil when the unsaved edits cannot be kept on this device: the editor works without them.
@@ -115,6 +121,23 @@ final class ViewModelFactory {
             session: aiDescriptionSession,
             platform: environment.platform
         )
+    }
+
+    /// The import of a CV the person already has: pasted text, or a PDF read with PDFKit, both on the device.
+    @MainActor
+    func makeImportViewModel() -> ImportViewModel {
+        let limits = ImportLimits.standard
+        return ImportViewModel(
+            importer: ImportCV(pdfReader: PDFKitTextExtractor(), limits: limits),
+            mapper: ImportedCVMapper(),
+            fileReader: ChosenFileReader(maximumBytes: limits.maximumPDFBytes, copies: openedFileCopies)
+        )
+    }
+
+    /// The router of the screens. It lets go of a PDF opened in the app that no import will read.
+    @MainActor
+    func makeAppRouter() -> AppRouter {
+        AppRouter(releaseFile: openedFileCopies.release)
     }
 
     // MARK: - Private Composition Root

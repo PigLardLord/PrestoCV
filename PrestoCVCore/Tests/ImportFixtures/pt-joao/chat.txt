@@ -1,0 +1,41 @@
+Com certeza! Aqui está o teu CV num formato profissional:
+
+# João Pereira
+**Eletricista**
+📍 Porto, Portugal | 📞 +351 932 000 202 | ✉️ joao.pereira@example.net | 🔗 linkedin.com/in/joao-pereira-example
+
+---
+
+## Perfil profissional
+Eletricista com doze anos de experiência em instalações residenciais e industriais, cuidadoso com a segurança.
+
+## Experiência profissional
+**Eletricista** | Exemplo Instalações Lda. | Porto | 05/2018 – presente
+- Instalações elétricas em edifícios novos
+- Manutenção de quadros industriais
+
+**Ajudante de eletricista** | Eletro Exemplo | Braga | 02/2013 – 04/2018
+- Apoio em obras residenciais
+
+## Formação académica
+### Curso profissional de eletricidade
+Escola Profissional do Porto, Porto | 2010 – 2013
+
+## Competências
+- Quadros elétricos, Domótica, Leitura de esquemas
+
+## Línguas
+| Language | Level |
+|---|---|
+| Português | nativo |
+| Espanhol | básico |
+
+## Certificações
+- Técnico de segurança elétrica – Exemplo Formação (2019)
+
+## Interesses
+Futebol, Pesca
+
+---
+
+Se quiseres, posso adaptá-lo a uma oferta de emprego específica.

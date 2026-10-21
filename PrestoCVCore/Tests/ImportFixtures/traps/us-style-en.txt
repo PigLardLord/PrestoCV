@@ -1,0 +1,20 @@
+MICHAEL TORRES
+New York, NY  |  (555) 010-0199  |  michael.torres@example.com  |  github.com/mtorres-example
+
+EXPERIENCE
+Acme Corp                                   New York, NY
+Senior Software Engineer                    Jan 2020 – Present
+• Led the rewrite of the billing service in Go
+• Mentored four junior engineers
+
+Example Labs Inc.                           Boston, MA
+Software Engineer                           Jul 2016 – Dec 2019
+• Built the data pipeline for the analytics product
+
+EDUCATION
+Example State University                    Boston, MA
+B.S. in Computer Science                    May 2016
+
+SKILLS
+Languages: Go, Python, TypeScript
+Tools: Kubernetes, PostgreSQL, Terraform

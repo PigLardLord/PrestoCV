@@ -588,3 +588,216 @@ private final class LeavableEditorSpy: LeavableEditor {
         return leaving == .allowed
     }
 }
+
+// MARK: - Import
+
+@MainActor
+@Suite("AppRouter - the import of a CV")
+struct AppRouterImportTests {
+
+    @Test("An imported CV opens in the editor as a new CV, with the notice of its review")
+    func importedCVOpensWithItsReview() {
+        let router = AppRouter(isAIShipped: false)
+        let review = ImportReview(items: [ImportReview.Item(field: .name, reason: .byPosition, text: "Lena Hartmann")], notImported: "")
+        let cv = CVModel(personalInfo: PersonalInfo(name: "Lena Hartmann"))
+
+        router.navigate(to: .importCV)
+        router.navigateToEditorWithImport(ImportedDraft(cv: cv, review: review))
+
+        #expect(router.currentRoute == .cvEditor(.new(template: cv, notice: .imported(review))))
+        #expect(router.navigationPath.count == 2)
+    }
+
+    @Test("A PDF opened in the app opens the import on it once; an import on screen reads it in place")
+    func openedPDFGoesToTheImport() {
+        let router = AppRouter(isAIShipped: false)
+        let file = URL(fileURLWithPath: "/tmp/Inbox/cv.pdf")
+
+        router.openImport(of: file)
+        #expect(router.currentRoute == .importCV)
+        #expect(router.navigationPath.count == 1)
+
+        router.openImport(of: file)
+        #expect(router.navigationPath.count == 1, "The import on screen reads the next PDF itself")
+        #expect(router.takePendingImportFile() == file)
+        #expect(router.takePendingImportFile() == nil, "A PDF is given once")
+    }
+
+    @Test("A PDF opened in the app opens the import again after the import screen was left")
+    func openedPDFReopensALeftImport() {
+        let router = AppRouter(isAIShipped: false)
+        router.navigate(to: .importCV)
+        router.navigateBack()
+
+        router.openImport(of: URL(fileURLWithPath: "/tmp/Inbox/cv.pdf"))
+
+        #expect(router.navigationPath.count == 1)
+    }
+
+    @Test("A PDF opened in the app opens the import again after another screen was opened over the import")
+    func openedPDFReopensACoveredImport() {
+        let router = AppRouter(isAIShipped: false)
+        router.navigate(to: .importCV)
+        router.navigate(to: .cvEditor(.stored(cvId: "first")))
+        router.navigateToRoot()
+
+        router.openImport(of: URL(fileURLWithPath: "/tmp/Inbox/cv.pdf"))
+
+        #expect(router.currentRoute == .importCV)
+        #expect(router.navigationPath.count == 1)
+    }
+
+    @Test("A PDF opened in the app before the import read the one opened earlier lets the earlier one go")
+    func openedPDFReplacesAnUnreadOne() {
+        let released = RemovedFiles()
+        let router = AppRouter(isAIShipped: false, releaseFile: { released.add($0) })
+        let first = URL(fileURLWithPath: "/tmp/Inbox/first.pdf")
+        let second = URL(fileURLWithPath: "/tmp/Inbox/second.pdf")
+
+        router.openImport(of: first)
+        router.openImport(of: second)
+        router.openImport(of: second)
+
+        #expect(released.urls == [first], "The one still to read is not let go, however often it is opened")
+        #expect(router.takePendingImportFile() == second)
+    }
+
+    @Test("A PDF opened in the app waits for the editor on screen to be discarded, as a CV picked meanwhile does")
+    func openedPDFWaitsForTheDiscard() {
+        let released = RemovedFiles()
+        let router = AppRouter(isAIShipped: false, releaseFile: { released.add($0) })
+        let file = URL(fileURLWithPath: "/tmp/Inbox/cv.pdf")
+        router.select(.stored(cvId: "first"))
+        let editor = LeavableEditorSpy(leaving: .asksFirst)
+        router.editorAppeared(editor)
+
+        router.openImport(of: file)
+
+        #expect(editor.leaveRequests == 1)
+        #expect(editor.showingCancelConfirmation, "The editor asks whether to discard the edits")
+        #expect(router.currentRoute == .cvEditor(.stored(cvId: "first")), "Nothing opens before the answer")
+        #expect(router.navigationPath.count == 1)
+        #expect(router.pendingImportFile == nil, "The import screen is not given the PDF before it opens")
+
+        // The person discards the edits
+        router.closeEditor()
+
+        #expect(router.currentRoute == .importCV)
+        #expect(router.navigationPath.count == 1, "The import takes the place of the editor")
+        #expect(router.takePendingImportFile() == file)
+        #expect(released.urls.isEmpty, "The import has the PDF to read")
+    }
+
+    @Test("Keeping the edits lets the PDF opened meanwhile go: leaving later shows the list")
+    func keepingTheEditsLetsTheOpenedPDFGo() {
+        let released = RemovedFiles()
+        let router = AppRouter(isAIShipped: false, releaseFile: { released.add($0) })
+        let file = URL(fileURLWithPath: "/tmp/Inbox/cv.pdf")
+        router.select(.stored(cvId: "first"))
+        let editor = LeavableEditorSpy(leaving: .asksFirst)
+        router.editorAppeared(editor)
+        router.openImport(of: file)
+
+        router.keepEditing()
+        router.closeEditor()
+
+        #expect(editor.leaveRequests == 1)
+        #expect(released.urls == [file])
+        #expect(router.navigationPath.count == 0)
+        #expect(router.pendingImportFile == nil)
+    }
+
+    @Test("A PDF opened in the app while the editor has nothing unsaved opens the import in place of the editor")
+    func openedPDFReplacesAnEditorWithNothingUnsaved() {
+        let released = RemovedFiles()
+        let router = AppRouter(isAIShipped: false, releaseFile: { released.add($0) })
+        let file = URL(fileURLWithPath: "/tmp/Inbox/cv.pdf")
+        router.select(.stored(cvId: "first"))
+        let editor = LeavableEditorSpy(leaving: .allowed)
+        router.editorAppeared(editor)
+
+        router.openImport(of: file)
+
+        #expect(editor.leaveRequests == 1, "The editor is asked first")
+        #expect(router.currentRoute == .importCV)
+        #expect(router.navigationPath.count == 1)
+        #expect(router.takePendingImportFile() == file)
+        #expect(released.urls.isEmpty)
+    }
+
+    @Test("A PDF opened in the app while a save is running opens nothing, and is let go")
+    func openedPDFWhileSavingIsLetGo() {
+        let released = RemovedFiles()
+        let router = AppRouter(isAIShipped: false, releaseFile: { released.add($0) })
+        let file = URL(fileURLWithPath: "/tmp/Inbox/cv.pdf")
+        router.select(.stored(cvId: "first"))
+        let editor = LeavableEditorSpy(leaving: .refused)
+        router.editorAppeared(editor)
+
+        router.openImport(of: file)
+        router.closeEditor()
+
+        #expect(editor.leaveRequests == 1)
+        #expect(released.urls == [file])
+        #expect(router.navigationPath.count == 0, "Leaving after the save shows the list, not the PDF opened during it")
+        #expect(router.pendingImportFile == nil)
+    }
+
+    @Test("The latest request wins while the editor asks: a CV picked after a PDF opened lets the PDF go, and the reverse")
+    func latestRequestWins() {
+        let released = RemovedFiles()
+        let router = AppRouter(isAIShipped: false, releaseFile: { released.add($0) })
+        let file = URL(fileURLWithPath: "/tmp/Inbox/cv.pdf")
+        router.select(.stored(cvId: "first"))
+        let editor = LeavableEditorSpy(leaving: .asksFirst)
+        router.editorAppeared(editor)
+
+        router.openImport(of: file)
+        router.select(.stored(cvId: "second"))
+
+        #expect(released.urls == [file])
+        #expect(router.pendingSelection == .stored(cvId: "second"))
+
+        router.openImport(of: file)
+
+        #expect(router.pendingSelection == nil)
+        router.closeEditor()
+        #expect(router.currentRoute == .importCV)
+        #expect(router.takePendingImportFile() == file)
+        #expect(released.urls == [file], "The PDF the import reads is not let go")
+        #expect(editor.leaveRequests == 3)
+    }
+
+    @Test("The same PDF opened again while the editor asks is the one that waits, not one to let go")
+    func samePDFOpenedAgainWaits() {
+        let released = RemovedFiles()
+        let router = AppRouter(isAIShipped: false, releaseFile: { released.add($0) })
+        let file = URL(fileURLWithPath: "/tmp/Inbox/cv.pdf")
+        router.select(.stored(cvId: "first"))
+        let editor = LeavableEditorSpy(leaving: .asksFirst)
+        router.editorAppeared(editor)
+
+        router.openImport(of: file)
+        router.openImport(of: file)
+        router.closeEditor()
+
+        #expect(editor.leaveRequests == 2)
+        #expect(released.urls.isEmpty)
+        #expect(router.takePendingImportFile() == file)
+    }
+
+    @Test("The editor asks before a PDF opened in the app takes its place when it has unsaved edits")
+    func realEditorAsksBeforeTheImportOpens() {
+        let router = AppRouter(isAIShipped: false)
+        router.select(.stored(cvId: "first"))
+        let editor = CVEditorViewModel(cvId: nil, initialCV: CVModel(), cvManagementUseCase: MockCVManagementUseCase())
+        editor.cv.personalInfo.name = "Marta Rinaldi"
+        router.editorAppeared(editor)
+
+        router.openImport(of: URL(fileURLWithPath: "/tmp/Inbox/cv.pdf"))
+
+        #expect(editor.showingCancelConfirmation)
+        #expect(router.currentRoute == .cvEditor(.stored(cvId: "first")))
+        #expect(router.navigationPath.count == 1)
+    }
+}

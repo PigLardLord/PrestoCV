@@ -27,5 +27,6 @@ Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected*
 | [0024](0024-run-apple-ci-and-releases-on-xcode-cloud.md) | Run the Apple CI and the releases on Xcode Cloud | Accepted |
 | [0025](0025-hold-the-legacy-app-to-the-separation-rules.md) | Hold the legacy app to the separation of views, view models and rules | Accepted |
 | [0026](0026-keep-the-core-portable-to-android.md) | Keep the core portable to Android | Accepted |
+| [0027](0027-import-a-cv-from-its-text-with-rules.md) | Import a CV from its text with rules, in a portable core, every value traced to its source | Accepted |
 
 New ADRs copy [template.md](template.md).

@@ -53,13 +53,17 @@ struct ViewModelFactoryTests {
         unsavedEdits = UnsavedEditsUseCase(repository: repository, now: { Date(timeIntervalSince1970: 1_700_000_000) })
     }
 
-    private func makeFactory(editingIDs: [UUID] = [UUID(), UUID()], keepsUnsavedEdits: Bool = true) throws -> ViewModelFactory {
+    private func makeFactory(
+        editingIDs: [UUID] = [UUID(), UUID()],
+        keepsUnsavedEdits: Bool = true,
+        container: URL? = nil
+    ) throws -> ViewModelFactory {
         let ids = EditingIDs(editingIDs)
         return try ViewModelFactory(
             dependencyContainer: UnusedContainer(),
             cvManagementUseCase: cvs,
             unsavedEditsUseCase: keepsUnsavedEdits ? unsavedEdits : nil,
-            environment: .fixed(newEditingID: { ids.next() })
+            environment: container.map { .fixed(newEditingID: { ids.next() }, container: $0) } ?? .fixed(newEditingID: { ids.next() })
         )
     }
 
@@ -176,5 +180,32 @@ struct ViewModelFactoryTests {
         let reopened = factory.makeAIGenerationViewModel()
 
         #expect(reopened.prompt == "Ward nurse with ten years in intensive care")
+    }
+
+    @Test("The router lets go of a PDF opened in the app that the import never read, in the app's own container")
+    func routerLetsGoOfAnUnreadPDF() throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let router = try makeFactory(container: fixture.container).makeAppRouter()
+        let unread = try fixture.copyInTemporaryInbox(named: "unread.pdf")
+        let latest = try fixture.copyInTemporaryInbox(named: "latest.pdf")
+
+        router.openImport(of: unread)
+        router.openImport(of: latest)
+
+        #expect(!FileManager.default.fileExists(atPath: unread.path))
+        #expect(FileManager.default.fileExists(atPath: latest.path), "The import still has to read it")
+    }
+
+    @Test("The import reads a PDF opened in the app and lets its copy go")
+    func importLetsGoOfTheCopyItRead() async throws {
+        let fixture = try AppContainerFixture()
+        defer { fixture.remove() }
+        let viewModel = try makeFactory(container: fixture.container).makeImportViewModel()
+        let copy = try fixture.copyInTemporaryInbox()
+
+        await viewModel.importFile(at: copy)?.value
+
+        #expect(!FileManager.default.fileExists(atPath: copy.path))
     }
 }

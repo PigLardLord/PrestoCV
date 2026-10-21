@@ -3,7 +3,7 @@ import PrestoCVCore
 import CVPDFExporter
 
 struct AppRootView: View {
-    @StateObject private var router = AppRouter()
+    @StateObject private var router: AppRouter
     @ObservedObject private var onboardingViewModel: OnboardingViewModel
     @ObservedObject private var cvListViewModel: CVListViewModel
     @ObservedObject private var unsavedEditsOffer: UnsavedEditsOfferViewModel
@@ -14,6 +14,7 @@ struct AppRootView: View {
         self.cvListViewModel = dependencies.cvListViewModel
         self.unsavedEditsOffer = dependencies.unsavedEditsOfferViewModel
         self.viewModelFactory = dependencies.viewModelFactory
+        self._router = StateObject(wrappedValue: dependencies.viewModelFactory.makeAppRouter())
     }
     
     var body: some View {
@@ -33,6 +34,10 @@ struct AppRootView: View {
             }
             .navigationDestination(for: Route.self) { route in
                 destinationView(for: router.destination(for: route))
+            }
+            // A PDF opened in the app from the share sheet or Files goes to the import
+            .onOpenURL { url in
+                router.openImport(of: url)
             }
             // At launch, and each time the root shows again, edits an earlier run left unsaved are offered
             .task {
@@ -91,6 +96,8 @@ struct AppRootView: View {
             TemplateSelectionView(viewModel: viewModelFactory.makeNewCVChoicesViewModel())
         case .aiGeneration:
             AIGenerationView(viewModel: viewModelFactory.makeAIGenerationViewModel())
+        case .importCV:
+            ImportView(viewModel: viewModelFactory.makeImportViewModel())
         case .cvEditor(let request):
             CVEditorView(
                 viewModel: viewModelFactory.makeCVEditorViewModel(for: request),

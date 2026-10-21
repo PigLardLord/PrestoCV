@@ -16,13 +16,15 @@ Test targets and test-support targets are described below each package. The chec
 
 ---
 
-## Package `PrestoCVCore` — CV Authoring
+## Package `PrestoCVCore` — CV Authoring and CV Import
 
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
 | `PrestoCVDomain` | domain | iOS, macOS, Linux ✓, Android ✓ | Foundation |
 | `PrestoCVApplication` | application | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVDomain`, Foundation |
 | `PrestoCVPersistence` | outbound adapter | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Glibc, Darwin, Android |
+| `PrestoCVImporting` | domain + application (CV Import) | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVDomain`, Foundation |
+| `PrestoCVImportingPDFKit` | outbound adapter | iOS, macOS | `PrestoCVImporting`, PDFKit, UIKit, AppKit, Foundation |
 
 **`PrestoCVDomain`**
 - **`CV`**, the aggregate:
@@ -68,7 +70,23 @@ Test targets and test-support targets are described below each package. The chec
   - `Quarantine/` with validated restore, erase and purge.
 - `DirectorySampleCVSource`: sample CVs from an injected directory, in the same v1 format and through the store's own reader. They are kept in `PrestoCV/Resources/Samples/`, and the app ships them from the switch to the new stack on (version 1 ships the legacy samples).
 
+**`PrestoCVImporting`** turns a CV someone already has into a draft, with rules only ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)). It is the CV Import context, packaged with Authoring because it reads Authoring's value objects and period rule instead of copying them: the only edge between two contexts inside this package, and it goes one way.
+- **What a reader saw, `ExtractedLayout`:** the lines of a pasted text, or the words of each page of a PDF with their box and style. Untrusted input (R8), bounded by `ImportLimits`.
+- **The document in reading order, `SourceDocument`:** blocks (a line, a heading, a list item, a row of cells) with page, box, column and style when there are any, over one canonical text. `SourceSpan`s count Unicode scalars.
+- **The rules:**
+  - `PlainTextReader` for pasted text, and `LayoutAnalyzer` for pages: lines, cells, a sidebar told from a table, the reading order, repeated headers and footers, page numbers;
+  - normalisation: chat Markdown and chatter, ligatures, line-end hyphenation, icon glyphs;
+  - `SectionVocabulary` and the segmentation by headings in six languages, Europass and Lebenslauf labels included;
+  - the readers of names, contacts, dates and periods, entries, skills, languages and levels, certifications and interests.
+- **The draft, `ImportedCV`:** every value is `Sourced`, with the spans it quotes and the rule that read it, if any. Values the rules are unsure of carry a check reason, and the review list collects them. Text that fits no field is kept as text not imported; noise is left out with its reason. A final gate checks every value against its spans.
+- **The use case, `ImportCV`:** pasted text, or a PDF through the port **`PDFTextExtracting`** (untyped `throws`, cancellable). Typed `ImportError`: empty, too large, too many pages, encrypted, unreadable, no text (a scan).
+- No platform condition, no Apple-only import, no bundle (R11, R18). It is built for Android with the rest of `PrestoCVCore`.
+
+**`PrestoCVImportingPDFKit`** implements `PDFTextExtracting` with PDFKit: each page's words with their box, font size and weight, in PDFKit's order, and nothing decided about the reading order, which the core decides. It checks the size, the page count and the encryption before it reads any text, refuses a page whose text is longer than the characters left before it reads the page's glyphs, counts the words as it reads them, and stops in the middle of a page once its task is cancelled. `characterBounds(at:)` has no box for the line breaks of `PDFPage.string`, so the adapter walks the two together. Every file is wrapped in `#if canImport(PDFKit)`.
+
 **Test support and tests.**
+- **`PrestoCVImportingTests`** may import `PrestoCVImporting`, `PrestoCVDomain`, Testing, Foundation. It holds the unit tests of every rule and the **contract table**: the synthetic corpus under `PrestoCVCore/Tests/ImportFixtures/` (texts, recorded page layouts and their PDFs, each with the fields it states), measured per language and form. No real CV is ever committed.
+- **`PrestoCVImportingPDFKitTests`** (Apple hosts) may import `PrestoCVImportingPDFKit`, `PrestoCVImporting`, Testing, Foundation, PDFKit, and CoreText, with which it draws hostile pages when it runs. Its contract test reads the fixture PDFs with PDFKit and compares the words with the recorded layouts that the Linux tests use.
 - `PrestoCVCoreTestSupport` may import `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Synchronization. It holds:
   - `InMemoryCVRepository`, `SteppingClock`, `SequentialIDGenerator`;
   - the **`CVRepository` contract suite**: round trip with timestamps, create twice, update bumps the revision, stale update and stale delete, 50 concurrent updates from one revision leave exactly one success, update after delete, listing order.
@@ -198,9 +216,9 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
 | `PrestoCVWorkflowPorts` | app ports | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation |
-| `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, Foundation |
+| `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `PrestoCVImporting`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, Foundation |
 | `PrestoCVPresentation` | inbound adapter | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain` (both `internal import`), Observation, Foundation |
-| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVBundledHeadings`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels` |
+| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `PrestoCVImportingPDFKit`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVBundledHeadings`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels` |
 
 **`PrestoCVWorkflowPorts`**
 - The ports that view models consume: `CVEditing` (new, save, load) and `CVExporting` (untyped `throws`, so cancellation passes through).
@@ -211,8 +229,9 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - `EditCVWorkflow`;
   - `ExportCVWorkflow`: from the editor snapshot, with the document language, through the renderer, then the completeness check on the actual PDF;
   - `BrowseDesigns`;
-  - `DraftCVWithAI`: availability, then draft, then an unsaved CV plus its gaps.
-- **Mappers:** `CV → CVDocument` and `CVDraft → CV`. They are exhaustive and deterministic, with typed dates. The draft mapper uses `Period.make` and reports every gap.
+  - `DraftCVWithAI`: availability, then draft, then an unsaved CV plus its gaps;
+  - `ImportCVWorkflow` (planned, [ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)): the import, then an unsaved CV plus its review list and the text not imported.
+- **Mappers:** `CV → CVDocument`, `CVDraft → CV` and, when the import is wired in, `ImportedCV → CV`. They are exhaustive and deterministic, with typed dates. The draft mapper uses `Period.make` and reports every gap.
 
 **`PrestoCVPresentation`**
 - `@Observable @MainActor` view models whose public API holds presentation types only: status enums, and no domain types.
@@ -227,7 +246,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - one `FileCVRepository` and one `FileDesignStore`;
   - the web-view rule list, compiled once;
   - the platform renderer and the PDFKit inspector;
-  - the AI adapter, `TimeSource`, `IDGenerator` and logger;
+  - the AI adapter, the PDFKit reader of the import, `TimeSource`, `IDGenerator` and logger;
   - the `ScreenFactory`.
 - **UI tests and previews** use the production `FileCVRepository` on a temporary directory seeded from fixture JSON. A launch argument selects it. No production target depends on a test-support target.
 
@@ -247,9 +266,10 @@ A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-
 | `Platform/` | the platform shims: iOS-only modifiers wrapped for `Features/`, HTML and PDF previews, sharing, pasteboard, file import and export | SwiftUI, UIKit, AppKit, WebKit, PDFKit, QuickLook, UniformTypeIdentifiers, `CVRenderingWebKitSupport`, `PrestoCVPresentation` |
 | `Resources/` | `Localizable.xcstrings`, sample CV JSON, assets | — |
 
-**The legacy target `PrestoCV`**, which version 1 ships ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), imports the legacy `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI`, and also `PrestoCVDomain` and `PrestoCVApplication`, whose rules its view models call ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)):
+**The legacy target `PrestoCV`**, which version 1 ships ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), imports the legacy `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI`, and also `PrestoCVDomain` and `PrestoCVApplication`, whose rules its view models call ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)), and `PrestoCVImporting` with its PDFKit reader, for the import of version 1 ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)):
 - it imports each declaration of the two by name (`import struct PrestoCVDomain.ExportPolicy`), since the legacy `PrestoCVCore` declares types with the same names;
 - its adapters from the legacy `CVModel` to the plain values the rules read are in `PrestoCV/Shared/CoreRules/`;
+- its mapper from an `ImportedCV` to an unsaved `CVModel` is in `PrestoCV/Features/Import/`, as the AI draft's is in `PrestoCV/Features/AIGeneration/`; the PDFs it opens from the share sheet are declared in `PrestoCV/Info.plist`, which Xcode merges with the generated one;
 - the checker holds it to R5 and R17, and its test target to R16.
 
 ---
@@ -270,13 +290,15 @@ Packages under `Tools/` that check the repository. They are `tool` targets in `r
 
 ```
 PrestoCV (app) ─▶ PrestoCVPresentation ─▶ PrestoCVWorkflowPorts ─▶ PrestoCVApplication ─▶ PrestoCVDomain
-     │                                     ▲
-     │                     PrestoCVIntegration ┴─▶ CVRendering ─┬─▶ CVDocumentModel
-     │                                    │                └─▶ CVDesignCatalog
-     │                                    └─▶ CVDrafting
-     └────▶ PrestoCVComposition ─▶ (all of the above) + PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns, CVBundledHeadings,
+     │                                     ▲                                                  ▲
+     │                     PrestoCVIntegration ┴─▶ CVRendering ─┬─▶ CVDocumentModel             │
+     │                                    │                └─▶ CVDesignCatalog              │
+     │                                    ├─▶ CVDrafting                                     │
+     │                                    └─▶ PrestoCVImporting ─────────────────────────────┘
+     └────▶ PrestoCVComposition ─▶ (all of the above) + PrestoCVPersistence, PrestoCVImportingPDFKit, CVDesignCatalogFileStore, CVBundledDesigns, CVBundledHeadings,
                                 CVRenderingWebKitSupport, CVRenderingIOS | CVRenderingMacOS,
                                 CVRenderingPDFKitInspector, CVDraftingFoundationModels
+PrestoCVImportingPDFKit ─▶ PrestoCVImporting
 
 Forbidden: any edge between PrestoCVCore, CVPDFExporter and CVGeneratorAI.
 Forbidden: any edge from a domain, application or port target to an adapter target.

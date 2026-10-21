@@ -1,0 +1,11 @@
+{
+ "id": "traps/consent-it", "language": "it", "form": "trap",
+ "person": {"name": "Luca Ferrari", "title": "Magazziniere", "email": "luca.ferrari@example.com", "phone": "345 000 0404",
+            "location": "Via Esempio 4, 37121 Verona", "links": [], "summary": null},
+ "experience": [
+  {"role": "Magazziniere", "employer": "Logistica Esempio S.p.A.", "location": "Verona", "start": [2017, null], "end": "current", "details": 2},
+  {"role": "Addetto alle vendite", "employer": "Negozio Esempio", "location": "Vicenza", "start": [2013, null], "end": [2017, null], "details": 0}
+ ],
+ "education": [{"degree": "Diploma di perito commerciale", "school": "ITC Esempio", "start": [2013, null], "end": null}],
+ "skills": [], "languages": [], "certifications": [], "interests": []
+}

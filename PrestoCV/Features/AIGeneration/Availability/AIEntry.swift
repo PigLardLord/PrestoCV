@@ -1,7 +1,7 @@
 import CVGeneratorAI
 
 /// What the first run and the "New CV" screen offer for AI drafting, given whether the model can run now and where the
-/// app runs: where the entry goes, whether it works, and the texts that say so. The views render it.
+/// app runs: whether there is an entry, whether it works, and the texts that say so. The views render it.
 enum AIEntry: Equatable {
     /// The AI draft works.
     case available
@@ -79,23 +79,6 @@ enum AIEntry: Equatable {
     }
 
     // MARK: - Presentation
-
-    /// Where the entry goes among the ways to start.
-    enum Position: Equatable {
-        /// Before the others: the AI draft works.
-        case first
-        /// After the ways to start that work.
-        case last
-    }
-
-    /// Where the entry goes, or nil where there is none.
-    var position: Position? {
-        switch self {
-        case .available: return .first
-        case .disabled: return .last
-        case .hidden: return nil
-        }
-    }
 
     /// Whether the entry is shown dimmed: it cannot draft, and it says why.
     var isDimmed: Bool {

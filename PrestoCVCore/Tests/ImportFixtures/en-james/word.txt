@@ -1,0 +1,37 @@
+James O'Neill
+Data Analyst
+4 Sample Road, Dublin
+Phone: +44 7700 900456
+Email: james.oneill@example.org
+linkedin.com/in/james-oneill-example
+
+PROFILE
+Data analyst who turns messy spreadsheets into dashboards people use, with a background in logistics.
+
+EMPLOYMENT HISTORY
+Data Analyst
+Example Logistics Ltd, Dublin
+06/2021 – Present
+• Built weekly dashboards for the operations team
+• Automated reports that took a day each week
+
+Operations Coordinator
+Acme Freight Ltd, Cork
+09/2017 – 05/2021
+• Planned routes for a fleet of forty vans
+
+EDUCATION AND TRAINING
+2016 – 2017: MSc in Business Analytics, University College Dublin
+
+KEY SKILLS
+SQL, Python, Power BI
+
+LANGUAGES
+English – native
+Spanish – conversational
+
+LICENCES & CERTIFICATIONS
+Microsoft Certified: Power BI Data Analyst Associate, Microsoft, 2022
+
+HOBBIES
+Hiking, Chess

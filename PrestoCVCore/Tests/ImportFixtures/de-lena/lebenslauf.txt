@@ -1,0 +1,38 @@
+Lebenslauf
+
+Persönliche Daten
+Name:	Lena Hartmann
+Anschrift:	Musterstraße 5, 04109 Leipzig
+Telefon:	+49 170 0000101
+E-Mail:	lena.hartmann@example.com
+Geburtsdatum:	14.05.1992
+Staatsangehörigkeit:	deutsch
+
+Berufserfahrung
+03/2019 – heute	Projektleiterin Elektrotechnik
+	Beispiel GmbH, Leipzig
+	• Planung von Elektroinstallationen in Bürogebäuden
+	• Leitung eines Teams von fünf Monteuren
+09/2015 – 02/2019	Elektrikerin
+	Muster Elektro AG, Dresden
+	• Installation und Wartung von Schaltanlagen
+
+Ausbildung
+09/2012 – 07/2015	Ausbildung zur Elektronikerin für Energie- und Gebäudetechnik
+	Berufsschule Leipzig, Leipzig
+
+Kenntnisse
+Fachlich:	KNX, SPS-Programmierung, AutoCAD
+
+Sprachen
+Deutsch	Muttersprache
+Englisch	verhandlungssicher (C1)
+
+Weiterbildungen
+2020	Elektrofachkraft für Prüfungen, TÜV Beispiel
+
+Hobbys
+Klettern, Fotografie
+
+Leipzig, 12.03.2026
+Lena Hartmann

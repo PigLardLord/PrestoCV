@@ -19,6 +19,7 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 | **CV Authoring** | core domain | The CV aggregate and its entries, their invariants and lifecycle; sample CVs; the reference to the chosen design | `PrestoCVCore` |
 | **Design Catalog** | supporting | Design packages (`.mcvt`), their validation, installation, versions and listing | `CVPDFExporter` |
 | **Document Rendering** | generic | Turning a document plus a design into HTML, and HTML into PDF, per platform | `CVPDFExporter` |
+| **CV Import** | supporting | Turning a CV someone already has (pasted text, a text PDF) into a draft by rules, every value traced to its source ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)) | `PrestoCVCore` (`PrestoCVImporting`), downstream of Authoring |
 | **AI Drafting** | supporting | Producing a CV draft from a free-text description with the on-device model | `CVGeneratorAI` |
 | **App** | integration and presentation | Cross-context workflows, the mappers between contexts, view models, views, the composition root | `PrestoCVApp` package + Xcode app target |
 
@@ -40,7 +41,7 @@ CV optimisation will come later from external APIs, as a separate context. AI ta
                               no arrows between the three packages
 ```
 
-- The three domain packages **never import each other**. Each publishes its own model: `CV` in Authoring, `CVDocument` in Rendering, `CVDraft` in Drafting.
+- The three domain packages **never import each other**. Each publishes its own model: `CV` in Authoring, `CVDocument` in Rendering, `CVDraft` in Drafting, and `ImportedCV` in Import, which lives in Authoring's package and reads Authoring's value objects.
 - Inside `CVPDFExporter`, Document Rendering is downstream of Design Catalog: it consumes validated stylesheets and palettes. That is the only edge between contexts inside a package, and it goes one way ([R1](rules.md#r1-packages-are-isolated-contexts-depend-only-along-documented-edges)).
 - All translation between contexts happens in one place: the app's integration layer (`PrestoCVIntegration`). Each mapper is exhaustive and tested ([ADR 0007](adr/0007-each-package-owns-its-model.md)).
 - `CVPDFExporter` is reusable outside the app, including on a Linux backend ([ADR 0002](adr/0002-cvpdfexporter-standalone-and-portable.md)).
@@ -54,7 +55,7 @@ Xcode app target "PrestoCV" (iOS 26.5, macOS 26) — SwiftUI views, design syste
    └──▶ PrestoCVComposition ──▶ everything below, renderer chosen per platform
                                    │
 PrestoCVApp package                    │
-  PrestoCVIntegration ─────────────────┼──▶ PrestoCVWorkflowPorts, PrestoCVApplication, PrestoCVDomain
+  PrestoCVIntegration ─────────────────┼──▶ PrestoCVWorkflowPorts, PrestoCVApplication, PrestoCVDomain, PrestoCVImporting
                                    ├──▶ CVDocumentModel, CVDesignCatalog, CVRendering
                                    └──▶ CVDrafting
   PrestoCVComposition ──▶ PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns, CVBundledHeadings,
@@ -62,6 +63,7 @@ PrestoCVApp package                    │
                       CVRenderingPDFKitInspector, CVDraftingFoundationModels
 
 PrestoCVCore package        PrestoCVDomain ◀── PrestoCVApplication ◀── PrestoCVPersistence
+                        PrestoCVDomain ◀── PrestoCVImporting ◀── PrestoCVImportingPDFKit
 CVPDFExporter package   CVDocumentModel ◀── CVRendering ──▶ CVDesignCatalog ◀── CVDesignCatalogFileStore, CVBundledDesigns
                         CVRendering ◀── CVRenderingWebKitSupport ◀── CVRenderingIOS / CVRenderingMacOS
                         CVRendering ◀── CVRenderingPDFKitInspector, CVBundledHeadings
@@ -91,12 +93,13 @@ Dependencies point inwards only. The domain knows nothing about storage, UI, loc
 
 | Module group | iOS | macOS | Linux | Android |
 |---|---|---|---|---|
-| Domain, application, persistence, design catalog, rendering core, drafting core, integration, presentation | ✓ | ✓ | ✓ must build and test | ✓ must build |
+| Domain, application, persistence, import core, design catalog, rendering core, drafting core, integration, presentation | ✓ | ✓ | ✓ must build and test | ✓ must build |
 | `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector` | ✓ | ✓ | | |
 | `CVRenderingIOS` | ✓ | | | |
 | `CVRenderingMacOS` | | ✓ | | |
 | Test-support targets | ✓ | ✓ | ✓ | ✓ must build |
 | `CVDraftingFoundationModels` | ✓ 26 | ✓ 26 | | |
+| `PrestoCVImportingPDFKit` | ✓ | ✓ | | |
 | Xcode app target | ✓ 26 | ✓ 26 | | |
 
 Linux support is not a nice-to-have. It is what proves that platform code stayed in the adapters ([R11](rules.md#r11-platform-code-lives-only-in-adapters)), and it is where the renderer for a backend will run.
