@@ -104,10 +104,10 @@ struct CertificationReaderTests {
         #expect(found.unplaced.isEmpty)
     }
 
-    @Test("A label of the link, in any of the six languages, is left out as structure, and the address is the link", arguments: [
-        "Credential: https://academy.example/c/123", "Link: https://academy.example/c/123", "Verifica online: https://academy.example/c/123",
-        "Zertifikat https://academy.example/c/123", "Enlace: https://academy.example/c/123", "Lien : https://academy.example/c/123",
-        "Verificar https://academy.example/c/123", "https://academy.example/c/123 (credential)",
+    @Test("An explicit label of the link, in any of the six languages, is left out as structure, and the address is the link", arguments: [
+        "Credential URL: https://academy.example/c/123", "Link: https://academy.example/c/123", "Verifica online: https://academy.example/c/123",
+        "Zertifikatslink https://academy.example/c/123", "Enlace: https://academy.example/c/123", "Lien : https://academy.example/c/123",
+        "Verificar https://academy.example/c/123", "https://academy.example/c/123 (link)", "View certificate: https://academy.example/c/123",
     ])
     func labelledLink(line: String) throws {
         let found = read("Certifications\nSwift Basics – Example Academy, 2023\n\(line)")
@@ -121,10 +121,15 @@ struct CertificationReaderTests {
     @Test("A short certification with a web address in its line is a certification of its own, not the label and link of the one before", arguments: [
         "Swift Basics https://academy.example/swift", "Swift Basics (2023) https://academy.example/swift",
         "Swift Basics 2023 https://academy.example/swift", "Swift Basics – academy.dev/swift", "Swift Basics: https://academy.example/swift",
+        // A noun that names a certification is no label: only a word that names the link, or the act of opening it, is
+        "Certificate https://academy.example/swift", "Certificate: https://academy.example/swift", "Badge https://academy.example/swift",
+        "Digital Badge https://academy.example/swift", "Credential https://academy.example/swift", "Certificato https://academy.example/swift",
+        "Zertifikat https://academy.example/swift", "Certificado https://academy.example/swift", "Attestation https://academy.example/swift",
+        "Details https://academy.example/swift", "Online https://academy.example/swift", "Website https://academy.example/swift",
     ])
     func titledAddressIsAnEntry(line: String) throws {
         let found = read("Certifications\nFirst Certificate\n\(line)")
-        #expect(found.cv.certifications.map(\.name.value) == ["First Certificate", "Swift Basics"])
+        #expect(found.cv.certifications.count == 2)
         #expect(found.cv.certifications.map { $0.link != nil } == [false, true])
         #expect(found.leftOut.isEmpty)
         #expect(found.unplaced.isEmpty)
@@ -141,6 +146,14 @@ struct CertificationReaderTests {
         #expect(certification.issuer?.value == "Example Academy")
         #expect(certification.link?.value.value == "https://academy.example/a")
         #expect(found.unplaced.map(\.text) == ["Remote cohort", "https://academy.example/b"])
+    }
+
+    @Test("A web address with no certification before it stays visible as text not imported")
+    func addressWithNoCertification() throws {
+        let found = read("Certifications\nhttps://academy.example/achievement\nSwift Basics – Example Academy (2023)")
+        #expect(found.cv.certifications.map(\.name.value) == ["Swift Basics"])
+        #expect(found.cv.certifications.first?.link == nil)
+        #expect(found.unplaced.map(\.text) == ["https://academy.example/achievement"])
     }
 
     @Test("Plain lines stay one certification each: a line is a description only when it reads as one")

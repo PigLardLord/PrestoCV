@@ -110,17 +110,19 @@ enum CertificationReader {
         return isDescription ? .description : nil
     }
 
-    /// What labels the web address of a certification, in the six languages: "Credential: https://…". A closed list, so
-    /// that a short title with its address is never taken for a label.
+    /// What labels the web address of a certification, in the six languages: "Credential URL: https://…". A closed list of
+    /// words that name the link itself, or the act of opening or verifying it. A noun that could be the name of a
+    /// certification ("Certificate", "Badge", "Credential") is no label: a line that starts with one is a certification
+    /// of its own, whose address is its link.
     private static let linkLabels: Set<String> = Set([
-        "link", "url", "web", "website", "credential", "credential url", "credential link", "certificate", "certificate link",
-        "certificate url", "verify", "verify at", "verification", "verification link", "verification url", "view credential",
-        "view certificate", "see credential", "badge", "digital badge", "details", "more info", "more information", "online",
-        "collegamento", "sito", "sito web", "verifica", "verifica online", "credenziale", "attestato", "certificato", "dettagli",
-        "maggiori informazioni", "verknüpfung", "zertifikat", "zertifikatslink", "nachweis", "verifizieren", "überprüfen",
-        "überprüfung", "anmeldedaten", "weitere informationen", "webseite", "enlace", "sitio web", "verificar", "verificación",
-        "credencial", "certificado", "detalles", "más información", "lien", "site web", "vérifier", "vérification", "attestation",
-        "certificat", "détails", "plus d'informations", "ligação", "site", "verificação", "mais informações",
+        "link", "url", "credential url", "credential link", "certificate link", "certificate url", "verify", "verify at",
+        "verification", "verification link", "verification url", "view credential", "view certificate", "see credential",
+        "show credential", "more info", "more information",
+        "collegamento", "verifica", "verifica online", "maggiori informazioni",
+        "verknüpfung", "zertifikatslink", "verifizieren", "überprüfen", "überprüfung", "weitere informationen",
+        "enlace", "verificar", "verificación", "más información",
+        "lien", "vérifier", "vérification", "plus d'informations",
+        "ligação", "verificação", "mais informações",
     ].map(SectionVocabulary.key))
 
     private static func add(_ continuation: Continuation, from line: Piece, to index: Int, in section: Section, into findings: inout Findings) {
