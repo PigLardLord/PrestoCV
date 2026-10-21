@@ -54,7 +54,7 @@ Characters are Unicode characters; keywords are counted in UTF-8 bytes, which is
 | pt-PT | 30 | 29 | 94 | 168 | 2641 | 27 / 61 (6 captions) | 215 |
 | pt-BR | 28 | 29 | 95 | 162 | 2586 | 27 / 61 (6 captions) | 205 |
 
-Notes for App Review: 3901 characters (4000).
+Notes for App Review: 3961 characters (4000).
 <!-- counts:end -->
 
 ## Notes for App Review
@@ -66,8 +66,8 @@ PrestoCV is a CV maker for iPhone and iPad. It has no account, no sign-in, no in
 
 WITHOUT THE AI DRAFT (any iPhone or iPad)
 1. On the first launch, tap "Start from an example" and choose one of the five examples, or tap "Create My First CV" for a blank CV. Later, the + button in My CVs opens the New CV screen with the same choices, "Empty CV" and "Example CV".
-2. Edit any section and tap Save. The examples leave the name and the contact details blank: add a name and an email, because the PDF needs both.
-3. Tap "Preview & export". Choose a design, a font style and a color palette in the Templates, Fonts and Colors tabs; the preview updates.
+2. Edit any section and tap Save, the checkmark at the top right. The examples leave the name and the contact details blank: add a name and an email, because the PDF needs both.
+3. Tap "Preview & export", the share symbol beside it. Choose a design, a font style and a color palette in the Templates, Fonts and Colors tabs; the preview updates.
 4. Tap "Send or save PDF". The share sheet opens; Save to Files, for example, saves the PDF.
 5. Unsaved changes: change a CV without saving, leave the app and close it from the app switcher. On the next launch, the app offers to restore the changes.
 
