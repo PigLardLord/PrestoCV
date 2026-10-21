@@ -27,12 +27,9 @@ enum ContactReader {
                 consumed.append(range)
             }
         }
-        for range in tokenRanges(in: text) where !consumed.contains(where: { $0.overlaps(range) }) {
-            let candidate = piece.sub(range)
-            if let link = link(candidate) {
-                contacts.links.append(link)
-                consumed.append(range)
-            }
+        for (link, range) in webAddresses(in: piece) where !consumed.contains(where: { $0.overlaps(range) }) {
+            contacts.links.append(link)
+            consumed.append(range)
         }
         for range in phoneRanges(in: text) where !consumed.contains(where: { $0.overlaps(range) }) {
             let candidate = piece.sub(range)
@@ -90,6 +87,11 @@ enum ContactReader {
     }
 
     // MARK: Web addresses
+
+    /// The web addresses in a piece of text, each with its range there.
+    static func webAddresses(in piece: Piece) -> [(link: ImportedLink, range: Range<String.Index>)] {
+        tokenRanges(in: piece.text).compactMap { range in link(piece.sub(range)).map { ($0, range) } }
+    }
 
     /// The ranges of the text's words, without the brackets and punctuation around them.
     private static func tokenRanges(in text: String) -> [Range<String.Index>] {

@@ -20,7 +20,7 @@ public struct LeftOutText: Hashable, Sendable {
         case documentTitle
         /// A template's placeholder in brackets, such as "[Your phone number]".
         case placeholder
-        /// The label of a group of skills, such as "Tools:".
+        /// The label of a group of skills, such as "Tools:", or of a value that follows it, such as a certification's "Credential:".
         case categoryLabel
         /// The explanations a template prints, such as the formato europeo's "[Indicare la madrelingua]".
         case templateText

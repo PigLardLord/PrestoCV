@@ -123,6 +123,10 @@ public struct ImportedCertification: Hashable, Sendable {
     public var name: Sourced<String>
     public var issuer: Sourced<String>?
     public var year: Sourced<Int>?
+    /// The web address the text gives for the certification, in its line or under it.
+    public var link: Sourced<WebLink>?
+    /// The lines under the certification that tell what it is, in order.
+    public var description: Sourced<String>?
 }
 
 // MARK: - What was not imported

@@ -91,6 +91,28 @@ struct ImportedCVMapperTests {
         #expect(cv.documentLanguage == "de")
     }
 
+    @Test("A certification keeps its brackets, and its issuer, year, link and description reach the CV")
+    func certificationFields() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Certifications
+        Applied Swift Series (Pro, Level Advanced) — Example Academy (2024)
+        https://academy.example/achievement
+        Covers actors and structured concurrency in depth.
+        Includes a capstone project reviewed by a mentor.
+        Our Best Practice (Pro, Remote Edition) — Beispiel Institut (2023)
+        """))
+        let certifications = draft.cv.certifications
+
+        #expect(certifications.map(\.name) == ["Applied Swift Series (Pro, Level Advanced)", "Our Best Practice (Pro, Remote Edition)"])
+        #expect(certifications.map(\.issuer) == ["Example Academy", "Beispiel Institut"])
+        #expect(certifications.map(\.year) == [2024, 2023])
+        #expect(certifications.map(\.url) == ["https://academy.example/achievement", ""])
+        #expect(certifications.map(\.description) == [
+            "Covers actors and structured concurrency in depth.\nIncludes a capstone project reviewed by a mentor.", "",
+        ])
+        #expect(draft.review.notImported.isEmpty, "Nothing the rules placed is listed again as text not imported")
+    }
+
     @Test("A language without a CEFR level is not added, since the CV needs one: it is listed to check and kept to copy")
     func languageWithoutLevel() throws {
         let draft = ImportedCVMapper().map(try importedText(text))

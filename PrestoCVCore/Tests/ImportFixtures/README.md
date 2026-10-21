@@ -26,7 +26,8 @@ read by `ContractTableTests` in `PrestoCVImportingTests` and, for the PDFs, by t
   A PDF comes with `*.layout.json`: the words and boxes a PDF reader sees, which the Linux tests read.
 - **`traps/`**: hand-written CVs in other styles, each with the trap it sets: references with their contacts, levels
   drawn as bars, "seit 2019" and a signature, the consent to data processing, an employer before the role, the one-line
-  headers of a US résumé, LinkedIn's PDF copied as text with its sidebar first, labelled personal details.
+  headers of a US résumé, LinkedIn's PDF copied as text with its sidebar first, labelled personal details, certifications whose
+  titles hold brackets with a comma, with a link and a description.
 - **`scan/scan.pdf`**: a PDF with no text layer.
 - **`*.expected.json`**: the fields each fixture states, which the table compares with what the import found.
 - **`index.json`**: every fixture, its language, form and files.

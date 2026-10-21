@@ -1,0 +1,16 @@
+LENA MARSH
+Software Developer
+Leeds, United Kingdom · lena.marsh@example.com
+
+EXPERIENCE
+Software Developer, Example Systems Ltd | 2019 – 2024
+- Built the booking service
+
+CERTIFICATIONS
+Applied Swift Series (Pro, Level Advanced) — Example Academy (2024)
+https://academy.example/achievement
+Covers actors and structured concurrency in depth.
+Includes a capstone project reviewed by a mentor.
+Our Best Practice [Remote, Self-paced] — Beispiel Institut (2023)
+Server Side Swift (Beta | Level 2) – Example Institute, 2022
+BLS Provider (Basic Life Support)

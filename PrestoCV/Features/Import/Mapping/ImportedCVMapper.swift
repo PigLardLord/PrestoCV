@@ -60,7 +60,10 @@ struct ImportedCVMapper {
             skills: imported.skills.map { Skill(name: $0.value) },
             languages: languages,
             certifications: imported.certifications.map { certification in
-                Certification(name: certification.name.value, issuer: certification.issuer?.value ?? "", year: certification.year?.value ?? 0)
+                Certification(
+                    name: certification.name.value, issuer: certification.issuer?.value ?? "", year: certification.year?.value ?? 0,
+                    url: certification.link?.value.value ?? "", description: certification.description?.value ?? ""
+                )
             },
             interests: imported.interests.map(\.value),
             social: person.links.compactMap(social),

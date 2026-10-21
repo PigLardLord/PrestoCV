@@ -67,6 +67,9 @@ enum Corpus {
             let name: String
             let issuer: String?
             let year: Int?
+            /// The web address and the description the text states; absent where it states none.
+            let link: String?
+            let description: String?
         }
 
         let id: String
