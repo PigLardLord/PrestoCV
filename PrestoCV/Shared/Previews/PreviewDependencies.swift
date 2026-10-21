@@ -25,6 +25,7 @@ enum PreviewDependencies {
             cvManagementUseCase: cvManagement(),
             documentLanguageDetector: documentLanguageDetector,
             clock: ContinuousClock(),
+            awaitLeftEditors: {},
             reportSaveFailure: { _ in }
         )
     }
@@ -57,7 +58,8 @@ enum PreviewDependencies {
             locale: Locale(identifier: "en"),
             now: { Date(timeIntervalSinceReferenceDate: 800_000_000) },
             calendar: { Calendar(identifier: .gregorian) },
-            sleep: { _ in }
+            sleep: { _ in },
+            awaitLeftEditors: {}
         )
     }
 

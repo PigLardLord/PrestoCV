@@ -259,34 +259,39 @@ struct AppRouterImportTests {
 
     @Test("A PDF opened in the app after the editor was left opens the import without saving the editor again")
     func openedPDFAfterTheEditorWasLeft() async {
-        let router = AppRouter(isAIShipped: false)
+        let saves = LeftEditorSaves()
+        let router = AppRouter(isAIShipped: false, leftEditorSaves: saves)
         router.openEditor(.stored(cvId: "first"))
         let editor = LeavableEditorSpy(saves: false)
         router.editorAppeared(editor)
         router.navigateBack()
         router.editorDisappeared(editor)
+        await saves.allEnded()
+        #expect(editor.saves == 1, "Leaving the editor stores what it showed")
 
         await router.openImport(of: URL(fileURLWithPath: "/tmp/Inbox/cv.pdf"))
 
-        #expect(editor.saves == 0)
+        #expect(editor.saves == 1, "The import does not store it again")
         #expect(router.currentRoute == .importCV)
         #expect(router.navigationPath.count == 1)
     }
 
     @Test("An editor that disappears after another appeared leaves the one on screen to be saved")
     func anotherEditorDisappearing() async {
-        let router = AppRouter(isAIShipped: false)
+        let saves = LeftEditorSaves()
+        let router = AppRouter(isAIShipped: false, leftEditorSaves: saves)
         let left = LeavableEditorSpy(saves: true)
         let shown = LeavableEditorSpy(saves: true)
         router.editorAppeared(left)
         router.openEditor(.stored(cvId: "second"))
         router.editorAppeared(shown)
         router.editorDisappeared(left)
+        await saves.allEnded()
 
         await router.openImport(of: URL(fileURLWithPath: "/tmp/Inbox/cv.pdf"))
 
-        #expect(shown.saves == 1)
-        #expect(left.saves == 0)
+        #expect(shown.saves == 1, "The editor on screen is stored before the import takes its place")
+        #expect(left.saves == 1, "The one that disappeared was stored when it did, and is not stored again")
     }
 
     @Test("The editor on screen stores its edits before a PDF opened in the app takes its place")
@@ -304,6 +309,138 @@ struct AppRouterImportTests {
         #expect(try #require(await cvs.createdCVs.first).personalInfo.name == "Marta Rinaldi")
         #expect(router.currentRoute == .importCV)
     }
+
+    // MARK: - Back from the editor
+
+    @Test("Back stores what the editor shows, and then leaves it")
+    func backStoresThenLeaves() async throws {
+        let cvs = MockCVManagementUseCase()
+        let stored = CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi"))
+        await cvs.storeCV(stored)
+        let router = AppRouter(isAIShipped: false)
+        let editor = CVEditorViewModel(cvId: stored.id.uuidString, cvManagementUseCase: cvs)
+        await editor.loadCV()
+        router.openEditor(.stored(cvId: stored.id.uuidString))
+        router.editorAppeared(editor)
+        editor.cv.personalInfo.phone = "+39 333 1234567"
+
+        await router.leaveEditor(editor)
+
+        #expect(router.navigationPath.isEmpty, "The list is back")
+        #expect(await cvs.updatedCVs.map(\.personalInfo.phone) == ["+39 333 1234567"], "The edits were stored before the editor left")
+    }
+
+    @Test("Back from an editor whose store keeps failing leaves nothing: the editor stays with its edits and its failure")
+    func backWithAFailingStoreKeepsTheEdits() async throws {
+        let cvs = MockCVManagementUseCase()
+        let stored = CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi"))
+        await cvs.storeCV(stored)
+        await cvs.setUpdateCVError(AppError.fileSystemError("disk full"))
+        let router = AppRouter(isAIShipped: false)
+        let editor = CVEditorViewModel(cvId: stored.id.uuidString, cvManagementUseCase: cvs)
+        await editor.loadCV()
+        router.openEditor(.stored(cvId: stored.id.uuidString))
+        router.editorAppeared(editor)
+        editor.cv.personalInfo.phone = "+39 333 1234567"
+
+        await router.leaveEditor(editor)
+        await router.leaveEditor(editor)
+
+        #expect(router.navigationPath.count == 1, "Back, however often it is tried, does not leave the edits behind")
+        #expect(editor.showsSaveFailure, "The editor says why")
+        #expect(editor.cv.personalInfo.phone == "+39 333 1234567", "The edits are still in the editor")
+        #expect(await cvs.updateCVCallCount == 2, "Each Back tries to store them again")
+
+        await cvs.setUpdateCVError(nil)
+        await router.leaveEditor(editor)
+
+        #expect(router.navigationPath.isEmpty, "Once the store works, Back stores the edits and leaves")
+        #expect(await cvs.updatedCVs.map(\.personalInfo.phone) == ["+39 333 1234567"])
+    }
+
+    @Test("Back from a new CV that cannot be stored yet keeps it in the editor too")
+    func backWithANewCVThatCannotBeStored() async throws {
+        let cvs = MockCVManagementUseCase()
+        await cvs.setCreateCVResult(.failure(AppError.fileSystemError("disk full")))
+        let router = AppRouter(isAIShipped: false)
+        let editor = CVEditorViewModel(cvId: nil, cvManagementUseCase: cvs)
+        router.openEditor(.new(template: CVModel(), notice: nil))
+        router.editorAppeared(editor)
+        editor.cv.personalInfo.name = "Marta Rinaldi"
+
+        await router.leaveEditor(editor)
+
+        #expect(router.navigationPath.count == 1)
+        #expect(editor.showsSaveFailure)
+        #expect(editor.cv.personalInfo.name == "Marta Rinaldi")
+    }
+
+    @Test("Back from an editor that another screen already replaced leaves that screen alone")
+    func backFromAReplacedEditorLeavesTheScreenAlone() async {
+        let router = AppRouter(isAIShipped: false)
+        let replaced = LeavableEditorSpy(saves: true)
+        router.editorAppeared(replaced)
+        router.openEditor(.stored(cvId: "second"))
+        router.editorDisappeared(replaced)
+
+        await router.leaveEditor(replaced)
+
+        #expect(router.navigationPath.count == 1, "The path is not popped for an editor that is not on screen")
+    }
+
+    @Test("Two Backs at once, as a tap and a swipe, leave the editor once")
+    func twoBacksAtOnceLeaveOnce() async {
+        let router = AppRouter(isAIShipped: false)
+        let editor = LeavableEditorSpy(saves: true)
+        router.navigate(to: .templateSelection)
+        router.navigate(to: .cvEditor(.stored(cvId: "first")))
+        router.editorAppeared(editor)
+
+        async let first: Void = router.leaveEditor(editor)
+        async let second: Void = router.leaveEditor(editor)
+        _ = await (first, second)
+
+        #expect(router.navigationPath.count == 1, "Only the editor is left, not the screen under it")
+    }
+
+    // MARK: - The saves of the editors that were left
+
+    @Test("What the list and the editors wait for is the save of the editor that was just left, however long it takes")
+    func leftEditorSavesAreWaitedFor() async throws {
+        let stored = CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi"))
+        let cvs = GatedCVManagementUseCase(gating: .update, storedCV: stored)
+        let saves = LeftEditorSaves()
+        let router = AppRouter(isAIShipped: false, leftEditorSaves: saves)
+        let editor = CVEditorViewModel(cvId: stored.id.uuidString, cvManagementUseCase: cvs)
+        await editor.loadCV()
+        editor.cv.personalInfo.phone = "+39 333 1234567"
+        router.editorDisappeared(editor)
+        let ended = Flag()
+        let waiting = Task {
+            await saves.allEnded()
+            ended.raise()
+        }
+        await cvs.waitUntilGatedCallStarts()
+        #expect(!ended.isRaised, "The save of the editor that was left is still running")
+
+        await cvs.openGate()
+        await waiting.value
+
+        #expect(ended.isRaised)
+        #expect(await cvs.updatedCVs.map(\.personalInfo.phone) == ["+39 333 1234567"])
+    }
+
+    @Test("With nothing left to save, there is nothing to wait for")
+    func nothingToWaitFor() async {
+        await LeftEditorSaves().allEnded()
+    }
+}
+
+/// Says that something happened.
+@MainActor
+private final class Flag {
+    private(set) var isRaised = false
+    func raise() { isRaised = true }
 }
 
 /// An editor on screen that counts how often it is saved before it is left.

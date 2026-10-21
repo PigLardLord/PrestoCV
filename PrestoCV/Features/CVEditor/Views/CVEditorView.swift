@@ -37,9 +37,29 @@ struct CVEditorView: View {
         .screenTitle(viewModel.screenTitle)
         // The quiet proof that the editor saves by itself, and that the CV stays on the device
         .navigationSubtitle(viewModel.subtitle)
+        // Back is the editor's own, so that it stores what the form shows before it leaves, and stays, with the failure,
+        // when that cannot be done: the system's Back would leave first, and the edits would go with the editor
+        .navigationBarBackButtonHidden(true)
+        // The swipe that goes back goes through the same Back when the form holds edits the store does not
+        .guardsBackSwipe(
+            canLeaveAtOnce: { viewModel.storeHoldsWhatTheFormShows },
+            leave: { Task { await router.leaveEditor(viewModel) } }
+        )
         .toolbar {
-            // Leading: the standard Back button. Trailing: export, in every layout, as its symbol, which leaves the
-            // title its room in every language
+            // Leading: Back. Trailing: export, in every layout, as its symbol, which leaves the title its room in every
+            // language
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    Task { await router.leaveEditor(viewModel) }
+                } label: {
+                    Label("common.back".localized, systemImage: "chevron.backward")
+                        .labelStyle(.iconOnly)
+                }
+                .accessibilityIdentifier("BackButton")
+                .accessibilityShowsLargeContentViewer {
+                    Label("common.back".localized, systemImage: "chevron.backward")
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     showingExportSheet = true
@@ -63,10 +83,9 @@ struct CVEditorView: View {
         .onChange(of: scenePhase) { _, phase in
             Task { await viewModel.sceneDidChange(isActive: phase == .active) }
         }
-        // Leaving the editor, with Back, the edge swipe or another screen in its place, stores what it shows at once
+        // However the editor is left, what it still shows is stored at once, and the list waits for that
         .onDisappear {
             router.editorDisappeared(viewModel)
-            Task { await viewModel.saveNow() }
         }
         // VoiceOver hears that a change could not be saved, each time, and that it is saved once a write succeeds again
         .onChange(of: viewModel.saveAnnouncement) { _, announcement in

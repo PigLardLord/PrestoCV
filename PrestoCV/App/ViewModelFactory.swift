@@ -18,6 +18,8 @@ final class ViewModelFactory {
     private let environment: AppEnvironment
     /// The description typed on the AI screen, kept until a draft is made from it.
     private let aiDescriptionSession = AIDescriptionSession()
+    /// The saves of the editors that were left, which the router starts and the list and the editors wait for.
+    private let leftEditorSaves = LeftEditorSaves()
     /// The copies the system makes of the PDFs opened in the app, which the import and the router let go.
     private var openedFileCopies: OpenedFileCopies {
         OpenedFileCopies(container: environment.container, removeFile: environment.removeFile)
@@ -49,7 +51,8 @@ final class ViewModelFactory {
             locale: environment.appLocale,
             now: environment.now,
             calendar: environment.calendar,
-            sleep: environment.sleep
+            sleep: environment.sleep,
+            awaitLeftEditors: leftEditorSaves.allEnded
         )
     }
 
@@ -61,6 +64,7 @@ final class ViewModelFactory {
             cvManagementUseCase: cvManagementUseCase,
             documentLanguageDetector: makeDocumentLanguageDetector(),
             clock: environment.clock,
+            awaitLeftEditors: leftEditorSaves.allEnded,
             reportSaveFailure: { error in
                 editorLogger.error("A change to a CV could not be saved: \(error.localizedDescription, privacy: .private)")
             }
@@ -124,7 +128,7 @@ final class ViewModelFactory {
     /// The router of the screens. It lets go of a PDF opened in the app that no import will read.
     @MainActor
     func makeAppRouter() -> AppRouter {
-        AppRouter(releaseFile: openedFileCopies.release)
+        AppRouter(releaseFile: openedFileCopies.release, leftEditorSaves: leftEditorSaves)
     }
 
     // MARK: - Private Composition Root

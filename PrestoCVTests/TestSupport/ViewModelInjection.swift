@@ -62,6 +62,7 @@ extension CVEditorViewModel {
         cvManagementUseCase: CVManagementUseCaseProtocol,
         documentLanguageDetector: DocumentLanguageDetector = englishDocumentLanguageDetector,
         clock: any Clock<Duration> = ManualClock(),
+        awaitLeftEditors: @escaping @MainActor () async -> Void = {},
         reportSaveFailure: @escaping @MainActor (any Error) -> Void = { _ in }
     ) {
         let request: EditorRequest
@@ -75,6 +76,7 @@ extension CVEditorViewModel {
             cvManagementUseCase: cvManagementUseCase,
             documentLanguageDetector: documentLanguageDetector,
             clock: clock,
+            awaitLeftEditors: awaitLeftEditors,
             reportSaveFailure: reportSaveFailure
         )
     }
@@ -86,7 +88,8 @@ extension CVListViewModel {
         cvManagementUseCase: CVManagementUseCaseProtocol,
         now: @escaping () -> Date = { testDay },
         calendar: @escaping () -> Calendar = { gregorianUTC },
-        sleep: @escaping (Duration) async throws -> Void = waitUntilCancelled
+        sleep: @escaping (Duration) async throws -> Void = waitUntilCancelled,
+        awaitLeftEditors: @escaping @MainActor () async -> Void = {}
     ) {
         self.init(
             cvManagementUseCase: cvManagementUseCase,
@@ -94,7 +97,8 @@ extension CVListViewModel {
             locale: Locale(identifier: "en"),
             now: now,
             calendar: calendar,
-            sleep: sleep
+            sleep: sleep,
+            awaitLeftEditors: awaitLeftEditors
         )
     }
 }

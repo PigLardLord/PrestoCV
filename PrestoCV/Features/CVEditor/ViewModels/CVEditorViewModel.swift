@@ -28,6 +28,8 @@ final class CVEditorViewModel: ObservableObject {
     let documentLanguageDetector: DocumentLanguageDetector
     private let request: EditorRequest
     private let clock: any Clock<Duration>
+    /// Returns once the editors that were left have stored what they showed, so that a CV is read as they left it.
+    private let awaitLeftEditors: @MainActor () async -> Void
     /// Told why a write failed, which the banner does not say.
     private let reportSaveFailure: @MainActor (any Error) -> Void
     /// Writes the form to the store; nil until the form shows a CV.
@@ -73,6 +75,12 @@ final class CVEditorViewModel: ObservableObject {
         showsSavedOnDevice ? "editor.saved".localized : ""
     }
 
+    /// Whether the store holds what the form shows, so that leaving the editor has nothing to store first. False while a
+    /// change waits for its pause or a write runs or has failed.
+    var storeHoldsWhatTheFormShows: Bool {
+        !(autosave?.hasChangesToWrite ?? false)
+    }
+
     /// Whether the last change could not be saved: it is only in memory until a write succeeds.
     var showsSaveFailure: Bool {
         saveStatus == .failed
@@ -84,18 +92,22 @@ final class CVEditorViewModel: ObservableObject {
     ///   - request: What the editor opens on. A new CV gets an id of its own, which its writes store it under.
     ///   - documentLanguageDetector: Reads which language the CV is written in, for the Automatic document language.
     ///   - clock: The clock the pause before a write is measured on.
+    ///   - awaitLeftEditors: Returns once the editors that were left have stored what they showed. A stored CV is read
+    ///     only after it, so that it is read as the editor before left it.
     ///   - reportSaveFailure: Told the cause of each write that fails.
     init(
         request: EditorRequest,
         cvManagementUseCase: CVManagementUseCaseProtocol,
         documentLanguageDetector: DocumentLanguageDetector,
         clock: any Clock<Duration>,
+        awaitLeftEditors: @escaping @MainActor () async -> Void,
         reportSaveFailure: @escaping @MainActor (any Error) -> Void
     ) {
         self.request = request
         self.cvManagementUseCase = cvManagementUseCase
         self.documentLanguageDetector = documentLanguageDetector
         self.clock = clock
+        self.awaitLeftEditors = awaitLeftEditors
         self.reportSaveFailure = reportSaveFailure
 
         switch request {
@@ -122,6 +134,8 @@ final class CVEditorViewModel: ObservableObject {
         }
 
         viewState = .loading
+        // An editor that was just left may still be storing this CV: read it once it has
+        await awaitLeftEditors()
         do {
             guard let loadedCV = try await cvManagementUseCase.getCV(by: uuid) else {
                 throw AppError.notFound("error.subject.cv".localized)

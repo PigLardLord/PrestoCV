@@ -100,6 +100,79 @@ final class AutosaveUITests: XCTestCase {
         XCTAssertTrue(rows(of: "Marta").firstMatch.waitForExistence(timeout: 10), "The list should show the CV")
     }
 
+    /// A store that keeps failing, as a full disk does, keeps the person in the editor: Back stores the edits first, and
+    /// when it cannot, the editor stays with its failure and its edits instead of leaving them behind.
+    func testBackWithAStoreThatKeepsFailingKeepsTheEditsInTheEditor() throws {
+        app.launchArguments += ["-PrestoCVUITestsFailingWrites", "1000"]
+        typeANameIntoANewCV("Marta")
+        let failure = app.staticTexts["Couldn't save your last change"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 10), "The editor should say that the change could not be saved")
+        XCTAssertTrue(app.backButton.waitForExistence(timeout: 10), "The editor should offer Back")
+
+        app.backButton.tap()
+
+        let name = app.textFields["Full Name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10), "Back should leave the editor open while its edits are not stored")
+        XCTAssertEqual(name.value as? String, "Marta", "What was typed should stay in the editor")
+        XCTAssertTrue(failure.exists, "The editor should keep saying why")
+        XCTAssertFalse(app.buttons["Create My First CV"].exists, "The list should not be shown")
+        add(app.keptScreenshot(named: "Editor - Back after a save that failed"))
+    }
+
+    /// Back before the pause is over, with a store that fails: the editor stays and says why, and the edits are in it.
+    func testBackBeforeThePauseWithAFailingStoreStaysAndSaysWhy() throws {
+        app.launchArguments += ["-PrestoCVUITestsFailingWrites", "1000"]
+        typeANameIntoANewCV("Marta")
+
+        app.backButton.tap()
+
+        let failure = app.staticTexts["Couldn't save your last change"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 10), "The editor should say that the change could not be saved")
+        XCTAssertEqual(app.textFields["Full Name"].value as? String, "Marta", "What was typed should stay in the editor")
+        XCTAssertFalse(app.buttons["Create My First CV"].exists, "The list should not be shown")
+    }
+
+    /// Swipes from the left edge to the right, as the system's Back gesture does.
+    private func swipeBackFromTheLeftEdge() {
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.0, dy: 0.5))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: end)
+    }
+
+    /// The edge swipe leaves the editor as Back does, and the CV is in the list.
+    func testTheEdgeSwipeLeavesLikeBack() throws {
+        typeANameIntoANewCV()
+        XCTAssertTrue(app.savedOnThisDevice.waitForExistence(timeout: 10), "The editor should say that it saved the CV")
+
+        swipeBackFromTheLeftEdge()
+
+        XCTAssertTrue(rows(of: "Marta Rinaldi").firstMatch.waitForExistence(timeout: 10), "The list should show the CV")
+    }
+
+    /// The edge swipe before the pause is over stores what was typed first, and then leaves.
+    func testTheEdgeSwipeBeforeThePauseStoresThenLeaves() throws {
+        typeANameIntoANewCV()
+
+        swipeBackFromTheLeftEdge()
+
+        XCTAssertTrue(rows(of: "Marta Rinaldi").firstMatch.waitForExistence(timeout: 10), "The list should show the CV")
+        XCTAssertEqual(app.alerts.count, 0, "Leaving should not ask anything")
+    }
+
+    /// The edge swipe from an editor whose store keeps failing does not leave the edits behind either.
+    func testTheEdgeSwipeWithAStoreThatKeepsFailingKeepsTheEdits() throws {
+        app.launchArguments += ["-PrestoCVUITestsFailingWrites", "1000"]
+        typeANameIntoANewCV("Marta")
+        let failure = app.staticTexts["Couldn't save your last change"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 10), "The editor should say that the change could not be saved")
+
+        swipeBackFromTheLeftEdge()
+
+        XCTAssertTrue(app.textFields["Full Name"].waitForExistence(timeout: 10), "The editor should stay open")
+        XCTAssertEqual(app.textFields["Full Name"].value as? String, "Marta", "What was typed should stay in the editor")
+        XCTAssertFalse(app.buttons["Create My First CV"].exists, "The list should not be shown")
+    }
+
     /// Choosing a design used to leave the editor with unsaved changes, and Back asked to discard them.
     func testChoosingADesignAndGoingBackAsksNothing() throws {
         typeANameIntoANewCV()

@@ -603,6 +603,57 @@ struct CVEditorViewModelTests {
         #expect(reports.causes == [AppError.fileSystemError("disk full"), AppError.fileSystemError("disk full")])
     }
 
+    // MARK: - Reading after the editor before
+
+    @Test("A stored CV is read only after the editors that were left have stored what they showed")
+    func storedCVIsReadAfterTheLeftEditors() async {
+        let existing = storedCV()
+        let mockUseCase = MockCVManagementUseCase()
+        await mockUseCase.storeCV(existing)
+        let gate = Gate()
+        let viewModel = CVEditorViewModel(
+            cvId: existing.id.uuidString, cvManagementUseCase: mockUseCase, awaitLeftEditors: { await gate.wait() }
+        )
+
+        let loading = Task { await viewModel.loadCV() }
+        await gate.waitUntilSomeoneWaits()
+        #expect(await !mockUseCase.getCVCalled, "The CV is not read while an editor that was just left is storing it")
+
+        await gate.open()
+        await loading.value
+
+        #expect(await mockUseCase.getCVCalled)
+        #expect(viewModel.cv.id == existing.id)
+    }
+
+    // MARK: - When the editor can be left at once
+
+    @Test("The edge swipe may leave at once only when the store holds what the form shows")
+    func storeHoldsWhatTheFormShowsOnlyWhenNothingIsToStore() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let existing = storedCV()
+        await mockUseCase.storeCV(existing)
+        let viewModel = await editor(of: existing, in: mockUseCase)
+        #expect(viewModel.storeHoldsWhatTheFormShows, "Nothing changed")
+
+        viewModel.cv.personalInfo.phone = "+39 333 1234567"
+        #expect(!viewModel.storeHoldsWhatTheFormShows, "A change waits for its pause")
+
+        await viewModel.saveNow()
+        #expect(viewModel.storeHoldsWhatTheFormShows, "The change is stored")
+
+        await mockUseCase.setUpdateCVError(AppError.fileSystemError("disk full"))
+        viewModel.cv.personalInfo.phone = "+39 333 7654321"
+        await viewModel.saveNow()
+        #expect(!viewModel.storeHoldsWhatTheFormShows, "The change could not be stored")
+    }
+
+    @Test("A blank new CV has nothing to store, so it may be left at once")
+    func blankNewCVMayBeLeftAtOnce() {
+        let viewModel = CVEditorViewModel(cvId: nil, initialCV: CVModel(), cvManagementUseCase: MockCVManagementUseCase())
+        #expect(viewModel.storeHoldsWhatTheFormShows)
+    }
+
     // MARK: - Saves in progress
 
     @Test("Edits made while a save runs are kept, and stored after it under the same CV")
@@ -703,5 +754,32 @@ final class SaveFailureLog {
 
     func record(_ cause: any Error) {
         causes.append(cause as? AppError ?? .unknown("\(cause)"))
+    }
+}
+
+/// A wait that ends when a test opens it.
+@MainActor
+final class Gate {
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var arrivals: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        guard !isOpen else { return }
+        arrivals.forEach { $0.resume() }
+        arrivals = []
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    /// Returns once someone is waiting at the gate.
+    func waitUntilSomeoneWaits() async {
+        guard waiters.isEmpty else { return }
+        await withCheckedContinuation { arrivals.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        waiters.forEach { $0.resume() }
+        waiters = []
     }
 }

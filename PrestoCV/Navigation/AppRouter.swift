@@ -24,16 +24,24 @@ final class AppRouter: ObservableObject {
     private let isAIShipped: Bool
     private let releaseFile: (URL) -> Void
     private weak var shownEditor: (any LeavableEditor)?
+    /// The saves of the editors that were left, which the list and the editors wait for before they read the store.
+    private let leftEditorSaves: LeftEditorSaves
     /// The depth of the path at which the import screen was pushed, while nothing has been pushed since. The screen can be
     /// left without the router knowing, by the back button.
     private var importDepth: Int?
 
     // MARK: - Initialization
-    /// - Parameter releaseFile: Lets go of a PDF opened in the app that no import will read, so that nothing of it is
-    ///   kept.
-    init(isAIShipped: Bool = AIFeature.isShipped, releaseFile: @escaping (URL) -> Void = { _ in }) {
+    /// - Parameters:
+    ///   - releaseFile: Lets go of a PDF opened in the app that no import will read, so that nothing of it is kept.
+    ///   - leftEditorSaves: Keeps the saves of the editors that were left, for the screens that read the store.
+    init(
+        isAIShipped: Bool = AIFeature.isShipped,
+        releaseFile: @escaping (URL) -> Void = { _ in },
+        leftEditorSaves: LeftEditorSaves = LeftEditorSaves()
+    ) {
         self.isAIShipped = isAIShipped
         self.releaseFile = releaseFile
+        self.leftEditorSaves = leftEditorSaves
     }
 
     // MARK: - Navigation Methods
@@ -97,6 +105,17 @@ final class AppRouter: ObservableObject {
         navigationPath.removeLast()
     }
 
+    /// Leaves the editor with its Back button: what it shows is stored first, and the editor stays, with its failure,
+    /// when that cannot be done, so that the edits are not lost with it.
+    func leaveEditor(_ editor: any LeavableEditor) async {
+        guard await editor.saveBeforeLeaving() else { return }
+        // Another request may have taken the editor's place while it was saved, or another Back (the button and the swipe)
+        // may have left it already
+        guard shownEditor === editor else { return }
+        shownEditor = nil
+        navigateBack()
+    }
+
     func navigateToRoot() {
         navigationPath = NavigationPath()
     }
@@ -111,9 +130,11 @@ final class AppRouter: ObservableObject {
         shownEditor = editor
     }
 
-    /// The editor is no longer on screen, as after Back: a PDF opened in the app has nothing to save first.
+    /// The editor is no longer on screen, as after Back or the edge swipe: a PDF opened in the app has nothing to save
+    /// first, and whatever the editor still shows is stored at once. The list and the editors wait for that save.
     func editorDisappeared(_ editor: any LeavableEditor) {
         if shownEditor === editor { shownEditor = nil }
+        leftEditorSaves.begin { _ = await editor.saveBeforeLeaving() }
     }
 
     // MARK: - Private Methods
