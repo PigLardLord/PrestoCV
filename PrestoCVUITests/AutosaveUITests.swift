@@ -90,6 +90,8 @@ final class AutosaveUITests: XCTestCase {
         XCTAssertEqual(app.textFields["Full Name"].value as? String, "Marta", "What was typed should stay in the editor")
         let tryAgain = app.buttons["Try Again"]
         XCTAssertTrue(tryAgain.exists, "The failure should offer to try again")
+        XCTAssertGreaterThanOrEqual(tryAgain.frame.width, 44, "Try Again should be at least 44 points wide")
+        XCTAssertGreaterThanOrEqual(tryAgain.frame.height, 44, "Try Again should be at least 44 points tall")
         add(app.keptScreenshot(named: "Editor - a save that failed"))
 
         tryAgain.tap()
