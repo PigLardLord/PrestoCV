@@ -68,9 +68,11 @@ struct CVEditorView: View {
             router.editorDisappeared(viewModel)
             Task { await viewModel.saveNow() }
         }
-        // VoiceOver hears that a change could not be saved, and that it is saved once a write succeeds again
-        .onChange(of: viewModel.showsSaveFailure) {
-            AccessibilityNotification.Announcement(viewModel.saveStatusAnnouncement).post()
+        // VoiceOver hears that a change could not be saved, each time, and that it is saved once a write succeeds again
+        .onChange(of: viewModel.saveAnnouncement) { _, announcement in
+            if let announcement {
+                AccessibilityNotification.Announcement(announcement.text).post()
+            }
         }
         .environment(\.rowDeletionAnchor, deletionAnchor)
         .anchoredConfirmationDialog(

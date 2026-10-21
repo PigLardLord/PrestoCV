@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Combine
 @testable import PrestoCV
 @testable import PrestoCVCore
 
@@ -386,14 +387,14 @@ struct CVEditorViewModelTests {
         #expect(!viewModel.showsSavedOnDevice, "A failed save is not said to be saved")
         #expect(viewModel.subtitle.isEmpty, "The banner says what happened, not the line under the title")
         #expect(viewModel.cv.personalInfo.location == "Bologna", "The edits stay in the editor")
-        #expect(viewModel.saveStatusAnnouncement == "editor.save_failed".localized, "VoiceOver hears the failure")
+        #expect(viewModel.saveAnnouncement?.text == "editor.save_failed".localized, "VoiceOver hears the failure")
 
         await mockUseCase.setUpdateCVError(nil)
         await viewModel.retrySaving()
 
         #expect(!viewModel.showsSaveFailure)
         #expect(viewModel.showsSavedOnDevice)
-        #expect(viewModel.saveStatusAnnouncement == "editor.saved".localized, "VoiceOver hears that the CV is saved again")
+        #expect(viewModel.saveAnnouncement?.text == "editor.saved".localized, "VoiceOver hears that the CV is saved again")
         #expect(await mockUseCase.updatedCVs.map(\.personalInfo.location) == ["Bologna"])
     }
 
@@ -452,6 +453,154 @@ struct CVEditorViewModelTests {
         await mockUseCase.setUpdateCVError(nil)
         #expect(await viewModel.saveBeforeLeaving())
         #expect(await mockUseCase.updatedCVs.map(\.personalInfo.location) == ["Bologna"])
+    }
+
+    // MARK: - What VoiceOver hears
+
+    /// The announcements an editor makes, in order.
+    private final class Heard {
+        private(set) var kinds: [SaveAnnouncement.Kind] = []
+        private var subscription: AnyCancellable?
+
+        @MainActor
+        init(_ viewModel: CVEditorViewModel) {
+            subscription = viewModel.$saveAnnouncement.sink { [self] announcement in
+                if let announcement { kinds.append(announcement.kind) }
+            }
+        }
+    }
+
+    @Test("VoiceOver hears every failed write, nothing when a retry starts, and that the CV is saved once a write succeeds")
+    func announcementsFollowTheOutcomesOfTheWrites() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let existing = storedCV()
+        await mockUseCase.storeCV(existing)
+        await mockUseCase.setUpdateCVError(AppError.fileSystemError("disk full"))
+        let viewModel = await editor(of: existing, in: mockUseCase)
+        let heard = Heard(viewModel)
+
+        viewModel.cv.personalInfo.location = "Bologna"
+        await viewModel.saveNow()
+        #expect(heard.kinds == [.failed])
+
+        await viewModel.retrySaving()
+        #expect(heard.kinds == [.failed, .failed], "A retry that fails again is told again, and its start was not told as a success")
+
+        await mockUseCase.setUpdateCVError(nil)
+        await viewModel.retrySaving()
+        #expect(heard.kinds == [.failed, .failed, .saved], "Saved is told once, when a write has succeeded")
+    }
+
+    @Test("A CV that never failed to save is saved without a word: there is nothing to recover from")
+    func savingWithoutAFailureIsSilent() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let existing = storedCV()
+        await mockUseCase.storeCV(existing)
+        let viewModel = await editor(of: existing, in: mockUseCase)
+        let heard = Heard(viewModel)
+
+        viewModel.cv.personalInfo.location = "Bologna"
+        await viewModel.saveNow()
+
+        #expect(heard.kinds.isEmpty)
+        #expect(viewModel.showsSavedOnDevice)
+    }
+
+    // MARK: - A failure that no longer matters
+
+    @Test("A failure goes when the form returns to what the store holds, and the editor can be left again")
+    func failureGoesWhenTheFormIsBackInTheStore() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let existing = storedCV()
+        await mockUseCase.storeCV(existing)
+        await mockUseCase.setUpdateCVError(AppError.fileSystemError("disk full"))
+        let viewModel = await editor(of: existing, in: mockUseCase)
+        let heard = Heard(viewModel)
+        viewModel.cv.personalInfo.location = "Bologna"
+        await viewModel.saveNow()
+        #expect(viewModel.showsSaveFailure)
+
+        viewModel.cv.personalInfo.location = existing.personalInfo.location
+
+        #expect(!viewModel.showsSaveFailure, "The store holds what the form shows: there is nothing to retry")
+        #expect(viewModel.showsSavedOnDevice)
+        #expect(heard.kinds == [.failed, .saved])
+        #expect(await viewModel.saveBeforeLeaving(), "Leaving, and opening a PDF over the editor, are allowed again")
+        #expect(await mockUseCase.updatedCVs.isEmpty, "Nothing is written: the store already holds this")
+    }
+
+    @Test("A new CV emptied again after a failed first write needs nothing stored, and the failure goes")
+    func failureGoesWhenANewCVIsEmptiedAgain() async {
+        let mockUseCase = MockCVManagementUseCase()
+        await mockUseCase.setCreateCVResult(.failure(AppError.fileSystemError("disk full")))
+        let viewModel = CVEditorViewModel(cvId: nil, initialCV: CVModel(), cvManagementUseCase: mockUseCase)
+        viewModel.cv.personalInfo.name = "Jane Doe"
+        await viewModel.saveNow()
+        #expect(viewModel.showsSaveFailure)
+
+        viewModel.cv.personalInfo.name = ""
+
+        #expect(!viewModel.showsSaveFailure)
+        #expect(await viewModel.saveBeforeLeaving())
+        #expect(await mockUseCase.createdCVs.isEmpty)
+    }
+
+    // MARK: - Changes while a write runs
+
+    @Test("A change that undoes the write in progress is stored too: leaving reports success only when the store holds the form")
+    func changeUndoingTheWriteInProgressIsStored() async {
+        let existing = storedCV()
+        let useCase = GatedCVManagementUseCase(gating: .update, storedCV: existing)
+        let viewModel = CVEditorViewModel(cvId: existing.id.uuidString, cvManagementUseCase: useCase)
+        await viewModel.loadCV()
+        viewModel.cv.personalInfo.phone = "+39 333 1234567"
+
+        let leaving = Task { await viewModel.saveBeforeLeaving() }
+        await useCase.waitUntilGatedCallStarts()
+        viewModel.cv.personalInfo.phone = existing.personalInfo.phone
+        await useCase.openGate()
+
+        #expect(await leaving.value, "Leaving returns once the store holds what the form shows")
+        #expect(await useCase.updatedCVs.map(\.personalInfo.phone) == ["+39 333 1234567", existing.personalInfo.phone])
+        #expect(viewModel.showsSavedOnDevice)
+    }
+
+    @Test("A change made while leaving writes is stored before leaving reports success")
+    func changeMadeWhileLeavingIsStored() async {
+        let existing = storedCV()
+        let useCase = GatedCVManagementUseCase(gating: .update, storedCV: existing)
+        let viewModel = CVEditorViewModel(cvId: existing.id.uuidString, cvManagementUseCase: useCase)
+        await viewModel.loadCV()
+        viewModel.cv.personalInfo.phone = "+39 333 1234567"
+
+        let leaving = Task { await viewModel.saveBeforeLeaving() }
+        await useCase.waitUntilGatedCallStarts()
+        viewModel.cv.personalInfo.location = "Bologna"
+        await useCase.openGate()
+
+        #expect(await leaving.value)
+        #expect(await useCase.updatedCVs.last?.personalInfo.location == "Bologna", "What the person typed last is stored")
+    }
+
+    // MARK: - Why a write failed
+
+    @Test("The cause of each failed write is reported, apart from the banner")
+    func failedWritesAreReportedWithTheirCause() async {
+        let mockUseCase = MockCVManagementUseCase()
+        let existing = storedCV()
+        await mockUseCase.storeCV(existing)
+        await mockUseCase.setUpdateCVError(AppError.fileSystemError("disk full"))
+        let reports = SaveFailureLog()
+        let viewModel = CVEditorViewModel(
+            cvId: existing.id.uuidString, cvManagementUseCase: mockUseCase, reportSaveFailure: { reports.record($0) }
+        )
+        await viewModel.loadCV()
+        viewModel.cv.personalInfo.location = "Bologna"
+
+        await viewModel.saveNow()
+        await viewModel.retrySaving()
+
+        #expect(reports.causes == [AppError.fileSystemError("disk full"), AppError.fileSystemError("disk full")])
     }
 
     // MARK: - Saves in progress
@@ -542,5 +691,17 @@ struct CVEditorViewModelTests {
         #expect(viewModel.viewState.isLoaded)
         #expect(viewModel.cv.name == "Existing CV")
         #expect(await mockUseCase.getCVCallCount == 2)
+    }
+}
+
+// MARK: - Test Helpers
+
+/// The causes a view model was told of.
+@MainActor
+final class SaveFailureLog {
+    private(set) var causes: [AppError] = []
+
+    func record(_ cause: any Error) {
+        causes.append(cause as? AppError ?? .unknown("\(cause)"))
     }
 }

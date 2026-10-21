@@ -15,6 +15,8 @@ final class CVEditorViewModel: ObservableObject {
     @Published var viewState: ViewState<CVModel> = .idle
     /// Where the CV stands with the store.
     @Published private(set) var saveStatus: Autosave<CVModel>.Status = .upToDate
+    /// What VoiceOver is told about saving, each time there is something to tell.
+    @Published private(set) var saveAnnouncement: SaveAnnouncement?
     @Published private(set) var pendingDeletion: PendingDeletion?
     /// What each contact field said when the person last left it: its check, which typing does not change.
     @Published private(set) var leftContactText: [ContactField: String] = [:]
@@ -26,10 +28,13 @@ final class CVEditorViewModel: ObservableObject {
     let documentLanguageDetector: DocumentLanguageDetector
     private let request: EditorRequest
     private let clock: any Clock<Duration>
-    /// The CV as last read from or written to storage; nil while the store does not hold it.
-    private var savedSnapshot: CVModel?
+    /// Told why a write failed, which the banner does not say.
+    private let reportSaveFailure: @MainActor (any Error) -> Void
     /// Writes the form to the store; nil until the form shows a CV.
     private var autosave: Autosave<CVModel>?
+    /// A failure has been announced, and the CV has not been saved since.
+    private var failureIsAnnounced = false
+    private var announcements = 0
     
     // MARK: - Computed Properties
     
@@ -37,7 +42,12 @@ final class CVEditorViewModel: ObservableObject {
     /// person, otherwise the role it is for. Without any of them, a CV that was never stored is "New CV", and a stored
     /// one "Untitled CV", as the list calls it.
     var screenTitle: String {
-        cv.editorTitle(isStored: savedSnapshot != nil)
+        cv.editorTitle(isStored: isStored)
+    }
+
+    /// Whether the store holds the CV: it did when the editor opened, or a write has stored it.
+    private var isStored: Bool {
+        autosave?.isStored ?? false
     }
     
     /// Whether the CV has enough content to be saved, by the save rule of PrestoCVDomain
@@ -54,7 +64,7 @@ final class CVEditorViewModel: ObservableObject {
     /// Whether the line under the title says that the CV is saved on this device: the store holds it, and the last
     /// write did not fail.
     var showsSavedOnDevice: Bool {
-        savedSnapshot != nil && saveStatus != .failed
+        isStored && saveStatus != .failed
     }
     
     /// The line under the title: "Saved on this device" while the store holds the CV and the last write did not fail;
@@ -68,26 +78,25 @@ final class CVEditorViewModel: ObservableObject {
         saveStatus == .failed
     }
 
-    /// What VoiceOver says when a save fails, or succeeds again after a failure.
-    var saveStatusAnnouncement: String {
-        showsSaveFailure ? "editor.save_failed".localized : "editor.saved".localized
-    }
-    
+
     // MARK: - Initialization
     /// - Parameters:
     ///   - request: What the editor opens on. A new CV gets an id of its own, which its writes store it under.
     ///   - documentLanguageDetector: Reads which language the CV is written in, for the Automatic document language.
     ///   - clock: The clock the pause before a write is measured on.
+    ///   - reportSaveFailure: Told the cause of each write that fails.
     init(
         request: EditorRequest,
         cvManagementUseCase: CVManagementUseCaseProtocol,
         documentLanguageDetector: DocumentLanguageDetector,
-        clock: any Clock<Duration>
+        clock: any Clock<Duration>,
+        reportSaveFailure: @escaping @MainActor (any Error) -> Void
     ) {
         self.request = request
         self.cvManagementUseCase = cvManagementUseCase
         self.documentLanguageDetector = documentLanguageDetector
         self.clock = clock
+        self.reportSaveFailure = reportSaveFailure
 
         switch request {
         case .stored:
@@ -117,7 +126,6 @@ final class CVEditorViewModel: ObservableObject {
             guard let loadedCV = try await cvManagementUseCase.getCV(by: uuid) else {
                 throw AppError.notFound("error.subject.cv".localized)
             }
-            savedSnapshot = loadedCV
             begin(showing: loadedCV, unchangedFrom: loadedCV, isStored: true)
         } catch {
             let appError = error as? AppError ?? AppError.unknown(error.localizedDescription)
@@ -126,10 +134,20 @@ final class CVEditorViewModel: ObservableObject {
     }
     
     /// Stores what the form shows at once, if it changed: the app is leaving the foreground, and iOS may end it, or the
-    /// editor is being left.
+    /// editor is being left. Changes made while it writes are stored too.
+    /// - Returns: Whether the store holds what the form shows, or there is nothing to store; false when the write
+    ///   failed or was cancelled, and the edits are only in the form.
     @MainActor
-    func saveNow() async {
-        await autosave?.flush()
+    @discardableResult
+    func saveNow() async -> Bool {
+        guard let autosave else { return true }
+        do {
+            try await autosave.flush()
+        } catch {
+            // The write was cancelled: it is no failure, and the edits are still only in the form
+            return false
+        }
+        return !autosave.hasChangesToWrite
     }
     
     /// The app came to the foreground or left it. On its way to the background the app can be ended by iOS at any
@@ -146,13 +164,12 @@ final class CVEditorViewModel: ObservableObject {
         await saveNow()
     }
 
-    /// Stores what the form shows at once, before another screen takes the editor's place.
+    /// Stores what the form shows at once, before the editor is left or another screen takes its place.
     /// - Returns: Whether the store holds what the form shows, or there is nothing to store; false when the write
     ///   failed, and the edits are only in the form.
     @MainActor
     func saveBeforeLeaving() async -> Bool {
         await saveNow()
-        return saveStatus != .failed
     }
 
     /// The person left a contact field: what it says now is checked, until they leave it again.
@@ -271,38 +288,55 @@ final class CVEditorViewModel: ObservableObject {
     ///     itself the change, as for a draft.
     ///   - isStored: Whether the store holds the CV already.
     private func begin(showing cv: CVModel, unchangedFrom baseline: CVModel?, isStored: Bool) {
+        let cvs = cvManagementUseCase
         let autosave = Autosave(
             content: cv,
             unchangedFrom: baseline,
             isStored: isStored,
             isWorthStoring: { $0.allowsSaving },
             clock: clock,
-            write: { [weak self] cv in
-                guard let self else { return }
-                try await self.store(cv)
+            onWriteFailure: reportSaveFailure,
+            // The write needs nothing of this editor, so that one that ends after the editor is gone still stores the CV
+            write: { cv, isStored in
+                if isStored {
+                    _ = try await cvs.updateCV(cv)
+                } else {
+                    _ = try await cvs.storeNewCV(cv)
+                }
             }
         )
-        autosave.onStatusChange = { [weak self] status in self?.saveStatus = status }
+        autosave.onStatusChange = { [weak self] status in self?.saveStatusChanged(to: status) }
         self.autosave = autosave
         self.cv = cv
         viewState = .loaded(cv)
+    }
+
+    /// Keeps the status the screen shows, and tells VoiceOver what it should hear: that a change could not be saved, each
+    /// time a write fails, and that the CV is saved once a write has succeeded after a failure. Nothing is said when a
+    /// retry starts, or when a CV that never failed is saved.
+    private func saveStatusChanged(to status: Autosave<CVModel>.Status) {
+        saveStatus = status
+        switch status {
+        case .failed:
+            failureIsAnnounced = true
+            announce(.failed)
+        case .upToDate where failureIsAnnounced:
+            failureIsAnnounced = false
+            announce(.saved)
+        case .upToDate, .pending, .writing:
+            break
+        }
+    }
+
+    private func announce(_ kind: SaveAnnouncement.Kind) {
+        announcements += 1
+        saveAnnouncement = SaveAnnouncement(kind: kind, sequence: announcements)
     }
 
     /// The form changed: it is stored once the pause after the last change has passed. A form that is not shown,
     /// because the CV is still loading or could not be, has nothing of the person's to store.
     private func formChanged() {
         autosave?.changed(to: cv)
-    }
-
-    /// Writes `cv` to the store: the first write of a new CV creates it, under the id it got when its editing began.
-    @MainActor
-    private func store(_ cv: CVModel) async throws {
-        if savedSnapshot == nil {
-            _ = try await cvManagementUseCase.storeNewCV(cv)
-        } else {
-            _ = try await cvManagementUseCase.updateCV(cv)
-        }
-        savedSnapshot = cv
     }
 
     private func row(of section: EditorSection, at index: Int) -> (any EditorRow)? {

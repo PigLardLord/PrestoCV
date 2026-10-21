@@ -6,8 +6,13 @@ import Foundation
 ///   the background.
 /// - **When not:** content that equals what the store holds is never written, so its edit time stays. A CV the store
 ///   does not hold yet is written only once it is worth storing: a blank one left untouched leaves nothing behind.
-/// - **If a write fails:** the content stays in memory, the status says so, and the next change or `flush()` tries
-///   again.
+/// - **After a write:** the content is compared with the store again. A change made while the write ran, or one that
+///   undid it, is written next: by the pause that follows, or by the flush that was waiting.
+/// - **If a write fails:** the content stays in memory, the status says so, the cause goes to the diagnostic boundary,
+///   and the next change or `flush()` tries again. The failure goes when the content returns to what the store holds,
+///   because nothing is left to retry.
+/// - **If a write is cancelled:** that is no failure. The content stays to be written, and `flush()` passes the
+///   cancellation on.
 ///
 /// The rule is the timing. The write is a port the editor gives, and so is the clock, so that tests move time by hand.
 @MainActor
@@ -17,7 +22,7 @@ public final class Autosave<Content: Equatable & Sendable> {
     public enum Status: Equatable, Sendable {
         /// The store holds the content, or there is nothing worth storing yet.
         case upToDate
-        /// A change waits for the pause to end.
+        /// A change waits for the pause to end, or for a write to be asked for again after one was cancelled.
         case pending
         /// The content is being written.
         case writing
@@ -40,16 +45,28 @@ public final class Autosave<Content: Equatable & Sendable> {
     /// Whether the store holds a version of the content: it did when the editing began, or a write has succeeded.
     public private(set) var isStored: Bool
 
+    /// The write that waits for the pause to end, if one does.
+    public private(set) var scheduledWrite: Task<Void, Never>?
+
     private var content: Content
     /// What counts as unchanged: what the store holds, or what a new editing started from; nil when even that is new.
     private var written: Content?
     private let isWorthStoring: @MainActor (Content) -> Bool
-    private let write: @MainActor (Content) async throws -> Void
+    private let write: @MainActor (Content, _ isStored: Bool) async throws -> Void
+    private let onWriteFailure: @MainActor (any Error) -> Void
     /// Fixes the end of a pause starting now, and gives the wait for it.
     private let pauseFromNow: () -> () async throws -> Void
-    private var timer: Task<Void, Never>?
-    private var running: Task<Void, Never>?
+    private var running: Task<WriteOutcome, Never>?
     private var lastWriteFailed = false
+    /// The flushes in progress: each one writes what is left, so a write that ends needs no pause of its own after it.
+    private var flushes = 0
+
+    private enum WriteOutcome {
+        case nothingToWrite
+        case written
+        case failed
+        case cancelled
+    }
 
     /// - Parameters:
     ///   - content: What the editor shows when its editing begins.
@@ -58,7 +75,11 @@ public final class Autosave<Content: Equatable & Sendable> {
     ///   - isStored: Whether the store holds the CV already.
     ///   - isWorthStoring: Whether content the store does not hold yet should be stored.
     ///   - clock: The clock the pause is measured on.
-    ///   - write: Stores the content, creating it the first time.
+    ///   - onWriteFailure: Told the cause of each write that fails, which the status does not carry: a full disk, a
+    ///     permission and an encoding error all read as `failed`.
+    ///   - write: Stores the content. It is told whether the store holds the CV already, so that it creates the CV the
+    ///     first time and updates it afterwards, and needs nothing of the editor that made it: a write that ends after
+    ///     the editor is gone still stores what it was given.
     public init(
         content: Content,
         unchangedFrom written: Content?,
@@ -66,13 +87,15 @@ public final class Autosave<Content: Equatable & Sendable> {
         pause: Duration = Autosave.pause,
         isWorthStoring: @escaping @MainActor (Content) -> Bool,
         clock: any Clock<Duration>,
-        write: @escaping @MainActor (Content) async throws -> Void
+        onWriteFailure: @escaping @MainActor (any Error) -> Void,
+        write: @escaping @MainActor (Content, _ isStored: Bool) async throws -> Void
     ) {
         self.content = content
         self.written = written
         self.isStored = isStored
         self.isWorthStoring = isWorthStoring
         self.write = write
+        self.onWriteFailure = onWriteFailure
         self.pauseFromNow = Self.pause(pause, on: clock)
     }
 
@@ -96,12 +119,41 @@ public final class Autosave<Content: Equatable & Sendable> {
     @discardableResult
     public func changed(to content: Content) -> Task<Void, Never>? {
         self.content = content
-        timer?.cancel()
-        timer = nil
+        cancelThePause()
         guard hasChangesToWrite else {
             updateStatus()
             return nil
         }
+        let scheduled = startThePause()
+        updateStatus()
+        return scheduled
+    }
+
+    /// Writes the content at once, if it has changed, after any write that is running, and goes on until the store
+    /// holds what the form shows: a change made while a write ran is written too. Nothing waits for the pause.
+    ///
+    /// A write that fails ends the flush: the content stays to be written, and the status says `failed`.
+    /// - Throws: `CancellationError` when the store cancelled the write. It is no failure: the content stays to be
+    ///   written, and the status does not say `failed`.
+    public func flush() async throws(CancellationError) {
+        flushes += 1
+        defer { flushes -= 1 }
+        while true {
+            cancelThePause()
+            switch await writeOnce() {
+            case .written:
+                continue
+            case .nothingToWrite, .failed:
+                return
+            case .cancelled:
+                throw CancellationError()
+            }
+        }
+    }
+
+    // MARK: - Private Methods
+
+    private func startThePause() -> Task<Void, Never> {
         let waitForThePause = pauseFromNow()
         let scheduled = Task { [weak self] in
             do {
@@ -112,60 +164,78 @@ public final class Autosave<Content: Equatable & Sendable> {
             }
             await self?.writeAfterThePause()
         }
-        timer = scheduled
-        updateStatus()
+        scheduledWrite = scheduled
         return scheduled
     }
 
-    /// Writes the content at once, if it has changed, after any write that is running. Nothing waits for the pause.
-    public func flush() async {
-        timer?.cancel()
-        timer = nil
-        await writeIfChanged()
+    private func cancelThePause() {
+        scheduledWrite?.cancel()
+        scheduledWrite = nil
     }
-
-    // MARK: - Private Methods
 
     private func writeAfterThePause() async {
         guard !Task.isCancelled else { return }
-        timer = nil
-        await writeIfChanged()
+        scheduledWrite = nil
+        _ = await writeOnce()
     }
 
     /// One write at a time: a write asked for while one runs follows it, with the content of that moment.
-    private func writeIfChanged() async {
+    private func writeOnce() async -> WriteOutcome {
         while let running {
-            await running.value
+            _ = await running.value
         }
         guard hasChangesToWrite else {
             updateStatus()
-            return
+            return .nothingToWrite
         }
         let snapshot = content
-        let writing = Task { [write] in
-            do {
-                try await write(snapshot)
-                self.written = snapshot
-                self.isStored = true
-                self.lastWriteFailed = false
-            } catch {
-                self.lastWriteFailed = true
-            }
+        let writing = Task {
+            let outcome = await self.attempt(snapshot)
             // Cleared before the task ends, so a write waiting for this one finds the way free
             self.running = nil
+            self.writeAgainIfTheContentMovedOn(after: outcome)
             self.updateStatus()
+            return outcome
         }
         running = writing
         updateStatus()
-        await writing.value
+        return await writing.value
+    }
+
+    private func attempt(_ snapshot: Content) async -> WriteOutcome {
+        do {
+            try await write(snapshot, isStored)
+            written = snapshot
+            isStored = true
+            lastWriteFailed = false
+            return .written
+        } catch is CancellationError {
+            return .cancelled
+        } catch {
+            lastWriteFailed = true
+            onWriteFailure(error)
+            return .failed
+        }
+    }
+
+    /// The form may differ from what a write stored: a change made while it ran, or one that undid it, and that no pause
+    /// is waiting for. A flush in progress writes it itself; otherwise a pause starts now.
+    private func writeAgainIfTheContentMovedOn(after outcome: WriteOutcome) {
+        guard outcome == .written, flushes == 0, scheduledWrite == nil, hasChangesToWrite else { return }
+        _ = startThePause()
     }
 
     private func updateStatus() {
+        // A failure is about the content that could not be written. Once the store holds what the form shows, there is
+        // nothing left to retry, and the failure would only stay for ever
+        if running == nil, !hasChangesToWrite {
+            lastWriteFailed = false
+        }
         if running != nil {
             status = .writing
         } else if lastWriteFailed {
             status = .failed
-        } else if timer != nil {
+        } else if scheduledWrite != nil || hasChangesToWrite {
             status = .pending
         } else {
             status = .upToDate

@@ -5,6 +5,9 @@ import CVPDFExporter
 import PrestoCVImporting
 import PrestoCVImportingPDFKit
 import struct PrestoCVApplication.ChangeStoredCV
+import os
+
+private let editorLogger = Logger(subsystem: "com.PigLardLord.prestocv", category: "editor")
 
 /// The composition root of the screens: it makes every view model, with the real services and the part of the device's
 /// environment each one needs. No view model makes a dependency of its own.
@@ -50,14 +53,17 @@ final class ViewModelFactory {
         )
     }
 
-    /// The editor of `request`, which saves what it shows by itself.
+    /// The editor of `request`, which saves what it shows by itself. A failed write is logged with its cause.
     @MainActor
     func makeCVEditorViewModel(for request: EditorRequest) -> CVEditorViewModel {
         CVEditorViewModel(
             request: request,
             cvManagementUseCase: cvManagementUseCase,
             documentLanguageDetector: makeDocumentLanguageDetector(),
-            clock: environment.clock
+            clock: environment.clock,
+            reportSaveFailure: { error in
+                editorLogger.error("A change to a CV could not be saved: \(error.localizedDescription, privacy: .private)")
+            }
         )
     }
     

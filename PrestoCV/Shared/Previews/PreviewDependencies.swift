@@ -24,7 +24,8 @@ enum PreviewDependencies {
             request: .new(template: CVModel(), notice: nil),
             cvManagementUseCase: cvManagement(),
             documentLanguageDetector: documentLanguageDetector,
-            clock: ContinuousClock()
+            clock: ContinuousClock(),
+            reportSaveFailure: { _ in }
         )
     }
 

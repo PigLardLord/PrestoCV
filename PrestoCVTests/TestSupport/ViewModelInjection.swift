@@ -61,7 +61,8 @@ extension CVEditorViewModel {
         notice: EditorNotice? = nil,
         cvManagementUseCase: CVManagementUseCaseProtocol,
         documentLanguageDetector: DocumentLanguageDetector = englishDocumentLanguageDetector,
-        clock: any Clock<Duration> = ManualClock()
+        clock: any Clock<Duration> = ManualClock(),
+        reportSaveFailure: @escaping @MainActor (any Error) -> Void = { _ in }
     ) {
         let request: EditorRequest
         if let cvId {
@@ -73,7 +74,8 @@ extension CVEditorViewModel {
             request: request,
             cvManagementUseCase: cvManagementUseCase,
             documentLanguageDetector: documentLanguageDetector,
-            clock: clock
+            clock: clock,
+            reportSaveFailure: reportSaveFailure
         )
     }
 }
