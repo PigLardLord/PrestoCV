@@ -67,10 +67,7 @@ final class ScrollingUITests: XCTestCase {
     /// A scroll that ends without the element where it can be tapped fails the test, instead of letting the next tap
     /// land elsewhere.
     func testAScrollThatCannotReachTheElementFailsTheTest() {
-        let app = XCUIApplication()
-        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage"]
-        app.launch()
-        XCTAssertTrue(app.buttons["Create My First CV"].waitForExistence(timeout: 20), "The first run should show")
+        let app = launchedOnTheFirstRun()
 
         // Only the failure of the scroll is expected: any other, as a drag that fails, fails the test
         let options = XCTExpectedFailure.Options()
@@ -78,5 +75,44 @@ final class ScrollingUITests: XCTestCase {
         XCTExpectFailure("The element is not in the app", options: options) {
             app.scrollTo(app.buttons["An element that is not in the app"], maxSteps: 2)
         }
+    }
+
+    // MARK: - Where the tab bar is
+
+    /// The tab bar bounds the room only while it floats over the lower part of the screen. The editor's tabs show where
+    /// the bar is: side by side in the lower half on an iPhone, side by side at the top on an iPad, and one above the
+    /// other in the side bar of the outer screen of the iPhone Duo.
+    func testTheTabBarBoundsTheRoomOnlyOverTheLowerPart() {
+        let app = launchedOnTheFirstRun()
+        app.buttons["Create My First CV"].tap()
+        let basics = app.buttons["Basics"].firstMatch
+        let experience = app.buttons["Experience"].firstMatch
+        XCTAssertTrue(experience.waitForExistence(timeout: 10), "The editor should show its tabs")
+        XCTAssertTrue(basics.exists, "The editor should show its tabs")
+
+        let first = basics.frame, second = experience.frame
+        let sideBySide = abs(first.midY - second.midY) < 1 && first.midX != second.midX
+        if sideBySide, first.midY > app.frame.midY {
+            XCTContext.runActivity(named: "The tabs float over the lower part") { _ in
+                let top = app.tabBarTop
+                XCTAssertNotNil(top, "A tab bar over the lower part should bound the room")
+                XCTAssertLessThanOrEqual(top ?? .infinity, min(first.minY, second.minY), "The room should end above the tabs")
+            }
+        } else {
+            XCTContext.runActivity(named: "The tabs are at the top or at the side") { _ in
+                XCTAssertNil(app.tabBarTop, "Tabs at the top or at the side should leave the room as it is")
+            }
+        }
+    }
+
+    // MARK: - Launching
+
+    /// The app on its first run, in English.
+    private func launchedOnTheFirstRun() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Create My First CV"].waitForExistence(timeout: 20), "The first run should show")
+        return app
     }
 }
