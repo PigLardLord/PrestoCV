@@ -81,6 +81,10 @@ enum SectionVocabulary {
         return table
     }()
 
+    /// The headings of each kind of section, by language. A heading is read whatever the language of the CV; the lists
+    /// are also the vote that tells the language. A word that a language borrows from another ("Tools" in a German CV,
+    /// "Technologies" in a French one) is therefore not added to the borrower's list: the share it took would weaken the
+    /// language that has the word already.
     static let entries: [(SectionKind, [(CVLanguage, [String])])] = [
         (.personal, [
             (.en, ["personal information", "personal details", "personal data", "contact", "contacts", "contact information", "contact details", "personal info"]),
@@ -155,7 +159,7 @@ enum SectionVocabulary {
                    "fähigkeiten und kenntnisse", "kenntnisse und fähigkeiten", "digitale kompetenzen", "soft skills", "fachliche kompetenzen",
                    "sonstige kenntnisse", "qualifikationen", "fachkompetenzen", "persönliche kompetenzen", "skills", "top-kenntnisse",
                    "top kenntnisse", "technische kenntnisse", "technische fähigkeiten", "technische kompetenzen", "technische skills",
-                   "fachliche kenntnisse", "it-kompetenzen", "technologien", "tools", "werkzeuge", "tech-stack", "technologie-stack",
+                   "fachliche kenntnisse", "it-kompetenzen", "technologien", "werkzeuge", "tech-stack", "technologie-stack",
                    "tools und technologien", "technologien und tools", "kernkompetenzen", "schlüsselkompetenzen", "kerntechnologien",
                    "haupttechnologien"]),
             (.es, ["habilidades", "competencias", "aptitudes", "conocimientos", "conocimientos informáticos", "competencias digitales",
@@ -165,13 +169,12 @@ enum SectionVocabulary {
                    "competencias principales", "habilidades clave", "tecnologías principales", "tecnologías clave"]),
             (.fr, ["compétences", "compétences techniques", "savoir-faire", "aptitudes", "connaissances", "compétences informatiques",
                    "compétences numériques", "outils", "compétences clés", "savoir être", "principales compétences",
-                   "technologies", "outils et technologies", "technologies et outils", "stack technique", "stack technologique",
+                   "outils et technologies", "technologies et outils", "stack technique", "stack technologique",
                    "connaissances techniques", "technologies principales", "technologies clés"]),
             (.pt, ["competências", "competências técnicas", "habilidades", "aptidões", "conhecimentos", "conhecimentos informáticos",
                    "competências digitais", "outras competências", "competências pessoais", "principais competências",
                    "ferramentas", "tecnologias", "tecnologias utilizadas", "ferramentas e tecnologias", "tecnologias e ferramentas",
-                   "stack tecnológico", "stack técnico", "tech stack", "conhecimentos técnicos", "habilidades técnicas",
-                   "competências chave", "tecnologias principais", "tecnologias chave"]),
+                   "stack tecnológico", "stack técnico", "tech stack", "conhecimentos técnicos", "competências chave", "tecnologias principais", "tecnologias chave"]),
         ]),
         (.languages, [
             (.en, ["languages", "language skills", "language", "languages spoken", "foreign languages", "language competences"]),

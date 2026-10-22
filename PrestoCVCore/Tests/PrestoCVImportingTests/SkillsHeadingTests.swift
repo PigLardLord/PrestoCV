@@ -13,14 +13,20 @@ enum SkillsHeadings {
         (.en, "Technology stack"), (.en, "Technical expertise"), (.en, "Core Technologies"), (.en, "Key technologies"),
         (.it, "Competenze tecniche"), (.it, "Conoscenze informatiche"), (.it, "Tecnologie"), (.it, "Strumenti"),
         (.it, "Stack tecnologico"), (.it, "Competenze chiave"), (.it, "Strumenti e tecnologie"), (.it, "Conoscenze tecniche"), (.it, "Tecnologie principali"),
-        (.de, "Kenntnisse"), (.de, "Technische Kenntnisse"), (.de, "IT-Kenntnisse"), (.de, "Technologien"), (.de, "Tools"),
+        (.de, "Kenntnisse"), (.de, "Technische Kenntnisse"), (.de, "IT-Kenntnisse"), (.de, "Technologien"),
         (.de, "Werkzeuge"), (.de, "Tech-Stack"), (.de, "Kernkompetenzen"), (.de, "Technische Fähigkeiten"), (.de, "Kerntechnologien"),
         (.es, "Conocimientos técnicos"), (.es, "Herramientas"), (.es, "Tecnologías"), (.es, "Stack tecnológico"),
         (.es, "Competencias clave"), (.es, "Herramientas y tecnologías"), (.es, "Tecnologías principales"),
-        (.fr, "Compétences techniques"), (.fr, "Outils"), (.fr, "Technologies"), (.fr, "Stack technique"),
+        (.fr, "Compétences techniques"), (.fr, "Outils"), (.fr, "Stack technique"),
         (.fr, "Connaissances techniques"), (.fr, "Outils et technologies"), (.fr, "Technologies principales"),
         (.pt, "Competências técnicas"), (.pt, "Ferramentas"), (.pt, "Tecnologias"), (.pt, "Conhecimentos técnicos"),
         (.pt, "Stack tecnológico"), (.pt, "Ferramentas e tecnologias"), (.pt, "Tecnologias principais"),
+    ]
+
+    /// Headings that a CV of a language borrows from another: the vocabulary reads the CV under them, and they keep the
+    /// vote of the language that has them, so that they do not weaken it in telling the language of a CV.
+    static let borrowed: [(language: CVLanguage, heading: String, votes: Set<CVLanguage>)] = [
+        (.fr, "Technologies", [.en]), (.de, "Tools", [.en]), (.pt, "Habilidades técnicas", [.es]),
     ]
 
     /// The heading of the work experience in each language, so that the CV's headings tell its language.
@@ -121,6 +127,38 @@ struct SkillsHeadingTests {
                 }
             }
         }
+    }
+
+    @Test("A heading a language borrows is read as skills and keeps the vote of the language that has it", arguments: SkillsHeadings.borrowed)
+    func borrowedHeadings(language: CVLanguage, heading: String, votes: Set<CVLanguage>) async throws {
+        for form in [heading, heading.uppercased(), heading + ":"] {
+            let match = SectionVocabulary.kind(ofHeading: form)
+            #expect(match?.kind == .skills, "\(language) \(form)")
+            #expect(match?.languages == votes, "\(language) \(form): \(String(describing: match?.languages))")
+        }
+        for result in [try importText(pastedText(language, heading: heading)), try await importLayout(page(language, heading: heading))] {
+            #expect(result.cv.skills.map(\.value) == SkillsHeadings.skills, "\(language) \(heading)")
+            #expect(result.unplaced.isEmpty, "\(language) \(heading): text not imported: \(result.unplaced.map(\.text))")
+            #expect(result.cv.experience.count == 1, "\(language) \(heading)")
+        }
+    }
+
+    @Test("An English CV stays English under a heading that French has too, with French names of employers")
+    func englishCVKeepsItsLanguage() throws {
+        let result = try importText("""
+        Alex Example
+        Software Engineer
+
+        Experience
+        Developer, Le Monde
+        03/2019 – 05/2024
+        Built APIs for Les Echos
+
+        Technologies
+        Swift, Docker
+        """)
+        #expect(result.cv.skills.map(\.value) == ["Swift", "Docker"])
+        #expect(result.language == .en)
     }
 
     @Test("A pasted CV with its skills under the heading has them read as skills, and nothing is left over", arguments: SkillsHeadings.all)
