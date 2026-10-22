@@ -19,16 +19,17 @@ extension RealRendererSuites {
         static let designs = ["professional", "modern", "minimal"]
 
         /// The number of pages of each planted CV, by design. A CV is planted so that its last page is neither almost
-        /// empty nor almost full, which keeps these numbers the same on every version of the system. A CV of two pages
-        /// also runs over by more than the tightening of `OnePageFit` takes back, and is printed with its design's spacing.
+        /// empty nor almost full, which keeps these numbers the same on every version of the system. The short CVs and the
+        /// one with long links run over one page with the spacing of Professional and Minimal, and `OnePageFit` brings them
+        /// onto one page. The others are too long for that, and are printed as their design lays them out.
         static let expectedPages: [String: [String: Int]] = [
-            "short-en": ["professional": 2, "modern": 1, "minimal": 2],
-            "short-it": ["professional": 2, "modern": 1, "minimal": 2],
-            "short-de": ["professional": 2, "modern": 1, "minimal": 2],
-            "short-es": ["professional": 2, "modern": 1, "minimal": 2],
-            "short-fr": ["professional": 2, "modern": 1, "minimal": 2],
-            "short-pt": ["professional": 2, "modern": 1, "minimal": 2],
-            "links": ["professional": 2, "modern": 1, "minimal": 2],
+            "short-en": ["professional": 1, "modern": 1, "minimal": 1],
+            "short-it": ["professional": 1, "modern": 1, "minimal": 1],
+            "short-de": ["professional": 1, "modern": 1, "minimal": 1],
+            "short-es": ["professional": 1, "modern": 1, "minimal": 1],
+            "short-fr": ["professional": 1, "modern": 1, "minimal": 1],
+            "short-pt": ["professional": 1, "modern": 1, "minimal": 1],
+            "links": ["professional": 1, "modern": 1, "minimal": 1],
             "contacts": ["professional": 1, "modern": 1, "minimal": 1],
             "real4x5": ["professional": 3, "modern": 2, "minimal": 3],
             "real9x5": ["professional": 4, "modern": 3, "minimal": 4],
@@ -129,8 +130,9 @@ extension RealRendererSuites {
             for planted in PlantedCVs.paginated {
                 let layout = try await Self.layout(of: planted, design: design)
 
+                // A CV brought onto one page ends near the foot of its page, where the tightening stopped
                 let lastFill = layout.fill(ofPage: layout.pageCount)
-                #expect((0.10...0.90).contains(lastFill), "\(planted.label) in \(design): the last page is \(Int(lastFill * 100))% full (\(layout.summary))")
+                #expect((0.10...0.95).contains(lastFill), "\(planted.label) in \(design): the last page is \(Int(lastFill * 100))% full (\(layout.summary))")
             }
         }
 
