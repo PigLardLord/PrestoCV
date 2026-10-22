@@ -474,6 +474,103 @@ struct AutosaveTests {
         #expect(store.writes.isEmpty, "Nothing writes again on its own after a failure")
     }
 
+    // MARK: - A retry after a failure
+
+    @Test("while a retry writes, the failure stays unresolved: the status says retrying until a write succeeds")
+    func retryKeepsTheFailureUntilItSucceeds() async throws {
+        let autosave = autosave()
+        var reported: [Autosave<String>.Status] = []
+        autosave.onStatusChange = { reported.append($0) }
+        store.fails = true
+        autosave.changed(to: "Ada L")
+        try await autosave.flush()
+
+        store.fails = false
+        store.close()
+        let retry = Task { try await autosave.flush() }
+        await store.waitUntilWriting()
+        #expect(autosave.status == .retrying, "A write runs, and nothing has stored the content yet")
+        #expect(autosave.status.hasUnresolvedFailure)
+
+        store.open()
+        try await retry.value
+        #expect(autosave.status == .upToDate)
+        #expect(!autosave.status.hasUnresolvedFailure)
+        #expect(reported == [.pending, .writing, .failed, .retrying, .upToDate])
+    }
+
+    @Test("a retry that fails again is a failure again, so each attempt is told")
+    func retryThatFailsAgainIsAFailureAgain() async throws {
+        let autosave = autosave()
+        var reported: [Autosave<String>.Status] = []
+        autosave.onStatusChange = { reported.append($0) }
+        store.fails = true
+        autosave.changed(to: "Ada L")
+        try await autosave.flush()
+
+        store.close()
+        let retry = Task { try await autosave.flush() }
+        await store.waitUntilWriting()
+        #expect(autosave.status == .retrying)
+        store.open()
+        try await retry.value
+
+        #expect(autosave.status == .failed)
+        #expect(reported == [.pending, .writing, .failed, .retrying, .failed])
+    }
+
+    @Test("a failure is unresolved while the status says failed or retrying, and only then")
+    func unresolvedFailureIsFailedOrRetrying() {
+        #expect(Autosave<String>.Status.failed.hasUnresolvedFailure)
+        #expect(Autosave<String>.Status.retrying.hasUnresolvedFailure)
+        #expect(!Autosave<String>.Status.writing.hasUnresolvedFailure)
+        #expect(!Autosave<String>.Status.pending.hasUnresolvedFailure)
+        #expect(!Autosave<String>.Status.upToDate.hasUnresolvedFailure)
+    }
+
+    // MARK: - Whether the store holds the content
+
+    @Test("the store holds the content only when no write runs and nothing differs: a write that runs may still land")
+    func storeHoldsTheContentOnlyWhenNoWriteRuns() async throws {
+        let autosave = autosave()
+        #expect(autosave.storeHoldsTheContent, "Nothing changed")
+        store.close()
+        let first = autosave.changed(to: "Ada L")
+        #expect(!autosave.storeHoldsTheContent, "A change waits for its pause")
+        clock.advance(by: .seconds(1))
+        await store.waitUntilWriting()
+
+        autosave.changed(to: "Ada")
+        #expect(!autosave.hasChangesToWrite, "The form is back to what the store held when the write began")
+        #expect(!autosave.storeHoldsTheContent, "and the write of Ada L, which still runs, may put something else there")
+
+        store.open()
+        await finish(first)
+        #expect(!autosave.storeHoldsTheContent, "The store holds Ada L, and the form Ada")
+        clock.advance(by: .seconds(1))
+        await finish(autosave.scheduledWrite)
+        #expect(autosave.storeHoldsTheContent)
+        #expect(store.writes == ["Ada L", "Ada"])
+    }
+
+    @Test("a write that runs for a new CV emptied meanwhile leaves the store holding something: it is not known to hold the form")
+    func newCVEmptiedDuringItsFirstWriteIsNotHeld() async throws {
+        let autosave = autosave(content: "", unchangedFrom: "", isStored: false)
+        store.close()
+        autosave.changed(to: "A")
+        let flush = Task { try await autosave.flush() }
+        await store.waitUntilWriting()
+
+        autosave.changed(to: " ")
+        #expect(!autosave.hasChangesToWrite, "Nothing worth storing is in the form")
+        #expect(!autosave.storeHoldsTheContent, "but the write of A may still store the CV")
+
+        store.open()
+        try await flush.value
+        #expect(store.writes == ["A", " "], "The CV the write stored is updated to what the form shows")
+        #expect(autosave.storeHoldsTheContent)
+    }
+
     @Test("a write the store cancels after a failure leaves the failure shown")
     func cancelledRetryKeepsTheFailure() async throws {
         let autosave = autosave()

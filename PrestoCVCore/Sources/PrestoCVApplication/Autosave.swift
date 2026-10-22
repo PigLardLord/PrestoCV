@@ -9,8 +9,8 @@ import Foundation
 /// - **After a write:** the content is compared with the store again. A change made while the write ran, or one that
 ///   undid it, is written next: by the pause that follows, or by the flush that was waiting.
 /// - **If a write fails:** the content stays in memory, the status says so, the cause goes to the diagnostic boundary,
-///   and the next change or `flush()` tries again. The failure goes when the content returns to what the store holds,
-///   because nothing is left to retry.
+///   and the next change or `flush()` tries again. The failure stays while that write runs (`retrying`), and goes once a
+///   write succeeds, or once the content is found to be what the store holds, because nothing is left to retry.
 /// - **If a write is cancelled:** that is no failure. The content stays to be written, a pause starts so that it is
 ///   written without another change, and `flush()` passes the cancellation on.
 ///
@@ -28,6 +28,14 @@ public final class Autosave<Content: Equatable & Sendable> {
         case writing
         /// The last write failed, and none has succeeded since: the content is only in memory.
         case failed
+        /// A write runs after the last one failed. Until it succeeds, the content is still only in memory.
+        case retrying
+
+        /// Whether a write failed and nothing has stored the content since. A write that runs does not settle it: only
+        /// one that succeeds does, or content found to be what the store holds.
+        public var hasUnresolvedFailure: Bool {
+            self == .failed || self == .retrying
+        }
     }
 
     /// How long after the last change the content is written.
@@ -110,6 +118,12 @@ public final class Autosave<Content: Equatable & Sendable> {
     /// Whether the content differs from what the store holds, and is worth writing.
     public var hasChangesToWrite: Bool {
         content != written && (isStored || isWorthStoring(content))
+    }
+
+    /// Whether the store is known to hold the content: no write runs, whose end could leave something else in the store,
+    /// and the content is what the store holds. Only then may the editor go without writing first.
+    public var storeHoldsTheContent: Bool {
+        running == nil && !hasChangesToWrite
     }
 
     // MARK: - Changes
@@ -245,7 +259,7 @@ public final class Autosave<Content: Equatable & Sendable> {
             lastWriteFailed = false
         }
         if running != nil {
-            status = .writing
+            status = lastWriteFailed ? .retrying : .writing
         } else if lastWriteFailed {
             status = .failed
         } else if scheduledWrite != nil || hasChangesToWrite {

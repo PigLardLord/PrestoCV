@@ -63,27 +63,29 @@ final class CVEditorViewModel: ObservableObject {
         hasMeaningfulContent
     }
     
-    /// Whether the line under the title says that the CV is saved on this device: the store holds it, and the last
-    /// write did not fail.
+    /// Whether the line under the title says that the CV is saved on this device: the store holds it, and no failure
+    /// waits for a write to succeed, not even while a retry runs.
     var showsSavedOnDevice: Bool {
-        isStored && saveStatus != .failed
+        isStored && !saveStatus.hasUnresolvedFailure
     }
     
-    /// The line under the title: "Saved on this device" while the store holds the CV and the last write did not fail;
-    /// nothing for a CV not stored yet, or while a failed change waits for the next write.
+    /// The line under the title: "Saved on this device" while the store holds the CV and no failure is unresolved;
+    /// nothing for a CV not stored yet, or while a failed change waits for a write to succeed.
     var subtitle: String {
         showsSavedOnDevice ? "editor.saved".localized : ""
     }
 
     /// Whether the store holds what the form shows, so that leaving the editor has nothing to store first. False while a
-    /// change waits for its pause or a write runs or has failed.
+    /// change waits for its pause, while a write runs, whose end can leave something else in the store, and after a
+    /// write failed.
     var storeHoldsWhatTheFormShows: Bool {
-        !(autosave?.hasChangesToWrite ?? false)
+        autosave?.storeHoldsTheContent ?? true
     }
 
-    /// Whether the last change could not be saved: it is only in memory until a write succeeds.
+    /// Whether the last change could not be saved: it is only in memory until a write succeeds. A retry that runs does
+    /// not hide it.
     var showsSaveFailure: Bool {
-        saveStatus == .failed
+        saveStatus.hasUnresolvedFailure
     }
 
 
@@ -161,7 +163,7 @@ final class CVEditorViewModel: ObservableObject {
             // The write was cancelled: it is no failure, and the edits are still only in the form
             return false
         }
-        return !autosave.hasChangesToWrite
+        return autosave.storeHoldsTheContent
     }
     
     /// The app came to the foreground or left it. On its way to the background the app can be ended by iOS at any
@@ -337,7 +339,7 @@ final class CVEditorViewModel: ObservableObject {
         case .upToDate where failureIsAnnounced:
             failureIsAnnounced = false
             announce(.saved)
-        case .upToDate, .pending, .writing:
+        case .upToDate, .pending, .writing, .retrying:
             break
         }
     }
