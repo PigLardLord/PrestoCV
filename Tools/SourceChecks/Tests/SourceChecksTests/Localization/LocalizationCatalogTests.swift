@@ -356,6 +356,21 @@ struct LocalizationCatalogTests {
         #expect(english.isEmpty, "German texts that say CV: \(english)")
     }
 
+    @Test("The title of a CV with none names it a CV, with the word for one that the app uses in each language")
+    func untitledCVSaysCV() throws {
+        let catalog = try LocalizationCatalog.load()
+
+        for language in LocalizationCatalog.languages {
+            // "New CV", "Nuovo CV", "Lebenslauf", "Novo currículo": the word for a CV ends the title of a new one
+            let newCV = try #require(catalog.texts(of: "editor.new_cv", in: language)?.first, "editor.new_cv in \(language)")
+            let word = try #require(newCV.split(separator: " ").last.map(String.init))
+            for untitled in catalog.texts(of: "cv.untitled", in: language) ?? [] {
+                #expect(untitled.range(of: word, options: .caseInsensitive) != nil,
+                        "cv.untitled should say \(word) in \(language), as the rest of the app does: \(untitled)")
+            }
+        }
+    }
+
     @Test("A capital letter is expected at the start of a sentence, in an abbreviation and in a proper name")
     func titleCaseWordsSkipsLegitimateCapitals() throws {
         #expect(try Self.titleCaseWords(in: "Crea Tu CV Perfecto") == ["Tu", "Perfecto"])

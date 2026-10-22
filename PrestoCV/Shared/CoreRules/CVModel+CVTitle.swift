@@ -18,8 +18,15 @@ extension CVModel {
         cvTitle.copyName(untitled: "cv.untitled".localized, copySuffix: "action.copy_suffix".localized)
     }
 
-    /// What the editor of the CV, and the offer to restore its edits, call it: its title; for a CV with none, "New CV"
-    /// until it is stored, and "Untitled CV", as the list calls it, once it is.
+    /// What a copy made of edits an earlier version of the app left unsaved is called, when the CV they were made on
+    /// changed after them: the title of that CV, marked as recovered.
+    var recoveredCopyName: String {
+        let recovered = "unsaved_edits.recovered_suffix".localized
+        return "\(cvTitle.text) \(recovered)"
+    }
+
+    /// What the editor of the CV calls it: its title; for a CV with none, "New CV" until it is stored, and "Untitled
+    /// CV", as the list calls it, once it is.
     func editorTitle(isStored: Bool) -> String {
         guard case .untitled = cvTitle else { return cvTitle.text }
         return isStored ? "cv.untitled".localized : "editor.new_cv".localized

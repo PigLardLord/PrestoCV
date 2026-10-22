@@ -30,7 +30,7 @@ struct CVListTitleTests {
         #expect(viewModel.title(of: CVModel(name: name, personalInfo: PersonalInfo(name: name, title: name))) == "cv.untitled".localized)
     }
 
-    @Test("Rows whose titles read alike are numbered, so that no two read the same")
+    @Test("Rows whose titles read alike are numbered, so that no two read the same; untitled ones as untitled documents are")
     func alikeRowsAreNumbered() async {
         let ids = ["00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002",
                    "00000000-0000-0000-0000-000000000003"].compactMap(UUID.init(uuidString:))
@@ -44,7 +44,7 @@ struct CVListTitleTests {
         await list.loadCVs()
 
         #expect(list.title(of: first) == "cv.untitled".localized)
-        #expect(list.title(of: second) == "cv.title.numbered".localizedWithArgs("cv.untitled".localized, 2))
+        #expect(list.title(of: second) == "\("cv.untitled".localized) 2", "Untitled CV 2, as the platform numbers an untitled document")
         #expect(list.title(of: named) == "Backend Engineer")
     }
 

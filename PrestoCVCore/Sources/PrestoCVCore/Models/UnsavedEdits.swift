@@ -1,9 +1,9 @@
 import CryptoKit
 import Foundation
 
-/// The edits of a CV that the editor has not saved yet, kept on the device so that they outlive the app when iOS ends
-/// it. They are not the CV: the person still decides to save them or to discard them.
-public struct UnsavedEdits: Codable, Sendable, Equatable, Identifiable {
+/// The edits of a CV that the editor of an earlier version had not saved, kept on the device so that they outlived the
+/// app when iOS ended it. The editor saves by itself now: `LeftoverEditsImport` stores what is left of them.
+public struct UnsavedEdits: Codable, Sendable, Equatable, Identifiable, StorageIdentified {
     /// The editing that kept them: one editor, from the moment it opens to the moment it is left.
     public let id: UUID
     /// The CV as the editor showed it. Its id is the one the CV is stored under, or will be: a new CV gets it when its
@@ -21,59 +21,38 @@ public struct UnsavedEdits: Codable, Sendable, Equatable, Identifiable {
         self.base = base
         self.keptAt = keptAt
     }
-}
 
-/// The hold of one editor or window of the app on the edits of an editing: while it lasts, only its holder keeps or
-/// removes them, and they are offered to no one else. It is released when the holder goes away.
-public struct UnsavedEditsClaim: Sendable, Equatable {
-    /// The editing the edits belong to.
-    public let editing: UUID
-    /// Tells this hold from an earlier one on the same editing, which may have been released.
-    let token: UUID
-}
-
-/// Why kept edits could not be changed.
-public enum UnsavedEditsError: Error, Equatable {
-    /// The claim used is not the one that holds the edits now, as when it was released.
-    case notHeld
+    /// The file name the edits are kept under, so that the storage can tell a file kept under another one.
+    public var storageIdentifier: String {
+        UnsavedEditsRepository.identifier(for: id)
+    }
 }
 
 // MARK: - Restoring
 
 extension UnsavedEdits {
-    /// How the edits go back into the editor, given what is stored under their CV's id, and under the id of their
-    /// copy, now.
+    /// How the edits go into the CVs, given what is stored under their CV's id, and under the id of their copy, now.
     public enum RestorePlan: Equatable, Sendable {
         /// The edits were restored as a copy before, and the copy was stored: it holds them, or what the person made of
-        /// them since. It opens as it is stored, and the edits go, so nothing saved to the copy is replaced. Each write
-        /// of edits restored as a copy names the copy, so edits that still name the CV they were made on are the ones
-        /// the copy was made of, kept on because they could not be removed.
-        case restoredAsCopy(CVModel)
+        /// them since. Nothing is stored, so nothing saved to the copy is replaced. Each write of edits restored as a
+        /// copy named the copy, so edits that still name the CV they were made on are the ones the copy was made of,
+        /// kept on because they could not be removed.
+        case restoredAsCopy
         /// The stored CV already holds the edits, as when the app was ended after a save and before its edits were
-        /// removed. There is nothing to restore.
+        /// removed. There is nothing to store.
         case alreadySaved
-        /// The edits are restored over the stored CV, which a save then updates.
+        /// The edits replace the stored CV they were made on.
         case update
-        /// Nothing is stored under the CV's id: a save stores the edits under it.
+        /// Nothing is stored under the CV's id: the edits are stored under it.
         case create
-        /// The stored CV changed after the edits were made on it, as when another window saved it. Restoring the edits
-        /// over it would replace the newer content without a word, so they are restored as a separate copy instead.
+        /// The stored CV changed after the edits were made on it, as when another window saved it. Storing the edits
+        /// over it would replace the newer content without a word, so they are stored as a separate copy instead.
         case copy
-
-        /// Whether the edits open as a CV of their own, apart from the one they were made on.
-        public var opensAsCopy: Bool {
-            switch self {
-            case .copy, .restoredAsCopy:
-                return true
-            case .alreadySaved, .update, .create:
-                return false
-            }
-        }
     }
 
-    /// The id the edits are stored under when they are restored as a copy. It is worked out from the edits, so it is
-    /// the same every time: edits restored again, after they could not be removed, find the copy they were made into
-    /// instead of making another.
+    /// The id the edits are stored under when they are stored as a copy. It is worked out from the edits, so it is the
+    /// same every time: edits stored again, after they could not be removed, find the copy they were made into instead
+    /// of making another.
     public var copyID: UUID {
         UUID(namedBy: "\(id.uuidString)/\(cv.id.uuidString)", in: Self.copyNamespace)
     }
@@ -87,8 +66,8 @@ extension UnsavedEdits {
     ///   - stored: The CV stored under the id of the edits' CV now, if there is one.
     ///   - storedCopy: The CV stored under `copyID` now, if there is one.
     public func restorePlan(over stored: CVModel?, copy storedCopy: CVModel?) -> RestorePlan {
-        if let storedCopy {
-            return .restoredAsCopy(storedCopy)
+        if storedCopy != nil {
+            return .restoredAsCopy
         }
         guard let stored else {
             return .create

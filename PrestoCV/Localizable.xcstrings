@@ -288,47 +288,6 @@
         }
       }
     },
-    "accessibility.unsaved_changes_hint" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieses Formular enthält ungespeicherte Änderungen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "There are unsaved changes in this form"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este formulario tiene cambios sin guardar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce formulaire contient des modifications non enregistrées"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Questo modulo contiene modifiche non salvate"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este formulário tem alterações não salvas"
-          }
-        }
-      }
-    },
     "action.add_certification" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1401,37 +1360,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beschreiben Sie Ihren Werdegang mit eigenen Worten. Die KI erstellt Ihren Lebenslauf auf diesem Gerät, und Sie prüfen alles, bevor Sie speichern."
+            "value" : "Beschreiben Sie Ihren Werdegang mit eigenen Worten. Die KI erstellt Ihren Lebenslauf auf diesem Gerät, und Sie prüfen alles, bevor Sie ihn versenden."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Describe your background in your own words. AI drafts your CV on this device, and you check everything before saving."
+            "value" : "Describe your background in your own words. AI drafts your CV on this device, and you check everything before you send it."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Describe tu trayectoria con tus propias palabras. La IA redacta tu CV en este dispositivo y tú lo revisas todo antes de guardar."
+            "value" : "Describe tu trayectoria con tus propias palabras. La IA redacta tu CV en este dispositivo y tú lo revisas todo antes de enviarlo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Décrivez votre parcours avec vos propres mots. L'IA rédige votre CV sur cet appareil et vous vérifiez tout avant d'enregistrer."
+            "value" : "Décrivez votre parcours avec vos propres mots. L'IA rédige votre CV sur cet appareil et vous vérifiez tout avant de l'envoyer."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Descrivi il tuo percorso con parole tue. L'IA scrive il tuo CV su questo dispositivo e tu controlli tutto prima di salvare."
+            "value" : "Descrivi il tuo percorso con parole tue. L'IA scrive il tuo CV su questo dispositivo e tu controlli tutto prima di inviarlo."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Descreva sua trajetória com suas próprias palavras. A IA escreve seu currículo neste dispositivo e você confere tudo antes de salvar."
+            "value" : "Descreva sua trajetória com suas próprias palavras. A IA escreve seu currículo neste dispositivo e você confere tudo antes de enviá-lo."
           }
         }
       }
@@ -1928,6 +1887,47 @@
         }
       }
     },
+    "common.back" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zurück"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atrás"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retour"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indietro"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voltar"
+          }
+        }
+      }
+    },
     "common.cancel" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2006,47 +2006,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Excluir"
-          }
-        }
-      }
-    },
-    "common.discard" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verwerfen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Discard"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descartar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ignorer"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scarta"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descartar"
           }
         }
       }
@@ -2334,47 +2293,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tentar novamente"
-          }
-        }
-      }
-    },
-    "common.save" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speichern"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Save"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Guardar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enregistrer"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Salva"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Salvar"
           }
         }
       }
@@ -2949,7 +2867,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ohne Titel"
+            "value" : "Lebenslauf ohne Titel"
           }
         },
         "en" : {
@@ -2980,88 +2898,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Currículo sem título"
-          }
-        }
-      }
-    },
-    "dialog.discard_changes.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alle ungespeicherten Änderungen gehen verloren."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "All unsaved changes will be lost."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se perderán todos los cambios sin guardar."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toutes les modifications non enregistrées seront perdues."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tutte le modifiche non salvate andranno perse."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Todas as alterações não salvas serão perdidas."
-          }
-        }
-      }
-    },
-    "dialog.discard_changes.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Änderungen verwerfen?"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Discard Changes?"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¿Descartar los cambios?"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ignorer les modifications ?"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scartare le modifiche?"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descartar as alterações?"
           }
         }
       }
@@ -3148,47 +2984,6 @@
         }
       }
     },
-    "editor.keep_editing" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Weiter bearbeiten"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keep Editing"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seguir editando"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuer la modification"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continua a modificare"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuar editando"
-          }
-        }
-      }
-    },
     "editor.new_cv" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3236,37 +3031,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Entwurf, von der KI aus Ihrer Beschreibung erstellt. Prüfen Sie jedes Feld und speichern Sie dann. Was Sie nicht erwähnt haben, bleibt leer."
+            "value" : "Entwurf, von der KI aus Ihrer Beschreibung erstellt. Prüfen Sie jedes Feld, bevor Sie den Lebenslauf versenden. Was Sie nicht erwähnt haben, bleibt leer."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Draft written by AI from your description. Check every field, then save. Anything you didn't mention is left blank."
+            "value" : "Draft written by AI from your description. Check every field before you send the CV. Anything you didn't mention is left blank."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Borrador escrito por la IA a partir de tu descripción. Revisa cada campo y luego guarda. Lo que no mencionaste queda en blanco."
+            "value" : "Borrador escrito por la IA a partir de tu descripción. Revisa cada campo antes de enviar el CV. Lo que no mencionaste queda en blanco."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Brouillon rédigé par l'IA à partir de votre description. Vérifiez chaque champ, puis enregistrez. Ce que vous n'avez pas mentionné reste vide."
+            "value" : "Brouillon rédigé par l'IA à partir de votre description. Vérifiez chaque champ avant d'envoyer le CV. Ce que vous n'avez pas mentionné reste vide."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bozza scritta dall'IA a partire dalla tua descrizione. Controlla ogni campo, poi salva. Ciò che non hai indicato resta vuoto."
+            "value" : "Bozza scritta dall'IA a partire dalla tua descrizione. Controlla ogni campo prima di inviare il CV. Ciò che non hai indicato resta vuoto."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rascunho escrito pela IA a partir da sua descrição. Confira cada campo e depois salve. O que você não mencionou fica em branco."
+            "value" : "Rascunho escrito pela IA a partir da sua descrição. Confira cada campo antes de enviar o currículo. O que você não mencionou fica em branco."
           }
         }
       }
@@ -3277,37 +3072,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aus Ihrem Text importiert. Prüfen Sie jedes Feld und speichern Sie dann. Text, der in kein Feld passt, wurde nicht übernommen; Sie können ihn kopieren."
+            "value" : "Aus Ihrem Text importiert. Prüfen Sie jedes Feld, bevor Sie den Lebenslauf versenden. Text, der in kein Feld passt, wurde nicht übernommen; Sie können ihn kopieren."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Imported from your text. Check every field, then save. Text that fits no field wasn't added; you can copy it."
+            "value" : "Imported from your text. Check every field before you send the CV. Text that fits no field wasn't added; you can copy it."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Importado de tu texto. Revisa cada campo y luego guarda. El texto que no encaja en ningún campo no se añadió: puedes copiarlo."
+            "value" : "Importado de tu texto. Revisa cada campo antes de enviar el CV. El texto que no encaja en ningún campo no se añadió: puedes copiarlo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Importé depuis votre texte. Vérifiez chaque champ, puis enregistrez. Le texte qui ne correspond à aucun champ n'a pas été ajouté : vous pouvez le copier."
+            "value" : "Importé depuis votre texte. Vérifiez chaque champ avant d'envoyer le CV. Le texte qui ne correspond à aucun champ n'a pas été ajouté : vous pouvez le copier."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Importato dal tuo testo. Controlla ogni campo, poi salva. Il testo che non entra in nessun campo non è stato aggiunto: puoi copiarlo."
+            "value" : "Importato dal tuo testo. Controlla ogni campo prima di inviare il CV. Il testo che non entra in nessun campo non è stato aggiunto: puoi copiarlo."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Importado do seu texto. Confira cada campo e depois salve. O texto que não cabe em nenhum campo não foi adicionado: você pode copiá-lo."
+            "value" : "Importado do seu texto. Confira cada campo antes de enviar o currículo. O texto que não cabe em nenhum campo não foi adicionado: você pode copiá-lo."
           }
         }
       }
@@ -3353,43 +3148,43 @@
         }
       }
     },
-    "editor.save_error.not_kept" : {
+    "editor.save_failed" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ihre Änderungen konnten nicht auf dieses Gerät geschrieben werden, daher wurde der Lebenslauf nicht gespeichert. Geben Sie Speicherplatz frei und versuchen Sie es erneut."
+            "value" : "Ihre letzte Änderung konnte nicht gespeichert werden"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your changes could not be written to this device, so the CV was not saved. Free up some storage and try again."
+            "value" : "Couldn't save your last change"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se pudieron escribir tus cambios en este dispositivo, así que el CV no se ha guardado. Libera espacio de almacenamiento e inténtalo de nuevo."
+            "value" : "No se pudo guardar tu último cambio"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vos modifications n’ont pas pu être écrites sur cet appareil, le CV n’a donc pas été enregistré. Libérez de l’espace de stockage et réessayez."
+            "value" : "Impossible d’enregistrer votre dernière modification"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Non è stato possibile scrivere le modifiche su questo dispositivo, quindi il CV non è stato salvato. Libera spazio di archiviazione e riprova."
+            "value" : "Impossibile salvare l’ultima modifica"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não foi possível gravar suas alterações neste dispositivo, por isso o currículo não foi salvo. Libere espaço de armazenamento e tente novamente."
+            "value" : "Não foi possível salvar sua última alteração"
           }
         }
       }
@@ -3472,47 +3267,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Editor de currículo"
-          }
-        }
-      }
-    },
-    "editor.unsaved_changes" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ungespeicherte Änderungen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unsaved Changes"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cambios sin guardar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modifications non enregistrées"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modifiche non salvate"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alterações não salvas"
           }
         }
       }
@@ -7992,37 +7746,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fügen Sie den Text eines Lebenslaufs ein, mit einem KI-Chat geschrieben oder aus einem Dokument, einer E-Mail oder LinkedIn kopiert, oder wählen Sie ein PDF. PrestoCV ordnet jeden Teil auf diesem Gerät ein, und Sie prüfen alles, bevor Sie speichern."
+            "value" : "Fügen Sie den Text eines Lebenslaufs ein, mit einem KI-Chat geschrieben oder aus einem Dokument, einer E-Mail oder LinkedIn kopiert, oder wählen Sie ein PDF. PrestoCV ordnet jeden Teil auf diesem Gerät ein, und Sie prüfen alles, bevor Sie den Lebenslauf versenden."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Paste the text of a CV, written with an AI chat or copied from a document, an email or LinkedIn, or choose a PDF. PrestoCV puts each part in its place on this device, and you check everything before saving."
+            "value" : "Paste the text of a CV, written with an AI chat or copied from a document, an email or LinkedIn, or choose a PDF. PrestoCV puts each part in its place on this device, and you check everything before you send the CV."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pega el texto de un CV, escrito con un chat de IA o copiado de un documento, un correo o LinkedIn, o elige un PDF. PrestoCV pone cada parte en su sitio en este dispositivo y tú lo revisas todo antes de guardar."
+            "value" : "Pega el texto de un CV, escrito con un chat de IA o copiado de un documento, un correo o LinkedIn, o elige un PDF. PrestoCV pone cada parte en su sitio en este dispositivo y tú lo revisas todo antes de enviar el CV."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Collez le texte d'un CV, écrit avec un chat d'IA ou copié d'un document, d'un e-mail ou de LinkedIn, ou choisissez un PDF. PrestoCV range chaque partie à sa place sur cet appareil, et vous vérifiez tout avant d'enregistrer."
+            "value" : "Collez le texte d'un CV, écrit avec un chat d'IA ou copié d'un document, d'un e-mail ou de LinkedIn, ou choisissez un PDF. PrestoCV range chaque partie à sa place sur cet appareil, et vous vérifiez tout avant d'envoyer le CV."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Incolla il testo di un CV, scritto con una chat di IA o copiato da un documento, da un'e-mail o da LinkedIn, oppure scegli un PDF. PrestoCV mette ogni parte al suo posto su questo dispositivo e tu controlli tutto prima di salvare."
+            "value" : "Incolla il testo di un CV, scritto con una chat di IA o copiato da un documento, da un'e-mail o da LinkedIn, oppure scegli un PDF. PrestoCV mette ogni parte al suo posto su questo dispositivo e tu controlli tutto prima di inviare il CV."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cole o texto de um currículo, escrito com um chat de IA ou copiado de um documento, de um e-mail ou do LinkedIn, ou escolha um PDF. O PrestoCV coloca cada parte no lugar neste dispositivo e você confere tudo antes de salvar."
+            "value" : "Cole o texto de um currículo, escrito com um chat de IA ou copiado de um documento, de um e-mail ou do LinkedIn, ou escolha um PDF. O PrestoCV coloca cada parte no lugar neste dispositivo e você confere tudo antes de enviar o currículo."
           }
         }
       }
@@ -10729,293 +10483,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "(recuperado)"
-          }
-        }
-      }
-    },
-    "unsaved_edits.restore.action" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wiederherstellen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restore"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recuperar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restaurer"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ripristina"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restaurar"
-          }
-        }
-      }
-    },
-    "unsaved_edits.restore.as_copy" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Als Kopie wiederherstellen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restore as Copy"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recuperar como copia"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restaurer comme copie"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ripristina come copia"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restaurar como cópia"
-          }
-        }
-      }
-    },
-    "unsaved_edits.restore.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sie haben ungespeicherte Änderungen an „%1$@“. Letzte Änderung: %2$@."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You have unsaved changes to “%1$@”. Last change: %2$@."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tienes cambios sin guardar en «%1$@». Último cambio: %2$@."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous avez des modifications non enregistrées dans « %1$@ ». Dernière modification : %2$@."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hai modifiche non salvate in “%1$@”. Ultima modifica: %2$@."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Você tem alterações não salvas em “%1$@”. Última alteração: %2$@."
-          }
-        }
-      }
-    },
-    "unsaved_edits.restore.message_copy" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sie haben ungespeicherte Änderungen an „%1$@“. Letzte Änderung: %2$@. Der Lebenslauf wurde seitdem erneut gespeichert, daher werden sie als separate Kopie geöffnet."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You have unsaved changes to “%1$@”. Last change: %2$@. The CV has been saved again since, so they open as a separate copy."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tienes cambios sin guardar en «%1$@». Último cambio: %2$@. El CV se ha guardado de nuevo desde entonces, así que se abrirán como una copia aparte."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous avez des modifications non enregistrées dans « %1$@ ». Dernière modification : %2$@. Le CV a été enregistré de nouveau depuis, elles s’ouvriront donc dans une copie distincte."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hai modifiche non salvate in “%1$@”. Ultima modifica: %2$@. Da allora il CV è stato salvato di nuovo, quindi si apriranno come copia separata."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Você tem alterações não salvas em “%1$@”. Última alteração: %2$@. O currículo foi salvo novamente desde então, por isso elas serão abertas como uma cópia separada."
-          }
-        }
-      }
-    },
-    "unsaved_edits.restore.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ungespeicherte Änderungen wiederherstellen?"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restore Unsaved Changes?"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¿Recuperar los cambios sin guardar?"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restaurer les modifications non enregistrées ?"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ripristinare le modifiche non salvate?"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restaurar as alterações não salvas?"
-          }
-        }
-      }
-    },
-    "unsaved_edits.unavailable.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sie wurden in einem anderen Fenster wiederhergestellt oder verworfen."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "They were restored or discarded in another window."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se recuperaron o se descartaron en otra ventana."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elles ont été restaurées ou ignorées dans une autre fenêtre."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sono state ripristinate o scartate in un’altra finestra."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elas foram restauradas ou descartadas em outra janela."
-          }
-        }
-      }
-    },
-    "unsaved_edits.unavailable.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Änderungen nicht mehr verfügbar"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Changes No Longer Available"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Los cambios ya no están disponibles"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ces modifications ne sont plus disponibles"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modifiche non più disponibili"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As alterações não estão mais disponíveis"
           }
         }
       }

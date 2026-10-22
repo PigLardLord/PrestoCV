@@ -12,7 +12,7 @@ final class AIGenerationViewModel: ObservableObject {
     }
     @Published private(set) var isGenerating: Bool = false
     @Published private(set) var errorMessage: String = ""
-    /// The generated CV, unsaved: the editor opens it for review and saves it only on request.
+    /// The generated CV, not stored yet: the editor opens it for review and stores it as it is.
     @Published private(set) var draft: CVModel?
 
     /// The running generation started by `startGenerating()`, kept so `cancel()` can stop it.

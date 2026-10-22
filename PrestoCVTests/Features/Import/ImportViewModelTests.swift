@@ -146,7 +146,7 @@ struct ImportViewModelTests {
             fileReader: fixture.reader()
         )
         let router = AppRouter(isAIShipped: false)
-        router.openImport(of: copy)
+        await router.openImport(of: copy)
 
         // The screen's task, which SwiftUI cancels as the pending file it is keyed on is cleared
         let screenTask = Task { @MainActor in router.takePendingImportFile().flatMap { viewModel.importFile(at: $0) } }

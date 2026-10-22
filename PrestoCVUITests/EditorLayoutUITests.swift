@@ -52,10 +52,12 @@ final class EditorLayoutUITests: XCTestCase {
         launch()
         assertOneExportControlInTheNavigationBar(context: "in portrait")
 
-        rotate(to: .landscapeLeft)
+        guard turn(to: .landscapeLeft) else {
+            throw XCTSkip("This screen does not turn to landscape, as the outer screen of the iPhone Duo; portrait passed")
+        }
         assertOneExportControlInTheNavigationBar(context: "in landscape")
 
-        rotate(to: .portrait)
+        XCTAssertTrue(turn(to: .portrait), "The screen should turn back to portrait")
         assertOneExportControlInTheNavigationBar(context: "back in portrait")
     }
 
@@ -105,11 +107,12 @@ final class EditorLayoutUITests: XCTestCase {
         XCTAssertLessThanOrEqual(gap, points, "The personal details should follow the document language row")
     }
 
-    /// The editor offers to preview and export once, in its navigation bar, and leaves no bar below the form: the form
-    /// reaches the bottom of the screen, save the strip of the home indicator, which is narrower than any button.
+    /// The editor offers to preview and export once, in its bar (the navigation bar, or the vertical bar of the iPhone
+    /// Duo), and leaves no bar below the form: the form reaches the bottom of the screen, save the strip of the home
+    /// indicator, which is narrower than any button.
     private func assertOneExportControlInTheNavigationBar(context: String) {
-        let barExport = app.navigationBars.buttons["Preview & export"]
-        XCTAssertTrue(barExport.waitForExistence(timeout: 10), "The navigation bar should offer to preview and export \(context)")
+        let barExport = app.barButton("Preview & export")
+        XCTAssertTrue(barExport.waitForExistence(timeout: 10), "The bar should offer to preview and export \(context)")
         let exportControls = app.buttons.matching(NSPredicate(format: "label == 'Preview & export'"))
         XCTAssertEqual(exportControls.count, 1, "The editor should offer to preview and export only once \(context)")
 
@@ -120,11 +123,11 @@ final class EditorLayoutUITests: XCTestCase {
     }
 
     /// Turns the device and waits until the screen has turned with it.
-    private func rotate(to orientation: UIDeviceOrientation) {
+    /// - Returns: Whether the screen turned: the outer screen of the iPhone Duo stays in portrait.
+    private func turn(to orientation: UIDeviceOrientation) -> Bool {
         XCUIDevice.shared.orientation = orientation
         let window = app.windows.firstMatch
         let turned = NSPredicate { _, _ in (window.frame.width > window.frame.height) == orientation.isLandscape }
-        let waited = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: turned, object: nil)], timeout: 10)
-        XCTAssertEqual(waited, .completed, "The screen should turn to \(orientation.isLandscape ? "landscape" : "portrait")")
+        return XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: turned, object: nil)], timeout: 10) == .completed
     }
 }
