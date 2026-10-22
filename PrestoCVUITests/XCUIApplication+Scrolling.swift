@@ -14,7 +14,8 @@ extension XCUIApplication {
     /// hittable, but a tap on it lands on the bar: the iPhone Duo shows the bar again as the form scrolls back, over
     /// the field the scroll brought down. A step that turns back has carried the element past the room where it can be
     /// tapped, so the steps after it are half as long. An element taller than the room between the bar and the
-    /// keyboard comes wholly onto the screen, with its middle, where a tap lands, in that room.
+    /// keyboard comes wholly onto the screen, with its middle, where a tap lands, in that room. One so tall that it
+    /// fits there only within a few points, less than the shortest step, may not be reached, and fails the test.
     ///
     /// It stops when the element no longer moves, which is the end of the form, when a step would be too short to
     /// scroll, or after `maxSteps`. The element may then be tapped where it is if it is clear of the bars and the
@@ -62,6 +63,15 @@ extension XCUIApplication {
         return strip.map(\.minY).min().map { min($0, top) } ?? top
     }
 
+    /// The top of a tab bar that floats over the lower part of the screen while it is shown, as on an iPhone. Nil
+    /// otherwise: an iPad shows its tabs at the top, and the outer screen of the iPhone Duo in a bar at its side.
+    var tabBarTop: CGFloat? {
+        let bar = tabBars.firstMatch
+        guard bar.exists, bar.isHittable else { return nil }
+        let top = bar.frame.minY
+        return top > frame.midY ? top : nil
+    }
+
     /// The top of the room the screen shows its content in: the bottom of the navigation bar, or the top of the window
     /// while the system hides the bar, as the iPhone Duo does while a form scrolls down. A hidden bar keeps its frame,
     /// but it cannot take a tap.
@@ -81,11 +91,12 @@ private extension XCUIElement {
 }
 
 /// Where an element can be tapped, read once for each step of a scroll: below the navigation bar while it is shown,
-/// above the keyboard while it is up, on the screen, and in the upper half of it.
+/// above the keyboard while it is up and above a tab bar over the lower part, on the screen, and in the upper half of it.
 struct TapRoom {
     /// The bottom of the navigation bar while it is shown, or the top of the screen.
     let top: CGFloat
-    /// The top of the keyboard and its strip while it is up, or the bottom of the screen.
+    /// The top of the keyboard and its strip while it is up, or of a tab bar over the lower part, whichever is higher;
+    /// or the bottom of the screen.
     let bottom: CGFloat
     let screen: CGRect
 
@@ -120,6 +131,7 @@ struct TapRoom {
 extension TapRoom {
     @MainActor init(in app: XCUIApplication) {
         let screen = app.frame
-        self.init(top: app.contentTop, bottom: app.keyboardTop ?? screen.maxY, screen: screen)
+        let covers = [app.keyboardTop, app.tabBarTop].compactMap { $0 }
+        self.init(top: app.contentTop, bottom: covers.min() ?? screen.maxY, screen: screen)
     }
 }

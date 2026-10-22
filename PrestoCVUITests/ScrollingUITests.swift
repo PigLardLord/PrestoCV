@@ -34,8 +34,8 @@ final class ScrollingUITests: XCTestCase {
         XCTAssertEqual(withoutTheKeyboard.tops(forHeight: 44, upwards: true), 100...634)
     }
 
-    /// An element too tall to have its middle in the upper half while it is below the bar is wholly on the screen
-    /// instead, rather than turned back and forth between the two.
+    /// An element too tall to have its middle in the upper half while it is below the bar may be anywhere it fits below
+    /// the bar instead, rather than turned back and forth between the two.
     func testAnElementTooTallForTheUpperHalfIsWhollyOnTheScreen() {
         XCTAssertEqual(withoutTheKeyboard.tops(forHeight: 500, upwards: false), 100...178)
     }
@@ -67,14 +67,15 @@ final class ScrollingUITests: XCTestCase {
     /// A scroll that ends without the element where it can be tapped fails the test, instead of letting the next tap
     /// land elsewhere.
     func testAScrollThatCannotReachTheElementFailsTheTest() {
-        // The failure is the one expected; nothing runs after it
-        continueAfterFailure = true
         let app = XCUIApplication()
         app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVUITestsEmptyStorage"]
         app.launch()
         XCTAssertTrue(app.buttons["Create My First CV"].waitForExistence(timeout: 20), "The first run should show")
 
-        XCTExpectFailure("The element is not in the app") {
+        // Only the failure of the scroll is expected: any other, as a drag that fails, fails the test
+        let options = XCTExpectedFailure.Options()
+        options.issueMatcher = { $0.compactDescription.contains("cannot be scrolled to a place where a tap lands on it") }
+        XCTExpectFailure("The element is not in the app", options: options) {
             app.scrollTo(app.buttons["An element that is not in the app"], maxSteps: 2)
         }
     }
