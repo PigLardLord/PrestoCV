@@ -23,7 +23,7 @@ struct LaunchEnvironmentTests {
     @Test("A UI test can make the first writes of a CV fail, as on a full disk; the writes after them are stored")
     func firstWritesFailWhenAsked() async throws {
         let store = MockCVManagementUseCase()
-        let cvs = LaunchEnvironment.cvs(store, arguments: ["PrestoCV", LaunchEnvironment.failingWritesArgument, "2"])
+        let cvs = LaunchEnvironment.cvs(store, arguments: ["PrestoCV", LaunchEnvironment.failingWritesArgument, "2"], sleep: { _ in })
         let cv = CVModel(personalInfo: PersonalInfo(name: "Marta Rinaldi"))
 
         await #expect(throws: CocoaError.self) { _ = try await cvs.storeNewCV(cv) }
@@ -34,11 +34,46 @@ struct LaunchEnvironmentTests {
         #expect(await store.createCVCallCount == 1, "The failed writes never reach the store")
     }
 
+    @Test("A UI test can give each write of a CV a step: held a while and then stored, failed, or stored; the writes after the steps are stored")
+    func writesFollowTheirSteps() async throws {
+        let store = MockCVManagementUseCase()
+        let holds = Holds()
+        let cvs = LaunchEnvironment.cvs(
+            store, arguments: ["PrestoCV", LaunchEnvironment.writeStepsArgument, "slow:6,fail,ok"], sleep: { await holds.hold($0) }
+        )
+        let cv = CVModel(personalInfo: PersonalInfo(name: "Marta Rinaldi"))
+
+        _ = try await cvs.storeNewCV(cv)
+        #expect(await holds.durations == [.seconds(6)], "The first write is held, and then stored")
+        await #expect(throws: CocoaError.self) { _ = try await cvs.updateCV(cv) }
+        _ = try await cvs.updateCV(cv)
+        _ = try await cvs.updateCV(cv)
+
+        #expect(await holds.durations == [.seconds(6)], "Only the slow step holds a write")
+        #expect(await store.createCVCallCount == 1)
+        #expect(await store.updateCVCallCount == 2, "The failed write never reaches the store; the others do")
+    }
+
+    @Test("Steps that cannot all be read script nothing: the CVs are the ones given")
+    func unreadableStepsScriptNothing() {
+        let store = MockCVManagementUseCase()
+        for steps in ["", "slow", "slow:x", "slow:0", "maybe", "fail,,ok"] {
+            let arguments = ["PrestoCV", LaunchEnvironment.writeStepsArgument, steps]
+            #expect(LaunchEnvironment.cvs(store, arguments: arguments, sleep: { _ in }) as? MockCVManagementUseCase === store, "\(steps)")
+        }
+    }
+
     @Test("Without the request, or with a count that is not a number above zero, the CVs are the ones given")
     func noWriteFailsUnlessAsked() {
         let store = MockCVManagementUseCase()
         for arguments in [["PrestoCV"], ["PrestoCV", LaunchEnvironment.failingWritesArgument], ["PrestoCV", LaunchEnvironment.failingWritesArgument, "0"]] {
-            #expect(LaunchEnvironment.cvs(store, arguments: arguments) as? MockCVManagementUseCase === store, "\(arguments)")
+            #expect(LaunchEnvironment.cvs(store, arguments: arguments, sleep: { _ in }) as? MockCVManagementUseCase === store, "\(arguments)")
         }
     }
+}
+
+/// How long each slow write was held.
+private actor Holds {
+    private(set) var durations: [Duration] = []
+    func hold(_ duration: Duration) { durations.append(duration) }
 }

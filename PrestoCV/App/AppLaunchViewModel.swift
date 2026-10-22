@@ -88,7 +88,9 @@ final class AppLaunchViewModel: ObservableObject {
         environment: AppEnvironment
     ) -> Phase {
         do {
-            let cvManagementUseCase = LaunchEnvironment.cvs(try container.makeCVManagementUseCase(), arguments: environment.arguments)
+            let cvManagementUseCase = LaunchEnvironment.cvs(
+                try container.makeCVManagementUseCase(), arguments: environment.arguments, sleep: environment.sleep
+            )
             let viewModelFactory = try ViewModelFactory(
                 dependencyContainer: container,
                 cvManagementUseCase: cvManagementUseCase,
