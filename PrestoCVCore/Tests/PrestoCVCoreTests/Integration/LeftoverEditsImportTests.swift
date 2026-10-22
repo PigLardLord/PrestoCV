@@ -28,6 +28,11 @@ struct LeftoverEditsImportTests {
             )
         }
 
+        /// The leftovers of one run, as the container makes them.
+        func leftoverRepository() throws -> UnsavedEditsRepository {
+            try DependencyContainer.makeUnsavedEditsRepository(in: unsavedEdits)
+        }
+
         /// Leaves `cv` as an earlier version kept it: the edits of an editing, made on `base`.
         @discardableResult
         func leave(_ cv: CVModel, over base: CVModel? = nil, keptAt seconds: TimeInterval = 1_700_000_000) async throws -> UnsavedEdits {
@@ -55,8 +60,51 @@ struct LeftoverEditsImportTests {
             return try FileManager.default.contentsOfDirectory(atPath: unsavedEdits.path).filter { $0.hasSuffix(".json") }
         }
 
+        /// Makes the folder of the leftovers one whose files cannot be removed, as a locked folder is, until `unlock()`.
+        func lock() throws {
+            try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: unsavedEdits.path)
+        }
+
+        func unlock() throws {
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: unsavedEdits.path)
+        }
+
         func remove() {
+            try? unlock()
             try? FileManager.default.removeItem(at: root)
+        }
+    }
+
+    /// The ways a leftover goes into the CVs, by its restore plan.
+    enum Plan: CaseIterable, Sendable {
+        case create
+        case update
+        case copy
+        case alreadySaved
+        case restoredAsCopy
+    }
+
+    /// Leaves edits that the import stores by `plan`, over the CVs it makes in `cvs`.
+    private func leaveEdits(storedBy plan: Plan, in installation: Installation, cvs: CVManagementUseCaseProtocol) async throws {
+        let cv = CVTestDataBuilder.minimalCV().withName("Ward nurse").build()
+        switch plan {
+        case .create:
+            try await installation.leave(cv)
+        case .update:
+            let stored = try await cvs.storeNewCV(cv)
+            try await installation.leave(edited(stored), over: stored)
+        case .copy:
+            let older = try await cvs.storeNewCV(cv)
+            try await installation.leave(edited(older), over: older)
+            _ = try await cvs.updateCV(edited(older, title: "Charge nurse"))
+        case .alreadySaved:
+            let stored = try await cvs.storeNewCV(cv)
+            try await installation.leave(stored, over: stored)
+        case .restoredAsCopy:
+            let older = try await cvs.storeNewCV(cv)
+            let leftover = try await installation.leave(edited(older), over: older)
+            _ = try await cvs.updateCV(edited(older, title: "Charge nurse"))
+            _ = try await cvs.storeNewCV(leftover.cv.copy(newId: leftover.copyID))
         }
     }
 
@@ -200,7 +248,7 @@ struct LeftoverEditsImportTests {
         try await installation.leave(cv)
         let cvs = try installation.cvManagement()
         let locked = LeftoverEditsImport(
-            leftovers: LockedLeftovers(leftovers: UnsavedEditsRepository(storageService: try FileStorageService(baseDirectory: installation.unsavedEdits))),
+            leftovers: LockedLeftovers(leftovers: try installation.leftoverRepository()),
             cvs: cvs,
             recoveredName: { "\($0.name) (recovered)" }
         )
@@ -212,6 +260,92 @@ struct LeftoverEditsImportTests {
         let second = try await installation.leftoverImport(into: cvs).importLeftovers()
         #expect(second == LeftoverEditsImportReport(imported: 1))
         #expect(try await cvs.getAllCVs() == [cv], "The leftover that stayed is not stored a second time")
+        #expect(try installation.leftoverFiles().isEmpty)
+    }
+
+    // MARK: - Edits stored once, whatever the person does next
+
+    @Test("Edits stored and not removed are not stored again after the person edited the CVs, at any launch", arguments: Plan.allCases)
+    func storedLeftoverIsNotStoredAgainAfterAnEdit(_ plan: Plan) async throws {
+        let installation = Installation()
+        defer { installation.remove() }
+        let cvs = try installation.cvManagement()
+        try await leaveEdits(storedBy: plan, in: installation, cvs: cvs)
+        let firstLaunch = try installation.leftoverImport(into: cvs)
+        try installation.lock()
+
+        let first = try await firstLaunch.importLeftovers()
+        #expect(first.failures.map(\.step) == [.removing], "The edits are stored, and the locked folder keeps them")
+        for cv in try await cvs.getAllCVs() {
+            _ = try await cvs.updateCV(edited(cv, title: "Head nurse"))
+        }
+        let asLeft = try await cvs.getAllCVs()
+
+        let second = try await installation.leftoverImport(into: cvs).importLeftovers()
+        #expect(second.failures.map(\.step) == [.removing])
+        #expect(try await cvs.getAllCVs() == asLeft, "The CVs are as the person left them: no copy, nothing replaced")
+
+        try installation.unlock()
+        let third = try await installation.leftoverImport(into: cvs).importLeftovers()
+        #expect(third == LeftoverEditsImportReport(imported: 1))
+        #expect(try await cvs.getAllCVs() == asLeft)
+        #expect(try installation.leftoverFiles().isEmpty)
+    }
+
+    @Test("Edits stored and not removed do not bring back the CVs the person deleted, at any launch", arguments: Plan.allCases)
+    func storedLeftoverDoesNotBringBackADeletedCV(_ plan: Plan) async throws {
+        let installation = Installation()
+        defer { installation.remove() }
+        let cvs = try installation.cvManagement()
+        try await leaveEdits(storedBy: plan, in: installation, cvs: cvs)
+        let firstLaunch = try installation.leftoverImport(into: cvs)
+        try installation.lock()
+
+        let first = try await firstLaunch.importLeftovers()
+        #expect(first.failures.map(\.step) == [.removing])
+        for cv in try await cvs.getAllCVs() {
+            try await cvs.deleteCV(id: cv.id)
+        }
+
+        let second = try await installation.leftoverImport(into: cvs).importLeftovers()
+        #expect(second.failures.map(\.step) == [.removing])
+        #expect(try await cvs.getAllCVs().isEmpty, "Nothing the person deleted comes back")
+
+        try installation.unlock()
+        let third = try await installation.leftoverImport(into: cvs).importLeftovers()
+        #expect(third == LeftoverEditsImportReport(imported: 1))
+        #expect(try await cvs.getAllCVs().isEmpty)
+        #expect(try installation.leftoverFiles().isEmpty)
+    }
+
+    @Test("The edits are marked as stored before they are removed, so a launch that ends between the two stores nothing again")
+    func markComesBeforeTheRemoval() async throws {
+        let installation = Installation()
+        defer { installation.remove() }
+        let cv = CVTestDataBuilder.minimalCV().withName("Ward nurse").build()
+        let leftover = try await installation.leave(cv)
+        let steps = RecordedLeftovers(leftovers: try installation.leftoverRepository())
+
+        let report = try await LeftoverEditsImport(leftovers: steps, cvs: try installation.cvManagement(), recoveredName: { $0.name })
+            .importLeftovers()
+
+        #expect(report == LeftoverEditsImportReport(imported: 1))
+        #expect(await steps.changes == [.markStored(leftover.id), .discard(leftover.id)])
+    }
+
+    @Test("A mark that cannot be written is reported with its cause, and the edits are still removed")
+    func markFailureIsReportedAndTheRemovalGoesOn() async throws {
+        let installation = Installation()
+        defer { installation.remove() }
+        let cv = CVTestDataBuilder.minimalCV().withName("Ward nurse").build()
+        try await installation.leave(cv)
+        let steps = RecordedLeftovers(leftovers: try installation.leftoverRepository(), markError: AppError.fileSystemError("disk full"))
+
+        let report = try await LeftoverEditsImport(leftovers: steps, cvs: try installation.cvManagement(), recoveredName: { $0.name })
+            .importLeftovers()
+
+        #expect(report == LeftoverEditsImportReport(imported: 1, failures: [.init(step: .marking, cause: .fileSystemError("disk full"))]))
+        #expect(report.keptCount == 0, "The edits are stored and removed: nothing stays")
         #expect(try installation.leftoverFiles().isEmpty)
     }
 
@@ -322,4 +456,38 @@ private struct LockedLeftovers: UnsavedEditsRepositoryProtocol {
 
     func acknowledgeUnreadable() async throws { try await leftovers?.acknowledgeUnreadable() }
     func discard(editing id: UUID) async throws { throw AppError.fileSystemError("locked") }
+    func markStored(editing id: UUID) async throws { try await leftovers?.markStored(editing: id) }
+    func isMarkedStored(editing id: UUID) async -> Bool { await leftovers?.isMarkedStored(editing: id) ?? false }
+}
+
+/// The leftovers, recording each change the import makes to them, in order. A mark can be made to fail.
+private actor RecordedLeftovers: UnsavedEditsRepositoryProtocol {
+    enum Change: Equatable {
+        case markStored(UUID)
+        case discard(UUID)
+    }
+
+    private let leftovers: UnsavedEditsRepositoryProtocol
+    private let markError: AppError?
+    private(set) var changes: [Change] = []
+
+    init(leftovers: UnsavedEditsRepositoryProtocol, markError: AppError? = nil) {
+        self.leftovers = leftovers
+        self.markError = markError
+    }
+
+    func allKept() async throws -> StorageLoadReport<UnsavedEdits> { try await leftovers.allKept() }
+    func acknowledgeUnreadable() async throws { try await leftovers.acknowledgeUnreadable() }
+    func isMarkedStored(editing id: UUID) async -> Bool { await leftovers.isMarkedStored(editing: id) }
+
+    func markStored(editing id: UUID) async throws {
+        changes.append(.markStored(id))
+        if let markError { throw markError }
+        try await leftovers.markStored(editing: id)
+    }
+
+    func discard(editing id: UUID) async throws {
+        changes.append(.discard(id))
+        try await leftovers.discard(editing: id)
+    }
 }

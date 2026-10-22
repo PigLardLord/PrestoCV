@@ -8,6 +8,9 @@ public struct LeftoverEditsImportReport: Equatable, Sendable {
         case listing
         /// The edits of a leftover could not be stored.
         case storing
+        /// The edits of a leftover are stored, and could not be marked as stored. When their removal fails too, the next
+        /// launch tells from the CVs whether they hold them.
+        case marking
         /// The edits of a leftover are stored, and the file could not be removed.
         case removing
         /// The files that could not be read could not be marked as seen.
@@ -50,6 +53,11 @@ public struct LeftoverEditsImportReport: Equatable, Sendable {
 /// The editor saves by itself, so nothing is kept on the side any more. Edits an earlier version left behind are stored
 /// at the next launch, once and without a question, as their restore plan says, and then removed: nobody loses them,
 /// and no second copy of a CV is left on the device.
+///
+/// Once stored, the edits are marked as stored before they are removed. Edits whose removal fails stay, and the next
+/// launches find the mark and only remove them, whatever the person did with the CVs since: an edited CV gets no copy,
+/// and a deleted one does not come back. The launch that ends between the store and the mark is the one place where the
+/// CVs tell, by their content, that they hold the edits; nobody can have changed them before it ends.
 public protocol LeftoverEditsImportProtocol: Sendable {
     /// - Throws: `CancellationError`, unchanged, when the import is cancelled: what is not stored stays for the next
     ///   launch.
@@ -75,7 +83,8 @@ public struct LeftoverEditsImport: LeftoverEditsImportProtocol {
         self.recoveredName = recoveredName
     }
 
-    /// Stores each leftover, the oldest first, so that later edits of the same CV are applied after earlier ones.
+    /// Stores each leftover, the oldest first, so that later edits of the same CV are applied after earlier ones, marks it
+    /// as stored, and removes it. A leftover marked already is only removed.
     public func importLeftovers() async throws(CancellationError) -> LeftoverEditsImportReport {
         var report = LeftoverEditsImportReport()
         let listing: StorageLoadReport<UnsavedEdits>
@@ -89,13 +98,23 @@ public struct LeftoverEditsImport: LeftoverEditsImportProtocol {
         }
         report.unreadableFiles = listing.unreadableCount
         for edits in listing.items.sorted(by: { ($0.keptAt, $0.id.uuidString) < ($1.keptAt, $1.id.uuidString) }) {
-            do {
-                try await store(edits)
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                report.failures.append(.init(step: .storing, cause: Self.cause(of: error)))
-                continue
+            if await !leftovers.isMarkedStored(editing: edits.id) {
+                do {
+                    try await store(edits)
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    report.failures.append(.init(step: .storing, cause: Self.cause(of: error)))
+                    continue
+                }
+                do {
+                    try await leftovers.markStored(editing: edits.id)
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    // The removal that follows makes the mark needless, and is tried all the same
+                    report.failures.append(.init(step: .marking, cause: Self.cause(of: error)))
+                }
             }
             do {
                 try await leftovers.discard(editing: edits.id)

@@ -65,6 +65,15 @@ public protocol UnsavedEditsRepositoryProtocol: Sendable {
     /// Removes the edits kept for an editing. Removing edits that are not kept is not an error.
     /// - Throws: AppError if they cannot be removed
     func discard(editing id: UUID) async throws
+
+    /// Marks the edits of an editing as stored: the CVs hold them now. It is done before they are removed, so that edits
+    /// whose removal fails are never stored again, whatever the person did with the CVs since. The mark stays when the
+    /// edits go: no version keeps edits any more, so no other edits come under that editing.
+    /// - Throws: AppError if the mark cannot be written
+    func markStored(editing id: UUID) async throws
+
+    /// Whether the edits of an editing were marked as stored.
+    func isMarkedStored(editing id: UUID) async -> Bool
 }
 
 /// Protocol for managing user onboarding state

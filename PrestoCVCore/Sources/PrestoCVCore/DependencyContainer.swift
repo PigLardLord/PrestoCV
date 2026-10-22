@@ -44,16 +44,23 @@ public final class DependencyContainer: DependencyContainerProtocol {
     /// - Parameters:
     ///   - cvs: The CVs the edits go into.
     ///   - recoveredName: The name of the copy made when the stored CV changed after the edits were made on it.
-    /// - Throws: AppError if the folder cannot be made
+    /// - Throws: AppError if the folder, or the one of its marks, cannot be made
     public static func makeLeftoverEditsImport(
         in directory: URL,
         cvs: CVManagementUseCaseProtocol,
         recoveredName: @escaping @Sendable (CVModel) -> String
     ) throws -> LeftoverEditsImport {
-        LeftoverEditsImport(
-            leftovers: UnsavedEditsRepository(storageService: try FileStorageService(fileManager: .default, baseDirectory: directory)),
-            cvs: cvs,
-            recoveredName: recoveredName
+        LeftoverEditsImport(leftovers: try makeUnsavedEditsRepository(in: directory), cvs: cvs, recoveredName: recoveredName)
+    }
+
+    /// The edits earlier versions kept, in `directory`, and the marks of those already stored, in `StoredUnsavedEdits`
+    /// beside it: a folder of its own, which a folder of edits that cannot be changed does not stop.
+    /// - Throws: AppError if either folder cannot be made
+    static func makeUnsavedEditsRepository(in directory: URL) throws -> UnsavedEditsRepository {
+        let marks = directory.deletingLastPathComponent().appendingPathComponent("StoredUnsavedEdits", isDirectory: true)
+        return UnsavedEditsRepository(
+            storageService: try FileStorageService(fileManager: .default, baseDirectory: directory),
+            marks: try FileStorageService(fileManager: .default, baseDirectory: marks)
         )
     }
 
