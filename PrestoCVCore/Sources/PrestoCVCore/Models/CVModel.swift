@@ -16,6 +16,9 @@ public struct CVModel: Codable, Identifiable, Sendable, Equatable {
     /// BCP 47 language of the exported document. Nil is automatic: the language the CV is written in, or the app's
     /// when that cannot be told (`DocumentLanguageDetector`).
     public var documentLanguage: String?
+    /// The design, palette and font the CV is exported with. Nil until one is chosen: a CV saved before the look
+    /// existed has none (`ExportLookResolver` in the app says what it is shown with), and the key is then not written.
+    public var look: CVLook?
     
     // Custom CodingKeys to handle JSON field naming
     private enum CodingKeys: String, CodingKey {
@@ -30,6 +33,7 @@ public struct CVModel: Codable, Identifiable, Sendable, Equatable {
         case interests
         case social
         case documentLanguage
+        case look
     }
     
     public init(
@@ -43,7 +47,8 @@ public struct CVModel: Codable, Identifiable, Sendable, Equatable {
         certifications: [Certification] = [],
         interests: [String] = [],
         social: [Social] = [],
-        documentLanguage: String? = nil
+        documentLanguage: String? = nil,
+        look: CVLook? = nil
     ) {
         self.id = id
         self.name = name
@@ -56,6 +61,7 @@ public struct CVModel: Codable, Identifiable, Sendable, Equatable {
         self.interests = interests
         self.social = social
         self.documentLanguage = documentLanguage
+        self.look = look
     }
     
     /// Creates a new CV from an existing template with a new ID
@@ -96,6 +102,20 @@ public struct CVModel: Codable, Identifiable, Sendable, Equatable {
         self.interests = try container.decodeIfPresent([String].self, forKey: .interests) ?? []
         self.social = try container.decodeIfPresent([Social].self, forKey: .social) ?? []
         self.documentLanguage = try container.decodeIfPresent(String.self, forKey: .documentLanguage)
+        self.look = try container.decodeIfPresent(CVLook.self, forKey: .look)
+    }
+}
+
+// MARK: - New CV
+
+extension CVModel {
+    /// A new CV that starts from this one, which is a blank CV, an example, an AI draft or an imported CV: a copy with an
+    /// identity of its own and the standard look. It never takes the look of the CV it started from, so that a new CV
+    /// looks as the app does and each CV keeps the look its person gives it. `copy` is for a duplicate, which keeps the look.
+    public func startingAsNewCV(newId: UUID = UUID()) -> CVModel {
+        var new = copy(newId: newId)
+        new.look = .standard
+        return new
     }
 }
 

@@ -71,21 +71,34 @@ final class ViewModelFactory {
         )
     }
     
-    /// The export sheet of a CV of the list: the language chosen in it is stored with the CV.
+    /// The export sheet of a CV of the list: the language and the design, palette and font chosen in it are stored with
+    /// the CV.
     @MainActor
     func makeExportSheetViewModel(exporting cv: CVModel, from list: CVListViewModel) -> CVExportSheetViewModel {
-        makeExportSheetViewModel(cv: cv) { language in
-            Task { await list.setDocumentLanguage(language, ofCVWithId: cv.id) }
-        }
+        makeExportSheetViewModel(
+            cv: cv,
+            documentLanguageSink: { language in
+                Task { await list.setDocumentLanguage(language, ofCVWithId: cv.id) }
+            },
+            lookSink: { look in
+                Task { await list.setLook(look, ofCVWithId: cv.id) }
+            }
+        )
     }
     
-    /// The export sheet of the CV an editor shows: the language chosen in it goes into the form, which saves it by
-    /// itself.
+    /// The export sheet of the CV an editor shows: the language and the design, palette and font chosen in it go into
+    /// the form, which saves them by itself.
     @MainActor
     func makeExportSheetViewModel(editing editor: CVEditorViewModel) -> CVExportSheetViewModel {
-        makeExportSheetViewModel(cv: editor.cv) { language in
-            editor.documentLanguageSelection = language
-        }
+        makeExportSheetViewModel(
+            cv: editor.cv,
+            documentLanguageSink: { language in
+                editor.documentLanguageSelection = language
+            },
+            lookSink: { look in
+                editor.chooseLook(look)
+            }
+        )
     }
     
     @MainActor
@@ -133,11 +146,12 @@ final class ViewModelFactory {
 
     // MARK: - Private Composition Root
 
-    /// An export sheet with a service and a preferences store of its own.
+    /// An export sheet with a service of its own, and the file of the old global choice to read for a CV without a look.
     @MainActor
     private func makeExportSheetViewModel(
         cv: CVModel,
-        documentLanguageSink: @escaping DocumentLanguageSink
+        documentLanguageSink: @escaping DocumentLanguageSink,
+        lookSink: @escaping LookSink
     ) -> CVExportSheetViewModel {
         CVExportSheetViewModel(
             cv: cv,
@@ -148,6 +162,7 @@ final class ViewModelFactory {
             ),
             preferencesStore: FileExportPreferencesStore(fileURL: environment.exportPreferencesFile),
             documentLanguageSink: documentLanguageSink,
+            lookSink: lookSink,
             exportPolicy: .standard,
             documentLanguageDetector: makeDocumentLanguageDetector(),
             appLocale: environment.appLocale

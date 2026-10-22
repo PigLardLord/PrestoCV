@@ -39,6 +39,48 @@ struct CVStoreTests {
         #expect(try await repository.getAllCVs() == [cv])
     }
     
+    // MARK: - Look Tests
+
+    @Test("A file of the released build is read with no look, and reading it does not change the file")
+    func releasedFileIsReadWithoutALook() async throws {
+        let (repository, directory) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let id = UUID()
+        let file = directory.appendingPathComponent("cv_\(id.uuidString).json")
+        let released = Data(#"{"id":"\#(id.uuidString)","name":"Backend","personalInfo":{"name":"Ada"},"interests":["Chess"],"createdAt":"2024-03-01T10:00:00Z","updatedAt":"2024-03-02T11:30:00Z"}"#.utf8)
+        try released.write(to: file)
+
+        let read = try #require(try await repository.getCV(by: id))
+        _ = try await repository.getAllCVs()
+        _ = try await repository.getCVListing()
+
+        #expect(read.look == nil)
+        #expect(read.name == "Backend")
+        #expect(try Data(contentsOf: file) == released, "Only a save writes the file")
+    }
+
+    @Test("A look is stored with the CV, read back, and the next save without one writes no look")
+    func lookIsStoredAndRemoved() async throws {
+        let (repository, directory) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var cv = CVTestDataBuilder.minimalCV().withName("Backend").build()
+        cv.look = CVLook(design: "modern", palette: "creative", fonts: "serif")
+
+        _ = try await repository.saveCV(cv)
+
+        #expect(try await repository.getCV(by: cv.id)?.look == cv.look)
+        #expect(try await repository.getAllCVs().first?.look == cv.look)
+        let stored = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: fileURL(of: cv, in: directory))) as? [String: Any])
+        #expect(stored["look"] as? [String: String] == ["design": "modern", "palette": "creative", "fonts": "serif"])
+
+        cv.look = nil
+        _ = try await repository.saveCV(cv)
+
+        let rewritten = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: fileURL(of: cv, in: directory))) as? [String: Any])
+        #expect(rewritten["look"] == nil)
+        #expect(try await repository.getCV(by: cv.id)?.look == nil)
+    }
+
     @Test("Files without an id are quarantined and the other CVs are listed")
     func filesWithoutIdAreQuarantined() async throws {
         let (repository, directory) = try makeStore()

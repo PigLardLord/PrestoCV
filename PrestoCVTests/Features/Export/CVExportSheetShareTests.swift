@@ -15,6 +15,7 @@ struct CVExportSheetShareTests {
             exportService: MockCVExportService(),
             preferencesStore: InMemoryExportPreferencesStore(),
             documentLanguageSink: { _ in },
+            lookSink: { _ in },
             exportPolicy: .standard,
             documentLanguageDetector: englishDocumentLanguageDetector,
             appLocale: Locale(identifier: "en"),

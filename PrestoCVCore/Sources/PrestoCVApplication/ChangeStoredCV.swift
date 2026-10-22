@@ -1,4 +1,5 @@
 import Foundation
+import PrestoCVDomain
 
 /// The stored CVs, as `ChangeStoredCV` reads and writes them (R3: the port belongs to its use case). A CV is a `Record`
 /// of the store's own shape, which the store also knows how to change. The app's stored CVs implement it until the
@@ -15,6 +16,8 @@ public protocol StoredCVs<Record>: Sendable {
     func renaming(_ cv: Record, to title: String) -> Record
     /// `cv` with another language for its PDF, as a BCP 47 tag; nil is automatic.
     func settingDocumentLanguage(of cv: Record, to tag: String?) -> Record
+    /// `cv` with another look for its PDF: the design, palette and font it is exported with.
+    func settingLook(of cv: Record, to look: DesignChoice) -> Record
 }
 
 public enum StoredCVChangeError: Error, Equatable, Sendable {
@@ -43,6 +46,12 @@ public struct ChangeStoredCV<Record: Sendable>: Sendable {
     /// - Returns: The CV as stored.
     public func setDocumentLanguage(_ tag: String?, of id: UUID) async throws -> Record {
         try await change(id) { cvs.settingDocumentLanguage(of: $0, to: tag) }
+    }
+
+    /// Sets the design, palette and font a stored CV's PDF is made with.
+    /// - Returns: The CV as stored.
+    public func setLook(_ look: DesignChoice, of id: UUID) async throws -> Record {
+        try await change(id) { cvs.settingLook(of: $0, to: look) }
     }
 
     private func change(_ id: UUID, _ apply: (Record) -> Record) async throws -> Record {

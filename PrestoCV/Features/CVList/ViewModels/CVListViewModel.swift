@@ -3,6 +3,7 @@ import Foundation
 import PrestoCVCore
 import struct PrestoCVApplication.ChangeStoredCV
 import enum PrestoCVDomain.CVTitle
+import struct PrestoCVDomain.DesignChoice
 import enum PrestoCVApplication.StoredCVChangeError
 
 @MainActor
@@ -42,10 +43,12 @@ final class CVListViewModel: ObservableObject {
     private var readSequence = 0
     /// A change went through and no read of the list has confirmed it yet.
     private var hasUnconfirmedChange = false
-    /// The CVs whose document language is being saved.
-    private var documentLanguageSaves: Set<UUID> = []
+    /// The CVs whose language or look is being saved: the saves of one CV go one after the other.
+    private var changeSaves: Set<UUID> = []
     /// The language last chosen for a CV and not yet being saved; nil is automatic.
     private var pendingDocumentLanguages: [UUID: DocumentLanguage?] = [:]
+    /// The look last chosen for a CV and not yet being saved.
+    private var pendingLooks: [UUID: DesignChoice] = [:]
     /// The label of each row, by identity, made once each time the list changes rather than each time a row is drawn.
     /// The words in it change only with the app's language, and iOS starts the app again for that.
     private var rowLabels: [String: String] = [:]
@@ -222,18 +225,39 @@ final class CVListViewModel: ObservableObject {
     /// choice still waiting, so that the latest choice is always the one stored last: the language the sheet shows.
     func setDocumentLanguage(_ language: DocumentLanguage?, ofCVWithId id: UUID) async {
         pendingDocumentLanguages.updateValue(language, forKey: id)
-        // A save is under way: it saves this choice when it is done
-        guard documentLanguageSaves.insert(id).inserted else { return }
-        defer { documentLanguageSaves.remove(id) }
+        await saveChanges(ofCVWithId: id)
+    }
 
-        while let wanted = pendingDocumentLanguages.removeValue(forKey: id) {
-            await perform {
-                .replaced(try await self.storedCVChanges.setDocumentLanguage(wanted?.rawValue, of: id))
-            }
-        }
+    /// Sets the design, palette and font a CV's PDF is made with, as chosen in its export sheet. Saved like the
+    /// language, and in the same line: a look chosen while a language is being saved waits for it, and the other way
+    /// round, so that each save reads the CV as the one before left it and neither choice undoes the other.
+    func setLook(_ look: DesignChoice, ofCVWithId id: UUID) async {
+        pendingLooks.updateValue(look, forKey: id)
+        await saveChanges(ofCVWithId: id)
     }
     
     // MARK: - Private Methods
+
+    /// Saves what was chosen for a CV in its export sheet, one choice at a time. The caller that finds no save under way
+    /// does them all, so a caller that finds one returns at once and its choice is saved by that one when it is done.
+    private func saveChanges(ofCVWithId id: UUID) async {
+        guard changeSaves.insert(id).inserted else { return }
+        defer { changeSaves.remove(id) }
+
+        while true {
+            if let language = pendingDocumentLanguages.removeValue(forKey: id) {
+                await perform {
+                    .replaced(try await self.storedCVChanges.setDocumentLanguage(language?.rawValue, of: id))
+                }
+            } else if let look = pendingLooks.removeValue(forKey: id) {
+                await perform {
+                    .replaced(try await self.storedCVChanges.setLook(look, of: id))
+                }
+            } else {
+                return
+            }
+        }
+    }
     
     /// What a change that went through did, as far as the list is concerned.
     private enum CommittedChange {

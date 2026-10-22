@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import PrestoCVCore
 import CVPDFExporter
+import struct PrestoCVDomain.DesignChoice
 import struct PrestoCVDomain.ExportPolicy
 import struct PrestoCVDomain.ExportReadiness
 
@@ -12,13 +13,26 @@ struct ExportSelection: Equatable {
     var fontScheme: FontScheme
     /// The language chosen for the PDF; nil is automatic
     var documentLanguage: DocumentLanguage?
+
+    /// The design, palette and font of the selection
+    var look: ExportLook {
+        get { ExportLook(templateId: templateId, colorPalette: colorPalette, fontScheme: fontScheme) }
+        set { (templateId, colorPalette, fontScheme) = (newValue.templateId, newValue.colorPalette, newValue.fontScheme) }
+    }
 }
 
 /// Where the language chosen for a CV's PDF in its export sheet goes, for the CV to keep it; nil is automatic.
 typealias DocumentLanguageSink = @MainActor (DocumentLanguage?) -> Void
 
+/// Where the design, palette and font chosen for a CV's PDF in its export sheet go, for the CV to keep them.
+typealias LookSink = @MainActor (DesignChoice) -> Void
+
 /// Drives the export sheet of one CV: the template, palette, font and language the user picks, the preview of that
 /// choice, and the PDF that is rendered once the preview has settled so that sharing it is a single tap.
+///
+/// The sheet starts from the look the CV keeps (`ExportLookResolver`) and hands each change of the design, palette or
+/// font to the look sink at once, as it does the language: whoever owns the CV stores it. Starting from the look
+/// is not a choice, so it is not handed over, and a CV opened and closed is left as it was.
 ///
 /// All the work of a selection runs in one task that the view model owns. A new selection, or the sheet closing,
 /// cancels it, and a generation number keeps a result that arrives late, from a task that was cancelled while it
@@ -67,11 +81,14 @@ final class CVExportSheetViewModel: ObservableObject {
     private let exportService: any CVExportServiceProtocol
     private let preferencesStore: any ExportPreferencesStore
     private let documentLanguageSink: DocumentLanguageSink
+    private let lookSink: LookSink
     private let previewDebounce: Duration
     private var refreshTask: Task<Void, Never>?
     private var generation = 0
     /// The sheet is on screen, from `start()` to `stop()`: a change of the selection makes its preview
     private var isShown = false
+    /// The selection is being set to the look the CV keeps, which is not a choice of the person
+    private var isStartingFromTheCVsLook = false
 
     var selectedTemplateId: String? {
         get { selection.templateId }
@@ -141,8 +158,10 @@ final class CVExportSheetViewModel: ObservableObject {
     /// - Parameters:
     ///   - cv: The CV to export. The sheet starts with the language chosen for it.
     ///   - exportService: Makes the preview and the PDF.
-    ///   - preferencesStore: Keeps the design chosen last, for the next export.
+    ///   - preferencesStore: Holds the design that earlier versions chose last for every CV, read only for a CV that
+    ///     keeps no look of its own.
     ///   - documentLanguageSink: Takes each language chosen in the sheet, for the CV to keep.
+    ///   - lookSink: Takes the design, palette and font each time one of them is chosen in the sheet, for the CV to keep.
     ///   - exportPolicy: How the CV is exported, for the preview and the PDF alike.
     ///   - documentLanguageDetector: Reads which language the CV is written in, for the Automatic document language.
     ///   - appLocale: The language the app is shown in.
@@ -153,6 +172,7 @@ final class CVExportSheetViewModel: ObservableObject {
         exportService: any CVExportServiceProtocol,
         preferencesStore: any ExportPreferencesStore,
         documentLanguageSink: @escaping DocumentLanguageSink,
+        lookSink: @escaping LookSink,
         exportPolicy: ExportPolicy,
         documentLanguageDetector: DocumentLanguageDetector,
         appLocale: Locale,
@@ -162,6 +182,7 @@ final class CVExportSheetViewModel: ObservableObject {
         self.exportService = exportService
         self.preferencesStore = preferencesStore
         self.documentLanguageSink = documentLanguageSink
+        self.lookSink = lookSink
         self.exportPolicy = exportPolicy
         self.appLocale = appLocale
         self.previewDebounce = previewDebounce
@@ -174,7 +195,7 @@ final class CVExportSheetViewModel: ObservableObject {
         automaticDocumentLanguage = documentLanguageDetector.automaticLanguage(for: cv)
     }
 
-    /// The sheet shows: the templates are loaded, which selects the one chosen last and so makes the first preview.
+    /// The sheet shows: the templates are loaded, which selects the CV's own design and so makes the first preview.
     /// From then on, until `stop()`, each change of the selection makes a new preview.
     func start() async {
         isShown = true
@@ -189,7 +210,7 @@ final class CVExportSheetViewModel: ObservableObject {
             if availableTemplates.isEmpty {
                 errorMessage = String(localized: "export.error.no_templates")
             } else if selectedTemplateId == nil {
-                restoreLastChoice(among: availableTemplates)
+                startFromTheCVsLook(among: availableTemplates)
             }
         } catch is CancellationError {
             // The sheet went away while the templates were loading
@@ -283,11 +304,16 @@ final class CVExportSheetViewModel: ObservableObject {
 
     // MARK: - Refreshing
 
-    /// A language chosen in the sheet goes to the CV at once; any change makes a new preview while the sheet shows.
+    /// A language, design, palette or font chosen in the sheet goes to the CV at once; any change makes a new preview
+    /// while the sheet shows. A look is handed over as the sheet shows it, whole: the parts the person did not touch go
+    /// with it.
     private func selectionDidChange(from oldValue: ExportSelection) {
         guard selection != oldValue else { return }
         if selection.documentLanguage != oldValue.documentLanguage {
             documentLanguageSink(selection.documentLanguage)
+        }
+        if !isStartingFromTheCVsLook, selection.look != oldValue.look, let choice = selection.look.designChoice {
+            lookSink(choice)
         }
         if isShown {
             requestPreview()
@@ -342,7 +368,6 @@ final class CVExportSheetViewModel: ObservableObject {
             }
             sharePDF = pdf
             isPreparingPDF = false
-            rememberChoice(templateId: templateId, customization: options.customization)
         } catch {
             guard isCurrent(requestGeneration) else { return }
             isPreparingPDF = false
@@ -383,31 +408,18 @@ final class CVExportSheetViewModel: ObservableObject {
         return url
     }
 
-    // MARK: - Remembering the choice
+    // MARK: - Starting from the CV's look
 
-    /// Starts from what the user chose last time; a template that is no longer installed gives way to the first one.
-    /// The choice changes at once, so that it makes one preview.
-    private func restoreLastChoice(among availableTemplates: [Template]) {
-        let lastChoice = preferencesStore.load()
-        var restored = selection
-        if let lastTemplateId = lastChoice.templateId,
-           availableTemplates.contains(where: { $0.id == lastTemplateId }) {
-            restored.templateId = lastTemplateId
-        } else {
-            restored.templateId = availableTemplates.first?.id
-        }
-        restored.colorPalette = lastChoice.colorPalette ?? restored.colorPalette
-        restored.fontScheme = lastChoice.fontScheme ?? restored.fontScheme
-        selection = restored
-    }
-
-    private func rememberChoice(templateId: String, customization: CustomizationOptions) {
-        let choice = ExportPreferences(
-            templateId: templateId,
-            colorPalette: customization.colorPalette,
-            fontScheme: customization.fontScheme
-        )
-        // The PDF is already made: failing to remember the choice must not turn the export into an error.
-        try? preferencesStore.save(choice)
+    /// Starts from the look the CV keeps, or for a CV without one from what earlier versions chose last; a part that is
+    /// missing, or a design that is no longer installed, gives its default. The selection changes at once, so that it
+    /// makes one preview, and it is not handed to the look sink: the CV is left as it is until the person chooses.
+    private func startFromTheCVsLook(among availableTemplates: [Template]) {
+        let legacy = cv.look == nil ? preferencesStore.load() : ExportPreferences()
+        let look = ExportLookResolver.resolve(look: cv.look, legacy: legacy, availableTemplateIds: availableTemplates.map(\.id))
+        var started = selection
+        started.look = look
+        isStartingFromTheCVsLook = true
+        defer { isStartingFromTheCVsLook = false }
+        selection = started
     }
 }

@@ -117,9 +117,10 @@ final class CVEditorViewModel: ObservableObject {
             self.notice = nil
         case .new(let template, let notice):
             self.notice = notice
-            // A new CV gets an id of its own. An AI draft or an imported CV is stored as it is, without waiting for a
-            // change; a blank CV or an example once it is changed, so one left untouched leaves nothing behind
-            let cv = template.copy()
+            // A new CV gets an id of its own, and the standard look: never the look of the CV it started from. An AI
+            // draft or an imported CV is stored as it is, without waiting for a change; a blank CV or an example once it
+            // is changed, so one left untouched leaves nothing behind
+            let cv = template.startingAsNewCV()
             begin(showing: cv, unchangedFrom: request.storesAsItIs ? nil : cv, isStored: false)
         }
     }

@@ -145,6 +145,37 @@ struct ViewModelFactoryTests {
         #expect(editor.cv.documentLanguage == "fr")
     }
 
+    @Test("The design chosen in the export sheet of a listed CV is stored with that CV, and nothing else of it changes")
+    func listExportSheetStoresTheLook() async throws {
+        let cv = CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi"), documentLanguage: "de")
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let list = CVListViewModel(cvManagementUseCase: CVManagementUseCase(cvRepository: repository, sampleRepository: NoSamples()))
+        let sheet = try makeFactory().makeExportSheetViewModel(exporting: cv, from: list)
+
+        await repository.holdNextListings(1)
+        sheet.selectedTemplateId = "minimal"
+        // Once the look is stored, the list reads the CVs again
+        await repository.waitUntilListingsAreHeld(1)
+
+        var expected = cv
+        expected.look = CVLook(design: "minimal", palette: "professional", fonts: "classic")
+        #expect(try await repository.getCV(by: cv.id) == expected)
+        await repository.releaseOldestListing()
+    }
+
+    @Test("The design chosen in the export sheet of the editor goes into the form, which saves it by itself")
+    func editorExportSheetSetsTheLook() throws {
+        let factory = try makeFactory()
+        let editor = factory.makeCVEditorViewModel(for: .new(template: CVModel(look: CVLook(design: "modern")), notice: nil))
+        let sheet = factory.makeExportSheetViewModel(editing: editor)
+        #expect(editor.cv.look == CVLook.standard, "A new CV starts with the standard look, not the template's")
+
+        sheet.selectedTemplateId = "minimal"
+        sheet.selectedFontScheme = .serif
+
+        #expect(editor.cv.look == CVLook(design: "minimal", palette: "professional", fonts: "serif"))
+    }
+
     @Test("The description typed on the AI screen is there again when the screen is opened anew")
     func aiDescriptionOutlivesItsScreen() throws {
         let factory = try makeFactory()

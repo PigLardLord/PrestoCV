@@ -2,6 +2,7 @@ import Testing
 import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
+import struct PrestoCVDomain.DesignChoice
 
 // MARK: - Test Doubles
 
@@ -468,6 +469,148 @@ struct CVListViewModelTests {
 
         #expect(viewModel.actionError?.contains("disk") == true)
         #expect(try #require(await repository.getCV(by: cv.id)).documentLanguage == "it")
+    }
+
+    // MARK: - Look
+
+    private let modern = DesignChoice(design: "modern", palette: "creative", fonts: "serif")!
+    private let minimal = DesignChoice(design: "minimal", palette: "minimal", fonts: "classic")!
+
+    @Test("The look chosen in the export sheet of a CV of the list is saved, and nothing else changes")
+    func lookIsSaved() async throws {
+        let cv = CVModel(name: "Luca – Sales", personalInfo: PersonalInfo(name: "Luca"), documentLanguage: "it")
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+
+        await viewModel.setLook(modern, ofCVWithId: cv.id)
+
+        var expected = cv
+        expected.look = CVLook(modern)
+        #expect(try await repository.getCV(by: cv.id) == expected, "Only the look changes")
+        #expect(viewModel.cvs == [expected], "The row shows the CV as stored")
+        #expect(viewModel.actionError == nil)
+    }
+
+    @Test("A look chosen while the one before is still being saved is stored last, whatever order the saves end in")
+    func latestLookIsStoredLast() async throws {
+        let cv = CVModel(name: "Luca – Sales", look: CVLook(minimal))
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+        await repository.holdNextSaves(1)
+
+        // Modern is being written, slowly, when minimal is chosen again
+        let first = Task { await viewModel.setLook(modern, ofCVWithId: cv.id) }
+        await repository.waitUntilSavesAreHeld(1)
+        let second = Task { await viewModel.setLook(minimal, ofCVWithId: cv.id) }
+        await second.value
+        await repository.releaseOldestSave()
+        await first.value
+
+        #expect(try #require(await repository.getCV(by: cv.id)).look == CVLook(minimal))
+        #expect(viewModel.cvs.first?.look == CVLook(minimal), "The list shows the look the sheet shows")
+    }
+
+    @Test("Looks chosen while one is being saved are not all saved: only the latest follows it")
+    func supersededLooksAreNotSaved() async throws {
+        let cv = CVModel(name: "Luca – Sales")
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+        await repository.holdNextSaves(1)
+        let other = DesignChoice(design: "professional", palette: "modern", fonts: "modern")!
+
+        let first = Task { await viewModel.setLook(modern, ofCVWithId: cv.id) }
+        await repository.waitUntilSavesAreHeld(1)
+        await viewModel.setLook(minimal, ofCVWithId: cv.id)
+        await viewModel.setLook(other, ofCVWithId: cv.id)
+        await repository.releaseOldestSave()
+        await first.value
+
+        #expect(try #require(await repository.getCV(by: cv.id)).look == CVLook(other), "The last one chosen")
+        #expect(await repository.saveCount == 2, "Modern, then the last: minimal was replaced before it was saved")
+    }
+
+    @Test("A language and a look chosen while one of them is being saved are both stored, whichever came first",
+          arguments: [true, false])
+    func languageAndLookKeepEachOther(languageFirst: Bool) async throws {
+        let cv = CVModel(name: "Luca – Sales", personalInfo: PersonalInfo(name: "Luca"), documentLanguage: "it")
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+        await repository.holdNextSaves(1)
+
+        let first = Task {
+            if languageFirst {
+                await viewModel.setDocumentLanguage(.german, ofCVWithId: cv.id)
+            } else {
+                await viewModel.setLook(modern, ofCVWithId: cv.id)
+            }
+        }
+        await repository.waitUntilSavesAreHeld(1)
+        if languageFirst {
+            await viewModel.setLook(modern, ofCVWithId: cv.id)
+        } else {
+            await viewModel.setDocumentLanguage(.german, ofCVWithId: cv.id)
+        }
+        await repository.releaseOldestSave()
+        await first.value
+
+        let stored = try #require(await repository.getCV(by: cv.id))
+        #expect(stored.documentLanguage == "de" && stored.look == CVLook(modern), "Neither choice undid the other")
+        #expect(stored.name == cv.name && stored.personalInfo == cv.personalInfo)
+        #expect(viewModel.cvs.first == stored)
+        #expect(await repository.saveCount == 2)
+    }
+
+    @Test("A look chosen for one CV does not wait for the save of another")
+    func looksOfTwoCVsAreSavedApart() async throws {
+        let first = CVModel(name: "First")
+        let second = CVModel(name: "Second")
+        let repository = InMemoryCVRepository(cvs: [first, second])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+        await repository.holdNextSaves(1)
+
+        let slow = Task { await viewModel.setLook(modern, ofCVWithId: first.id) }
+        await repository.waitUntilSavesAreHeld(1)
+        await viewModel.setLook(minimal, ofCVWithId: second.id)
+
+        #expect(try #require(await repository.getCV(by: second.id)).look == CVLook(minimal))
+        #expect(try #require(await repository.getCV(by: first.id)).look == nil, "The first is still being written")
+        await repository.releaseOldestSave()
+        await slow.value
+        #expect(try #require(await repository.getCV(by: first.id)).look == CVLook(modern))
+    }
+
+    @Test("A look that cannot be saved reports an error and keeps the CV as it was")
+    func failedLookReportsAnError() async throws {
+        let cv = CVModel(name: "Luca – Sales", look: CVLook(minimal))
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+        await repository.fail(.save, with: AppError.unknown("disk"))
+
+        await viewModel.setLook(modern, ofCVWithId: cv.id)
+
+        #expect(viewModel.actionError?.contains("disk") == true)
+        #expect(try #require(await repository.getCV(by: cv.id)).look == CVLook(minimal))
+    }
+
+    @Test("A look chosen for a CV that was deleted meanwhile reports an error and stores nothing")
+    func lookOfADeletedCV() async {
+        let cv = CVModel(name: "Luca – Sales")
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+        try? await repository.deleteCV(id: cv.id)
+
+        await viewModel.setLook(modern, ofCVWithId: cv.id)
+
+        #expect(viewModel.actionError != nil)
+        #expect(await repository.saveCount == 0)
+        #expect(await repository.storedNames.isEmpty)
     }
 
     // MARK: - Delete

@@ -21,7 +21,8 @@ struct AppEnvironment {
     let clock: any Clock<Duration>
     /// Where each export gets a folder of its own
     let temporaryDirectory: URL
-    /// Where the design chosen last is kept: a file and not `UserDefaults`, which would need a privacy manifest entry
+    /// Where earlier versions kept the design chosen last for the whole app. Nothing writes the file any more: it is read
+    /// for a CV that has no look of its own. A file and not `UserDefaults`, which would need a privacy manifest entry
     let exportPreferencesFile: URL
     /// The app's own folder on the device. The system copies a PDF opened in the app ("Open in PrestoCV") into it, and the
     /// import deletes each copy once read

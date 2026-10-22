@@ -197,7 +197,11 @@ struct CVEditorView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
             CVEditorView(viewModel: PreviewDependencies.editor()) { editor in
-                PreviewDependencies.exportSheet(for: editor.cv, sink: { editor.documentLanguageSelection = $0 })
+                PreviewDependencies.exportSheet(
+                    for: editor.cv,
+                    sink: { editor.documentLanguageSelection = $0 },
+                    lookSink: { editor.chooseLook($0) }
+                )
             }
         }
         .environmentObject(AppRouter())
