@@ -63,9 +63,9 @@ extension XCUIApplication {
         return strip.map(\.minY).min().map { min($0, top) } ?? top
     }
 
-    /// The top of a tab bar that floats over the lower part of the screen while it is shown, as on an iPhone. Nil when
-    /// the tabs are at the top, as on an iPad in a wide window, or in a bar at the side, as on the outer screen of the
-    /// iPhone Duo.
+    /// The top of a tab bar that floats over the lower part of the screen while it is shown, as on an iPhone. Nil while
+    /// no tab bar is shown, as while the keyboard is up in the editor, and when the tabs are at the top, as on an iPad
+    /// in a wide window, or in a bar at the side, as on the outer screen of the iPhone Duo.
     var tabBarTop: CGFloat? {
         let bar = tabBars.firstMatch
         guard bar.exists, bar.isHittable else { return nil }

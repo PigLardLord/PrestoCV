@@ -80,27 +80,30 @@ final class ScrollingUITests: XCTestCase {
     // MARK: - Where the tab bar is
 
     /// The tab bar bounds the room only while it floats over the lower part of the screen. The editor's tabs show where
-    /// the bar is: side by side in the lower half on an iPhone, side by side at the top on an iPad, and one above the
-    /// other in the side bar of the outer screen of the iPhone Duo.
-    func testTheTabBarBoundsTheRoomOnlyOverTheLowerPart() {
+    /// the bar is: side by side in the lower half on an iPhone, side by side at the top on an iPad in a wide window,
+    /// and one above the other in the side bar of the outer screen of the iPhone Duo.
+    func testTheTabBarBoundsTheRoomOnlyOverTheLowerPart() throws {
+        continueAfterFailure = false
         let app = launchedOnTheFirstRun()
         app.buttons["Create My First CV"].tap()
         let basics = app.buttons["Basics"].firstMatch
         let experience = app.buttons["Experience"].firstMatch
         XCTAssertTrue(experience.waitForExistence(timeout: 10), "The editor should show its tabs")
         XCTAssertTrue(basics.exists, "The editor should show its tabs")
+        XCTAssertNil(app.keyboardTop, "The editor should open with the keyboard down")
 
         let first = basics.frame, second = experience.frame
         let sideBySide = abs(first.midY - second.midY) < 1 && first.midX != second.midX
         if sideBySide, first.midY > app.frame.midY {
-            XCTContext.runActivity(named: "The tabs float over the lower part") { _ in
-                let top = app.tabBarTop
-                XCTAssertNotNil(top, "A tab bar over the lower part should bound the room")
-                XCTAssertLessThanOrEqual(top ?? .infinity, min(first.minY, second.minY), "The room should end above the tabs")
+            try XCTContext.runActivity(named: "The tabs float over the lower part") { _ in
+                let top = try XCTUnwrap(app.tabBarTop, "A tab bar over the lower part should bound the room")
+                XCTAssertLessThanOrEqual(top, min(first.minY, second.minY), "The bar should start above its tabs")
+                XCTAssertEqual(TapRoom(in: app).bottom, top, "The room should end at the bar")
             }
         } else {
             XCTContext.runActivity(named: "The tabs are at the top or at the side") { _ in
                 XCTAssertNil(app.tabBarTop, "Tabs at the top or at the side should leave the room as it is")
+                XCTAssertEqual(TapRoom(in: app).bottom, app.frame.maxY, "The room should end at the bottom of the screen")
             }
         }
     }
