@@ -611,6 +611,33 @@ if [[ "$(uname)" == Darwin ]]; then
 else
   expect "packages: an Apple-only manifest branch is invisible on Linux, so CI also checks packages on macOS" 0 "" --packages .
 fi
+# --- the pre-commit hook
+# git exports GIT_DIR and GIT_INDEX_FILE to its hooks, as absolute paths in a linked worktree. SwiftPM runs git in its
+# dependency checkouts with `git -C`, which those variables override, so the first commit in a fresh worktree checked
+# out swift-syntax's revision in the project's repository and failed. Here check.sh is a stub that makes the same call.
+HOOK_ROOT="$(mktemp -d)"; ROOTS+=("$HOOK_ROOT")
+# Not the condition of an `if`, where bash ignores set -e and only the last command would count.
+(
+  set -e; cd "$HOOK_ROOT"
+  # The developer's git configuration (identity, signing, hooks) plays no part.
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+  export GIT_AUTHOR_NAME=selftest GIT_AUTHOR_EMAIL=selftest@example.invalid
+  export GIT_COMMITTER_NAME=selftest GIT_COMMITTER_EMAIL=selftest@example.invalid
+  git init -q -b main dep; git -C dep commit -q --allow-empty -m first; git -C dep commit -q --allow-empty -m second
+  FIRST="$(git -C dep rev-parse HEAD~1)"
+  git init -q -b main repo; mkdir -p repo/Tools/ArchitectureCheck hooks
+  printf '#!/usr/bin/env bash\nexec git -C "%s" checkout -q -f %s\n' "$HOOK_ROOT/dep" "$FIRST" > repo/Tools/ArchitectureCheck/check.sh
+  chmod +x repo/Tools/ArchitectureCheck/check.sh
+  git -C repo add -A; git -C repo commit -q -m stub
+  ln -s "$HERE/pre-commit.sh" hooks/pre-commit; git -C repo config core.hooksPath "$HOOK_ROOT/hooks"
+  git -C repo worktree add -q ../wt -b feature
+  echo 'let x = 1' > wt/A.swift; git -C wt add A.swift; git -C wt commit -q -m change
+  # The stub checked out its own repository, and git, which reads the index again after the hook, committed ours.
+  [ "$(git -C dep rev-parse HEAD)" = "$FIRST" ] || { echo "check.sh did not check out its own repository"; exit 1; }
+  git -C wt cat-file -e HEAD:A.swift || { echo "the commit lost the staged A.swift"; exit 1; }
+) > "$HOOK_ROOT/out.txt" 2>&1
+if [[ $? -eq 0 ]]; then pass=$((pass+1)); echo "ok   hook: git in check.sh works on its own repository from a linked worktree"
+else fail=$((fail+1)); echo "FAIL hook: git in check.sh works on its own repository from a linked worktree"; sed 's/^/     /' "$HOOK_ROOT/out.txt"; fi
 
 echo "selftest: $pass passed, $fail failed"
 [[ $fail -eq 0 ]]

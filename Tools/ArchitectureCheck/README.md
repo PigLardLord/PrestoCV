@@ -33,7 +33,7 @@ The first build takes a few minutes, because it compiles SwiftSyntax.
 
 ## Pre-commit hook
 
-`pre-commit.sh` checks a checkout of the index, which is what is being committed, so a violation that is only in the working tree does not block the commit. It runs only when the commit touches Swift files, manifests, test plans, the checker or `docs/architecture/`. A rename counts as a deletion plus an addition. The staged checker is the one that runs, and its build shares `Tools/ArchitectureCheck/.build`, so SwiftSyntax is not rebuilt. A path given to `--modules` or `--adr-dir` that cannot be read is an error, never a silent pass. To install it as a drop-in of the repository's git hooks:
+`pre-commit.sh` checks a checkout of the index, which is what is being committed, so a violation that is only in the working tree does not block the commit. It runs only when the commit touches Swift files, manifests, test plans, the checker or `docs/architecture/`. A rename counts as a deletion plus an addition. The staged checker is the one that runs, and its build shares `Tools/ArchitectureCheck/.build`, so SwiftSyntax is not rebuilt. Before `check.sh` runs, the hook clears the variables git exports to its hooks (`GIT_DIR`, `GIT_INDEX_FILE` and the rest of `git rev-parse --local-env-vars`): in a linked worktree they are absolute paths, and SwiftPM's git calls for its dependencies would run on this repository instead of theirs, so the first build in a fresh worktree failed. `selftest.sh` drives the hook in a linked worktree to keep it that way. A path given to `--modules` or `--adr-dir` that cannot be read is an error, never a silent pass. To install it as a drop-in of the repository's git hooks:
 
 ```bash
 mkdir -p .githooks/pre-commit.d
