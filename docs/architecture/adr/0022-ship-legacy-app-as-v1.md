@@ -31,6 +31,7 @@
 
 - **The release:** it is reachable this week, and the P0 bugs are fixed in code that the migration later deletes.
 - **The switch:** it gains an importer and its tests.
+- **The importer maps the look.** The legacy CV file has gained an optional `look` key (#286): `{"design", "palette", "fonts"}`, each an id as plain text. The key is absent until the person chooses a design, palette or font for that CV, and an absent key is not written. The importer copies it into `CV.design` (`DesignChoice`): `design` is required there, so a look without one is dropped; `palette` and `fonts` are copied when present; an id outside the pattern of a `DesignChoice` (`^[a-z0-9-]{1,64}$`) drops the whole look, and the CV imports with the default design. A CV without a `look` imports without a design choice. The old global choice (`export-preferences.json`) is not imported: it only ever seeded the CVs that had no look.
 - **The rules:** the checker does not see the legacy fixes, so each one is reviewed once, against the review checklist.
 
 ## Alternatives considered
