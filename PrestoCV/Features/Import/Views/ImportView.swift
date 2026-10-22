@@ -124,11 +124,13 @@ struct ImportView: View {
                 .labelStyle(.titleAndIcon)
                 .accessibilityIdentifier("import.paste")
             }
-            // A text editor has no label of its own: VoiceOver names it by the title above it
+            // A text editor has no label of its own: VoiceOver names it by the title above it. The box keeps its height
+            // and a long CV scrolls inside it: a box that grew with the text took the import far below it, and a swipe
+            // on the text moved the text, not the screen
             TextEditor(text: $viewModel.text)
                 .accessibilityLabel("import.text.title".localized)
                 .accessibilityIdentifier("import.text")
-                .frame(minHeight: 220)
+                .frame(height: 220)
                 .padding(DesignTokens.Spacing.sm)
                 .background(DesignTokens.Colors.backgroundSecondary)
                 .cornerRadius(DesignTokens.CornerRadius.md)

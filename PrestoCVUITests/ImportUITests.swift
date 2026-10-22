@@ -70,6 +70,21 @@ final class ImportUITests: XCTestCase {
         add(app.keptScreenshot(named: "Import - experience"))
     }
 
+    /// A long pasted CV scrolls inside the box it is pasted in, and the import stays under the box, on the screen. Before,
+    /// the box grew with the text and took the import far below it, where a swipe on the text, which moved the text and
+    /// not the screen, could not bring it.
+    func testALongPastedCVLeavesTheImportOnTheScreen() throws {
+        UIPasteboard.general.string = String(decoding: try fixture("chat", "txt"), as: UTF8.self)
+        openTheImport()
+        XCTAssertTrue(pasteButton.waitForExistence(timeout: 10))
+        pasteButton.tap()
+        let importText = app.buttons["Import this text"]
+        XCTAssertTrue(importText.waitForExistence(timeout: 10))
+
+        XCTAssertLessThanOrEqual(importText.frame.maxY, app.frame.maxY, "The import should stay on the screen, however long the text")
+        XCTAssertTrue(importText.isHittable, "The import should take a tap where it is")
+    }
+
     func testAPastedPDFOpensInTheEditor() throws {
         UIPasteboard.general.setData(try fixture("linkedin", "pdf"), forPasteboardType: "com.adobe.pdf")
         openTheImport()
