@@ -316,7 +316,8 @@ struct CertificationLinkTests {
     private static let entryEvidence = [
         "Swift Basics – Example Academy", "Example Academy – Swift Basics", "Swift Basics (2023)",
         "Certificate in practical cloud security — Example Academy.", "Example Academy — certificate in practical cloud security.",
-        "Certificate in practical cloud security — 2023.",
+        "Certificate in practical cloud security — 2023.", "Certificate in practical cloud security - Example Academy.",
+        "Example Academy - certificate in practical cloud security.",
     ]
 
     @Test("A line with the evidence of a certification of its own is never the description of the one above, nor is its address", arguments: entryEvidence)

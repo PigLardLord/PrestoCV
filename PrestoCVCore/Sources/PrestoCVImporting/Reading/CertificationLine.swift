@@ -99,11 +99,11 @@ struct CertificationLine {
     /// make a sentence of a title. A line with the shape of a title with its issuer is none, whatever it ends with.
     var endsAsSentence: Bool { isPlain && !block.isEmphasized && EntryReader.endsAsSentence(text) && !isTitleWithIssuer }
 
-    /// Whether the line has the shape of a title with its issuer: it is cut by a strong separator, and a part is an
-    /// organisation or a school, first or last: "Swift Basics – Example Academy", "Example Academy | Swift Basics". The
-    /// commas of a sentence do not cut it.
+    /// Whether the line has the shape of a title with its issuer: it is cut by a strong separator or a spaced hyphen, and
+    /// a part is an organisation or a school, first or last: "Swift Basics – Example Academy", "Example Academy | Swift
+    /// Basics". The commas of a sentence do not cut it.
     private var isTitleWithIssuer: Bool {
-        let parts = around.flatMap { $0.split(by: Separators.strong) }
+        let parts = around.flatMap { $0.split(by: Separators.strong + [" - "]) }
         return parts.count > 1 && parts.contains { Self.isIssuer($0.text) }
     }
 
