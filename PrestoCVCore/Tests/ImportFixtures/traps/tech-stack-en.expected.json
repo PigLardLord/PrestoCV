@@ -1,0 +1,13 @@
+{
+ "id": "traps/tech-stack-en", "language": "en", "form": "trap",
+ "person": {"name": "Alex Morgan", "title": "Mobile Developer", "email": "alex.morgan@example.com", "phone": "07700 900411", "location": "Leeds, UK", "links": [], "summary": null},
+ "experience": [
+  {"role": "Mobile Developer", "employer": "Acme Apps Ltd", "location": "Leeds", "start": [2021, 3], "end": "current", "details": 1},
+  {"role": "Junior Developer", "employer": "Example Software Ltd", "location": "York", "start": [2018, 6], "end": [2021, 2], "details": 0}
+ ],
+ "education": [
+  {"degree": "BSc Computer Science", "school": "Example University", "location": "Leeds", "start": [2015, null], "end": [2018, null]}
+ ],
+ "skills": ["Swift", "SwiftUI", "Combine", "Kotlin", "Docker"],
+ "languages": [], "certifications": [], "interests": []
+}
