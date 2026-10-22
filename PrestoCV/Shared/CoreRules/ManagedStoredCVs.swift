@@ -1,7 +1,7 @@
 import Foundation
 import PrestoCVCore
 import protocol PrestoCVApplication.StoredCVs
-import struct PrestoCVDomain.DesignChoice
+import struct PrestoCVApplication.LookChange
 
 /// The app's stored CVs, as `ChangeStoredCV` of PrestoCVApplication reads and writes them: through the CV management of
 /// PrestoCVCore.
@@ -28,9 +28,9 @@ struct ManagedStoredCVs: StoredCVs {
         return changed
     }
 
-    func settingLook(of cv: CVModel, to look: DesignChoice) -> CVModel {
+    func settingLook(of cv: CVModel, to change: LookChange) -> CVModel {
         var changed = cv
-        changed.look = CVLook(look)
+        changed.look = CVLook.applying(change, to: cv.look)
         return changed
     }
 }

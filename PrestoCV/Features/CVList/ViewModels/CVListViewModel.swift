@@ -3,7 +3,7 @@ import Foundation
 import PrestoCVCore
 import struct PrestoCVApplication.ChangeStoredCV
 import enum PrestoCVDomain.CVTitle
-import struct PrestoCVDomain.DesignChoice
+import struct PrestoCVApplication.LookChange
 import enum PrestoCVApplication.StoredCVChangeError
 
 @MainActor
@@ -47,8 +47,9 @@ final class CVListViewModel: ObservableObject {
     private var changeSaves: Set<UUID> = []
     /// The language last chosen for a CV and not yet being saved; nil is automatic.
     private var pendingDocumentLanguages: [UUID: DocumentLanguage?] = [:]
-    /// The look last chosen for a CV and not yet being saved.
-    private var pendingLooks: [UUID: DesignChoice] = [:]
+    /// What was chosen of the look of a CV and is not yet being saved: the parts chosen since its last save began, with
+    /// the look the sheet showed last.
+    private var pendingLooks: [UUID: LookChange] = [:]
     /// The label of each row, by identity, made once each time the list changes rather than each time a row is drawn.
     /// The words in it change only with the app's language, and iOS starts the app again for that.
     private var rowLabels: [String: String] = [:]
@@ -228,11 +229,12 @@ final class CVListViewModel: ObservableObject {
         await saveChanges(ofCVWithId: id)
     }
 
-    /// Sets the design, palette and font a CV's PDF is made with, as chosen in its export sheet. Saved like the
-    /// language, and in the same line: a look chosen while a language is being saved waits for it, and the other way
-    /// round, so that each save reads the CV as the one before left it and neither choice undoes the other.
-    func setLook(_ look: DesignChoice, ofCVWithId id: UUID) async {
-        pendingLooks.updateValue(look, forKey: id)
+    /// Changes the design, palette or font a CV's PDF is made with, as chosen in its export sheet: only the parts the
+    /// person chose. Saved like the language, and in the same line: a look chosen while a language is being saved waits
+    /// for it, and the other way round, so that each save reads the CV as the one before left it and neither choice
+    /// undoes the other. Parts chosen while a save is under way are saved together after it, the latest choice of each.
+    func setLook(_ change: LookChange, ofCVWithId id: UUID) async {
+        pendingLooks[id] = pendingLooks[id].map { $0.followed(by: change) } ?? change
         await saveChanges(ofCVWithId: id)
     }
     

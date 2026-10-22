@@ -16,8 +16,9 @@ public protocol StoredCVs<Record>: Sendable {
     func renaming(_ cv: Record, to title: String) -> Record
     /// `cv` with another language for its PDF, as a BCP 47 tag; nil is automatic.
     func settingDocumentLanguage(of cv: Record, to tag: String?) -> Record
-    /// `cv` with another look for its PDF: the design, palette and font it is exported with.
-    func settingLook(of cv: Record, to look: DesignChoice) -> Record
+    /// `cv` with its look for its PDF changed as `change` says: the parts the person chose are set, and the others are
+    /// left as the CV holds them.
+    func settingLook(of cv: Record, to change: LookChange) -> Record
 }
 
 public enum StoredCVChangeError: Error, Equatable, Sendable {
@@ -48,10 +49,10 @@ public struct ChangeStoredCV<Record: Sendable>: Sendable {
         try await change(id) { cvs.settingDocumentLanguage(of: $0, to: tag) }
     }
 
-    /// Sets the design, palette and font a stored CV's PDF is made with.
+    /// Changes the design, palette or font a stored CV's PDF is made with: the parts the person chose, and no other.
     /// - Returns: The CV as stored.
-    public func setLook(_ look: DesignChoice, of id: UUID) async throws -> Record {
-        try await change(id) { cvs.settingLook(of: $0, to: look) }
+    public func setLook(_ lookChange: LookChange, of id: UUID) async throws -> Record {
+        try await change(id) { cvs.settingLook(of: $0, to: lookChange) }
     }
 
     private func change(_ id: UUID, _ apply: (Record) -> Record) async throws -> Record {

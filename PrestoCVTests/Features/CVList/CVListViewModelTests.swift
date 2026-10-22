@@ -2,6 +2,7 @@ import Testing
 import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
+import struct PrestoCVApplication.LookChange
 import struct PrestoCVDomain.DesignChoice
 
 // MARK: - Test Doubles
@@ -473,8 +474,11 @@ struct CVListViewModelTests {
 
     // MARK: - Look
 
-    private let modern = DesignChoice(design: "modern", palette: "creative", fonts: "serif")!
-    private let minimal = DesignChoice(design: "minimal", palette: "minimal", fonts: "classic")!
+    private let modernChoice = DesignChoice(design: "modern", palette: "creative", fonts: "serif")!
+    private let minimalChoice = DesignChoice(design: "minimal", palette: "minimal", fonts: "classic")!
+    /// Every part chosen at once
+    private var modern: LookChange { LookChange(shown: modernChoice, parts: [.design, .palette, .fonts]) }
+    private var minimal: LookChange { LookChange(shown: minimalChoice, parts: [.design, .palette, .fonts]) }
 
     @Test("The look chosen in the export sheet of a CV of the list is saved, and nothing else changes")
     func lookIsSaved() async throws {
@@ -486,7 +490,7 @@ struct CVListViewModelTests {
         await viewModel.setLook(modern, ofCVWithId: cv.id)
 
         var expected = cv
-        expected.look = CVLook(modern)
+        expected.look = CVLook(modernChoice)
         #expect(try await repository.getCV(by: cv.id) == expected, "Only the look changes")
         #expect(viewModel.cvs == [expected], "The row shows the CV as stored")
         #expect(viewModel.actionError == nil)
@@ -494,7 +498,7 @@ struct CVListViewModelTests {
 
     @Test("A look chosen while the one before is still being saved is stored last, whatever order the saves end in")
     func latestLookIsStoredLast() async throws {
-        let cv = CVModel(name: "Luca – Sales", look: CVLook(minimal))
+        let cv = CVModel(name: "Luca – Sales", look: CVLook(minimalChoice))
         let repository = InMemoryCVRepository(cvs: [cv])
         let viewModel = makeViewModel(repository: repository)
         await viewModel.loadCVs()
@@ -508,8 +512,8 @@ struct CVListViewModelTests {
         await repository.releaseOldestSave()
         await first.value
 
-        #expect(try #require(await repository.getCV(by: cv.id)).look == CVLook(minimal))
-        #expect(viewModel.cvs.first?.look == CVLook(minimal), "The list shows the look the sheet shows")
+        #expect(try #require(await repository.getCV(by: cv.id)).look == CVLook(minimalChoice))
+        #expect(viewModel.cvs.first?.look == CVLook(minimalChoice), "The list shows the look the sheet shows")
     }
 
     @Test("Looks chosen while one is being saved are not all saved: only the latest follows it")
@@ -519,7 +523,8 @@ struct CVListViewModelTests {
         let viewModel = makeViewModel(repository: repository)
         await viewModel.loadCVs()
         await repository.holdNextSaves(1)
-        let other = DesignChoice(design: "professional", palette: "modern", fonts: "modern")!
+        let otherChoice = DesignChoice(design: "professional", palette: "modern", fonts: "modern")!
+        let other = LookChange(shown: otherChoice, parts: [.design, .palette, .fonts])
 
         let first = Task { await viewModel.setLook(modern, ofCVWithId: cv.id) }
         await repository.waitUntilSavesAreHeld(1)
@@ -528,8 +533,42 @@ struct CVListViewModelTests {
         await repository.releaseOldestSave()
         await first.value
 
-        #expect(try #require(await repository.getCV(by: cv.id)).look == CVLook(other), "The last one chosen")
+        #expect(try #require(await repository.getCV(by: cv.id)).look == CVLook(otherChoice), "The last one chosen")
         #expect(await repository.saveCount == 2, "Modern, then the last: minimal was replaced before it was saved")
+    }
+
+    @Test("A part chosen is saved and the ids of the other parts stay as the CV holds them, even ids the app does not know")
+    func chosenPartLeavesTheOthersAlone() async throws {
+        let held = CVLook(design: "future-design", palette: "neon", fonts: "handwritten")
+        let cv = CVModel(name: "Luca – Sales", look: held)
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+
+        await viewModel.setLook(LookChange(shown: modernChoice, parts: [.palette]), ofCVWithId: cv.id)
+
+        let expected = CVLook(design: "future-design", palette: "creative", fonts: "handwritten")
+        #expect(try #require(await repository.getCV(by: cv.id)).look == expected)
+        #expect(viewModel.cvs.first?.look == expected)
+    }
+
+    @Test("Parts chosen one after the other while a save is under way are saved together, each as it was last chosen")
+    func partsChosenDuringASaveAreSavedTogether() async throws {
+        let cv = CVModel(name: "Luca – Sales", look: CVLook(design: "future-design", palette: "neon", fonts: "handwritten"))
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+        await repository.holdNextSaves(1)
+
+        let first = Task { await viewModel.setLook(LookChange(shown: modernChoice, parts: [.design]), ofCVWithId: cv.id) }
+        await repository.waitUntilSavesAreHeld(1)
+        await viewModel.setLook(LookChange(shown: modernChoice, parts: [.palette]), ofCVWithId: cv.id)
+        await viewModel.setLook(LookChange(shown: minimalChoice, parts: [.fonts]), ofCVWithId: cv.id)
+        await repository.releaseOldestSave()
+        await first.value
+
+        #expect(try #require(await repository.getCV(by: cv.id)).look == CVLook(design: "modern", palette: "creative", fonts: "classic"))
+        #expect(await repository.saveCount == 2, "The design, then the palette and the fonts together")
     }
 
     @Test("A language and a look chosen while one of them is being saved are both stored, whichever came first",
@@ -558,7 +597,7 @@ struct CVListViewModelTests {
         await first.value
 
         let stored = try #require(await repository.getCV(by: cv.id))
-        #expect(stored.documentLanguage == "de" && stored.look == CVLook(modern), "Neither choice undid the other")
+        #expect(stored.documentLanguage == "de" && stored.look == CVLook(modernChoice), "Neither choice undid the other")
         #expect(stored.name == cv.name && stored.personalInfo == cv.personalInfo)
         #expect(viewModel.cvs.first == stored)
         #expect(await repository.saveCount == 2)
@@ -577,16 +616,16 @@ struct CVListViewModelTests {
         await repository.waitUntilSavesAreHeld(1)
         await viewModel.setLook(minimal, ofCVWithId: second.id)
 
-        #expect(try #require(await repository.getCV(by: second.id)).look == CVLook(minimal))
+        #expect(try #require(await repository.getCV(by: second.id)).look == CVLook(minimalChoice))
         #expect(try #require(await repository.getCV(by: first.id)).look == nil, "The first is still being written")
         await repository.releaseOldestSave()
         await slow.value
-        #expect(try #require(await repository.getCV(by: first.id)).look == CVLook(modern))
+        #expect(try #require(await repository.getCV(by: first.id)).look == CVLook(modernChoice))
     }
 
     @Test("A look that cannot be saved reports an error and keeps the CV as it was")
     func failedLookReportsAnError() async throws {
-        let cv = CVModel(name: "Luca – Sales", look: CVLook(minimal))
+        let cv = CVModel(name: "Luca – Sales", look: CVLook(minimalChoice))
         let repository = InMemoryCVRepository(cvs: [cv])
         let viewModel = makeViewModel(repository: repository)
         await viewModel.loadCVs()
@@ -595,7 +634,7 @@ struct CVListViewModelTests {
         await viewModel.setLook(modern, ofCVWithId: cv.id)
 
         #expect(viewModel.actionError?.contains("disk") == true)
-        #expect(try #require(await repository.getCV(by: cv.id)).look == CVLook(minimal))
+        #expect(try #require(await repository.getCV(by: cv.id)).look == CVLook(minimalChoice))
     }
 
     @Test("A look chosen for a CV that was deleted meanwhile reports an error and stores nothing")

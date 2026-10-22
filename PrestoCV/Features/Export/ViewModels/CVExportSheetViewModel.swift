@@ -2,7 +2,7 @@ import Combine
 import Foundation
 import PrestoCVCore
 import CVPDFExporter
-import struct PrestoCVDomain.DesignChoice
+import struct PrestoCVApplication.LookChange
 import struct PrestoCVDomain.ExportPolicy
 import struct PrestoCVDomain.ExportReadiness
 
@@ -24,15 +24,18 @@ struct ExportSelection: Equatable {
 /// Where the language chosen for a CV's PDF in its export sheet goes, for the CV to keep it; nil is automatic.
 typealias DocumentLanguageSink = @MainActor (DocumentLanguage?) -> Void
 
-/// Where the design, palette and font chosen for a CV's PDF in its export sheet go, for the CV to keep them.
-typealias LookSink = @MainActor (DesignChoice) -> Void
+/// Where the design, palette or font chosen for a CV's PDF in its export sheet goes, for the CV to keep it: the parts
+/// the person chose, and no other.
+typealias LookSink = @MainActor (LookChange) -> Void
 
 /// Drives the export sheet of one CV: the template, palette, font and language the user picks, the preview of that
 /// choice, and the PDF that is rendered once the preview has settled so that sharing it is a single tap.
 ///
 /// The sheet starts from the look the CV keeps (`ExportLookResolver`) and hands each change of the design, palette or
-/// font to the look sink at once, as it does the language: whoever owns the CV stores it. Starting from the look
-/// is not a choice, so it is not handed over, and a CV opened and closed is left as it was.
+/// font to the look sink at once, as it does the language: whoever owns the CV stores it. What is handed over is what
+/// the person chose, with the look the sheet shows: a part they did not touch stays as the CV holds it, even an id the
+/// app does not know, for which the sheet shows a default. Starting from the look is not a choice, so it is not handed
+/// over, and a CV opened and closed is left as it was.
 ///
 /// All the work of a selection runs in one task that the view model owns. A new selection, or the sheet closing,
 /// cancels it, and a generation number keeps a result that arrives late, from a task that was cancelled while it
@@ -305,15 +308,14 @@ final class CVExportSheetViewModel: ObservableObject {
     // MARK: - Refreshing
 
     /// A language, design, palette or font chosen in the sheet goes to the CV at once; any change makes a new preview
-    /// while the sheet shows. A look is handed over as the sheet shows it, whole: the parts the person did not touch go
-    /// with it.
+    /// while the sheet shows. A look is handed over as the parts the person changed, with the look the sheet shows.
     private func selectionDidChange(from oldValue: ExportSelection) {
         guard selection != oldValue else { return }
         if selection.documentLanguage != oldValue.documentLanguage {
             documentLanguageSink(selection.documentLanguage)
         }
-        if !isStartingFromTheCVsLook, selection.look != oldValue.look, let choice = selection.look.designChoice {
-            lookSink(choice)
+        if !isStartingFromTheCVsLook, let change = selection.look.change(from: oldValue.look) {
+            lookSink(change)
         }
         if isShown {
             requestPreview()

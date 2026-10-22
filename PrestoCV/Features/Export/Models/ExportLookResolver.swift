@@ -1,6 +1,7 @@
 import Foundation
 import PrestoCVCore
 import CVPDFExporter
+import struct PrestoCVApplication.LookChange
 import struct PrestoCVDomain.DesignChoice
 
 /// The design, color palette and font scheme the export sheet shows and exports with.
@@ -15,6 +16,17 @@ struct ExportLook: Equatable {
     var designChoice: DesignChoice? {
         guard let templateId else { return nil }
         return DesignChoice(design: templateId, palette: colorPalette.rawValue, fonts: fontScheme.rawValue)
+    }
+
+    /// What the person changed to get from `earlier` to this look: the parts that differ, and this look as the sheet
+    /// shows it. Nil when nothing differs, and without a design to name.
+    func change(from earlier: ExportLook) -> LookChange? {
+        guard let shown = designChoice else { return nil }
+        var parts: Set<LookChange.Part> = []
+        if templateId != earlier.templateId { parts.insert(.design) }
+        if colorPalette != earlier.colorPalette { parts.insert(.palette) }
+        if fontScheme != earlier.fontScheme { parts.insert(.fonts) }
+        return parts.isEmpty ? nil : LookChange(shown: shown, parts: parts)
     }
 }
 

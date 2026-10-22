@@ -3,10 +3,12 @@ import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
 @testable import CVPDFExporter
+import struct PrestoCVApplication.LookChange
 import struct PrestoCVDomain.DesignChoice
 
 /// The sheet keeps the design, palette and font with its CV: it starts from the look the CV keeps, hands each change
-/// to the CV at once, and leaves the choice of earlier versions, one for the whole app, alone.
+/// to the CV at once, as the parts the person chose, and leaves the choice of earlier versions, one for the whole app,
+/// alone.
 @MainActor
 @Suite("CVExportSheetViewModel Tests - the look of the CV")
 struct CVExportSheetViewModelLookTests {
@@ -18,7 +20,7 @@ struct CVExportSheetViewModelLookTests {
     /// What the sheet handed over, in order
     @MainActor
     final class SentLooks {
-        var all: [DesignChoice] = []
+        var all: [LookChange] = []
     }
 
     @MainActor
@@ -64,8 +66,9 @@ struct CVExportSheetViewModelLookTests {
         )
     }
 
-    private func choice(_ design: String, _ palette: ColorPalette, _ font: FontScheme) -> DesignChoice {
-        DesignChoice(design: design, palette: palette.rawValue, fonts: font.rawValue)!
+    /// The change a choice makes: the parts chosen, and the look the sheet shows after it
+    private func change(_ parts: Set<LookChange.Part>, shown design: String, _ palette: ColorPalette, _ font: FontScheme) -> LookChange {
+        LookChange(shown: DesignChoice(design: design, palette: palette.rawValue, fonts: font.rawValue)!, parts: parts)
     }
 
     // MARK: - Where the sheet starts
@@ -160,7 +163,7 @@ struct CVExportSheetViewModelLookTests {
 
     // MARK: - Choosing
 
-    @Test("Each design, palette and font chosen is handed to the CV once, as the look the sheet shows")
+    @Test("Each design, palette and font chosen is handed to the CV once, as the part chosen and the look the sheet shows")
     func eachChoiceIsHandedOver() async {
         let viewModel = await makeViewModel(look: Self.modern)
         await viewModel.loadTemplates()
@@ -170,9 +173,9 @@ struct CVExportSheetViewModelLookTests {
         viewModel.selectedFontScheme = .classic
 
         #expect(sentLooks.all == [
-            choice("minimal", .creative, .serif),
-            choice("minimal", .minimal, .serif),
-            choice("minimal", .minimal, .classic),
+            change([.design], shown: "minimal", .creative, .serif),
+            change([.palette], shown: "minimal", .minimal, .serif),
+            change([.fonts], shown: "minimal", .minimal, .classic),
         ])
     }
 
@@ -189,7 +192,7 @@ struct CVExportSheetViewModelLookTests {
         viewModel.selectedColorPalette = .minimal
         viewModel.selectedColorPalette = .minimal
 
-        #expect(sentLooks.all == [choice("modern", .minimal, .serif)])
+        #expect(sentLooks.all == [change([.palette], shown: "modern", .minimal, .serif)])
     }
 
     @Test("A language chosen alone does not hand a look over, and a look chosen alone does not hand a language")
@@ -202,7 +205,7 @@ struct CVExportSheetViewModelLookTests {
         #expect(sentLanguages.all == [.french])
 
         viewModel.selectedFontScheme = .classic
-        #expect(sentLooks.all == [choice("modern", .creative, .classic)])
+        #expect(sentLooks.all == [change([.fonts], shown: "modern", .creative, .classic)])
         #expect(sentLanguages.all == [.french])
     }
 
@@ -215,20 +218,33 @@ struct CVExportSheetViewModelLookTests {
 
         viewModel.selectedColorPalette = .minimal
 
-        #expect(sentLooks.all == [choice("modern", .minimal, .serif)])
+        #expect(sentLooks.all == [change([.palette], shown: "modern", .minimal, .serif)])
         #expect(viewModel.sharePDF == nil, "No PDF has been made yet")
         await viewModel.stop().value
         await service.releaseHeld(.export)
     }
 
-    @Test("A choice made on a CV whose look the app cannot read hands over the look the sheet shows, whole")
-    func choiceStoresWhatIsShown() async {
-        let viewModel = await makeViewModel(look: CVLook(design: "retired-design", palette: "neon", fonts: "serif"))
+    @Test("A choice made on a CV whose look the app cannot read hands over the part chosen and no other",
+          arguments: [LookChange.Part.design, .palette, .fonts])
+    func choiceHandsOverOnlyThePartChosen(part: LookChange.Part) async {
+        let viewModel = await makeViewModel(look: CVLook(design: "future-design", palette: "neon", fonts: "handwritten"))
         await viewModel.loadTemplates()
+        #expect(shown(by: viewModel) == ExportLook(templateId: "professional", colorPalette: .professional, fontScheme: .classic),
+                "The sheet shows a default for every id it does not know")
 
-        viewModel.selectedColorPalette = .creative
+        switch part {
+        case .design: viewModel.selectedTemplateId = "modern"
+        case .palette: viewModel.selectedColorPalette = .creative
+        case .fonts: viewModel.selectedFontScheme = .serif
+        }
 
-        #expect(sentLooks.all == [choice("professional", .creative, .serif)])
+        let expectedShown = ExportLook(
+            templateId: part == .design ? "modern" : "professional",
+            colorPalette: part == .palette ? .creative : .professional,
+            fontScheme: part == .fonts ? .serif : .classic
+        )
+        #expect(sentLooks.all == [LookChange(shown: expectedShown.designChoice!, parts: [part])],
+                "The ids of the parts the person did not touch are not theirs to replace")
     }
 
     @Test("Without a design there is no look to hand over")
@@ -263,7 +279,10 @@ struct CVExportSheetViewModelLookTests {
 
         #expect(shown(by: first) == ExportLook(templateId: "modern", colorPalette: .minimal, fontScheme: .serif))
         #expect(shown(by: second) == ExportLook(templateId: "minimal", colorPalette: .minimal, fontScheme: .serif))
-        #expect(sentLooks.all == [choice("minimal", .minimal, .serif), choice("modern", .minimal, .serif)])
+        #expect(sentLooks.all == [
+            change([.fonts], shown: "minimal", .minimal, .serif),
+            change([.palette], shown: "modern", .minimal, .serif),
+        ])
     }
 
     // MARK: - The old global file

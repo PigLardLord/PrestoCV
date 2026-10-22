@@ -2,6 +2,7 @@ import Testing
 import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
+import struct PrestoCVApplication.LookChange
 import struct PrestoCVDomain.DesignChoice
 
 /// The design, palette and font chosen in the export sheet of an open editor go into its form, which saves them with the
@@ -10,8 +11,11 @@ import struct PrestoCVDomain.DesignChoice
 @Suite("CVEditorViewModel Tests - Look")
 struct CVEditorViewModelLookTests {
 
-    private let modern = DesignChoice(design: "modern", palette: "creative", fonts: "serif")!
-    private let minimal = DesignChoice(design: "minimal", palette: "minimal", fonts: "classic")!
+    private let modernChoice = DesignChoice(design: "modern", palette: "creative", fonts: "serif")!
+    private let minimalChoice = DesignChoice(design: "minimal", palette: "minimal", fonts: "classic")!
+    /// Every part chosen at once
+    private var modern: LookChange { LookChange(shown: modernChoice, parts: [.design, .palette, .fonts]) }
+    private var minimal: LookChange { LookChange(shown: minimalChoice, parts: [.design, .palette, .fonts]) }
 
     private func savedCV(look: CVLook? = nil) -> CVModel {
         CVModel(name: "Backend", personalInfo: PersonalInfo(name: "Ada", email: "ada@example.com"), documentLanguage: "it", look: look)
@@ -37,6 +41,31 @@ struct CVEditorViewModelLookTests {
         #expect(viewModel.cv.look == CVLook(design: "modern", palette: "creative", fonts: "serif"))
     }
 
+    @Test("A part chosen is set and the ids of the other parts stay as the CV holds them, even ids the app does not know",
+          arguments: [
+              (LookChange.Part.design, CVLook(design: "modern", palette: "neon", fonts: "handwritten")),
+              (LookChange.Part.palette, CVLook(design: "future-design", palette: "creative", fonts: "handwritten")),
+              (LookChange.Part.fonts, CVLook(design: "future-design", palette: "neon", fonts: "serif")),
+          ])
+    func chosenPartLeavesTheOthersAlone(part: LookChange.Part, expected: CVLook) async {
+        let (viewModel, useCase) = await openEditor(on: savedCV(look: CVLook(design: "future-design", palette: "neon", fonts: "handwritten")))
+
+        viewModel.chooseLook(LookChange(shown: modernChoice, parts: [part]))
+        await viewModel.saveNow()
+
+        #expect(viewModel.cv.look == expected)
+        #expect(await useCase.updatedCVs.last?.look == expected)
+    }
+
+    @Test("A CV with no look takes the look the sheet showed, whichever part was chosen", arguments: LookChange.Part.allCases)
+    func noLookTakesTheLookShown(part: LookChange.Part) async {
+        let (viewModel, _) = await openEditor(on: savedCV())
+
+        viewModel.chooseLook(LookChange(shown: modernChoice, parts: [part]))
+
+        #expect(viewModel.cv.look == CVLook(modernChoice))
+    }
+
     @Test("A look chosen is saved with the CV, and nothing else of it changes")
     func chosenLookIsSaved() async {
         let saved = savedCV()
@@ -47,7 +76,7 @@ struct CVEditorViewModelLookTests {
         await viewModel.saveNow()
 
         var expected = saved
-        expected.look = CVLook(modern)
+        expected.look = CVLook(modernChoice)
         #expect(await useCase.updatedCVs == [expected])
         #expect(viewModel.saveStatus == .upToDate)
     }
@@ -63,22 +92,22 @@ struct CVEditorViewModelLookTests {
         clock.advance(by: .seconds(1))
         await viewModel.saveNow()
 
-        #expect(await useCase.updatedCVs.map(\.look) == [CVLook(minimal)], "Two choices in a row are one write")
+        #expect(await useCase.updatedCVs.map(\.look) == [CVLook(minimalChoice)], "Two choices in a row are one write")
     }
 
     @Test("Choosing a look again replaces the one before")
     func laterLookReplacesTheEarlier() async {
-        let (viewModel, useCase) = await openEditor(on: savedCV(look: CVLook(modern)))
+        let (viewModel, useCase) = await openEditor(on: savedCV(look: CVLook(modernChoice)))
 
         viewModel.chooseLook(minimal)
         await viewModel.saveNow()
 
-        #expect(await useCase.updatedCVs.last?.look == CVLook(minimal))
+        #expect(await useCase.updatedCVs.last?.look == CVLook(minimalChoice))
     }
 
     @Test("Choosing the look the CV has already changes nothing and stores nothing")
     func sameLookStoresNothing() async {
-        let (viewModel, useCase) = await openEditor(on: savedCV(look: CVLook(modern)))
+        let (viewModel, useCase) = await openEditor(on: savedCV(look: CVLook(modernChoice)))
 
         viewModel.chooseLook(modern)
         await viewModel.saveNow()
@@ -99,7 +128,7 @@ struct CVEditorViewModelLookTests {
         await viewModel.saveNow()
 
         var expected = saved
-        expected.look = CVLook(modern)
+        expected.look = CVLook(modernChoice)
         #expect(await useCase.updatedCVs == [expected], "The title is back; the look is what is left to store")
     }
 
@@ -114,7 +143,7 @@ struct CVEditorViewModelLookTests {
         await viewModel.saveNow()
 
         let stored = await useCase.updatedCVs.last
-        #expect(stored?.look == CVLook(minimal))
+        #expect(stored?.look == CVLook(minimalChoice))
         #expect(stored?.documentLanguage == "de")
     }
 
@@ -129,7 +158,7 @@ struct CVEditorViewModelLookTests {
         await viewModel.saveNow()
 
         var expected = saved
-        expected.look = CVLook(modern)
+        expected.look = CVLook(modernChoice)
         #expect(await useCase.updatedCVs == [expected])
     }
 
@@ -147,9 +176,9 @@ struct CVEditorViewModelLookTests {
 
     @Test("A stored look is there when the editor opens")
     func storedLookIsShown() async {
-        let (viewModel, _) = await openEditor(on: savedCV(look: CVLook(modern)))
+        let (viewModel, _) = await openEditor(on: savedCV(look: CVLook(modernChoice)))
 
-        #expect(viewModel.cv.look == CVLook(modern))
+        #expect(viewModel.cv.look == CVLook(modernChoice))
     }
 
     @Test("A look that the app does not know is kept by a save of something else")
@@ -170,8 +199,8 @@ struct CVEditorViewModelLookTests {
     func newCVStartsWithTheStandardLook(start: String) async {
         let (template, notice): (CVModel, EditorNotice?) = switch start {
         case "blank": (CVModel(), nil)
-        case "example": (CVModel(name: "Example", look: CVLook(modern)), nil)
-        case "AI draft": (CVModel(name: "Draft", personalInfo: PersonalInfo(name: "Ada"), look: CVLook(minimal)), .aiDraft)
+        case "example": (CVModel(name: "Example", look: CVLook(modernChoice)), nil)
+        case "AI draft": (CVModel(name: "Draft", personalInfo: PersonalInfo(name: "Ada"), look: CVLook(minimalChoice)), .aiDraft)
         default: (CVModel(personalInfo: PersonalInfo(name: "Ada")), .imported(ImportReview(items: [], notImported: "")))
         }
 

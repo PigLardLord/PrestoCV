@@ -163,6 +163,39 @@ struct ViewModelFactoryTests {
         await repository.releaseOldestListing()
     }
 
+    /// A look no part of which the app knows
+    private static let unknownLook = CVLook(design: "future-design", palette: "neon", fonts: "handwritten")
+
+    @Test("Choosing a design in the export sheet of a listed CV stores the design and leaves the palette and font ids it holds as they are")
+    func listExportSheetKeepsTheIdsOfTheUntouchedParts() async throws {
+        let cv = CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi"), look: Self.unknownLook)
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let list = CVListViewModel(cvManagementUseCase: CVManagementUseCase(cvRepository: repository, sampleRepository: NoSamples()))
+        let sheet = try makeFactory().makeExportSheetViewModel(exporting: cv, from: list)
+
+        await repository.holdNextListings(1)
+        sheet.selectedTemplateId = "modern"
+        // Once the look is stored, the list reads the CVs again
+        await repository.waitUntilListingsAreHeld(1)
+
+        #expect(try await repository.getCV(by: cv.id)?.look == CVLook(design: "modern", palette: "neon", fonts: "handwritten"))
+        await repository.releaseOldestListing()
+    }
+
+    @Test("Choosing a design in the export sheet of the editor leaves the palette and font ids of its CV as they are")
+    func editorExportSheetKeepsTheIdsOfTheUntouchedParts() async throws {
+        let saved = CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi"), look: Self.unknownLook)
+        await cvs.storeCV(saved)
+        let factory = try makeFactory()
+        let editor = factory.makeCVEditorViewModel(for: .stored(cvId: saved.id.uuidString))
+        await editor.loadCV()
+        let sheet = factory.makeExportSheetViewModel(editing: editor)
+
+        sheet.selectedTemplateId = "modern"
+
+        #expect(editor.cv.look == CVLook(design: "modern", palette: "neon", fonts: "handwritten"))
+    }
+
     @Test("The design chosen in the export sheet of the editor goes into the form, which saves it by itself")
     func editorExportSheetSetsTheLook() throws {
         let factory = try makeFactory()
