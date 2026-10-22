@@ -60,7 +60,10 @@ struct ImportedCVMapper {
             skills: imported.skills.map { Skill(name: $0.value) },
             languages: languages,
             certifications: imported.certifications.map { certification in
-                Certification(name: certification.name.value, issuer: certification.issuer?.value ?? "", year: certification.year?.value ?? 0)
+                Certification(
+                    name: certification.name.value, issuer: certification.issuer?.value ?? "", year: certification.year?.value ?? 0,
+                    url: certification.link?.value.value ?? "", description: certification.description?.value ?? ""
+                )
             },
             interests: imported.interests.map(\.value),
             social: person.links.compactMap(social),
@@ -81,6 +84,7 @@ struct ImportedCVMapper {
             case .summary: field = .summary
             case .experience(let index), .experiencePeriod(let index): field = .experience(index + 1)
             case .education(let index), .educationPeriod(let index): field = .education(index + 1)
+            case .certification(let index): field = .certification(index + 1)
             case .language: return nil   // a language without a level is listed once, where it is left out
             }
             let reason: ImportReview.Item.Reason
@@ -90,6 +94,7 @@ struct ImportedCVMapper {
             case .periodUnreadable, .periodOpenEnd: reason = .period
             case .levelNotCEFR: reason = .languageNotAdded
             case .levelsDiffer: reason = .languageLevels
+            case .certificationOrDetail: reason = .certificationOrDetail
             }
             return ImportReview.Item(field: field, reason: reason, text: item.text)
         }

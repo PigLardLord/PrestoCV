@@ -1,0 +1,21 @@
+{
+ "id": "traps/certifications-en", "language": "en", "form": "trap",
+ "person": {"name": "LENA MARSH", "title": "Software Developer", "email": "lena.marsh@example.com", "phone": null,
+            "location": "Leeds, United Kingdom", "links": [], "summary": null},
+ "experience": [
+  {"role": "Software Developer", "employer": "Example Systems Ltd", "location": null, "start": [2019], "end": [2024], "details": 1}
+ ],
+ "education": [], "skills": [], "languages": [],
+ "certifications": [
+  {"name": "Applied Swift Series (Pro, Level Advanced)", "issuer": "Example Academy", "year": 2024,
+   "link": "https://academy.example/achievement",
+   "description": "Covers actors and structured concurrency in depth.\nIncludes a capstone project reviewed by a mentor."},
+  {"name": "Our Best Practice [Remote, Self-paced]", "issuer": "Beispiel Institut", "year": 2023,
+   "link": "https://academy.example/c/123", "description": null},
+  {"name": "Server Side Swift (Beta | Level 2)", "issuer": "Example Institute", "year": 2022, "link": null, "description": null},
+  {"name": "BLS Provider (Basic Life Support)", "issuer": null, "year": null, "link": null, "description": null},
+  {"name": "Swift Basics", "issuer": null, "year": null, "link": "https://academy.example/swift", "description": null},
+  {"name": "Certificate", "issuer": null, "year": null, "link": "https://academy.example/c/456", "description": null}
+ ],
+ "interests": []
+}

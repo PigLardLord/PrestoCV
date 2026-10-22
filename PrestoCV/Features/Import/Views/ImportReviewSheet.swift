@@ -65,7 +65,7 @@ struct ImportReviewSheet: View {
     /// The field, with the entry's number when it is one of a list.
     private func label(of item: ImportReview.Item) -> String {
         switch item.field {
-        case .experience(let number), .education(let number):
+        case .experience(let number), .education(let number), .certification(let number):
             return item.fieldKey.localizedWithArgs(number)
         default:
             return item.fieldKey.localized

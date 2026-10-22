@@ -52,6 +52,9 @@ public enum CheckReason: String, Hashable, Sendable {
     case levelNotCEFR
     /// A Europass grid that gives the language different levels.
     case levelsDiffer
+    /// A certification that may be a detail of the one above it, such as its level, or the label of its link: nothing
+    /// told it from a certification of its own, so it stands as one.
+    case certificationOrDetail
 }
 
 // MARK: - The imported CV
@@ -123,6 +126,10 @@ public struct ImportedCertification: Hashable, Sendable {
     public var name: Sourced<String>
     public var issuer: Sourced<String>?
     public var year: Sourced<Int>?
+    /// The web address the text gives for the certification, in its line or on a line of its own under it.
+    public var link: Sourced<WebLink>?
+    /// The sentences under the certification that tell what it is, in order.
+    public var description: Sourced<String>?
 }
 
 // MARK: - What was not imported

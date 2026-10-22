@@ -253,4 +253,25 @@ enum EntryVocabulary {
         "currículum", "currículo", "curriculum vitae et studiorum", "cv europass", "mein lebenslauf", "my cv", "il mio cv",
         "il mio curriculum", "mi currículum", "mon cv", "o meu currículo", "meu currículo",
     ].map(SectionVocabulary.key))
+
+    // MARK: Labels of a link
+
+    /// Whether a piece is the label of a web address, in the six languages: "Credential URL", "Verifica online". A closed
+    /// list of words that name the link itself, or the act of opening or verifying it. A noun that could be the name of
+    /// a certification ("Certificate", "Badge", "Credential", "Zertifikat") is no label: a line that starts with one is
+    /// a certification of its own, whose address is its link.
+    static func isLinkLabel(_ text: String) -> Bool {
+        linkLabels.contains(SectionVocabulary.key(text))
+    }
+
+    private static let linkLabels: Set<String> = Set([
+        "link", "url", "credential url", "credential link", "certificate link", "certificate url", "verify", "verify at",
+        "verification", "verification link", "verification url", "view credential", "view certificate", "see credential",
+        "show credential", "more info", "more information",
+        "collegamento", "verifica", "verifica online", "maggiori informazioni",
+        "verknüpfung", "zertifikatslink", "verifizieren", "überprüfen", "überprüfung", "weitere informationen",
+        "enlace", "verificar", "verificación", "más información",
+        "lien", "vérifier", "vérification", "plus d'informations",
+        "ligação", "verificação", "mais informações",
+    ].map(SectionVocabulary.key))
 }

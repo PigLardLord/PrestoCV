@@ -77,6 +77,8 @@ struct ContractTableTests {
             guard let found = result.cv.certifications.first(where: { $0.name.value == certification.name }) else { continue }
             score.compare("issuer of \(certification.name)", expected: certification.issuer, found: found.issuer?.value)
             score.compare("year of \(certification.name)", expected: certification.year.map(String.init), found: found.year.map { String($0.value) })
+            score.compare("link of \(certification.name)", expected: certification.link, found: found.link?.value.value)
+            score.compare("description of \(certification.name)", expected: certification.description, found: found.description?.value)
         }
         score.compare("interest", expected: expected.interests, found: result.cv.interests.map(\.value))
         return score

@@ -8150,6 +8150,47 @@
         }
       }
     },
+    "import.review.field.certification" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zertifikat %lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certification %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificación %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certification %lld"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificazione %lld"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificação %lld"
+          }
+        }
+      }
+    },
     "import.review.field.education" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8515,6 +8556,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Não importado"
+          }
+        }
+      }
+    },
+    "import.review.reason.certification" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Möglicherweise ein Detail des vorigen Zertifikats und kein eigenes: Prüfen Sie es."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It may be a detail of the certification above, not a certification of its own: check it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puede ser un detalle de la certificación anterior y no una certificación propia: revísala."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il peut s'agir d'un détail de la certification précédente, et non d'une certification à part entière : vérifiez-le."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Potrebbe essere un dettaglio della certificazione precedente e non una certificazione a sé: controllala."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pode ser um detalhe da certificação anterior e não uma certificação própria: confira."
           }
         }
       }

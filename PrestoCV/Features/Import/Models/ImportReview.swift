@@ -11,6 +11,8 @@ struct ImportReview: Hashable, Sendable {
             /// An experience entry, counted from one as the editor lists it.
             case experience(Int)
             case education(Int)
+            /// A certification, counted from one as the editor lists it.
+            case certification(Int)
             case language
         }
 
@@ -25,6 +27,8 @@ struct ImportReview: Hashable, Sendable {
             case languageNotAdded
             /// A Europass grid that gives a language several levels.
             case languageLevels
+            /// A certification that may be a detail of the one above it, since nothing told it from a certification of its own.
+            case certificationOrDetail
         }
 
         let field: Field
@@ -40,6 +44,7 @@ struct ImportReview: Hashable, Sendable {
             case .summary: return "import.review.field.summary"
             case .experience: return "import.review.field.experience"
             case .education: return "import.review.field.education"
+            case .certification: return "import.review.field.certification"
             case .language: return "import.review.field.language"
             }
         }
@@ -51,6 +56,7 @@ struct ImportReview: Hashable, Sendable {
             case .period: return "import.review.reason.period"
             case .languageNotAdded: return "import.review.reason.language"
             case .languageLevels: return "import.review.reason.levels"
+            case .certificationOrDetail: return "import.review.reason.certification"
             }
         }
     }

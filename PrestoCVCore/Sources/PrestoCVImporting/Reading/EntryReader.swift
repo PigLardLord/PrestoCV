@@ -62,12 +62,9 @@ enum EntryReader {
 
     static func line(_ block: SourceBlock, cells: [Piece]) -> Line {
         let text = cells.map(\.text).joined(separator: " ")
-        let words = text.words
         let isBullet = block.kind == .listItem
         // A sentence: long, or ended by a full stop with words in lower case, as a description is
-        let lowerCaseWords = words.filter { $0.first?.isLowercase == true }.count
-        let isProse = !isBullet && !block.isEmphasized
-            && (words.count > 16 || (text.hasSuffix(".") && words.count >= 4 && lowerCaseWords >= 2))
+        let isProse = !isBullet && !block.isEmphasized && (text.words.count > 16 || endsAsSentence(text))
         var line = Line(block: block, cells: cells, isBullet: isBullet, isProse: isProse)
         line.isDurationOnly = DurationReader.isDurationOnly(text)
         if !isProse {
@@ -83,6 +80,12 @@ enum EntryReader {
             line.period = anchorPeriod(in: line.label == .period ? line.labelValue : cells, isBullet: isBullet)
         }
         return line
+    }
+
+    /// Whether the text ends as a sentence does: a full stop after at least four words, two of them in lower case.
+    static func endsAsSentence(_ text: String) -> Bool {
+        let words = text.words
+        return text.hasSuffix(".") && words.count >= 4 && words.filter { $0.first?.isLowercase == true }.count >= 2
     }
 
     /// A Europass row: its label in the first cell, or before a colon.

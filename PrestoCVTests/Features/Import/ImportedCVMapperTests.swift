@@ -91,6 +91,44 @@ struct ImportedCVMapperTests {
         #expect(cv.documentLanguage == "de")
     }
 
+    @Test("A certification keeps its brackets, and its issuer, year, link and description reach the CV")
+    func certificationFields() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Certifications
+        Applied Swift Series (Pro, Level Advanced) — Example Academy (2024)
+        https://academy.example/achievement
+        Covers actors and structured concurrency in depth.
+        Includes a capstone project reviewed by a mentor.
+        Our Best Practice (Pro, Remote Edition) — Beispiel Institut (2023)
+        """))
+        let certifications = draft.cv.certifications
+
+        #expect(certifications.map(\.name) == ["Applied Swift Series (Pro, Level Advanced)", "Our Best Practice (Pro, Remote Edition)"])
+        #expect(certifications.map(\.issuer) == ["Example Academy", "Beispiel Institut"])
+        #expect(certifications.map(\.year) == [2024, 2023])
+        #expect(certifications.map(\.url) == ["https://academy.example/achievement", ""])
+        #expect(certifications.map(\.description) == [
+            "Covers actors and structured concurrency in depth.\nIncludes a capstone project reviewed by a mentor.", "",
+        ])
+        #expect(draft.review.isEmpty, "Nothing the rules placed is listed again as text not imported, and nothing is to check")
+    }
+
+    @Test("A line that may be a detail of the certification above it stands as a certification of its own, listed to check")
+    func certificationToCheck() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Certifications
+        First Certificate – Example Academy (2023)
+        Certificate https://academy.example/c/123
+        """))
+
+        #expect(draft.cv.certifications.map(\.name) == ["First Certificate", "Certificate"])
+        #expect(draft.cv.certifications.map(\.url) == ["", "https://academy.example/c/123"])
+        #expect(draft.review.items == [ImportReview.Item(field: .certification(2), reason: .certificationOrDetail, text: "Certificate")])
+        #expect(draft.review.items.first?.fieldKey == "import.review.field.certification")
+        #expect(draft.review.items.first?.reasonKey == "import.review.reason.certification")
+        #expect(draft.review.notImported.isEmpty)
+    }
+
     @Test("A language without a CEFR level is not added, since the CV needs one: it is listed to check and kept to copy")
     func languageWithoutLevel() throws {
         let draft = ImportedCVMapper().map(try importedText(text))
