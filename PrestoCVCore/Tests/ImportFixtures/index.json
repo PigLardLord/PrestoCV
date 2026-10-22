@@ -91,6 +91,15 @@
   "pdf": "it-marco/wordpdf.pdf"
  },
  {
+  "id": "it-marco/railpdf",
+  "language": "it",
+  "form": "railpdf",
+  "kind": "layout",
+  "expected": "it-marco/railpdf.expected.json",
+  "source": "it-marco/railpdf.layout.json",
+  "pdf": "it-marco/railpdf.pdf"
+ },
+ {
   "id": "de-lena/chat",
   "language": "de",
   "form": "chat",
@@ -182,6 +191,15 @@
   "pdf": "de-jonas/wordpdf.pdf"
  },
  {
+  "id": "de-jonas/railpdf",
+  "language": "de",
+  "form": "railpdf",
+  "kind": "layout",
+  "expected": "de-jonas/railpdf.expected.json",
+  "source": "de-jonas/railpdf.layout.json",
+  "pdf": "de-jonas/railpdf.pdf"
+ },
+ {
   "id": "en-emily/chat",
   "language": "en",
   "form": "chat",
@@ -246,6 +264,15 @@
   "expected": "en-james/wordpdf.expected.json",
   "source": "en-james/wordpdf.layout.json",
   "pdf": "en-james/wordpdf.pdf"
+ },
+ {
+  "id": "en-james/railpdf",
+  "language": "en",
+  "form": "railpdf",
+  "kind": "layout",
+  "expected": "en-james/railpdf.expected.json",
+  "source": "en-james/railpdf.layout.json",
+  "pdf": "en-james/railpdf.pdf"
  },
  {
   "id": "es-lucia/chat",
@@ -314,6 +341,15 @@
   "pdf": "es-javier/wordpdf.pdf"
  },
  {
+  "id": "es-javier/railpdf",
+  "language": "es",
+  "form": "railpdf",
+  "kind": "layout",
+  "expected": "es-javier/railpdf.expected.json",
+  "source": "es-javier/railpdf.layout.json",
+  "pdf": "es-javier/railpdf.pdf"
+ },
+ {
   "id": "fr-camille/chat",
   "language": "fr",
   "form": "chat",
@@ -380,6 +416,15 @@
   "pdf": "fr-thomas/wordpdf.pdf"
  },
  {
+  "id": "fr-thomas/railpdf",
+  "language": "fr",
+  "form": "railpdf",
+  "kind": "layout",
+  "expected": "fr-thomas/railpdf.expected.json",
+  "source": "fr-thomas/railpdf.layout.json",
+  "pdf": "fr-thomas/railpdf.pdf"
+ },
+ {
   "id": "pt-mariana/chat",
   "language": "pt",
   "form": "chat",
@@ -444,6 +489,15 @@
   "expected": "pt-joao/wordpdf.expected.json",
   "source": "pt-joao/wordpdf.layout.json",
   "pdf": "pt-joao/wordpdf.pdf"
+ },
+ {
+  "id": "pt-joao/railpdf",
+  "language": "pt",
+  "form": "railpdf",
+  "kind": "layout",
+  "expected": "pt-joao/railpdf.expected.json",
+  "source": "pt-joao/railpdf.layout.json",
+  "pdf": "pt-joao/railpdf.pdf"
  },
  {
   "id": "traps/bars-it",

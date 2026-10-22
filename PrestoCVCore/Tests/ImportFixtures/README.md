@@ -21,6 +21,8 @@ read by `ContractTableTests` in `PrestoCVImportingTests` and, for the PDFs, by t
   - `lebenslauf.txt`: the German tabular Lebenslauf copied from its Word table (the German people);
   - `linkedin.pdf`: LinkedIn's "Save to PDF", with its sidebar (one person per language);
   - `wordpdf.pdf`: a one-column CV from a word processor (the other person per language);
+  - `railpdf.pdf`: the headings right-aligned in a narrow column, each beside the first line of its section (the other
+    person per language);
   - `lebenslaufpdf.pdf` and `europasspdf.pdf`: the tabular forms as PDFs.
 
   A PDF comes with `*.layout.json`: the words and boxes a PDF reader sees, which the Linux tests read.

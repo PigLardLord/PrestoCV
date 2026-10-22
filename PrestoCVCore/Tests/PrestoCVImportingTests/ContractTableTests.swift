@@ -106,8 +106,8 @@ struct ContractTableTests {
     /// The lowest rate each form may fall to. The table only ever rises: a defect found adds a fixture, which fails, before
     /// its fix.
     static let floors: [String: Double] = [
-        "chat": 1, "word": 1, "latex": 1, "europass": 1, "lebenslauf": 1, "linkedin": 1, "wordpdf": 1, "lebenslaufpdf": 1,
-        "europasspdf": 1, "trap": 1,
+        "chat": 1, "word": 1, "latex": 1, "europass": 1, "lebenslauf": 1, "linkedin": 1, "wordpdf": 1, "railpdf": 1,
+        "lebenslaufpdf": 1, "europasspdf": 1, "trap": 1,
     ]
 
     @Test("Every fixture of the corpus imports with nothing invented, at or above its form's floor")
@@ -129,7 +129,7 @@ struct ContractTableTests {
 
     /// The rates by language and form, and the totals.
     static func report(_ rows: [(Corpus.Entry, Score)]) -> String {
-        let forms = ["chat", "word", "latex", "europass", "lebenslauf", "linkedin", "wordpdf", "lebenslaufpdf", "europasspdf", "trap"]
+        let forms = ["chat", "word", "latex", "europass", "lebenslauf", "linkedin", "wordpdf", "railpdf", "lebenslaufpdf", "europasspdf", "trap"]
         let languages = ["en", "it", "de", "es", "fr", "pt"]
         var lines = ["Import contract table: values found of the values stated (missed, wrong, extra)", ""]
         lines.append("form".padding(toLength: 14, withPad: " ", startingAt: 0) + languages.map { $0.padding(toLength: 12, withPad: " ", startingAt: 0) }.joined())

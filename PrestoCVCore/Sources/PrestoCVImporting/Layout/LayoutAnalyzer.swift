@@ -21,8 +21,10 @@ enum LayoutAnalyzer {
         var pageLines: [[PageLine]] = []
         var lineCount = 0
         var cellCount = 0
+        try work.count(AnalysisWork.sortSteps(wordCount))
+        let bodySize = median(pages.flatMap { $0.words.map(\.fontSize) }) ?? 10
         for (index, page) in pages.enumerated() {
-            let found = try lines(of: page, number: index + 1, work: &work)
+            let found = try lines(of: page, number: index + 1, bodySize: bodySize, work: &work)
             lineCount += found.count
             cellCount += found.reduce(0) { $0 + $1.cells.count }
             guard lineCount <= limits.maximumLines, cellCount <= limits.maximumCells else { throw ImportError.tooLarge }
@@ -32,8 +34,6 @@ enum LayoutAnalyzer {
         removeRepeated(&pageLines, pages: pages, leftOut: &leftOut)
 
         let allCells = pageLines.flatMap { $0.flatMap(\.cells) }
-        try work.count(AnalysisWork.sortSteps(wordCount))
-        let bodySize = median(pages.flatMap { $0.words.map(\.fontSize) }) ?? 10
         let split = try columns(of: allCells, width: pages.first?.width ?? 595, work: &work)
 
         try work.count(lineCount + cellCount)
@@ -137,7 +137,11 @@ enum LayoutAnalyzer {
 
     /// The words of a page grouped into lines by their height on the page, and each line into cells at its wide gaps. A
     /// word without a box on the page, one not finite or of a negative size, cannot be placed and is no text.
-    static func lines(of page: ExtractedPage, number: Int, work: inout AnalysisWork) throws -> [PageLine] {
+    ///
+    /// A section's heading in a column of its own, right-aligned to the left of its section's first line, stands closer to
+    /// that line than two cells of a table do. So the words before a gap of more than two spaces are a cell of their own
+    /// when they are a heading of the vocabulary, drawn bold or large (#287).
+    static func lines(of page: ExtractedPage, number: Int, bodySize: Double, work: inout AnalysisWork) throws -> [PageLine] {
         let words = page.words.filter { !$0.text.allSatisfy(\.isWhitespace) && isPlaceable($0.frame) }
             .sorted { ($0.frame.y, $0.frame.x) < ($1.frame.y, $1.frame.x) }
         try work.count(2 * AnalysisWork.sortSteps(page.words.count))
@@ -158,12 +162,18 @@ enum LayoutAnalyzer {
                 open.append(groups.count - 1)
             }
         }
-        return groups.map { group in
+        return try groups.map { group in
             let sorted = group.sorted { $0.frame.x < $1.frame.x }
             var cells: [[ExtractedWord]] = [[sorted[0]]]
             for (previous, word) in zip(sorted, sorted.dropFirst()) {
                 let gap = word.frame.x - previous.frame.maxX
-                if gap > max(8, 1.5 * max(previous.fontSize, word.fontSize)) {
+                let size = max(previous.fontSize, word.fontSize)
+                var splits = gap > max(8, 1.5 * size)
+                if !splits, cells.count == 1, gap > headingColumnGap * size {
+                    try work.count(cells[0].count)
+                    splits = isHeading(cells[0], bodySize: bodySize)
+                }
+                if splits {
                     cells.append([word])
                 } else {
                     cells[cells.count - 1].append(word)
@@ -171,6 +181,15 @@ enum LayoutAnalyzer {
             }
             return PageLine(page: number, cells: cells.map(Cell.init))
         }.sorted { ($0.frame.y, $0.frame.x) < ($1.frame.y, $1.frame.x) }
+    }
+
+    /// The gap, in font sizes, past which a heading ends a line's first cell: more than two spaces.
+    private static let headingColumnGap = 0.7
+
+    /// The words of a line's first cell, up to a gap, are a heading of the vocabulary drawn bold or large.
+    private static func isHeading(_ words: [ExtractedWord], bodySize: Double) -> Bool {
+        guard words.count <= 7, words.allSatisfy({ $0.isBold || $0.fontSize >= bodySize * 1.15 }) else { return false }
+        return SectionVocabulary.kind(ofHeading: words.map(\.text).joined(separator: " ")) != nil
     }
 
     private static func isPlaceable(_ frame: Rect) -> Bool {
