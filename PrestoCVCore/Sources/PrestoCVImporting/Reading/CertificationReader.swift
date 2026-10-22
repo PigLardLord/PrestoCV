@@ -53,10 +53,14 @@ enum CertificationReader {
             let cut = dates.map(\.range).filter { !isPartOfBracketedWords($0, in: piece) }
             parts += piece.removing(cut).flatMap { $0.split(by: Separators.strong + [" - ", ", "]) }
         }
+        // The label of the line's link, "Verify:", is left out, not read as the issuer
+        let labels = line.addresses.isEmpty ? [] : parts.filter { EntryVocabulary.isLinkLabel($0.text) }
+        parts.removeAll { labels.contains($0) }
         guard let name = parts.first else {
             findings.unplace(line.block, in: section)
             return nil
         }
+        for label in labels { findings.leaveOut(label, .categoryLabel) }
         var certification = ImportedCertification(name: name.quote(check: check))
         certification.year = year
         certification.link = line.addresses.first?.link.address

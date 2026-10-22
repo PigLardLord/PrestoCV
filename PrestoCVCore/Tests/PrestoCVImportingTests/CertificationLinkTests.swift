@@ -166,6 +166,25 @@ struct CertificationLinkTests {
         #expect(found.unplaced.isEmpty)
     }
 
+    @Test("The label of a link inside the line of a title is left out, not read as the issuer", arguments: [
+        ("Swift Basics – Verify: https://academy.example/swift", nil as String?),
+        ("Swift Basics https://academy.example/swift (link)", nil),
+        ("Swift Basics (2023) – Credential URL: https://academy.example/swift", nil),
+        ("Verify – Swift Basics https://academy.example/swift", nil),
+        ("Swift Basics – Example Academy – Verifica online: https://academy.example/swift", "Example Academy"),
+    ])
+    func labelInTheTitleLine(line: String, issuer: String?) throws {
+        let found = read("Certifications\n\(line)")
+        let certification = try #require(found.cv.certifications.first)
+        #expect(found.cv.certifications.count == 1)
+        #expect(certification.name.value == "Swift Basics")
+        #expect(certification.issuer?.value == issuer)
+        #expect(certification.link?.value.value == "https://academy.example/swift")
+        #expect(found.leftOut.map(\.reason).allSatisfy { $0 == .categoryLabel })
+        #expect(found.leftOut.count == 1)
+        #expect(found.unplaced.isEmpty)
+    }
+
     @Test("A second address stays visible as text not imported; it neither replaces the link nor makes a certification")
     func secondAddress() throws {
         let found = read("""
