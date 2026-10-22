@@ -615,9 +615,9 @@ fi
 # git exports GIT_DIR and GIT_INDEX_FILE to its hooks, as absolute paths in a linked worktree. SwiftPM runs git in its
 # dependency checkouts with `git -C`, which those variables override, so the first commit in a fresh worktree checked
 # out swift-syntax's revision in the project's repository and failed. Here check.sh is a stub that makes the same call,
-# and records the configuration given to the commit with `git -c` and GIT_CONFIG_COUNT, which the hook keeps.
+# and records what it sees of the configuration given to the commit with `git -c` and GIT_CONFIG_COUNT: nothing.
 HOOK_ROOT="$(mktemp -d)"; ROOTS+=("$HOOK_ROOT")
-LABEL="hook: from a linked worktree, check.sh's git works on its own repository with the commit's configuration, and the commit keeps the staged file"
+LABEL="hook: from a linked worktree, check.sh's git works on its own repository without the commit's configuration, and the commit keeps the staged file"
 # Not the condition of an `if`, where bash ignores set -e and only the last command would count.
 (
   set -e; cd "$HOOK_ROOT"
@@ -648,7 +648,7 @@ LABEL="hook: from a linked worktree, check.sh's git works on its own repository 
   [ "$(git -C dep rev-parse HEAD)" = "$FIRST" ] || { echo "check.sh did not check out its own repository"; exit 1; }
   git -C wt cat-file -e HEAD:A.swift || { echo "the commit lost the staged A.swift"; exit 1; }
   KEPT="$(tr '\n' ' ' < kept)"
-  [ "$KEPT" = "param count " ] || { echo "check.sh got this of the configuration given to the commit: '$KEPT'"; exit 1; }
+  [ -z "$KEPT" ] || { echo "check.sh got configuration given to the commit: '$KEPT'"; exit 1; }
 ) > "$HOOK_ROOT/out.txt" 2>&1
 if [[ $? -eq 0 ]]; then pass=$((pass+1)); echo "ok   $LABEL"
 else fail=$((fail+1)); echo "FAIL $LABEL"; sed 's/^/     /' "$HOOK_ROOT/out.txt"; fi
