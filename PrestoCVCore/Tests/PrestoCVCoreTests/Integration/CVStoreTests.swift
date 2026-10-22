@@ -59,6 +59,26 @@ struct CVStoreTests {
         #expect(try Data(contentsOf: file) == released, "Only a save writes the file")
     }
 
+    @Test("A file whose look cannot be read stays in the list with no look, is not set aside, and is not changed",
+          arguments: malformedStoredLooks)
+    func malformedLookKeepsTheCVListed(look: String) async throws {
+        let (repository, directory) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let id = UUID()
+        let file = directory.appendingPathComponent("cv_\(id.uuidString).json")
+        let written = Data(#"{"id":"\#(id.uuidString)","name":"Backend","personalInfo":{"name":"Ada"},"look":\#(look),"createdAt":"2024-03-01T10:00:00Z","updatedAt":"2024-03-02T11:30:00Z"}"#.utf8)
+        try written.write(to: file)
+
+        let listing = try await repository.getCVListing()
+
+        #expect(listing.cvs.map(\.name) == ["Backend"], "A look is presentation: it never takes the CV out of the list")
+        #expect(listing.cvs.first?.look == nil)
+        #expect(listing.unreadableCount == 0)
+        #expect(try await repository.getCV(by: id)?.look == nil)
+        #expect(try quarantined(in: directory).isEmpty)
+        #expect(try Data(contentsOf: file) == written, "Only a save writes the file")
+    }
+
     @Test("A look is stored with the CV, read back, and the next save without one writes no look")
     func lookIsStoredAndRemoved() async throws {
         let (repository, directory) = try makeStore()

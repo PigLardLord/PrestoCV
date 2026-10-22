@@ -102,7 +102,18 @@ public struct CVModel: Codable, Identifiable, Sendable, Equatable {
         self.interests = try container.decodeIfPresent([String].self, forKey: .interests) ?? []
         self.social = try container.decodeIfPresent([Social].self, forKey: .social) ?? []
         self.documentLanguage = try container.decodeIfPresent(String.self, forKey: .documentLanguage)
-        self.look = try container.decodeIfPresent(CVLook.self, forKey: .look)
+        self.look = Self.readableLook(in: container)
+    }
+
+    /// The look in a stored CV, or nil when there is none or it cannot be read. A look is only how the CV is printed, so a
+    /// malformed one must not make the whole file unreadable: that would set the CV aside, out of the list, over its
+    /// presentation. The content of the CV stays strict, and reading changes nothing in the file.
+    private static func readableLook(in container: KeyedDecodingContainer<CodingKeys>) -> CVLook? {
+        do {
+            return try container.decodeIfPresent(CVLook.self, forKey: .look)
+        } catch {
+            return nil
+        }
     }
 }
 

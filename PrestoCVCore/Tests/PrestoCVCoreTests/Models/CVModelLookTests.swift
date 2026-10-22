@@ -2,6 +2,9 @@ import Testing
 import Foundation
 @testable import PrestoCVCore
 
+/// Looks that are not three optional ids: a list, a text, a number, and ids that are not text
+let malformedStoredLooks = [#"[]"#, #""modern""#, #"7"#, #"{"palette":42}"#, #"{"design":["modern"]}"#, #"{"fonts":{"id":"serif"}}"#]
+
 @Suite("CVModel look")
 struct CVModelLookTests {
 
@@ -64,6 +67,24 @@ struct CVModelLookTests {
 
         #expect(cv.look == CVLook(design: "retired-design", palette: "Neon", fonts: "comic"))
         #expect(try json(of: cv)["look"] as? [String: String] == ["design": "retired-design", "palette": "Neon", "fonts": "comic"])
+    }
+
+    @Test("A look that cannot be read is no look, and the rest of the CV is read as it is", arguments: malformedStoredLooks)
+    func malformedLookReadsAsNoLook(look: String) throws {
+        let cv = try decode(#"{"name":"Backend","personalInfo":{"name":"Ada"},"interests":["Chess"],"documentLanguage":"de","look":\#(look)}"#)
+
+        #expect(cv.look == nil)
+        #expect(cv.name == "Backend")
+        #expect(cv.personalInfo.name == "Ada")
+        #expect(cv.interests == ["Chess"])
+        #expect(cv.documentLanguage == "de")
+    }
+
+    @Test("A malformed look does not make the rest of the CV any less strict")
+    func malformedLookDoesNotLoosenTheContent() {
+        #expect(throws: DecodingError.self) {
+            _ = try decode(#"{"name":5,"look":[]}"#)
+        }
     }
 
     @Test("A look with some of its ids decodes, and the missing ones stay missing")
