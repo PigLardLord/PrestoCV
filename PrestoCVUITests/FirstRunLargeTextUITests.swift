@@ -3,7 +3,8 @@ import XCTest
 /// At the largest text size the welcome alone used to fill the first screen, and every way to start was below it.
 /// The person reaches them without scrolling, whatever the device can do with AI, and they keep their order: the import,
 /// the AI draft, the examples, the blank CV. The dimmed AI draft fits the screen and explains itself in German too,
-/// where the words are long.
+/// where the words are long: there the four titles take three or four lines each, more than a phone's screen holds at
+/// that size, and the first run scrolls to them rather than draw them smaller than the person chose.
 final class FirstRunLargeTextUITests: XCTestCase {
 
     private var app: XCUIApplication!
@@ -87,7 +88,7 @@ final class FirstRunLargeTextUITests: XCTestCase {
 
         XCTAssertTrue(app.text(Self.notOnThisDeviceInGerman).waitForExistence(timeout: 10), "A tap should show the full explanation")
         add(app.keptScreenshot(named: "First run, German, largest text, device not eligible, explanation"))
-        app.navigationBars.buttons["Fertig"].tap()
+        app.barButton("Fertig").tap()
     }
 
     private static let notOnThisDeviceInGerman = "Dieses Gerät unterstützt keine KI-Entwürfe. "

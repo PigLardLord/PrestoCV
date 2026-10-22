@@ -167,16 +167,15 @@ final class EditorKeyboardUITests: XCTestCase {
         XCTAssertEqual(field.value as? String, text, "Everything typed should arrive in \(name)")
     }
 
-    /// Waits until `field` has the keyboard focus and is above the keyboard and above the Done button over it.
+    /// Waits until `field` has the keyboard focus and is above the keyboard and above the Done button over it, and below
+    /// the navigation bar while the bar is shown.
     private func assertAboveTheKeyboard(_ field: XCUIElement, _ name: String) {
+        let app = app!
         XCTAssertTrue(field.waitForKeyboardFocus(true), "\(name) should get the keyboard focus")
-        let keyboard = app.keyboards.firstMatch
-        XCTAssertTrue(keyboard.waitForExistence(timeout: 10), XCUIApplication.noSoftwareKeyboard)
-        let done = app.toolbars.buttons["Done"]
-        let bar = app.navigationBars.firstMatch
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), XCUIApplication.noSoftwareKeyboard)
         let clear = NSPredicate { _, _ in
-            let top = done.exists ? min(keyboard.frame.minY, done.frame.minY) : keyboard.frame.minY
-            return field.exists && field.frame.maxY <= top && field.frame.minY >= bar.frame.maxY
+            guard field.exists, let keyboardTop = app.keyboardTop else { return false }
+            return field.frame.maxY <= keyboardTop && field.frame.minY >= app.contentTop
         }
         let waited = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: clear, object: nil)], timeout: 5)
         XCTAssertEqual(waited, .completed, "\(name) should be in view above the keyboard and its Done button")
