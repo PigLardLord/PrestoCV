@@ -96,14 +96,25 @@ struct CertificationLine {
     var isDated: Bool { around.contains { !DateReader.periods(in: $0.text).isEmpty } }
 
     /// Whether the line is a sentence, judged on its words outside any address, so that the length of an address does not
-    /// make a sentence of a title.
-    var endsAsSentence: Bool { isPlain && !block.isEmphasized && EntryReader.endsAsSentence(text) }
+    /// make a sentence of a title. A line with the shape of a title with its issuer is none, whatever it ends with.
+    var endsAsSentence: Bool { isPlain && !block.isEmphasized && EntryReader.endsAsSentence(text) && !isTitleWithIssuer }
 
-    /// Whether a part of the line after its first is an organisation or a school: "Swift Basics – Example Academy".
+    /// Whether the line has the shape of a title with its issuer: it is cut by a strong separator, and a part is an
+    /// organisation or a school, first or last: "Swift Basics – Example Academy", "Example Academy | Swift Basics". The
+    /// commas of a sentence do not cut it.
+    private var isTitleWithIssuer: Bool {
+        let parts = around.flatMap { $0.split(by: Separators.strong) }
+        return parts.count > 1 && parts.contains { Self.isIssuer($0.text) }
+    }
+
+    /// Whether any part of the line, cut where a title is cut, is an organisation or a school, even when it is the line:
+    /// "Example Academy".
     private var namesIssuer: Bool {
-        around.flatMap { $0.split(by: Separators.strong + [" - ", ", "]) }.dropFirst().contains {
-            EntryVocabulary.isOrganisation($0.text) || EntryVocabulary.isSchool($0.text)
-        }
+        around.flatMap { $0.split(by: Separators.strong + [" - ", ", "]) }.contains { Self.isIssuer($0.text) }
+    }
+
+    private static func isIssuer(_ text: String) -> Bool {
+        EntryVocabulary.isOrganisation(text) || EntryVocabulary.isSchool(text)
     }
 
     // MARK: Layout
@@ -125,6 +136,6 @@ struct CertificationLine {
         guard isPlain, !block.followsGap else { return false }
         // A single word with an address, "Certificate https://…": a noun could be the label of the link
         if !addresses.isEmpty { return text.words.count == 1 }
-        return open.title.isEmphasized && !block.isEmphasized && !isDated && !namesIssuer
+        return open.title.isEmphasized && !block.isEmphasized && !isDated && !isTitleWithIssuer
     }
 }

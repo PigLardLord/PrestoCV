@@ -309,6 +309,43 @@ struct CertificationLinkTests {
         #expect(found.unplaced.isEmpty)
     }
 
+    // MARK: Evidence of a certification of its own beats every rule that joins a line to the one above
+
+    /// Lines that read as a certification of their own, in the shapes of the review rounds: a title with its issuer, the
+    /// issuer first, a date, a sentence-shaped title with its issuer, and one with a date.
+    private static let entryEvidence = [
+        "Swift Basics – Example Academy", "Example Academy – Swift Basics", "Swift Basics (2023)",
+        "Certificate in practical cloud security — Example Academy.", "Example Academy — certificate in practical cloud security.",
+        "Certificate in practical cloud security — 2023.",
+    ]
+
+    @Test("A line with the evidence of a certification of its own is never the description of the one above, nor is its address", arguments: entryEvidence)
+    func entryEvidenceBeatsTheSentenceRule(line: String) throws {
+        let found = read("Certifications\nFirst Certificate\n\(line)\nhttps://academy.example/security")
+        #expect(found.cv.certifications.count == 2)
+        #expect(found.cv.certifications.allSatisfy { $0.description == nil })
+        #expect(found.cv.certifications.map { $0.link?.value.value } == [nil, "https://academy.example/security"])
+        #expect(found.unplaced.isEmpty)
+    }
+
+    @Test("In a PDF, a line with the evidence of a certification of its own is not placed under the one above by its layout", arguments: entryEvidence + [
+        "Example Academy", "Swift Basics https://academy.example/security",
+    ])
+    func entryEvidenceBeatsTheLayoutRule(line: String) async throws {
+        for (indent, size) in [(8.0, 9.5), (0.0, 8.0)] {
+            for bold in [false, true] {
+                let result = try await importedPDF([
+                    Row(text: "First Certificate (2023)", bold: bold),
+                    Row(text: line, indent: indent, size: size),
+                ])
+                #expect(result.cv.certifications.count == 2, "\(line), indent \(indent), size \(size), bold \(bold)")
+                #expect(result.cv.certifications.allSatisfy { $0.description == nil })
+                #expect(result.cv.certifications.first?.link == nil)
+                #expect(result.ungrounded.isEmpty)
+            }
+        }
+    }
+
     @Test("In a PDF, the layout joins a line only to a title that states an issuer or a year: the titles indented under a group heading stay certifications")
     func layoutNeedsACompleteTitle() async throws {
         let result = try await importedPDF([
