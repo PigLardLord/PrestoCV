@@ -17,11 +17,16 @@ import PrestoCVImporting
 /// of the box, and does not depend on the letters' shapes as a count of the strokes that cross some rows does. A word
 /// is bold when its strokes, in ems, are clearly wider than the median word's of its page: a CV is mostly regular text.
 ///
-/// The measure takes the box of a word for two levels, the background's and the ink's. A band of another grey behind
+/// The measure takes the box of a word for two levels: the background's, the box's median, and the ink's, the level of
+/// the colour PDFKit gives the word's text. A level read from the box's pixels would take a darker hairline across grey
+/// letters for the ink, and the letters' flat insides for a band. What lies past the ink, seen from the background (a
+/// black rule across grey letters), is set apart with its neighbours and not measured. A band of another grey behind
 /// part of the box (a table row, a highlight) is a third level: it is ink without an edge, whether the band or the
 /// page is the median of the box, and a regular word reads as bold. A box with such a flat shade is not measured, and
-/// keeps the weight its font gives. A hairline across the box, an underline or a border, is a stroke of its own: thinner
-/// than the letters' it lowers the measure, and it needs to be as thick as a stem to raise it.
+/// keeps the weight its font gives; so does a box crossed by a rule past the ink three pixels thick, whose middle is
+/// flat. A hairline between the background and the ink, an underline or a border, is a stroke of its own: thinner than
+/// the letters' it lowers the measure, and it needs to be as thick as a stem to raise it. A word whose colour PDFKit
+/// does not give, that mixes colours, or whose colour is not drawn at its level (a transparent text) is not measured.
 ///
 /// A PDF is untrusted input (R8). The page is drawn in a bitmap of at most `maximumPixels` at a fixed scale, a page
 /// too large for it is not measured, and a page reads at most `maximumReads` pixels in all: past them, the words left
@@ -39,12 +44,13 @@ enum InkWeight {
 
     // MARK: Measure
 
-    /// The pixel levels between a word's background and its darkest ink, below which it has no ink to measure.
+    /// The pixel levels between a word's background and its colour's level, below which it has no ink to measure.
     static let minimumContrast = 64
     /// A pixel is flat when its four neighbours, all in the box, are within this many levels of its own.
     static let flatTolerance = 2
     /// A flat pixel is shade when its level is more than `backgroundTolerance` levels from the box's background and
-    /// more than `inkTolerance` from its darkest (or lightest) ink: the box has a third level.
+    /// more than `inkTolerance` from its colour's level: the box has a third level. A box holds its colour when a pixel
+    /// is within `inkTolerance` of its level, and a pixel more than `inkTolerance` past it lies past the ink.
     static let backgroundTolerance = 4
     static let inkTolerance = 16
     /// The share of a box's ink that its shade may be: past it, the box has no weight. The shade is ink that the edges
@@ -68,21 +74,22 @@ enum InkWeight {
     /// For each of `words`, whether its strokes are heavy against the page's: all false when the page cannot be measured.
     /// - Parameters:
     ///   - bounds: the page's crop box, the origin of the words' frames.
-    static func heavyWords(on page: PDFPage, bounds: CGRect, words: [ExtractedWord]) throws -> [Bool] {
+    ///   - levels: the level of each word's colour as the page is drawn (`Levels`), nil for a word of no known colour.
+    static func heavyWords(on page: PDFPage, bounds: CGRect, words: [ExtractedWord], levels: [Int?]) throws -> [Bool] {
         let none = [Bool](repeating: false, count: words.count)
         // A rotated page is drawn turned, and its words' frames are in the page as it is shown
         guard page.rotation == 0, words.count >= minimumWords, fits(bounds.size) else { return none }
         try Task.checkCancellation()
         guard let bitmap = draw(page, bounds: bounds) else { return none }
         let weights = try bitmap.pixels.withUnsafeBufferPointer {
-            try strokeWidths(of: words, in: $0, width: bitmap.width)
+            try strokeWidths(of: words, levels: levels, in: $0, width: bitmap.width)
         }
         return heavy(weights)
     }
 
-    /// The stroke width of each word, nil for a word that is too short, has no letter (a bullet, a dash, a number) or
-    /// cannot be measured.
-    static func strokeWidths(of words: [ExtractedWord], in pixels: UnsafeBufferPointer<UInt8>, width: Int) throws -> [Double?] {
+    /// The stroke width of each word at the level of its colour in `levels`, nil for a word that is too short, has no
+    /// letter (a bullet, a dash, a number), has no level, or cannot be measured.
+    static func strokeWidths(of words: [ExtractedWord], levels: [Int?], in pixels: UnsafeBufferPointer<UInt8>, width: Int) throws -> [Double?] {
         var weights: [Double?] = []
         weights.reserveCapacity(words.count)
         guard width > 0 else { return [Double?](repeating: nil, count: words.count) }
@@ -95,7 +102,12 @@ enum InkWeight {
                 weights.append(nil)
                 continue
             }
-            weights.append(strokeWidth(in: pixels, width: width, box: box, em: word.fontSize * scale, reads: &reads))
+            // A word whose colour is not known, or that mixes colours, is not measured
+            guard index < levels.count, let ink = levels[index] else {
+                weights.append(nil)
+                continue
+            }
+            weights.append(strokeWidth(in: pixels, width: width, box: box, em: word.fontSize * scale, ink: ink, reads: &reads))
         }
         return weights
     }
@@ -137,6 +149,25 @@ enum InkWeight {
         let width: Int
     }
 
+    /// The grey levels that colours take on the page as `draw` draws it, read from one pixel filled with each.
+    struct Levels {
+        private let context = CGContext(
+            data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue
+        )
+
+        /// The level of `colour` filled on white, nil when it cannot be filled.
+        func level(of colour: CGColor) -> Int? {
+            guard let context, let data = context.data else { return nil }
+            let pixel = CGRect(x: 0, y: 0, width: 1, height: 1)
+            context.setFillColor(gray: 1, alpha: 1)
+            context.fill(pixel)
+            context.setFillColor(colour)
+            context.fill(pixel)
+            return Int(data.load(as: UInt8.self))
+        }
+    }
+
     /// A box in a bitmap, in pixels: the left and the top included, the right and the bottom not.
     struct PixelBox {
         let left: Int
@@ -168,45 +199,70 @@ enum InkWeight {
 
     // MARK: Word
 
-    /// The width, in ems, of the strokes in a box: twice the ink over the length of the edges. The background is the
-    /// box's median level, so light strokes on a dark ground measure as dark ones on a light ground.
-    /// - Returns: nil when the box is too small, has too little contrast to hold ink, holds a shade (a band of another
-    ///   grey across a part of it), or once the page has read its `maximumReads`.
-    static func strokeWidth(in pixels: UnsafeBufferPointer<UInt8>, width: Int, box: PixelBox, em: Double, reads: inout Int) -> Double? {
-        guard width > 0, em > 0, em.isFinite else { return nil }
-        let left = max(0, box.left)
-        let right = min(width, box.right)
-        let top = max(0, box.top)
-        let bottom = min(pixels.count / width, box.bottom)
-        guard right - left >= minimumSide, bottom - top >= minimumSide else { return nil }
+    /// The width, in ems, of the strokes in a box whose text is drawn at the level `ink`: twice the ink over the length
+    /// of the edges. The background is the box's median level, so light strokes on a dark ground measure as dark ones on
+    /// a light ground.
+    ///
+    /// The ink's level is the text's colour, not a level read from the box: a darker hairline across grey letters, or a
+    /// darker band behind them, would be taken for the ink, and the letters' flat insides for a shade. What lies past
+    /// the ink, seen from the background, is not the text's: those pixels and their neighbours are set apart, and
+    /// neither their ink nor their edges count. A flat one is a band, and counts as shade.
+    /// - Returns: nil when the box is too small, has too little contrast to hold ink, does not hold the ink's level (a
+    ///   transparent text, or a colour that is not the one drawn), holds a shade (a band of another grey across a part
+    ///   of it), or once the page has read its `maximumReads`.
+    static func strokeWidth(in pixels: UnsafeBufferPointer<UInt8>, width: Int, box: PixelBox, em: Double, ink: Int, reads: inout Int) -> Double? {
+        guard width > 0, em > 0, em.isFinite, (0...255).contains(ink) else { return nil }
+        let region = Region(
+            left: max(0, box.left), right: min(width, box.right), top: max(0, box.top), bottom: min(pixels.count / width, box.bottom)
+        )
+        guard region.right - region.left >= minimumSide, region.bottom - region.top >= minimumSide else { return nil }
         // Two passes over the box: the background, then the ink and the edges
-        reads += 2 * (right - left) * (bottom - top)
+        reads += 2 * region.area
         guard reads <= maximumReads else { return nil }
 
         var histogram = [Int](repeating: 0, count: 256)
-        for row in top..<bottom {
-            for column in left..<right { histogram[Int(pixels[row * width + column])] += 1 }
+        for row in region.top..<region.bottom {
+            for column in region.left..<region.right { histogram[Int(pixels[row * width + column])] += 1 }
         }
         let background = median(of: histogram)
-        // The ink is the level farthest from the background
-        let ink = histogram.indices.filter { histogram[$0] > 0 }.max { abs($0 - background) < abs($1 - background) } ?? background
-        guard abs(ink - background) >= minimumContrast else { return nil }
+        let contrast = abs(ink - background)
+        guard contrast >= minimumContrast else { return nil }
+        // A text drawn lighter than its colour (a transparent one) or in another colour has no pixel at its level
+        guard (max(0, ink - inkTolerance)...min(255, ink + inkTolerance)).contains(where: { histogram[$0] > 0 }) else { return nil }
+        let toward = ink < background ? -1 : 1
+        let isPastInk = { (level: Int) in (level - background) * toward > contrast + inkTolerance }
+
+        var apart: [Bool]?
+        if histogram.indices.contains(where: { histogram[$0] > 0 && isPastInk($0) }) {
+            // One more pass over the box, to set apart what lies past the ink
+            reads += region.area
+            guard reads <= maximumReads else { return nil }
+            apart = pastInk(in: pixels, width: width, region: region, isPastInk: isPastInk)
+        }
+        func isApart(_ row: Int, _ column: Int) -> Bool {
+            apart?[(row - region.top) * (region.right - region.left) + column - region.left] ?? false
+        }
 
         var strokes = 0
         var shade = 0
         var edge = 0.0
-        for row in top..<bottom {
-            for column in left..<right {
+        for row in region.top..<region.bottom {
+            for column in region.left..<region.right {
                 let level = Int(pixels[row * width + column])
                 let distance = abs(level - background)
+                if isApart(row, column) {
+                    // A hairline has no flat pixel; a band past the ink does, and is a shade
+                    if isPastInk(level), isFlat(in: pixels, width: width, row: row, column: column, region: region) { shade += distance }
+                    continue
+                }
                 strokes += distance
-                // The steps to the next pixel on the right and to the one above, none past the box
-                let across = column + 1 < right ? level - Int(pixels[row * width + column + 1]) : 0
-                let up = row > top ? level - Int(pixels[(row - 1) * width + column]) : 0
+                // The steps to the next pixel on the right and to the one above, none past the box or set apart
+                let across = column + 1 < region.right && !isApart(row, column + 1) ? level - Int(pixels[row * width + column + 1]) : 0
+                let up = row > region.top && !isApart(row - 1, column) ? level - Int(pixels[(row - 1) * width + column]) : 0
                 edge += Double(across * across + up * up).squareRoot()
                 // A flat level that is neither the background's nor the ink's is a band behind a part of the word
                 if distance > backgroundTolerance, abs(level - ink) > inkTolerance,
-                   isFlat(in: pixels, width: width, row: row, column: column, box: (left, right, top, bottom)) {
+                   isFlat(in: pixels, width: width, row: row, column: column, region: region) {
                     shade += distance
                 }
             }
@@ -216,11 +272,38 @@ enum InkWeight {
         return 2 * Double(strokes) / edge / em
     }
 
+    /// A box cut to its bitmap.
+    private struct Region {
+        let left: Int
+        let right: Int
+        let top: Int
+        let bottom: Int
+
+        var area: Int { (right - left) * (bottom - top) }
+    }
+
+    /// For each pixel of the region, row by row, whether it or one of its eight neighbours lies past the ink: a pixel
+    /// half covered by a hairline is between the ink and the background, and is set apart with the hairline.
+    private static func pastInk(
+        in pixels: UnsafeBufferPointer<UInt8>, width: Int, region: Region, isPastInk: (Int) -> Bool
+    ) -> [Bool] {
+        let columns = region.right - region.left
+        var apart = [Bool](repeating: false, count: region.area)
+        for row in region.top..<region.bottom {
+            for column in region.left..<region.right where isPastInk(Int(pixels[row * width + column])) {
+                for near in max(region.top, row - 1)..<min(region.bottom, row + 2) {
+                    for beside in max(region.left, column - 1)..<min(region.right, column + 2) {
+                        apart[(near - region.top) * columns + beside - region.left] = true
+                    }
+                }
+            }
+        }
+        return apart
+    }
+
     /// Whether a pixel and its four neighbours, all in the box, are within `flatTolerance` levels of each other.
-    private static func isFlat(
-        in pixels: UnsafeBufferPointer<UInt8>, width: Int, row: Int, column: Int, box: (left: Int, right: Int, top: Int, bottom: Int)
-    ) -> Bool {
-        guard column > box.left, column + 1 < box.right, row > box.top, row + 1 < box.bottom else { return false }
+    private static func isFlat(in pixels: UnsafeBufferPointer<UInt8>, width: Int, row: Int, column: Int, region: Region) -> Bool {
+        guard column > region.left, column + 1 < region.right, row > region.top, row + 1 < region.bottom else { return false }
         let index = row * width + column
         let level = Int(pixels[index])
         return abs(Int(pixels[index - 1]) - level) <= flatTolerance && abs(Int(pixels[index + 1]) - level) <= flatTolerance

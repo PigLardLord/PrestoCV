@@ -43,14 +43,16 @@ struct WordWeightPDFKitTests {
         var top = CGFloat(40)
         for line in lines {
             top += line.size * 1.5
-            context.textPosition = CGPoint(x: line.x, y: box.height - top)
+            // Drawing a line moves the text position to its end: the band and the hairline are placed from its start
+            let origin = CGPoint(x: line.x, y: box.height - top)
             let drawn = NSAttributedString(string: line.text, attributes: [.font: line.face.font(line.size, bold: line.bold)])
             let ctLine = CTLineCreateWithAttributedString(drawn)
             if let shade = line.shade {
-                DrawnShade.fill(shade, reach: line.reach, behind: ctLine, at: context.textPosition, size: line.size, in: context)
+                DrawnShade.fill(shade, reach: line.reach, behind: ctLine, at: origin, size: line.size, in: context)
             }
+            context.textPosition = origin
             CTLineDraw(ctLine, context)
-            if line.underline { DrawnShade.underline(ctLine, at: context.textPosition, size: line.size, in: context) }
+            if line.underline { DrawnShade.hairline(across: ctLine, at: origin, size: line.size, in: context) }
         }
         context.endPDFPage()
         context.closePDF()

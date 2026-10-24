@@ -31,8 +31,18 @@ struct RailLayoutPDFKitTests {
         var shade: CGFloat?
     }
 
-    private func line(_ text: String, size: CGFloat, bold: Bool, face: DrawnFace) -> CTLine {
-        CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [.font: face.font(size, bold: bold)]))
+    /// How the section headings are drawn: in a grey, and crossed by a black hairline.
+    private struct Headings {
+        var gray: CGFloat = 0
+        var hairline: DrawnShade.Hairline?
+    }
+
+    private func line(_ text: String, size: CGFloat, bold: Bool, face: DrawnFace, gray: CGFloat = 0) -> CTLine {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: face.font(size, bold: bold),
+            NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(gray: gray, alpha: 1),
+        ]
+        return CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
     }
 
     private func draw(_ text: String, at x: CGFloat, baseline: CGFloat, size: CGFloat, bold: Bool, face: DrawnFace, in context: CGContext) {
@@ -41,7 +51,7 @@ struct RailLayoutPDFKitTests {
     }
 
     /// A one-page PDF drawn when the test runs in `face`, its lines from the top of the page down.
-    private func drawnPDF(_ lines: [Line], face: DrawnFace) throws -> Data {
+    private func drawnPDF(_ lines: [Line], face: DrawnFace, headings: Headings = Headings()) throws -> Data {
         let data = NSMutableData()
         var box = CGRect(x: 0, y: 0, width: 595, height: 842)
         let consumer = try #require(CGDataConsumer(data: data as CFMutableData))
@@ -52,8 +62,13 @@ struct RailLayoutPDFKitTests {
             top += line.gap + line.size
             let baseline = box.height - top
             if let heading = line.heading {
-                let width = CGFloat(CTLineGetTypographicBounds(self.line(heading, size: 9.5, bold: true, face: face), nil, nil, nil))
-                draw(heading, at: Self.edge - width, baseline: baseline, size: 9.5, bold: true, face: face, in: context)
+                let drawn = self.line(heading, size: 9.5, bold: true, face: face, gray: headings.gray)
+                let origin = CGPoint(x: Self.edge - CGFloat(CTLineGetTypographicBounds(drawn, nil, nil, nil)), y: baseline)
+                context.textPosition = origin
+                CTLineDraw(drawn, context)
+                if let hairline = headings.hairline {
+                    DrawnShade.hairline(hairline, across: drawn, at: origin, size: 9.5, in: context)
+                }
             }
             if let shade = line.shade {
                 let origin = CGPoint(x: line.x ?? Self.body, y: baseline)
@@ -124,6 +139,27 @@ struct RailLayoutPDFKitTests {
         #expect(result.cv.experience.map { $0.role?.value } == ["Software Engineer"], "\(label): \(result.cv.experience.map { $0.role?.value })")
         #expect(result.cv.experience.first?.employer?.value == "ACME", "\(label): \(String(describing: result.cv.experience.first?.employer?.value))")
         #expect(result.cv.skills.count == 6, "\(label): \(result.cv.skills.count)")
+        #expect(result.unplaced.isEmpty, "\(label): text not imported: \(result.unplaced.map(\.text))")
+    }
+
+    @Test("Grey headings crossed by a black hairline are bold, and their sections are read: the hairline is not the letters' ink",
+          arguments: DrawnFace.allCases, DrawnShade.Hairline.allCases)
+    func greyHeadingsCrossedByAHairline(face: DrawnFace, hairline: DrawnShade.Hairline) async throws {
+        let pdf = try drawnPDF(cv(skillsHeading: "Technologies", skillsFirst: false), face: face, headings: Headings(gray: 0.31, hairline: hairline))
+        let label = "\(face.testDescription), \(hairline.testDescription)"
+        guard case .pages(let pages) = try await PDFKitTextExtractor().layout(ofPDF: pdf, limits: .standard) else {
+            Issue.record("\(label): no pages")
+            return
+        }
+        // The headings stand under the header, in the column left of the sections ("Languages" is also a row of the skills)
+        let headings = pages.flatMap(\.words).filter { $0.frame.y > 100 && $0.frame.maxX <= Self.edge + 1 }
+        #expect(headings.map(\.text).sorted() == ["Education", "Experience", "Languages", "Technologies", "Work"], "\(label): \(headings.map(\.text))")
+        #expect(headings.allSatisfy { $0.isBold }, "\(label): \(headings.map { "\($0.text) \($0.isBold)" })")
+        let result = try await importer().importPDF(pdf)
+        #expect(result.cv.skills.map(\.value) == ["Swift", "Kotlin", "SwiftUI", "Combine", "Docker", "AWS"], "\(label): \(result.cv.skills.map(\.value))")
+        #expect(result.cv.experience.map { $0.role?.value } == ["Software Engineer"], "\(label)")
+        #expect(result.cv.education.count == 1, "\(label): \(result.cv.education.count)")
+        #expect(result.cv.languages.map(\.name.value) == ["English", "German"], "\(label): \(result.cv.languages.map(\.name.value))")
         #expect(result.unplaced.isEmpty, "\(label): text not imported: \(result.unplaced.map(\.text))")
     }
 }
