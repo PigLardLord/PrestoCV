@@ -204,7 +204,7 @@ What a step never does:
 - set the lines closer than 1.2 times the size of the text;
 - take the margin at the foot of the page below 10 mm.
 
-Each bundled design says how it tightens, with rules under `html.fit-one-page` and `html.fit-one-page-compact`; a rule of a step starts at the root element, so it cannot reach a page that is not tightened. `OnePageFitTests` holds the designs to what they may set (spacing and the layout of lists, never a font size, a width or a transform), to the line height and to the least space they keep between sections and entries. A design without such rules is printed as it lays itself out. The version of a design goes up when its rules change, so that an installed copy is replaced.
+Each bundled design says how it tightens, with rules under `html.fit-one-page` and `html.fit-one-page-compact`; a rule of a step starts at the root element, so it cannot reach a page that is not tightened. `OnePageFitTests` holds the designs to what they may set (spacing and the layout of lists, never a font size, a width or a transform), to the line height and to the least space they keep between sections and entries, and they read the cascade to hold Modern's first entry of a section flush under its heading in every step. A design without such rules is printed as it lays itself out. The version of a design goes up when its rules change, so that an installed copy is replaced.
 
 ### Regenerating the thumbnails
 

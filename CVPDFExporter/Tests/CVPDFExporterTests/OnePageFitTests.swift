@@ -109,14 +109,19 @@ struct OnePageFitTests {
         return Rule(selectors: selectors, declarations: declarations)
     }
 
-    /// The rules of a design that apply only while the root element has a class of a step
-    private static func fitRules(of id: String) throws -> [Rule] {
+    /// Every rule of a design's stylesheet, in the order the stylesheet gives them
+    private static func allRules(of id: String) throws -> [Rule] {
         let url = try #require(
             Bundle.module.url(forResource: id, withExtension: "mcvt", subdirectory: "Templates/Bundled"),
             "Bundled template '\(id)' should be in the module bundle"
         )
         let package = try JSONDecoder().decode(TemplatePackage.self, from: Data(contentsOf: url))
-        return rules(in: package.cssContent).filter { rule in
+        return rules(in: package.cssContent)
+    }
+
+    /// The rules of a design that apply only while the root element has a class of a step
+    private static func fitRules(of id: String) throws -> [Rule] {
+        try allRules(of: id).filter { rule in
             rule.selectors.contains { selector in OnePageFit.classNames.contains { selector.contains(".\($0)") } }
         }
     }
@@ -124,6 +129,52 @@ struct OnePageFitTests {
     private static func points(_ value: String) -> Double? {
         guard value.hasSuffix("pt") else { return nil }
         return Double(value.dropLast(2))
+    }
+
+    // MARK: - The cascade
+
+    /// How a selector of a design matches an element, and how specific it is: the classes it names, then its elements
+    private struct Match {
+        let specificity: (classes: Int, elements: Int)
+    }
+
+    /// Whether `selector` matches an element that has `classes` while the root element has `rootClasses`. It reads the
+    /// selectors the designs use for an element and its root: classes on the element, and a `html.class` ahead of them.
+    /// A selector with a sibling or child combinator, or one that names an ancestor other than the root, does not match:
+    /// it is for an element that is not the one asked about.
+    private static func match(_ selector: String, element classes: Set<String>, root rootClasses: Set<String>) -> Match? {
+        let segments = selector.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard let last = segments.last, !segments.contains(where: { ["+", ">", "~"].contains($0) }) else { return nil }
+        var specificity = (classes: 0, elements: 0)
+
+        for segment in segments.dropLast() {
+            let parts = segment.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+            guard parts[0] == "html", Set(parts.dropFirst()).isSubset(of: rootClasses) else { return nil }
+            specificity.elements += 1
+            specificity.classes += parts.count - 1
+        }
+        let parts = last.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+        guard parts[0].isEmpty, parts.count > 1, Set(parts.dropFirst()).isSubset(of: classes) else { return nil }
+        specificity.classes += parts.count - 1
+        return Match(specificity: specificity)
+    }
+
+    /// The value of a length property of an element, as the cascade settles it: of the rules that match, the most specific
+    /// wins, and of two equally specific the later one. `padding` sets the top padding by its first value.
+    private static func computedLength(_ property: String, element classes: Set<String>, root rootClasses: Set<String>, in rules: [Rule]) -> Double? {
+        var winner: (specificity: (classes: Int, elements: Int), value: String)?
+        for rule in rules {
+            let matches = rule.selectors.compactMap { Self.match($0, element: classes, root: rootClasses) }
+            guard let best = matches.max(by: { ($0.specificity.classes, $0.specificity.elements) < ($1.specificity.classes, $1.specificity.elements) }) else { continue }
+            for (name, value) in rule.declarations {
+                let setsProperty = name == property || (property == "padding-top" && name == "padding")
+                guard setsProperty, let first = value.split(whereSeparator: \.isWhitespace).first else { continue }
+                if let current = winner, (current.specificity.classes, current.specificity.elements) > (best.specificity.classes, best.specificity.elements) { continue }
+                winner = (best.specificity, String(first))
+            }
+        }
+        guard let value = winner?.value else { return nil }
+        return value == "0" ? 0 : points(value)
     }
 
     @Test("every bundled design says how it tightens its spacing, in every step", arguments: designs)
@@ -158,6 +209,25 @@ struct OnePageFitTests {
                 let allowed = Self.allowedProperties.contains(property) || property.hasPrefix("--spacing-")
                 #expect(allowed, "\(id): \(rule.selectors.joined(separator: ", ")) sets \(property): \(value)")
             }
+        }
+    }
+
+    /// The roots a page can have: the design's own, then each step of the renderer
+    private static var roots: [Set<String>] { [[]] + OnePageFit.standardSteps.map { Set($0.classNames) } }
+
+    @Test("Modern keeps the first entry of a section flush under its heading in every step, and no step pads the entries more than the one before")
+    func modernFirstEntryStaysFlush() throws {
+        let rules = try Self.allRules(of: "modern")
+        var lighterPadding = Double.infinity
+
+        for root in Self.roots {
+            let first = Self.computedLength("padding-top", element: ["job-entry", "job-entry-first"], root: root, in: rules)
+            let later = Self.computedLength("padding-top", element: ["job-entry"], root: root, in: rules)
+
+            #expect(first == 0, "Modern under \(root.sorted()): the first entry has padding-top \(String(describing: first))")
+            #expect((later ?? 0) > 0, "Modern under \(root.sorted()): the entries after it have padding-top \(String(describing: later))")
+            #expect((later ?? 0) <= lighterPadding, "Modern under \(root.sorted()): the entries have padding-top \(String(describing: later)), more than in the step before")
+            lighterPadding = later ?? 0
         }
     }
 
