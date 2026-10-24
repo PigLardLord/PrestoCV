@@ -634,6 +634,9 @@ struct EntryReaderTests {
         ("Larkin Hardware, Akron, OH", "Larkin Hardware", "Akron, OH"),
         ("Harbor Dental Studio, Austin, Texas", "Harbor Dental Studio", "Austin, Texas"),
         ("Larkin Hardware, Calgary, Alberta", "Larkin Hardware", "Calgary, Alberta"),
+        ("Northgate Hospital, Leeds, West Yorkshire, United Kingdom", "Northgate Hospital", "Leeds, West Yorkshire, United Kingdom"),
+        ("Northgate Hospital, Reading, Berkshire, England", "Northgate Hospital", "Reading, Berkshire, England"),
+        ("Northgate Hospital, Lyon, Auvergne-Rhône-Alpes, France", "Northgate Hospital", "Lyon, Auvergne-Rhône-Alpes, France"),
     ])
     func employerWithCityAndState(line: String, employer: String, place: String) throws {
         let found = read("""
@@ -650,6 +653,7 @@ struct EntryReaderTests {
 
     @Test("A city with its state or country, alone on its line, is one place, however many parts it has", arguments: [
         "Springfield, Illinois, United States", "Leeds, United Kingdom", "Akron, OH", "Austin, Texas",
+        "Leeds, West Yorkshire, United Kingdom", "Reading, Berkshire, England", "Lyon, Auvergne-Rhône-Alpes, France",
     ])
     func cityWithRegion(place: String) throws {
         let found = read("""

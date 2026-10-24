@@ -310,6 +310,11 @@ enum EntryReader {
         guard parts.count >= 2, let last = parts.last, Places.isCountryOrRegion(last.text) else { return nil }
         var start = parts.count - 2
         while start > 0, Places.isCountryOrRegion(parts[start].text) { start -= 1 }
+        // A city before an area the rules do not know: "Leeds, West Yorkshire, United Kingdom". An area by its form, or a known
+        // city before a part that is none, belongs to the place; "Harbor Law Firm, Medford, Ohio" keeps its employer.
+        if start > 0, Places.isArea(parts[start].text) || (!Places.isPlaceOnly(parts[start].text) && Places.isPlaceOnly(parts[start - 1].text)) {
+            start -= 1
+        }
         let isPlace = parts[start...].allSatisfy {
             $0.words.count <= 3 && $0.text.first?.isUppercase == true && !EntryVocabulary.isOrganisation($0.text)
                 && !EntryVocabulary.isRole($0.text) && !EntryVocabulary.isSchool($0.text) && !EntryVocabulary.isDegree($0.text)

@@ -588,6 +588,14 @@
   "source": "traps/datos-personales-es.txt"
  },
  {
+  "id": "traps/employer-area-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/employer-area-en.expected.json",
+  "source": "traps/employer-area-en.txt"
+ },
+ {
   "id": "traps/employer-first-en",
   "language": "en",
   "form": "trap",
@@ -642,6 +650,14 @@
   "kind": "text",
   "expected": "traps/lone-city-fr.expected.json",
   "source": "traps/lone-city-fr.txt"
+ },
+ {
+  "id": "traps/name-city-word-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/name-city-word-en.expected.json",
+  "source": "traps/name-city-word-en.txt"
  },
  {
   "id": "traps/pasiones-es",

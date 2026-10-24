@@ -220,16 +220,22 @@ enum HeaderReader {
     }
 
     /// The first line of the head that reads as a name, with its credentials cut off. A line with a code that is also
-    /// the code of a state ("Jane Rowe, MD") is a name only when no other line is one: "Silver Spring, MD" is a place.
+    /// the code of a state ("Jane Rowe, MD") is a name only when no other line is one: "Silver Spring, MD" is a place. So is
+    /// a line with a word that is also a city ("Thomas Kiel", "Jack London"): "Greater London" is a place.
     private static func nameCandidate(in candidates: [Candidate]) -> NameReading? {
         let window = candidates.indices.prefix(6).filter { candidates[$0].isFirstInBlock }
-        for allowingAmbiguous in [false, true] {
-            for index in window {
-                let piece = candidates[index].piece
-                if let split = Credentials.split(piece, allowingAmbiguous: allowingAmbiguous), looksLikeName(split.name.text) {
-                    return NameReading(index: index, name: split.name, split: split)
+        for allowingPlaceWords in [false, true] {
+            for allowingAmbiguous in [false, true] {
+                for index in window {
+                    let piece = candidates[index].piece
+                    if let split = Credentials.split(piece, allowingAmbiguous: allowingAmbiguous),
+                       looksLikeName(split.name.text, allowingPlaceWords: allowingPlaceWords) {
+                        return NameReading(index: index, name: split.name, split: split)
+                    }
+                    if !allowingAmbiguous, looksLikeName(piece.text, allowingPlaceWords: allowingPlaceWords) {
+                        return NameReading(index: index, name: piece, split: nil)
+                    }
                 }
-                if !allowingAmbiguous, looksLikeName(piece.text) { return NameReading(index: index, name: piece, split: nil) }
             }
         }
         return nil
@@ -264,8 +270,9 @@ enum HeaderReader {
     }
 
     /// Two to five words, each with a capital (or a particle such as "de", "van", "von"), letters only, and not a
-    /// heading, a role, a document's title or an organisation.
-    static func looksLikeName(_ text: String) -> Bool {
+    /// heading, a role, a document's title or an organisation, and no place: a word that is the name of a city rejects it,
+    /// unless `allowingPlaceWords` is set and the other words are no place ("Thomas Kiel" is a name, "Berlin Germany" is not).
+    static func looksLikeName(_ text: String, allowingPlaceWords: Bool = false) -> Bool {
         let words = text.split(separator: " ")
         guard (2...5).contains(words.count), text.count <= 60 else { return false }
         guard text.allSatisfy({ $0.isLetter || " -'’.".contains($0) }) else { return false }
@@ -275,7 +282,7 @@ enum HeaderReader {
         }
         if SectionVocabulary.kind(ofHeading: text) != nil || EntryVocabulary.isDocumentTitle(text) { return false }
         if EntryVocabulary.isRole(text) || EntryVocabulary.isOrganisation(text) || EntryVocabulary.isSchool(text) { return false }
-        return !Places.isKnownPlace(text)
+        return allowingPlaceWords ? !Places.isPlaceOnly(text) : !Places.isKnownPlace(text)
     }
 
     private static let nameParticles: Set<String> = ["de", "da", "di", "del", "della", "dei", "van", "von", "der", "den", "la", "le", "y", "e", "dos", "das", "do", "du", "zu", "ten", "ter", "al", "el"]

@@ -288,6 +288,29 @@ struct HeaderReaderTests {
         }
     }
 
+    @Test("A surname or a given name that is the name of a city is still a name, with credentials or without", arguments: [
+        "Thomas Kiel", "Anna Münster", "Paul Kassel", "Maria Mainz", "Jack London", "Florence Nightingale",
+    ], ["", ", RN"])
+    func nameWithACityWord(line: String, credentials: String) {
+        let found = header(line + credentials + "\nNurse\nperson@example.com")
+        #expect(found.cv.person.name?.value == line, "\(line)\(credentials)")
+        #expect(found.cv.person.title?.value == "Nurse" + (credentials.isEmpty ? "" : ", RN"), "\(line)\(credentials)")
+        #expect(found.cv.person.location == nil, "\(line)\(credentials)")
+    }
+
+    @Test("Places alone are no name; a line with a city and another word is a name only when no other line is")
+    func placeWordsAreNoName() {
+        for line in ["Berlin Germany", "New York", "Fully Remote", "Milano Italia"] {
+            let found = header(line + "\nNurse\nperson@example.com")
+            #expect(found.cv.person.name == nil, "\(line)")
+        }
+        let placeFirst = header("Greater London\nAnna Weber\nNurse\nanna@example.com")
+        #expect(placeFirst.cv.person.name?.value == "Anna Weber")
+        let nameFirst = header("Thomas Kiel\nNurse\nGreater London\nthomas@example.com")
+        #expect(nameFirst.cv.person.name?.value == "Thomas Kiel")
+        #expect(nameFirst.cv.person.location?.value == "Greater London")
+    }
+
     // MARK: The place and the street (#302)
 
     @Test("A city with its state or province is the place, whichever way the state is written", arguments: [

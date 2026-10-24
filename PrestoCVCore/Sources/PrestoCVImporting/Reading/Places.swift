@@ -14,6 +14,42 @@ enum Places {
         return hasPostalCode(text) || hasRegionTail(text)
     }
 
+    /// Whether a piece reads as a place and as nothing else: a postal code, a city with its region, a mode of work, or only
+    /// words of known places ("Berlin Germany", "New York"). A name with a word that is also a city, "Thomas Kiel" or
+    /// "Jack London", is not: the word before it is no place.
+    static func isPlaceOnly(_ text: String) -> Bool {
+        if hasPostalCode(text) || hasRegionTail(text) { return true }
+        let words = text.words.map { $0.folded }
+        guard !words.isEmpty else { return false }
+        if workModePhrases.contains(where: { contains($0, in: words) }) { return true }
+        var index = 0
+        while index < words.count {
+            let length = (1...3).reversed().first { count in
+                index + count <= words.count && known.contains(words[index..<(index + count)].joined(separator: " "))
+            }
+            guard let length else { return false }
+            index += length
+        }
+        return true
+    }
+
+    private static func contains(_ phrase: [String], in words: [String]) -> Bool {
+        guard !phrase.isEmpty, phrase.count <= words.count else { return false }
+        return (0...(words.count - phrase.count)).contains { words[$0..<($0 + phrase.count)].elementsEqual(phrase) }
+    }
+
+    /// Whether a piece names an area by its form, not by its name: "West Yorkshire", "Orange County", "Provincia di Torino".
+    static func isArea(_ text: String) -> Bool {
+        let words = text.words.map { $0.folded }
+        guard let last = words.last else { return false }
+        return (last.hasSuffix("shire") && last.count > 5) || words.contains { areaWords.contains($0) }
+    }
+
+    private static let areaWords: Set<String> = [
+        "county", "province", "provincia", "provinz", "region", "regione", "district", "distrito", "canton", "kanton",
+        "department", "departement", "prefecture", "oblast", "kreis", "landkreis", "contea", "condado", "comte", "comarca",
+    ]
+
     /// Whether a piece names a country or a region, as the last part of "Leeds, United Kingdom" or "Akron, OH" does.
     static func isCountryOrRegion(_ text: String) -> Bool {
         let words = text.words
@@ -136,9 +172,17 @@ enum Places {
         "orléans", "amiens", "limoges", "perpignan", "saint-étienne", "le havre",
     ]
 
-    private static let others = [
+    private static let others = workModes + areas
+
+    private static let workModes = [
         "remote", "da remoto", "in remoto", "smart working", "remoto", "homeoffice", "home office", "télétravail", "à distance",
-        "hybrid", "ibrido", "híbrido", "hybride", "metropolitan area",
+        "hybrid", "ibrido", "híbrido", "hybride",
+    ]
+
+    private static let workModePhrases: [[String]] = workModes.map { $0.words.map { $0.folded } }
+
+    private static let areas = [
+        "metropolitan area",
         "lombardia", "lombardy", "piemonte", "piedmont", "lazio", "veneto", "toscana", "tuscany", "emilia-romagna", "sachsen", "saxony",
         "bayern", "bavaria", "baviera", "berlin-brandenburg", "île-de-france", "catalunya", "cataluña", "catalonia", "andalucía",
         "comunidad de madrid", "lisbon area", "grande lisboa", "área metropolitana de lisboa",
