@@ -99,14 +99,17 @@ enum SectionVocabulary {
     }
 
     /// A known heading with generic words before or after it: "Objective statement" is the summary. At least one word
-    /// of the heading stays, and the section is the one of the words that stay.
+    /// of the heading stays, and the section is the one of the words that stay. A generic word that is a heading of
+    /// its own in another language, as the English "resume" is the French summary, is dropped only when it names the
+    /// same section as the words that stay: "Résumé et compétences" is two sections, not the skills.
     private static func qualified(_ text: String) -> Match? {
         var words = key(text).split(separator: " ")
         let count = words.count
-        while let first = words.first, qualifiers.contains(String(first)) { words.removeFirst() }
-        while let last = words.last, qualifiers.contains(String(last)) { words.removeLast() }
-        guard words.count < count, !words.isEmpty else { return nil }
-        return index[words.joined(separator: " ")]
+        var dropped: [String] = []
+        while let first = words.first, qualifiers.contains(String(first)) { dropped.append(String(words.removeFirst())) }
+        while let last = words.last, qualifiers.contains(String(last)) { dropped.append(String(words.removeLast())) }
+        guard words.count < count, !words.isEmpty, let match = index[words.joined(separator: " ")] else { return nil }
+        return dropped.allSatisfy { index[$0].map { $0.kind == match.kind } ?? true } ? match : nil
     }
 
     /// Two or more known headings joined by "/", "&", "+", "|", a comma or a joining word: "Weiterbildung / Kurse". When

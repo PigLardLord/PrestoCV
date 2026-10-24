@@ -50,6 +50,8 @@ enum SectionHeadings {
         // Alternatives of two kinds have no section of their own to be read in: they are text not imported
         ("Ehrenamt & Interessen", .additional, [.de]), ("Formation / Cours", .additional, [.fr]),
         ("Skills and Languages", .additional, [.en]), ("Berufserfahrung und Ausbildung", .additional, [.de]),
+        // "Résumé" is the summary of a French CV, and the generic "resume" of an English one: it is no qualifier there
+        ("Résumé et compétences", .additional, [.fr]), ("Résumé / Compétences", .additional, [.fr]),
     ]
 
     /// Text that is no heading: a bracket that is no heading of the same kind, a sentence, a generic word alone.
@@ -57,7 +59,7 @@ enum SectionHeadings {
         "Skills (see the project page)", "Skills (Languages)", "Education (Skills)", "Skills (hard skills",
         "Credentials", "Statement", "Resume and CV",
         "Managed the education and credentials of forty staff", "Education and credentials are listed below",
-        "Strengths, weaknesses", "Swift / Kotlin", "Tools for the whole team", "Work & Travel", "Skills in (hard skills) and more",
+        "Compétences (Résumé)", "Strengths, weaknesses", "Swift / Kotlin", "Tools for the whole team", "Work & Travel", "Skills in (hard skills) and more",
         // More than seven words
         "Skills, Languages, Interests, Projects, Awards, References, Publications, Memberships",
         "Competenze tecniche e trasversali e informatiche e linguistiche e personali (Hard Skills)",
@@ -304,6 +306,22 @@ struct SectionHeadingTests {
         let texts = result.unplaced.map(\.text)
         #expect(texts.contains("Stato di nascita: Italia"), "\(texts)")
         #expect(texts.contains("Provincia di nascita: Torino"), "\(texts)")
+    }
+
+    @Test("A French summary under a heading that joins it to the skills is shown as text, never taken for skills")
+    func frenchSummaryBesideSkills() throws {
+        for heading in ["Résumé et compétences", "Résumé / Compétences"] {
+            let result = try importText("""
+            Alex Martin
+            Ingénieur
+
+            \(heading)
+            Ingénieur logiciel spécialisé en systèmes embarqués
+            """)
+            #expect(result.cv.skills.isEmpty, "\(heading): \(result.cv.skills.map(\.value))")
+            #expect(result.unplaced.map(\.text) == ["Ingénieur logiciel spécialisé en systèmes embarqués"], "\(heading)")
+            #expect(result.unplaced.first?.heading == heading)
+        }
     }
 
     @Test("Two kinds of section under one heading are shown as text not imported, with that heading")
