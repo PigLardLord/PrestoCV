@@ -244,12 +244,13 @@ struct HeaderReaderTests {
         #expect(alone.cv.person.name?.value == "Jane Rowe")
         #expect(alone.cv.person.name?.check == .nameByPosition)
         #expect(alone.cv.person.title?.value == "Physician, MD")
-        // With a name that needs no guess in the head, the place with the state is a place
+        // With a name that needs no guess in the head, the place with the state is a place; read without its code it could
+        // have been the name, so the two are to be checked
         let withName = header("Silver Spring, MD\nJane Rowe\nNurse")
         #expect(withName.cv.person.name?.value == "Jane Rowe")
         #expect(withName.cv.person.name?.check == .nameByPosition)
         #expect(withName.cv.person.location?.value == "Silver Spring, MD")
-        #expect(withName.cv.person.location?.check == nil)
+        #expect(withName.cv.person.location?.check == .locationByPosition)
     }
 
     @Test("A place with a state or a province is never a name", arguments: [
@@ -336,6 +337,54 @@ struct HeaderReaderTests {
         #expect(person.location?.check == .locationByPosition, "\(place)")
     }
 
+    @Test("A place that no list knows, above the name, is never the name without a check, whatever the name's words", arguments: [
+        "Thomas Kiel", "Rebecca Cook", "Victoria West", "Anna Weber",
+    ])
+    func unknownPlaceAboveTheName(name: String) {
+        let titled = header("Greater Wexby\n" + name + "\nNurse\nperson@example.com")
+        #expect(titled.cv.person.name?.value == name, "\(name)")
+        #expect(titled.cv.person.name?.check == .nameByPosition, "\(name)")
+        #expect(titled.cv.person.title?.value == "Nurse", "\(name)")
+        let placeIsKept = titled.cv.person.location?.value == "Greater Wexby" || titled.unplaced.map(\.text).contains("Greater Wexby")
+        #expect(placeIsKept, "\(name)")
+        // With no title nothing in the head tells the two lines apart: both are read, and each is to be checked
+        let person = header("Greater Wexby\n" + name + "\nperson@example.com").cv.person
+        let read = [person.name, person.title, person.location].compactMap { $0 }
+        let unchecked = read.filter { $0.check == nil }.map(\.value)
+        #expect(Set(read.map(\.value)) == ["Greater Wexby", name], "\(name)")
+        #expect(unchecked.isEmpty, "\(name)")
+    }
+
+    @Test("The first line is the name over a place that no list knows under it, sure only with a title of its own", arguments: [
+        "Thomas Kiel", "Rebecca Cook", "Victoria West", "Anna Weber",
+    ])
+    func nameAboveAnUnknownPlace(name: String) {
+        let hasListWord = name == "Thomas Kiel" || name == "Rebecca Cook"
+        let titled = header(name + "\nNurse\nGreater Wexby\nperson@example.com").cv.person
+        #expect(titled.name?.value == name, "\(name)")
+        #expect(titled.name?.check == (hasListWord ? .nameByPosition : nil), "\(name)")
+        #expect(titled.title?.value == "Nurse", "\(name)")
+        #expect(titled.location?.value == "Greater Wexby", "\(name)")
+        // The line under the name could have been the name: it is read where a title is expected, and the two are to be checked
+        let untitled = header(name + "\nGreater Wexby\nperson@example.com").cv.person
+        #expect(untitled.name?.value == name, "\(name)")
+        #expect(untitled.name?.check == .nameByPosition, "\(name)")
+        let other = [untitled.title, untitled.location].compactMap { $0 }
+        #expect(other.map(\.value) == ["Greater Wexby"], "\(name)")
+        #expect(!other.contains { $0.check == nil }, "\(name)")
+    }
+
+    @Test("A line made only of known places, above the name, is the place, and both are to be checked", arguments: [
+        "Berlin Germany", "San Francisco",
+    ])
+    func knownPlaceAboveTheName(place: String) {
+        let person = header(place + "\nAnna Weber\nperson@example.com").cv.person
+        #expect(person.name?.value == "Anna Weber", "\(place)")
+        #expect(person.name?.check == .nameByPosition, "\(place)")
+        #expect(person.location?.value == place, "\(place)")
+        #expect(person.location?.check == .locationByPosition, "\(place)")
+    }
+
     @Test("A place alone is never the name without a check", arguments: [
         "Greater London", "Berlin Germany", "New York", "Fully Remote", "Milano Italia", "Upper Bielefeld",
     ], ["\nNurse", ""])
@@ -344,11 +393,11 @@ struct HeaderReaderTests {
         #expect(name == nil || name?.check == .nameByPosition, "\(place)\(title)")
     }
 
-    @Test("The first line is the name when no other line reads as one, and a place a list tells under it is to be checked")
+    @Test("The first line is the name; with another line that could be one and no title it is to be checked, and so is the place")
     func nameFirst() {
         let untitled = header("Anna Weber\nGreater London\nanna@example.com")
         #expect(untitled.cv.person.name?.value == "Anna Weber")
-        #expect(untitled.cv.person.name?.check == nil)
+        #expect(untitled.cv.person.name?.check == .nameByPosition)
         #expect(untitled.cv.person.title == nil)
         #expect(untitled.cv.person.location?.value == "Greater London")
         #expect(untitled.cv.person.location?.check == .locationByPosition)
@@ -383,6 +432,62 @@ struct HeaderReaderTests {
             #expect(found.cv.person.title?.value == "Nurse", "\(text)")
             #expect(found.unplaced.isEmpty, "\(text)")
         }
+    }
+
+    @Test("A place after a contact on its line has no title under it, and is not in doubt as the name")
+    func placeOnTheContactLine() {
+        let kiel = header("Thomas Kiel\nperson@example.com | Greater London\nNurse")
+        #expect(kiel.cv.person.name?.value == "Thomas Kiel")
+        #expect(kiel.cv.person.name?.check == .nameByPosition)
+        #expect(kiel.cv.person.location?.value == "Greater London")
+        #expect(kiel.cv.person.location?.check == nil)
+        let weber = header("Anna Weber\nperson@example.com | Greater London\nNurse")
+        #expect(weber.cv.person.name?.value == "Anna Weber")
+        #expect(weber.cv.person.name?.check == nil)
+        #expect(weber.cv.person.location?.value == "Greater London")
+        let below = header("person@example.com | Greater London\nThomas Kiel\nNurse")
+        #expect(below.cv.person.name?.value == "Thomas Kiel")
+        #expect(below.cv.person.title?.value == "Nurse")
+        #expect(below.cv.person.location?.value == "Greater London")
+        // A name after a contact on its line is still the name, its title under it
+        let after = header("person@example.com | Anna Weber\nNurse")
+        #expect(after.cv.person.name?.value == "Anna Weber")
+        #expect(after.cv.person.title?.value == "Nurse")
+    }
+
+    @Test("A name in a heading of the first level stays in the head after a contact or the document's title, whatever its words", arguments: [
+        "Thomas Kiel", "Rebecca Cook", "Anna Weber",
+    ], ["person@example.com\n\n", "**Curriculum Vitae**\n\n", "Here is the CV you asked for.\n\n"])
+    func nameHeadingInTheHead(name: String, before: String) {
+        let found = header(before + "# " + name + "\nNurse\n\n## Experience\n2019 - 2021\nNurse\nAcme Ltd")
+        #expect(found.cv.person.name?.value == name, "\(before)\(name)")
+        #expect(found.cv.person.name?.check == (name == "Anna Weber" ? nil : .nameByPosition), "\(before)\(name)")
+        #expect(found.cv.person.title?.value == "Nurse", "\(before)\(name)")
+    }
+
+    @Test("The profile of LinkedIn's text starts at its name after the sidebar, whatever the name's and the last skill's words", arguments: [
+        "Thomas Kiel", "Rebecca Cook", "Anna Weber",
+    ], ["Wound care", "Patient Safety"])
+    func linkedInNameAfterTheSidebar(name: String, skill: String) {
+        let found = header("""
+        Contact
+        person@example.com
+        Top Skills
+        Triage
+        \(skill)
+        \(name)
+        Nurse at Acme Clinic
+        Greater London
+        Summary
+        Nurse with ten years in emergency care.
+        Experience
+        Acme Clinic
+        Nurse
+        2019 - 2021
+        """)
+        #expect(found.cv.person.name?.value == name, "\(skill) \(name)")
+        #expect(found.cv.person.title?.value == "Nurse at Acme Clinic", "\(skill) \(name)")
+        #expect(found.cv.person.location?.value == "Greater London", "\(skill) \(name)")
     }
 
     @Test("A name given by its label loses its credentials, whatever its words")

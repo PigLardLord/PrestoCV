@@ -36,8 +36,8 @@ enum SectionSegmenter {
             }
             let firstCell = document.text(ofCell: 0, in: block)
             // LinkedIn's PDF copied as text gives its sidebar first: the profile starts at the name, a few lines before
-            // its summary or experience
-            if sidebarKinds.contains(sections[sections.count - 1].kind), block.cells.count == 1, HeaderReader.looksLikeName(firstCell),
+            // its summary or experience. The name is told by its shape, whatever its words: the head weighs it (#301)
+            if sidebarKinds.contains(sections[sections.count - 1].kind), block.cells.count == 1, HeaderReader.hasNameShape(firstCell),
                startsProfile(after: position, in: document) {
                 sections.append(Section(kind: .header, heading: nil, blocks: [block], languages: []))
                 continue
@@ -56,7 +56,8 @@ enum SectionSegmenter {
                 sections.append(Section(kind: match.kind, heading: block, blocks: [block], languages: match.languages))
                 continue
             }
-            if let match = heading(block, in: document, isFirst: sections.count == 1 && sections[0].blocks.isEmpty) {
+            let isInHead = headKinds.contains(sections[sections.count - 1].kind)
+            if let match = heading(block, in: document, isFirst: sections.count == 1 && sections[0].blocks.isEmpty, isInHead: isInHead) {
                 sections.append(Section(kind: match.kind, heading: block, blocks: [], languages: match.languages))
                 continue
             }
@@ -67,6 +68,9 @@ enum SectionSegmenter {
 
     private static let sidebarKinds: Set<SectionKind> = [.personal, .skills, .languages, .certifications]
 
+    /// The sections the head of the CV is read from.
+    private static let headKinds: Set<SectionKind> = [.header, .personal]
+
     /// Whether a summary or an experience heading follows within four blocks.
     private static func startsProfile(after position: Int, in document: SourceDocument) -> Bool {
         document.blocks.dropFirst(position + 1).prefix(4).contains { block in
@@ -76,8 +80,9 @@ enum SectionSegmenter {
     }
 
     /// The section a block opens, if it is a heading: a heading of the vocabulary, alone in its block; or one the
-    /// vocabulary does not know but the text marks as a heading.
-    private static func heading(_ block: SourceBlock, in document: SourceDocument, isFirst: Bool) -> SectionVocabulary.Match? {
+    /// vocabulary does not know but the text marks as a heading. In the head, a heading of the first level with the shape
+    /// of a name is the name, whatever its words ("# Thomas Kiel" after the contacts); after the head it is a heading.
+    private static func heading(_ block: SourceBlock, in document: SourceDocument, isFirst: Bool, isInHead: Bool) -> SectionVocabulary.Match? {
         guard block.kind != .listItem, block.kind != .tableHeader else { return nil }
         let cells = block.cells.map { document.text(of: $0) }
         let nonEmpty = cells.filter { !$0.isEmpty }
@@ -86,8 +91,8 @@ enum SectionSegmenter {
             return match
         }
         guard !isFirst, isMarkedAsHeading(block, text: text) else { return nil }
-        // The name at the top of a chat answer, after its opening sentence
-        if case .heading(1) = block.kind, HeaderReader.looksLikeName(text) { return nil }
+        // The name at the top of a chat answer, after its opening sentence, the contacts or the document's title
+        if case .heading(1) = block.kind, isInHead, HeaderReader.hasNameShape(text) { return nil }
         return SectionVocabulary.Match(kind: .unknown, languages: [])
     }
 

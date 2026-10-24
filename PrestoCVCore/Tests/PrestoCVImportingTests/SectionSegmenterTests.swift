@@ -69,6 +69,18 @@ struct SectionSegmenterTests {
         #expect(found[2].1 == "Il mio motto")
     }
 
+    @Test("A heading of the first level with the shape of a name stays in the head, whatever its words; after the head it opens a section")
+    func nameHeading() {
+        for name in ["Thomas Kiel", "Rebecca Cook", "Anna Weber"] {
+            let found = sections("person@example.com\n\n# \(name)\nNurse\n\n## Experience\n2019 - 2021 Nurse")
+            #expect(found.map(\.0) == [.header, .experience], "\(name)")
+            #expect(found[0].2 == ["person@example.com", name, "Nurse"], "\(name)")
+            let later = sections("# Giulia Bianchi\n## Esperienza\n- Assistenza\n# \(name)\nSempre avanti")
+            #expect(later.map(\.0) == [.header, .experience, .unknown], "\(name)")
+            #expect(later.count == 3 && later[2].1 == name, "\(name)")
+        }
+    }
+
     @Test("A Europass row of the mother tongue opens the languages and stays in them")
     func europassLanguageRows() {
         let found = sections("CAPACITÀ E COMPETENZE PERSONALI\nMADRELINGUA\tItaliano\nALTRE LINGUE\tInglese")

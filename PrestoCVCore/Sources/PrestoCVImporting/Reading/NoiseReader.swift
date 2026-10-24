@@ -71,6 +71,7 @@ enum NoiseReader {
                 findings.leaveOut(block, .signature)
                 signed = true
             } else if signed, HeaderReader.looksLikeName(text) {
+                // Strict on purpose: a name with a word of a list ("Thomas Kiel") stays visible, which loses nothing
                 findings.leaveOut(block, .signature)
             }
         }
