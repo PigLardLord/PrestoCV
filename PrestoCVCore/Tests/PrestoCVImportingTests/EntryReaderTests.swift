@@ -365,9 +365,9 @@ struct EntryReaderTests {
         #expect(found.cv.experience.map { $0.details.map(\.value) } == [["Cassa e rifornimento scaffali"], []])
     }
 
-    @Test("A range that opens the section but belongs to no entry leaves the later dates with the head lines above them")
+    @Test("A range that opens the section and holds every other is no entry: it stays visible, the later dates keep the head lines above them")
     func leadingRangeBelongsToNoEntry() throws {
-        // The range is isolated by a gap, the last date has nothing after it, or both
+        // The range is isolated by a gap or not, the entries have bullets or not
         let samples = [
             """
             Experience
@@ -399,12 +399,200 @@ struct EntryReaderTests {
             2010 – 2020
             • Cleaned the offices
             """,
+            """
+            Experience
+            2010 – 2025
+            Developer at Acme Ltd
+            2020 – 2025
+            • Built the tools
+            Cleaner at Verdi Ltd
+            2010 – 2020
+            • Cleaned the offices
+            """,
         ]
         for text in samples {
-            let named = read(text).cv.experience.filter { $0.role != nil }
-            #expect(named.map { $0.role?.value } == ["Developer", "Cleaner"])
-            #expect(named.map { $0.period?.value.start.year } == [2020, 2010])
+            let found = read(text)
+            #expect(summary(found) == ["Developer|Acme Ltd|-|2020", "Cleaner|Verdi Ltd|-|2010"])
+            #expect(found.unplaced.map(\.text) == ["2010 – 2025"])
+            #expect(found.cv.experience.allSatisfy { $0.check == nil })
         }
+    }
+
+    // MARK: Which lines belong to which date, read over the whole section (#295)
+
+    /// The lines of each entry after its role and employer: a place or details.
+    private func ownLines(_ found: Findings) -> [[String]] {
+        found.cv.experience.map { [$0.location?.value].compactMap { $0 } + $0.details.map(\.value) }
+    }
+
+    @Test("Dates alone above their entries, with a blank line after any line: no gap tips the reading")
+    func datesAboveWithAGapAnywhere() throws {
+        let lines = [
+            "Experience",
+            "2020 – 2021", "Trainee at Northgate Hospital, Leeds", "Helped on the ward",
+            "2019 – 2020", "Cleaner at Verdi Ltd, Leeds", "Cleaned offices",
+            "2018 – 2019", "Shop assistant at Blue Shop, Rome", "Served customers",
+        ]
+        for gap in 1..<lines.count {
+            var spaced = lines
+            spaced.insert("", at: gap)
+            let found = read(spaced.joined(separator: "\n"))
+            #expect(summary(found) == [
+                "Trainee|Northgate Hospital|Leeds|2020", "Cleaner|Verdi Ltd|Leeds|2019", "Shop assistant|Blue Shop|Rome|2018",
+            ], "a gap before line \(gap)")
+            #expect(found.cv.experience.map { $0.details.map(\.value) } == [["Helped on the ward"], ["Cleaned offices"], ["Served customers"]],
+                    "a gap before line \(gap)")
+            #expect(found.cv.experience.allSatisfy { $0.check == nil }, "a gap before line \(gap)")
+        }
+    }
+
+    @Test("Dates after their heads, each with a short line under it that is its own")
+    func datesAfterWithShortLines() throws {
+        let found = read("""
+        Experience
+        Developer at Acme Ltd
+        2020 – 2025
+        Built the tools
+        Cleaner at Verdi Ltd
+        2015 – 2020
+        Cleaned the offices
+        Shop assistant at Blue Shop
+        2010 – 2015
+        Served customers
+        """)
+        #expect(found.cv.experience.map { "\($0.role?.value ?? "-")|\($0.employer?.value ?? "-")|\($0.period?.value.start.year ?? 0)" } == [
+            "Developer|Acme Ltd|2020", "Cleaner|Verdi Ltd|2015", "Shop assistant|Blue Shop|2010",
+        ])
+        #expect(ownLines(found) == [["Built the tools"], ["Cleaned the offices"], ["Served customers"]])
+    }
+
+    @Test("One line for each entry with its date at the end, and a short line under it that is its own")
+    func oneLineEntriesWithShortLines() throws {
+        let found = read("""
+        Experience
+        Developer at Acme Ltd, 2020 – 2025
+        Built the tools
+        Cleaner at Verdi Ltd, 2015 – 2020
+        Cleaned the offices
+        Shop assistant at Blue Shop, 2010 – 2015
+        Served customers
+        """)
+        #expect(found.cv.experience.map { "\($0.role?.value ?? "-")|\($0.employer?.value ?? "-")|\($0.period?.value.start.year ?? 0)" } == [
+            "Developer|Acme Ltd|2020", "Cleaner|Verdi Ltd|2015", "Shop assistant|Blue Shop|2010",
+        ])
+        #expect(ownLines(found) == [["Built the tools"], ["Cleaned the offices"], ["Served customers"]])
+    }
+
+    @Test("A line before the first date that names no part is no entry's head when the dates come first")
+    func strayLineBeforeTheFirstDate() throws {
+        let found = read("""
+        Experience
+        Selected positions
+        2020 – 2021
+        Trainee at Northgate Hospital, Leeds
+        Helped on the ward
+        2019 – 2020
+        Cleaner at Verdi Ltd, Leeds
+        Cleaned offices
+        2018 – 2019
+        Shop assistant at Blue Shop, Rome
+        Served customers
+        """)
+        #expect(summary(found) == [
+            "Trainee|Northgate Hospital|Leeds|2020", "Cleaner|Verdi Ltd|Leeds|2019", "Shop assistant|Blue Shop|Rome|2018",
+        ])
+        #expect(found.unplaced.map(\.text) == ["Selected positions"])
+    }
+
+    @Test("When both readings fit equally, the common layout is kept and the entries they part differently are flagged")
+    func equalReadingsAreFlagged() throws {
+        // Opening with a date: dates first is kept
+        let datesFirst = read("""
+        Experience
+        2018 – 2019
+        Developer at Acme Ltd
+        2020 – 2025
+        Cleaner at Verdi Ltd
+        2010 – 2020
+        """)
+        #expect(datesFirst.cv.experience.map { $0.role?.value } == ["Developer", "Cleaner", nil])
+        #expect(datesFirst.cv.experience.map(\.check) == [.entryBoundsUnsure, .entryBoundsUnsure, .entryBoundsUnsure])
+        // A line above the only date: dates after is kept, and the line is not lost
+        let datesAfter = read("""
+        Education
+        Hotel Reception
+        2015 - 2017
+        Riverside College, Leeds
+        """, kind: .education)
+        try #require(datesAfter.cv.education.count == 1)
+        #expect(datesAfter.cv.education[0].degree?.value == "Hotel Reception")
+        #expect(datesAfter.cv.education[0].school?.value == "Riverside College")
+        #expect(datesAfter.cv.education[0].check == .entryBoundsUnsure)
+    }
+
+    @Test("A role above its date and the employer under it, and a part named again among the details, keep their entries")
+    func partsOnBothSidesOfTheDate() throws {
+        let split = read("""
+        Experience
+        Developer
+        2020 – 2025
+        Acme Ltd
+        Cleaner
+        2015 – 2020
+        Verdi Ltd
+        """)
+        #expect(found(split) == ["Developer|Acme Ltd|2020", "Cleaner|Verdi Ltd|2015"])
+        let named = read("""
+        Education
+        Payroll Practice Award
+        Example Payroll Institute
+        2022
+        Bachelor of Arts in tourism
+        Riverside University, June 2014
+        Modules: event management and accounting
+        """, kind: .education)
+        #expect(named.cv.education.map { $0.degree?.value } == ["Payroll Practice Award", "Bachelor of Arts in tourism"])
+        #expect(named.cv.education.map { $0.school?.value } == ["Example Payroll Institute", "Riverside University"])
+    }
+
+    private func found(_ found: Findings) -> [String] {
+        found.cv.experience.map { "\($0.role?.value ?? "-")|\($0.employer?.value ?? "-")|\($0.period?.value.start.year ?? 0)" }
+    }
+
+    @Test("A table's row of column names heads no entry, before or after the dates", arguments: [
+        """
+        Schulischer Werdegang
+        Zeitraum | Schule | Abschluss
+        2016 – 2019 | Beispiel-Gymnasium, Leipzig | Abitur
+        2010 – 2016 | Beispiel-Realschule, Leipzig | Mittlerer Schulabschluss
+        """,
+        """
+        Schulischer Werdegang
+        Abschluss | Schule | Zeitraum
+        Abitur | Beispiel-Gymnasium, Leipzig | 2016 – 2019
+        Mittlerer Schulabschluss | Beispiel-Realschule, Leipzig | 2010 – 2016
+        """,
+    ])
+    func columnNamesHeadNoEntry(_ text: String) throws {
+        let found = read(text, kind: .education)
+        #expect(found.cv.education.map { $0.degree?.value } == ["Abitur", "Mittlerer Schulabschluss"])
+        #expect(found.cv.education.map { $0.school?.value } == ["Beispiel-Gymnasium", "Beispiel-Realschule"])
+        #expect(found.unplaced.count == 1)
+    }
+
+    @Test("A period after a role on its line, with LinkedIn's duration after it, anchors its entry")
+    func periodBeforeADuration() throws {
+        let found = read("""
+        Experience
+        Team Lead January 2017 - February 2019 (2 years 2 months)
+        Northgate Works, Leeds
+        Developer March 2015 - December 2016 (1 year 10 months)
+        Riverside Yard, Leeds
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == ["Team Lead", "Developer"])
+        #expect(found.cv.experience.map { $0.period?.value } == [
+            ImportedPeriod(start: ym(2017, 1), end: .date(ym(2019, 2))), ImportedPeriod(start: ym(2015, 3), end: .date(ym(2016, 12))),
+        ])
     }
 
     @Test("An end before the start, and a range with no end, are flagged")

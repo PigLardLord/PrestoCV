@@ -1,10 +1,10 @@
 import PrestoCVDomain
 
 /// Reads the entries of an experience or education section (ADR 0027). Entries are anchored to their dates; whether a
-/// CV puts the dates before or after the entry's other lines is learned from the section itself. The labelled rows of
-/// the Europass and the formato europeo are read by their labels. Within an entry, the role and the employer (or the
-/// degree and the school) are told apart by a connector ("at", "presso", "bei"), by their words, or, failing both, by
-/// the order the section's other entries use, and then the entry is flagged.
+/// CV puts the dates before or after the entry's other lines is read from the whole section (`EntryLayout`). The
+/// labelled rows of the Europass and the formato europeo are read by their labels. Within an entry, the role and the
+/// employer (or the degree and the school) are told apart by a connector ("at", "presso", "bei"), by their words, or,
+/// failing both, by the order the section's other entries use, and then the entry is flagged.
 enum EntryReader {
 
     enum Kind { case experience, education }
@@ -35,6 +35,8 @@ enum EntryReader {
         var tail: [Line] = []
         var body: [Line] = []
         var inheritedEmployer: Piece?
+        /// The section's two readings part the lines next to this entry's date differently, and neither fits better.
+        var boundsUnsure = false
     }
 
     static func read(_ section: Section, kind: Kind, into findings: inout Findings) {
@@ -50,7 +52,7 @@ enum EntryReader {
         if labelled >= 2 {
             readLabelled(lines, section: section, kind: kind, into: &findings)
         } else {
-            let drafts = entries(of: lines, section: section, findings: &findings)
+            let drafts = entries(of: lines, section: section, kind: kind, findings: &findings)
             let order = sectionOrder(drafts, kind: kind)
             for draft in drafts {
                 append(draft, kind: kind, order: order, section: section, into: &findings)
@@ -104,10 +106,11 @@ enum EntryReader {
         for cell in cells {
             for match in DateReader.periods(in: cell.text) {
                 let before = cell.text[..<match.range.lowerBound].trimmingSpaces()
-                let after = cell.text[match.range.upperBound...].trimmingSpaces()
+                // The text after the period as a string of its own: a range read in it indexes that string
+                let after = String(cell.text[match.range.upperBound...].trimmingSpaces())
                 let opensCell = before.isEmpty || before.last.map { "|·•—–-,(:/[*".contains($0) } == true
                 let closesCell = after.isEmpty || after.first.map { "|·•—–-,):/]*".contains($0) } == true
-                    || DurationReader.ranges(in: String(after)).first?.lowerBound == after.startIndex
+                    || DurationReader.ranges(in: after).first?.lowerBound == after.startIndex
                 if isBullet ? before.isEmpty : (opensCell || closesCell) {
                     return (cell.sub(match.range), match.period)
                 }
@@ -118,30 +121,18 @@ enum EntryReader {
 
     // MARK: Entries by their dates
 
-    private static func entries(of lines: [Line], section: Section, findings: inout Findings) -> [Draft] {
-        let usable = lines.filter { !$0.isDurationOnly }
+    private static func entries(of lines: [Line], section: Section, kind: Kind, findings: inout Findings) -> [Draft] {
+        // A table's row of column names heads no entry: it stays visible
+        for line in lines where isColumnHeader(line) {
+            for cell in line.cells { findings.unplace(cell, in: section) }
+        }
+        let usable = lines.filter { !$0.isDurationOnly && !isColumnHeader($0) }
         let anchors = usable.indices.filter { usable[$0].period != nil && (!usable[$0].isBullet || usable.allSatisfy { $0.isBullet }) }
         guard !anchors.isEmpty else { return entriesWithoutDates(usable) }
 
-        // How many lines before each date belong to its entry
-        var heads: [Int] = []
-        for (position, anchor) in anchors.enumerated() {
-            let floor = position == 0 ? 0 : anchors[position - 1] + 1
-            var count = 0
-            var index = anchor - 1
-            while index >= floor, !usable[index].isBody {
-                count += 1
-                index -= 1
-            }
-            heads.append(count)
-        }
-        // A section that opens with its first entry's date has its dates first: nothing precedes that date, so the
-        // short lines under a date are its entry's own, and not the head of the next date. Otherwise most dates
-        // leaving no head line of their own says so.
-        let datesFirst = opensWithItsFirstDate(usable, anchors: anchors, in: findings.document)
-            || heads.filter { $0 == 0 }.count * 2 > heads.count
-        let positive = heads.filter { $0 > 0 }
-        let typicalHead = mode(positive) ?? 0
+        // Which lines belong to which date, read both ways over the whole section
+        let layout = EntryLayout.reading(usable, anchors: anchors, kind: kind,
+                                         usuallyDatesFirst: opensWithItsFirstDate(usable, anchors: anchors, in: findings.document))
 
         // LinkedIn groups a company's roles: the line before the company's total duration names it
         var groupStarts: [Int: Piece] = [:]
@@ -149,24 +140,19 @@ enum EntryReader {
             if let employer = lines[index - 1].cells.first { groupStarts[lines[index - 1].block.index] = employer }
         }
 
+        // Lines before the first entry, and a range that sums up the section, stay visible
+        let firstEntry = layout.opensWithSummary ? 1 : 0
+        let shown = firstEntry < anchors.count ? layout.starts[firstEntry] : usable.count
+        for line in usable[..<shown] {
+            for cell in line.cells { findings.unplace(cell, in: section) }
+        }
         var drafts: [Draft] = []
-        var starts: [Int] = []
-        for (position, anchor) in anchors.enumerated() {
-            let head = datesFirst ? 0 : min(heads[position], max(typicalHead, position == 0 ? heads[position] : 0))
-            starts.append(anchor - head)
-        }
-        // Lines before the first entry stay visible
-        if let first = starts.first {
-            for line in usable[..<first] {
-                for cell in line.cells { findings.unplace(cell, in: section) }
-            }
-        }
         var group: Piece?
-        for (position, anchor) in anchors.enumerated() {
-            let start = starts[position]
-            let end = position + 1 < starts.count ? starts[position + 1] : usable.count
+        for position in anchors.indices.dropFirst(firstEntry) {
+            let anchor = anchors[position]
+            let entry = layout.range(of: position, lineCount: usable.count)
             var draft = Draft()
-            draft.head = Array(usable[start..<anchor])
+            draft.head = Array(usable[entry.lowerBound..<anchor])
             // A group's roles share its company until a role names a company of its own
             if let employer = draft.head.lazy.compactMap({ groupStarts[$0.block.index] }).first {
                 group = employer
@@ -175,29 +161,30 @@ enum EntryReader {
             }
             draft.anchor = usable[anchor]
             var index = anchor + 1
-            while index < end, !usable[index].isBody, usable[index].period == nil {
+            while index < entry.upperBound, !usable[index].isBody, usable[index].period == nil {
                 draft.tail.append(usable[index])
                 index += 1
             }
-            draft.body = Array(usable[index..<end])
+            draft.body = Array(usable[index..<entry.upperBound])
             if let employer = group, draft.head.count < 2 { draft.inheritedEmployer = employer }
+            draft.boundsUnsure = layout.unsure.contains(position)
             drafts.append(draft)
         }
         return drafts
     }
 
-    /// Whether the section opens with its first entry's date: its first line starts with a period (a date at the end
-    /// of the first line says nothing, that line holds its entry's head), and the period is neither a range alone
-    /// with a gap after it, which sums up the whole section, nor a last line with nothing after it, which would
-    /// leave an entry empty.
+    /// A table's row of column names: two cells or more, each an entry label ("Zeitraum | Schule | Abschluss").
+    private static func isColumnHeader(_ line: Line) -> Bool {
+        let names = line.cells.flatMap { $0.split(by: Separators.strong) }.map { $0.trimmed() }
+        return names.count >= 2 && line.period == nil && names.allSatisfy { EntryVocabulary.entryLabel($0.text) != nil }
+    }
+
+    /// Whether the section opens with its first entry's date, the line holding nothing before it: the more common
+    /// layout when the two readings fit the section equally (a date at the end of the first line says nothing, that
+    /// line holds its entry's head).
     private static func opensWithItsFirstDate(_ usable: [Line], anchors: [Int], in document: SourceDocument) -> Bool {
-        guard anchors[0] == 0, let first = surroundings(of: usable[0], in: document), !hasContent(first.before) else { return false }
-        if !hasContent(first.after), usable.count > 1, usable[1].block.followsGap { return false }
-        if let last = anchors.last, last == usable.count - 1, let end = surroundings(of: usable[last], in: document),
-           !hasContent(end.before), !hasContent(end.after) {
-            return false
-        }
-        return true
+        guard anchors[0] == 0, let first = surroundings(of: usable[0], in: document) else { return false }
+        return !hasContent(first.before)
     }
 
     /// The text of the line before and after its period.
@@ -244,11 +231,6 @@ enum EntryReader {
     private static func hasSeparator(_ text: String) -> Bool {
         Separators.strong.contains { text.contains($0) } || text.contains(", ")
             || EntryVocabulary.roleEmployerConnectors.contains { text.contains($0) }
-    }
-
-    private static func mode(_ values: [Int]) -> Int? {
-        let counts = Dictionary(values.map { ($0, 1) }, uniquingKeysWith: +)
-        return counts.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }.first?.key
     }
 
     // MARK: The parts of an entry
@@ -422,7 +404,9 @@ enum EntryReader {
         let location = places.first
         let period = draft.anchor?.period.map { periodValue($0.piece, $0.value) }
         let details = (extra.map(\.piece) + draft.body.flatMap(\.cells)).map { $0.quote() }
-        let check: CheckReason? = byOrder && (primary != nil && secondary != nil) ? .roleOrEmployerByOrder : nil
+        // Lines that may be another entry's come first: they may also be why the parts were read by their order
+        let check: CheckReason? = draft.boundsUnsure ? .entryBoundsUnsure
+            : byOrder && (primary != nil && secondary != nil) ? .roleOrEmployerByOrder : nil
         switch kind {
         case .experience:
             var entry = ImportedExperience()

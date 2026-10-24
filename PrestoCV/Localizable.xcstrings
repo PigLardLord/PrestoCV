@@ -8519,6 +8519,47 @@
         }
       }
     },
+    "import.review.reason.bounds" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Zeilen neben diesen Daten gehören vielleicht zum vorherigen oder nächsten Eintrag: Prüfen Sie sie."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The lines next to these dates may belong to the entry before or after: check them."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las líneas junto a estas fechas pueden ser de la entrada anterior o de la siguiente: revísalas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les lignes autour de ces dates appartiennent peut-être à l'entrée précédente ou suivante : vérifiez-les."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le righe vicino a queste date potrebbero appartenere alla voce precedente o successiva: controllale."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As linhas junto a estas datas podem pertencer à entrada anterior ou seguinte: verifique-as."
+          }
+        }
+      }
+    },
     "import.review.reason.language" : {
       "extractionState" : "manual",
       "localizations" : {

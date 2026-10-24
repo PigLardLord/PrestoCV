@@ -44,6 +44,9 @@ public enum CheckReason: String, Hashable, Sendable {
     case summaryWithoutHeading
     /// Nothing told the role from the employer: the CV's own order did.
     case roleOrEmployerByOrder
+    /// Nothing in the section told whether the lines next to the entry's dates are its own or the entry's beside it:
+    /// the more common layout decided.
+    case entryBoundsUnsure
     /// A date the rules could not make a period of, such as an end before the start.
     case periodUnreadable
     /// A period without an end: "2019 –".
