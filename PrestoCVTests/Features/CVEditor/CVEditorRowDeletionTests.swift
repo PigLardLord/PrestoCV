@@ -200,6 +200,41 @@ struct CVEditorRowDeletionTests {
         #expect(viewModel.pendingDeletion == nil)
     }
 
+    /// An interest is a plain string and a list can hold the same one twice, so its text alone does not say which of the
+    /// two was asked about: once one of them is gone, the one that slid into its place is a copy, not the row asked about.
+    @Test("An answer is not carried out on the twin of an interest that is already gone")
+    func anAnswerIsNotCarriedOutOnTheTwinOfAnInterest() throws {
+        let viewModel = makeViewModel()
+        EditorSection.interests.addRow(to: viewModel, text: "Reading")
+        EditorSection.interests.addRow(to: viewModel, text: "Reading")
+        viewModel.requestRemoval(of: .interests, at: 0)
+        let deletion = try #require(viewModel.pendingDeletion)
+        // Another route takes the interest that was asked about out of the list while the question is up
+        viewModel.cv.interests.remove(at: 0)
+
+        viewModel.confirmDeletion(deletion)
+
+        #expect(viewModel.cv.interests == ["Reading"], "The twin was not asked about")
+        #expect(viewModel.pendingDeletion == nil)
+    }
+
+    /// A guard: the answer still removes the interest asked about when other interests come and go around it.
+    @Test("An answer removes one of two equal interests, whatever the other interests around them do")
+    func anAnswerRemovesOneOfTwoEqualInterests() throws {
+        let viewModel = makeViewModel()
+        EditorSection.interests.addRow(to: viewModel, text: "Reading")
+        EditorSection.interests.addRow(to: viewModel, text: "Chess")
+        EditorSection.interests.addRow(to: viewModel, text: "Reading")
+        viewModel.requestRemoval(of: .interests, at: 0)
+        let deletion = try #require(viewModel.pendingDeletion)
+        viewModel.cv.interests.remove(at: 1)
+        EditorSection.interests.addRow(to: viewModel, text: "Cooking")
+
+        viewModel.confirmDeletion(deletion)
+
+        #expect(viewModel.cv.interests == ["Reading", "Cooking"], "One Reading goes, as asked, and nothing else")
+    }
+
     @Test("An answer that comes after the question was cancelled removes nothing", arguments: EditorSection.allCases)
     func anAnswerAfterCancellingRemovesNothing(section: EditorSection) throws {
         let viewModel = makeViewModel()

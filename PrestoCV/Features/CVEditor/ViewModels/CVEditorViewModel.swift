@@ -377,8 +377,14 @@ final class CVEditorViewModel: ObservableObject {
         case .languages: return cv.languages[safe: index]
         case .certifications: return cv.certifications[safe: index]
         case .social: return cv.social[safe: index]
-        case .interests: return cv.interests[safe: index].map(InterestEntry.init)
+        case .interests: return interestEntry(at: index)
         }
+    }
+
+    /// The interest at `index`, with the number of interests that say the same: a list can hold one text twice.
+    private func interestEntry(at index: Int) -> InterestEntry? {
+        guard let text = cv.interests[safe: index] else { return nil }
+        return InterestEntry(text: text, copies: cv.interests.filter { $0 == text }.count)
     }
 
     @MainActor

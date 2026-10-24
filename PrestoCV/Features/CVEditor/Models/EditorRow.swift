@@ -67,9 +67,19 @@ extension Social: EditorRow {
 /// An interest is a plain string in the CV; this gives it the shape of the other rows.
 struct InterestEntry: EditorRow {
     let text: String
+    /// How many interests of the CV say exactly this, this one included.
+    var copies = 1
 
     var isBlank: Bool { text.isBlankText }
     var displayName: String { firstFilled(of: [text], orPlaceholder: "field.interest") }
-    /// A plain string has nothing but its text to tell it from another interest.
-    var identity: AnyHashable { text }
+
+    /// A plain string has nothing but its text to tell it from another interest, and a list can hold the same text twice.
+    /// The number of copies completes it: when one of two equal interests is gone, the one that slid into its place
+    /// is alone, and is not the row that was asked about.
+    var identity: AnyHashable { Identity(text: text, copies: copies) }
+
+    private struct Identity: Hashable {
+        let text: String
+        let copies: Int
+    }
 }
