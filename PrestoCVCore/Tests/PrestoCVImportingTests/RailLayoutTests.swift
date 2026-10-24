@@ -123,6 +123,77 @@ struct RailLayoutTests {
         #expect(lines.contains("Education tools for retail"), "\(lines)")
     }
 
+    @Test("A bold title that starts with the word of a heading stays whole when no section's text starts after it")
+    func titleOfAJob() async throws {
+        var sketch = PageSketch()
+        sketch.put("Alex Example", x: 46, y: 40, size: 24, bold: true)
+        sketch.put("Work Experience", x: 60, y: 100, size: 12, bold: true)
+        // A gap of ten points between the two words of the title, as a justified bold line has
+        sketch.put("Education", x: 60, y: 130, bold: true)
+        sketch.put("Consultant", x: 60 + 9 * 10 * 0.5 + 10, y: 130, bold: true)
+        sketch.put("Example Ltd", x: 60, y: 146)
+        sketch.put("2019 – 2024", x: 60, y: 160)
+        #expect(try analyze([sketch.page]).lines.map(\.text).contains("Education Consultant"))
+
+        let result = try await importLayout(sketch.page)
+        #expect(result.cv.education.isEmpty, "\(result.cv.education.count) education entries")
+        #expect(result.cv.experience.map { $0.role?.value } == ["Education Consultant"])
+        #expect(result.cv.experience.first?.employer?.value == "Example Ltd")
+    }
+
+    @Test("A skills table whose longest label is the word of a heading keeps that row whole")
+    func tableLabel() async throws {
+        var sketch = PageSketch()
+        sketch.put("Alex Example", x: 46, y: 40, size: 24, bold: true)
+        sketch.put("Skills", x: 46, y: 100, size: 12, bold: true)
+        // The values start at x = 115: ten points past the longest label, and where no line of text starts
+        let rows = [("Languages", "Swift, Kotlin"), ("Tools", "Docker, AWS"), ("Methods", "Agile, TDD")]
+        for (index, row) in rows.enumerated() {
+            sketch.put(row.0, x: 60, y: 124 + Double(index) * 16, bold: true)
+            sketch.put(row.1, x: 115, y: 124 + Double(index) * 16)
+        }
+        let lines = try analyze([sketch.page]).lines.map(\.text)
+        #expect(lines.contains("Languages Swift, Kotlin"), "\(lines)")
+
+        let result = try await importLayout(sketch.page)
+        #expect(result.cv.languages.isEmpty, "\(result.cv.languages.map(\.name.value))")
+        #expect(Set(result.cv.skills.map(\.value)).isSuperset(of: ["Kotlin", "Docker", "AWS", "Agile", "TDD"]), "\(result.cv.skills.map(\.value))")
+    }
+
+    @Test("The text of the sections starts at one edge to within the ink of its first letters")
+    func inkOffsets() throws {
+        var sketch = PageSketch()
+        for (index, offset) in [0.0, 1.2, -1.1, 2.4].enumerated() {
+            let y = 100 + Double(index) * 40
+            put(heading: index.isMultiple(of: 2) ? "Core Technologies" : "Education", y: y, into: &sketch)
+            sketch.put("Languages", x: Self.bodyStart + offset, y: y, size: 9.3, bold: true)
+        }
+        #expect(try analyze([sketch.page]).lines.map(\.text) == [
+            "Core Technologies\tLanguages", "Education\tLanguages", "Core Technologies\tLanguages", "Education\tLanguages",
+        ])
+    }
+
+    @Test("A line of bold headings' words with wide gaps, many times over, is analysed within the budget of a sort")
+    func hostileHeadingGaps() throws {
+        var words: [ExtractedWord] = []
+        for line in 0..<1_000 {
+            for column in 0..<10 {
+                words.append(ExtractedWord(
+                    text: "Education", frame: Rect(x: 20 + Double(column) * 55, y: Double(line) * 0.8, width: 45, height: 0.6),
+                    fontSize: 0.5, isBold: true
+                ))
+            }
+        }
+        let page = ExtractedPage(width: 595, height: 842, words: words)
+        let limits = ImportLimits(
+            maximumPDFBytes: 1_000_000, maximumPages: 10, maximumCharacters: 1_000_000,
+            maximumWords: 20_000, maximumLines: 2_000, maximumCells: 20_000,
+            maximumAnalysisSteps: 16 * AnalysisWork.sortSteps(words.count)
+        )
+        var work = AnalysisWork(budget: limits.maximumAnalysisSteps)
+        _ = try LayoutAnalyzer.analyze([page], limits: limits, work: &work)
+    }
+
     @Test("A CV with its headings in a column beside the sections has every section read", arguments: [true, false])
     func wholeCV(skillsFirst: Bool) async throws {
         expectWholeCV(try await importLayout(page(skillsHeading: "Core Technologies", skillsFirst: skillsFirst)), "skills first: \(skillsFirst)")
