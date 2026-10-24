@@ -89,15 +89,15 @@ enum HeaderReader {
         }
 
         var taken = Set<Int>()
-        if findings.cv.person.name == nil, let reading = nameCandidate(in: candidates) {
+        var head: HeadName?
+        if findings.cv.person.name == nil, let chosen = headName(of: candidates, in: findings.document) {
+            head = chosen
+            let reading = chosen.reading
             let candidate = candidates[reading.index]
-            let isMarked = !reading.isGuess
-                && (candidate.block.kind == .heading(level: 1) || reading.index == 0 || isLargestText(candidate.block, in: findings.document))
-            findings.cv.person.name = reading.name.quote(check: isMarked ? nil : .nameByPosition)
+            findings.cv.person.name = reading.name.quote(check: chosen.isSure ? nil : .nameByPosition)
             taken.insert(reading.index)
             // The title follows the name, in the same line or the next, and the credentials of the name go with it
-            let next = reading.index + 1
-            if next < candidates.count, candidates[next].section == candidate.section, looksLikeTitle(candidates[next]) {
+            if let next = titleLine(under: reading.index, in: candidates) {
                 findings.cv.person.title = title(candidates[next].piece, with: reading.split?.credentials ?? [])
                 taken.insert(next)
             } else if let tail = reading.split?.tail {
@@ -107,7 +107,8 @@ enum HeaderReader {
         if findings.cv.person.location == nil,
            let index = candidates.indices.first(where: { !taken.contains($0) && looksLikePlace(candidates[$0], beside: contactBlocks) }) {
             taken.insert(index)
-            findings.cv.person.location = location(at: index, in: candidates, beside: contactBlocks, taken: &taken)
+            let isInDoubt = head?.leavesInDoubt(index, in: candidates) ?? false
+            findings.cv.person.location = location(at: index, in: candidates, beside: contactBlocks, isInDoubt: isInDoubt, taken: &taken)
         }
         if !hasSummarySection {
             let prose = candidates.indices.filter {
@@ -210,57 +211,116 @@ enum HeaderReader {
 
     // MARK: Name, title and place
 
+    /// A line of the head read as a name, with its credentials cut off.
     private struct NameReading {
         let index: Int
         let name: Piece
         let split: Credentials.Split?
-
-        /// A name that only the position gives: a code of a state among its credentials.
-        var isGuess: Bool { split?.isAmbiguous ?? false }
+        /// What the word lists say against the line as a name: they lower its score, and never decide alone.
+        let doubt: Int
     }
 
-    /// The first line of the head that reads as a name, with its credentials cut off. A line with a code that is also
-    /// the code of a state ("Jane Rowe, MD") is a name only when no other line is one: "Silver Spring, MD" is a place. So is
-    /// a line with a word that is also a city ("Thomas Kiel", "Jack London"): "Greater London" is a place.
-    private static func nameCandidate(in candidates: [Candidate]) -> NameReading? {
+    /// The name chosen among the lines of the head, and the lines that could have been it.
+    private struct HeadName {
+        let reading: NameReading
+        let isSure: Bool
+        let readings: Set<Int>
+
+        /// Whether a place that only a known word tells, at `index`, is in doubt: the line could have been the name, and the
+        /// name is not sure, or it is the line right under the name, where a title is expected.
+        func leavesInDoubt(_ index: Int, in candidates: [Candidate]) -> Bool {
+            (!isSure && readings.contains(index)) || (index == reading.index + 1 && !candidates[index].blockHasContacts)
+        }
+    }
+
+    /// The name of the head, chosen on the evidence of the whole head among its first lines that have the shape of a name
+    /// (ADR 0027, #301). A mark (a heading of the first level, the largest type of its page) counts most, then a title
+    /// under the line, then being the first line, and every word list that knows the line counts against it. A name can
+    /// hold a word that is also a city, a trade or a point of the compass ("Thomas Kiel", "Rebecca Cook", "Victoria West")
+    /// and a place a word no list knows ("Greater London"), so no list decides alone. The best line is the name even with a
+    /// low score; on equal scores the one the lists say less against wins, then the earlier one. It is sure only when it is
+    /// marked or first, no list knows it and no other line has a title under it.
+    private static func headName(of candidates: [Candidate], in document: SourceDocument) -> HeadName? {
         let window = candidates.indices.prefix(6).filter { candidates[$0].isFirstInBlock }
-        for allowingPlaceWords in [false, true] {
-            for allowingAmbiguous in [false, true] {
-                for index in window {
-                    let piece = candidates[index].piece
-                    if let split = Credentials.split(piece, allowingAmbiguous: allowingAmbiguous),
-                       looksLikeName(split.name.text, allowingPlaceWords: allowingPlaceWords) {
-                        return NameReading(index: index, name: split.name, split: split)
-                    }
-                    if !allowingAmbiguous, looksLikeName(piece.text, allowingPlaceWords: allowingPlaceWords) {
-                        return NameReading(index: index, name: piece, split: nil)
-                    }
-                }
-            }
+        let readings = window.compactMap { nameReading(at: $0, in: candidates) }
+        let indices = Set(readings.map(\.index))
+        let titled = indices.filter { hasTitle(under: $0, in: candidates, readings: indices) }
+        func isMarked(_ index: Int) -> Bool {
+            candidates[index].block.kind == .heading(level: 1) || isLargestText(candidates[index].block, in: document)
+        }
+        func score(_ reading: NameReading) -> Int {
+            (isMarked(reading.index) ? 4 : 0) + (titled.contains(reading.index) ? 3 : 0) + (reading.index == 0 ? 2 : 0) - reading.doubt
+        }
+        let best = readings.max { (score($0), -$0.doubt, -$0.index) < (score($1), -$1.doubt, -$1.index) }
+        guard let best else { return nil }
+        let isSure = (isMarked(best.index) || best.index == 0) && best.doubt == 0 && titled.subtracting([best.index]).isEmpty
+        return HeadName(reading: best, isSure: isSure, readings: indices)
+    }
+
+    /// The line at `index` read as a name: without its credentials, whole, or without a code that may also be a state's,
+    /// which counts against it ("Jane Rowe, MD" is a name, "Silver Spring, MD" a place).
+    private static func nameReading(at index: Int, in candidates: [Candidate]) -> NameReading? {
+        let piece = candidates[index].piece
+        if let split = Credentials.split(piece, allowingAmbiguous: false), hasNameShape(split.name.text) {
+            return NameReading(index: index, name: split.name, split: split, doubt: doubt(split.name.text))
+        }
+        if hasNameShape(piece.text) {
+            return NameReading(index: index, name: piece, split: nil, doubt: doubt(piece.text))
+        }
+        if let split = Credentials.split(piece, allowingAmbiguous: true), hasNameShape(split.name.text) {
+            return NameReading(index: index, name: split.name, split: split, doubt: doubt(split.name.text) + listWeight)
         }
         return nil
     }
 
+    /// Whether the line under the one at `index` is its title: it reads as a title and not as another name, or it names a
+    /// role and has no title under it in turn ("Greater London / Rebecca Cook / Nurse": the cook is the name, not a title).
+    private static func hasTitle(under index: Int, in candidates: [Candidate], readings: Set<Int>) -> Bool {
+        guard let next = titleLine(under: index, in: candidates) else { return false }
+        guard readings.contains(next) else { return true }
+        return EntryVocabulary.isRole(candidates[next].piece.text) && titleLine(under: next, in: candidates) == nil
+    }
+
+    /// The line under the one at `index`, in the same section, when it reads as a title.
+    private static func titleLine(under index: Int, in candidates: [Candidate]) -> Int? {
+        let next = index + 1
+        guard next < candidates.count, candidates[next].section == candidates[index].section, looksLikeTitle(candidates[next]) else { return nil }
+        return next
+    }
+
+    /// What the word lists say against a line as a name: a word of a known place, a role, an organisation or a school each
+    /// count once, and a line made only of places ("Berlin Germany") twice.
+    private static func doubt(_ text: String) -> Int {
+        let place = Places.isPlaceOnly(text) ? 2 : Places.isKnownPlace(text) ? 1 : 0
+        let lists = [EntryVocabulary.isRole(text), EntryVocabulary.isOrganisation(text), EntryVocabulary.isSchool(text)]
+        return (place + lists.count(where: \.self)) * listWeight
+    }
+
+    private static let listWeight = 2
+
     /// The credentials of a name given under the label of a name stay visible as text not imported.
     private static func withoutCredentials(_ values: [Piece], in section: Section, into findings: inout Findings) -> [Piece] {
-        guard let first = values.first, let split = Credentials.split(first, allowingAmbiguous: false), looksLikeName(split.name.text) else { return values }
+        guard let first = values.first, let split = Credentials.split(first, allowingAmbiguous: false), hasNameShape(split.name.text) else { return values }
         findings.unplace(split.tail, in: section)
         return [split.name] + values.dropFirst()
     }
 
-    /// The title with the credentials of the name after it: "Nurse, RN".
+    /// The title with the credentials of the name after it: "Nurse, RN". A title that names a role and also has the form
+    /// of a place ("Driver Creek, Oregon") is to be checked.
     private static func title(_ piece: Piece, with credentials: [Piece]) -> Sourced<String> {
-        guard !credentials.isEmpty else { return piece.quote() }
+        let check: CheckReason? = hasPlaceForm(piece.text) ? .titleByPosition : nil
+        guard !credentials.isEmpty else { return piece.quote(check: check) }
         let pieces = [piece] + credentials
-        return Sourced(value: pieces.map(\.text).joined(separator: ", "), spans: pieces.map(\.span))
+        return Sourced(value: pieces.map(\.text).joined(separator: ", "), spans: pieces.map(\.span), check: check)
     }
 
-    /// A label the vocabulary does not know ("Contact via") is shown as text not imported. One that reads as a name or as
-    /// a place ("Jane Rowe: jane@example.com", "Torino: 333 000 0000") is the content of the line and stays a candidate.
+    /// A label the vocabulary does not know ("Contact via") is shown as text not imported. One that has the shape of a name
+    /// or reads as a place ("Rebecca Cook: rebecca@example.com", "Torino: 333 000 0000") is the content of the line and
+    /// stays a candidate.
     private static func keepingNames(_ labels: [Piece], in section: Section, into findings: inout Findings) -> [Piece] {
         var kept: [Piece] = []
         for label in labels {
-            if looksLikeName(label.text) || Places.isKnownPlace(label.text) {
+            if hasNameShape(label.text) || Places.isKnownPlace(label.text) {
                 kept.append(label)
             } else {
                 findings.unplace(label, in: section)
@@ -269,10 +329,15 @@ enum HeaderReader {
         return kept
     }
 
-    /// Two to five words, each with a capital (or a particle such as "de", "van", "von"), letters only, and not a
-    /// heading, a role, a document's title or an organisation, and no place: a word that is the name of a city rejects it,
-    /// unless `allowingPlaceWords` is set and the other words are no place ("Thomas Kiel" is a name, "Berlin Germany" is not).
-    static func looksLikeName(_ text: String, allowingPlaceWords: Bool = false) -> Bool {
+    /// A name with nothing against it, for a line that no other line of a head weighs: the shape of a name, and no word
+    /// that a list of places, roles, organisations or schools knows.
+    static func looksLikeName(_ text: String) -> Bool {
+        hasNameShape(text) && doubt(text) == 0
+    }
+
+    /// The shape of a name, whatever its words mean: two to five words of letters, each with a capital or a particle
+    /// such as "de", "van", "von", and no heading or document's title.
+    private static func hasNameShape(_ text: String) -> Bool {
         let words = text.split(separator: " ")
         guard (2...5).contains(words.count), text.count <= 60 else { return false }
         guard text.allSatisfy({ $0.isLetter || " -'’.".contains($0) }) else { return false }
@@ -280,9 +345,7 @@ enum HeaderReader {
             guard let first = word.first(where: \.isLetter) else { return false }
             if !first.isUppercase && !nameParticles.contains(word.folded) { return false }
         }
-        if SectionVocabulary.kind(ofHeading: text) != nil || EntryVocabulary.isDocumentTitle(text) { return false }
-        if EntryVocabulary.isRole(text) || EntryVocabulary.isOrganisation(text) || EntryVocabulary.isSchool(text) { return false }
-        return allowingPlaceWords ? !Places.isPlaceOnly(text) : !Places.isKnownPlace(text)
+        return SectionVocabulary.kind(ofHeading: text) == nil && !EntryVocabulary.isDocumentTitle(text)
     }
 
     private static let nameParticles: Set<String> = ["de", "da", "di", "del", "della", "dei", "van", "von", "der", "den", "la", "le", "y", "e", "dos", "das", "do", "du", "zu", "ten", "ter", "al", "el"]
@@ -327,8 +390,17 @@ enum HeaderReader {
 
     private static let cityParticles: Set<String> = ["am", "an", "im", "upon", "sur", "en", "de", "del", "di", "da", "do", "la", "le", "les", "aux", "on"]
 
-    /// The place at `index`. A street is followed by the line of its city, and the two are one place.
-    private static func location(at index: Int, in candidates: [Candidate], beside contactBlocks: Set<Int>, taken: inout Set<Int>) -> Sourced<String> {
+    /// The form of a place, whatever list knows its words: a postal code, a city with its region or country, a mode of
+    /// work, only known places, or a street address.
+    private static func hasPlaceForm(_ text: String) -> Bool {
+        Places.isPlaceOnly(text) || Places.isAddress(text)
+    }
+
+    /// The place at `index`. A street is followed by the line of its city, and the two are one place. A place with the
+    /// form of one is sure; one that only a known word tells is sure unless the name leaves it in doubt.
+    private static func location(
+        at index: Int, in candidates: [Candidate], beside contactBlocks: Set<Int>, isInDoubt: Bool, taken: inout Set<Int>
+    ) -> Sourced<String> {
         let candidate = candidates[index]
         var pieces = [candidate.piece]
         let next = index + 1
@@ -339,8 +411,10 @@ enum HeaderReader {
             pieces.append(candidates[next].piece)
             taken.insert(next)
         }
-        let isKnown = pieces.contains { Places.isKnownPlace($0.text) } || Places.isAddress(candidate.piece.text)
-        return Sourced(value: pieces.map(\.text).joined(separator: ", "), spans: pieces.map(\.span), check: isKnown ? nil : .locationByPosition)
+        let hasForm = pieces.contains { Places.isPlaceOnly($0.text) } || Places.isAddress(candidate.piece.text)
+        let isKnown = pieces.contains { Places.isKnownPlace($0.text) }
+        let isSure = hasForm || (isKnown && !isInDoubt)
+        return Sourced(value: pieces.map(\.text).joined(separator: ", "), spans: pieces.map(\.span), check: isSure ? nil : .locationByPosition)
     }
 
     /// The block drawn in the largest type of its page: the name of most PDFs.
