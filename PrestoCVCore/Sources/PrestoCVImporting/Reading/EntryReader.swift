@@ -135,7 +135,12 @@ enum EntryReader {
             }
             heads.append(count)
         }
-        let datesFirst = heads.filter { $0 == 0 }.count * 2 > heads.count
+        // A section whose first line starts with a date has its dates first: nothing precedes the first entry's date,
+        // so the short lines under a date are its entry's own, and not the head of the next date. A date at the end of
+        // the first line says nothing, the line holds its entry's head. Otherwise most dates leaving no head line of
+        // their own says so.
+        let opensWithDate = anchors[0] == 0 && startsWithPeriod(usable[0], in: findings.document)
+        let datesFirst = opensWithDate || heads.filter { $0 == 0 }.count * 2 > heads.count
         let positive = heads.filter { $0 > 0 }
         let typicalHead = mode(positive) ?? 0
 
@@ -180,6 +185,13 @@ enum EntryReader {
             drafts.append(draft)
         }
         return drafts
+    }
+
+    /// Whether nothing but marks comes before the line's period: no letter and no digit.
+    private static func startsWithPeriod(_ line: Line, in document: SourceDocument) -> Bool {
+        guard let period = line.period?.piece, line.block.span.lowerBound <= period.span.lowerBound else { return false }
+        let before = document.text(of: SourceSpan(line.block.span.lowerBound, period.span.lowerBound))
+        return !before.contains { $0.isLetter || $0.isNumber }
     }
 
     /// Entries with no dates: a new entry at each line of a head that follows a body or a gap.

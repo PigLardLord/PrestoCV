@@ -548,6 +548,22 @@
   "source": "traps/data-course-de.txt"
  },
  {
+  "id": "traps/dates-above-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/dates-above-en.expected.json",
+  "source": "traps/dates-above-en.txt"
+ },
+ {
+  "id": "traps/dates-above-it",
+  "language": "it",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/dates-above-it.expected.json",
+  "source": "traps/dates-above-it.txt"
+ },
+ {
   "id": "traps/datos-personales-es",
   "language": "es",
   "form": "trap",

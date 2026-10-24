@@ -214,6 +214,157 @@ struct EntryReaderTests {
         #expect(found.cv.experience.allSatisfy { $0.check == nil })
     }
 
+    // MARK: Each date alone on the line above its entry (#295)
+
+    private func summary(_ found: Findings) -> [String] {
+        found.cv.experience.map { entry in
+            [entry.role?.value, entry.employer?.value, entry.location?.value, entry.period.map { "\($0.value.start.year)" }]
+                .map { $0 ?? "-" }.joined(separator: "|")
+        }
+    }
+
+    @Test("Dates alone above their entries: the first line is a date, so every date opens its entry, with or without bullets")
+    func datesAloneAboveEntries() throws {
+        let plain = read("""
+        Experience
+        2020 – 2021
+        Trainee at Northgate Hospital, Leeds
+        Helped on the ward
+        2019 – 2020
+        Cleaner at Verdi Ltd, Leeds
+        Cleaned offices
+        2018 – 2019
+        Shop assistant at Blue Shop, Rome
+        Served customers
+        """)
+        let bulleted = read("""
+        Experience
+        2020 – 2021
+        Trainee at Northgate Hospital, Leeds
+        • Helped on the ward
+        2019 – 2020
+        Cleaner at Verdi Ltd, Leeds
+        • Cleaned offices
+        2018 – 2019
+        Shop assistant at Blue Shop, Rome
+        • Served customers
+        """)
+        for found in [plain, bulleted] {
+            #expect(summary(found) == [
+                "Trainee|Northgate Hospital|Leeds|2020", "Cleaner|Verdi Ltd|Leeds|2019", "Shop assistant|Blue Shop|Rome|2018",
+            ])
+            #expect(found.cv.experience.map { $0.details.map(\.value) } == [["Helped on the ward"], ["Cleaned offices"], ["Served customers"]])
+            #expect(found.cv.experience.allSatisfy { $0.check == nil })
+        }
+    }
+
+    @Test("Dates alone above their entries, in Italian and in German")
+    func datesAloneAboveEntriesInOtherLanguages() throws {
+        let italian = read("""
+        Esperienza professionale
+        2020 – 2021
+        Tirocinante presso Ospedale Esempio, Torino
+        Assistenza in reparto
+        2019 – 2020
+        Addetta alle pulizie presso Verdi Srl, Torino
+        Pulizia degli uffici
+        2018 – 2019
+        Commessa presso Negozio Blu, Roma
+        Servizio ai clienti
+        """)
+        #expect(summary(italian) == [
+            "Tirocinante|Ospedale Esempio|Torino|2020", "Addetta alle pulizie|Verdi Srl|Torino|2019", "Commessa|Negozio Blu|Roma|2018",
+        ])
+        let german = read("""
+        Berufserfahrung
+        2020 – 2021
+        Praktikantin bei Klinikum Beispiel, Leipzig
+        Mithilfe auf der Station
+        2019 – 2020
+        Reinigungskraft bei Verdi GmbH, Leipzig
+        Reinigung der Büros
+        2018 – 2019
+        Verkäuferin bei Blaues Geschäft, Dresden
+        Beratung der Kunden
+        """)
+        #expect(summary(german) == [
+            "Praktikantin|Klinikum Beispiel|Leipzig|2020", "Reinigungskraft|Verdi GmbH|Leipzig|2019", "Verkäuferin|Blaues Geschäft|Dresden|2018",
+        ])
+    }
+
+    @Test("Education with each date alone above its entry")
+    func educationDatesAloneAbove() throws {
+        let found = read("""
+        Education
+        2016 – 2019
+        BSc Nursing, University of Leeds
+        Final year project on wound care
+        2012 – 2016
+        Diploma, Northgate School, Leeds
+        Maths and science
+        2010 – 2012
+        Certificate, Verdi College, Leeds
+        Evening classes
+        """, kind: .education)
+        #expect(found.cv.education.map { $0.degree?.value } == ["BSc Nursing", "Diploma", "Certificate"])
+        #expect(found.cv.education.map { $0.school?.value } == ["University of Leeds", "Northgate School", "Verdi College"])
+        #expect(found.cv.education.map { $0.period?.value.start.year } == [2016, 2012, 2010])
+        #expect(found.cv.education.map { $0.details.map(\.value) } == [["Final year project on wound care"], ["Maths and science"], ["Evening classes"]])
+    }
+
+    @Test("Two entries with their dates alone above: one more entry cannot tip the reading")
+    func twoEntriesDatesAbove() throws {
+        let found = read("""
+        Experience
+        2020 – 2021
+        Trainee at Northgate Hospital, Leeds
+        Helped on the ward
+        2019 – 2020
+        Cleaner at Verdi Ltd, Leeds
+        Cleaned offices
+        """)
+        #expect(summary(found) == ["Trainee|Northgate Hospital|Leeds|2020", "Cleaner|Verdi Ltd|Leeds|2019"])
+    }
+
+    @Test("A date opening each line, with the entry after it on the same line and a short line below")
+    func datesOpeningLinesWithShortDescriptions() throws {
+        let education = read("""
+        Educación
+        09/2015 - 05/2019, Enfermería, Universidad de Ejemplo, Sevilla
+        Primera clase con honores
+        09/2011 - 05/2015, Bachillerato, Instituto Prueba, Sevilla
+        Nota media de sobresaliente
+        """, kind: .education)
+        #expect(education.cv.education.map { $0.degree?.value } == ["Enfermería", "Bachillerato"])
+        #expect(education.cv.education.map { $0.school?.value } == ["Universidad de Ejemplo", "Instituto Prueba"])
+        #expect(education.cv.education.map { $0.details.map(\.value) } == [["Primera clase con honores"], ["Nota media de sobresaliente"]])
+        let experience = read("""
+        Berufserfahrung
+        08/2022 – 07/2025 Pflegehelferin
+        Klinikum Beispiel, Leipzig
+        Abschluss: Praxisnote 2,1
+        09/2018 – 06/2022 Verkäuferin
+        Blaues Geschäft, Dresden
+        Beratung der Kunden
+        """)
+        #expect(summary(experience) == ["Pflegehelferin|Klinikum Beispiel|Leipzig|2022", "Verkäuferin|Blaues Geschäft|Dresden|2018"])
+    }
+
+    @Test("A date at the end of the first line is its entry's own, so the head lines above later dates stay theirs")
+    func dateEndingTheFirstLine() throws {
+        let found = read("""
+        Esperienze lavorative
+        Cassiera presso Mercato Esempio, Padova
+        dal 2018 ad oggi
+        - Cassa e rifornimento scaffali
+
+        Commessa presso Negozio Prova, Treviso
+        2014 - 2018
+        """)
+        #expect(summary(found) == ["Cassiera|Mercato Esempio|Padova|2018", "Commessa|Negozio Prova|Treviso|2014"])
+        #expect(found.cv.experience.map { $0.details.map(\.value) } == [["Cassa e rifornimento scaffali"], []])
+    }
+
     @Test("An end before the start, and a range with no end, are flagged")
     func unreadablePeriods() throws {
         let found = read("""
