@@ -42,6 +42,14 @@ struct ContactReaderTests {
         }
     }
 
+    @Test("A period in the middle of a line is no phone number, and reading it is safe wherever it stands")
+    func periodAfterOtherText() {
+        for text in ["Kassel · 03/2019 – 05/2021", "Beispiel GmbH, Kassel 03/2019 - 05/2021", "Tel. 0561 123456 · 03/2019 – 05/2021"] {
+            let phones = ContactReader.read(piece(text)).phones.map(\.value.value)
+            #expect(!phones.contains { $0.contains("2021") }, "\(text)")
+        }
+    }
+
     @Test("A web address with its scheme is kept as written; GitHub and XING are told apart")
     func links() {
         let contacts = ContactReader.read(piece("https://github.com/example-dev | www.xing.com/profile/Lena_Example | https://example.com/portfolio"))

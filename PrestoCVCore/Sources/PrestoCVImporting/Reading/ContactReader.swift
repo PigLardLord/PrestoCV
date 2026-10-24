@@ -202,7 +202,9 @@ enum ContactReader {
         let digits = candidate.filter(\.isNumber)
         guard (7...17).contains(digits.count), labelled != .fax else { return false }
         // A date or a period is no phone number
-        if let period = DateReader.periods(in: candidate).first, candidate[period.range].filter(\.isNumber).count * 2 >= digits.count {
+        // The range of a period is in the string it was read in: read it in a string of its own, not in a slice
+        let text = String(candidate)
+        if let period = DateReader.periods(in: text).first, text[period.range].filter(\.isNumber).count * 2 >= digits.count {
             return false
         }
         if labelled == .phone { return true }
