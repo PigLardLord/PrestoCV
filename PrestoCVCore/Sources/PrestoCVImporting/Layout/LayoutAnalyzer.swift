@@ -204,7 +204,7 @@ enum LayoutAnalyzer {
         /// The gap, in font sizes, past which a heading ends a line's first cell: more than two spaces.
         private static let minimumGap = 0.7
         /// A heading is at most this many words.
-        private static let maximumWords = 7
+        private static let maximumWords = SectionVocabulary.maximumWords
         /// How far, in points, two lines may start from one another and be at the same edge: the ink of their first letters.
         private static let sameEdge = 3.0
 

@@ -102,6 +102,25 @@ struct RailLayoutTests {
         ])
     }
 
+    @Test("A heading read by its parts is a cell of its own too: a bracketed qualifier, a generic word, alternatives", arguments: [
+        "Technical Skills (Hard Skills)", "Education and credentials", "Weiterbildung / Kurse",
+    ])
+    func headingsByTheirParts(heading: String) throws {
+        var sketch = PageSketch()
+        put(heading: heading, y: 100, into: &sketch)
+        sketch.put("Languages", x: Self.bodyStart, y: 100, size: 9.3, bold: true)
+        sketch.put("Swift, Kotlin", x: 314, y: 100, size: 9.3)
+        sketch.put("Frameworks", x: Self.bodyStart, y: 116, size: 9.3, bold: true)
+        sketch.put("SwiftUI, Combine", x: 314, y: 116, size: 9.3)
+        put(heading: "Education", y: 140, into: &sketch)
+        sketch.put("BSc Computer Science", x: Self.bodyStart, y: 140, size: 9.3, bold: true)
+        sketch.put("University of Example · 2012 – 2016", x: Self.bodyStart, y: 156, size: 9)
+        #expect(try analyze([sketch.page]).lines.map(\.text) == [
+            "\(heading)\tLanguages\tSwift, Kotlin", "Frameworks\tSwiftUI, Combine",
+            "Education\tBSc Computer Science", "University of Example · 2012 – 2016",
+        ])
+    }
+
     @Test("Headings beside one another's lines and no other text there are no evidence of a column: the lines stay whole")
     func candidatesAlone() throws {
         var sketch = PageSketch()

@@ -51,7 +51,7 @@ enum SectionSegmenter {
                 continue
             }
             if block.cells.count > 1, block.kind != .listItem, block.kind != .tableHeader,
-               let match = SectionVocabulary.kind(ofHeading: firstCell), firstCell.words.count <= 7 {
+               let match = SectionVocabulary.kind(ofHeading: firstCell), firstCell.words.count <= SectionVocabulary.maximumWords {
                 // A heading in the first cell of a row, its section's first value in the others
                 sections.append(Section(kind: match.kind, heading: block, blocks: [block], languages: match.languages))
                 continue
@@ -82,7 +82,7 @@ enum SectionSegmenter {
         let cells = block.cells.map { document.text(of: $0) }
         let nonEmpty = cells.filter { !$0.isEmpty }
         guard nonEmpty.count == 1, let text = nonEmpty.first else { return nil }
-        if text.words.count <= 7, let match = SectionVocabulary.kind(ofHeading: text) {
+        if text.words.count <= SectionVocabulary.maximumWords, let match = SectionVocabulary.kind(ofHeading: text) {
             return match
         }
         guard !isFirst, isMarkedAsHeading(block, text: text) else { return nil }

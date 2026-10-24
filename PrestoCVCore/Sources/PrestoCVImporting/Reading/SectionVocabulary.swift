@@ -38,9 +38,16 @@ enum SectionVocabulary {
         let languages: Set<CVLanguage>
     }
 
-    /// The kind of section a heading names, or nil when the vocabulary does not know it.
+    /// The most words a heading has: a longer line is a sentence, whatever words of a heading it has.
+    static let maximumWords = 7
+
+    /// The kind of section a heading names, or nil when the vocabulary does not know it. A heading of the lists is read
+    /// as it stands. Any other of at most `maximumWords` words is read by its parts, by the first rule that fits:
+    /// a bracketed qualifier, a generic word beside a known heading, or alternatives that are all known headings.
     static func kind(ofHeading text: String) -> Match? {
-        index[key(text)]
+        if let match = index[key(text)] { return match }
+        guard text.words.count <= maximumWords else { return nil }
+        return bracketed(text) ?? qualified(text) ?? alternatives(text)
     }
 
     /// The labels of the Europass that open the languages: "Madrelingua", "Mother tongue(s)", "Altre lingue".
@@ -59,6 +66,75 @@ enum SectionVocabulary {
     }
 
     private static let joiningWords: Set<String> = ["and", "e", "und", "y", "et", "s"]
+
+    // MARK: Headings read by their parts
+
+    /// Generic words that may stand beside the word of a heading without changing the section it names: "Resume Summary"
+    /// is the summary, "Education and credentials" the education. They are no heading alone.
+    static let qualifierWords: [CVLanguage: [String]] = [
+        .en: ["resume", "cv", "statement", "credentials"],
+    ]
+
+    private static let qualifiers: Set<String> = Set(qualifierWords.values.flatMap { $0 }.map(key))
+
+    /// The words that join two alternatives, besides the symbols that `alternativeSeparators` lists.
+    private static let alternativeWords: Set<String> = ["and", "e", "und", "y", "et"]
+    private static let alternativeSeparators: Set<Character> = ["/", "&", "+", "|", ",", ";"]
+
+    private static let brackets: [Character: Character] = [")": "(", "]": "["]
+
+    /// A heading and, in brackets at its end, another heading of the same kind: "Competenze tecniche (Hard Skills)" is
+    /// the skills, in the language of the heading outside the brackets. A bracket that is no such heading ("Work
+    /// Experience (2015 – 2023)") makes the text no heading.
+    private static func bracketed(_ text: String) -> Match? {
+        var body = Substring(text)
+        while let last = body.last, last == ":" || last.isWhitespace { body = body.dropLast() }
+        guard let close = body.last, let open = brackets[close], let start = body.lastIndex(of: open) else { return nil }
+        let inside = body[body.index(after: start)..<body.index(before: body.endIndex)]
+        let outside = body[..<start]
+        let isBracket: (Character) -> Bool = { brackets[$0] != nil || brackets.values.contains($0) }
+        guard !inside.contains(where: isBracket), !outside.contains(where: isBracket),
+              let base = index[key(String(outside))], let note = index[key(String(inside))], base.kind == note.kind else { return nil }
+        return base
+    }
+
+    /// A known heading with generic words before or after it: "Objective statement" is the summary. At least one word
+    /// of the heading stays, and the section is the one of the words that stay.
+    private static func qualified(_ text: String) -> Match? {
+        var words = key(text).split(separator: " ")
+        let count = words.count
+        while let first = words.first, qualifiers.contains(String(first)) { words.removeFirst() }
+        while let last = words.last, qualifiers.contains(String(last)) { words.removeLast() }
+        guard words.count < count, !words.isEmpty else { return nil }
+        return index[words.joined(separator: " ")]
+    }
+
+    /// Two or more known headings joined by "/", "&", "+", "|", a comma or a joining word: "Weiterbildung / Kurse". When
+    /// the parts are one kind of section, it is that kind; when they are two, no section of its own reads them, so
+    /// they are additional information and the lines under the heading show as text not imported. The vote is the
+    /// languages that all the parts have, or, if there are none, the languages of any part.
+    private static func alternatives(_ text: String) -> Match? {
+        var spaced = ""
+        for character in text { spaced += alternativeSeparators.contains(character) ? " | " : String(character) }
+        var parts: [[Substring]] = [[]]
+        for token in spaced.split(whereSeparator: \.isWhitespace) {
+            if token == "|" || alternativeWords.contains(token.lowercased()) {
+                parts.append([])
+            } else {
+                parts[parts.count - 1].append(token)
+            }
+        }
+        guard parts.count >= 2 else { return nil }
+        var matches: [Match] = []
+        for part in parts {
+            guard let match = index[key(part.joined(separator: " "))] else { return nil }
+            matches.append(match)
+        }
+        let kinds = Set(matches.map(\.kind))
+        let common = matches.dropFirst().reduce(matches[0].languages) { $0.intersection($1.languages) }
+        let languages = common.isEmpty ? matches.reduce(into: Set<CVLanguage>()) { $0.formUnion($1.languages) } : common
+        return Match(kind: kinds.count == 1 ? matches[0].kind : .additional, languages: languages)
+    }
 
     private static let languageLabels: Set<String> = Set([
         "madrelingua", "madrelingue", "lingua madre", "altre lingue", "altra lingua", "mother tongue", "mother tongues",
@@ -88,7 +164,7 @@ enum SectionVocabulary {
     static let entries: [(SectionKind, [(CVLanguage, [String])])] = [
         (.personal, [
             (.en, ["personal information", "personal details", "personal data", "contact", "contacts", "contact information", "contact details", "personal info"]),
-            (.it, ["informazioni personali", "dati personali", "contatti", "recapiti", "dati anagrafici", "anagrafica", "contatto"]),
+            (.it, ["informazioni personali", "dati personali", "contatti", "recapiti", "dati anagrafici", "anagrafica", "contatto", "indirizzo", "altre generalità"]),
             (.de, ["persönliche daten", "persönliche angaben", "kontakt", "kontaktdaten", "persönliches", "angaben zur person"]),
             (.es, ["información personal", "datos personales", "contacto", "datos de contacto", "información de contacto", "contactar"]),
             (.fr, ["informations personnelles", "coordonnées", "contact", "état civil", "données personnelles"]),
@@ -115,7 +191,7 @@ enum SectionVocabulary {
                    "esperienze professionali", "percorso professionale", "carriera", "attività lavorativa", "esperienze di lavoro"]),
             (.de, ["berufserfahrung", "beruflicher werdegang", "berufspraxis", "berufliche erfahrung", "berufliche stationen",
                    "praxiserfahrung", "erfahrung", "werdegang", "beruflicher hintergrund", "arbeitserfahrung", "berufstätigkeit",
-                   "berufliche laufbahn", "berufliche tätigkeiten"]),
+                   "berufliche laufbahn", "berufliche tätigkeiten", "praktika"]),
             (.es, ["experiencia", "experiencia laboral", "experiencia profesional", "trayectoria profesional", "historial laboral",
                    "experiencias"]),
             (.fr, ["expérience", "expériences", "expérience professionnelle", "expériences professionnelles", "parcours professionnel",
@@ -127,7 +203,7 @@ enum SectionVocabulary {
             (.en, ["education", "education and training", "academic background", "qualifications", "training", "academic qualifications",
                    "studies", "education training", "academic education"]),
             (.it, ["istruzione", "istruzione e formazione", "formazione", "studi", "percorso di studi", "titoli di studio",
-                   "formazione accademica", "percorso formativo", "titolo di studio", "istruzione formazione"]),
+                   "formazione accademica", "percorso formativo", "titolo di studio", "istruzione formazione", "esperienze formative"]),
             (.de, ["ausbildung", "bildung", "bildungsweg", "schulbildung", "studium", "schul- und berufsausbildung", "akademischer werdegang",
                    "ausbildung und studium", "schule und studium", "schulische ausbildung", "hochschulbildung", "schulischer werdegang",
                    "berufsausbildung", "schul und berufsausbildung", "akademische ausbildung", "studium und ausbildung",
@@ -154,14 +230,14 @@ enum SectionVocabulary {
                    "competenze personali", "competenze organizzative", "competenze comunicative", "competenze principali",
                    "tecnologie", "strumenti", "tecnologie utilizzate", "strumenti e tecnologie", "tecnologie e strumenti",
                    "stack tecnologico", "stack tecnico", "tech stack", "conoscenze tecniche", "competenze chiave", "tecnologie principali",
-                   "tecnologie chiave"]),
+                   "tecnologie chiave", "abilità e competenze", "software e strumenti", "qualità personali"]),
             (.de, ["kenntnisse", "fähigkeiten", "kompetenzen", "fachkenntnisse", "edv-kenntnisse", "it-kenntnisse", "besondere kenntnisse",
                    "fähigkeiten und kenntnisse", "kenntnisse und fähigkeiten", "digitale kompetenzen", "soft skills", "fachliche kompetenzen",
                    "sonstige kenntnisse", "qualifikationen", "fachkompetenzen", "persönliche kompetenzen", "skills", "top-kenntnisse",
                    "top kenntnisse", "technische kenntnisse", "technische fähigkeiten", "technische kompetenzen", "technische skills",
                    "fachliche kenntnisse", "it-kompetenzen", "technologien", "werkzeuge", "tech-stack", "technologie-stack",
                    "tools und technologien", "technologien und tools", "kernkompetenzen", "schlüsselkompetenzen", "kerntechnologien",
-                   "haupttechnologien"]),
+                   "haupttechnologien", "fertigkeiten", "besondere qualifikationen"]),
             (.es, ["habilidades", "competencias", "aptitudes", "conocimientos", "conocimientos informáticos", "competencias digitales",
                    "habilidades técnicas", "competencias técnicas", "otras habilidades", "aptitudes principales",
                    "conocimientos técnicos", "herramientas", "tecnologías", "tecnologías utilizadas", "herramientas y tecnologías",
@@ -174,7 +250,8 @@ enum SectionVocabulary {
             (.pt, ["competências", "competências técnicas", "habilidades", "aptidões", "conhecimentos", "conhecimentos informáticos",
                    "competências digitais", "outras competências", "competências pessoais", "principais competências",
                    "ferramentas", "tecnologias", "tecnologias utilizadas", "ferramentas e tecnologias", "tecnologias e ferramentas",
-                   "stack tecnológico", "stack técnico", "tech stack", "conhecimentos técnicos", "competências chave", "tecnologias principais", "tecnologias chave"]),
+                   "stack tecnológico", "stack técnico", "tech stack", "conhecimentos técnicos", "competências chave", "tecnologias principais", "tecnologias chave",
+                   "qualificações essenciais"]),
         ]),
         (.languages, [
             (.en, ["languages", "language skills", "language", "languages spoken", "foreign languages", "language competences"]),
@@ -191,18 +268,18 @@ enum SectionVocabulary {
             (.it, ["certificazioni", "certificati", "attestati", "corsi", "corsi di formazione", "abilitazioni", "corsi e certificazioni",
                    "certificazioni e corsi", "formazione continua"]),
             (.de, ["zertifikate", "zertifizierungen", "weiterbildung", "weiterbildungen", "fortbildungen", "fortbildung", "lehrgänge",
-                   "kurse", "nachweise", "zusatzqualifikationen", "zertifikate und weiterbildungen"]),
+                   "kurse", "nachweise", "zusatzqualifikationen", "zertifikate und weiterbildungen", "bescheinigungen"]),
             (.es, ["certificaciones", "certificados", "cursos", "formación complementaria", "licencias", "cursos y certificaciones"]),
-            (.fr, ["certifications", "certificats", "formations complémentaires", "attestations", "habilitations", "certifications et formations"]),
+            (.fr, ["certifications", "certificats", "formations complémentaires", "attestations", "habilitations", "certifications et formations", "cours"]),
             (.pt, ["certificações", "certificados", "cursos", "formação complementar", "licenças", "cursos e certificações"]),
         ]),
         (.interests, [
             (.en, ["interests", "hobbies", "hobbies and interests", "interests hobbies", "leisure", "personal interests", "activities", "hobbies interests"]),
             (.it, ["interessi", "hobby", "hobby e interessi", "passioni", "tempo libero", "interessi personali"]),
-            (.de, ["hobbys", "hobbies", "interessen", "freizeit", "freizeitaktivitäten", "persönliche interessen", "hobbys und interessen"]),
-            (.es, ["intereses", "aficiones", "hobbies", "pasatiempos", "intereses personales"]),
+            (.de, ["hobbys", "hobbies", "interessen", "freizeit", "freizeitaktivitäten", "persönliche interessen", "hobbys und interessen", "leidenschaften"]),
+            (.es, ["intereses", "aficiones", "hobbies", "pasatiempos", "intereses personales", "pasiones"]),
             (.fr, ["centres d'intérêt", "centres d'intérêts", "loisirs", "intérêts", "passions", "hobbies", "centre d'intérêt"]),
-            (.pt, ["interesses", "hobbies", "passatempos", "lazer", "interesses pessoais"]),
+            (.pt, ["interesses", "hobbies", "passatempos", "lazer", "interesses pessoais", "paixões"]),
         ]),
         (.projects, [
             (.en, ["projects", "personal projects", "selected projects", "key projects"]),
@@ -215,7 +292,8 @@ enum SectionVocabulary {
         (.volunteering, [
             (.en, ["volunteering", "volunteer experience", "volunteer work", "voluntary work"]),
             (.it, ["volontariato", "attività di volontariato"]),
-            (.de, ["ehrenamt", "ehrenamtliches engagement", "ehrenamtliche tätigkeiten", "soziales engagement", "engagement"]),
+            (.de, ["ehrenamt", "ehrenamtliches engagement", "ehrenamtliche tätigkeiten", "soziales engagement", "engagement", "ehrenamtliche tätigkeit",
+                   "freiwilligenarbeit"]),
             (.es, ["voluntariado", "experiencia de voluntariado"]),
             (.fr, ["bénévolat", "engagements", "engagement associatif", "vie associative"]),
             (.pt, ["voluntariado", "trabalho voluntário"]),
@@ -238,13 +316,18 @@ enum SectionVocabulary {
         ]),
         (.additional, [
             (.en, ["additional information", "other information", "awards", "honors", "honours", "honors-awards", "publications",
-                   "achievements", "memberships", "annexes", "miscellaneous", "awards and honors"]),
-            (.it, ["ulteriori informazioni", "altre informazioni", "allegati", "premi", "pubblicazioni", "riconoscimenti", "varie"]),
+                   "achievements", "memberships", "annexes", "miscellaneous", "awards and honors",
+                   // What a CV is proud of and what it is good at
+                   "key achievements", "accomplishments", "strengths"]),
+            (.it, ["ulteriori informazioni", "altre informazioni", "allegati", "premi", "pubblicazioni", "riconoscimenti", "varie", "altri dati", "risultati ottenuti", "principali risultati",
+                   "punti di forza"]),
             (.de, ["sonstiges", "weitere angaben", "zusätzliche informationen", "auszeichnungen", "publikationen", "veröffentlichungen",
-                   "mitgliedschaften", "anlagen"]),
-            (.es, ["información adicional", "otros datos", "premios", "publicaciones", "logros", "anexos", "otros"]),
-            (.fr, ["informations complémentaires", "informations supplémentaires", "prix", "publications", "distinctions", "divers", "annexes"]),
-            (.pt, ["informações adicionais", "outras informações", "prémios", "prêmios", "publicações", "anexos", "outros"]),
+                   "mitgliedschaften", "anlagen", "erfolge", "wichtigste erfolge", "stärken"]),
+            (.es, ["información adicional", "otros datos", "premios", "publicaciones", "logros", "anexos", "otros", "logros clave", "logros destacados", "principales logros"]),
+            (.fr, ["informations complémentaires", "informations supplémentaires", "prix", "publications", "distinctions", "divers", "annexes", "réalisations", "principales réalisations",
+                   "réalisations clés", "points forts"]),
+            (.pt, ["informações adicionais", "outras informações", "prémios", "prêmios", "publicações", "anexos", "outros", "conquistas", "principais conquistas", "realizações",
+                   "principais realizações", "pontos fortes"]),
         ]),
     ]
 

@@ -21,6 +21,9 @@ enum SkillsHeadings {
         (.fr, "Connaissances techniques"), (.fr, "Outils et technologies"), (.fr, "Technologies principales"),
         (.pt, "Competências técnicas"), (.pt, "Ferramentas"), (.pt, "Tecnologias"), (.pt, "Conhecimentos técnicos"),
         (.pt, "Stack tecnológico"), (.pt, "Ferramentas e tecnologias"), (.pt, "Tecnologias principais"),
+        // The ones the study found besides (#293)
+        (.de, "Fertigkeiten"), (.de, "Besondere Qualifikationen"), (.it, "Abilità e competenze"), (.it, "Software e strumenti"),
+        (.pt, "Qualificações essenciais"),
     ]
 
     /// Headings that a CV of a language borrows from another: the vocabulary reads the CV under them, and they keep the

@@ -500,6 +500,14 @@
   "pdf": "pt-joao/railpdf.pdf"
  },
  {
+  "id": "traps/achievements-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/achievements-en.expected.json",
+  "source": "traps/achievements-en.txt"
+ },
+ {
   "id": "traps/bars-it",
   "language": "it",
   "form": "trap",
@@ -514,6 +522,14 @@
   "kind": "text",
   "expected": "traps/colon-dates-fr.expected.json",
   "source": "traps/colon-dates-fr.txt"
+ },
+ {
+  "id": "traps/competenze-bracket-it",
+  "language": "it",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/competenze-bracket-it.expected.json",
+  "source": "traps/competenze-bracket-it.txt"
  },
  {
   "id": "traps/consent-it",
@@ -578,6 +594,30 @@
   "kind": "text",
   "expected": "traps/linkedin-text-pt.expected.json",
   "source": "traps/linkedin-text-pt.txt"
+ },
+ {
+  "id": "traps/pasiones-es",
+  "language": "es",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/pasiones-es.expected.json",
+  "source": "traps/pasiones-es.txt"
+ },
+ {
+  "id": "traps/qualificacoes-pt",
+  "language": "pt",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/qualificacoes-pt.expected.json",
+  "source": "traps/qualificacoes-pt.txt"
+ },
+ {
+  "id": "traps/realisations-fr",
+  "language": "fr",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/realisations-fr.expected.json",
+  "source": "traps/realisations-fr.txt"
  },
  {
   "id": "traps/references-en",
@@ -650,5 +690,13 @@
   "kind": "text",
   "expected": "traps/us-style-en.expected.json",
   "source": "traps/us-style-en.txt"
+ },
+ {
+  "id": "traps/weiterbildung-kurse-de",
+  "language": "de",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/weiterbildung-kurse-de.expected.json",
+  "source": "traps/weiterbildung-kurse-de.txt"
  }
 ]
