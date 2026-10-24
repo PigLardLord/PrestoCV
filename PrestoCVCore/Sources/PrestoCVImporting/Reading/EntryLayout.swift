@@ -3,8 +3,10 @@
 /// opens with a date may open with a range that sums it up, and a short line under a date may be its entry's own or the
 /// head of the next one. So the section is read both ways and each reading is scored over all its entries. The better
 /// reading gives every entry a head on its own side of the date, keeps every line that names a role, an employer, a
-/// degree or a school in a head, and gives no entry two of them. When the two readings score the same and part the
-/// lines differently, the usual layout decides and the entries they part differently are flagged.
+/// degree or a school out of the descriptions, and gives no entry two of them. Both readings take as an entry's head
+/// the run of lines next to its date that fits best, so a line further down that names a part again weighs on neither.
+/// When the two readings score the same and part the lines differently, the usual layout decides and the entries they
+/// part differently are flagged.
 struct EntryLayout: Equatable {
     /// The line where each date's entry starts, by date.
     var starts: [Int]
@@ -120,30 +122,45 @@ private extension EntryLayout {
         /// The cost of the lines before a reading's first entry, which no entry holds.
         func leftBefore(_ start: Int) -> Int { sum(headsOrMarked, 0..<start) }
 
-        /// How well an entry fits its reading. A line that names a part counts for the entry when it stands on the
-        /// reading's side of the date: under it when the dates come first, above it when they come after. Each of the
-        /// two main parts the entry names on that side and on the date's line counts for it once, and against it for
-        /// each time more; a part named only on the other side of the date (an employer under the date that follows
-        /// its role) counts once. A line that names a part counts against the entry when it falls among the
-        /// descriptions, where no head is. An entry also loses for a date alone with no line on its side, which leaves
-        /// it without a head, and for having no line but its date's. The range that sums up a section is no entry,
-        /// and costs nothing.
+        /// How well an entry fits its reading. The entry's head is its date's line and the lines next to it on the
+        /// reading's side: the lines above the date that the reading gives the entry when the dates come after, and,
+        /// when they come first, the run of lines under the date that fits best, so that a line further down that names
+        /// a role or a company again ("Trained an engineer at Client Ltd") is one of the entry's other lines, as the
+        /// lines under a date are when the dates come after. A line of the head that names a part counts for the entry.
+        /// Each of the two main parts the head names counts for it once, and against it for each time more; a part
+        /// named only on the other side of the date (an employer under the date that follows its role) counts once. A
+        /// line that names a part counts against the entry when it falls among the descriptions, where no head is. An
+        /// entry also loses for a date alone with no line on its side, which leaves it without a head, and for having
+        /// no line but its date's. The range that sums up a section is no entry, and costs nothing.
         func quality(_ position: Int, entry: Range<Int>, side: Side) -> Int {
             let anchor = anchors[position]
             let tailEnd = min(tailEnds[position], entry.upperBound)
             let above = entry.lowerBound..<anchor
             let tail = anchor + 1..<tailEnd
             if isSummary(position, entry: entry) { return 0 }
-            var quality = side == .datesFirst ? sum(marked, tail) : sum(marked, above)
-            quality -= sum(markedHeads, tailEnd..<entry.upperBound)
-            let own = side == .datesFirst ? anchor..<tailEnd : entry.lowerBound..<anchor + 1
-            let across = side == .datesFirst ? above : tail
+            var quality = -sum(markedHeads, tailEnd..<entry.upperBound)
+            switch side {
+            case .datesAfter:
+                quality += headQuality(entry.lowerBound..<anchor + 1, date: anchor, across: tail)
+            case .datesFirst:
+                // A date alone takes at least one line of its own when it has any under it, as it does above it
+                let shortest = dateAlone[position] && !tail.isEmpty ? 1 : 0
+                quality += (shortest...tail.count).map { headQuality(anchor..<anchor + 1 + $0, date: anchor, across: above) }
+                    .max() ?? 0
+            }
+            if dateAlone[position], (side == .datesFirst ? tail : above).isEmpty { quality -= 1 }
+            if entry.count == 1 { quality -= 1 }
+            return quality
+        }
+
+        /// How well a head (`own`, which holds the date's line) names the entry's parts, with the lines `across` the
+        /// date from it.
+        private func headQuality(_ own: Range<Int>, date: Int, across: Range<Int>) -> Int {
+            var quality = sum(marked, own) - sum(marked, date..<date + 1)
             for totals in [primary, secondary] {
                 let count = sum(totals, own)
                 quality += count > 0 ? 1 - (count - 1) : min(1, sum(totals, across))
             }
-            if dateAlone[position], (side == .datesFirst ? tail : above).isEmpty { quality -= 1 }
-            if entry.count == 1 { quality -= 1 }
             return quality
         }
 

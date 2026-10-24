@@ -559,6 +559,29 @@ struct EntryReaderTests {
         found.cv.experience.map { "\($0.role?.value ?? "-")|\($0.employer?.value ?? "-")|\($0.period?.value.start.year ?? 0)" }
     }
 
+    @Test("Lines that name a role and a company again under an entry's head stay its own, with the dates first or after",
+          arguments: [true, false], [1, 2])
+    func partsNamedAgainUnderTheHead(datesFirst: Bool, linesEach: Int) throws {
+        let entries = [
+            ("Developer at Acme Ltd", "2020 – 2024", ["Trained an engineer at Client Ltd", "Supported a designer at Partner Ltd"]),
+            ("Analyst at Example Ltd", "2015 – 2019", ["Trained an engineer at Customer Ltd", "Supported a designer at Vendor Ltd"]),
+            ("Cleaner at Verdi Ltd", "2010 – 2015", ["Trained a cleaner at Rossi Ltd", "Supported a manager at Bianchi Ltd"]),
+        ]
+        let lines = entries.flatMap { head, dates, others in
+            (datesFirst ? [dates, head] : [head, dates]) + others.prefix(linesEach)
+        }
+        let found = read((["Experience"] + lines).joined(separator: "\n"))
+        let layout = "\(datesFirst ? "dates first" : "dates after"), \(linesEach) lines each"
+        #expect(self.found(found) == ["Developer|Acme Ltd|2020", "Analyst|Example Ltd|2015", "Cleaner|Verdi Ltd|2010"], "\(layout)")
+        let named = entries.map { Array($0.2.prefix(linesEach).compactMap { $0.components(separatedBy: " at ").last }) }
+        let companies = found.cv.experience.map { entry in
+            let details = entry.details.map(\.value).joined(separator: " ")
+            return named.joined().filter { details.contains($0) }
+        }
+        #expect(companies == named, "\(layout)")
+        #expect(found.cv.experience.allSatisfy { $0.check == nil }, "\(layout)")
+    }
+
     @Test("A table's row of column names heads no entry, before or after the dates", arguments: [
         """
         Schulischer Werdegang
