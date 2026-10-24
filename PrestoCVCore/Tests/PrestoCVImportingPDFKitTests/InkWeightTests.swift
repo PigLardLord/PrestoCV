@@ -186,6 +186,42 @@ struct InkWeightTests {
         #expect(!InkWeight.fits(CGSize(width: 14_400, height: 14_400)))
         #expect(!InkWeight.fits(.zero))
         #expect(!InkWeight.fits(CGSize(width: CGFloat.infinity, height: 800)))
+        #expect(!InkWeight.fits(CGSize(width: CGFloat.nan, height: 800)))
+    }
+
+    @Test("A sliver of a page is not drawn: its area is small, but each side is rounded up to a whole pixel")
+    func sliver() {
+        // 0.001 by 1e9 points is an area of a million, and a bitmap of one pixel by four billion
+        #expect(!InkWeight.fits(CGSize(width: 0.001, height: 1e9)))
+        #expect(!InkWeight.fits(CGSize(width: 1e9, height: 0.001)))
+        #expect(!InkWeight.fits(CGSize(width: 0.001, height: 1e300)))
+        #expect(InkWeight.fits(CGSize(width: 0.001, height: 1e6)))
+    }
+
+    @Test("A frame that is not finite, or lies far past the bitmap, has no weight and traps nothing")
+    func hostileFrames() throws {
+        var canvas = Canvas(width: 400, height: 80)
+        canvas.bars(thickness: 4)
+        let fine = Rect(x: 2, y: 2, width: 90, height: 16)
+        func word(_ frame: Rect, size: Double = 10) -> ExtractedWord {
+            ExtractedWord(text: "Abcdef", frame: frame, fontSize: size, isBold: false)
+        }
+        let words = [
+            word(Rect(x: 1e300, y: 2, width: 90, height: 16)),
+            word(Rect(x: -1e300, y: 2, width: 90, height: 16)),
+            word(Rect(x: 1e19, y: 2, width: 90, height: 16)),
+            word(Rect(x: 2, y: 1e19, width: 90, height: 16)),
+            word(Rect(x: .nan, y: 2, width: 90, height: 16)),
+            word(Rect(x: 2, y: 2, width: .infinity, height: 16)),
+            word(Rect(x: 2, y: 2, width: 90, height: .nan)),
+            word(Rect(x: 1e308, y: 2, width: 1e308, height: 16)),
+            word(fine, size: .infinity),
+            word(fine, size: .nan),
+            word(fine, size: -10),
+            word(fine),
+        ]
+        let weights = try canvas.pixels.withUnsafeBufferPointer { try InkWeight.strokeWidths(of: words, in: $0, width: 400) }
+        #expect(weights.map { $0 != nil } == [Bool](repeating: false, count: words.count - 1) + [true])
     }
 }
 #endif

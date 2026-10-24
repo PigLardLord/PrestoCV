@@ -70,33 +70,39 @@ enum InkWeight {
     static func strokeWidths(of words: [ExtractedWord], in pixels: UnsafeBufferPointer<UInt8>, width: Int) throws -> [Double?] {
         var weights: [Double?] = []
         weights.reserveCapacity(words.count)
+        guard width > 0 else { return [Double?](repeating: nil, count: words.count) }
+        let height = pixels.count / width
         var reads = 0
         for (index, word) in words.enumerated() {
             if index % wordsBetweenChecks == 0 { try Task.checkCancellation() }
-            guard word.text.count >= minimumCharacters, word.text.contains(where: \.isLetter) else {
+            guard word.text.count >= minimumCharacters, word.text.contains(where: \.isLetter),
+                  let box = PixelBox(frame: word.frame, width: width, height: height) else {
                 weights.append(nil)
                 continue
             }
-            let box = PixelBox(
-                left: Int((word.frame.x * scale).rounded(.down)), right: Int((word.frame.maxX * scale).rounded(.up)),
-                top: Int((word.frame.y * scale).rounded(.down)), bottom: Int((word.frame.maxY * scale).rounded(.up))
-            )
             weights.append(strokeWidth(in: pixels, width: width, box: box, em: word.fontSize * scale, reads: &reads))
         }
         return weights
     }
 
     /// Whether a page of this size is drawn in at most `maximumPixels`.
-    static func fits(_ size: CGSize) -> Bool {
-        let area = Double(size.width) * Double(size.height)
-        return area > 0 && size.width.isFinite && size.height.isFinite && area * scale * scale <= maximumPixels
+    static func fits(_ size: CGSize) -> Bool { pixelSize(of: size) != nil }
+
+    /// The size in pixels of a page of this size, each side rounded up to a whole pixel (a sliver of a page is a bitmap
+    /// of one pixel by billions, whatever its area); nil for a size that is not finite, has no area, or needs more than
+    /// `maximumPixels`.
+    static func pixelSize(of size: CGSize) -> (width: Int, height: Int)? {
+        let width = (Double(size.width) * scale).rounded(.up)
+        let height = (Double(size.height) * scale).rounded(.up)
+        // Each side is bounded before the conversion, which traps on a value that an Int cannot hold
+        guard width.isFinite, height.isFinite, width >= 1, height >= 1,
+              width <= maximumPixels, height <= maximumPixels, width * height <= maximumPixels else { return nil }
+        return (Int(width), Int(height))
     }
 
     /// The page in grey levels, black on white, row 0 at the top.
     static func draw(_ page: PDFPage, bounds: CGRect) -> Bitmap? {
-        let width = Int((Double(bounds.width) * scale).rounded(.up))
-        let height = Int((Double(bounds.height) * scale).rounded(.up))
-        guard width > 0, height > 0 else { return nil }
+        guard let (width, height) = pixelSize(of: bounds.size) else { return nil }
         var pixels = [UInt8](repeating: 255, count: width * height)
         let drawn: Bool = pixels.withUnsafeMutableBytes { buffer in
             guard let context = CGContext(
@@ -122,6 +128,27 @@ enum InkWeight {
         let right: Int
         let top: Int
         let bottom: Int
+
+        init(left: Int, right: Int, top: Int, bottom: Int) {
+            self.left = left
+            self.right = right
+            self.top = top
+            self.bottom = bottom
+        }
+
+        /// The box of a word's frame in a bitmap of `width` by `height` pixels, nil for a frame that is not finite. A
+        /// frame is untrusted (R8): its edges are cut to a pixel past the bitmap before they become integers, which
+        /// trap on a value they cannot hold.
+        init?(frame: Rect, width: Int, height: Int) {
+            guard frame.x.isFinite, frame.y.isFinite, frame.maxX.isFinite, frame.maxY.isFinite else { return nil }
+            func pixel(_ value: Double, _ rule: FloatingPointRoundingRule, limit: Int) -> Int {
+                Int(min(max((value * InkWeight.scale).rounded(rule), -1), Double(limit) + 1))
+            }
+            self.init(
+                left: pixel(frame.x, .down, limit: width), right: pixel(frame.maxX, .up, limit: width),
+                top: pixel(frame.y, .down, limit: height), bottom: pixel(frame.maxY, .up, limit: height)
+            )
+        }
     }
 
     // MARK: Word
@@ -131,7 +158,7 @@ enum InkWeight {
     /// - Returns: nil when the box is too small, has too little contrast to hold ink, or once the page has read its
     ///   `maximumReads`.
     static func strokeWidth(in pixels: UnsafeBufferPointer<UInt8>, width: Int, box: PixelBox, em: Double, reads: inout Int) -> Double? {
-        guard width > 0, em > 0 else { return nil }
+        guard width > 0, em > 0, em.isFinite else { return nil }
         let left = max(0, box.left)
         let right = min(width, box.right)
         let top = max(0, box.top)
