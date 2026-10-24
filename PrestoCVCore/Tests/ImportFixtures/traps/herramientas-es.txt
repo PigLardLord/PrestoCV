@@ -1,0 +1,18 @@
+Pablo Ejemplo
+Desarrollador móvil
+Valencia · pablo.ejemplo@example.org · 600 000 505
+
+EXPERIENCIA PROFESIONAL
+Desarrollador móvil en Apps Ejemplo S.L. (Valencia)
+Marzo 2021 - Actualidad
+Desarrollo de la app de reservas en Swift.
+
+Desarrollador junior en Software Ejemplo S.L. (Alicante)
+Junio 2018 - Febrero 2021
+
+FORMACIÓN ACADÉMICA
+Grado en Ingeniería Informática, Universidad de Valencia (2015-2018)
+
+HERRAMIENTAS
+Swift, SwiftUI, Combine
+Kotlin, Docker
