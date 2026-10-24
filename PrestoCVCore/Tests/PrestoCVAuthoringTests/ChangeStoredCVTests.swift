@@ -54,6 +54,7 @@ private actor InMemoryStoredCVs: StoredCVs {
     }
 
     func changeElsewhere(_ id: UUID, content: String) { stored[id]?.content = content }
+    func changeLookElsewhere(_ id: UUID, to look: StoredLook) { stored[id]?.look = look }
     func failLoading() { failsLoading = true }
     func failUpdating() { failsUpdating = true }
 }
@@ -99,7 +100,7 @@ struct ChangeStoredCVTests {
     func look() async throws {
         let store = InMemoryStoredCVs([original])
         await store.changeElsewhere(cvID, content: "saved since in another window")
-        let changed = try await ChangeStoredCV(cvs: store).setLook(modernChange, of: cvID)
+        let changed: Record? = try await ChangeStoredCV(cvs: store).setLook(modernChange, of: cvID)
         let expected = Record(id: cvID, title: "iOS roles", language: "it", look: StoredLook(modernLook), content: "saved since in another window")
         #expect(changed == expected)
         #expect(await store.updates == [expected])
@@ -108,8 +109,8 @@ struct ChangeStoredCVTests {
     @Test("a look replaces the look the CV had")
     func lookReplacesTheLook() async throws {
         let store = InMemoryStoredCVs([Record(id: cvID, title: "iOS roles", language: "it", look: StoredLook(modernLook), content: "as saved")])
-        let changed = try await ChangeStoredCV(cvs: store).setLook(minimalChange, of: cvID)
-        #expect(changed.look == StoredLook(minimalLook))
+        let changed: Record? = try await ChangeStoredCV(cvs: store).setLook(minimalChange, of: cvID)
+        #expect(changed?.look == StoredLook(minimalLook))
         #expect(await store.updates.map(\.look) == [StoredLook(minimalLook)])
     }
 
@@ -119,9 +120,40 @@ struct ChangeStoredCVTests {
         let shown = DesignChoice(design: "professional", palette: "minimal", fonts: "classic")!
         let store = InMemoryStoredCVs([Record(id: cvID, title: "iOS roles", language: "it", look: held, content: "as saved")])
 
-        let changed = try await ChangeStoredCV(cvs: store).setLook(LookChange(shown: shown, parts: [.palette]), of: cvID)
+        let changed: Record? = try await ChangeStoredCV(cvs: store).setLook(LookChange(shown: shown, parts: [.palette]), of: cvID)
 
-        #expect(changed.look == StoredLook(design: "future-design", palette: "minimal", fonts: "handwritten"))
+        #expect(changed?.look == StoredLook(design: "future-design", palette: "minimal", fonts: "handwritten"))
+    }
+
+    @Test("choosing the look the CV has already is no change: nothing is stored")
+    func sameLookIsNoChange() async throws {
+        let store = InMemoryStoredCVs([Record(id: cvID, title: "iOS roles", language: "it", look: StoredLook(modernLook), content: "as saved")])
+        let changed: Record? = try await ChangeStoredCV(cvs: store).setLook(modernChange, of: cvID)
+        #expect(changed == nil)
+        #expect(await store.updates.isEmpty)
+    }
+
+    @Test("a part chosen that the CV holds already is no change, whatever the ids of the other parts are")
+    func sameChosenPartIsNoChange() async throws {
+        let held = StoredLook(design: "future-design", palette: "creative", fonts: "handwritten")
+        let store = InMemoryStoredCVs([Record(id: cvID, title: "iOS roles", language: "it", look: held, content: "as saved")])
+        let changed: Record? = try await ChangeStoredCV(cvs: store).setLook(LookChange(shown: modernLook, parts: [.palette]), of: cvID)
+        #expect(changed == nil)
+        #expect(await store.updates.isEmpty)
+    }
+
+    @Test("whether the look is the one the CV has is decided on the CV as stored now: a look another window stored meanwhile counts")
+    func sameLookIsDecidedOnTheCVAsStoredNow() async throws {
+        let store = InMemoryStoredCVs([original])
+        await store.changeLookElsewhere(cvID, to: StoredLook(modernLook))
+        let alreadyThere: Record? = try await ChangeStoredCV(cvs: store).setLook(modernChange, of: cvID)
+        #expect(alreadyThere == nil, "The look chosen is the look stored now")
+        #expect(await store.updates.isEmpty)
+
+        await store.changeLookElsewhere(cvID, to: StoredLook(minimalLook))
+        let replaced: Record? = try await ChangeStoredCV(cvs: store).setLook(modernChange, of: cvID)
+        #expect(replaced?.look == StoredLook(modernLook), "The look stored now is another, whatever the CV was when the person looked at it")
+        #expect(await store.updates.map(\.look) == [StoredLook(modernLook)])
     }
 
     @Test("a language and a look chosen one after the other both stay, whichever is chosen first")

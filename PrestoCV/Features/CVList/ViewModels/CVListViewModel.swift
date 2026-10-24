@@ -226,12 +226,14 @@ final class CVListViewModel: ObservableObject {
         }.value
     }
     
-    /// Stores a copy of a listed CV, named after the title the list shows it with, as "Lena Hartmann (Copy)"
+    /// Stores a copy of a CV, named after the title it has when the copy is made, as "Lena Hartmann (Copy)". The title is
+    /// read from the stored CV, once the changes ahead of this one for the CV have ended and the editors that were left have
+    /// stored theirs: a row of the list can be a rename behind.
     func duplicateCV(withId id: UUID) async {
-        guard let name = cvs.first(where: { $0.id == id })?.copyName else { return }
         await changeQueue.enqueue(id) { [self] in
             await perform {
-                .added(try await self.cvManagementUseCase.duplicateCV(id: id, named: name))
+                guard let stored = try await self.cvManagementUseCase.getCV(by: id) else { throw StoredCVChangeError.notFound }
+                return .added(try await self.cvManagementUseCase.duplicateCV(id: id, named: stored.copyName))
             }
         }.value
     }
@@ -332,7 +334,7 @@ final class CVListViewModel: ObservableObject {
                 }
                 if let look = choices.look {
                     await perform {
-                        .replaced(try await self.storedCVChanges.setLook(look, of: id))
+                        try await self.storedCVChanges.setLook(look, of: id).map(CommittedChange.replaced)
                     }
                 }
                 storingChoices[id] = nil
