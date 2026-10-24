@@ -133,7 +133,16 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
         }
         try close()
         budget.words -= words.count
-        return ExtractedPage(width: size.width, height: size.height, words: words)
+        return ExtractedPage(width: size.width, height: size.height, words: try withInkWeights(words, on: page, bounds: bounds))
+    }
+
+    /// The words, bold where their fonts say it or their strokes are clearly heavier than the page's: PDFKit gives back
+    /// a plain font for a font it cannot name, and a PDF's headings are bold in the ink only (`InkWeight`).
+    private static func withInkWeights(_ words: [ExtractedWord], on page: PDFPage, bounds: CGRect) throws -> [ExtractedWord] {
+        let heavy = try InkWeight.heavyWords(on: page, bounds: bounds, words: words)
+        return zip(words, heavy).map { word, heavy in
+            heavy && !word.isBold ? ExtractedWord(text: word.text, frame: word.frame, fontSize: word.fontSize, isBold: true) : word
+        }
     }
 
     /// The font size at a character, and whether its font is bold: by its traits, or by its name, as many PDF fonts

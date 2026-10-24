@@ -29,21 +29,17 @@ struct RailLayoutPDFKitTests {
         var gap: CGFloat = 4
     }
 
-    private func font(_ size: CGFloat, bold: Bool) -> CTFont {
-        CTFontCreateWithName((bold ? "Helvetica-Bold" : "Helvetica") as CFString, size, nil)
+    private func line(_ text: String, size: CGFloat, bold: Bool, face: DrawnFace) -> CTLine {
+        CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [.font: face.font(size, bold: bold)]))
     }
 
-    private func line(_ text: String, size: CGFloat, bold: Bool) -> CTLine {
-        CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [.font: font(size, bold: bold)]))
-    }
-
-    private func draw(_ text: String, at x: CGFloat, baseline: CGFloat, size: CGFloat, bold: Bool, in context: CGContext) {
+    private func draw(_ text: String, at x: CGFloat, baseline: CGFloat, size: CGFloat, bold: Bool, face: DrawnFace, in context: CGContext) {
         context.textPosition = CGPoint(x: x, y: baseline)
-        CTLineDraw(line(text, size: size, bold: bold), context)
+        CTLineDraw(line(text, size: size, bold: bold, face: face), context)
     }
 
-    /// A one-page PDF drawn when the test runs, its lines from the top of the page down.
-    private func drawnPDF(_ lines: [Line]) throws -> Data {
+    /// A one-page PDF drawn when the test runs in `face`, its lines from the top of the page down.
+    private func drawnPDF(_ lines: [Line], face: DrawnFace) throws -> Data {
         let data = NSMutableData()
         var box = CGRect(x: 0, y: 0, width: 595, height: 842)
         let consumer = try #require(CGDataConsumer(data: data as CFMutableData))
@@ -54,12 +50,12 @@ struct RailLayoutPDFKitTests {
             top += line.gap + line.size
             let baseline = box.height - top
             if let heading = line.heading {
-                let width = CGFloat(CTLineGetTypographicBounds(self.line(heading, size: 9.5, bold: true), nil, nil, nil))
-                draw(heading, at: Self.edge - width, baseline: baseline, size: 9.5, bold: true, in: context)
+                let width = CGFloat(CTLineGetTypographicBounds(self.line(heading, size: 9.5, bold: true, face: face), nil, nil, nil))
+                draw(heading, at: Self.edge - width, baseline: baseline, size: 9.5, bold: true, face: face, in: context)
             }
-            draw(line.text, at: line.x ?? Self.body, baseline: baseline, size: line.size, bold: line.bold, in: context)
+            draw(line.text, at: line.x ?? Self.body, baseline: baseline, size: line.size, bold: line.bold, face: face, in: context)
             for cell in line.cells {
-                draw(cell.text, at: cell.x, baseline: baseline, size: line.size, bold: cell.bold, in: context)
+                draw(cell.text, at: cell.x, baseline: baseline, size: line.size, bold: cell.bold, face: face, in: context)
             }
         }
         context.endPDFPage()
@@ -79,6 +75,8 @@ struct RailLayoutPDFKitTests {
             Line(text: "Example Ltd, Leeds", bold: true, size: 9.5),
             Line(text: "03/2019 – 05/2024", size: 9),
             Line(text: "Built the billing service for retail customers."),
+            Line(text: "Moved the checkout to a new payment provider."),
+            Line(text: "Taught two colleagues how to review code."),
         ]
         return [
             Line(text: "Alex Example", bold: true, size: 22, x: 46, gap: 0),
@@ -96,11 +94,11 @@ struct RailLayoutPDFKitTests {
         ImportCV(pdfReader: PDFKitTextExtractor(), limits: .standard)
     }
 
-    @Test("A drawn PDF with its headings in a column beside the sections has every section read", arguments: [true, false])
-    func wholeCV(skillsFirst: Bool) async throws {
+    @Test("A drawn PDF with its headings in a column beside the sections has every section read", arguments: DrawnFace.allCases, [true, false])
+    func wholeCV(face: DrawnFace, skillsFirst: Bool) async throws {
         for heading in ["Core Technologies", "Technologies", "Tools", "Technical Skills"] {
-            let result = try await importer().importPDF(drawnPDF(cv(skillsHeading: heading, skillsFirst: skillsFirst)))
-            let label = "\(heading), skills first: \(skillsFirst)"
+            let result = try await importer().importPDF(drawnPDF(cv(skillsHeading: heading, skillsFirst: skillsFirst), face: face))
+            let label = "\(face.testDescription), \(heading), skills first: \(skillsFirst)"
             #expect(result.cv.skills.map(\.value) == ["Swift", "Kotlin", "SwiftUI", "Combine", "Docker", "AWS"], "\(label): \(result.cv.skills.map(\.value))")
             #expect(result.cv.experience.map { $0.role?.value } == ["Software Engineer"], "\(label)")
             #expect(result.cv.experience.first?.employer?.value == "Example Ltd", "\(label)")
