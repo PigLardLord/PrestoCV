@@ -23,11 +23,18 @@ enum LayoutAnalyzer {
         var cellCount = 0
         try work.count(AnalysisWork.sortSteps(wordCount))
         let bodySize = median(pages.flatMap { $0.words.map(\.fontSize) }) ?? 10
-        for (index, page) in pages.enumerated() {
-            let found = try lines(of: page, number: index + 1, bodySize: bodySize, work: &work)
-            lineCount += found.count
+        var pageGroups: [[[ExtractedWord]]] = []
+        for page in pages {
+            let groups = try lineWords(of: page, work: &work)
+            lineCount += groups.count
+            guard lineCount <= limits.maximumLines else { throw ImportError.tooLarge }
+            pageGroups.append(groups)
+        }
+        let headings = try TextColumns(pages: pageGroups, bodySize: bodySize, work: &work)
+        for (index, groups) in pageGroups.enumerated() {
+            let found = lines(of: groups, headingEnds: headings.headingEnds[index], number: index + 1)
             cellCount += found.reduce(0) { $0 + $1.cells.count }
-            guard lineCount <= limits.maximumLines, cellCount <= limits.maximumCells else { throw ImportError.tooLarge }
+            guard cellCount <= limits.maximumCells else { throw ImportError.tooLarge }
             pageLines.append(found)
         }
         try work.count(2 * lineCount)
@@ -127,20 +134,15 @@ enum LayoutAnalyzer {
 
         /// Where the text starts past a list marker: a wrapped line of the item starts there too.
         var textStart: Double? {
-            cells.first.map { LayoutAnalyzer.textStart(of: $0.words) }
+            cells.first.map { LayoutAnalyzer.textStart(of: $0.words[...]) }
         }
     }
 
     private static let bulletMarks: Set<String> = ["•", "-", "–", "▪", "◦", "●", "■", "►", "➢", "*", "·", "o", "\u{F0B7}"]
 
-    /// The words of a page grouped into lines by their height on the page, and each line into cells at its wide gaps. A
-    /// word without a box on the page, one not finite or of a negative size, cannot be placed and is no text.
-    ///
-    /// A section's heading in a column of its own, right-aligned to the left of its section's first line, stands closer to
-    /// that line than two cells of a table do. So the words before a gap of more than two spaces are a cell of their own
-    /// when they are a heading of the vocabulary, drawn bold or large, and the text after the gap starts where the text
-    /// of other lines of the page starts: a column of text beside the headings (#287).
-    static func lines(of page: ExtractedPage, number: Int, bodySize: Double, work: inout AnalysisWork) throws -> [PageLine] {
+    /// The words of a page grouped into lines by their height on the page, each line's words from left to right. A word
+    /// without a box on the page, one not finite or of a negative size, cannot be placed and is no text.
+    private static func lineWords(of page: ExtractedPage, work: inout AnalysisWork) throws -> [[ExtractedWord]] {
         let words = page.words.filter { !$0.text.allSatisfy(\.isWhitespace) && isPlaceable($0.frame) }
             .sorted { ($0.frame.y, $0.frame.x) < ($1.frame.y, $1.frame.x) }
         try work.count(2 * AnalysisWork.sortSteps(page.words.count))
@@ -161,14 +163,23 @@ enum LayoutAnalyzer {
                 open.append(groups.count - 1)
             }
         }
-        let sortedGroups = groups.map { $0.sorted { $0.frame.x < $1.frame.x } }
-        let column = try TextColumns(lines: sortedGroups, bodySize: bodySize, work: &work)
-        return sortedGroups.enumerated().map { index, sorted in
+        return groups.map { $0.sorted { $0.frame.x < $1.frame.x } }
+    }
+
+    /// The lines of a page, each split into cells at its wide gaps.
+    ///
+    /// A section's heading in a column of its own, right-aligned to the left of its section's first line, stands closer to
+    /// that line than two cells of a table do. So a line's first cell also ends where `headingEnds` says a heading drawn
+    /// in such a column ends (#287).
+    ///
+    /// - Parameter groups: The words of each line, from left to right, at least one word in each.
+    private static func lines(of groups: [[ExtractedWord]], headingEnds: [Int?], number: Int) -> [PageLine] {
+        groups.enumerated().map { index, sorted in
             var cells: [[ExtractedWord]] = [[sorted[0]]]
             for (offset, (previous, word)) in zip(sorted, sorted.dropFirst()).enumerated() {
                 let gap = word.frame.x - previous.frame.maxX
                 let size = max(previous.fontSize, word.fontSize)
-                if gap > max(8, 1.5 * size) || column.headingEnds[index] == offset + 1 {
+                if gap > max(8, 1.5 * size) || headingEnds[index] == offset + 1 {
                     cells.append([word])
                 } else {
                     cells[cells.count - 1].append(word)
@@ -178,10 +189,17 @@ enum LayoutAnalyzer {
         }.sorted { ($0.frame.y, $0.frame.x) < ($1.frame.y, $1.frame.x) }
     }
 
-    /// The heading columns of a page: for each line, the index of the word where a heading drawn in a column of its own
-    /// ends, if there is one. Such a heading is a heading of the vocabulary, drawn bold or large, ending a line's first
-    /// cell at a gap of more than two spaces, and the text after it starts where the text of another line of the page
-    /// starts. A bold title with a wide gap in it, or a label of a table, has no other line starting beside it.
+    /// The heading columns of a document: for each line of each page, the index of the word where a heading drawn in a
+    /// column of its own ends, if there is one. Such a heading is a heading of the vocabulary, drawn bold or large, ending
+    /// a line's first cell at a gap of more than two spaces, and the text after it starts where the text of a line that is
+    /// no such candidate starts, on any page of the document: a column of text beside the headings.
+    ///
+    /// Only the lines that are no candidate count as evidence. A candidate is the line in doubt, so the same bold title
+    /// repeated on two jobs, its gap at the same place twice, is no column: neither line vouches for the other. And the
+    /// edge is the document's, not the page's: a page whose only section beside the column is one line, a name's page or
+    /// a continuation page, has its heading read from the lines of the other pages. The edge of a line of a list item is
+    /// both its mark's and its text's, so a section of list items has its heading read whether its first line is an item
+    /// or not. A bold title with a wide gap in it, or a label of a table, has no other line starting beside it.
     private struct TextColumns {
         /// The gap, in font sizes, past which a heading ends a line's first cell: more than two spaces.
         private static let minimumGap = 0.7
@@ -190,31 +208,42 @@ enum LayoutAnalyzer {
         /// How far, in points, two lines may start from one another and be at the same edge: the ink of their first letters.
         private static let sameEdge = 3.0
 
-        private(set) var headingEnds: [Int?]
+        /// For each page, for each line, where the heading that starts it ends.
+        private(set) var headingEnds: [[Int?]]
 
-        /// - Parameter lines: The words of each line, from left to right, at least one word in each.
-        init(lines: [[ExtractedWord]], bodySize: Double, work: inout AnalysisWork) throws {
-            var ends = [Int?](repeating: nil, count: lines.count)
+        /// - Parameter pages: The words of each line of each page, from left to right, at least one word in each line.
+        init(pages: [[[ExtractedWord]]], bodySize: Double, work: inout AnalysisWork) throws {
+            var ends = pages.map { [Int?](repeating: nil, count: $0.count) }
             var starts: [Double] = []
-            var afterHeadings: [Double] = []
-            for (index, sorted) in lines.enumerated() {
-                try work.count(Self.maximumWords)
-                if let end = Self.headingEnd(of: sorted, bodySize: bodySize) {
-                    ends[index] = end
-                    afterHeadings.append(sorted[end].frame.x)
-                } else {
-                    starts.append(LayoutAnalyzer.textStart(of: sorted))
+            var candidates = 0
+            for (page, lines) in pages.enumerated() {
+                for (index, sorted) in lines.enumerated() {
+                    try work.count(Self.maximumWords)
+                    if let end = Self.headingEnd(of: sorted, bodySize: bodySize) {
+                        ends[page][index] = end
+                        candidates += 1
+                    } else {
+                        starts.append(sorted[0].frame.x)
+                        let text = LayoutAnalyzer.textStart(of: sorted[...])
+                        if text != sorted[0].frame.x { starts.append(text) }
+                    }
                 }
             }
-            try work.count(AnalysisWork.sortSteps(starts.count) + 2 * AnalysisWork.sortSteps(afterHeadings.count))
+            guard candidates > 0 else {
+                headingEnds = ends
+                return
+            }
+            try work.count(AnalysisWork.sortSteps(starts.count))
             starts.sort()
-            afterHeadings.sort()
-            // A heading counts when another line of the page starts at the edge of the text after it
-            for index in ends.indices {
-                guard let end = ends[index] else { continue }
-                let edge = lines[index][end].frame.x
-                let others = Self.count(near: edge, in: starts) + Self.count(near: edge, in: afterHeadings) - 1
-                if others < 1 { ends[index] = nil }
+            // Four searches of the sorted starts for each candidate
+            try work.count(4 * candidates * (Int.bitWidth - max(starts.count, 1).leadingZeroBitCount))
+            for page in ends.indices {
+                for index in ends[page].indices {
+                    guard let end = ends[page][index] else { continue }
+                    let after = pages[page][index][end...]
+                    let edges = [after[end].frame.x, LayoutAnalyzer.textStart(of: after)]
+                    if !edges.contains(where: { Self.count(near: $0, in: starts) > 0 }) { ends[page][index] = nil }
+                }
             }
             headingEnds = ends
         }
@@ -257,9 +286,10 @@ enum LayoutAnalyzer {
     /// Where the text of words, left to right, starts: past a list marker if they start with one.
     ///
     /// - Parameter words: At least one word.
-    private static func textStart(of words: [ExtractedWord]) -> Double {
-        if bulletMarks.contains(words[0].text), words.count > 1 { return words[1].frame.x }
-        return words[0].frame.x
+    private static func textStart(of words: ArraySlice<ExtractedWord>) -> Double {
+        let first = words.startIndex
+        if bulletMarks.contains(words[first].text), words.count > 1 { return words[first + 1].frame.x }
+        return words[first].frame.x
     }
 
     private static func isPlaceable(_ frame: Rect) -> Bool {

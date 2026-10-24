@@ -19,8 +19,8 @@ struct RailLayoutTests {
         return try LayoutAnalyzer.analyze(pages, limits: .standard, work: &work)
     }
 
-    private func importLayout(_ page: ExtractedPage) async throws -> ImportResult {
-        try await ImportCV(pdfReader: ScriptedPDFReader(layout: .pages([page])), limits: .standard).importPDF(Data([1]))
+    private func importLayout(_ pages: ExtractedPage...) async throws -> ImportResult {
+        try await ImportCV(pdfReader: ScriptedPDFReader(layout: .pages(pages)), limits: .standard).importPDF(Data([1]))
     }
 
     /// A section's heading, bold unless said otherwise, ending at the headings' column's right edge.
@@ -31,7 +31,9 @@ struct RailLayoutTests {
     }
 
     /// A CV drawn in the layout: the skills (a label and its items on each row) before the experience or after it.
-    private func page(skillsHeading: String, experienceHeading: String = "Work Experience", skillsFirst: Bool) -> ExtractedPage {
+    private func page(
+        skillsHeading: String, experienceHeading: String = "Work Experience", skillsFirst: Bool, languages: Bool = true
+    ) -> ExtractedPage {
         var sketch = PageSketch()
         sketch.put("Alex Example", x: 46, y: 40, size: 24, bold: true)
         sketch.put("Software Engineer", x: 46, y: 74, size: 12, bold: true)
@@ -66,6 +68,7 @@ struct RailLayoutTests {
         sketch.put("BSc Computer Science", x: Self.bodyStart, y: y, size: 9.3, bold: true)
         sketch.put("University of Example · 2012 – 2016", x: Self.bodyStart, y: y + 16, size: 9)
         y += 56
+        guard languages else { return sketch.page }
         put(heading: "Languages", y: y, into: &sketch)
         sketch.put("English: C1", x: Self.bodyStart, y: y, size: 9.3, bold: true)
         sketch.put("German: B2", x: Self.bodyStart, y: y + 18, size: 9.3, bold: true)
@@ -88,10 +91,26 @@ struct RailLayoutTests {
         put(heading: "Core Technologies", y: 100, into: &sketch)
         sketch.put("Languages", x: Self.bodyStart, y: 100, size: 9.3, bold: true)
         sketch.put("Swift, Kotlin", x: 314, y: 100, size: 9.3)
+        sketch.put("Frameworks", x: Self.bodyStart, y: 116, size: 9.3, bold: true)
+        sketch.put("SwiftUI, Combine", x: 314, y: 116, size: 9.3)
+        put(heading: "Education", y: 140, into: &sketch)
+        sketch.put("BSc Computer Science", x: Self.bodyStart, y: 140, size: 9.3, bold: true)
+        sketch.put("University of Example · 2012 – 2016", x: Self.bodyStart, y: 156, size: 9)
+        #expect(try analyze([sketch.page]).lines.map(\.text) == [
+            "Core Technologies\tLanguages\tSwift, Kotlin", "Frameworks\tSwiftUI, Combine",
+            "Education\tBSc Computer Science", "University of Example · 2012 – 2016",
+        ])
+    }
+
+    @Test("Headings beside one another's lines and no other text there are no evidence of a column: the lines stay whole")
+    func candidatesAlone() throws {
+        var sketch = PageSketch()
+        put(heading: "Core Technologies", y: 100, into: &sketch)
+        sketch.put("Languages", x: Self.bodyStart, y: 100, size: 9.3, bold: true)
         put(heading: "Education", y: 140, into: &sketch)
         sketch.put("BSc Computer Science", x: Self.bodyStart, y: 140, size: 9.3, bold: true)
         #expect(try analyze([sketch.page]).lines.map(\.text) == [
-            "Core Technologies\tLanguages\tSwift, Kotlin", "Education\tBSc Computer Science",
+            "Core Technologies Languages", "Education BSc Computer Science",
         ])
     }
 
@@ -101,11 +120,80 @@ struct RailLayoutTests {
         sketch.put("Alex Example", x: 46, y: 40, size: 9.3)
         put(heading: "CORE TECHNOLOGIES", y: 100, into: &sketch)
         sketch.put("Languages", x: Self.bodyStart, y: 100, size: 9.3, bold: true)
+        sketch.put("Frameworks", x: Self.bodyStart, y: 116, size: 9.3, bold: true)
         put(heading: "Education", y: 140, size: 13, bold: false, into: &sketch)
         sketch.put("BSc Computer Science", x: Self.bodyStart, y: 140, size: 9.3, bold: true)
         #expect(try analyze([sketch.page]).lines.map(\.text) == [
-            "Alex Example", "CORE TECHNOLOGIES\tLanguages", "Education\tBSc Computer Science",
+            "Alex Example", "CORE TECHNOLOGIES\tLanguages", "Frameworks", "Education\tBSc Computer Science",
         ])
+    }
+
+    @Test("Two jobs with the same bold title, a gap at the same place in both, do not vouch for each other's heading")
+    func repeatedTitles() async throws {
+        var sketch = PageSketch()
+        sketch.put("Alex Example", x: 46, y: 40, size: 24, bold: true)
+        sketch.put("Work Experience", x: 60, y: 100, size: 12, bold: true)
+        for (index, job) in [("Example Ltd", "2019 – 2024"), ("Sample GmbH", "2015 – 2019")].enumerated() {
+            let y = 130 + Double(index) * 50
+            sketch.put("Education", x: 60, y: y, bold: true)
+            sketch.put("Consultant", x: 60 + 9 * 10 * 0.5 + 10, y: y, bold: true)
+            sketch.put(job.0, x: 60, y: y + 16)
+            sketch.put(job.1, x: 60, y: y + 30)
+        }
+        let lines = try analyze([sketch.page]).lines.map(\.text)
+        let whole = lines.count { $0 == "Education Consultant" }
+        #expect(whole == 2, "\(lines)")
+
+        let result = try await importLayout(sketch.page)
+        #expect(result.cv.education.isEmpty, "\(result.cv.education.count) education entries")
+        #expect(result.cv.experience.map { $0.role?.value } == ["Education Consultant", "Education Consultant"])
+        #expect(result.cv.experience.map { $0.employer?.value } == ["Example Ltd", "Sample GmbH"])
+    }
+
+    @Test("A section of one line on a page of its own has its heading read: the text of the other pages starts at that edge")
+    func continuationPage() async throws {
+        var last = PageSketch()
+        put(heading: "Languages", y: 100, into: &last)
+        last.put("English: C1", x: Self.bodyStart, y: 100, size: 9.3, bold: true)
+        let first = page(skillsHeading: "Core Technologies", skillsFirst: true, languages: false)
+        #expect(try analyze([first, last.page]).lines.map(\.text).last == "Languages\tEnglish: C1")
+
+        let result = try await importLayout(first, last.page)
+        #expect(result.cv.languages.map(\.name.value) == ["English"], "\(result.cv.languages.map(\.name.value))")
+        #expect(result.cv.education.count == 1)
+    }
+
+    @Test("A page with a name and one section of one line has its heading read when the next pages hold the column")
+    func namePage() async throws {
+        var first = PageSketch()
+        first.put("Alex Example", x: 46, y: 40, size: 24, bold: true)
+        first.put("alex.example@example.org · Leeds, United Kingdom", x: 46, y: 74, size: 9)
+        put(heading: "Core Technologies", y: 110, into: &first)
+        first.put("Languages", x: Self.bodyStart, y: 110, size: 9.3, bold: true)
+        first.put("Swift, Kotlin", x: 314, y: 110, size: 9.3)
+        var next = PageSketch()
+        put(heading: "Work Experience", y: 100, into: &next)
+        next.put("Software Engineer", x: Self.bodyStart, y: 100, size: 11.5, bold: true)
+        next.put("Example Ltd · Leeds", x: Self.bodyStart, y: 118, size: 9.5, bold: true)
+        next.put("03/2019 – 05/2024", x: Self.bodyStart, y: 134, size: 9)
+        next.put("Built the billing service for retail customers.", x: Self.bodyStart, y: 152, size: 9.3)
+
+        let result = try await importLayout(first.page, next.page)
+        #expect(result.cv.skills.map(\.value) == ["Swift", "Kotlin"], "\(result.cv.skills.map(\.value))")
+        #expect(result.cv.experience.map { $0.role?.value } == ["Software Engineer"])
+    }
+
+    @Test("A section whose lines are all list items has its heading read: its items' marks start at the edge of its first line")
+    func listSection() throws {
+        var sketch = PageSketch()
+        sketch.put("Alex Example", x: 46, y: 40, size: 24, bold: true)
+        put(heading: "Skills", y: 100, into: &sketch)
+        for (index, item) in ["Swift and Kotlin", "SwiftUI and Combine", "Docker and AWS"].enumerated() {
+            sketch.put("•", x: Self.bodyStart, y: 100 + Double(index) * 16, size: 9.3)
+            sketch.put(item, x: Self.bodyStart + 8, y: 100 + Double(index) * 16, size: 9.3)
+        }
+        let lines = try analyze([sketch.page]).lines.map(\.text)
+        #expect(lines.contains("Skills\t• Swift and Kotlin"), "\(lines)")
     }
 
     @Test("A line that only starts with the word of a heading is one cell, whatever the gap after it")
@@ -163,13 +251,16 @@ struct RailLayoutTests {
     @Test("The text of the sections starts at one edge to within the ink of its first letters")
     func inkOffsets() throws {
         var sketch = PageSketch()
-        for (index, offset) in [0.0, 1.2, -1.1, 2.4].enumerated() {
+        sketch.put("University of Example", x: Self.bodyStart, y: 80, size: 9)
+        for (index, offset) in [0.0, 1.2, -1.1, 2.4, 4.0].enumerated() {
             let y = 100 + Double(index) * 40
             put(heading: index.isMultiple(of: 2) ? "Core Technologies" : "Education", y: y, into: &sketch)
             sketch.put("Languages", x: Self.bodyStart + offset, y: y, size: 9.3, bold: true)
         }
+        // The last text starts four points past the edge of the only line that is no heading's: it is no column's
         #expect(try analyze([sketch.page]).lines.map(\.text) == [
-            "Core Technologies\tLanguages", "Education\tLanguages", "Core Technologies\tLanguages", "Education\tLanguages",
+            "University of Example", "Core Technologies\tLanguages", "Education\tLanguages", "Core Technologies\tLanguages",
+            "Education\tLanguages", "Core Technologies Languages",
         ])
     }
 
