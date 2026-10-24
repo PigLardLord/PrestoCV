@@ -626,4 +626,39 @@ struct EntryReaderTests {
         """)
         #expect(found.cv.experience.first?.period?.check == .periodOpenEnd)
     }
+
+    // MARK: A city and a state or a country in the line of the employer (#301, #302)
+
+    @Test("An employer with its city and state: the city and the state are the place, the employer is no part of it", arguments: [
+        ("Harbor Law Firm, Medford, Ohio", "Harbor Law Firm", "Medford, Ohio"),
+        ("Larkin Hardware, Akron, OH", "Larkin Hardware", "Akron, OH"),
+        ("Harbor Dental Studio, Austin, Texas", "Harbor Dental Studio", "Austin, Texas"),
+        ("Larkin Hardware, Calgary, Alberta", "Larkin Hardware", "Calgary, Alberta"),
+    ])
+    func employerWithCityAndState(line: String, employer: String, place: String) throws {
+        let found = read("""
+        Experience
+        \(line)
+        Executive assistant, March 2015–Present
+        Northgate Mill, Seattle, WA
+        Administrative assistant, June 2011–March 2015
+        """)
+        #expect(found.cv.experience.map { $0.employer?.value } == [employer, "Northgate Mill"], "\(line)")
+        #expect(found.cv.experience.map { $0.location?.value } == [place, "Seattle, WA"], "\(line)")
+        #expect(found.cv.experience.map { $0.role?.value } == ["Executive assistant", "Administrative assistant"], "\(line)")
+    }
+
+    @Test("A city with its state or country, alone on its line, is one place, however many parts it has", arguments: [
+        "Springfield, Illinois, United States", "Leeds, United Kingdom", "Akron, OH", "Austin, Texas",
+    ])
+    func cityWithRegion(place: String) throws {
+        let found = read("""
+        Experience
+        Executive assistant, March 2015–Present
+        Northgate Hospital
+        \(place)
+        """)
+        #expect(found.cv.experience.first?.employer?.value == "Northgate Hospital", "\(place)")
+        #expect(found.cv.experience.first?.location?.value == place, "\(place)")
+    }
 }

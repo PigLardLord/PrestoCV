@@ -93,6 +93,14 @@ enum EntryVocabulary {
         return words.contains { degreeWords.contains($0) || degreeStems.contains(where: $0.hasPrefix) }
     }
 
+    /// Whether the text opens with the word of a degree: "Bachelor of Science in Nursing", "Diplom Elektrotechnik".
+    static func startsWithDegree(_ text: String) -> Bool {
+        guard let first = text.words.first?.folded else { return false }
+        return degreeStems.contains(where: first.hasPrefix) || degreeOpeners.contains(first)
+    }
+
+    private static let degreeOpeners: Set<String> = ["phd", "ph.d", "mba", "doctor", "doctorate", "doctorado", "doctorat", "doutorado", "mestrado", "grado", "licence"]
+
     private static let legalForms: Set<String> = [
         "gmbh", "ag", "kg", "ohg", "ug", "ev", "spa", "srl", "srls", "sas", "snc", "ltd", "limited", "inc", "llc", "llp", "plc", "corp",
         "sa", "sl", "slu", "sarl", "sasu", "lda", "ltda", "bv", "nv", "gbr", "kgaa", "co", "group", "gruppo", "gruppe", "grupo",
@@ -219,9 +227,15 @@ enum EntryVocabulary {
                         "stadt", "ciudad", "ville", "cidade", "residence", "wohnhaft", "residente", "home address", "indirizzo di residenza", "comune",
                         "comune di residenza"]),
             (.phone, ["tel", "telefon", "telefono", "telephone", "téléphone", "teléfono", "telefone", "phone", "mobile", "mobil", "handy",
-                      "cell", "cellulare", "móvil", "portable", "telemóvel", "celular", "mobile phone", "telefono cellulare"]),
+                      "cell", "cellulare", "móvil", "portable", "telemóvel", "celular", "mobile phone", "telefono cellulare",
+                      "phone number", "mobile number", "telephone number", "cell phone", "cellphone", "número de teléfono",
+                      "teléfono móvil", "número de telefone", "número de telemóvel", "numero di telefono", "numéro de téléphone",
+                      "téléphone mobile", "tél", "telefonnummer", "handynummer", "mobiltelefon", "tlf", "tlm", "mob", "fon"]),
             (.email, ["mail", "e-mail", "email", "posta elettronica", "correo", "correo electrónico", "courriel", "correio eletrónico",
-                      "correio eletrônico", "adresse e-mail", "indirizzo email", "e-mail-adresse"]),
+                      "correio eletrônico", "adresse e-mail", "indirizzo email", "e-mail-adresse", "email address", "e-mail address",
+                      "dirección de correo electrónico", "dirección de correo", "dirección de email", "endereço de correio electrónico",
+                      "endereço de correio eletrónico", "endereço de correio eletrônico", "endereço de e-mail", "indirizzo e-mail",
+                      "indirizzo di posta elettronica", "adresse électronique", "adresse email", "adresse courriel", "correio electrónico"]),
             (.web, ["website", "sito web", "sito", "webseite", "homepage", "sitio web", "site web", "site", "portfolio", "linkedin",
                     "github", "xing", "web"]),
             (.birth, ["date of birth", "data di nascita", "geburtsdatum", "fecha de nacimiento", "date de naissance",

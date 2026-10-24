@@ -11,11 +11,15 @@ enum ContactReader {
         var links: [ImportedLink] = []
         /// What is left of the piece, split where a contact was, without the labels of the contacts.
         var rest: [Piece] = []
+        /// The labels before a contact that the vocabulary does not know ("Contact via"), to be shown as text not imported.
+        var unknownLabels: [Piece] = []
 
         var isEmpty: Bool { emails.isEmpty && phones.isEmpty && links.isEmpty }
     }
 
-    static func read(_ piece: Piece) -> Contacts {
+    /// `label` is the label the value was given under, when the line had one ("Phone" before a number): a number under
+    /// the label of a phone is the phone, whatever its shape.
+    static func read(_ piece: Piece, label: EntryVocabulary.PersonalLabel? = nil) -> Contacts {
         var contacts = Contacts()
         var consumed: [Range<String.Index>] = []
         let text = piece.text
@@ -34,39 +38,93 @@ enum ContactReader {
                 consumed.append(range)
             }
         }
-        for range in phoneRanges(in: text) where !consumed.contains(where: { $0.overlaps(range) }) {
+        for range in phoneRanges(in: text, hinted: label == .phone, beside: consumed) where !consumed.contains(where: { $0.overlaps(range) }) {
             let candidate = piece.sub(range)
             if let phone = PhoneNumber(candidate.text) {
                 contacts.phones.append(Sourced(value: phone, spans: [candidate.span]))
                 consumed.append(range)
             }
         }
-        contacts.rest = piece.removing(consumed).flatMap { $0.split(by: Separators.strong) }.filter { !isContactLabel($0.text) }
+        split(piece, around: consumed, into: &contacts)
         return contacts
+    }
+
+    // MARK: What is left of the line
+
+    /// The pieces between the contacts, split at the strong separators. A label right before a contact is not a part
+    /// of the line: a known one is dropped, an unknown one is kept apart to be shown, never read as a place or a title.
+    private static func split(_ piece: Piece, around consumed: [Range<String.Index>], into contacts: inout Contacts) {
+        var start = piece.text.startIndex
+        for range in consumed.sorted(by: { $0.lowerBound < $1.lowerBound }) where range.lowerBound >= start {
+            gap(piece.sub(start..<range.lowerBound), beforeAContact: true, into: &contacts)
+            start = range.upperBound
+        }
+        gap(piece.sub(start..<piece.text.endIndex), beforeAContact: false, into: &contacts)
+    }
+
+    private static func gap(_ gap: Piece, beforeAContact: Bool, into contacts: inout Contacts) {
+        let trimmed = gap.trimmed()
+        var segments = trimmed.isEmpty ? [] : trimmed.split(by: Separators.strong)
+        let endsWithColon = beforeAContact && gap.text.trimmingSpaces().hasSuffix(":")
+        if endsWithColon, let last = segments.last, !isContactLabel(last.text) {
+            if let (head, _) = strippingLabel(last) {
+                segments.removeLast()
+                if !head.isEmpty { segments.append(head) }
+            } else if isLabelLike(last.text) {
+                segments.removeLast()
+                contacts.unknownLabels.append(last)
+            }
+        }
+        contacts.rest += segments.filter { !isContactLabel($0.text) }
+    }
+
+    /// The piece without a label of a contact at its end, as in "Available for relocation. Mail".
+    private static func strippingLabel(_ piece: Piece) -> (head: Piece, label: Piece)? {
+        let words = piece.words
+        guard words.count >= 2 else { return nil }
+        for count in stride(from: min(4, words.count - 1), through: 1, by: -1) {
+            let start = words[words.count - count].startIndex
+            let label = piece.sub(start..<piece.text.endIndex)
+            guard isStrictLabel(label.text) else { continue }
+            return (piece.sub(piece.text.startIndex..<start).trimmed(), label)
+        }
+        return nil
+    }
+
+    /// A short run of words with no digit and no comma, the shape of a label, not of a sentence or a list.
+    private static func isLabelLike(_ text: String) -> Bool {
+        let words = text.words
+        return (1...4).contains(words.count) && text.allSatisfy { $0.isLetter || " ’'.-&/()".contains($0) }
     }
 
     // MARK: Labels
 
-    /// The label of a contact field, such as "E-mail", "Tel.", "Handy" or "(Mobile)".
+    /// The label of a contact field, such as "E-mail", "Tel.", "Handy", "Phone number" or "(Mobile)".
     static func isContactLabel(_ text: String) -> Bool {
-        contactLabels.contains(SectionVocabulary.key(text))
+        if isStrictLabel(text) || extraLabels.contains(SectionVocabulary.key(text)) { return true }
+        // A qualifier in brackets does not change what the label is: "Telefon (privat)"
+        let piece = Piece(text: text, span: SourceSpan(0, text.unicodeScalars.count))
+        let ranges = piece.bracketedRanges()
+        guard !ranges.isEmpty else { return false }
+        let parts = piece.removing(ranges)
+        return parts.count == 1 && (isStrictLabel(parts[0].text) || extraLabels.contains(SectionVocabulary.key(parts[0].text)))
     }
 
     static func isPhoneLabel(_ text: String) -> Bool {
-        phoneLabels.contains(SectionVocabulary.key(text))
+        EntryVocabulary.personalLabel(text) == .phone || extraPhoneLabels.contains(SectionVocabulary.key(text))
     }
 
-    private static let phoneLabels: Set<String> = Set([
-        "tel", "tel.", "telefon", "telefono", "telefonnummer", "telephone", "téléphone", "teléfono", "telefone", "phone", "mobile",
-        "mobil", "handy", "cell", "cellulare", "cell.", "móvil", "portable", "telemóvel", "celular", "tlf", "tlm", "mob", "fon",
-        "mobile phone", "numero di telefono", "número de teléfono", "número de telefone", "tél", "mobiltelefon", "work", "home",
-    ].map(SectionVocabulary.key))
+    /// A label the personal details of the CV know: the vocabulary of the labels exists once.
+    private static func isStrictLabel(_ text: String) -> Bool {
+        switch EntryVocabulary.personalLabel(text) {
+        case .phone, .email, .web: true
+        default: false
+        }
+    }
 
-    private static let contactLabels: Set<String> = phoneLabels.union([
-        "mail", "e-mail", "email", "e mail", "posta elettronica", "correo", "correo electrónico", "courriel", "correio eletrónico",
-        "correio eletrônico", "linkedin", "github", "xing", "website", "web", "sito", "sito web", "homepage", "webseite", "sitio web",
-        "site web", "site", "portfolio", "personal", "company", "other", "blog",
-    ].map(SectionVocabulary.key))
+    private static let extraPhoneLabels: Set<String> = Set(["work", "home"].map(SectionVocabulary.key))
+
+    private static let extraLabels: Set<String> = extraPhoneLabels.union(["personal", "company", "other", "blog"].map(SectionVocabulary.key))
 
     // MARK: E-mail addresses
 
@@ -158,7 +216,9 @@ enum ContactReader {
 
     // MARK: Phone numbers
 
-    private static func phoneRanges(in text: String) -> [Range<String.Index>] {
+    /// `hinted`: the line gave the value under the label of a phone. `beside` are the ranges of the other contacts of
+    /// the line, which count as the edge of a number as the text's own edges do.
+    private static func phoneRanges(in text: String, hinted: Bool, beside taken: [Range<String.Index>]) -> [Range<String.Index>] {
         var ranges: [Range<String.Index>] = []
         var index = text.startIndex
         let allowed: Set<Character> = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", " ", "+", "(", ")", ".", "/", "-"]
@@ -174,8 +234,8 @@ enum ContactReader {
             var end = index
             while end < text.endIndex, allowed.contains(text[end]) { end = text.index(after: end) }
             while end > index, !(text[text.index(before: end)].isNumber) { end = text.index(before: end) }
-            let candidate = text[index..<end]
-            if isPhone(candidate, labelled: label(before: index, in: text)) {
+            let shape = Shape(text: text, range: index..<end, taken: taken)
+            if isPhone(shape, marker: marker(before: index, in: text), hinted: hinted) {
                 ranges.append(index..<end)
                 index = end
             } else {
@@ -185,30 +245,90 @@ enum ContactReader {
         return ranges
     }
 
-    private enum Label { case phone, fax, none }
+    private enum Marker { case phone, fax, none }
 
-    /// The label right before a number: "Tel.:", "Handy", "📞", or "Fax".
-    private static func label(before index: String.Index, in text: String) -> Label {
+    /// The label right before a number: "Tel.:", "Handy", "Phone number", "📞", or "Fax".
+    private static func marker(before index: String.Index, in text: String) -> Marker {
         let before = text[..<index].trimmingSpaces()
         if let last = before.last, Piece.isIcon(last), "📞📱☎✆".contains(last) { return .phone }
-        let words = before.split(whereSeparator: { $0 == " " || $0 == ":" || $0 == "|" || $0 == "·" }).suffix(2)
+        let words = before.split(whereSeparator: { $0 == " " || $0 == ":" || $0 == "|" || $0 == "·" }).suffix(3)
         guard let lastWord = words.last else { return .none }
-        let lastTwo = words.joined(separator: " ")
         if SectionVocabulary.key(String(lastWord)) == "fax" { return .fax }
-        return isPhoneLabel(String(lastWord)) || isPhoneLabel(lastTwo) ? .phone : .none
+        let suffixes = (1...words.count).map { words.suffix($0).joined(separator: " ") }
+        return suffixes.contains(where: isPhoneLabel) ? .phone : .none
     }
 
-    private static func isPhone(_ candidate: Substring, labelled: Label) -> Bool {
-        let digits = candidate.filter(\.isNumber)
-        guard (7...17).contains(digits.count), labelled != .fax else { return false }
+    /// A candidate number with what surrounds it in its text.
+    private struct Shape {
+        let candidate: Substring
+        let digits: String
+        /// Whether it stands alone in its text or between two separators, as a number of a line of contacts does.
+        let isAlone: Bool
+
+        init(text: String, range: Range<String.Index>, taken: [Range<String.Index>]) {
+            candidate = text[range]
+            digits = String(candidate.filter(\.isNumber))
+            isAlone = Shape.isEdge(before: range.lowerBound, in: text, taken: taken) && Shape.isEdge(after: range.upperBound, in: text, taken: taken)
+        }
+
+        private static let separators: Set<Character> = ["|", "·", "•", "—", "–", ";", "‧", "∙", "▪", "⋅"]
+
+        private static func isEdge(before index: String.Index, in text: String, taken: [Range<String.Index>]) -> Bool {
+            var lower = index
+            while lower > text.startIndex, text[text.index(before: lower)].isWhitespace {
+                lower = text.index(before: lower)
+                if text[lower] == "\t" { return true }
+            }
+            return lower == text.startIndex || separators.contains(text[text.index(before: lower)]) || taken.contains { $0.upperBound == lower }
+        }
+
+        private static func isEdge(after index: String.Index, in text: String, taken: [Range<String.Index>]) -> Bool {
+            var upper = index
+            while upper < text.endIndex, text[upper].isWhitespace {
+                if text[upper] == "\t" { return true }
+                upper = text.index(after: upper)
+            }
+            return upper == text.endIndex || separators.contains(text[upper]) || taken.contains { $0.lowerBound == upper }
+        }
+    }
+
+    private static func isPhone(_ shape: Shape, marker: Marker, hinted: Bool) -> Bool {
+        let candidate = shape.candidate
+        guard (7...17).contains(shape.digits.count), marker != .fax else { return false }
         // A date or a period is no phone number
         // The range of a period is in the string it was read in: read it in a string of its own, not in a slice
         let text = String(candidate)
-        if let period = DateReader.periods(in: text).first, text[period.range].filter(\.isNumber).count * 2 >= digits.count {
+        if let period = DateReader.periods(in: text).first, text[period.range].filter(\.isNumber).count * 2 >= shape.digits.count {
             return false
         }
-        if labelled == .phone { return true }
+        if marker == .phone || hinted { return true }
+        if isPostalCode(text) { return false }
         if candidate.hasPrefix("+") || candidate.hasPrefix("0") || candidate.hasPrefix("(") { return true }
-        return digits.count >= 9 && candidate.contains(" ")
+        if shape.digits.count >= 9 && candidate.contains(" ") { return true }
+        return hasNorthAmericanShape(text, isAlone: shape.isAlone)
+    }
+
+    /// A postal code written with a dash: "01010-000" in Brazil, "1000-001" in Portugal, "12345-6789" in the United States.
+    static func isPostalCode(_ text: String) -> Bool {
+        guard let sizes = groupSizes(of: text, separatedBy: "-") else { return false }
+        return [[5, 3], [4, 3], [5, 4]].contains(sizes)
+    }
+
+    /// Ten digits in the groups of the United States and Canada ("555-555-5555", "1-555-555-5555"), or ten or eleven
+    /// digits without a separator. Only the dashed form is a phone number wherever it stands; the others are one only
+    /// when the number is a part of the line by itself, so that a figure in a sentence is no phone number.
+    private static func hasNorthAmericanShape(_ text: String, isAlone: Bool) -> Bool {
+        let groups = [[3, 3, 4], [1, 3, 3, 4]]
+        if let sizes = groupSizes(of: text, separatedBy: "-"), groups.contains(sizes) { return true }
+        guard isAlone else { return false }
+        if let sizes = groupSizes(of: text, separatedBy: "."), groups.contains(sizes) { return true }
+        return (10...11).contains(text.count) && text.allSatisfy { $0.isASCII && $0.isNumber }
+    }
+
+    /// The sizes of the groups of digits between the separators, when the text is only digits and that separator.
+    private static func groupSizes(of text: String, separatedBy separator: Character) -> [Int]? {
+        let groups = text.split(separator: separator, omittingEmptySubsequences: false)
+        guard groups.allSatisfy({ !$0.isEmpty && $0.allSatisfy { $0.isASCII && $0.isNumber } }) else { return nil }
+        return groups.map(\.count)
     }
 }

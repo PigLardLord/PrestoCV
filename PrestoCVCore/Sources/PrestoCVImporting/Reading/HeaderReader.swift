@@ -18,6 +18,8 @@ enum HeaderReader {
         var emails: [(Sourced<EmailAddress>, Section)] = []
         var phones: [(Sourced<PhoneNumber>, Section)] = []
         var names = LabelledName()
+        // The blocks that hold a contact: a line next to one of them can be the place
+        var contactBlocks = Set<Int>()
 
         for section in sections {
             for block in section.blocks where !findings.consumedBlocks.contains(block.index) {
@@ -25,7 +27,7 @@ enum HeaderReader {
                 if let (label, values) = labelled(cells) {
                     switch label {
                     case .name:
-                        names.add(values, to: \.name, section: section, into: &findings)
+                        names.add(withoutCredentials(values, in: section, into: &findings), to: \.name, section: section, into: &findings)
                     case .firstName:
                         names.add(values, to: \.firstName, section: section, into: &findings)
                     case .lastName:
@@ -38,12 +40,13 @@ enum HeaderReader {
                             findings.unplace(block, in: section)
                         }
                     case .phone, .email, .web:
+                        contactBlocks.insert(block.index)
                         for value in values {
-                            let contacts = ContactReader.read(value)
+                            let contacts = ContactReader.read(value, label: label)
                             emails += contacts.emails.map { ($0, section) }
                             phones += contacts.phones.map { ($0, section) }
                             findings.cv.person.links += contacts.links
-                            for rest in contacts.rest { findings.unplace(rest, in: section) }
+                            for rest in contacts.rest + contacts.unknownLabels { findings.unplace(rest, in: section) }
                         }
                     case .birth, .nationality, .maritalStatus, .gender, .fax, .other:
                         // Personal details that the CV has no field for stay visible, with their label
@@ -59,8 +62,10 @@ enum HeaderReader {
                     emails += contacts.emails.map { ($0, section) }
                     phones += contacts.phones.map { ($0, section) }
                     findings.cv.person.links += contacts.links
-                    rest += contacts.rest
+                    rest += contacts.rest + keepingNames(contacts.unknownLabels, in: section, into: &findings)
                 }
+                if hasContacts { contactBlocks.insert(block.index) }
+                rest.sort { $0.span < $1.span }
                 for (index, piece) in rest.enumerated() {
                     candidates.append(Candidate(piece: piece, block: block, section: section, blockHasContacts: hasContacts, isFirstInBlock: index == 0))
                 }
@@ -84,23 +89,25 @@ enum HeaderReader {
         }
 
         var taken = Set<Int>()
-        if findings.cv.person.name == nil, let index = nameCandidate(in: candidates) {
-            let candidate = candidates[index]
-            let isMarked = candidate.block.kind == .heading(level: 1) || index == 0 || isLargestText(candidate.block, in: findings.document)
-            findings.cv.person.name = candidate.piece.quote(check: isMarked ? nil : .nameByPosition)
-            taken.insert(index)
-            // The title follows the name, in the same line or the next
-            let next = index + 1
+        if findings.cv.person.name == nil, let reading = nameCandidate(in: candidates) {
+            let candidate = candidates[reading.index]
+            let isMarked = !reading.isGuess
+                && (candidate.block.kind == .heading(level: 1) || reading.index == 0 || isLargestText(candidate.block, in: findings.document))
+            findings.cv.person.name = reading.name.quote(check: isMarked ? nil : .nameByPosition)
+            taken.insert(reading.index)
+            // The title follows the name, in the same line or the next, and the credentials of the name go with it
+            let next = reading.index + 1
             if next < candidates.count, candidates[next].section == candidate.section, looksLikeTitle(candidates[next]) {
-                findings.cv.person.title = candidates[next].piece.quote()
+                findings.cv.person.title = title(candidates[next].piece, with: reading.split?.credentials ?? [])
                 taken.insert(next)
+            } else if let tail = reading.split?.tail {
+                findings.unplace(tail, in: candidate.section)
             }
         }
         if findings.cv.person.location == nil,
-           let index = candidates.indices.first(where: { !taken.contains($0) && looksLikePlace(candidates[$0]) }) {
-            let piece = candidates[index].piece
-            findings.cv.person.location = piece.quote(check: Places.isKnownPlace(piece.text) ? nil : .locationByPosition)
+           let index = candidates.indices.first(where: { !taken.contains($0) && looksLikePlace(candidates[$0], beside: contactBlocks) }) {
             taken.insert(index)
+            findings.cv.person.location = location(at: index, in: candidates, beside: contactBlocks, taken: &taken)
         }
         if !hasSummarySection {
             let prose = candidates.indices.filter {
@@ -203,8 +210,57 @@ enum HeaderReader {
 
     // MARK: Name, title and place
 
-    private static func nameCandidate(in candidates: [Candidate]) -> Int? {
-        candidates.indices.prefix(6).first { looksLikeName(candidates[$0].piece.text) && candidates[$0].isFirstInBlock }
+    private struct NameReading {
+        let index: Int
+        let name: Piece
+        let split: Credentials.Split?
+
+        /// A name that only the position gives: a code of a state among its credentials.
+        var isGuess: Bool { split?.isAmbiguous ?? false }
+    }
+
+    /// The first line of the head that reads as a name, with its credentials cut off. A line with a code that is also
+    /// the code of a state ("Jane Rowe, MD") is a name only when no other line is one: "Silver Spring, MD" is a place.
+    private static func nameCandidate(in candidates: [Candidate]) -> NameReading? {
+        let window = candidates.indices.prefix(6).filter { candidates[$0].isFirstInBlock }
+        for allowingAmbiguous in [false, true] {
+            for index in window {
+                let piece = candidates[index].piece
+                if let split = Credentials.split(piece, allowingAmbiguous: allowingAmbiguous), looksLikeName(split.name.text) {
+                    return NameReading(index: index, name: split.name, split: split)
+                }
+                if !allowingAmbiguous, looksLikeName(piece.text) { return NameReading(index: index, name: piece, split: nil) }
+            }
+        }
+        return nil
+    }
+
+    /// The credentials of a name given under the label of a name stay visible as text not imported.
+    private static func withoutCredentials(_ values: [Piece], in section: Section, into findings: inout Findings) -> [Piece] {
+        guard let first = values.first, let split = Credentials.split(first, allowingAmbiguous: false), looksLikeName(split.name.text) else { return values }
+        findings.unplace(split.tail, in: section)
+        return [split.name] + values.dropFirst()
+    }
+
+    /// The title with the credentials of the name after it: "Nurse, RN".
+    private static func title(_ piece: Piece, with credentials: [Piece]) -> Sourced<String> {
+        guard !credentials.isEmpty else { return piece.quote() }
+        let pieces = [piece] + credentials
+        return Sourced(value: pieces.map(\.text).joined(separator: ", "), spans: pieces.map(\.span))
+    }
+
+    /// A label the vocabulary does not know ("Contact via") is shown as text not imported. One that reads as a name or as
+    /// a place ("Jane Rowe: jane@example.com", "Torino: 333 000 0000") is the content of the line and stays a candidate.
+    private static func keepingNames(_ labels: [Piece], in section: Section, into findings: inout Findings) -> [Piece] {
+        var kept: [Piece] = []
+        for label in labels {
+            if looksLikeName(label.text) || Places.isKnownPlace(label.text) {
+                kept.append(label)
+            } else {
+                findings.unplace(label, in: section)
+            }
+        }
+        return kept
     }
 
     /// Two to five words, each with a capital (or a particle such as "de", "van", "von"), letters only, and not a
@@ -228,20 +284,56 @@ enum HeaderReader {
         let text = candidate.piece.text
         let words = candidate.piece.words
         guard (1...14).contains(words.count), text.contains(where: \.isLetter), candidate.isFirstInBlock else { return false }
-        if !DateReader.periods(in: text).isEmpty || SectionVocabulary.kind(ofHeading: text) != nil { return false }
-        if looksLikePlace(candidate) && !EntryVocabulary.isRole(text) { return false }
+        if !DateReader.periods(in: text).isEmpty || SectionVocabulary.kind(ofHeading: text) != nil || isBareLabel(text) { return false }
+        // The line under the name is a title unless it is a place or a street, whatever follows it
+        if looksLikePlace(candidate, beside: []) && !EntryVocabulary.isRole(text) { return false }
         return true
     }
 
-    /// A short piece of letters that names a place: in a line of contacts, or alone with a comma or a known place.
-    private static func looksLikePlace(_ candidate: Candidate) -> Bool {
+    /// A short piece of letters that names a place: a known place or a street, in a line of contacts, or alone with a
+    /// comma. A short line of capitalised words between lines of contacts is a place as well, to be checked.
+    private static func looksLikePlace(_ candidate: Candidate, beside contactBlocks: Set<Int>) -> Bool {
         let text = candidate.piece.text
         let words = candidate.piece.words
         guard (1...8).contains(words.count), !text.contains("@"), text.contains(where: \.isLetter) else { return false }
         if EntryVocabulary.isRole(text) || EntryVocabulary.isOrganisation(text) || text.hasSuffix(".") { return false }
-        if SectionVocabulary.kind(ofHeading: text) != nil || !DateReader.periods(in: text).isEmpty { return false }
-        if Places.isKnownPlace(text) { return true }
-        return candidate.blockHasContacts && (text.contains(",") || words.count <= 3)
+        if SectionVocabulary.kind(ofHeading: text) != nil || !DateReader.periods(in: text).isEmpty || isBareLabel(text) { return false }
+        if Places.isKnownPlace(text) || Places.isAddress(text) { return true }
+        if candidate.blockHasContacts && (text.contains(",") || words.count <= 3) { return true }
+        return isLoneCity(candidate, beside: contactBlocks)
+    }
+
+    /// The label of a personal detail alone on its line, its value on the lines under it: "Anschrift:", "Address".
+    private static func isBareLabel(_ text: String) -> Bool {
+        EntryVocabulary.personalLabel(text) != nil
+    }
+
+    /// One to three capitalised words of letters, in a line of their own next to a line of contacts: "Bielefeld".
+    private static func isLoneCity(_ candidate: Candidate, beside contactBlocks: Set<Int>) -> Bool {
+        let index = candidate.block.index
+        guard candidate.isFirstInBlock, contactBlocks.contains(index - 1) || contactBlocks.contains(index + 1) else { return false }
+        let text = candidate.piece.text
+        let words = candidate.piece.words
+        guard (1...3).contains(words.count), text.allSatisfy({ $0.isLetter || " -'’.".contains($0) }) else { return false }
+        return words.allSatisfy { $0.first?.isUppercase == true || cityParticles.contains($0.folded) }
+    }
+
+    private static let cityParticles: Set<String> = ["am", "an", "im", "upon", "sur", "en", "de", "del", "di", "da", "do", "la", "le", "les", "aux", "on"]
+
+    /// The place at `index`. A street is followed by the line of its city, and the two are one place.
+    private static func location(at index: Int, in candidates: [Candidate], beside contactBlocks: Set<Int>, taken: inout Set<Int>) -> Sourced<String> {
+        let candidate = candidates[index]
+        var pieces = [candidate.piece]
+        let next = index + 1
+        if Places.isAddress(candidate.piece.text), !Places.isKnownPlace(candidate.piece.text), next < candidates.count, !taken.contains(next),
+           candidates[next].section == candidate.section, candidates[next].isFirstInBlock,
+           !Places.isAddress(candidates[next].piece.text) || Places.isKnownPlace(candidates[next].piece.text),
+           looksLikePlace(candidates[next], beside: contactBlocks) {
+            pieces.append(candidates[next].piece)
+            taken.insert(next)
+        }
+        let isKnown = pieces.contains { Places.isKnownPlace($0.text) } || Places.isAddress(candidate.piece.text)
+        return Sourced(value: pieces.map(\.text).joined(separator: ", "), spans: pieces.map(\.span), check: isKnown ? nil : .locationByPosition)
     }
 
     /// The block drawn in the largest type of its page: the name of most PDFs.

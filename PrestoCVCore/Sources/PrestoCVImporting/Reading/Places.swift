@@ -11,22 +11,60 @@ enum Places {
                 return true
             }
         }
-        return hasPostalCode(text)
+        return hasPostalCode(text) || hasRegionTail(text)
     }
 
-    /// Whether a piece names a country or a region, as the last part of "Leeds, United Kingdom" does.
+    /// Whether a piece names a country or a region, as the last part of "Leeds, United Kingdom" or "Akron, OH" does.
     static func isCountryOrRegion(_ text: String) -> Bool {
-        let key = text.words.map { $0.folded }.joined(separator: " ")
-        return regions.contains(key)
+        let words = text.words
+        if words.count == 1, let code = words.first, regionCodes.contains(String(code)) { return true }
+        return regions.contains(words.map { $0.folded }.joined(separator: " "))
     }
 
-    private static let regions: Set<String> = Set((countries + others + states).map { $0.words.map { $0.folded }.joined(separator: " ") })
+    /// A city of one to three words, then a state, a province or a country: "Akron, OH", "Austin, Texas", "Calgary, Alberta".
+    /// The states are no places by themselves: "Virginia Woolf" and "Denzel Washington" are names.
+    private static func hasRegionTail(_ text: String) -> Bool {
+        guard !text.contains(where: \.isNumber) else { return false }
+        let cuts = (text.ranges(of: ", ") + text.ranges(of: " - ")).sorted { $0.lowerBound < $1.lowerBound }
+        guard let cut = cuts.last else { return false }
+        let city = text[text.startIndex..<cut.lowerBound].trimmingSpaces()
+        let region = text[cut.upperBound...].trimmingSpaces()
+        let cityWords = city.split(separator: " ")
+        guard (1...3).contains(cityWords.count), cityWords.allSatisfy({ $0.first?.isUppercase == true }),
+              city.allSatisfy({ $0.isLetter || " -'’.".contains($0) }) else { return false }
+        return isCountryOrRegion(String(region))
+    }
 
-    /// The codes of the states of the United States, as in "Boston, MA".
-    private static let states = [
+    private static let regions: Set<String> = Set((countries + others + stateNames + provinces + nations + laender).map { $0.words.map { $0.folded }.joined(separator: " ") })
+
+    /// The codes of the states of the United States, the provinces of Canada and a few states of Brazil, as in "Boston, MA".
+    /// A code is read only in capitals: "ma" and "or" are words.
+    private static let regionCodes: Set<String> = [
         "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA",
         "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN",
         "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC",
+        "ON", "QC", "BC", "AB", "MB", "SK", "NS", "NB", "NL", "PE", "NT", "NU", "YT",
+        "SP", "RJ", "MG", "RS", "PR", "DF", "GO",
+    ]
+
+    private static let stateNames = [
+        "alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut", "delaware", "florida", "georgia", "hawaii",
+        "idaho", "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana", "maine", "maryland", "massachusetts", "michigan",
+        "minnesota", "mississippi", "missouri", "montana", "nebraska", "nevada", "new hampshire", "new jersey", "new mexico", "new york",
+        "north carolina", "north dakota", "ohio", "oklahoma", "oregon", "pennsylvania", "rhode island", "south carolina", "south dakota",
+        "tennessee", "texas", "utah", "vermont", "virginia", "washington", "west virginia", "wisconsin", "wyoming", "district of columbia",
+    ]
+
+    private static let provinces = [
+        "ontario", "quebec", "québec", "british columbia", "alberta", "manitoba", "saskatchewan", "nova scotia", "new brunswick",
+        "newfoundland and labrador", "prince edward island",
+    ]
+
+    private static let nations = ["england", "scotland", "wales", "northern ireland", "inghilterra", "scozia", "galles", "angleterre", "écosse"]
+
+    private static let laender = [
+        "baden-württemberg", "brandenburg", "hessen", "mecklenburg-vorpommern", "niedersachsen", "nordrhein-westfalen",
+        "rheinland-pfalz", "saarland", "sachsen-anhalt", "schleswig-holstein", "thüringen", "hesse", "lower saxony",
     ]
 
     /// A postal code: four or five digits next to a word, as in "04109 Leipzig", "10121 Torino", "1000-001 Lisboa".
@@ -41,6 +79,23 @@ enum Places {
         }
         return false
     }
+
+    // MARK: Street addresses
+
+    /// A street and number, or a postal code: "Musterstraße 5", "123 Main Street", "Via Roma 1", "04109 Leipzig".
+    static func isAddress(_ text: String) -> Bool {
+        if hasPostalCode(text) { return true }
+        guard text.contains(where: \.isNumber) else { return false }
+        return text.words.map { $0.folded }.contains { word in
+            streetWords.contains(word) || streetSuffixes.contains { word.hasSuffix($0) && word.count > $0.count }
+        }
+    }
+
+    private static let streetSuffixes = ["strasse", "str", "weg", "platz", "allee", "gasse"]
+
+    private static let streetWords: Set<String> = Set(["via", "viale", "piazza", "corso", "largo", "str", "strasse", "weg", "platz", "allee",
+        "calle", "avenida", "av", "plaza", "paseo", "rua", "avenue", "ave", "rue", "boulevard", "blvd", "bd", "street", "st", "road", "rd",
+        "lane", "travessa"].map(\.folded))
 
     private static let known: Set<String> = Set((countries + cities + others).map(\.folded))
 
@@ -75,6 +130,10 @@ enum Places {
         "zurich", "zurigo", "genf", "geneva", "ginevra", "genève", "basel", "bern", "lausanne", "lugano", "wien", "vienna", "viena",
         "vienne", "graz", "salzburg", "innsbruck", "linz", "brussels", "bruxelles", "brüssel", "bruselas", "bruxelas", "amsterdam",
         "rotterdam", "new york", "san francisco", "boston", "chicago", "toronto", "montreal", "luxembourg",
+        "los angeles", "seattle", "philadelphia", "pittsburgh", "minneapolis", "atlanta", "miami", "akron", "san diego", "san jose",
+        "las vegas", "vancouver", "ottawa", "calgary", "reims", "bielefeld", "duisburg", "wuppertal", "augsburg", "kiel",
+        "lübeck", "rostock", "erfurt", "mainz", "wiesbaden", "kassel", "münster", "aachen", "toulon", "dijon",
+        "orléans", "amiens", "limoges", "perpignan", "saint-étienne", "le havre",
     ]
 
     private static let others = [

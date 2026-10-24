@@ -295,12 +295,26 @@ enum EntryReader {
         }
         let parts = piece.split(by: [", "])
         // "Leeds, United Kingdom": short capitalised parts that end with a known country or region are one place
-        if parts.count >= 2, let last = parts.last, Places.isCountryOrRegion(last.text),
-           parts.allSatisfy({ $0.words.count <= 3 && $0.text.first?.isUppercase == true && !EntryVocabulary.isOrganisation($0.text)
-               && !EntryVocabulary.isRole($0.text) && !EntryVocabulary.isSchool($0.text) && !EntryVocabulary.isDegree($0.text) }) {
-            return [Segment(piece: piece, part: .location, isMarked: true)]
+        if let start = placeStart(in: parts), let last = parts.last {
+            let lower = cellRange(of: parts[start], in: piece).lowerBound
+            let upper = cellRange(of: last, in: piece).upperBound
+            return parts[..<start].map { classify($0, kind: kind) } + [Segment(piece: piece.sub(lower..<upper), part: .location, isMarked: true)]
         }
         return parts.map { classify($0, kind: kind) }
+    }
+
+    /// Where the place starts in the parts of a line that ends with a country or a region: the city before it, and the
+    /// regions before that, as in "Springfield, Illinois, United States". What comes before the city, "Harbor Law Firm,
+    /// Medford, Ohio", is no part of the place.
+    private static func placeStart(in parts: [Piece]) -> Int? {
+        guard parts.count >= 2, let last = parts.last, Places.isCountryOrRegion(last.text) else { return nil }
+        var start = parts.count - 2
+        while start > 0, Places.isCountryOrRegion(parts[start].text) { start -= 1 }
+        let isPlace = parts[start...].allSatisfy {
+            $0.words.count <= 3 && $0.text.first?.isUppercase == true && !EntryVocabulary.isOrganisation($0.text)
+                && !EntryVocabulary.isRole($0.text) && !EntryVocabulary.isSchool($0.text) && !EntryVocabulary.isDegree($0.text)
+        }
+        return isPlace ? start : nil
     }
 
     static func classify(_ piece: Piece, kind: Kind) -> Segment {
@@ -326,7 +340,7 @@ enum EntryReader {
             if isDegree { return Segment(piece: piece, part: .primary, isMarked: true) }
         }
         if isPlace { return Segment(piece: piece, part: .location, isMarked: true) }
-        if isAddress(text) { return Segment(piece: piece, part: .address, isMarked: true) }
+        if Places.isAddress(text) { return Segment(piece: piece, part: .address, isMarked: true) }
         return Segment(piece: piece, part: .unknown, isMarked: false)
     }
 
@@ -335,17 +349,6 @@ enum EntryReader {
         return ["gmbh", "ag", "spa", "srl", "ltd", "inc", "llc", "sa", "sl", "sarl", "lda", "kg"].contains(where: words.contains)
             || ["s.p.a", "s.r.l", "s.a.", "e.v"].contains { text.folded.contains($0) }
     }
-
-    /// A street and number, or a postal code.
-    private static func isAddress(_ text: String) -> Bool {
-        if Places.hasPostalCode(text) { return true }
-        let words = text.words.map { $0.folded }
-        guard text.contains(where: \.isNumber) else { return false }
-        return words.contains { streetWords.contains($0) || $0.hasSuffix("strasse") || $0.hasSuffix("straße".folded) || $0.hasSuffix("weg") || $0.hasSuffix("platz") }
-    }
-
-    private static let streetWords: Set<String> = Set(["via", "viale", "piazza", "corso", "largo", "str", "strasse", "weg", "platz", "allee",
-        "calle", "avenida", "av", "plaza", "paseo", "rua", "avenue", "rue", "boulevard", "bd", "street", "st", "road", "rd", "lane", "travessa", "largo"].map(\.folded))
 
     /// The order in which the section's entries put their two main parts, learned from the entries that mark both.
     struct Order: Equatable {

@@ -540,6 +540,22 @@
   "source": "traps/consent-it.txt"
  },
  {
+  "id": "traps/credentials-de",
+  "language": "de",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/credentials-de.expected.json",
+  "source": "traps/credentials-de.txt"
+ },
+ {
+  "id": "traps/credentials-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/credentials-en.expected.json",
+  "source": "traps/credentials-en.txt"
+ },
+ {
   "id": "traps/data-course-de",
   "language": "de",
   "form": "trap",
@@ -580,6 +596,14 @@
   "source": "traps/employer-first-en.txt"
  },
  {
+  "id": "traps/employer-state-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/employer-state-en.expected.json",
+  "source": "traps/employer-state-en.txt"
+ },
+ {
   "id": "traps/ferramentas-pt",
   "language": "pt",
   "form": "trap",
@@ -612,12 +636,28 @@
   "source": "traps/linkedin-text-pt.txt"
  },
  {
+  "id": "traps/lone-city-fr",
+  "language": "fr",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/lone-city-fr.expected.json",
+  "source": "traps/lone-city-fr.txt"
+ },
+ {
   "id": "traps/pasiones-es",
   "language": "es",
   "form": "trap",
   "kind": "text",
   "expected": "traps/pasiones-es.expected.json",
   "source": "traps/pasiones-es.txt"
+ },
+ {
+  "id": "traps/postcode-pt",
+  "language": "pt",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/postcode-pt.expected.json",
+  "source": "traps/postcode-pt.txt"
  },
  {
   "id": "traps/qualificacoes-pt",
@@ -658,6 +698,22 @@
   "kind": "text",
   "expected": "traps/stack-technique-fr.expected.json",
   "source": "traps/stack-technique-fr.txt"
+ },
+ {
+  "id": "traps/street-es",
+  "language": "es",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/street-es.expected.json",
+  "source": "traps/street-es.txt"
+ },
+ {
+  "id": "traps/street-it",
+  "language": "it",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/street-it.expected.json",
+  "source": "traps/street-it.txt"
  },
  {
   "id": "traps/surname-label-it",
