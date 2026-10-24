@@ -365,6 +365,48 @@ struct EntryReaderTests {
         #expect(found.cv.experience.map { $0.details.map(\.value) } == [["Cassa e rifornimento scaffali"], []])
     }
 
+    @Test("A range that opens the section but belongs to no entry leaves the later dates with the head lines above them")
+    func leadingRangeBelongsToNoEntry() throws {
+        // The range is isolated by a gap, the last date has nothing after it, or both
+        let samples = [
+            """
+            Experience
+            2010 – 2025
+
+            Developer at Acme Ltd
+            2020 – 2025
+
+            Cleaner at Verdi Ltd
+            2010 – 2020
+            """,
+            """
+            Experience
+            2010 – 2025
+            Developer at Acme Ltd
+            2020 – 2025
+            Cleaner at Verdi Ltd
+            2010 – 2020
+            """,
+            """
+            Experience
+            2010 – 2025
+
+            Developer at Acme Ltd
+            2020 – 2025
+            • Built the tools
+
+            Cleaner at Verdi Ltd
+            2010 – 2020
+            • Cleaned the offices
+            """,
+        ]
+        for text in samples {
+            let named = read(text).cv.experience.filter { $0.role != nil }
+            #expect(named.map { $0.role?.value } == ["Developer", "Cleaner"])
+            #expect(named.map { $0.period?.value.start.year } == [2020, 2010])
+        }
+    }
+
     @Test("An end before the start, and a range with no end, are flagged")
     func unreadablePeriods() throws {
         let found = read("""

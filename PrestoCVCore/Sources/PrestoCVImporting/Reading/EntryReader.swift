@@ -135,12 +135,11 @@ enum EntryReader {
             }
             heads.append(count)
         }
-        // A section whose first line starts with a date has its dates first: nothing precedes the first entry's date,
-        // so the short lines under a date are its entry's own, and not the head of the next date. A date at the end of
-        // the first line says nothing, the line holds its entry's head. Otherwise most dates leaving no head line of
-        // their own says so.
-        let opensWithDate = anchors[0] == 0 && startsWithPeriod(usable[0], in: findings.document)
-        let datesFirst = opensWithDate || heads.filter { $0 == 0 }.count * 2 > heads.count
+        // A section that opens with its first entry's date has its dates first: nothing precedes that date, so the
+        // short lines under a date are its entry's own, and not the head of the next date. Otherwise most dates
+        // leaving no head line of their own says so.
+        let datesFirst = opensWithItsFirstDate(usable, anchors: anchors, in: findings.document)
+            || heads.filter { $0 == 0 }.count * 2 > heads.count
         let positive = heads.filter { $0 > 0 }
         let typicalHead = mode(positive) ?? 0
 
@@ -187,11 +186,31 @@ enum EntryReader {
         return drafts
     }
 
-    /// Whether nothing but marks comes before the line's period: no letter and no digit.
-    private static func startsWithPeriod(_ line: Line, in document: SourceDocument) -> Bool {
-        guard let period = line.period?.piece, line.block.span.lowerBound <= period.span.lowerBound else { return false }
-        let before = document.text(of: SourceSpan(line.block.span.lowerBound, period.span.lowerBound))
-        return !before.contains { $0.isLetter || $0.isNumber }
+    /// Whether the section opens with its first entry's date: its first line starts with a period (a date at the end
+    /// of the first line says nothing, that line holds its entry's head), and the period is neither a range alone
+    /// with a gap after it, which sums up the whole section, nor a last line with nothing after it, which would
+    /// leave an entry empty.
+    private static func opensWithItsFirstDate(_ usable: [Line], anchors: [Int], in document: SourceDocument) -> Bool {
+        guard anchors[0] == 0, let first = surroundings(of: usable[0], in: document), !hasContent(first.before) else { return false }
+        if !hasContent(first.after), usable.count > 1, usable[1].block.followsGap { return false }
+        if let last = anchors.last, last == usable.count - 1, let end = surroundings(of: usable[last], in: document),
+           !hasContent(end.before), !hasContent(end.after) {
+            return false
+        }
+        return true
+    }
+
+    /// The text of the line before and after its period.
+    private static func surroundings(of line: Line, in document: SourceDocument) -> (before: String, after: String)? {
+        guard let period = line.period?.piece, line.block.span.lowerBound <= period.span.lowerBound,
+              period.span.upperBound <= line.block.span.upperBound else { return nil }
+        return (document.text(of: SourceSpan(line.block.span.lowerBound, period.span.lowerBound)),
+                document.text(of: SourceSpan(period.span.upperBound, line.block.span.upperBound)))
+    }
+
+    /// Whether the text holds a letter or a digit, not only marks.
+    private static func hasContent(_ text: String) -> Bool {
+        text.contains { $0.isLetter || $0.isNumber }
     }
 
     /// Entries with no dates: a new entry at each line of a head that follows a body or a gap.
