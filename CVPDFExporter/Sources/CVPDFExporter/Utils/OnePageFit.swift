@@ -23,9 +23,13 @@ public struct OnePageFit: Sendable, Equatable {
     /// Every class a step puts on the root element
     public static let classNames: Set<String> = [className, compactClassName]
 
-    /// The margin at the foot of a page never shrinks below this, in points (10 mm): a printer cannot print closer
-    /// to the edge, and a page is easy to read with that much white below its text.
-    public static let minimumBottomMargin = 28.0
+    /// The least margin at the foot of a page, in millimetres: a printer cannot print closer to the edge, and a page is
+    /// easy to read with that much white below its text
+    public static let minimumBottomMarginInMillimetres = 10.0
+
+    /// The margin at the foot of a page never shrinks below this, in points: `minimumBottomMarginInMillimetres`, at 72
+    /// points to the inch of 25.4 mm
+    public static let minimumBottomMargin = minimumBottomMarginInMillimetres / 25.4 * 72
 
     /// One print of a CV with its spacing tightened
     public struct Step: Sendable, Equatable {

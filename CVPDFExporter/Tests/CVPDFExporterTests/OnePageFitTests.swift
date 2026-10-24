@@ -50,7 +50,12 @@ struct OnePageFitTests {
         #expect(fit.bottomMargin(during: shrinking, normal: 43) == OnePageFit.minimumBottomMargin)
         #expect(fit.bottomMargin(during: shrinking, normal: 72) == OnePageFit.minimumBottomMargin)
         #expect(fit.bottomMargin(during: shrinking, normal: 20) == 20, "A margin already below the minimum is not raised")
-        #expect(OnePageFit.minimumBottomMargin >= 28)
+    }
+
+    @Test("the least foot margin is 10 mm to the point, as the documents say")
+    func footMarginFloorIsTenMillimetres() {
+        let tenMillimetres = 10.0 / 25.4 * 72.0
+        #expect(abs(OnePageFit.minimumBottomMargin - tenMillimetres) < 0.001, "\(OnePageFit.minimumBottomMargin) pt is not 10 mm (\(tenMillimetres) pt)")
     }
 
     // MARK: - What the designs do under the classes

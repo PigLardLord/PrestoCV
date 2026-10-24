@@ -195,7 +195,7 @@ A short CV often runs over one page by a few lines, and its last sections, kept 
 The renderer tries two steps on a candidate, lightest first, and keeps the first print that takes one page:
 
 1. **Tightening** (class `fit-one-page` on the root element): the space between blocks and between lines closes up a little. The foot margin of the page stays.
-2. **Compact** (classes `fit-one-page` and `fit-one-page-compact`): the space closes up to the least that is still easy to read; the small lists (languages, profiles, certificates) of the designs that stack them run along a line instead of down a column; and the margin at the foot of the page shrinks from the page's margin to `OnePageFit.minimumBottomMargin` (10 mm).
+2. **Compact** (classes `fit-one-page` and `fit-one-page-compact`): the space closes up to the least that is still easy to read; the small lists (languages, profiles, certificates) of the designs that stack them run along a line instead of down a column; and the margin at the foot of the page shrinks from the page's margin to `OnePageFit.minimumBottomMargin`, which is 10 mm.
 
 A CV that no step brings onto one page is printed as its design lays it out. That print is drawn before the page changes, so it is the same, page for page, as without `OnePageFit`: a long CV keeps its page breaks, and so does a CV of two pages that is too long to fit.
 
