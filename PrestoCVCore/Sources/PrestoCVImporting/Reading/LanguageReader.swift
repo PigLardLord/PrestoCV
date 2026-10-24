@@ -7,6 +7,7 @@ enum LanguageReader {
     static func read(_ section: Section, into findings: inout Findings) {
         // The language the block above created, when it created exactly one: a level on a line of its own is its level
         var above: Int?
+        let firstLanguage = findings.cv.languages.count
         for (position, block) in section.blocks.enumerated() {
             let before = findings.cv.languages.count
             defer { above = findings.cv.languages.count == before + 1 ? before : nil }
@@ -21,7 +22,12 @@ enum LanguageReader {
                 if isNative(first.text) { nativeLabel = first }
                 cells.removeFirst()
             }
-            if let nativeLabel, cells.isEmpty, attachNative(nativeLabel, to: above, section: section, into: &findings) { continue }
+            if let nativeLabel, cells.isEmpty {
+                // Alone on its line it is the level of the language above. Where no language can take it but one has been
+                // read in the section, it is a statement left over, not a label of the row: shown, never dropped.
+                if attachNative(nativeLabel, to: above, section: section, into: &findings) { continue }
+                if findings.cv.languages.count > firstLanguage { findings.unplace(nativeLabel, in: section); continue }
+            }
             let next = section.blocks.indices.contains(position + 1) ? section.blocks[position + 1] : nil
             let row = Row(nativeLabel: nativeLabel, above: above, levelFollows: isLevelOnly(next, in: section, findings: findings))
             read(items(of: cells), row: row, section: section, into: &findings)

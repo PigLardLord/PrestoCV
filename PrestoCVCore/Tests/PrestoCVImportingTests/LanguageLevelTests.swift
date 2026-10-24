@@ -71,6 +71,28 @@ struct LanguageLevelTests {
         #expect(before.unplaced.map(\.text) == ["Native"])
     }
 
+    @Test("A native statement alone on its line that no language can take is shown, in each language's words", arguments: ownLine)
+    func nativeThatCannotBeTaken(heading: String, name: String, native: String, other: String) {
+        let afterALevel = read("\(heading)\n\(name): C1\n\(native)")
+        #expect(summary(afterALevel) == ["\(name)=c1"])
+        #expect(afterALevel.unplaced.map(\.text) == [native])
+
+        let afterSeveral = read("\(heading)\n\(name), \(other)\n\(native)")
+        #expect(summary(afterSeveral) == ["\(name)=-", "\(other)=-"])
+        #expect(afterSeveral.unplaced.map(\.text) == [native])
+
+        let afterAnotherLine = read("\(heading)\n\(name)\nCambridge Certificate\n\(native)")
+        #expect(afterAnotherLine.cv.languages.map { $0.level?.value } == [nil])
+        #expect(afterAnotherLine.unplaced.map(\.text) == ["Cambridge Certificate", native])
+    }
+
+    @Test("The label of the mother tongues above their language is a label, not a text left out")
+    func nativeLabelAboveItsLanguage() {
+        let found = read("Lingue\nMadrelingua\nItaliano\nAltre lingue\nInglese\nB2")
+        #expect(summary(found) == ["Italiano=-", "Inglese=b2"])
+        #expect(found.unplaced.isEmpty)
+    }
+
     // MARK: A language outside the list
 
     @Test("A name next to a CEFR level or the words of a native speaker is a language, whatever the name", arguments: [
