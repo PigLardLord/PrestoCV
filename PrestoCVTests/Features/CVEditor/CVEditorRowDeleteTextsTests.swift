@@ -47,7 +47,7 @@ struct CVEditorRowDeleteTextsTests {
 
     @Test("The question and the message of a pending deletion come from its kind and its row")
     func pendingDeletionTexts() {
-        let deletion = PendingDeletion(section: .certifications, index: 2, rowName: "AWS Architect")
+        let deletion = PendingDeletion(section: .certifications, index: 2, rowName: "AWS Architect", rowIdentity: "AWS Architect")
 
         #expect(deletion.title == EditorSection.certifications.deleteConfirmationTitle)
         #expect(deletion.message == "editor.delete_row.message".localizedWithArgs("AWS Architect"))

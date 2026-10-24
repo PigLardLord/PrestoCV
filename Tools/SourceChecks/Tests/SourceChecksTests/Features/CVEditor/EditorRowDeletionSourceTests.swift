@@ -52,6 +52,22 @@ struct EditorRowDeletionSourceTests {
         #expect(!source.contains(".onDelete("))
     }
 
+    @Test("The anchor of the confirmation is described as the row that was swiped, not as a button")
+    func anchorIsDescribedAsTheSwipedRow() throws {
+        let url = Repository.root
+            .appendingPathComponent("PrestoCV")
+            .appendingPathComponent("DesignSystem")
+            .appendingPathComponent("Components")
+            .appendingPathComponent("AnchoredConfirmationDialog.swift")
+        let source = try String(contentsOf: url, encoding: .utf8)
+
+        // The delete button is a swipe action now; nothing in the rows is a trash button any more
+        #expect(!source.contains("trash button"), "The comment of RowDeletionAnchor still names the button the rows used to have")
+        let anchor = try #require(source.range(of: "final class RowDeletionAnchor"))
+        let comment = String(source[..<anchor.lowerBound].suffix(300))
+        #expect(comment.contains("swipe"), "The anchor is the row whose delete button was swiped open")
+    }
+
     // MARK: - No delete control inside a row
 
     @Test("No row of the editor holds a delete button or a trash icon")

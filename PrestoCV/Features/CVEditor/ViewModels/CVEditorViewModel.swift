@@ -282,7 +282,7 @@ final class CVEditorViewModel: ObservableObject {
             return
         }
         guard row.isBlank else {
-            let deletion = PendingDeletion(section: section, index: index, rowName: row.displayName)
+            let deletion = PendingDeletion(section: section, index: index, rowName: row.displayName, rowIdentity: row.identity)
             deletionTitle = deletion.title
             pendingDeletion = deletion
             return
@@ -290,9 +290,18 @@ final class CVEditorViewModel: ObservableObject {
         removeRow(of: section, at: index)
     }
 
+    /// Removes the row that `deletion` asked about, once the person has said yes. An answer to a question that is no
+    /// longer the one asked (it was cancelled, answered already, or another took its place) removes nothing, and nor
+    /// does one for a place that another row has taken: the rows below a removed row move up into its index.
     @MainActor
     func confirmDeletion(_ deletion: PendingDeletion) {
+        guard pendingDeletion == deletion else {
+            return
+        }
         pendingDeletion = nil
+        guard row(of: deletion.section, at: deletion.index)?.identity == deletion.rowIdentity else {
+            return
+        }
         removeRow(of: deletion.section, at: deletion.index)
     }
 

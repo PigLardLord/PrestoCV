@@ -35,6 +35,8 @@ struct PendingDeletion: Equatable {
     let index: Int
     /// How the row is called in the confirmation.
     let rowName: String
+    /// Which row was asked about. The index alone is not enough to name it: once a row is gone, the next one takes its place.
+    let rowIdentity: AnyHashable
 
     /// The question of the confirmation, which names the kind of row.
     var title: String {

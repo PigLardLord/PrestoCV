@@ -7,6 +7,13 @@ protocol EditorRow {
     var isBlank: Bool { get }
     /// What the row is called in its delete button and in the confirmation to delete it.
     var displayName: String { get }
+    /// What tells this row from every other, whatever is typed in it: the row is the same row after its text was
+    /// edited, and a row that took its place is another row, even with the same text.
+    var identity: AnyHashable { get }
+}
+
+extension EditorRow where Self: Identifiable, Self.ID: Hashable {
+    var identity: AnyHashable { AnyHashable(id) }
 }
 
 extension EditorRow {
@@ -63,4 +70,6 @@ struct InterestEntry: EditorRow {
 
     var isBlank: Bool { text.isBlankText }
     var displayName: String { firstFilled(of: [text], orPlaceholder: "field.interest") }
+    /// A plain string has nothing but its text to tell it from another interest.
+    var identity: AnyHashable { text }
 }
