@@ -9,6 +9,13 @@ protocol EditorRow {
     var displayName: String { get }
 }
 
+extension EditorRow {
+    /// What the delete action of the row says to VoiceOver, so that it names the item it deletes: "Delete Swift".
+    var deleteActionLabel: String {
+        "accessibility.delete_row".localizedWithArgs(displayName)
+    }
+}
+
 private extension String {
     var isBlankText: Bool {
         trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

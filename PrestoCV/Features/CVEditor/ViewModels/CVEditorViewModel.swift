@@ -18,6 +18,9 @@ final class CVEditorViewModel: ObservableObject {
     /// What VoiceOver is told about saving, each time there is something to tell.
     @Published private(set) var saveAnnouncement: SaveAnnouncement?
     @Published private(set) var pendingDeletion: PendingDeletion?
+    /// The question of the confirmation to delete a row. It stays once the request is gone: the dialog is still on the
+    /// screen while it closes, and its title must not go blank.
+    private(set) var deletionTitle = ""
     /// What each contact field said when the person last left it: its check, which typing does not change.
     @Published private(set) var leftContactText: [ContactField: String] = [:]
     /// The message shown above a new CV, set by the screen that opened it.
@@ -279,7 +282,9 @@ final class CVEditorViewModel: ObservableObject {
             return
         }
         guard row.isBlank else {
-            pendingDeletion = PendingDeletion(section: section, index: index, rowName: row.displayName)
+            let deletion = PendingDeletion(section: section, index: index, rowName: row.displayName)
+            deletionTitle = deletion.title
+            pendingDeletion = deletion
             return
         }
         removeRow(of: section, at: index)
