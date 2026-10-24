@@ -6,7 +6,9 @@ struct CVListView<EmptyState: View>: View {
     @ObservedObject var viewModel: CVListViewModel
     @EnvironmentObject var router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
-    @State private var exportTarget: CVModel?
+    @State private var exportSheet: ExportSheet?
+    /// The export sheet of a row is being made: another tap on a row waits for it, so that one sheet is shown
+    @State private var isMakingExportSheet = false
     @State private var deleteTarget: CVModel?
     @State private var rowFrames = ScreenFrames<UUID>()
     @State private var showDeleteConfirmation = false
@@ -14,13 +16,14 @@ struct CVListView<EmptyState: View>: View {
     @State private var deleteAnchor: CGRect?
     @State private var renameTarget: CVModel?
     @State private var renameText = ""
-    private let makeExportSheet: @MainActor (CVModel) -> CVExportSheetViewModel
+    private let makeExportSheet: @MainActor (UUID) async -> CVExportSheetViewModel?
     private let emptyState: EmptyState
 
-    /// - Parameter makeExportSheet: Gives the export sheet of a CV of the list.
+    /// - Parameter makeExportSheet: Gives the export sheet of the CV of the list with the given id, or nil when that CV
+    ///   cannot be read, which the list view model has reported.
     init(
         viewModel: CVListViewModel,
-        makeExportSheet: @escaping @MainActor (CVModel) -> CVExportSheetViewModel,
+        makeExportSheet: @escaping @MainActor (UUID) async -> CVExportSheetViewModel?,
         @ViewBuilder emptyState: () -> EmptyState
     ) {
         self.viewModel = viewModel
@@ -76,8 +79,8 @@ struct CVListView<EmptyState: View>: View {
         .refreshable {
             await viewModel.loadCVs()
         }
-        .sheet(item: $exportTarget, onDismiss: viewModel.storeChoicesNow) { cv in
-            CVExportSheetView(viewModel: makeExportSheet(cv))
+        .sheet(item: $exportSheet, onDismiss: viewModel.storeChoicesNow) { sheet in
+            CVExportSheetView(viewModel: sheet.viewModel)
         }
         .anchoredConfirmationDialog(
             String(localized: "cv.delete.confirmation.title"),
@@ -120,6 +123,17 @@ struct CVListView<EmptyState: View>: View {
         }
     }
     
+    // MARK: - Actions
+
+    private func showExportSheet(ofCVWithId id: UUID) async {
+        guard !isMakingExportSheet else { return }
+        isMakingExportSheet = true
+        defer { isMakingExportSheet = false }
+        if let viewModel = await makeExportSheet(id) {
+            exportSheet = ExportSheet(viewModel: viewModel)
+        }
+    }
+
     // MARK: - View Components
     
     private var cvListView: some View {
@@ -139,7 +153,7 @@ struct CVListView<EmptyState: View>: View {
                     renameTarget = cv
                 },
                 onExport: {
-                    exportTarget = cv
+                    Task { await showExportSheet(ofCVWithId: cv.id) }
                 },
                 onDelete: {
                     deleteAnchor = rowFrames.rect(for: cv.id)
@@ -151,6 +165,14 @@ struct CVListView<EmptyState: View>: View {
         }
         .readableContentWidth()
     }
+}
+
+// MARK: - Export Sheet
+
+/// The export sheet that is shown: the view model it was made with, which the sheet keeps for as long as it is shown
+private struct ExportSheet: Identifiable {
+    let id = UUID()
+    let viewModel: CVExportSheetViewModel
 }
 
 // MARK: - CV Row View
@@ -219,15 +241,17 @@ struct CVListView_Previews: PreviewProvider {
         .environmentObject(AppRouter())
     }
     
-    private static func makeExportSheet(_ cv: CVModel) -> CVExportSheetViewModel {
-        PreviewDependencies.exportSheet(for: cv, sink: { _ in })
+    private static let cvs = [
+        CVModel(name: "Backend Engineer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Software Engineer")),
+        CVModel(name: "Product Designer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Designer")),
+    ]
+
+    private static func makeExportSheet(_ id: UUID) -> CVExportSheetViewModel? {
+        cvs.first { $0.id == id }.map { PreviewDependencies.exportSheet(for: $0, sink: { _ in }) }
     }
     
     private static func makeViewModel() -> CVListViewModel {
-        PreviewDependencies.list(of: [
-            CVModel(name: "Backend Engineer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Software Engineer")),
-            CVModel(name: "Product Designer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Designer")),
-        ])
+        PreviewDependencies.list(of: cvs)
     }
 }
 #endif

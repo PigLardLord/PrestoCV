@@ -45,7 +45,7 @@ struct AppRootView: View {
     private var listView: some View {
         CVListView(
             viewModel: cvListViewModel,
-            makeExportSheet: { viewModelFactory.makeExportSheetViewModel(exporting: $0, from: cvListViewModel) }
+            makeExportSheet: { await viewModelFactory.makeExportSheetViewModel(exportingCVWithId: $0, from: cvListViewModel) }
         ) {
             FirstRunView(viewModel: viewModelFactory.makeNewCVChoicesViewModel())
         }

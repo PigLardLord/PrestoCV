@@ -9,10 +9,9 @@ private struct NoSamples: SampleCVRepositoryProtocol {
     func getSample(by name: String) async throws -> CVModel? { nil }
 }
 
-private struct WriteFailed: Error {}
-
 /// What the list does with the language and the look chosen in the export sheet of one of its CVs: it waits for the
-/// choices to stop, stores them in one write, and keeps what was chosen until the row of the CV shows it.
+/// choices to stop, and stores them in one write. What a sheet opened again starts from is in
+/// `CVListViewModelCurrentCVTests`.
 @MainActor
 @Suite("CVListViewModel Tests - the choices made in an export sheet")
 struct CVListViewModelChoicesTests {
@@ -160,81 +159,5 @@ struct CVListViewModelChoicesTests {
         let stored = try #require(await repository.getCV(by: cv.id))
         #expect(stored.look?.design == "modern" && stored.documentLanguage == "de", "Both were stored, in turn")
         #expect(await repository.saveCount == 2)
-    }
-
-    // MARK: - What a sheet opened again starts from
-
-    @Test("A row with nothing chosen for it is as it is")
-    func rowWithNothingChosen() {
-        let list = makeViewModel(InMemoryCVRepository(cvs: [cv]))
-
-        #expect(list.withPendingChoices(cv) == cv)
-    }
-
-    @Test("A row shows the choices that wait for their pause: the language, and the parts of the look chosen")
-    func rowShowsTheWaitingChoices() {
-        let list = makeViewModel(InMemoryCVRepository(cvs: [cv]))
-
-        list.chooseDocumentLanguage(.german, ofCVWithId: cv.id)
-        list.chooseLook(lookChange([.design], design: "modern"), ofCVWithId: cv.id)
-
-        let shown = list.withPendingChoices(cv)
-        #expect(shown.documentLanguage == "de")
-        #expect(shown.look == CVLook(design: "modern", palette: "professional", fonts: "classic"))
-        #expect(shown.name == cv.name && shown.personalInfo == cv.personalInfo, "Nothing else of the CV")
-    }
-
-    @Test("A row shows the choices that are being written, and the ones that wait behind them")
-    func rowShowsTheChoicesBeingWritten() async throws {
-        let repository = InMemoryCVRepository(cvs: [cv])
-        let list = makeViewModel(repository)
-        await list.loadCVs()
-        await repository.holdNextSaves(1)
-
-        let save = list.chooseLook(lookChange([.design], design: "modern"), ofCVWithId: cv.id)
-        list.storeChoicesNow()
-        await repository.waitUntilSavesAreHeld(1)
-        list.chooseLook(lookChange([.fonts], design: "modern", fonts: "serif"), ofCVWithId: cv.id)
-
-        let row = try #require(list.cvs.first)
-        #expect(row.look == nil, "The row is still as it was read")
-        #expect(list.withPendingChoices(row).look == CVLook(design: "modern", palette: "professional", fonts: "serif"))
-
-        list.storeChoicesNow()
-        await repository.releaseOldestSave()
-        await save?.value
-    }
-
-    @Test("Once the choices are stored the row shows them, and has nothing more to add")
-    func rowShowsTheStoredChoices() async throws {
-        let repository = InMemoryCVRepository(cvs: [cv])
-        let list = makeViewModel(repository)
-        await list.loadCVs()
-
-        let save = list.chooseLook(lookChange([.design], design: "modern"), ofCVWithId: cv.id)
-        list.chooseDocumentLanguage(.german, ofCVWithId: cv.id)
-        list.storeChoicesNow()
-        await save?.value
-
-        let row = try #require(list.cvs.first)
-        #expect(row.look?.design == "modern" && row.documentLanguage == "de")
-        #expect(list.withPendingChoices(row) == row)
-    }
-
-    @Test("A write that fails leaves the row as it is: the sheet does not show a choice that was not stored")
-    func failedChoicesAreNotShown() async throws {
-        let repository = InMemoryCVRepository(cvs: [cv])
-        let list = makeViewModel(repository)
-        await list.loadCVs()
-        await repository.fail(.save, with: WriteFailed())
-
-        let save = list.chooseLook(lookChange([.design], design: "modern"), ofCVWithId: cv.id)
-        list.chooseDocumentLanguage(.german, ofCVWithId: cv.id)
-        list.storeChoicesNow()
-        await save?.value
-
-        let row = try #require(list.cvs.first)
-        #expect(list.withPendingChoices(row) == row)
-        #expect(list.actionError != nil, "The person is told")
     }
 }

@@ -265,7 +265,7 @@ final class CVListViewModel: ObservableObject {
     /// Changes the design, palette or font a CV's PDF is made with, as chosen in its export sheet: only the parts the
     /// person chose. Registered and stored like the language, in the same line and in the same save: a design, a palette and
     /// a font chosen one after the other are stored together, the latest choice of each, with one write and one read of
-    /// the list. The look the sheet showed is what a sheet opened again starts from (`withPendingChoices(_:)`).
+    /// the list. The look the sheet showed is what a sheet opened again starts from (`currentCV(withId:)`).
     /// - Returns: The save that stores it, for a caller that wants to wait for it; nil when a save under way will store it.
     @discardableResult
     func chooseLook(_ change: LookChange, ofCVWithId id: UUID) -> Task<Void, Never>? {
@@ -280,15 +280,41 @@ final class CVListViewModel: ObservableObject {
         ending.values.forEach { $0.cancel() }
     }
 
-    /// A row of the list as its export sheet starts from it: with what was chosen for the CV in an earlier sheet and the
-    /// row does not show yet, because the save is waiting for its pause or has not gone through. A sheet opened again then
-    /// shows the choices made, and what the person chooses next is added to them, not to a row that is a save behind.
-    func withPendingChoices(_ cv: CVModel) -> CVModel {
-        let notShown = (storingChoices[cv.id] ?? ExportChoices()).followed(by: waitingChoices[cv.id] ?? ExportChoices())
-        return notShown.applied(to: cv)
+    /// The CV a screen that makes output from it starts from, the export sheet: the CV as the store holds it now, with the
+    /// choices made in an export sheet that the store does not hold yet.
+    ///
+    /// It is read from the store, once the editors that were left have stored what they showed, and never taken from the
+    /// row: a row is a read behind for as long as the list is reading again, and for good when that read failed, and a sheet
+    /// made from it would show, and make the PDF from, a look or a language that an editor has changed since. The choices
+    /// that wait for their pause or are being written are not in the store yet: they are added on top, as they were when the
+    /// CV was asked for, so that a sheet opened again shows them and what the person chooses next is added to them. The
+    /// change queue is not waited for, since a write that is held would hold the sheet back with it.
+    /// - Returns: Nil when the CV cannot be read, which is reported as an action error: the person is told, and no sheet
+    ///   is made from a row that may be out of date. Nil without an error when the read was cancelled.
+    func currentCV(withId id: UUID) async -> CVModel? {
+        let notStored = pendingChoices(ofCVWithId: id)
+        await awaitLeftEditors()
+        do {
+            guard let stored = try await cvManagementUseCase.getCV(by: id) else {
+                actionError = Self.message(for: StoredCVChangeError.notFound)
+                return nil
+            }
+            return notStored.applied(to: stored)
+        } catch is CancellationError {
+            return nil
+        } catch {
+            actionError = Self.message(for: error)
+            return nil
+        }
     }
 
     // MARK: - Private Methods
+
+    /// What was chosen for a CV in an export sheet and the store does not hold yet: what the save under way is writing and,
+    /// after it, what waits for the pause to end.
+    private func pendingChoices(ofCVWithId id: UUID) -> ExportChoices {
+        (storingChoices[id] ?? ExportChoices()).followed(by: waitingChoices[id] ?? ExportChoices())
+    }
 
     /// Registers a choice, restarts the pause before the choices are stored, and queues the save unless one is queued or
     /// running: that one stores every choice made until it ends, so a caller that finds it returns at once.

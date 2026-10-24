@@ -16,6 +16,7 @@ final class ViewModelFactory {
     private let sampleRepository: SampleCVRepositoryProtocol
     private let cvManagementUseCase: CVManagementUseCaseProtocol
     private let environment: AppEnvironment
+    private let makeExportService: () -> any CVExportServiceProtocol
     /// The description typed on the AI screen, kept until a draft is made from it.
     private let aiDescriptionSession = AIDescriptionSession()
     /// The saves of the editors that were left, which the router starts and the list and the editors wait for.
@@ -28,15 +29,39 @@ final class ViewModelFactory {
     }
     
     /// - Parameter environment: What the view models read from the device.
-    init(
+    convenience init(
         dependencyContainer: PrestoCVCore.DependencyContainerProtocol,
         cvManagementUseCase: CVManagementUseCaseProtocol,
         environment: AppEnvironment
+    ) throws {
+        try self.init(
+            dependencyContainer: dependencyContainer,
+            cvManagementUseCase: cvManagementUseCase,
+            environment: environment,
+            makeExportService: {
+                CVExportService(
+                    container: PDFExportDependencyContainer(),
+                    fileNames: ExportFileName(titlePattern: DocumentTitlePatterns(bundle: environment.bundle).pattern(in:)),
+                    temporaryDirectory: environment.temporaryDirectory
+                )
+            }
+        )
+    }
+
+    /// - Parameters:
+    ///   - environment: What the view models read from the device.
+    ///   - makeExportService: Makes the service an export sheet exports and previews with, one for each sheet.
+    init(
+        dependencyContainer: PrestoCVCore.DependencyContainerProtocol,
+        cvManagementUseCase: CVManagementUseCaseProtocol,
+        environment: AppEnvironment,
+        makeExportService: @escaping () -> any CVExportServiceProtocol
     ) throws {
         self.dependencyContainer = dependencyContainer
         self.sampleRepository = try dependencyContainer.makeSampleCVRepository()
         self.cvManagementUseCase = cvManagementUseCase
         self.environment = environment
+        self.makeExportService = makeExportService
     }
     
     @MainActor
@@ -77,17 +102,20 @@ final class ViewModelFactory {
     }
     
     /// The export sheet of a CV of the list: the language and the design, palette and font chosen in it are stored with
-    /// the CV. It starts from the CV with what was chosen in an earlier sheet and is not stored yet, so that a sheet opened
-    /// again before the list has stored the last choice shows it.
+    /// the CV. It starts from the CV as the store holds it now, with what was chosen in an earlier sheet and is not stored
+    /// yet (`CVListViewModel.currentCV(withId:)`), and never from the row of the list, which can be a read behind: the
+    /// sheet would show, and make the PDF from, a look or a language that an editor has changed since.
+    /// - Returns: Nil when the CV cannot be read, which the list reports to the person.
     @MainActor
-    func makeExportSheetViewModel(exporting cv: CVModel, from list: CVListViewModel) -> CVExportSheetViewModel {
-        makeExportSheetViewModel(
-            cv: list.withPendingChoices(cv),
+    func makeExportSheetViewModel(exportingCVWithId id: UUID, from list: CVListViewModel) async -> CVExportSheetViewModel? {
+        guard let cv = await list.currentCV(withId: id) else { return nil }
+        return makeExportSheetViewModel(
+            cv: cv,
             documentLanguageSink: { language in
-                list.chooseDocumentLanguage(language, ofCVWithId: cv.id)
+                list.chooseDocumentLanguage(language, ofCVWithId: id)
             },
             lookSink: { change in
-                list.chooseLook(change, ofCVWithId: cv.id)
+                list.chooseLook(change, ofCVWithId: id)
             }
         )
     }
@@ -161,11 +189,7 @@ final class ViewModelFactory {
     ) -> CVExportSheetViewModel {
         CVExportSheetViewModel(
             cv: cv,
-            exportService: CVExportService(
-                container: PDFExportDependencyContainer(),
-                fileNames: ExportFileName(titlePattern: DocumentTitlePatterns(bundle: environment.bundle).pattern(in:)),
-                temporaryDirectory: environment.temporaryDirectory
-            ),
+            exportService: makeExportService(),
             preferencesStore: FileExportPreferencesStore(fileURL: environment.exportPreferencesFile),
             documentLanguageSink: documentLanguageSink,
             lookSink: lookSink,
