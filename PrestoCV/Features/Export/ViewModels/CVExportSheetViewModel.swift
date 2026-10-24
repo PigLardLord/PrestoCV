@@ -75,6 +75,10 @@ final class CVExportSheetViewModel: ObservableObject {
     /// The activity of the share sheet that saves a file to Files
     static let saveToFilesActivity = "com.apple.DocumentManagerUICore.SaveToFiles"
 
+    /// How long a selection must stay put before the sheet reacts to it: it makes its preview then, and the list of CVs
+    /// stores what was chosen.
+    static let selectionInterval = Duration.milliseconds(250)
+
     /// How the CV is exported: the page, its border, the longest CV, and what a CV needs before it is exported
     let exportPolicy: ExportPolicy
     /// The CV the sheet exports
@@ -169,7 +173,7 @@ final class CVExportSheetViewModel: ObservableObject {
     ///   - documentLanguageDetector: Reads which language the CV is written in, for the Automatic document language.
     ///   - appLocale: The language the app is shown in.
     ///   - previewDebounce: How long a selection must stay put before its preview is made, so that changing the
-    ///     template, the palette and the font in quick succession makes one preview and one PDF
+    ///     template, the palette and the font in quick succession makes one preview and one PDF (`selectionInterval`)
     init(
         cv: CVModel,
         exportService: any CVExportServiceProtocol,
@@ -179,7 +183,7 @@ final class CVExportSheetViewModel: ObservableObject {
         exportPolicy: ExportPolicy,
         documentLanguageDetector: DocumentLanguageDetector,
         appLocale: Locale,
-        previewDebounce: Duration = .milliseconds(250)
+        previewDebounce: Duration = CVExportSheetViewModel.selectionInterval
     ) {
         self.cv = cv
         self.exportService = exportService

@@ -20,6 +20,8 @@ final class ViewModelFactory {
     private let aiDescriptionSession = AIDescriptionSession()
     /// The saves of the editors that were left, which the router starts and the list and the editors wait for.
     private let leftEditorSaves = LeftEditorSaves()
+    /// The changes to stored CVs that the list makes, one CV at a time, which the editor of the CV waits for.
+    private let storedCVChanges = StoredCVChangeQueue()
     /// The copies the system makes of the PDFs opened in the app, which the import and the router let go.
     private var openedFileCopies: OpenedFileCopies {
         OpenedFileCopies(container: environment.container, removeFile: environment.removeFile)
@@ -42,16 +44,18 @@ final class ViewModelFactory {
         return OnboardingViewModel(onboardingUseCase: try dependencyContainer.makeOnboardingUseCase())
     }
 
-    /// The list of CVs, whose stored CVs are renamed and given a document language through PrestoCVApplication.
+    /// The list of CVs, whose stored CVs are renamed and given a document language or a look through PrestoCVApplication.
     @MainActor
     func makeCVListViewModel() -> CVListViewModel {
         CVListViewModel(
             cvManagementUseCase: cvManagementUseCase,
             storedCVChanges: ChangeStoredCV(cvs: ManagedStoredCVs(cvs: cvManagementUseCase)),
+            changeQueue: storedCVChanges,
             locale: environment.appLocale,
             now: environment.now,
             calendar: environment.calendar,
             sleep: environment.sleep,
+            clock: environment.clock,
             awaitLeftEditors: leftEditorSaves.allEnded
         )
     }
@@ -65,6 +69,7 @@ final class ViewModelFactory {
             documentLanguageDetector: makeDocumentLanguageDetector(),
             clock: environment.clock,
             awaitLeftEditors: leftEditorSaves.allEnded,
+            awaitStoredChanges: storedCVChanges.settled,
             reportSaveFailure: { error in
                 editorLogger.error("A change to a CV could not be saved: \(error.localizedDescription, privacy: .private)")
             }
@@ -72,16 +77,17 @@ final class ViewModelFactory {
     }
     
     /// The export sheet of a CV of the list: the language and the design, palette and font chosen in it are stored with
-    /// the CV.
+    /// the CV. It starts from the CV with what was chosen in an earlier sheet and is not stored yet, so that a sheet opened
+    /// again before the list has stored the last choice shows it.
     @MainActor
     func makeExportSheetViewModel(exporting cv: CVModel, from list: CVListViewModel) -> CVExportSheetViewModel {
         makeExportSheetViewModel(
-            cv: cv,
+            cv: list.withPendingChoices(cv),
             documentLanguageSink: { language in
-                Task { await list.setDocumentLanguage(language, ofCVWithId: cv.id) }
+                list.chooseDocumentLanguage(language, ofCVWithId: cv.id)
             },
-            lookSink: { look in
-                Task { await list.setLook(look, ofCVWithId: cv.id) }
+            lookSink: { change in
+                list.chooseLook(change, ofCVWithId: cv.id)
             }
         )
     }

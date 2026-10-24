@@ -76,7 +76,7 @@ struct CVListView<EmptyState: View>: View {
         .refreshable {
             await viewModel.loadCVs()
         }
-        .sheet(item: $exportTarget) { cv in
+        .sheet(item: $exportTarget, onDismiss: viewModel.storeChoicesNow) { cv in
             CVExportSheetView(viewModel: makeExportSheet(cv))
         }
         .anchoredConfirmationDialog(

@@ -17,7 +17,8 @@ struct AppEnvironment {
     let preferredLanguages: () -> [String]
     /// How the app waits
     let sleep: @Sendable (Duration) async throws -> Void
-    /// The clock the editors measure the pause before they save on
+    /// The clock the editors measure the pause before they save on, and the list the pause before it stores what was chosen
+    /// in an export sheet
     let clock: any Clock<Duration>
     /// Where each export gets a folder of its own
     let temporaryDirectory: URL

@@ -27,10 +27,15 @@ final class CVListViewModel: ObservableObject {
     
     /// How often the times of the rows are told again while the list is shown: they are given in minutes at best.
     static let tickInterval = Duration.seconds(60)
+    /// How long nothing must be chosen in an export sheet before what was chosen is stored: a design, a palette and a font
+    /// tried in turn make one save, and one change of the CV's time, as they make one preview in the sheet.
+    static let choicePause = CVExportSheetViewModel.selectionInterval
     
     // MARK: - Private Properties
     private let cvManagementUseCase: CVManagementUseCaseProtocol
     private let storedCVChanges: ChangeStoredCV<CVModel>
+    /// The changes to the stored CVs, one CV at a time, which the editors wait for.
+    private let changeQueue: StoredCVChangeQueue
     private let locale: Locale
     private let now: () -> Date
     private let waitBetweenTicks: (Duration) async throws -> Void
@@ -43,13 +48,18 @@ final class CVListViewModel: ObservableObject {
     private var readSequence = 0
     /// A change went through and no read of the list has confirmed it yet.
     private var hasUnconfirmedChange = false
-    /// The CVs whose language or look is being saved: the saves of one CV go one after the other.
-    private var changeSaves: Set<UUID> = []
-    /// The language last chosen for a CV and not yet being saved; nil is automatic.
-    private var pendingDocumentLanguages: [UUID: DocumentLanguage?] = [:]
-    /// What was chosen of the look of a CV and is not yet being saved: the parts chosen since its last save began, with
-    /// the look the sheet showed last.
-    private var pendingLooks: [UUID: LookChange] = [:]
+    /// The CVs with a save of the choices made in their export sheet, queued or under way. One save runs for each of them,
+    /// and it stores every choice made until it has nothing left to store.
+    private var savingChoices: Set<UUID> = []
+    /// What was chosen for a CV in its export sheet and no save has taken yet: the language and the look, the latest choice
+    /// of each. It is there from the moment of the choice, before anything is stored.
+    private var waitingChoices: [UUID: ExportChoices] = [:]
+    /// What the save under way for a CV is storing. The row of the CV shows it once the save has gone through.
+    private var storingChoices: [UUID: ExportChoices] = [:]
+    /// For each CV that a choice was made for lately, the wait until `choicePause` has passed with no other choice: the
+    /// choices are stored when it ends. A new choice replaces it with a later one, and `storeChoicesNow()` ends it.
+    private var quietPeriods: [UUID: Task<Void, Never>] = [:]
+    private let clock: any Clock<Duration>
     /// The label of each row, by identity, made once each time the list changes rather than each time a row is drawn.
     /// The words in it change only with the app's language, and iOS starts the app again for that.
     private var rowLabels: [String: String] = [:]
@@ -80,29 +90,36 @@ final class CVListViewModel: ObservableObject {
     
     // MARK: - Initialization
     /// - Parameters:
-    ///   - storedCVChanges: Renames a stored CV, or sets the language of its PDF.
+    ///   - storedCVChanges: Renames a stored CV, or sets the language or the look of its PDF.
+    ///   - changeQueue: Where the changes to a stored CV wait for the ones before them for the same CV; the editor of the CV
+    ///     waits there too.
     ///   - locale: The language of the words that say when a CV was saved: the language of the app.
     ///   - now: The clock of the app.
     ///   - calendar: What counts as a day when a save is told in days. It is asked for each time a text is made, so
     ///     that a change of the time zone of the device moves the days with it.
     ///   - sleep: How the clock of the list waits between two ticks.
+    ///   - clock: The clock the pause before the choices made in an export sheet are stored is measured on.
     ///   - awaitLeftEditors: Returns once the editors that were left have stored what they showed. The store is read only
     ///     after it, so that a CV just edited is listed as the editor left it.
     init(
         cvManagementUseCase: CVManagementUseCaseProtocol,
         storedCVChanges: ChangeStoredCV<CVModel>,
+        changeQueue: StoredCVChangeQueue,
         locale: Locale,
         now: @escaping () -> Date,
         calendar: @escaping () -> Calendar,
         sleep: @escaping (Duration) async throws -> Void,
+        clock: any Clock<Duration>,
         awaitLeftEditors: @escaping @MainActor () async -> Void
     ) {
         self.awaitLeftEditors = awaitLeftEditors
         self.cvManagementUseCase = cvManagementUseCase
         self.storedCVChanges = storedCVChanges
+        self.changeQueue = changeQueue
         self.locale = locale
         self.now = now
         self.waitBetweenTicks = sleep
+        self.clock = clock
         self.presentationDate = now()
         self.calendar = calendar
     }
@@ -142,10 +159,13 @@ final class CVListViewModel: ObservableObject {
     }
     
     /// The app came to the foreground or left it. Back in the foreground, which can be days after the rows were last
-    /// drawn, the times of the rows are told again.
+    /// drawn, the times of the rows are told again. On its way out, what was chosen in an export sheet is stored without
+    /// waiting for the pause.
     func sceneDidChange(isActive: Bool) {
         if isActive {
             refreshPresentationDate()
+        } else {
+            storeChoicesNow()
         }
     }
     
@@ -198,64 +218,127 @@ final class CVListViewModel: ObservableObject {
     }
     
     func deleteCV(withId id: UUID) async {
-        await perform {
-            try await self.cvManagementUseCase.deleteCV(id: id)
-            return .removed(id)
-        }
+        await changeQueue.enqueue(id) { [self] in
+            await perform {
+                try await self.cvManagementUseCase.deleteCV(id: id)
+                return .removed(id)
+            }
+        }.value
     }
     
     /// Stores a copy of a listed CV, named after the title the list shows it with, as "Lena Hartmann (Copy)"
     func duplicateCV(withId id: UUID) async {
         guard let name = cvs.first(where: { $0.id == id })?.copyName else { return }
-        await perform {
-            .added(try await self.cvManagementUseCase.duplicateCV(id: id, named: name))
-        }
+        await changeQueue.enqueue(id) { [self] in
+            await perform {
+                .added(try await self.cvManagementUseCase.duplicateCV(id: id, named: name))
+            }
+        }.value
     }
     
     /// Gives a CV a new name, as `ChangeStoredCV` does: trimmed, never blank, and nothing but the name changes.
     func renameCV(id: UUID, to newName: String) async {
-        await perform {
-            try await self.storedCVChanges.rename(id, to: newName).map(CommittedChange.replaced)
-        }
+        await changeQueue.enqueue(id) { [self] in
+            await perform {
+                try await self.storedCVChanges.rename(id, to: newName).map(CommittedChange.replaced)
+            }
+        }.value
     }
 
-    /// Sets the language of a CV's PDF, as chosen in its export sheet; nil is automatic. `ChangeStoredCV` reads the CV
-    /// again before it is saved, so that nothing but its language changes.
+    // MARK: - Choices Made in an Export Sheet
+
+    /// Sets the language of a CV's PDF, as chosen in its export sheet; nil is automatic.
     ///
-    /// The saves of one CV run one after the other. A choice made while one is being saved waits, and replaces any
-    /// choice still waiting, so that the latest choice is always the one stored last: the language the sheet shows.
-    func setDocumentLanguage(_ language: DocumentLanguage?, ofCVWithId id: UUID) async {
-        pendingDocumentLanguages.updateValue(language, forKey: id)
-        await saveChanges(ofCVWithId: id)
+    /// The choice is registered at once, and stored once the pause has passed with nothing else chosen
+    /// (`storeChoicesNow()` ends the wait): in line with every other change to the CV (`StoredCVChangeQueue`), one after
+    /// the other, each reading the CV as the one before left it. A choice made while another is being stored waits, and
+    /// replaces any choice of its kind still waiting, so that the latest choice is always the one stored last: the
+    /// language the sheet shows.
+    /// - Returns: The save that stores it, for a caller that wants to wait for it; nil when a save under way will store it.
+    @discardableResult
+    func chooseDocumentLanguage(_ language: DocumentLanguage?, ofCVWithId id: UUID) -> Task<Void, Never>? {
+        choose(ExportChoices(documentLanguage: .init(value: language)), ofCVWithId: id)
     }
 
     /// Changes the design, palette or font a CV's PDF is made with, as chosen in its export sheet: only the parts the
-    /// person chose. Saved like the language, and in the same line: a look chosen while a language is being saved waits
-    /// for it, and the other way round, so that each save reads the CV as the one before left it and neither choice
-    /// undoes the other. Parts chosen while a save is under way are saved together after it, the latest choice of each.
-    func setLook(_ change: LookChange, ofCVWithId id: UUID) async {
-        pendingLooks[id] = pendingLooks[id].map { $0.followed(by: change) } ?? change
-        await saveChanges(ofCVWithId: id)
+    /// person chose. Registered and stored like the language, in the same line and in the same save: a design, a palette and
+    /// a font chosen one after the other are stored together, the latest choice of each, with one write and one read of
+    /// the list. The look the sheet showed is what a sheet opened again starts from (`withPendingChoices(_:)`).
+    /// - Returns: The save that stores it, for a caller that wants to wait for it; nil when a save under way will store it.
+    @discardableResult
+    func chooseLook(_ change: LookChange, ofCVWithId id: UUID) -> Task<Void, Never>? {
+        choose(ExportChoices(look: change), ofCVWithId: id)
     }
-    
+
+    /// Stores what was chosen in the export sheets now, without waiting for the pause to end: a sheet was closed, or the
+    /// app is leaving the foreground.
+    func storeChoicesNow() {
+        let ending = quietPeriods
+        quietPeriods = [:]
+        ending.values.forEach { $0.cancel() }
+    }
+
+    /// A row of the list as its export sheet starts from it: with what was chosen for the CV in an earlier sheet and the
+    /// row does not show yet, because the save is waiting for its pause or has not gone through. A sheet opened again then
+    /// shows the choices made, and what the person chooses next is added to them, not to a row that is a save behind.
+    func withPendingChoices(_ cv: CVModel) -> CVModel {
+        let notShown = (storingChoices[cv.id] ?? ExportChoices()).followed(by: waitingChoices[cv.id] ?? ExportChoices())
+        return notShown.applied(to: cv)
+    }
+
     // MARK: - Private Methods
 
-    /// Saves what was chosen for a CV in its export sheet, one choice at a time. The caller that finds no save under way
-    /// does them all, so a caller that finds one returns at once and its choice is saved by that one when it is done.
-    private func saveChanges(ofCVWithId id: UUID) async {
-        guard changeSaves.insert(id).inserted else { return }
-        defer { changeSaves.remove(id) }
+    /// Registers a choice, restarts the pause before the choices are stored, and queues the save unless one is queued or
+    /// running: that one stores every choice made until it ends, so a caller that finds it returns at once.
+    private func choose(_ choice: ExportChoices, ofCVWithId id: UUID) -> Task<Void, Never>? {
+        waitingChoices[id] = (waitingChoices[id] ?? ExportChoices()).followed(by: choice)
+        startQuietPeriod(ofCVWithId: id)
+        guard savingChoices.insert(id).inserted else { return nil }
+        return changeQueue.enqueue(id) { [self] in
+            await saveChoices(ofCVWithId: id)
+        }
+    }
 
+    /// The pause starts now, in place of the one a choice before it started. It ends at a moment fixed here, on the clock's
+    /// own instants, however late the wait for it begins.
+    private func startQuietPeriod(ofCVWithId id: UUID) {
+        quietPeriods[id]?.cancel()
+        let clock = self.clock
+        let wait = Self.beginPause(Self.choicePause, on: clock)
+        quietPeriods[id] = Task { try? await wait() }
+    }
+
+    private static func beginPause<C: Clock<Duration>>(_ length: Duration, on clock: C) -> @Sendable () async throws -> Void {
+        let end = clock.now.advanced(by: length)
+        return { try await clock.sleep(until: end, tolerance: nil) }
+    }
+
+    /// Stores what was chosen for a CV, once nothing has been chosen for the length of the pause and then one kind of
+    /// choice at a time, until nothing is left. The row of the CV shows what was stored, and it is read again, for each.
+    private func saveChoices(ofCVWithId id: UUID) async {
         while true {
-            if let language = pendingDocumentLanguages.removeValue(forKey: id) {
-                await perform {
-                    .replaced(try await self.storedCVChanges.setDocumentLanguage(language?.rawValue, of: id))
+            if let quiet = quietPeriods[id] {
+                await quiet.value
+                // A choice made meanwhile has put a later pause in its place, which is waited for in turn
+                if quietPeriods[id] == quiet {
+                    quietPeriods[id] = nil
                 }
-            } else if let look = pendingLooks.removeValue(forKey: id) {
-                await perform {
-                    .replaced(try await self.storedCVChanges.setLook(look, of: id))
+            } else if let choices = waitingChoices.removeValue(forKey: id) {
+                storingChoices[id] = choices
+                if let language = choices.documentLanguage {
+                    await perform {
+                        .replaced(try await self.storedCVChanges.setDocumentLanguage(language.value?.rawValue, of: id))
+                    }
                 }
+                if let look = choices.look {
+                    await perform {
+                        .replaced(try await self.storedCVChanges.setLook(look, of: id))
+                    }
+                }
+                storingChoices[id] = nil
             } else {
+                // Nothing left, and nothing can be chosen between this check and the end of the save: it ends here
+                savingChoices.remove(id)
                 return
             }
         }
@@ -271,18 +354,28 @@ final class CVListViewModel: ObservableObject {
         case unreadableCVsAcknowledged
     }
     
-    /// Runs a change of the stored CVs. A change that fails is reported as an action error and leaves the list
-    /// alone, and so does one that changed nothing (nil). One that goes through is shown in the list at once, from what
-    /// it returned, and the list is then read again, so that the user sees what happened even when that read fails.
+    /// Runs a change of the stored CVs, once the editors that were left have stored what they showed, so that the change
+    /// is made on that and does not undo it. A change that fails is reported as an action error and leaves the list
+    /// alone, and so does one that changed nothing (nil). One that goes through is shown in the list at once, from what it
+    /// returned, and the list is then read again, so that the user sees what happened even when that read fails.
     private func perform(_ change: () async throws -> CommittedChange?) async {
-        let committed: CommittedChange
+        guard let committed = await commit(change) else { return }
+        await present(committed)
+    }
+
+    /// Runs a change of the stored CVs. Nil when it failed, which is reported, or when it changed nothing.
+    private func commit(_ change: () async throws -> CommittedChange?) async -> CommittedChange? {
+        await awaitLeftEditors()
         do {
-            guard let change = try await change() else { return }
-            committed = change
+            return try await change()
         } catch {
             actionError = Self.message(for: error)
-            return
+            return nil
         }
+    }
+
+    /// Shows a change that went through, and reads the list again.
+    private func present(_ committed: CommittedChange) async {
         apply(committed)
         await loadCVs()
     }

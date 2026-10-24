@@ -26,6 +26,7 @@ enum PreviewDependencies {
             documentLanguageDetector: documentLanguageDetector,
             clock: ContinuousClock(),
             awaitLeftEditors: {},
+            awaitStoredChanges: { _ in },
             reportSaveFailure: { _ in }
         )
     }
@@ -60,10 +61,12 @@ enum PreviewDependencies {
         return CVListViewModel(
             cvManagementUseCase: management,
             storedCVChanges: .init(cvs: ManagedStoredCVs(cvs: management)),
+            changeQueue: StoredCVChangeQueue(),
             locale: Locale(identifier: "en"),
             now: { Date(timeIntervalSinceReferenceDate: 800_000_000) },
             calendar: { Calendar(identifier: .gregorian) },
             sleep: { _ in },
+            clock: ContinuousClock(),
             awaitLeftEditors: {}
         )
     }

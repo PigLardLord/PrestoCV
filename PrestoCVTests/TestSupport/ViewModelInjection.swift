@@ -1,6 +1,7 @@
 import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
+import struct PrestoCVApplication.LookChange
 
 // The view models take every dependency through their initialisers, and the app's entry point gives them the device's.
 // These tests give fixed ones unless they vary them: English, a fixed day in UTC, and waits that end only when their task
@@ -63,6 +64,7 @@ extension CVEditorViewModel {
         documentLanguageDetector: DocumentLanguageDetector = englishDocumentLanguageDetector,
         clock: any Clock<Duration> = ManualClock(),
         awaitLeftEditors: @escaping @MainActor () async -> Void = {},
+        awaitStoredChanges: @escaping @MainActor (UUID) async -> Void = { _ in },
         reportSaveFailure: @escaping @MainActor (any Error) -> Void = { _ in }
     ) {
         let request: EditorRequest
@@ -77,6 +79,7 @@ extension CVEditorViewModel {
             documentLanguageDetector: documentLanguageDetector,
             clock: clock,
             awaitLeftEditors: awaitLeftEditors,
+            awaitStoredChanges: awaitStoredChanges,
             reportSaveFailure: reportSaveFailure
         )
     }
@@ -89,17 +92,36 @@ extension CVListViewModel {
         now: @escaping () -> Date = { testDay },
         calendar: @escaping () -> Calendar = { gregorianUTC },
         sleep: @escaping (Duration) async throws -> Void = waitUntilCancelled,
+        clock: any Clock<Duration> = ManualClock(),
+        changeQueue: StoredCVChangeQueue = StoredCVChangeQueue(),
         awaitLeftEditors: @escaping @MainActor () async -> Void = {}
     ) {
         self.init(
             cvManagementUseCase: cvManagementUseCase,
             storedCVChanges: .init(cvs: ManagedStoredCVs(cvs: cvManagementUseCase)),
+            changeQueue: changeQueue,
             locale: Locale(identifier: "en"),
             now: now,
             calendar: calendar,
             sleep: sleep,
+            clock: clock,
             awaitLeftEditors: awaitLeftEditors
         )
+    }
+
+    /// Chooses a language the way a sheet does, and returns once it is stored: the pause before it is stored is not waited for
+    func setDocumentLanguage(_ language: DocumentLanguage?, ofCVWithId id: UUID) async {
+        let save = chooseDocumentLanguage(language, ofCVWithId: id)
+        storeChoicesNow()
+        await save?.value
+    }
+
+    /// Chooses a look the way a sheet does, and returns once it is stored, or once the save under way that will store it
+    /// has begun: the pause before it is stored is not waited for
+    func setLook(_ change: LookChange, ofCVWithId id: UUID) async {
+        let save = chooseLook(change, ofCVWithId: id)
+        storeChoicesNow()
+        await save?.value
     }
 }
 

@@ -119,12 +119,13 @@ struct ViewModelFactoryTests {
     func listExportSheetStoresTheLanguage() async throws {
         let cv = CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi"), documentLanguage: "de")
         let repository = InMemoryCVRepository(cvs: [cv])
-        let list = CVListViewModel(cvManagementUseCase: CVManagementUseCase(cvRepository: repository, sampleRepository: NoSamples()))
+        let list = CVListViewModel(cvManagementUseCase: CVManagementUseCase(cvRepository: repository, sampleRepository: NoSamples()), clock: clock)
         let sheet = try makeFactory().makeExportSheetViewModel(exporting: cv, from: list)
         #expect(sheet.documentLanguageChoice == .german, "The sheet starts with the language chosen for the CV")
 
         await repository.holdNextListings(1)
         sheet.documentLanguageChoice = .french
+        clock.advance(by: CVListViewModel.choicePause)
         // Once the language is stored, the list reads the CVs again
         await repository.waitUntilListingsAreHeld(1)
 
@@ -149,11 +150,12 @@ struct ViewModelFactoryTests {
     func listExportSheetStoresTheLook() async throws {
         let cv = CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi"), documentLanguage: "de")
         let repository = InMemoryCVRepository(cvs: [cv])
-        let list = CVListViewModel(cvManagementUseCase: CVManagementUseCase(cvRepository: repository, sampleRepository: NoSamples()))
+        let list = CVListViewModel(cvManagementUseCase: CVManagementUseCase(cvRepository: repository, sampleRepository: NoSamples()), clock: clock)
         let sheet = try makeFactory().makeExportSheetViewModel(exporting: cv, from: list)
 
         await repository.holdNextListings(1)
         sheet.selectedTemplateId = "minimal"
+        clock.advance(by: CVListViewModel.choicePause)
         // Once the look is stored, the list reads the CVs again
         await repository.waitUntilListingsAreHeld(1)
 
@@ -170,11 +172,12 @@ struct ViewModelFactoryTests {
     func listExportSheetKeepsTheIdsOfTheUntouchedParts() async throws {
         let cv = CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi"), look: Self.unknownLook)
         let repository = InMemoryCVRepository(cvs: [cv])
-        let list = CVListViewModel(cvManagementUseCase: CVManagementUseCase(cvRepository: repository, sampleRepository: NoSamples()))
+        let list = CVListViewModel(cvManagementUseCase: CVManagementUseCase(cvRepository: repository, sampleRepository: NoSamples()), clock: clock)
         let sheet = try makeFactory().makeExportSheetViewModel(exporting: cv, from: list)
 
         await repository.holdNextListings(1)
         sheet.selectedTemplateId = "modern"
+        clock.advance(by: CVListViewModel.choicePause)
         // Once the look is stored, the list reads the CVs again
         await repository.waitUntilListingsAreHeld(1)
 
@@ -207,6 +210,106 @@ struct ViewModelFactoryTests {
         sheet.selectedFontScheme = .serif
 
         #expect(editor.cv.look == CVLook(design: "minimal", palette: "professional", fonts: "serif"))
+    }
+
+    // MARK: - The List and the Editor
+
+    /// A factory over the CVs of `repository`, so that its list and its editors store into the same place
+    private func makeFactory(storing repository: InMemoryCVRepository, environment: AppEnvironment? = nil) throws -> ViewModelFactory {
+        try ViewModelFactory(
+            dependencyContainer: UnusedContainer(),
+            cvManagementUseCase: CVManagementUseCase(cvRepository: repository, sampleRepository: NoSamples()),
+            environment: environment ?? .fixed(clock: clock)
+        )
+    }
+
+    @Test("A CV opened while the look chosen for it in the list is still being stored shows that look, and its first save keeps it")
+    func editorOpenedDuringAListSaveKeepsTheLook() async throws {
+        let cv = CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi", email: "marta@example.com"))
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let factory = try makeFactory(storing: repository)
+        let list = factory.makeCVListViewModel()
+        await list.loadCVs()
+        let sheet = factory.makeExportSheetViewModel(exporting: cv, from: list)
+        await repository.holdNextSaves(1)
+
+        sheet.selectedTemplateId = "minimal"
+        clock.advance(by: CVListViewModel.choicePause)
+        await repository.waitUntilSavesAreHeld(1)
+        // The sheet is closed and the CV opened at once, before the look is stored
+        let editor = factory.makeCVEditorViewModel(for: .stored(cvId: cv.id.uuidString))
+        let loading = Task { await editor.loadCV() }
+        await settle(repository)   // whatever the editor asks of the store has been answered by now
+        #expect(editor.viewState.isLoading, "The editor waits for the look, which is on its way to the store")
+        await repository.releaseOldestSave()
+        await loading.value
+        editor.cv.personalInfo.title = "Staff nurse"
+        await editor.saveNow()
+
+        #expect(editor.cv.look?.design == "minimal", "The editor opened on the CV with the look that was on its way")
+        let stored = try #require(await repository.getCV(by: cv.id))
+        #expect(stored.look?.design == "minimal", "Its first save did not undo the look")
+        #expect(stored.personalInfo.title == "Staff nurse", "And the look did not undo the edit")
+    }
+
+    @Test("A CV opened while the look chosen for it is waiting for its pause shows that look, and its first save keeps it")
+    func editorOpenedDuringThePauseKeepsTheLook() async throws {
+        let cv = CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi", email: "marta@example.com"))
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let factory = try makeFactory(storing: repository)
+        let list = factory.makeCVListViewModel()
+        await list.loadCVs()
+        let sheet = factory.makeExportSheetViewModel(exporting: cv, from: list)
+
+        sheet.selectedTemplateId = "minimal"
+        // The CV is opened at once, before anything is stored
+        let editor = factory.makeCVEditorViewModel(for: .stored(cvId: cv.id.uuidString))
+        let loading = Task { await editor.loadCV() }
+        await settle(repository)   // whatever the editor asks of the store has been answered by now
+        #expect(editor.viewState.isLoading, "The editor waits for the look, which is not stored yet")
+        clock.advance(by: CVListViewModel.choicePause)
+        await loading.value
+        editor.cv.personalInfo.title = "Staff nurse"
+        await editor.saveNow()
+
+        #expect(editor.cv.look?.design == "minimal", "The editor opened on the CV with the look that was on its way")
+        let stored = try #require(await repository.getCV(by: cv.id))
+        #expect(stored.look?.design == "minimal", "Its first save did not undo the look")
+        #expect(stored.personalInfo.title == "Staff nurse", "And the look did not undo the edit")
+    }
+
+    @Test("An export sheet opened again before the choices of the last one are stored starts from them, and the next choice is added")
+    func reopenedSheetStartsFromTheChoicesNotStoredYet() async throws {
+        let cv = CVModel(name: "Ward nurse", personalInfo: PersonalInfo(name: "Marta Rinaldi"), documentLanguage: "de")
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let factory = try makeFactory(storing: repository)
+        let list = factory.makeCVListViewModel()
+        await list.loadCVs()
+        await repository.holdNextSaves(1)
+
+        // A design and a language are chosen, and the sheet is closed while their write is held up
+        let first = factory.makeExportSheetViewModel(exporting: cv, from: list)
+        first.selectedTemplateId = "minimal"
+        first.documentLanguageChoice = .french
+        list.storeChoicesNow()
+        await repository.waitUntilSavesAreHeld(1)
+
+        // The next sheet is opened from the row, which still shows the CV as it was. The sheets of these tests find no
+        // templates, so a sheet shows its look only after one is chosen: the look it starts from is the list's
+        // (CVListViewModelChoicesTests), the language is the sheet's own
+        let row = try #require(list.cvs.first)
+        #expect(row.look == nil && row.documentLanguage == "de")
+        let second = factory.makeExportSheetViewModel(exporting: row, from: list)
+        #expect(second.documentLanguageChoice == .french, "The language chosen in the sheet before, not the row's")
+        second.documentLanguageChoice = .english
+        list.storeChoicesNow()
+        await repository.releaseOldestSave()
+
+        // The editor waits for both, and shows what was chosen last, with the design chosen before
+        let editor = factory.makeCVEditorViewModel(for: .stored(cvId: cv.id.uuidString))
+        await editor.loadCV()
+        #expect(editor.cv.look?.design == "minimal")
+        #expect(editor.cv.documentLanguage == "en")
     }
 
     @Test("The description typed on the AI screen is there again when the screen is opened anew")
