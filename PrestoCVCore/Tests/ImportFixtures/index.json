@@ -636,6 +636,22 @@
   "source": "traps/language-notes-en.txt"
  },
  {
+  "id": "traps/language-own-line-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/language-own-line-en.expected.json",
+  "source": "traps/language-own-line-en.txt"
+ },
+ {
+  "id": "traps/language-unlisted-de",
+  "language": "de",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/language-unlisted-de.expected.json",
+  "source": "traps/language-unlisted-de.txt"
+ },
+ {
   "id": "traps/linkedin-text-pt",
   "language": "pt",
   "form": "trap",
