@@ -18,9 +18,19 @@ struct Findings {
         ))
     }
 
+    /// A value that was read and is not used, as text not imported: the text of each of its spans.
+    mutating func unplace(_ value: Sourced<String>, in section: Section) {
+        for span in value.spans { unplace(Piece(text: document.text(of: span), span: span), in: section) }
+    }
+
     /// The whole block as text not imported, its cells joined as the canonical text joins them.
     mutating func unplace(_ block: SourceBlock, in section: Section) {
         unplace(Piece(text: document.text(of: block.span), span: block.span), in: section)
+    }
+
+    /// Whether the piece is already text left out, such as a duration that LinkedIn computes.
+    func isLeftOut(_ piece: Piece) -> Bool {
+        leftOut.contains { $0.span?.contains(piece.span) == true }
     }
 
     mutating func leaveOut(_ piece: Piece, _ reason: LeftOutText.Reason) {

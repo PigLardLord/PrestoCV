@@ -1,0 +1,10 @@
+{
+ "id": "traps/surname-label-it", "language": "it", "form": "trap",
+ "person": {"name": "Maria Rossi", "title": null, "email": "maria.rossi@example.com", "phone": "+39 333 000 0505",
+            "location": null, "links": [], "summary": null},
+ "experience": [
+  {"role": "Cameriera", "employer": "Trattoria Esempio", "location": null, "start": [2019, 6], "end": [2023, 9], "details": 1}
+ ],
+ "education": [{"degree": "Diploma alberghiero", "school": "Istituto Esempio", "start": [2014, null], "end": [2019, null]}],
+ "skills": [], "languages": [], "certifications": [], "interests": []
+}

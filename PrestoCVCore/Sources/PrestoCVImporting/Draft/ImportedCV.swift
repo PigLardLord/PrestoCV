@@ -115,7 +115,8 @@ public struct ImportedLanguage: Hashable, Sendable {
     public var name: Sourced<String>
     /// Only a CEFR level, or a native language, that the text states.
     public var level: Sourced<LanguageProficiency>?
-    /// The words that give a level the rules do not read as CEFR: "fluent", "buono", "Professional working".
+    /// The words that give a level the rules do not read as CEFR: "fluent", "buono", "Professional working". Only
+    /// when the language has no level: words beside a level are text not imported.
     public var levelWords: Sourced<String>?
 }
 
@@ -134,4 +135,47 @@ public struct UnplacedText: Hashable, Sendable {
     public let heading: String?
     public let text: String
     public let span: SourceSpan
+}
+
+extension ImportedCV {
+    /// The spans of every value of the CV. A new field of the CV joins this list: a test compares it with the spans
+    /// found by walking the CV.
+    var sourceSpans: [SourceSpan] {
+        var spans: [SourceSpan] = []
+        func add<Value>(_ value: Sourced<Value>?) { spans += value?.spans ?? [] }
+        add(person.name)
+        add(person.title)
+        add(person.email)
+        add(person.phone)
+        add(person.location)
+        add(person.summary)
+        for link in person.links { add(link.address) }
+        for entry in experience {
+            add(entry.role)
+            add(entry.employer)
+            add(entry.location)
+            add(entry.period)
+            entry.details.forEach { add($0) }
+        }
+        for entry in education {
+            add(entry.degree)
+            add(entry.school)
+            add(entry.location)
+            add(entry.period)
+            entry.details.forEach { add($0) }
+        }
+        skills.forEach { add($0) }
+        for language in languages {
+            add(language.name)
+            add(language.level)
+            add(language.levelWords)
+        }
+        for certification in certifications {
+            add(certification.name)
+            add(certification.issuer)
+            add(certification.year)
+        }
+        interests.forEach { add($0) }
+        return spans
+    }
 }

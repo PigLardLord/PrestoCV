@@ -8,6 +8,12 @@ struct Section: Equatable {
     /// The languages whose vocabulary the heading is from.
     var languages: Set<CVLanguage>
 
+    /// What the heading is in the text: its block, or, when a row of cells opens the section, its first cell.
+    var headingSpan: SourceSpan? {
+        guard let heading else { return nil }
+        return heading.cells.count > 1 && blocks.first?.index == heading.index ? heading.cells[0] : heading.span
+    }
+
     /// The cells of a block of the section: a heading row that also holds the section's first value, as the formato
     /// europeo's "CAPACITÀ E COMPETENZE TECNICHE | …", gives only its value.
     func cells(of block: SourceBlock, in document: SourceDocument) -> [Piece] {

@@ -17,8 +17,7 @@ enum HeaderReader {
         var candidates: [Candidate] = []
         var emails: [(Sourced<EmailAddress>, Section)] = []
         var phones: [(Sourced<PhoneNumber>, Section)] = []
-        var firstName: Piece?
-        var lastName: Piece?
+        var names = LabelledName()
 
         for section in sections {
             for block in section.blocks where !findings.consumedBlocks.contains(block.index) {
@@ -26,14 +25,15 @@ enum HeaderReader {
                 if let (label, values) = labelled(cells) {
                     switch label {
                     case .name:
-                        if findings.cv.person.name == nil, let value = values.first { findings.cv.person.name = value.quote() }
+                        names.add(values, to: \.name, section: section, into: &findings)
                     case .firstName:
-                        firstName = values.first
+                        names.add(values, to: \.firstName, section: section, into: &findings)
                     case .lastName:
-                        lastName = values.first
+                        names.add(values, to: \.lastName, section: section, into: &findings)
                     case .address:
                         if findings.cv.person.location == nil, let value = values.first {
                             findings.cv.person.location = value.quote()
+                            for rest in values.dropFirst() { findings.unplace(rest, in: section) }
                         } else {
                             findings.unplace(block, in: section)
                         }
@@ -67,11 +67,7 @@ enum HeaderReader {
             }
         }
 
-        if findings.cv.person.name == nil, let first = firstName, let last = lastName {
-            findings.cv.person.name = Sourced(value: first.text + " " + last.text, spans: [first.span, last.span])
-        } else if findings.cv.person.name == nil, let only = firstName ?? lastName {
-            findings.cv.person.name = only.quote()
-        }
+        findings.cv.person.name = names.name(into: &findings)
         takeContacts(emails: emails, phones: phones, into: &findings)
 
         // The document's title and a template's placeholders are no part of the CV
@@ -121,6 +117,50 @@ enum HeaderReader {
         }
         for (index, candidate) in candidates.enumerated() where !taken.contains(index) {
             findings.unplace(candidate.piece, in: candidate.section)
+        }
+    }
+
+    // MARK: Labelled name
+
+    /// The parts of the name given by label: a name, a first name and a last name. A first name and a last name are
+    /// one name, the first name first; a part that is not in the name stays visible as text not imported.
+    private struct LabelledName {
+        struct Part {
+            let piece: Piece
+            let section: Section
+        }
+
+        var name: Part?
+        var firstName: Part?
+        var lastName: Part?
+
+        /// Keeps the first value of a label; any other value of it is text not imported.
+        mutating func add(_ values: [Piece], to slot: WritableKeyPath<LabelledName, Part?>, section: Section, into findings: inout Findings) {
+            guard let first = values.first else { return }
+            if self[keyPath: slot] == nil {
+                self[keyPath: slot] = Part(piece: first, section: section)
+            } else {
+                findings.unplace(first, in: section)
+            }
+            for rest in values.dropFirst() { findings.unplace(rest, in: section) }
+        }
+
+        func name(into findings: inout Findings) -> Sourced<String>? {
+            if name != nil, let firstName { findings.unplace(firstName.piece, in: firstName.section) }
+            guard let given = name ?? firstName else { return lastName?.piece.quote() }
+            guard let last = lastName else { return given.piece.quote() }
+            // A name that holds the surname already is the whole name; the surname is not doubled
+            let isWholeName = name != nil && given.piece.words.count >= 2
+            if isWholeName || Self.holds(given.piece.text, last.piece.text) {
+                findings.unplace(last.piece, in: last.section)
+                return given.piece.quote()
+            }
+            return Sourced(value: given.piece.text + " " + last.piece.text, spans: [given.piece.span, last.piece.span])
+        }
+
+        private static func holds(_ name: String, _ part: String) -> Bool {
+            let part = SectionVocabulary.key(part)
+            return !part.isEmpty && " \(SectionVocabulary.key(name)) ".contains(" \(part) ")
         }
     }
 

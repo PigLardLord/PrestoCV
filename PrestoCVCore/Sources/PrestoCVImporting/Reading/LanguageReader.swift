@@ -27,6 +27,8 @@ enum LanguageReader {
     ///   evidence.
     private static func read(_ items: [Piece], nativeLabel: Piece?, section: Section, into findings: inout Findings) {
         var current: Int?
+        var notes: [Int: [Piece]] = [:]
+        defer { unplace(notes, section: section, into: &findings) }
         for item in items {
             if let name = languageName(in: item) {
                 var language = ImportedLanguage(name: name.quote())
@@ -34,31 +36,78 @@ enum LanguageReader {
                     language.level = Sourced(value: .native, spans: [nativeLabel.span], reading: .languageLevel)
                 }
                 findings.cv.languages.append(language)
-                current = findings.cv.languages.count - 1
-                describe(findings.cv.languages.count - 1, with: item.removing([range(of: name, in: item)]), section: section, into: &findings)
+                let index = findings.cv.languages.count - 1
+                current = index
+                describe(index, with: item.removing([range(of: name, in: item)]), nativeLabel: nativeLabel, notes: &notes, section: section, into: &findings)
             } else if let current {
-                describe(current, with: [item], section: section, into: &findings)
-            } else if !attachLevel(item, into: &findings) {
+                describe(current, with: [item], nativeLabel: nativeLabel, notes: &notes, section: section, into: &findings)
+            } else if !attachLevel(item, section: section, into: &findings) {
                 // A grid of levels, or the words of a level, under the language before it; otherwise text not imported
                 findings.unplace(item, in: section)
             }
         }
     }
 
-    /// Gives a language the level its parts state, or the words of one; other parts stay visible.
-    private static func describe(_ index: Int, with parts: [Piece], section: Section, into findings: inout Findings) {
+    /// Gives a language the level its parts state, or the words of one. A language has one level: what else a part says
+    /// stays visible as text not imported, and so does a second level.
+    private static func describe(
+        _ index: Int, with parts: [Piece], nativeLabel: Piece?, notes: inout [Int: [Piece]], section: Section, into findings: inout Findings
+    ) {
         for part in parts {
-            if let level = level(in: part) {
+            let language = findings.cv.languages[index]
+            if let (level, rest) = level(in: part) {
+                // The row's label gives a language its level only until the language states one itself
+                let isFromLabel = nativeLabel.map { language.level?.spans == [$0.span] } ?? false
+                guard language.level == nil || isFromLabel else {
+                    notes[index, default: []].append(part)
+                    continue
+                }
+                if let words = language.levelWords { findings.unplace(words, in: section) }
                 findings.cv.languages[index].level = level
                 findings.cv.languages[index].levelWords = nil
-            } else if let words = levelWordsPiece(part) {
-                if findings.cv.languages[index].level == nil && findings.cv.languages[index].levelWords == nil {
-                    findings.cv.languages[index].levelWords = words
-                }
+                if !rest.isEmpty { notes[index, default: []].append(part) }
+            } else if let words = levelWordsPiece(part), language.level == nil {
+                addWords(words, to: index, into: &findings)
             } else {
-                findings.unplace(part, in: section)
+                notes[index, default: []].append(part)
             }
         }
+    }
+
+    /// What the row of a language says besides its level, as text not imported with the language it is about: for each
+    /// language one quote from its name to the end of its last note when they share a line, the notes alone otherwise.
+    private static func unplace(_ notes: [Int: [Piece]], section: Section, into findings: inout Findings) {
+        for index in notes.keys.sorted() {
+            let parts = notes[index] ?? []
+            guard let first = parts.first, let last = parts.last else { continue }
+            unplace(parts, from: first.span.lowerBound, to: last.span.upperBound, ofLanguage: index, section: section, into: &findings)
+        }
+    }
+
+    /// One note of a language of an earlier row, with its language when they share a line.
+    private static func unplace(_ part: Piece, ofLanguage index: Int, section: Section, into findings: inout Findings) {
+        unplace([part], from: part.span.lowerBound, to: part.span.upperBound, ofLanguage: index, section: section, into: &findings)
+    }
+
+    private static func unplace(
+        _ parts: [Piece], from start: Int, to end: Int, ofLanguage index: Int, section: Section, into findings: inout Findings
+    ) {
+        if let name = findings.cv.languages[index].name.spans.first, name.lowerBound <= start {
+            let span = SourceSpan(name.lowerBound, end)
+            let text = findings.document.text(of: span)
+            if !text.contains("\n") { return findings.unplace(Piece(text: text, span: span), in: section) }
+        }
+        for part in parts { findings.unplace(part, in: section) }
+    }
+
+    /// The words of a level, after the ones the language has.
+    private static func addWords(_ words: Sourced<String>, to index: Int, into findings: inout Findings) {
+        guard let existing = findings.cv.languages[index].levelWords else {
+            findings.cv.languages[index].levelWords = words
+            return
+        }
+        let check: CheckReason = existing.check == .levelsDiffer || words.check == .levelsDiffer ? .levelsDiffer : .levelNotCEFR
+        findings.cv.languages[index].levelWords = Sourced(value: existing.value + "\n" + words.value, spans: existing.spans + words.spans, check: check)
     }
 
     // MARK: Names
@@ -104,14 +153,15 @@ enum LanguageReader {
 
     // MARK: Levels
 
-    /// A CEFR level, or the words of a native language, in a piece. Different CEFR levels give none.
-    private static func level(in piece: Piece) -> Sourced<LanguageProficiency>? {
+    /// A CEFR level, or the words of a native language, in a piece, and the rest of the piece. Different CEFR levels
+    /// give none.
+    private static func level(in piece: Piece) -> (level: Sourced<LanguageProficiency>, rest: [Piece])? {
         if isNative(piece.text) {
-            return Sourced(value: .native, spans: [piece.span], reading: .languageLevel)
+            return (Sourced(value: .native, spans: [piece.span], reading: .languageLevel), [])
         }
         let levels = cefrLevels(in: piece)
         guard let first = levels.first, levels.allSatisfy({ $0.1 == first.1 }) else { return nil }
-        return Sourced(value: first.1, spans: [first.0.span], reading: .languageLevel)
+        return (Sourced(value: first.1, spans: levels.map(\.0.span), reading: .languageLevel), piece.removing(levels.map { range(of: $0.0, in: piece) }))
     }
 
     /// Every CEFR level a piece states, with where.
@@ -169,28 +219,24 @@ enum LanguageReader {
 
     /// A piece of levels under a language that has none yet: a Europass grid ("B2 B2 B1 B1 B2"), or the words of a
     /// level on a line of their own.
-    private static func attachLevel(_ piece: Piece, into findings: inout Findings) -> Bool {
+    private static func attachLevel(_ piece: Piece, section: Section, into findings: inout Findings) -> Bool {
         guard let last = findings.cv.languages.indices.last, findings.cv.languages[last].level == nil else { return false }
         let levels = cefrLevels(in: piece)
         if !levels.isEmpty {
             let rest = piece.removing(levels.map { range(of: $0.0, in: piece) })
             guard rest.allSatisfy({ levelWordsPiece($0) != nil }) else { return false }
             if levels.allSatisfy({ $0.1 == levels[0].1 }) {
+                if let words = findings.cv.languages[last].levelWords { findings.unplace(words, in: section) }
                 findings.cv.languages[last].level = Sourced(value: levels[0].1, spans: levels.map(\.0.span), reading: .languageLevel)
                 findings.cv.languages[last].levelWords = nil
+                if !rest.isEmpty { unplace(piece, ofLanguage: last, section: section, into: &findings) }
             } else {
-                findings.cv.languages[last].levelWords = piece.quote(check: .levelsDiffer)
+                addWords(piece.quote(check: .levelsDiffer), to: last, into: &findings)
             }
             return true
         }
         if let words = levelWordsPiece(piece) {
-            if let existing = findings.cv.languages[last].levelWords {
-                findings.cv.languages[last].levelWords = Sourced(
-                    value: existing.value + "\n" + words.value, spans: existing.spans + words.spans, check: .levelNotCEFR
-                )
-            } else {
-                findings.cv.languages[last].levelWords = words
-            }
+            addWords(words, to: last, into: &findings)
             return true
         }
         return false

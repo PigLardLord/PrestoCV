@@ -3,6 +3,16 @@
 enum CVReader {
 
     static func read(_ document: SourceDocument, leftOut: [LeftOutText]) -> ImportResult {
+        let (findings, sections) = readSections(document, leftOut: leftOut)
+        let result = ImportResult(
+            document: document, cv: findings.cv, language: SectionSegmenter.language(of: sections, in: document),
+            unplaced: findings.unplaced.sorted { $0.span < $1.span }, leftOut: findings.leftOut
+        )
+        return Remainder.swept(ImportGrounding.enforced(result), sections: sections)
+    }
+
+    /// What the readers found in each section, before anything is checked.
+    static func readSections(_ document: SourceDocument, leftOut: [LeftOutText]) -> (findings: Findings, sections: [Section]) {
         var findings = Findings(document: document)
         findings.leftOut = leftOut
         NoiseReader.read(into: &findings)
@@ -37,11 +47,7 @@ enum CVReader {
                 }
             }
         }
-        let result = ImportResult(
-            document: document, cv: findings.cv, language: SectionSegmenter.language(of: sections, in: document),
-            unplaced: findings.unplaced.sorted { $0.span < $1.span }, leftOut: findings.leftOut
-        )
-        return ImportGrounding.enforced(result)
+        return (findings, sections)
     }
 
     /// The summary: the lines of its section, in order.

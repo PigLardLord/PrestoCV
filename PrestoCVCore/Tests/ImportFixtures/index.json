@@ -524,6 +524,14 @@
   "source": "traps/consent-it.txt"
  },
  {
+  "id": "traps/data-course-de",
+  "language": "de",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/data-course-de.expected.json",
+  "source": "traps/data-course-de.txt"
+ },
+ {
   "id": "traps/datos-personales-es",
   "language": "es",
   "form": "trap",
@@ -554,6 +562,14 @@
   "kind": "text",
   "expected": "traps/herramientas-es.expected.json",
   "source": "traps/herramientas-es.txt"
+ },
+ {
+  "id": "traps/language-notes-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/language-notes-en.expected.json",
+  "source": "traps/language-notes-en.txt"
  },
  {
   "id": "traps/linkedin-text-pt",
@@ -588,6 +604,14 @@
   "source": "traps/stack-technique-fr.txt"
  },
  {
+  "id": "traps/surname-label-it",
+  "language": "it",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/surname-label-it.expected.json",
+  "source": "traps/surname-label-it.txt"
+ },
+ {
   "id": "traps/tech-stack-en",
   "language": "en",
   "form": "trap",
@@ -610,6 +634,14 @@
   "kind": "text",
   "expected": "traps/tecnologie-it.expected.json",
   "source": "traps/tecnologie-it.txt"
+ },
+ {
+  "id": "traps/two-places-it",
+  "language": "it",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/two-places-it.expected.json",
+  "source": "traps/two-places-it.txt"
  },
  {
   "id": "traps/us-style-en",

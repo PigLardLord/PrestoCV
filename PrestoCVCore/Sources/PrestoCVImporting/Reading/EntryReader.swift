@@ -386,7 +386,9 @@ enum EntryReader {
                 extra.append(segment)
             }
         }
-        let location = locationValue(locations, in: findings.document)
+        // An entry has one place: the first; any other place line stays visible
+        let places = locationGroups(locations, in: findings.document)
+        let location = places.first
         let period = draft.anchor?.period.map { periodValue($0.piece, $0.value) }
         let details = (extra.map(\.piece) + draft.body.flatMap(\.cells)).map { $0.quote() }
         let check: CheckReason? = byOrder && (primary != nil && secondary != nil) ? .roleOrEmployerByOrder : nil
@@ -399,8 +401,9 @@ enum EntryReader {
             entry.period = period
             entry.details = details
             entry.check = check
-            guard entry.role != nil || entry.employer != nil || entry.period != nil else { return unplace(details, in: section, &findings) }
+            guard entry.role != nil || entry.employer != nil || entry.period != nil else { return unplace(details + places, in: section, &findings) }
             findings.cv.experience.append(entry)
+            unplace(Array(places.dropFirst()), in: section, &findings)
         case .education:
             var entry = ImportedEducation()
             entry.degree = primary?.piece.quote()
@@ -409,32 +412,39 @@ enum EntryReader {
             entry.period = period
             entry.details = details
             entry.check = check
-            guard entry.degree != nil || entry.school != nil || entry.period != nil else { return unplace(details, in: section, &findings) }
+            guard entry.degree != nil || entry.school != nil || entry.period != nil else { return unplace(details + places, in: section, &findings) }
             findings.cv.education.append(entry)
+            unplace(Array(places.dropFirst()), in: section, &findings)
         }
     }
 
-    private static func unplace(_ details: [Sourced<String>], in section: Section, _ findings: inout Findings) {
-        for detail in details {
-            guard let span = detail.spans.first else { continue }
-            findings.unplace(Piece(text: detail.value, span: span), in: section)
+    private static func unplace(_ values: [Sourced<String>], in section: Section, _ findings: inout Findings) {
+        for value in values { findings.unplace(value, in: section) }
+    }
+
+    /// The places of an entry, in order: one quote for each run of location segments that only a separator parts, so
+    /// "Leeds, United Kingdom" is one place and the same two on two lines are two.
+    private static func locationGroups(_ segments: [Segment], in document: SourceDocument) -> [Sourced<String>] {
+        var groups: [[Piece]] = []
+        for piece in segments.map(\.piece).sorted(by: { $0.span < $1.span }) {
+            if let last = groups.last?.last, !hasContentBetween(last, piece, in: document) {
+                groups[groups.count - 1].append(piece)
+            } else {
+                groups.append([piece])
+            }
         }
+        return groups.map { covering($0[0], $0[$0.count - 1], in: document) }
     }
 
-    /// The place of an entry: one quote from its first location segment to its last, when they are in one block;
-    /// otherwise the first.
-    private static func locationValue(_ segments: [Segment], in document: SourceDocument) -> Sourced<String>? {
-        let pieces = segments.map(\.piece).sorted { $0.span < $1.span }
-        guard let first = pieces.first, let last = pieces.last else { return nil }
-        return covering(first, last, in: document)
+    /// Whether a letter, a digit or a line break comes between two pieces.
+    private static func hasContentBetween(_ first: Piece, _ second: Piece, in document: SourceDocument) -> Bool {
+        document.text(of: SourceSpan(first.span.upperBound, second.span.lowerBound)).contains { $0.isLetter || $0.isNumber || $0 == "\n" || $0 == "\t" }
     }
 
-    /// One quote from the start of `first` to the end of `last`, when no line break comes between them.
+    /// One quote from the start of `first` to the end of `last`, in one line.
     private static func covering(_ first: Piece, _ last: Piece, in document: SourceDocument) -> Sourced<String> {
         let span = SourceSpan(first.span.lowerBound, last.span.upperBound)
-        let text = document.text(of: span)
-        guard !text.contains("\n") else { return first.quote() }
-        return Sourced(value: text, spans: [span])
+        return Sourced(value: document.text(of: span), spans: [span])
     }
 
     static func periodValue(_ piece: Piece, _ period: ImportedPeriod) -> Sourced<ImportedPeriod> {
@@ -496,25 +506,38 @@ enum EntryReader {
             var secondary: Piece?
             var location: Sourced<String>?
             var details: [Sourced<String>] = []
+            // An entry has one value for each of its parts; any other value of a row is kept as a detail, and a second
+            // place or period stays visible as text not imported
+            func setLocation(_ value: Sourced<String>) {
+                if location == nil { location = value } else { findings.unplace(value, in: section) }
+            }
             for (label, values) in rows {
                 switch label {
                 case .period:
-                    if let value = values.first, let match = DateReader.periods(in: value.text).first {
+                    if period == nil, let value = values.first, let match = DateReader.periods(in: value.text).first {
                         period = periodValue(value.sub(match.range), match.period)
+                        for rest in value.removing([match.range]) where !findings.isLeftOut(rest) { findings.unplace(rest, in: section) }
+                        for rest in values.dropFirst() { findings.unplace(rest, in: section) }
                     } else {
                         details += values.map { $0.quote(check: .periodUnreadable) }
                     }
                 case .employer, .school:
-                    let parts = values.first?.split(by: [", "]) ?? []
-                    secondary = parts.first
-                    if parts.count > 1, let first = parts.dropFirst().first, let last = parts.last {
-                        location = covering(first, last, in: findings.document)
+                    guard secondary == nil, let first = values.first else {
+                        details += values.map { $0.quote() }
+                        continue
                     }
+                    let parts = first.split(by: [", "])
+                    secondary = parts.first
+                    if parts.count > 1, let second = parts.dropFirst().first, let last = parts.last {
+                        setLocation(covering(second, last, in: findings.document))
+                    }
+                    for rest in values.dropFirst() { findings.unplace(rest, in: section) }
                 case .role, .qualification:
-                    primary = values.first
+                    if primary == nil { primary = values.first } else { details += values.prefix(1).map { $0.quote() } }
                     details += values.dropFirst().map { $0.quote() }
                 case .location:
-                    location = values.first?.quote()
+                    if let first = values.first { setLocation(first.quote()) }
+                    for rest in values.dropFirst() { findings.unplace(rest, in: section) }
                 case .sector, .duties, .subjects, .level, nil:
                     details += values.map { $0.quote() }
                 }
