@@ -34,6 +34,17 @@ struct EditorRowDeletionSourceTests {
         #expect(source.contains(".accessibilityLabel(deleteLabel("), "VoiceOver hears which item the button deletes")
     }
 
+    @Test("The identity of a row, by which the form scrolls to it, is the last modifier after the swipe actions")
+    func rowIdentityComesAfterTheSwipeActions() throws {
+        let source = try componentSource("EditableItemsList.swift")
+
+        let swipe = try #require(source.range(of: ".swipeActions("))
+        let identity = try #require(source.range(of: ".id(newRowFocus?.identity(ofRow:"))
+        // Inside the swipe actions the id is not that of the row the list scrolls to: a row added low on the screen then
+        // stops under the Done button, as seen on iOS 27.0
+        #expect(swipe.lowerBound < identity.lowerBound, "A row with swipe actions gets its id from the modifier outside them")
+    }
+
     @Test("The list no longer deletes through onDelete, which cannot name the row")
     func listDoesNotUseOnDelete() throws {
         let source = try componentSource("EditableItemsList.swift")

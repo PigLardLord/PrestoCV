@@ -24,7 +24,6 @@ struct EditableItemsList<Item, RowContent: View>: View {
                 let item = items[index]
                 rowContent(Binding(element: index, of: $items))
                     .environment(\.rowIndex, index)
-                    .id(newRowFocus?.identity(ofRow: index))
                     .trackingScreenFrame(of: index, in: frames)
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         // role .none, as on the list of CVs: .destructive makes the confirmation dialog flicker
@@ -37,6 +36,9 @@ struct EditableItemsList<Item, RowContent: View>: View {
                         .tint(DesignTokens.Colors.error)
                         .accessibilityLabel(deleteLabel(item))
                     }
+                    // Last, outside the swipe actions: the form scrolls to a new row by this id, and inside them it
+                    // is not found, so a row added low on the screen stopped under the Done button (iOS 27)
+                    .id(newRowFocus?.identity(ofRow: index))
             }
         }
     }
