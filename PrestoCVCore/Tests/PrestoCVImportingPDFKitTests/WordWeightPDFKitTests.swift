@@ -20,6 +20,10 @@ struct WordWeightPDFKitTests {
         var bold = false
         var face: DrawnFace = .helvetica
         var x: CGFloat = 40
+        /// The grey of a band behind the line, and how far it reaches into the boxes of its words.
+        var shade: CGFloat?
+        var reach: DrawnShade.Reach = .foot
+        var underline = false
     }
 
     private static let paragraph = [
@@ -41,7 +45,12 @@ struct WordWeightPDFKitTests {
             top += line.size * 1.5
             context.textPosition = CGPoint(x: line.x, y: box.height - top)
             let drawn = NSAttributedString(string: line.text, attributes: [.font: line.face.font(line.size, bold: line.bold)])
-            CTLineDraw(CTLineCreateWithAttributedString(drawn), context)
+            let ctLine = CTLineCreateWithAttributedString(drawn)
+            if let shade = line.shade {
+                DrawnShade.fill(shade, reach: line.reach, behind: ctLine, at: context.textPosition, size: line.size, in: context)
+            }
+            CTLineDraw(ctLine, context)
+            if line.underline { DrawnShade.underline(ctLine, at: context.textPosition, size: line.size, in: context) }
         }
         context.endPDFPage()
         context.closePDF()
@@ -88,6 +97,35 @@ struct WordWeightPDFKitTests {
         let read = try await words(of: drawnPDF(lines + serif + sans))
         #expect(read.count > 40)
         #expect(!read.contains { $0.isBold }, "bold words: \(read.filter { $0.isBold }.map { $0.text })")
+    }
+
+    @Test("A regular word on a band behind its foot is not bold, whatever the grey, the font and the size",
+          arguments: DrawnFace.allCases, [0.5, 0.63, 0.8])
+    func shadedWord(face: DrawnFace, gray: Double) async throws {
+        for size in [8.0, 10.0, 14.0] {
+            let lines = [Line(text: "ACME", size: size, face: face, shade: gray)] + Self.paragraph.map { Line(text: $0, size: size, face: face) }
+            let read = try await words(of: drawnPDF(lines))
+            #expect(read.contains { $0.text == "ACME" })
+            let bold = read.filter(\.isBold).map(\.text)
+            #expect(bold.isEmpty, "\(face.testDescription), grey \(gray), size \(size): \(bold)")
+        }
+    }
+
+    @Test("A bold heading on a band that holds its whole box is bold, and a band under another line does not change it",
+          arguments: DrawnFace.allCases, [0.5, 0.8])
+    func headingOnItsOwnBand(face: DrawnFace, gray: Double) async throws {
+        let lines = [Line(text: "Languages", bold: true, face: face, shade: gray, reach: .box)]
+            + Self.paragraph.enumerated().map { Line(text: $1, face: face, shade: $0 == 2 ? gray : nil) }
+        let read = try await words(of: drawnPDF(lines))
+        let bold = read.filter(\.isBold).map(\.text)
+        #expect(bold == ["Languages"], "\(face.testDescription), grey \(gray): \(bold)")
+    }
+
+    @Test("Regular underlined words are not bold: an underline is a stroke thinner than the letters'", arguments: DrawnFace.allCases)
+    func underlinedWords(face: DrawnFace) async throws {
+        let read = try await words(of: drawnPDF(Self.paragraph.map { Line(text: $0, face: face, underline: true) }))
+        #expect(read.count > 20)
+        #expect(!read.contains { $0.isBold }, "\(face.testDescription): \(read.filter(\.isBold).map(\.text))")
     }
 
     @Test("A page of a few words keeps the weight its fonts give")

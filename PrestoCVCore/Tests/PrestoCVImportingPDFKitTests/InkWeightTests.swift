@@ -28,6 +28,20 @@ struct InkWeightTests {
             }
         }
 
+        /// The rows from `first` on in a grey, under what is drawn next.
+        mutating func shade(from first: Int, level: UInt8) {
+            for row in first..<height {
+                for column in 0..<width { pixels[row * width + column] = level }
+            }
+        }
+
+        /// A line of ink across the box, `thickness` pixels high, from row `first`.
+        mutating func rule(from first: Int, thickness: Int, ink: UInt8 = 0) {
+            for row in first..<(first + thickness) {
+                for column in 0..<width { pixels[row * width + column] = ink }
+            }
+        }
+
         /// Bars of `thickness` pixels, every `period` pixels.
         mutating func bars(thickness: Int, every period: Int = 12, ink: UInt8 = 0) {
             var x = 6
@@ -118,6 +132,59 @@ struct InkWeightTests {
         #expect(bars.measure(box: InkWeight.PixelBox(left: 10, right: 11, top: 0, bottom: 60)) == nil)
         #expect(bars.measure(box: InkWeight.PixelBox(left: 0, right: 240, top: 20, bottom: 22)) == nil)
         #expect(bars.measure(em: 0) == nil)
+    }
+
+    @Test("A box that is partly shaded has no weight: the shade is ink with an edge only at its border", arguments: [160, 200] as [UInt8])
+    func partlyShaded(level: UInt8) throws {
+        // The lower two fifths of the box stand on a grey, as a band behind the foot of a line
+        var shaded = Canvas()
+        shaded.shade(from: 36, level: level)
+        shaded.bars(thickness: 4)
+        #expect(shaded.measure() == nil, "shade at level \(level)")
+    }
+
+    @Test("A box that is shaded but for a strip has no weight: the strip is what differs from the box's median")
+    func mostlyShaded() {
+        var canvas = Canvas()
+        canvas.shade(from: 12, level: 140)
+        canvas.bars(thickness: 4)
+        #expect(canvas.measure() == nil)
+    }
+
+    @Test("A shade so light that it adds a few hundredths to the ink is tolerated: the box is measured, a little heavier")
+    func lightShade() throws {
+        var plain = Canvas()
+        plain.bars(thickness: 4)
+        var shaded = Canvas()
+        shaded.shade(from: 36, level: 245)
+        shaded.bars(thickness: 4)
+        let base = try #require(plain.measure())
+        let measured = try #require(shaded.measure())
+        #expect(measured >= base && measured <= base * 1.08, "\(measured) against \(base)")
+    }
+
+    @Test("A box wholly on a grey or on a dark ground is measured as on a white one; a thin shade does not decide")
+    func uniformGround() throws {
+        for ground in [UInt8(200), 120, 30] {
+            var canvas = Canvas(level: ground)
+            canvas.bars(thickness: 4, ink: ground > 100 ? 0 : 255)
+            #expect(abs(try #require(canvas.measure()) - 0.1) < 0.005, "ground \(ground)")
+        }
+        // A single row of a grey at the foot of the box is under the share of the ink that a shade may have
+        var thin = Canvas()
+        thin.shade(from: 59, level: 160)
+        thin.bars(thickness: 4)
+        #expect(abs(try #require(thin.measure()) - 0.1) < 0.01)
+    }
+
+    @Test("A hairline across the box, an underline or a border, is a stroke of its own: it is not taken for a shade")
+    func ruleAcrossTheBox() throws {
+        var plain = Canvas()
+        plain.bars(thickness: 4)
+        var underlined = plain
+        underlined.rule(from: 52, thickness: 2)
+        let base = try #require(plain.measure())
+        #expect(try #require(underlined.measure()) <= base * 1.05)
     }
 
     @Test("A box that reaches past the bitmap is cut to it; one wholly outside has no weight")

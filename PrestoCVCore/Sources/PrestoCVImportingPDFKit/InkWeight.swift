@@ -17,6 +17,12 @@ import PrestoCVImporting
 /// of the box, and does not depend on the letters' shapes as a count of the strokes that cross some rows does. A word
 /// is bold when its strokes, in ems, are clearly wider than the median word's of its page: a CV is mostly regular text.
 ///
+/// The measure takes the box of a word for two levels, the background's and the ink's. A band of another grey behind
+/// part of the box (a table row, a highlight) is a third level: it is ink without an edge, whether the band or the
+/// page is the median of the box, and a regular word reads as bold. A box with such a flat shade is not measured, and
+/// keeps the weight its font gives. A hairline across the box, an underline or a border, is a stroke of its own: thinner
+/// than the letters' it lowers the measure, and it needs to be as thick as a stem to raise it.
+///
 /// A PDF is untrusted input (R8). The page is drawn in a bitmap of at most `maximumPixels` at a fixed scale, a page
 /// too large for it is not measured, and a page reads at most `maximumReads` pixels in all: past them, the words left
 /// keep the weight their fonts give.
@@ -35,6 +41,15 @@ enum InkWeight {
 
     /// The pixel levels between a word's background and its darkest ink, below which it has no ink to measure.
     static let minimumContrast = 64
+    /// A pixel is flat when its four neighbours, all in the box, are within this many levels of its own.
+    static let flatTolerance = 2
+    /// A flat pixel is shade when its level is more than `backgroundTolerance` levels from the box's background and
+    /// more than `inkTolerance` from its darkest (or lightest) ink: the box has a third level.
+    static let backgroundTolerance = 4
+    static let inkTolerance = 16
+    /// The share of a box's ink that its shade may be: past it, the box has no weight. The shade is ink that the edges
+    /// do not carry, and it raises the measure by its share.
+    static let maximumShade = 0.05
     /// The smallest box, in pixels on each side, whose edges are measured.
     static let minimumSide = 3
     /// A word of fewer characters is not measured: of a few straight letters, as "BI" or "11", it measures heavier than
@@ -155,8 +170,8 @@ enum InkWeight {
 
     /// The width, in ems, of the strokes in a box: twice the ink over the length of the edges. The background is the
     /// box's median level, so light strokes on a dark ground measure as dark ones on a light ground.
-    /// - Returns: nil when the box is too small, has too little contrast to hold ink, or once the page has read its
-    ///   `maximumReads`.
+    /// - Returns: nil when the box is too small, has too little contrast to hold ink, holds a shade (a band of another
+    ///   grey across a part of it), or once the page has read its `maximumReads`.
     static func strokeWidth(in pixels: UnsafeBufferPointer<UInt8>, width: Int, box: PixelBox, em: Double, reads: inout Int) -> Double? {
         guard width > 0, em > 0, em.isFinite else { return nil }
         let left = max(0, box.left)
@@ -173,23 +188,43 @@ enum InkWeight {
             for column in left..<right { histogram[Int(pixels[row * width + column])] += 1 }
         }
         let background = median(of: histogram)
-        let contrast = histogram.indices.filter { histogram[$0] > 0 }.map { abs($0 - background) }.max() ?? 0
-        guard contrast >= minimumContrast else { return nil }
+        // The ink is the level farthest from the background
+        let ink = histogram.indices.filter { histogram[$0] > 0 }.max { abs($0 - background) < abs($1 - background) } ?? background
+        guard abs(ink - background) >= minimumContrast else { return nil }
 
-        var ink = 0
+        var strokes = 0
+        var shade = 0
         var edge = 0.0
         for row in top..<bottom {
             for column in left..<right {
                 let level = Int(pixels[row * width + column])
-                ink += abs(level - background)
+                let distance = abs(level - background)
+                strokes += distance
                 // The steps to the next pixel on the right and to the one above, none past the box
                 let across = column + 1 < right ? level - Int(pixels[row * width + column + 1]) : 0
                 let up = row > top ? level - Int(pixels[(row - 1) * width + column]) : 0
                 edge += Double(across * across + up * up).squareRoot()
+                // A flat level that is neither the background's nor the ink's is a band behind a part of the word
+                if distance > backgroundTolerance, abs(level - ink) > inkTolerance,
+                   isFlat(in: pixels, width: width, row: row, column: column, box: (left, right, top, bottom)) {
+                    shade += distance
+                }
             }
         }
+        guard Double(shade) <= maximumShade * Double(strokes) else { return nil }
         guard edge > 0 else { return nil }
-        return 2 * Double(ink) / edge / em
+        return 2 * Double(strokes) / edge / em
+    }
+
+    /// Whether a pixel and its four neighbours, all in the box, are within `flatTolerance` levels of each other.
+    private static func isFlat(
+        in pixels: UnsafeBufferPointer<UInt8>, width: Int, row: Int, column: Int, box: (left: Int, right: Int, top: Int, bottom: Int)
+    ) -> Bool {
+        guard column > box.left, column + 1 < box.right, row > box.top, row + 1 < box.bottom else { return false }
+        let index = row * width + column
+        let level = Int(pixels[index])
+        return abs(Int(pixels[index - 1]) - level) <= flatTolerance && abs(Int(pixels[index + 1]) - level) <= flatTolerance
+            && abs(Int(pixels[index - width]) - level) <= flatTolerance && abs(Int(pixels[index + width]) - level) <= flatTolerance
     }
 
     /// The level that half of the pixels are at or below.

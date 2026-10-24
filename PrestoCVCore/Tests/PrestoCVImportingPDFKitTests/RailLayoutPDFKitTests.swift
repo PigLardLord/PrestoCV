@@ -27,6 +27,8 @@ struct RailLayoutPDFKitTests {
         var cells: [(x: CGFloat, text: String, bold: Bool)] = []
         /// The space left above the line.
         var gap: CGFloat = 4
+        /// The grey of a band behind the foot of the line.
+        var shade: CGFloat?
     }
 
     private func line(_ text: String, size: CGFloat, bold: Bool, face: DrawnFace) -> CTLine {
@@ -53,6 +55,10 @@ struct RailLayoutPDFKitTests {
                 let width = CGFloat(CTLineGetTypographicBounds(self.line(heading, size: 9.5, bold: true, face: face), nil, nil, nil))
                 draw(heading, at: Self.edge - width, baseline: baseline, size: 9.5, bold: true, face: face, in: context)
             }
+            if let shade = line.shade {
+                let origin = CGPoint(x: line.x ?? Self.body, y: baseline)
+                DrawnShade.fill(shade, reach: .foot, behind: self.line(line.text, size: line.size, bold: line.bold, face: face), at: origin, size: line.size, in: context)
+            }
             draw(line.text, at: line.x ?? Self.body, baseline: baseline, size: line.size, bold: line.bold, face: face, in: context)
             for cell in line.cells {
                 draw(cell.text, at: cell.x, baseline: baseline, size: line.size, bold: cell.bold, face: face, in: context)
@@ -64,7 +70,7 @@ struct RailLayoutPDFKitTests {
     }
 
     /// The CV: a header across the page, then each section with its heading beside its first line.
-    private func cv(skillsHeading: String, skillsFirst: Bool) -> [Line] {
+    private func cv(skillsHeading: String, skillsFirst: Bool, employer: Line = Line(text: "Example Ltd, Leeds", bold: true, size: 9.5)) -> [Line] {
         let skills = [
             Line(heading: skillsHeading, text: "Languages", bold: true, cells: [(314, "Swift, Kotlin", false)], gap: 20),
             Line(text: "Frameworks", bold: true, cells: [(314, "SwiftUI, Combine", false)], gap: 12),
@@ -72,7 +78,7 @@ struct RailLayoutPDFKitTests {
         ]
         let experience = [
             Line(heading: "Work Experience", text: "Software Engineer", bold: true, size: 11.5, gap: 20),
-            Line(text: "Example Ltd, Leeds", bold: true, size: 9.5),
+            employer,
             Line(text: "03/2019 – 05/2024", size: 9),
             Line(text: "Built the billing service for retail customers."),
             Line(text: "Moved the checkout to a new payment provider."),
@@ -106,6 +112,19 @@ struct RailLayoutPDFKitTests {
             #expect(result.cv.languages.map(\.name.value) == ["English", "German"], "\(label): \(result.cv.languages.map(\.name.value))")
             #expect(result.unplaced.isEmpty, "\(label): text not imported: \(result.unplaced.map(\.text))")
         }
+    }
+
+    @Test("A regular employer line on a band behind its foot is read as the employer: the band is not ink of the letters",
+          arguments: DrawnFace.allCases, [nil, 0.63, 0.8] as [CGFloat?])
+    func employerOnABand(face: DrawnFace, gray: CGFloat?) async throws {
+        // An employer of capitals alone on a line is read as a heading when it is bold, which is what a band would make it
+        let employer = Line(text: "ACME", size: 9.5, shade: gray)
+        let result = try await importer().importPDF(drawnPDF(cv(skillsHeading: "Technologies", skillsFirst: false, employer: employer), face: face))
+        let label = "\(face.testDescription), band \(String(describing: gray))"
+        #expect(result.cv.experience.map { $0.role?.value } == ["Software Engineer"], "\(label): \(result.cv.experience.map { $0.role?.value })")
+        #expect(result.cv.experience.first?.employer?.value == "ACME", "\(label): \(String(describing: result.cv.experience.first?.employer?.value))")
+        #expect(result.cv.skills.count == 6, "\(label): \(result.cv.skills.count)")
+        #expect(result.unplaced.isEmpty, "\(label): text not imported: \(result.unplaced.map(\.text))")
     }
 }
 #endif
