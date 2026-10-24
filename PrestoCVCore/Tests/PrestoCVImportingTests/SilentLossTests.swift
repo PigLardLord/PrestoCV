@@ -41,6 +41,20 @@ enum Coverage {
     static func describe(_ pieces: [Piece]) -> [String] {
         pieces.map { "«\($0.text)»" }
     }
+
+    /// The passages of the text not imported that share some of their text with the one before: the list is a set of
+    /// separate passages, and nothing the person wrote is shown twice.
+    static func overlaps(_ unplaced: [UnplacedText]) -> [String] {
+        var found: [String] = []
+        var previous: UnplacedText?
+        for item in unplaced.sorted(by: { $0.span < $1.span }) {
+            if let before = previous, item.span.lowerBound < before.span.upperBound {
+                found.append("«\(before.text)» and «\(item.text)»")
+            }
+            if previous.map({ item.span.upperBound > $0.span.upperBound }) ?? true { previous = item }
+        }
+        return found
+    }
 }
 
 /// A repeatable shuffle: the same entry is shuffled the same way on every run and on every machine.
@@ -72,8 +86,10 @@ struct SilentLossTests {
     @Test("Every line of every fixture is in a value, in the text not imported, in the text left out or in a heading")
     func corpus() throws {
         for entry in try Corpus.entries() {
-            let lost = Coverage.lost(try Corpus.importResult(of: entry))
+            let result = try Corpus.importResult(of: entry)
+            let lost = Coverage.lost(result)
             #expect(lost.isEmpty, "\(entry.id): lost \(Coverage.describe(lost))")
+            #expect(Coverage.overlaps(result.unplaced).isEmpty, "\(entry.id): shown twice \(Coverage.overlaps(result.unplaced))")
         }
     }
 
@@ -106,6 +122,7 @@ struct SilentLossTests {
                 guard let result = try? importText(variant.joined(separator: "\n")) else { continue }
                 let lost = Coverage.lost(result)
                 #expect(lost.isEmpty, "\(entry.id) \(name): lost \(Coverage.describe(lost))")
+                #expect(Coverage.overlaps(result.unplaced).isEmpty, "\(entry.id) \(name): shown twice \(Coverage.overlaps(result.unplaced))")
             }
         }
     }
@@ -116,6 +133,25 @@ struct SilentLossTests {
             let cv = try Corpus.importResult(of: entry).cv
             #expect(Set(cv.sourceSpans) == Set(Coverage.spans(in: cv)), "\(entry.id): the list of spans differs from the spans the CV holds")
         }
+    }
+
+    // MARK: Passages of the text not imported
+
+    @Test("Passages that share text are one passage; passages that only touch stay two")
+    func mergedPassages() throws {
+        let document = try importText("alpha beta gamma delta epsilon zeta").document
+        func passage(_ lower: Int, _ upper: Int, _ section: SectionKind = .unknown) -> UnplacedText {
+            let span = SourceSpan(lower, upper)
+            return UnplacedText(section: section, heading: nil, text: document.text(of: span), span: span)
+        }
+        // One inside another, one that shares the end of the second, then two that touch at 30
+        let merged = Remainder.merged([
+            passage(12, 22), passage(30, 35), passage(6, 10), passage(0, 16, .languages), passage(0, 3), passage(23, 30),
+        ], in: document)
+        #expect(merged.map(\.span) == [SourceSpan(0, 22), SourceSpan(23, 30), SourceSpan(30, 35)])
+        #expect(merged.first?.text == document.text(of: SourceSpan(0, 22)))
+        #expect(merged.first?.section == .languages, "the section of the first passage that has one")
+        #expect(Coverage.overlaps(merged).isEmpty)
     }
 
     // MARK: A second place of an entry
@@ -184,6 +220,20 @@ struct SilentLossTests {
         #expect(found.cv.languages[1].level?.value == .a2)
         #expect(Coverage.lost(found).isEmpty)
         #expect(found.unplaced.map(\.text) == ["French: fluent (lived in Lyon for two years)", "Spanish: A2 – school"])
+    }
+
+    @Test("The words of a level that a level replaces and the note after it are one text not imported, not two")
+    func languageWordsReplacedByLevel() throws {
+        let found = try importText("""
+        Languages
+        English: fluent, B2 (certificate)
+        Deutsch: C1
+        """)
+        #expect(found.cv.languages.map { $0.level?.value } == [.b2, .c1])
+        #expect(found.cv.languages[0].levelWords == nil)
+        #expect(found.unplaced.map(\.text) == ["English: fluent, B2 (certificate)"])
+        #expect(Coverage.overlaps(found.unplaced).isEmpty)
+        #expect(Coverage.lost(found).isEmpty)
     }
 
     @Test("A note that a comma parts into several items is one text not imported, with its language")
@@ -279,6 +329,13 @@ struct SilentLossTests {
         ("it", "Corsi", "Corso sul trattamento dei dati personali in ambito sanitario (8 ore)", "trattamento dei dati personali"),
         ("pt", "Cursos", "Curso de RGPD para gestores de equipas (16 horas)", "RGPD"),
         ("en", "Courses", "GDPR essentials for team leads (2 days)", "GDPR"),
+        // The words of a consent in the title of a course: the course is about consent, the person gives none
+        ("en", "Courses", "Training on consent to process personal data lawfully", "consent to process"),
+        ("it", "Corsi", "Corso su consenso e autorizzazione al trattamento dei dati personali (4 ore)", "autorizzazione"),
+        ("de", "Weiterbildung", "Schulung zu Einwilligung und Einverständnis nach der DSGVO für Vereine", "Einwilligung"),
+        ("es", "Formación complementaria", "Curso sobre consentimiento y protección de datos personales en la empresa", "consentimiento"),
+        ("fr", "Formations complémentaires", "Formation au consentement et à la protection des données personnelles (2 jours)", "consentement"),
+        ("pt", "Cursos", "Curso sobre consentimento e proteção de dados pessoais na empresa", "consentimento"),
     ]
 
     @Test("The consent to data processing is left out, in every language")
@@ -302,9 +359,10 @@ struct SilentLossTests {
 
     @Test("A consent is left out and a course next to it is kept")
     func consentNextToCourse() throws {
-        for (consent, course) in zip(Self.consents.filter { ["de", "es", "fr", "pt"].contains($0.language) }, Self.courses.filter { ["de", "es", "fr", "pt"].contains($0.language) }) {
+        for consent in Self.consents {
+            guard let course = Self.courses.first(where: { $0.language == consent.language }) else { continue }
             let found = try importText("\(course.heading)\n\(course.text)\n\n\(consent.text)")
-            #expect(found.leftOut.filter { $0.reason == .consent }.map(\.text) == [consent.text], "\(course.language)")
+            #expect(found.leftOut.filter { $0.reason == .consent }.map(\.text) == [consent.text], "\(course.language): \(consent.text)")
             #expect(Coverage.lost(found).isEmpty, "\(course.language)")
         }
     }

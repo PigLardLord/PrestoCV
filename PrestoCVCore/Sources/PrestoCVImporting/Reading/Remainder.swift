@@ -18,8 +18,27 @@ enum Remainder {
                 text: piece.text, span: piece.span
             ))
         }
-        swept.unplaced.sort { $0.span < $1.span }
+        swept.unplaced = merged(swept.unplaced, in: result.document)
         return swept
+    }
+
+    /// The text not imported as separate passages of the source, in order: passages that share some of their text are
+    /// one passage, so that nothing the person wrote is shown twice. The passage has the section of the first of them
+    /// that is in a section.
+    static func merged(_ unplaced: [UnplacedText], in document: SourceDocument) -> [UnplacedText] {
+        var passages: [UnplacedText] = []
+        for item in unplaced.sorted(by: { $0.span < $1.span }) {
+            guard let last = passages.last, item.span.lowerBound < last.span.upperBound else {
+                passages.append(item)
+                continue
+            }
+            let span = SourceSpan(last.span.lowerBound, max(last.span.upperBound, item.span.upperBound))
+            let owner = last.section == .unknown ? item : last
+            passages[passages.count - 1] = UnplacedText(
+                section: owner.section, heading: owner.heading, text: document.text(of: span), span: span
+            )
+        }
+        return passages
     }
 
     /// What the person wrote that the spans do not cover, line by line, and that is no structure: the labels and the

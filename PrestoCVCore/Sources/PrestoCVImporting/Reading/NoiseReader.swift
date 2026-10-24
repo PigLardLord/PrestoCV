@@ -21,12 +21,19 @@ enum NoiseReader {
     // MARK: Consent
 
     /// A sentence of six words or more in which the person authorises the processing of their data: an act of consent
-    /// and the data it is about. A course on data protection has the subject and no act: it stays in the CV.
+    /// in the first person and the data it is about. A course on data protection has the subject and no act, and a
+    /// course on consent names the act as a noun: both stay in the CV.
     static func isConsent(_ text: String) -> Bool {
         guard text.words.count >= 6 else { return false }
         let folded = text.folded
         if ownData.contains(where: { folded.contains($0) }) { return true }
-        return acts.contains { folded.contains($0) } && subjects.contains { folded.contains($0) }
+        let spoken = spaced(folded)
+        return acts.contains { spoken.contains($0) } && subjects.contains { folded.contains($0) }
+    }
+
+    /// The words of a text between single spaces, so that a phrase is found only as whole words.
+    private static func spaced(_ folded: String) -> String {
+        " " + folded.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).joined(separator: " ") + " "
     }
 
     // MARK: Page numbers
@@ -91,11 +98,15 @@ enum NoiseReader {
 
     // MARK: Markers
 
-    /// The words of an act of consent, in every language: "autorizzo", "willige ... ein", "consentimiento", "I consent".
+    /// The act of consent, in the first person and as whole words ("I consent", "autorizzo", "willige ... ein"): the noun
+    /// of the act ("consent", "consenso", "Einwilligung") is also the subject of a course.
     private static let acts = [
-        "autorizz", "acconsent", "consenso", "autoriz", "consentimiento", "consentimento", "consentement", "consent to", "i consent",
-        "willige", "einwillig", "einverstanden", "einverständnis", "zustimm", "autoris", "acepto", "aceito",
-    ].map(\.folded)
+        "autorizzo", "autorizza", "acconsento", "acconsente", "consento", "mio consenso",
+        "i consent", "hereby consent", "i authorise", "i authorize", "hereby authorise", "hereby authorize", "i agree", "my consent",
+        "willige", "stimme zu", "bin einverstanden", "erklare mich", "mein einverstandnis",
+        "autorizo", "acepto", "consiento", "mi consentimiento", "aceito", "consinto", "meu consentimento",
+        "autorise", "accepte", "consens", "mon consentement",
+    ].map { spaced($0.folded) }
 
     /// What the consent is about: the data of the person and the law that protects it.
     private static let subjects = [
