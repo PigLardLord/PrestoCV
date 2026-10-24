@@ -43,6 +43,12 @@ struct EditorRowDeletionSourceTests {
         // Inside the swipe actions the id is not that of the row the list scrolls to: a row added low on the screen then
         // stops under the Done button, as seen on iOS 27.0
         #expect(swipe.lowerBound < identity.lowerBound, "A row with swipe actions gets its id from the modifier outside them")
+
+        // Last of all: a modifier after the id would wrap the row once more, and the form would scroll to the wrapper
+        let afterIdentity = source[identity.upperBound...]
+        let restOfBody = afterIdentity.components(separatedBy: "private func").first ?? ""
+        let modifiersAfter = restOfBody.split(separator: "\n").filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix(".") }
+        #expect(modifiersAfter.isEmpty, "The id is the last modifier of the row, but \(modifiersAfter) follow it")
     }
 
     @Test("The list no longer deletes through onDelete, which cannot name the row")
