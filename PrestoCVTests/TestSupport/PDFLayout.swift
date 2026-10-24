@@ -64,6 +64,16 @@ struct PDFLayout {
         return sizes
     }
 
+    /// Whether the text is set in the sizes of `other`, give or take what a reader of the PDF cannot tell apart from the
+    /// same size: a tenth of a point (the sizes are read back to a tenth) and half a percent. WebKit prints a design such as
+    /// Modern, whose page does not fit the printable width, scaled to fit, and the scale follows the height of the printable
+    /// area: with the same CSS and no step, the name of the CV is 28.8 pt with a foot margin of 20 pt, 29.0 pt with 43 pt and
+    /// 29.1 pt with 72 pt. A step that set a font size would move it by more than that.
+    func fontSizes(matching other: PDFLayout) -> Bool {
+        let mine = fontSizes.sorted(), theirs = other.fontSizes.sorted()
+        return mine.count == theirs.count && zip(mine, theirs).allSatisfy { abs($0 - $1) <= 0.1 + $1 * 0.005 + 1e-9 }
+    }
+
     /// How much of the height between the margins the text of a page uses, from 0 to 1
     func fill(ofPage number: Int) -> Double {
         guard let lowest = pages[number - 1].lowestTextEdge else { return 0 }
@@ -215,6 +225,28 @@ extension PDFLayout {
     func missing(markers: [String]) -> [String] {
         let flat = text.filter { !$0.isWhitespace }
         return markers.filter { !flat.contains($0.filter { !$0.isWhitespace }) }
+    }
+
+    /// The runs in `runs` that the text of the PDF does not read whole, one after the other, in this order: a run is a title
+    /// with the items under it, and an item set among the items of another run, or a title in the middle of a list, breaks it.
+    /// Upper and lower case, white space and the marks between words (a dash, a colon, a comma) do not count.
+    /// The text is the lines of the pages from the top down, so a design that sets its lists in columns is not read by it.
+    func unreadRuns(_ runs: [String]) -> [String] {
+        let flat = Self.lettersAndDigits(text)
+        var position = flat.startIndex
+        var unread: [String] = []
+        for run in runs {
+            if let found = flat.range(of: Self.lettersAndDigits(run), range: position..<flat.endIndex) {
+                position = found.upperBound
+            } else {
+                unread.append(run)
+            }
+        }
+        return unread
+    }
+
+    private static func lettersAndDigits(_ text: String) -> String {
+        String(text.lowercased().filter { $0.isLetter || $0.isNumber })
     }
 
     private func isEntryTitle(_ line: Line, _ pattern: String) -> Bool {

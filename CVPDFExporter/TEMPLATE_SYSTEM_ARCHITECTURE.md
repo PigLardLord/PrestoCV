@@ -204,6 +204,8 @@ What a step never does:
 - set the lines closer than 1.2 times the size of the text;
 - take the margin at the foot of the page below 10 mm.
 
+The text of the compact print reads in the order of the design's own print: an item that a design stacks, such as a profile's platform over its address, is set on one line so that the platform comes before its address. WebKit prints Modern scaled to fit, and the scale follows the height of the printable area, so its text comes out a fraction of a percent smaller when the foot margin shrinks (the name is 28.9 pt instead of 29.0 pt), as it does for any change of the page's margin without a step; the CSS sets the same sizes.
+
 Each bundled design says how it tightens, with rules under `html.fit-one-page` and `html.fit-one-page-compact`; a rule of a step starts at the root element, so it cannot reach a page that is not tightened. `OnePageFitTests` holds the designs to what they may set (spacing and the layout of lists, never a font size, a width or a transform), to the line height and to the least space they keep between sections and entries, and they read the cascade to hold Modern's first entry of a section flush under its heading in every step. A design without such rules is printed as it lays itself out. The version of a design goes up when its rules change, so that an installed copy is replaced.
 
 ### Regenerating the thumbnails

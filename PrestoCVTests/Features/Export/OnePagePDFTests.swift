@@ -28,7 +28,7 @@ extension RealRendererSuites {
         /// ones of the pagination tests, and the samples of the app in each of its languages
         static func allCVs() async throws -> [(label: String, cv: CVModel)] {
             var cvs = EverydayCVs.all.map { ($0.label, $0.cv) }
-            cvs += [(ShortCVs.trailingLists.label, ShortCVs.trailingLists.cv), (ShortCVs.tooLongForOnePage.label, ShortCVs.tooLongForOnePage.cv)]
+            cvs += [ShortCVs.trailingLists, ShortCVs.longFirstJob(lines: 28), ShortCVs.tooLongForOnePage].map { ($0.label, $0.cv) }
             cvs += PlantedCVs.paginated.map { ($0.label, $0.cv) }
             for language in BundledSamples.languages {
                 cvs += try await BundledSamples.load(language: language).map { ($0.label, $0.cv) }
@@ -62,6 +62,8 @@ extension RealRendererSuites {
 
         // MARK: - The case of the product review
 
+        /// Modern is not here: it sets its lists in a sidebar beside the text, so this CV takes one page as the design lays it
+        /// out and needs no step. Its own case is `aSidebarDesignTakesTheCompactStepForALongFirstJob`.
         @Test("the lists that a design leaves alone on a second page come back onto the first", arguments: ["professional", "minimal"])
         func trailingListsComeBackOntoTheFirstPage(design: String) async throws {
             let short = ShortCVs.trailingLists
@@ -85,6 +87,51 @@ extension RealRendererSuites {
             let printed = try await Self.layout(short.label, short.cv, design: design)
             #expect(printed.pageCount == 1, "\(design): \(printed.summary)")
             #expect(printed.missing(markers: short.markers).isEmpty, "\(design) lost: \(printed.missing(markers: short.markers))")
+
+            // The lists set along a line read as the design's own: each language with its level, each profile with its
+            // address, and no title in the middle of another list
+            #expect(own.unreadRuns(short.runs).isEmpty, "\(design), as the design lays it out, does not read \(own.unreadRuns(short.runs))")
+            #expect(printed.unreadRuns(short.runs).isEmpty, "\(design), brought onto one page, does not read \(printed.unreadRuns(short.runs)):\n\(printed.text)")
+        }
+
+        // MARK: - A sidebar
+
+        @Test("a design with a sidebar takes the compact step for a long first job, and keeps its text readable")
+        func aSidebarDesignTakesTheCompactStepForALongFirstJob() async throws {
+            let design = "modern"
+            let short = try await Self.shortestFirstJob(thatTheTighteningCannotFit: design)
+
+            let own = try await Self.layout(short.label, short.cv, design: design, fit: .disabled)
+            #expect(own.pageCount == 2, "\(own.summary)")
+
+            // The tightening alone, as the renderer had it before the compact step, leaves the last sections on a second page
+            let tightened = try await Self.layout(short.label, short.cv, design: design, fit: .tighteningOnly)
+            #expect(tightened.pageCount == 2, "\(tightened.summary)")
+
+            let printed = try await Self.layout(short.label, short.cv, design: design)
+            #expect(printed.pageCount == 1, "\(short.label): \(printed.summary)")
+            #expect(printed.missing(markers: short.markers).isEmpty, "lost: \(printed.missing(markers: short.markers))")
+            expectReadable(printed, as: short.label, in: design, comparedTo: own)
+        }
+
+        /// The CV with the first job that is one line too long for the tightening, which is where the compact step starts to
+        /// matter. The length at which the tightening runs out is not the same on every system, so it is looked for, between
+        /// 20 lines (one page by the design's own layout) and 40 (two pages, whatever the step), instead of being written down:
+        /// the compact step makes room for a couple of lines more than the tightening, so the line after the last one that the
+        /// tightening brings onto one page is well inside what the compact step brings onto one.
+        private static func shortestFirstJob(thatTheTighteningCannotFit design: String) async throws -> ShortCVs.Short {
+            func tighteningTakesOnePage(_ lines: Int) async throws -> Bool {
+                let short = ShortCVs.longFirstJob(lines: lines)
+                return try await layout(short.label, short.cv, design: design, fit: .tighteningOnly).pageCount == 1
+            }
+            var fits = 20, doesNotFit = 40
+            let bounds = try await (tighteningTakesOnePage(fits), tighteningTakesOnePage(doesNotFit))
+            try #require(bounds == (true, false), "\(design): the tightening takes \(fits) lines onto one page: \(bounds.0), and \(doesNotFit): \(bounds.1)")
+            while doesNotFit - fits > 1 {
+                let middle = (fits + doesNotFit) / 2
+                if try await tighteningTakesOnePage(middle) { fits = middle } else { doesNotFit = middle }
+            }
+            return ShortCVs.longFirstJob(lines: doesNotFit)
         }
 
         // MARK: - A CV that does not fit
@@ -139,16 +186,19 @@ extension RealRendererSuites {
             for short in Self.shortCases {
                 let own = try await Self.layout(short.label, short.cv, design: design, fit: .disabled)
                 let printed = try await Self.layout(short.label, short.cv, design: design)
-
-                #expect(!printed.fontSizes.isEmpty)
-                #expect(printed.fontSizes == own.fontSizes, "\(short.label) in \(design): the text is set in other sizes: \(own.fontSizes) became \(printed.fontSizes)")
-                for page in 1...printed.pageCount {
-                    #expect(printed.isInsideMargins(page: page, bottomMargin: CGFloat(OnePageFit.minimumBottomMargin)),
-                            "\(short.label) in \(design), page \(page) has text outside the margins")
-                }
-                // PDFKit reads some lines of a design as overlapping where it wraps a tag: no more of them than before
-                #expect(printed.overlappingLines().count <= own.overlappingLines().count, "\(short.label) in \(design): \(printed.overlappingLines())")
+                expectReadable(printed, as: short.label, in: design, comparedTo: own)
             }
+        }
+
+        private func expectReadable(_ printed: PDFLayout, as label: String, in design: String, comparedTo own: PDFLayout) {
+            #expect(!printed.fontSizes.isEmpty)
+            #expect(printed.fontSizes(matching: own), "\(label) in \(design): the text is set in other sizes: \(own.fontSizes.sorted()) became \(printed.fontSizes.sorted())")
+            for page in 1...printed.pageCount {
+                #expect(printed.isInsideMargins(page: page, bottomMargin: CGFloat(OnePageFit.minimumBottomMargin)),
+                        "\(label) in \(design), page \(page) has text outside the margins")
+            }
+            // PDFKit reads some lines of a design as overlapping where it wraps a tag: no more of them than before
+            #expect(printed.overlappingLines().count <= own.overlappingLines().count, "\(label) in \(design): \(printed.overlappingLines())")
         }
     }
 }
