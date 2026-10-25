@@ -40,11 +40,29 @@ public enum StoreIssue: Sendable, Equatable {
 
 public enum StoreFailure: Sendable, Equatable { case notADirectory, cannotList, cannotLock }
 
+/// The error under a failed call, as codes only: its domain and its code, never a path or a message (R7).
+public struct FailureCause: Sendable, Equatable, CustomStringConvertible {
+    public enum Domain: Sendable, Equatable {
+        /// `NSCocoaErrorDomain`: Foundation's own file errors, such as a write without permission.
+        case cocoa
+        /// `NSPOSIXErrorDomain`: the code is the `errno` value.
+        case posix
+        /// Any other domain, or a Swift error that has none.
+        case other
+    }
+
+    public let domain: Domain, code: Int
+    public init(domain: Domain, code: Int) { self.domain = domain; self.code = code }
+
+    /// `posix 13`: the form a failed test and the log show.
+    public var description: String { "\(domain) \(code)" }
+}
+
 /// No paths or free-form strings: file names only, and coded failures (R7).
 public enum RepositoryError: Error, Equatable, Sendable {
     case notFound(CVID), alreadyExists(CVID), conflict(CVID, storedRevision: Int)
     case corrupt(file: String), unreadable(file: String), upgradeRequired(file: String, version: Int), tooLarge(file: String)
-    case invalidName(String), storeUnavailable(StoreFailure), writeFailed(file: String)
+    case invalidName(String), storeUnavailable(StoreFailure), writeFailed(file: String, cause: FailureCause)
     /// Refused before writing: the file would exceed the size cap, or would not read back (the previous version is kept).
     case wouldNotReadBack(file: String)
 }
