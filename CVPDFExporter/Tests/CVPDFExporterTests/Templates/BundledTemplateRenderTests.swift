@@ -263,8 +263,8 @@ struct BundledTemplateRenderTests {
         }
 
         let classAttributes = try NSRegularExpression(pattern: "class=\"([^\"]*)\"")
-        // The renderer sets this class on the root element when it prints a CV tightened onto one page
-        var present: Set<String> = [OnePageFit.className]
+        // The renderer sets these classes on the root element when it prints a CV tightened onto one page
+        var present = OnePageFit.classNames
         for match in classAttributes.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
             present.formUnion(String(html[Range(match.range(at: 1), in: html)!]).split(separator: " ").map(String.init))
         }

@@ -1,0 +1,18 @@
+Rita Exemplo
+Programadora móvel
+Porto · rita.exemplo@example.com · +351 910 000 505
+
+EXPERIÊNCIA PROFISSIONAL
+Programadora móvel – Apps Exemplo S.A., Porto
+Março 2021 – atualmente
+Desenvolvimento da aplicação de reservas em Swift.
+
+Programadora júnior – Software Exemplo S.A., Braga
+Junho 2018 – Fevereiro 2021
+
+FORMAÇÃO
+Licenciatura em Informática – Universidade do Porto (2015 – 2018)
+
+FERRAMENTAS
+Swift, SwiftUI, Combine
+Kotlin, Docker
