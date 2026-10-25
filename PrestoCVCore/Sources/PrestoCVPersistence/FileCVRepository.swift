@@ -126,8 +126,10 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     /// written and the previous version stays (review round 2: the writer accepted what the reader rejects).
     ///
     /// A failure keeps the error it came from, as a domain and a code (R7); the text the user sees does not depend on it.
-    private func write(_ cv: CV, createdAt: Date, updatedAt: Date) throws(RepositoryError) {
+    private func write(_ cv: CV) throws(RepositoryError) {
         let name = url(cv.id).lastPathComponent
+        // `stored(revision:at:)` sets both dates, and a read always returns them, so a CV without them would not read back.
+        guard let createdAt = cv.createdAt, let updatedAt = cv.updatedAt else { throw .wouldNotReadBack(file: name) }
         let data: Data
         do { data = try CVFileV1(cv, createdAt: createdAt, updatedAt: updatedAt).encoded() } catch { throw .writeFailed(file: name, cause: FailureCause(error)) }
         guard data.count <= maxFileBytes else { throw .wouldNotReadBack(file: name) }
@@ -146,9 +148,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     public func create(_ cv: CV) async throws(RepositoryError) -> CV {
         try withStoreLock { () throws(RepositoryError) -> CV in
             guard try current(cv.id) == nil else { throw .alreadyExists(cv.id) }
-            let at = now(), stored = cv.stored(revision: 1, at: at)
-            try write(stored, createdAt: cv.createdAt ?? at, updatedAt: at)
-            return stored
+            let stored = cv.stored(revision: 1, at: now()); try write(stored); return stored
         }
     }
 
@@ -156,10 +156,10 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         try withStoreLock { () throws(RepositoryError) -> CV in
             guard let existing = try current(cv.id) else { throw .notFound(cv.id) }
             guard existing.revision == cv.revision else { throw .conflict(cv.id, storedRevision: existing.revision) }
-            let at = now(), stored = cv.stored(revision: cv.revision + 1, at: at)
-            let written = CV(id: stored.id, revision: stored.revision, createdAt: existing.createdAt, updatedAt: at, title: stored.title,
+            let stored = cv.stored(revision: cv.revision + 1, at: now())
+            let written = CV(id: stored.id, revision: stored.revision, createdAt: existing.createdAt, updatedAt: stored.updatedAt, title: stored.title,
                              personal: stored.personal, sections: stored.sections, design: stored.design, language: stored.language)
-            try write(written, createdAt: existing.createdAt ?? at, updatedAt: at)
+            try write(written)
             return try current(cv.id) ?? written
         }
     }

@@ -176,6 +176,42 @@ struct FileRepositoryTests {
         #expect(try await r.update(v).revision == 2)
     }
 
+    // The repository stamps the dates of a stored CV once, in `CV.stored(revision:at:)`, and writes exactly those:
+    // these guard that, so a second source for a date cannot creep back into `write`.
+    @Test("a created CV is stamped from the clock, and keeps the creation date the caller carried")
+    func createDates() async throws {
+        struct At: TimeSource { let date: Date; func now() -> Date { date } }
+        let carried = Date(timeIntervalSince1970: 1_600_000_000), clock = Date(timeIntervalSince1970: 1_700_000_000)
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let r = FileCVRepository(directory: dir, clock: At(date: clock))
+
+        let fresh = try await r.create(named("Ada"))
+        #expect(fresh.createdAt == clock && fresh.updatedAt == clock)
+        let c = named("Bea", id: id2)
+        let withDate = CV(id: c.id, revision: 0, createdAt: carried, updatedAt: carried, title: c.title, personal: c.personal,
+                          sections: c.sections, design: c.design, language: c.language)
+        let kept = try await r.create(withDate)
+        #expect(kept.createdAt == carried && kept.updatedAt == clock)
+        let reread = repo(dir)
+        #expect(try await reread.load(id1) == fresh)
+        #expect(try await reread.load(id2) == kept)
+    }
+
+    @Test("an update keeps the stored creation date, whatever dates the caller carries, and takes the update date from the clock")
+    func updateDates() async throws {
+        struct At: TimeSource { let date: Date; func now() -> Date { date } }
+        let first = Date(timeIntervalSince1970: 1_700_000_000), second = Date(timeIntervalSince1970: 1_700_000_500)
+        let stale = Date(timeIntervalSince1970: 1_500_000_000)
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let v1 = try await FileCVRepository(directory: dir, clock: At(date: first)).create(named("Ada"))
+        let behind = CV(id: v1.id, revision: v1.revision, createdAt: stale, updatedAt: stale, title: v1.title, personal: v1.personal,
+                        sections: v1.sections, design: v1.design, language: v1.language)
+
+        let v2 = try await FileCVRepository(directory: dir, clock: At(date: second)).update(behind)
+        #expect(v2.revision == 2 && v2.createdAt == first && v2.updatedAt == second)
+        #expect(try await repo(dir).load(id1) == v2)
+    }
+
     @Test("a failing quarantine does not hide the healthy CVs")
     func quarantineFails() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
