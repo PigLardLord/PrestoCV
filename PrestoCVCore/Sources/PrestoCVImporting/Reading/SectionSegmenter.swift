@@ -7,6 +7,9 @@ struct Section: Equatable {
     var blocks: [SourceBlock]
     /// The languages whose vocabulary the heading is from.
     var languages: Set<CVLanguage>
+    /// The heading is one of the first level in the shape of a name that closed the head: it could have been the name
+    /// (#301), so the name the head gives is to be checked.
+    var headingCouldBeTheName = false
 
     /// What the heading is in the text: its block, or, when a row of cells opens the section, its first cell.
     var headingSpan: SourceSpan? {
@@ -57,8 +60,11 @@ enum SectionSegmenter {
                 continue
             }
             let head = headKinds.contains(sections[sections.count - 1].kind) ? headBlocks(of: sections, in: block.column) : nil
-            if let match = heading(block, in: document, isFirst: sections.count == 1 && sections[0].blocks.isEmpty, head: head) {
-                sections.append(Section(kind: match.kind, heading: block, blocks: [], languages: match.languages))
+            if let opening = heading(block, in: document, isFirst: sections.count == 1 && sections[0].blocks.isEmpty, head: head) {
+                sections.append(Section(
+                    kind: opening.match.kind, heading: block, blocks: [], languages: opening.match.languages,
+                    headingCouldBeTheName: opening.couldBeTheName
+                ))
                 continue
             }
             sections[sections.count - 1].blocks.append(block)
@@ -90,20 +96,26 @@ enum SectionSegmenter {
     /// first level with the shape of a name is the name, whatever its words ("# Thomas Kiel" after the contacts), unless
     /// the head already holds a line in the shape of a name that its contacts follow: the shape tells a name from a heading
     /// no better than the words, so the heading then opens a section ("Anna Weber / person@example.com / # University
-    /// Projects", #301). After the head it is a heading.
-    private static func heading(_ block: SourceBlock, in document: SourceDocument, isFirst: Bool, head: [SourceBlock]?) -> SectionVocabulary.Match? {
+    /// Projects", #301). Such a heading could still have been the name ("Greater Wexby / person@example.com / # Anna
+    /// Weber"), and the section says so. After the head it is a heading.
+    private static func heading(
+        _ block: SourceBlock, in document: SourceDocument, isFirst: Bool, head: [SourceBlock]?
+    ) -> (match: SectionVocabulary.Match, couldBeTheName: Bool)? {
         guard block.kind != .listItem, block.kind != .tableHeader else { return nil }
         let cells = block.cells.map { document.text(of: $0) }
         let nonEmpty = cells.filter { !$0.isEmpty }
         guard nonEmpty.count == 1, let text = nonEmpty.first else { return nil }
         if text.words.count <= SectionVocabulary.maximumWords, let match = SectionVocabulary.kind(ofHeading: text) {
-            return match
+            return (match, false)
         }
         guard !isFirst, isMarkedAsHeading(block, text: text) else { return nil }
         // The name at the top of a chat answer, after its opening sentence, the contacts or the document's title
-        if case .heading(1) = block.kind, let head, HeaderReader.hasNameShape(text),
-           !HeaderReader.holdsNameBeforeContacts(head, in: document) { return nil }
-        return SectionVocabulary.Match(kind: .unknown, languages: [])
+        var couldBeTheName = false
+        if case .heading(1) = block.kind, let head, HeaderReader.hasNameShape(text) {
+            guard HeaderReader.holdsNameBeforeContacts(head, in: document) else { return nil }
+            couldBeTheName = true
+        }
+        return (SectionVocabulary.Match(kind: .unknown, languages: []), couldBeTheName)
     }
 
     /// A heading the vocabulary does not know: a Markdown heading of level 1 or 2 that is not the name at the top, or

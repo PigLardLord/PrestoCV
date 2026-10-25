@@ -14,7 +14,7 @@ struct HeaderReaderTests {
         let (document, sections) = pasted(text)
         var findings = Findings(document: document)
         HeaderReader.read(
-            sections.filter { $0.kind == .header || $0.kind == .personal },
+            sections.filter { $0.kind == .header || $0.kind == .personal }, headingsThatCouldBeTheName: sections.filter(\.headingCouldBeTheName),
             hasSummarySection: sections.contains { $0.kind == .summary }, into: &findings
         )
         return findings
@@ -467,7 +467,7 @@ struct HeaderReaderTests {
 
     // MARK: A heading after the name (#301)
 
-    @Test("A heading of the first level after the name and its contacts is a section, not the name, the title or the place", arguments: [
+    @Test("A heading of the first level after the name and its contacts is a section, not the name, the title or the place; the name is to be checked, as the heading could have been it", arguments: [
         "Anna Weber", "Thomas Kiel", "Rebecca Cook",
     ], ["", "Nurse\n"])
     func headingAfterTheNameAndContacts(name: String, title: String) throws {
@@ -476,11 +476,33 @@ struct HeaderReaderTests {
         )
         let person = result.cv.person
         #expect(person.name?.value == name, "\(name) / \(title)")
-        #expect(person.name?.check == (name == "Anna Weber" ? nil : .nameByPosition), "\(name) / \(title)")
+        #expect(person.name?.check == .nameByPosition, "\(name) / \(title)")
         #expect(person.title?.value == (title.isEmpty ? nil : "Nurse"), "\(name) / \(title)")
         #expect(person.location == nil, "\(name) / \(title)")
         #expect(result.unplaced.map(\.text) == ["Built a scheduling application"], "\(name) / \(title)")
         #expect(result.unplaced.first?.heading == "University Projects", "\(name) / \(title)")
+    }
+
+    @Test("The price of a heading after a line in the shape of a name and the contacts: a name in it is a section's heading, and the line before the contacts is the name, to be checked")
+    func nameInAHeadingAfterTheContacts() throws {
+        let importer = ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard)
+        for before in ["Greater Wexby", "Senior Nurse"] {
+            let result = try importer.importText("\(before)\nperson@example.com\n\n# Anna Weber\nNurse")
+            #expect(result.cv.person.name?.value == before, "\(before)")
+            #expect(result.cv.person.name?.check == .nameByPosition, "\(before)")
+            #expect(result.cv.person.title == nil, "\(before)")
+            #expect(result.unplaced.map(\.text) == ["Nurse"], "\(before)")
+            #expect(result.unplaced.first?.heading == "Anna Weber", "\(before)")
+            // A heading with no line of its own is shown, with the head
+            let bare = try importer.importText("\(before)\nperson@example.com\n\n# Anna Weber\n\n## Experience\n2019 - 2021 Nurse, Northgate Hospital")
+            #expect(bare.cv.person.name?.check == .nameByPosition, "\(before)")
+            #expect(bare.unplaced.map(\.text) == ["Anna Weber"], "\(before)")
+            #expect(bare.unplaced.first?.section == .header && bare.unplaced.first?.heading == nil, "\(before)")
+        }
+        // A name given by its label stays sure
+        let labelled = try importer.importText("Name: Anna Weber\nEmail: person@example.com\n\n# University Projects\nBuilt a scheduling application")
+        #expect(labelled.cv.person.name?.value == "Anna Weber")
+        #expect(labelled.cv.person.name?.check == nil)
     }
 
     @Test("A heading of the first level under a line in the shape of a name is no mark of the name: the first line keeps its evidence", arguments: [

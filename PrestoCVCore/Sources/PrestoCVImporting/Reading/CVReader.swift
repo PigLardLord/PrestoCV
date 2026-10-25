@@ -19,7 +19,7 @@ enum CVReader {
         let sections = SectionSegmenter.sections(of: document)
 
         HeaderReader.read(
-            sections.filter { $0.kind == .header || $0.kind == .personal },
+            sections.filter { $0.kind == .header || $0.kind == .personal }, headingsThatCouldBeTheName: sections.filter(\.headingCouldBeTheName),
             hasSummarySection: sections.contains { $0.kind == .summary }, into: &findings
         )
         for section in sections {

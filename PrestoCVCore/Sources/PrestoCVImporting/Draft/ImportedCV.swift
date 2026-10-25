@@ -34,7 +34,8 @@ public enum ReadingRule: String, Hashable, Sendable {
 
 /// Why a value of an import should be checked by the person.
 public enum CheckReason: String, Hashable, Sendable {
-    /// The name was taken from its place at the top, with no label or mark that says it is the name.
+    /// The name was taken from its place at the top, with no label or mark that says it is the name, or a heading that
+    /// closed the head could have been it.
     case nameByPosition
     /// The professional title was taken from its place under the name.
     case titleByPosition

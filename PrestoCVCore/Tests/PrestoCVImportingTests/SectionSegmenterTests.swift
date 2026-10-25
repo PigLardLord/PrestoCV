@@ -97,6 +97,18 @@ struct SectionSegmenterTests {
         }
     }
 
+    @Test("A section opened in the head at a heading in the shape of a name is one whose heading could have been the name (#301)")
+    func headingThatCouldBeTheName() {
+        let (_, cut) = pasted("Anna Weber\nperson@example.com\n\n# University Projects\nBuilt a scheduling application\n\n# Thomas Kiel\nNurse")
+        #expect(cut.map(\.kind) == [.header, .unknown, .unknown])
+        // After another section, a heading is only a heading
+        #expect(cut.map(\.headingCouldBeTheName) == [false, true, false])
+        for heading in ["# Experience", "## University Projects", "# Projects at university"] {
+            let (_, other) = pasted("Anna Weber\nperson@example.com\n\n\(heading)\n2019 - 2021 Nurse")
+            #expect(other.count == 2 && !other[1].headingCouldBeTheName, "\(heading)")
+        }
+    }
+
     @Test("A name in a heading after the contacts stays in the head when nothing before them has the shape of a name (#301)")
     func nameHeadingAfterNoName() {
         // A piece after a contact of its line holds the place, a line of known places alone is a place, and a name with no

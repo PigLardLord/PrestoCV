@@ -16,7 +16,12 @@ enum HeaderReader {
         let followsContact: Bool
     }
 
-    static func read(_ sections: [Section], hasSummarySection: Bool, into findings: inout Findings) {
+    /// Reads the head from its `sections`. The `headingsThatCouldBeTheName` are the sections opened at a heading that
+    /// closed the head and could have been the name (#301): the name the head gives is then to be checked, and such a
+    /// heading with no line of its own is shown with the head, as text not imported.
+    static func read(
+        _ sections: [Section], headingsThatCouldBeTheName cut: [Section], hasSummarySection: Bool, into findings: inout Findings
+    ) {
         var candidates: [Candidate] = []
         var emails: [(Sourced<EmailAddress>, Section)] = []
         var phones: [(Sourced<PhoneNumber>, Section)] = []
@@ -98,7 +103,7 @@ enum HeaderReader {
             head = chosen
             let reading = chosen.reading
             let candidate = candidates[reading.index]
-            findings.cv.person.name = reading.name.quote(check: chosen.isSure ? nil : .nameByPosition)
+            findings.cv.person.name = reading.name.quote(check: chosen.isSure && cut.isEmpty ? nil : .nameByPosition)
             taken.insert(reading.index)
             // The title follows the name, in the same line or the next, and the credentials of the name go with it; a line
             // that could have been the name is to be checked as the title
@@ -134,6 +139,13 @@ enum HeaderReader {
         }
         for (index, candidate) in candidates.enumerated() where !taken.contains(index) {
             findings.unplace(candidate.piece, in: candidate.section)
+        }
+        // A heading that could have been the name and has no line of its own would vanish with its section
+        for section in cut where section.blocks.isEmpty {
+            guard let heading = section.heading,
+                  let head = sections.last(where: { ($0.heading ?? $0.blocks.first).map { $0.index < heading.index } ?? false }) ?? sections.first
+            else { continue }
+            findings.unplace(heading, in: head)
         }
     }
 
