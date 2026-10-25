@@ -165,16 +165,16 @@ struct LocalizationCatalogTests {
     fileprivate static let sentenceCaseLanguages = ["es", "fr", "it", "pt"]
 
     /// Words that promise future availability or readiness, by language: that the AI draft, a model or its data will
-    /// be there soon, in a moment, or not yet. Nothing tells when they will be ready, and the owner decided that the AI
-    /// texts promise no availability the app cannot deliver now (#255). The expected duration of a task that is already
-    /// running is not such a promise.
+    /// be there soon, in a moment, later, or not yet. Nothing tells when they will be ready, and the owner decided that the
+    /// AI texts promise no availability the app cannot deliver now (#255, #270). The expected duration of a task that is
+    /// already running is not such a promise.
     fileprivate static let availabilityPromises: [String: [String]] = [
-        "en": ["soon", "shortly", "in a moment", "coming", "yet"],
-        "de": ["bald", "gleich", "demnächst", "in Kürze", "noch nicht"],
-        "es": ["pronto", "en un momento", "en breve", "todavía no", "aún no"],
-        "fr": ["bientôt", "dans un instant", "sous peu", "pas encore"],
-        "it": ["presto", "tra un attimo", "fra poco", "a breve", "non ancora"],
-        "pt": ["em breve", "em instantes", "logo", "ainda não"],
+        "en": ["soon", "shortly", "in a moment", "coming", "yet", "later"],
+        "de": ["bald", "gleich", "demnächst", "in Kürze", "noch nicht", "später"],
+        "es": ["pronto", "en un momento", "en breve", "todavía no", "aún no", "más tarde"],
+        "fr": ["bientôt", "dans un instant", "sous peu", "pas encore", "plus tard"],
+        "it": ["presto", "tra un attimo", "fra poco", "a breve", "non ancora", "più tardi"],
+        "pt": ["em breve", "em instantes", "logo", "ainda não", "mais tarde"],
     ]
 
     /// The promise of future availability or readiness in a text, if it makes one.
@@ -419,6 +419,8 @@ struct LocalizationCatalogTests {
         #expect(Self.availabilityPromise(in: "Getting ready, available soon", language: "en") == "soon")
         #expect(Self.availabilityPromise(in: "In preparazione, presto disponibile", language: "it") == "presto")
         #expect(Self.availabilityPromise(in: "Bald verfügbar", language: "de") == "bald")
+        #expect(Self.availabilityPromise(in: "Try again later.", language: "en") == "later")
+        #expect(Self.availabilityPromise(in: "Riprova più tardi.", language: "it") == "più tardi")
         #expect(Self.availabilityPromise(in: "Downloading the model", language: "en") == nil)
         #expect(Self.availabilityPromise(in: "Not available right now", language: "en") == nil)
         #expect(Self.availabilityPromise(in: "Apple Intelligence is busy right now. Please try again.", language: "en") == nil)
