@@ -25,21 +25,27 @@ struct PDFLayout {
     }
 
     let pages: [Page]
-    /// The sizes of the fonts the text is set in, in points to a tenth, as PDFKit reads them back
-    let fontSizes: Set<Double>
     let pageSize: CGSize
     let margins: (top: CGFloat, left: CGFloat, bottom: CGFloat, right: CGFloat)
+
+    /// The sizes of the fonts the text is set in, in points to a tenth, as PDFKit reads them back. Reading them is by far the
+    /// dearest part of reading a PDF back: PDFKit looks up each font by name, fails, and logs a note for every run of text.
+    /// Few tests ask, so they are read on the first use and then kept.
+    var fontSizes: Set<Double> { fonts.sizes }
+
+    private let fonts: Fonts
 
     var pageCount: Int { pages.count }
     var blankPageNumbers: [Int] { pages.indices.filter { pages[$0].isBlank }.map { $0 + 1 } }
     var text: String { pages.map(\.text).joined(separator: "\n") }
 
     init?(pdf url: URL, margins: (top: CGFloat, left: CGFloat, bottom: CGFloat, right: CGFloat)) {
-        guard let document = PDFDocument(url: url), document.pageCount > 0 else { return nil }
+        guard let data = try? Data(contentsOf: url),
+              let document = PDFDocument(data: data), document.pageCount > 0 else { return nil }
         let first = document.page(at: 0)!.bounds(for: .mediaBox)
         self.pageSize = first.size
         self.margins = margins
-        self.fontSizes = Self.fontSizes(of: document)
+        self.fonts = Fonts(pdf: data)
         self.pages = (0..<document.pageCount).map { index in
             let page = document.page(at: index)!
             let selection = page.selection(for: page.bounds(for: .mediaBox))
@@ -50,6 +56,26 @@ struct PDFLayout {
             return Page(lines: lines.sorted { lhs, rhs in
                 abs(lhs.bounds.maxY - rhs.bounds.maxY) < 2 ? lhs.bounds.minX < rhs.bounds.minX : lhs.bounds.maxY > rhs.bounds.maxY
             })
+        }
+    }
+
+    /// The fonts of a PDF, read on first use. The layout keeps the bytes of the PDF, because the tests delete its file once it
+    /// is read back.
+    private final class Fonts: @unchecked Sendable {
+        private let pdf: Data
+        private let lock = NSLock()
+        private var memo: Set<Double>?
+
+        init(pdf: Data) { self.pdf = pdf }
+
+        var sizes: Set<Double> {
+            lock.lock()
+            defer { lock.unlock() }
+            if let memo { return memo }
+            var found = Set<Double>()
+            if let document = PDFDocument(data: pdf) { found = PDFLayout.fontSizes(of: document) }
+            memo = found
+            return found
         }
     }
 
