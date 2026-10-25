@@ -12,13 +12,15 @@ import PrestoCVApplication
 @testable import PrestoCVPersistence
 import PrestoCVCoreTestSupport
 
-/// What Foundation reports for a failed call, read here without the repository's own mapping.
+/// What Foundation reports for a failed call, read here without the repository's own mapping. On Apple platforms the
+/// errno sits under the Cocoa error; swift-corelibs-foundation reports none.
 private func foundationCause(_ error: any Error) -> FailureCause {
     let bridged = error as NSError
+    let underlying = (bridged.userInfo[NSUnderlyingErrorKey] as? NSError).flatMap { $0.domain == NSPOSIXErrorDomain ? $0.code : nil }
     switch bridged.domain {
-    case NSCocoaErrorDomain: return FailureCause(domain: .cocoa, code: bridged.code)
+    case NSCocoaErrorDomain: return FailureCause(domain: .cocoa, code: bridged.code, underlyingPOSIX: underlying)
     case NSPOSIXErrorDomain: return FailureCause(domain: .posix, code: bridged.code)
-    default: return FailureCause(domain: .other, code: bridged.code)
+    default: return FailureCause(domain: .other, code: bridged.code, underlyingPOSIX: underlying)
     }
 }
 
@@ -72,6 +74,34 @@ struct FileCVRepositoryFailureTests {
         #expect(FailureCause(NSError(domain: "Elsewhere", code: 7, userInfo: [NSFilePathErrorKey: "/private/path"])) == FailureCause(domain: .other, code: 7))
     }
 
+    // Cocoa 513 (`fileWriteNoPermission`) covers more than one errno: a write refused by a folder that cannot be written
+    // to (EACCES) and one refused by a file the device has locked (EPERM). The errno under it tells them apart.
+    @Test("the errno under a Cocoa error is kept, so that two refusals that are both Cocoa 513 read differently")
+    func underlyingErrno() {
+        func refusal(by errno: Int32, path: String = "/private/path") -> NSError {
+            NSError(domain: NSCocoaErrorDomain, code: CocoaError.fileWriteNoPermission.rawValue,
+                    userInfo: [NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(errno)), NSFilePathErrorKey: path])
+        }
+        let locked = FailureCause(refusal(by: EPERM)), readOnly = FailureCause(refusal(by: EACCES))
+        #expect(locked == FailureCause(domain: .cocoa, code: 513, underlyingPOSIX: Int(EPERM)))
+        #expect(readOnly == FailureCause(domain: .cocoa, code: 513, underlyingPOSIX: Int(EACCES)))
+        #expect(locked != readOnly)
+        #expect("\(locked)" == "cocoa 513 (posix 1)")
+        #expect("\(readOnly)" == "cocoa 513 (posix 13)")
+        #expect(!"\(locked)".contains("private"))                                   // a code, never the path beside it
+    }
+
+    @Test("only a POSIX errno is kept under an error: another domain, a missing key and a POSIX error itself keep none")
+    func underlyingErrnoOnlyWhenThereIsOne() {
+        let elsewhere = NSError(domain: NSCocoaErrorDomain, code: 4, userInfo: [NSUnderlyingErrorKey: NSError(domain: "Elsewhere", code: 9)])
+        #expect(FailureCause(elsewhere) == FailureCause(domain: .cocoa, code: 4))
+        #expect(FailureCause(CocoaError(.fileWriteNoPermission)) == FailureCause(domain: .cocoa, code: 513))
+        let posixOverPosix = NSError(domain: NSPOSIXErrorDomain, code: Int(EACCES), userInfo: [NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM))])
+        #expect(FailureCause(posixOverPosix) == FailureCause(domain: .posix, code: Int(EACCES)))
+        let other = NSError(domain: "Elsewhere", code: 7, userInfo: [NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC))])
+        #expect(FailureCause(other) == FailureCause(domain: .other, code: 7, underlyingPOSIX: Int(ENOSPC)))
+    }
+
     @Test("a cause reads as its domain and code in test output and in the log")
     func description() {
         #expect("\(FailureCause(domain: .posix, code: 13))" == "posix 13")
@@ -87,6 +117,9 @@ struct FileCVRepositoryFailureTests {
         let saved = try await r.create(named("Ada"))
         let expected = try failedWriteCause()
         #expect(expected.domain != .other && expected.code != 0)         // Foundation names a cause; the repository must keep it
+        #if canImport(Darwin)
+        #expect(expected.underlyingPOSIX == Int(EACCES), "cause: \(expected)")   // on Apple platforms Foundation puts the errno under Cocoa 513
+        #endif
         chmod(dir.path, 0o555)
         await #expect(throws: RepositoryError.writeFailed(file: fileName(id1), cause: expected)) { _ = try await r.update(saved) }
         await #expect(throws: RepositoryError.writeFailed(file: fileName(id2), cause: expected)) { _ = try await r.create(named("Bob", id: id2)) }

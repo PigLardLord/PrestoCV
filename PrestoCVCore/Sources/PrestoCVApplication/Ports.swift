@@ -52,10 +52,18 @@ public struct FailureCause: Sendable, Equatable, CustomStringConvertible {
     }
 
     public let domain: Domain, code: Int
-    public init(domain: Domain, code: Int) { self.domain = domain; self.code = code }
+    /// The `errno` under the error, when Foundation reports one. A Cocoa code covers several of them: `cocoa 513` is
+    /// both a folder that cannot be written to (`posix 13`) and a file the device has locked, so only the pair tells
+    /// them apart. Foundation on Apple platforms reports it; swift-corelibs-foundation on Linux does not.
+    public let underlyingPOSIX: Int?
+    public init(domain: Domain, code: Int, underlyingPOSIX: Int? = nil) {
+        self.domain = domain; self.code = code; self.underlyingPOSIX = underlyingPOSIX
+    }
 
-    /// `posix 13`: the form a failed test and the log show.
-    public var description: String { "\(domain) \(code)" }
+    /// `posix 13`, or `cocoa 513 (posix 13)`: the form a failed test and a printed error show.
+    public var description: String {
+        underlyingPOSIX.map { "\(domain) \(code) (posix \($0))" } ?? "\(domain) \(code)"
+    }
 }
 
 /// No paths or free-form strings: file names only, and coded failures (R7).
