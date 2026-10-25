@@ -408,6 +408,18 @@ struct DeploymentTargetTests {
         #expect(findings.isEmpty, "The oldest supported iOS is \(DeploymentTargets.minimum) (#180):\n\(findings.map(\.description).joined(separator: "\n"))")
     }
 
+    @Test("The archive check holds the same minimum as the source check, and checks the MinimumOSVersion of the archive")
+    func archiveCheckHoldsTheMinimum() throws {
+        let path = "Tools/Release/check-archive.sh"
+        let script = try String(contentsOf: Repository.root.appendingPathComponent(path), encoding: .utf8)
+
+        let constants = script.components(separatedBy: "\n").filter { $0.hasPrefix("MINIMUM_OS_VERSION=") }
+        try #require(constants.count == 1, "\(path) must set MINIMUM_OS_VERSION once: \(constants)")
+        #expect(constants[0] == "MINIMUM_OS_VERSION=\"\(DeploymentTargets.minimum)\"", "\(path) says \(constants[0]); the source check says \(DeploymentTargets.minimum)")
+        #expect(script.contains("MinimumOSVersion"), "\(path) does not read MinimumOSVersion: an archive built for an older iOS would pass")
+        #expect(script.contains("$MINIMUM_OS_VERSION"), "\(path) does not use MINIMUM_OS_VERSION")
+    }
+
     @Test("The scan reads the manifests of the tools but not the prototype's, which nothing builds")
     func scanSkipsOnlyThePrototype() {
         let manifests = DeploymentTargets.manifests(under: Repository.root)
