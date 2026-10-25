@@ -68,14 +68,14 @@ struct ViewModelFactoryTests {
         #expect(await !cvs.createCVCalled)
     }
 
-    @Test("A draft opens with the AI notice, and is stored as it is")
-    func draftOpensWithTheNotice() async throws {
+    @Test("A draft opens with its AI notice, and is stored as it is", arguments: [EditorNotice.aiDraft, .aiDraftUnchecked])
+    func draftOpensWithTheNotice(notice: EditorNotice) async throws {
         let draft = CVModel(name: "Drafted", personalInfo: PersonalInfo(name: "Maria Rossi"))
 
-        let editor = try makeFactory().makeCVEditorViewModel(for: .new(template: draft, notice: .aiDraft))
+        let editor = try makeFactory().makeCVEditorViewModel(for: .new(template: draft, notice: notice))
         await editor.saveNow()
 
-        #expect(editor.notice == .aiDraft)
+        #expect(editor.notice == notice)
         #expect(editor.cv.id != draft.id, "The draft gets an id of its own")
         #expect(await cvs.createdCVs.map(\.personalInfo.name) == ["Maria Rossi"])
     }
@@ -154,6 +154,25 @@ struct ViewModelFactoryTests {
 
         #expect(reopened.prompt == "Ward nurse with ten years in intensive care")
     }
+
+    #if DEBUG
+    @Test("A debug launch that scripts the model and a claim check with no answer gives the unchecked AI draft (ADR 0028)")
+    func scriptedLaunchGivesTheUncheckedDraft() async throws {
+        let arguments = ["PrestoCV", AIDraftScript.scriptedDraftArgument, "nurse", AIDraftScript.claimCheckArgument, "fail"]
+        let factory = try ViewModelFactory(
+            dependencyContainer: UnusedContainer(), cvManagementUseCase: cvs, environment: .fixed(clock: clock, arguments: arguments)
+        )
+        let screen = factory.makeAIGenerationViewModel()
+        screen.prompt = AIDraftScript.nurseDescription
+
+        await screen.generateCV()
+
+        #expect(screen.errorMessage.isEmpty)
+        #expect(screen.draft?.notice == .aiDraftUnchecked)
+        #expect(screen.draft?.cv.relevant_experience.map(\.company) == ["San Camillo"], "The device's rules keep the job")
+        #expect(screen.draft?.cv.skills.isEmpty == true)
+    }
+    #endif
 
     @Test("The router lets go of a PDF opened in the app that the import never read, in the app's own container")
     func routerLetsGoOfAnUnreadPDF() async throws {

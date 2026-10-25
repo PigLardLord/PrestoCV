@@ -6,8 +6,28 @@ struct EditorNoticeTests {
 
     @Test("The AI draft notice has a message in the string catalog")
     func aiDraftMessageIsTranslated() {
-        let key = EditorNotice.aiDraft.messageKey
-        #expect(key.localized != key, "\(key) is missing from the string catalog")
+        #expect(EditorNotice.aiDraft.messageKeys == ["editor.notice.ai_draft"])
+        for key in EditorNotice.aiDraft.messageKeys {
+            #expect(key.localized != key, "\(key) is missing from the string catalog")
+        }
+    }
+
+    @Test("An AI draft whose personal items could not be checked says so after the reminder to check it (ADR 0028)")
+    func uncheckedDraftSaysWhatIsLeftBlank() {
+        let notice = EditorNotice.aiDraftUnchecked
+
+        #expect(notice.messageKeys == ["editor.notice.ai_draft", "editor.notice.ai_draft.unchecked"])
+        for key in notice.messageKeys {
+            #expect(key.localized != key, "\(key) is missing from the string catalog")
+        }
+        #expect(notice.review == nil, "It leads to no review")
+    }
+
+    @Test("Each notice has its symbol: the AI drafts share one, the import has its own")
+    func symbols() {
+        #expect(EditorNotice.aiDraft.iconName == "sparkles")
+        #expect(EditorNotice.aiDraftUnchecked.iconName == "sparkles")
+        #expect(EditorNotice.imported(ImportReview(items: [], notImported: "")).iconName == "doc.on.clipboard")
     }
 }
 
@@ -19,7 +39,8 @@ struct ImportEditorNoticeTests {
         let review = ImportReview(items: [], notImported: "Geburtsdatum: 14.05.1992")
         let notice = EditorNotice.imported(review)
 
-        #expect(notice.messageKey.localized != notice.messageKey, "\(notice.messageKey) is missing from the string catalog")
+        #expect(notice.messageKeys == ["editor.notice.imported"])
+        #expect(notice.messageKeys[0].localized != notice.messageKeys[0], "\(notice.messageKeys[0]) is missing from the string catalog")
         #expect(notice.review == review)
         #expect(EditorNotice.aiDraft.review == nil)
     }

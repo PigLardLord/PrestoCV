@@ -27,10 +27,13 @@ struct AIGenerationViewModelTests {
 
     private func makeViewModel(
         appLanguageCode: String? = "it", session: AIDescriptionSession = AIDescriptionSession(),
-        lexicalClasses: FakeLexicalTagger = .english, platform: AIPlatform = .iPhoneOrIPad
+        lexicalClasses: FakeLexicalTagger = .english, platform: AIPlatform = .iPhoneOrIPad,
+        claimChecker: FakeClaimChecker = FakeClaimChecker()
     ) -> AIGenerationViewModel {
         AIGenerationViewModel(
-            cvGenerationUseCase: CVGeneratorUseCase(service: service, sanitizer: CVDataSanitizer(lexicalClasses: lexicalClasses)),
+            cvGenerationUseCase: CVGeneratorUseCase(
+                service: service, claimChecker: claimChecker, sanitizer: CVDataSanitizer(lexicalClasses: lexicalClasses)
+            ),
             mapper: AIDraftMapper(labels: labels, languageOfText: { _ in "pt-PT" }),
             languageData: languageData,
             appLanguageCode: appLanguageCode,
@@ -152,13 +155,42 @@ struct AIGenerationViewModelTests {
 
         await viewModel.generateCV()
 
-        #expect(viewModel.draft?.personalInfo.name == "John Doe")
-        #expect(viewModel.draft?.name.isEmpty == true, "The list calls the draft by its person until it is renamed")
-        #expect(viewModel.draft?.relevant_experience.first?.period == "2020 – Oggi")
-        #expect(viewModel.draft?.languages.map(\.name) == ["Italian"], "A language without a level is skipped")
-        #expect(viewModel.draft?.documentLanguage == "pt", "The CV follows the language of the description")
+        #expect(viewModel.draft?.cv.personalInfo.name == "John Doe")
+        #expect(viewModel.draft?.cv.name.isEmpty == true, "The list calls the draft by its person until it is renamed")
+        #expect(viewModel.draft?.cv.relevant_experience.first?.period == "2020 – Oggi")
+        #expect(viewModel.draft?.cv.languages.map(\.name) == ["Italian"], "A language without a level is skipped")
+        #expect(viewModel.draft?.cv.documentLanguage == "pt", "The CV follows the language of the description")
+        #expect(viewModel.draft?.notice == .aiDraft, "The claim check answered, so the draft opens with the usual notice")
         #expect(viewModel.errorMessage.isEmpty)
         #expect(!viewModel.isGenerating)
+    }
+
+    @Test("A claim check that gives no answer still gives a draft, without its personal items and with the notice that says so (ADR 0028)")
+    func uncheckedDraftSaysSo() async {
+        let viewModel = makeViewModel(claimChecker: FakeClaimChecker(fails: true))
+        viewModel.prompt = validPrompt
+
+        await viewModel.generateCV()
+
+        #expect(viewModel.draft?.personalItemsUnchecked == true)
+        #expect(viewModel.draft?.notice == .aiDraftUnchecked)
+        #expect(viewModel.draft?.cv.personalInfo.name == "John Doe", "What the check does not judge stays")
+        #expect(viewModel.draft?.cv.relevant_experience.map(\.company) == ["Tech Corp"])
+        #expect(viewModel.draft?.cv.languages.isEmpty == true, "The languages are withdrawn for the person to add")
+        #expect(viewModel.errorMessage.isEmpty, "A check without an answer is not an error")
+    }
+
+    @Test("A description of nothing but personal items, with a claim check that gives no answer, still opens a draft with the notice (ADR 0028)")
+    func uncheckedEmptyDraftStillOpens() async {
+        service.generateResult = .success(CVData(skills: [CVGeneratorAI.Skill(name: "Excel")]))
+        let viewModel = makeViewModel(claimChecker: FakeClaimChecker(fails: true))
+        viewModel.prompt = "I use Excel every day."
+
+        await viewModel.generateCV()
+
+        #expect(viewModel.draft?.notice == .aiDraftUnchecked)
+        #expect(viewModel.draft?.cv.skills.isEmpty == true, "The skill the check could not judge is left for the person to add")
+        #expect(viewModel.errorMessage.isEmpty, "A check without an answer is not an error, even when it leaves nothing")
     }
 
     @Test("generateCV sends the description and the app language")
@@ -239,7 +271,7 @@ struct AIGenerationViewModelTests {
         await viewModel.generateCV()
 
         #expect(languageData.requests.isEmpty)
-        #expect(viewModel.draft?.personalInfo.name == "John Doe")
+        #expect(viewModel.draft?.cv.personalInfo.name == "John Doe")
         #expect(viewModel.errorMessage.isEmpty)
     }
 
