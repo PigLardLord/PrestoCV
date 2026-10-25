@@ -49,6 +49,22 @@ struct LanguageDataPreparationTests {
         system.answerHeld(.available)
     }
 
+    @Test("The bound is given to the preparation, which waits that long")
+    func boundIsGiven() async {
+        system.outcome = nil
+        let sleeps = sleeps
+        let preparation = LanguageDataPreparation(requester: system, bound: .seconds(5), sleep: { try await sleeps.sleep(for: $0) })
+
+        let wait = Task { await preparation.prepare(language: "en") }
+        await system.waitUntilHeld(1)
+        await sleeps.waitUntilStarted(1)
+        #expect(await sleeps.durations == [.seconds(5)])
+        await sleeps.endAll()
+
+        #expect(await wait.value == .notAvailable)
+        system.answerHeld(.notAvailable)
+    }
+
     @Test("A cancelled wait ends at once with notAvailable, without the system's answer")
     func cancelledWaitEndsAtOnce() async {
         system.outcome = nil

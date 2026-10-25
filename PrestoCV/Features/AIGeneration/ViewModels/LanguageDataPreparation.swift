@@ -7,17 +7,20 @@ struct LanguageDataPreparation {
     nonisolated static let bound: Duration = .seconds(60)
 
     private let requester: any LanguageDataRequesting
+    private let waitsAtMost: Duration
     private let sleep: @Sendable (Duration) async throws -> Void
 
     /// - Parameters:
     ///   - requester: What asks the system for the data.
+    ///   - bound: How long the wait lasts at most. The app uses `LanguageDataPreparation.bound`; a debug launch shortens it.
     ///   - sleep: The wait of the bound, which ends early with an error when its task is cancelled.
-    init(requester: any LanguageDataRequesting, sleep: @escaping @Sendable (Duration) async throws -> Void) {
+    init(requester: any LanguageDataRequesting, bound: Duration = LanguageDataPreparation.bound, sleep: @escaping @Sendable (Duration) async throws -> Void) {
         self.requester = requester
+        self.waitsAtMost = bound
         self.sleep = sleep
     }
 
-    /// Asks for the data of `language`, a BCP 47 code, and waits for it at most `bound`. Cancelled, it returns `.notAvailable` at once.
+    /// Asks for the data of `language`, a BCP 47 code, and waits for it at most the bound. Cancelled, it returns `.notAvailable` at once.
     func prepare(language: String) async -> LanguageDataOutcome {
         let (answers, answer) = AsyncStream.makeStream(of: LanguageDataOutcome.self)
         let request = Task { [requester] in
@@ -26,7 +29,7 @@ struct LanguageDataPreparation {
         }
         let timer = Task { [sleep] in
             do {
-                try await sleep(Self.bound)
+                try await sleep(waitsAtMost)
             } catch {
                 // A cancelled timer gives no answer: only a bound that has passed does
                 return

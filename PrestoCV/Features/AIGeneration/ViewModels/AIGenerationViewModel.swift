@@ -11,6 +11,9 @@ final class AIGenerationViewModel: ObservableObject {
         didSet { session?.text = prompt }
     }
     @Published private(set) var isGenerating: Bool = false
+    /// The busy screen waits for the language data that the system downloads, up to `LanguageDataPreparation.bound`, and not for the
+    /// model. The screen says so, because the model's "up to a minute" does not hold for this wait.
+    @Published private(set) var isWaitingForLanguageData: Bool = false
     @Published private(set) var errorMessage: String = ""
     /// The generated CV, not stored yet: the editor opens it for review, with the notice it calls for, and stores it as it is.
     @Published private(set) var draft: AIDraft?
@@ -86,6 +89,7 @@ final class AIGenerationViewModel: ObservableObject {
         let generation = Generation(request: CVGenerationRequest(userPrompt: prompt, fallbackLanguageCode: appLanguageCode))
         activeGeneration = generation.id
         isGenerating = true
+        isWaitingForLanguageData = false
         errorMessage = ""
         return generation
     }
@@ -111,17 +115,21 @@ final class AIGenerationViewModel: ObservableObject {
     }
 
     /// The draft of `generation`. When the device has not got the language data that grounding the description needs, the system is
-    /// asked for it while the screen stays busy, and once the data is there the draft is generated once more, without another tap.
-    /// Only once: data the device still lacks then, or that does not come, ends as `languageDataUnavailable`.
+    /// asked for it while the screen stays busy and says so, and once the data is there the draft is generated once more, without
+    /// another tap. Only once: data the device still lacks then, or that does not come, ends as `languageDataUnavailable`.
     private func generateWithLanguageData(_ generation: Generation) async throws -> GeneratedDraft {
         do {
             return try await cvGenerationUseCase.generateCV(from: generation.request)
         } catch CVGenerationError.languageDataUnavailable(let language) {
             guard mayAct(generation) else { throw CancellationError() }
-            guard await languageData.prepare(language: language) == .available else {
+            isWaitingForLanguageData = true
+            let outcome = await languageData.prepare(language: language)
+            // Only the generation that owns the screen changes it: a cancelled one finds `cancel()` has already reset it
+            guard mayAct(generation) else { throw CancellationError() }
+            isWaitingForLanguageData = false
+            guard outcome == .available else {
                 throw CVGenerationError.languageDataUnavailable(languageCode: language)
             }
-            guard mayAct(generation) else { throw CancellationError() }
             return try await cvGenerationUseCase.generateCV(from: generation.request)
         }
     }
@@ -136,6 +144,7 @@ final class AIGenerationViewModel: ObservableObject {
         guard activeGeneration == generation.id else { return }
         activeGeneration = nil
         isGenerating = false
+        isWaitingForLanguageData = false
     }
 
     /// Stops the running generation, if any, and returns the screen to its idle state.
@@ -144,6 +153,7 @@ final class AIGenerationViewModel: ObservableObject {
         generationTask = nil
         activeGeneration = nil
         isGenerating = false
+        isWaitingForLanguageData = false
     }
 
     func clearError() {

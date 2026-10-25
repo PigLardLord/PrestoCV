@@ -84,25 +84,29 @@ final class AIGenerationUITests: XCTestCase {
 
     /// An English description, which the device can ground only with the English language data.
     private let englishDescription = "I have worked at San Camillo in Roma since 2015. I use Excel every day."
-    /// The note of the overlay that covers a busy screen. Its loading view hides its own message from accessibility and is
-    /// named "Processing...", which other screens also show; the note is only on this overlay.
-    private let busy = "This can take up to a minute."
+    /// What the overlay that covers the screen says while the app waits for the data. Its loading view hides the message from
+    /// accessibility as text, and is named with it, as VoiceOver reads it, in place of the "Processing..." that other screens show.
+    private let waiting = "Getting the language data your description needs..."
+    /// The note of the same overlay while the model writes. It would be false during the wait for the data, so it is not there.
+    private let timeNote = "This can take up to a minute."
     private let endMessage = "This device cannot get the language data that drafts in English or German need."
     private let reminder = "Draft written by AI from your description."
 
-    /// The device has no English data and the system never answers: the screen stays busy until the app's own 60-second bound,
-    /// then says what the person can do instead, and the screen can be used again. The simulator cannot run the model, and its
-    /// language data is whatever it has: the debug launch arguments script both.
+    /// The device has no English data and the system never answers: the screen says that it waits for the data until the app's
+    /// bound, then says what the person can do instead, and the screen can be used again. The simulator cannot run the model, and
+    /// its language data is whatever it has: the debug launch arguments script both, and the bound of this launch is a few
+    /// seconds, not the app's minute, which a unit test checks (`LanguageDataPreparationTests`).
     func testLanguageDataThatNeverArrivesEndsWithTheMessageAndTheScreenWorksAgain() throws {
-        executionTimeAllowance = 300
         launch(["-PrestoCVUITestsScriptedDraft", "nurse", "-LanguageDataOverride", "neverArrives"])
         openTheAIScreenOnFirstRun()
         let generate = describeAndGenerate(englishDescription)
 
-        XCTAssertTrue(app.staticTexts[busy].waitForExistence(timeout: 10), "The screen should stay busy while the app waits for the data")
+        let waitingScreen = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", waiting)).firstMatch
+        XCTAssertTrue(waitingScreen.waitForExistence(timeout: 10), "The screen should say that it waits for the data, as VoiceOver reads it")
+        XCTAssertFalse(app.staticTexts[timeNote].exists, "The model's minute does not hold while the app waits for the data")
         add(app.keptScreenshot(named: "Language data - waiting"))
         let alert = app.alerts["Error"]
-        XCTAssertTrue(alert.waitForExistence(timeout: 90), "The wait should end at its bound of 60 seconds, with a message")
+        XCTAssertTrue(alert.waitForExistence(timeout: 30), "The wait should end at its bound with a message")
         XCTAssertTrue(
             alert.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", endMessage)).firstMatch.exists,
             "The message should say that the device cannot get the data, and what to do instead"
@@ -110,14 +114,14 @@ final class AIGenerationUITests: XCTestCase {
         add(app.keptScreenshot(named: "Language data - end message"))
         alert.buttons["OK"].tap()
         XCTAssertTrue(waitUntil(alert, exists: false), "OK should close the message")
-        XCTAssertTrue(waitUntil(app.staticTexts[busy], exists: false), "The screen should no longer be busy")
+        XCTAssertTrue(waitUntil(waitingScreen, exists: false), "The screen should no longer be busy")
 
         app.scrollTo(generate)
         XCTAssertTrue(generate.isEnabled, "Generate should be on again for the same description")
         generate.tap()
-        XCTAssertTrue(app.staticTexts[busy].waitForExistence(timeout: 10), "Generate should start again")
+        XCTAssertTrue(waitingScreen.waitForExistence(timeout: 10), "Generate should start again")
         app.buttons["Cancel"].tap()
-        XCTAssertTrue(waitUntil(app.staticTexts[busy], exists: false), "Cancel should end the wait at once")
+        XCTAssertTrue(waitUntil(waitingScreen, exists: false), "Cancel should end the wait at once")
         XCTAssertFalse(alert.exists, "A cancelled wait shows no message")
     }
 

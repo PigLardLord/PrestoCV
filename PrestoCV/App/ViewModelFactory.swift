@@ -100,7 +100,7 @@ final class ViewModelFactory {
     }
 
     /// The AI screen. When the device has not got the language data a description needs, it asks the system for it and waits at
-    /// most `LanguageDataPreparation.bound`; the grounding then reads the data the system gave.
+    /// most `LanguageDataPreparation.bound` (a debug launch can shorten it); the grounding then reads the data the system gave.
     @MainActor
     func makeAIGenerationViewModel() -> AIGenerationViewModel {
         let languageData = makeLanguageData()
@@ -110,7 +110,7 @@ final class ViewModelFactory {
                 labels: makeAIDraftLabels(),
                 languageOfText: DescriptionLanguageDetector.languageTag(of:)
             ),
-            languageData: LanguageDataPreparation(requester: languageData.requester, sleep: environment.sleep),
+            languageData: LanguageDataPreparation(requester: languageData.requester, bound: languageData.bound, sleep: environment.sleep),
             appLanguageCode: environment.appLanguage,
             session: aiDescriptionSession,
             platform: environment.platform
@@ -175,16 +175,16 @@ final class ViewModelFactory {
         return { useCase.availability() }
     }
 
-    /// What tells the verbs of English and German, and what asks the system for their data: the device's framework, or, in a debug
-    /// build, the data a UI test scripted.
+    /// What tells the verbs of English and German, what asks the system for their data, and how long the wait for it lasts: the
+    /// device's framework and the app's bound, or, in a debug build, the data a UI test scripted.
     @MainActor
-    private func makeLanguageData() -> (tagger: any LexicalTagger, requester: any LanguageDataRequesting) {
+    private func makeLanguageData() -> (tagger: any LexicalTagger, requester: any LanguageDataRequesting, bound: Duration) {
         #if DEBUG
         if let scripted = LanguageDataOverride.current(arguments: environment.arguments) {
-            return (scripted.tagger, scripted.requester)
+            return (scripted.tagger, scripted.requester, scripted.bound)
         }
         #endif
-        return (DeviceLexicalTagger(), NaturalLanguageDataRequester())
+        return (DeviceLexicalTagger(), NaturalLanguageDataRequester(), LanguageDataPreparation.bound)
     }
 
     /// The generation on the device's model, whose draft the rules (ADR 0023) and the claim check (ADR 0028) limit to what the

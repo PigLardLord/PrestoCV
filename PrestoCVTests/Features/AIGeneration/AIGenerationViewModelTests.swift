@@ -265,6 +265,7 @@ struct AIGenerationViewModelTests {
 
         #expect(await sleeps.durations == [.seconds(60)], "The person waits at most a minute")
         #expect(viewModel.isGenerating, "The generating screen stays up while the app waits")
+        #expect(viewModel.isWaitingForLanguageData, "The screen says it waits for the data, not that the model writes")
         #expect(viewModel.errorMessage.isEmpty)
 
         await sleeps.endAll()
@@ -275,8 +276,38 @@ struct AIGenerationViewModelTests {
         #expect(languageData.requests == ["en"])
         #expect(service.generateRequests.isEmpty)
         #expect(!viewModel.isGenerating)
+        #expect(!viewModel.isWaitingForLanguageData)
         #expect(viewModel.canGenerate)
         languageData.answerHeld(.notAvailable)
+    }
+
+    @Test("The wait for the data is a phase of its own on the busy screen, and the screen goes back to the model's writing once the data is there")
+    func waitingForTheDataIsItsOwnPhase() async {
+        let tagger = ArrivingLexicalTagger()
+        languageData.outcome = nil
+        languageData.onAvailable = tagger.dataArrives
+        service.holdsGeneration = true
+        let viewModel = makeViewModel(lexicalClasses: tagger)
+        viewModel.prompt = validPrompt
+        #expect(!viewModel.isWaitingForLanguageData, "Nothing is awaited before Generate")
+
+        viewModel.startGenerating()
+        await languageData.waitUntilHeld(1)
+
+        #expect(viewModel.isWaitingForLanguageData)
+        #expect(service.generateRequests.isEmpty, "The model is not writing yet")
+
+        languageData.answerHeld(.available)
+        await service.waitUntilGenerationsAreHeld()
+
+        #expect(viewModel.isGenerating)
+        #expect(!viewModel.isWaitingForLanguageData, "The data is there: now the model writes")
+
+        service.releaseOldestGeneration(returning: FakeCVGenerationService.sample)
+        await viewModel.generationTask?.value
+
+        #expect(viewModel.draft?.cv.personalInfo.name == "John Doe")
+        #expect(!viewModel.isWaitingForLanguageData)
     }
 
     @Test("Once the data arrives the draft is generated again, without another tap")

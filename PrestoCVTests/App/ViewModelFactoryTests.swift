@@ -192,6 +192,34 @@ struct ViewModelFactoryTests {
         #expect(screen.draft?.notice == .aiDraftUnchecked)
         #expect(screen.draft?.cv.relevant_experience.map(\.company) == ["San Camillo"])
     }
+
+    @Test("A debug launch whose language data never arrives ends the wait at the short bound it scripts, with the message, and no draft (#270)")
+    func scriptedSilentLanguageDataEndsAtTheShortBound() async throws {
+        let sleeps = HeldSleeps()
+        let arguments = [
+            "PrestoCV", AIDraftScript.scriptedDraftArgument, "nurse", LanguageDataOverride.launchArgument, "neverArrives",
+        ]
+        let factory = try ViewModelFactory(
+            dependencyContainer: UnusedContainer(), cvManagementUseCase: cvs,
+            environment: .fixed(clock: clock, sleep: { try await sleeps.sleep(for: $0) }, arguments: arguments)
+        )
+        let screen = factory.makeAIGenerationViewModel()
+        screen.prompt = "I have worked at San Camillo in Roma since 2015. I use Excel every day."
+
+        screen.startGenerating()
+        await sleeps.waitUntilStarted(1)
+
+        #expect(await sleeps.durations == [LanguageDataOverride.silentBound], "The wait of the app is the one the launch scripts")
+        #expect(screen.isGenerating)
+        #expect(screen.isWaitingForLanguageData)
+
+        await sleeps.endAll()
+        await screen.generationTask?.value
+
+        #expect(screen.errorMessage == "ai.unavailable.language_data_not_ready".localized)
+        #expect(screen.draft == nil)
+        #expect(!screen.isGenerating)
+    }
     #endif
 
     @Test("The router lets go of a PDF opened in the app that the import never read, in the app's own container")

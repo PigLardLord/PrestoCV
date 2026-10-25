@@ -7,7 +7,7 @@ import Synchronization
 ///
 /// - `-LanguageDataOverride arrives`: the device has no language data until the app asks the system for it, which gives it at once.
 /// - `-LanguageDataOverride neverArrives`: the device has no language data, and the system never answers the app's request, so
-///   the app's wait ends at its bound.
+///   the app's wait ends at `silentBound`, which is shorter than the app's own bound so that a UI test does not wait a minute.
 ///
 /// Either way no word is tagged as a verb, so that a description gives the same draft on every simulator, whatever data it has.
 struct LanguageDataOverride {
@@ -17,6 +17,12 @@ struct LanguageDataOverride {
     let tagger: any LexicalTagger
     /// What asks the system for the data.
     let requester: any LanguageDataRequesting
+    /// How long the app waits for the data in this launch.
+    let bound: Duration
+
+    /// The wait of a system that never answers. It is long enough for a UI test to see the waiting screen and the screen's own
+    /// controls, and shorter than `LanguageDataPreparation.bound`.
+    static let silentBound: Duration = .seconds(10)
 
     /// The language data this launch scripted, if it did. It reads the launch arguments themselves, as `AIAvailabilityOverride` does.
     @MainActor
@@ -24,8 +30,10 @@ struct LanguageDataOverride {
         guard let index = arguments.firstIndex(of: launchArgument), arguments.indices.contains(index + 1) else { return nil }
         let data = ScriptedLanguageData()
         switch arguments[index + 1] {
-        case "arrives": return LanguageDataOverride(tagger: data, requester: ArrivingLanguageData(data: data))
-        case "neverArrives": return LanguageDataOverride(tagger: data, requester: SilentLanguageData())
+        case "arrives":
+            return LanguageDataOverride(tagger: data, requester: ArrivingLanguageData(data: data), bound: LanguageDataPreparation.bound)
+        case "neverArrives":
+            return LanguageDataOverride(tagger: data, requester: SilentLanguageData(), bound: silentBound)
         default: return nil
         }
     }

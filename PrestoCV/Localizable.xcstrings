@@ -1436,6 +1436,47 @@
         }
       }
     },
+    "ai.generation.language_data_message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Sprachdaten für Ihre Beschreibung werden geladen …"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Getting the language data your description needs..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obteniendo los datos de idioma que necesita tu descripción..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récupération des données linguistiques dont votre description a besoin..."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recupero dei dati linguistici di cui ha bisogno la tua descrizione..."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obtendo os dados de idioma de que sua descrição precisa..."
+          }
+        }
+      }
+    },
     "ai.generation.loading_message" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -37,6 +37,17 @@ struct LanguageDataOverrideTests {
         #expect(data.tagger.verbs(in: description, language: "en").isEmpty)
     }
 
+    @Test("neverArrives shortens the wait of the app to a few seconds, so that a UI test does not pay the 60 seconds; arrives keeps the app's bound")
+    func neverArrivesShortensTheBound() throws {
+        let silent = try scripted("neverArrives")
+        let arriving = try scripted("arrives")
+
+        #expect(silent.bound == LanguageDataOverride.silentBound)
+        #expect(silent.bound < LanguageDataPreparation.bound)
+        #expect(silent.bound >= .seconds(5), "Long enough for a UI test to see the screen wait")
+        #expect(arriving.bound == LanguageDataPreparation.bound)
+    }
+
     @Test("Without the launch argument, without a value after it, or with another value, the device's data is used")
     func otherwiseTheDevicesData() {
         #expect(LanguageDataOverride.current(arguments: ["PrestoCV"]) == nil)
