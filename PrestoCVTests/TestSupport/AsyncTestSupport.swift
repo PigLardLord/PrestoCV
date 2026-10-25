@@ -6,12 +6,15 @@ actor HeldSleeps {
     private var sleepers: [UUID: CheckedContinuation<Void, Error>] = [:]
     private var cancelled: Set<UUID> = []
     private(set) var startedCount = 0
+    /// How long each sleep was asked to last, in the order they started.
+    private(set) var durations: [Duration] = []
     private var startWaiters = CountWaiters()
 
     var sleepingCount: Int { sleepers.count }
 
     func sleep(for duration: Duration) async throws {
         let id = UUID()
+        durations.append(duration)
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 start(id, continuation)
@@ -95,24 +98,3 @@ struct CountWaiters {
 /// The bound on a wait for something that must happen. It is generous: it costs time only when the code is broken, and
 /// the test host may be busy with suites that run beside it.
 let patience: Duration = .seconds(60)
-
-/// Runs `operation`, and tells whether it finished within `timeout`. The operation must end when it is cancelled.
-func finishes(within timeout: Duration = patience, _ operation: @escaping @Sendable () async -> Void) async -> Bool {
-    await withTaskGroup(of: Bool.self) { group in
-        group.addTask {
-            await operation()
-            return !Task.isCancelled
-        }
-        group.addTask {
-            do {
-                try await Task.sleep(for: timeout)
-            } catch {
-                return true
-            }
-            return false
-        }
-        let first = await group.next() ?? false
-        group.cancelAll()
-        return first
-    }
-}

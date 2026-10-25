@@ -18,11 +18,12 @@ func waitUntilCancelled(_ duration: Duration) async throws {
 let englishDocumentLanguageDetector = DocumentLanguageDetector(preferredLanguages: ["en"], read: NaturalLanguageReader.read)
 
 extension AppEnvironment {
-    /// A device in English, on a fixed day in UTC, whose waits end only when cancelled, and whose clock moves only when
-    /// a test moves it. `arguments` are the launch arguments, none by default.
+    /// A device in English, on a fixed day in UTC, whose waits end only when cancelled (or as `sleep` says), and whose clock
+    /// moves only when a test moves it. `arguments` are the launch arguments, none by default.
     static func fixed(
         clock: any Clock<Duration> = ManualClock(),
         container: URL = FileManager.default.temporaryDirectory.appendingPathComponent("Container-\(UUID().uuidString)"),
+        sleep: @escaping @Sendable (Duration) async throws -> Void = waitUntilCancelled,
         arguments: [String] = []
     ) -> AppEnvironment {
         AppEnvironment(
@@ -31,7 +32,7 @@ extension AppEnvironment {
             timeZone: .gmt,
             appLanguage: "en",
             preferredLanguages: { ["en"] },
-            sleep: waitUntilCancelled,
+            sleep: sleep,
             clock: clock,
             temporaryDirectory: FileManager.default.temporaryDirectory,
             exportPreferencesFile: FileManager.default.temporaryDirectory.appendingPathComponent("export-preferences-\(UUID().uuidString).json"),
