@@ -42,7 +42,8 @@ private func release(_ directory: URL) {
 /// The cause Foundation gives for a write of the repository's kind into a directory that cannot be written to.
 private func failedWriteCause() throws -> FailureCause {
     let (directory, _) = try makeReadOnlyDirectory(); defer { release(directory) }
-    do { try Data("x".utf8).write(to: directory.appendingPathComponent("other"), options: FileCVRepository.writeOptions) }
+    let options = repo(directory).writeOptions                      // the options of the repository under test, not of the host
+    do { try Data("x".utf8).write(to: directory.appendingPathComponent("other"), options: options) }
     catch { return foundationCause(error) }
     Issue.record("a write into a read-only directory succeeded"); return FailureCause(domain: .other, code: 0)
 }

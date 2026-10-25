@@ -17,16 +17,17 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     let directory: URL
     let clock: any TimeSource
     let maxFileBytes: Int
+    /// The options of every write, from the protection class the composition root gave: complete unless it said otherwise.
+    nonisolated let writeOptions: Data.WritingOptions
     var quarantine: URL { directory.appendingPathComponent("Quarantine", isDirectory: true) }
 
-    public init(directory: URL, clock: any TimeSource, maxFileBytes: Int = 5 * 1024 * 1024) {
-        self.directory = directory; self.clock = clock; self.maxFileBytes = maxFileBytes
+    public init(directory: URL, clock: any TimeSource, options: StoreOptions = StoreOptions()) {
+        self.directory = directory; self.clock = clock
+        self.maxFileBytes = options.maxFileBytes; self.writeOptions = options.writing
     }
 
     static let suffix = ".cv.json"
     static let uuidPattern = "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
-    /// Atomic, and on Apple platforms unreadable while the device is locked. The simulator does not apply protection.
-    static let writeOptions: Data.WritingOptions = [.atomic, .completeFileProtection]
     private func url(_ id: CVID) -> URL { directory.appendingPathComponent(id.raw.uuidString + Self.suffix) }
 
     // MARK: Locking
@@ -136,7 +137,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         do {
             guard try CVFileV1.decode(data).toDomain() == cv else { throw RepositoryError.wouldNotReadBack(file: name) }
         } catch { throw .wouldNotReadBack(file: name) }
-        do { try data.write(to: url(cv.id), options: Self.writeOptions) } catch { throw .writeFailed(file: name, cause: FailureCause(error)) }
+        do { try data.write(to: url(cv.id), options: writeOptions) } catch { throw .writeFailed(file: name, cause: FailureCause(error)) }
     }
 
     /// Timestamps are stored with whole-second precision (ISO 8601), so they are normalised before use;

@@ -65,7 +65,7 @@ Test targets and test-support targets are described below each package. The chec
 **`PrestoCVPersistence`**
 - `FileCVRepository`:
   - one `CVFileV1` file per CV, named from its id;
-  - atomic writes with `complete` protection ([ADR 0009](adr/0009-persisted-schema-v1.md): what that means for a locked device), and a read-back check before every write;
+  - atomic writes, with `complete` protection unless the composition root gives another class through `StoreOptions` (tests of the store's logic give none; [ADR 0009](adr/0009-persisted-schema-v1.md): what that means for a locked device and for CI hosts), and a read-back check before every write;
   - a failed write, delete, restore, erase or purge (the failures mapped to `writeFailed`) keeps the error it came from, as a `FailureCause` (domain, code, and the `errno` under a Cocoa error); the classified read, lock, listing and quarantine outcomes keep no cause, and the use cases drop it when they translate to `AuthoringError`;
   - every mutation under an exclusive `flock` on the store, from the C library of the platform: `Glibc`, `Darwin` or `Android` ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md));
   - reads classified as described in R12;

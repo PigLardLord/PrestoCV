@@ -23,7 +23,13 @@ let id1 = CVID(UUID(uuidString: "11111111-1111-1111-1111-111111111111")!)
 let id2 = CVID(UUID(uuidString: "22222222-2222-2222-2222-222222222222")!)
 let isRoot = geteuid() == 0
 func named(_ name: String, id: CVID = id1) -> CV { CV(id: id, personal: PersonalDetails(fullName: name)) }
-func repo(_ dir: URL) -> FileCVRepository { FileCVRepository(directory: dir, clock: SteppingClock()) }
+/// The store the logic tests build. It writes without file protection: a class-A write needs the user's key, and a host
+/// whose keybag is locked (a CI machine nobody is signed in on) refuses it with EPERM, so tests of listing, quarantine,
+/// restore, dates and failure causes would depend on the host (ADR 0009). The protection itself is pinned by
+/// `defaultWriteOptions`, `noProtectionWriteOptions` and, on a device, `dataProtection`.
+func repo(_ dir: URL, clock: any TimeSource = SteppingClock(), maxFileBytes: Int = StoreOptions().maxFileBytes) -> FileCVRepository {
+    FileCVRepository(directory: dir, clock: clock, options: StoreOptions(maxFileBytes: maxFileBytes, protection: .unprotected))
+}
 func fileName(_ id: CVID) -> String { "\(id.raw.uuidString).cv.json" }
 
 /// A stored CV in schema 1, minimal unless a field is given. `sections` replaces a section's JSON by its key.
@@ -138,14 +144,14 @@ struct FileRepositoryTests {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try Data(count: 2048).write(to: dir.appendingPathComponent(fileName(id1)))
-        let r = FileCVRepository(directory: dir, clock: SteppingClock(), maxFileBytes: 1024)
+        let r = repo(dir, clock: SteppingClock(), maxFileBytes: 1024)
         #expect(try await r.list().issues == [.tooLarge(file: fileName(id1), bytes: 2048)])
     }
 
     @Test("a save that would not read back is refused and the previous version stays")
     func wouldNotReadBack() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
-        let r = FileCVRepository(directory: dir, clock: SteppingClock(), maxFileBytes: 4096)
+        let r = repo(dir, clock: SteppingClock(), maxFileBytes: 4096)
         let v1 = try await r.create(named("Ada"))
         func with(role: String) -> CV {
             var cv = v1, sections = v1.sections
@@ -155,7 +161,7 @@ struct FileRepositoryTests {
         }
         let big = with(role: String(repeating: "𝒜", count: 2000))                                  // 4-byte scalars: over the size cap
         await #expect(throws: RepositoryError.wouldNotReadBack(file: fileName(id1))) { _ = try await r.update(big) }
-        let roomy = FileCVRepository(directory: dir, clock: SteppingClock())
+        let roomy = repo(dir, clock: SteppingClock())
         await #expect(throws: RepositoryError.wouldNotReadBack(file: fileName(id1))) { _ = try await roomy.update(with(role: String(repeating: "x", count: 10_001))) }
         await #expect(throws: RepositoryError.wouldNotReadBack(file: fileName(id2))) {
             _ = try await r.create(named(String(repeating: "𝒜", count: 2000), id: id2))
@@ -169,7 +175,7 @@ struct FileRepositoryTests {
     func fractionalClock() async throws {
         struct Fractional: TimeSource { func now() -> Date { Date(timeIntervalSince1970: 1_700_000_000.7654) } }
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
-        let r = FileCVRepository(directory: dir, clock: Fractional())
+        let r = repo(dir, clock: Fractional())
         let v1 = try await r.create(named("Ada"))
         #expect(try await r.load(id1) == v1)
         var v = v1; v.rename("x")
@@ -183,7 +189,7 @@ struct FileRepositoryTests {
         struct At: TimeSource { let date: Date; func now() -> Date { date } }
         let carried = Date(timeIntervalSince1970: 1_600_000_000), clock = Date(timeIntervalSince1970: 1_700_000_000)
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
-        let r = FileCVRepository(directory: dir, clock: At(date: clock))
+        let r = repo(dir, clock: At(date: clock))
 
         let fresh = try await r.create(named("Ada"))
         #expect(fresh.createdAt == clock && fresh.updatedAt == clock)
@@ -203,11 +209,11 @@ struct FileRepositoryTests {
         let first = Date(timeIntervalSince1970: 1_700_000_000), second = Date(timeIntervalSince1970: 1_700_000_500)
         let stale = Date(timeIntervalSince1970: 1_500_000_000)
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
-        let v1 = try await FileCVRepository(directory: dir, clock: At(date: first)).create(named("Ada"))
+        let v1 = try await repo(dir, clock: At(date: first)).create(named("Ada"))
         let behind = CV(id: v1.id, revision: v1.revision, createdAt: stale, updatedAt: stale, title: v1.title, personal: v1.personal,
                         sections: v1.sections, design: v1.design, language: v1.language)
 
-        let v2 = try await FileCVRepository(directory: dir, clock: At(date: second)).update(behind)
+        let v2 = try await repo(dir, clock: At(date: second)).update(behind)
         #expect(v2.revision == 2 && v2.createdAt == first && v2.updatedAt == second)
         #expect(try await repo(dir).load(id1) == v2)
     }
@@ -237,7 +243,7 @@ struct FileRepositoryTests {
         }
         await #expect(throws: RepositoryError.corrupt(file: "1~\(name)")) { _ = try await r.restore(quarantined: "1~\(name)") }
         // A repaired file passes the same size cap as a read; a failed restore leaves both folders unchanged.
-        let small = FileCVRepository(directory: dir, clock: SteppingClock(), maxFileBytes: 64)
+        let small = repo(dir, clock: SteppingClock(), maxFileBytes: 64)
         try Data(fileJSON().utf8).write(to: dir.appendingPathComponent("Quarantine/1~\(name)"))
         await #expect(throws: RepositoryError.tooLarge(file: "1~\(name)")) { _ = try await small.restore(quarantined: "1~\(name)") }
         #expect(FileManager.default.fileExists(atPath: dir.appendingPathComponent("Quarantine/1~\(name)").path))
@@ -406,9 +412,29 @@ struct FileRepositoryTests {
         #expect(wins == 1)
     }
 
-    @Test("every write is atomic and asks for complete data protection")
-    func writeOptions() {
-        #expect(FileCVRepository.writeOptions.contains(.atomic) && FileCVRepository.writeOptions.contains(.completeFileProtection))
+    // The protection class is given to the repository, like its location, and the default is the app's: complete.
+    @Test("a repository built with the defaults writes atomically and asks for complete data protection")
+    func defaultWriteOptions() {
+        let options = FileCVRepository(directory: tempDir(), clock: SteppingClock()).writeOptions
+        #expect(options.contains(.atomic) && options.contains(.completeFileProtection))
+    }
+
+    @Test("a repository built with no protection still writes atomically, and asks for no protection class")
+    func noProtectionWriteOptions() {
+        let options = FileCVRepository(directory: tempDir(), clock: SteppingClock(), options: StoreOptions(protection: .unprotected)).writeOptions
+        #expect(options == [.atomic])
+    }
+
+    @Test("a size cap given without a protection keeps the complete one")
+    func sizeCapKeepsDefaultProtection() {
+        let options = FileCVRepository(directory: tempDir(), clock: SteppingClock(), options: StoreOptions(maxFileBytes: 64)).writeOptions
+        #expect(options.contains(.atomic) && options.contains(.completeFileProtection))
+    }
+
+    @Test("the repository the logic tests build asks for no protection class, so that they do not depend on the host")
+    func logicTestsAreUnprotected() {
+        #expect(repo(tempDir()).writeOptions == [.atomic])
+        #expect(repo(tempDir(), maxFileBytes: 64).writeOptions == [.atomic])
     }
 
     #if os(iOS)
@@ -416,7 +442,7 @@ struct FileRepositoryTests {
           .enabled(if: !runningInSimulator, "the simulator neither applies nor reports data protection"))
     func dataProtection() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
-        _ = try await repo(dir).create(named("Ada"))
+        _ = try await FileCVRepository(directory: dir, clock: SteppingClock()).create(named("Ada"))   // the defaults, as the app builds it
         let attributes = try FileManager.default.attributesOfItem(atPath: dir.appendingPathComponent(fileName(id1)).path)
         #expect(attributes[.protectionKey] as? FileProtectionType == .complete, "protection: \(String(describing: attributes[.protectionKey]))")
     }
