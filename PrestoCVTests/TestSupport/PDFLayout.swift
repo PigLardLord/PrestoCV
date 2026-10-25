@@ -1,6 +1,7 @@
 import Foundation
 import PDFKit
 import CoreGraphics
+import Synchronization
 import UIKit
 
 /// Where the text of a PDF is, page by page, as PDFKit reads it back: enough to judge how a design paginates
@@ -61,21 +62,20 @@ struct PDFLayout {
 
     /// The fonts of a PDF, read on first use. The layout keeps the bytes of the PDF, because the tests delete its file once it
     /// is read back.
-    private final class Fonts: @unchecked Sendable {
+    private final class Fonts: Sendable {
         private let pdf: Data
-        private let lock = NSLock()
-        private var memo: Set<Double>?
+        private let memo = Mutex<Set<Double>?>(nil)
 
         init(pdf: Data) { self.pdf = pdf }
 
         var sizes: Set<Double> {
-            lock.lock()
-            defer { lock.unlock() }
-            if let memo { return memo }
-            var found = Set<Double>()
-            if let document = PDFDocument(data: pdf) { found = PDFLayout.fontSizes(of: document) }
-            memo = found
-            return found
+            memo.withLock { memo in
+                if let memo { return memo }
+                var found = Set<Double>()
+                if let document = PDFDocument(data: pdf) { found = PDFLayout.fontSizes(of: document) }
+                memo = found
+                return found
+            }
         }
     }
 
