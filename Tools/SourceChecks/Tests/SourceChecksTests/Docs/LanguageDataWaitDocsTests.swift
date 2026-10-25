@@ -58,6 +58,24 @@ struct LanguageDataWaitDocsTests {
         #expect(bullet.contains("\(bound) seconds"), "\(description.path) should say that the wait lasts at most \(bound) seconds: \(bullet)")
     }
 
+    /// The text of the notes that Apple reads during review: the fenced block under "## Notes for App Review".
+    private static func notesForAppReview() throws -> String {
+        let text = try String(contentsOf: root.appendingPathComponent("docs/release/store-listing.md"), encoding: .utf8)
+        let lines = text.components(separatedBy: "\n")
+        let heading = try #require(lines.firstIndex { $0 == "## Notes for App Review" }, "store-listing.md has no notes for App Review")
+        let open = try #require(lines[heading...].firstIndex { $0.hasPrefix("```") }, "The notes for App Review have no text block")
+        let close = try #require(lines[(open + 1)...].firstIndex { $0.hasPrefix("```") }, "The text block of the notes for App Review is not closed")
+        return lines[(open + 1)..<close].joined(separator: " ")
+    }
+
+    @Test("The notes for App Review give a time in minutes only for the model's writing, which comes after the wait for the data")
+    func notesDoNotPromiseATotal() throws {
+        let sentences = try Self.notesForAppReview().components(separatedBy: ". ")
+        for sentence in sentences where sentence.lowercased().contains("minute") {
+            #expect(sentence.lowercased().contains("writ"), "A reviewer who waits for the data and then for the model takes longer than this sentence says: \(sentence)")
+        }
+    }
+
     @Test("A doc that describes the wait does not send the person to try again later", arguments: descriptions)
     func docDoesNotPromiseAnotherTry(of description: Description) throws {
         let bullet = try Self.bullet(startingWith: description.startOfBullet, in: description.path).lowercased()
