@@ -422,9 +422,9 @@ struct DeploymentTargetTests {
 
     /// A tree with a manifest at each of these paths, in a folder of its own.
     private static func tree(of paths: [String]) throws -> URL {
-        // Resolved: a Mac's temporary folder is a link (/var to /private/var), and the scan reports paths from its root.
-        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
-            .appendingPathComponent("DeploymentTargetTests-\(UUID().uuidString)")
+        // Not resolved: a Mac's temporary folder is a link (/var to /private/var), and the scan must report the same paths
+        // whichever way its root is written.
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("DeploymentTargetTests-\(UUID().uuidString)")
         for path in paths {
             let url = root.appendingPathComponent(path)
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -464,6 +464,24 @@ struct DeploymentTargetTests {
         #expect(manifests.map(\.path) == ["Backend/Package.swift", "Tools/Check/Package.swift", "Tools/Check/Package@swift-6.swift", "Toolset/Package.swift"])
         #expect(manifests.map(\.mustDeclareIOS) == [true, false, false, true])
         #expect(DeploymentTargets.hostOnlyFolders == ["Tools"])
+    }
+
+    @Test("The paths found are relative to the root however it is written: through a link, or with the form a Mac's temporary folder has")
+    func pathsDoNotDependOnHowTheRootIsWritten() throws {
+        let real = try Self.tree(of: ["Tools/Check/Package.swift", "App/Package.swift", "Prototypes/P/Package.swift"])
+        let link = real.deletingLastPathComponent().appendingPathComponent("DeploymentTargetTests-link-\(UUID().uuidString)")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+        defer {
+            try? FileManager.default.removeItem(at: link)
+            try? FileManager.default.removeItem(at: real)
+        }
+
+        for root in [real, link, real.resolvingSymlinksInPath(), URL(fileURLWithPath: real.path + "/")] {
+            let manifests = DeploymentTargets.manifests(under: root)
+
+            #expect(manifests.map(\.path) == ["App/Package.swift", "Tools/Check/Package.swift"], "\(root.path): \(manifests.map(\.path))")
+            #expect(manifests.map(\.mustDeclareIOS) == [true, false], "\(root.path)")
+        }
     }
 
     @Test("A manifest of the app that declares no iOS platform is told where a package that never builds for iOS goes")

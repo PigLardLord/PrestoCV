@@ -308,11 +308,14 @@ enum DeploymentTargets {
     /// as excluded).
     static func manifests(under root: URL) -> [(path: String, mustDeclareIOS: Bool)] {
         let skipped: Set<String> = [".build", "DerivedData", "node_modules"]
-        guard let walk = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isDirectoryKey]) else { return [] }
+        // The walk starts from the folder itself, as a link to it is not followed, and the paths are the ones the walk
+        // reports from there: they are never cut out of an absolute path, which a Mac writes two ways (/var, /private/var).
+        let base = root.resolvingSymlinksInPath()
+        guard let walk = FileManager.default.enumerator(atPath: base.path) else { return [] }
         var manifests: [(path: String, mustDeclareIOS: Bool)] = []
-        for case let url as URL in walk {
-            let path = String(url.path.dropFirst(root.path.count + 1))
-            let name = url.lastPathComponent
+        for case let path as String in walk {
+            let name = (path as NSString).lastPathComponent
+            let url = base.appendingPathComponent(path)
             if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
                 if name.hasPrefix(".") || skipped.contains(name) || path == "Prototypes" { walk.skipDescendants() }
             } else if manifestName.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil {
