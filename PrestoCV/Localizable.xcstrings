@@ -1647,37 +1647,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Sprachdaten für den Entwurf werden vorbereitet. Versuchen Sie es später noch einmal."
+            "value" : "Dieses Gerät kann die Sprachdaten nicht laden, die Entwürfe auf Englisch oder Deutsch benötigen. Schreiben Sie Ihren Lebenslauf von Hand, importieren Sie ihn oder beschreiben Sie sich auf Italienisch, Spanisch, Französisch oder Portugiesisch."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparing language data for the draft. Try again later."
+            "value" : "This device cannot get the language data that drafts in English or German need. Write your CV by hand, import it, or describe yourself in Italian, Spanish, French or Portuguese."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparando los datos de idioma para el borrador. Inténtalo de nuevo más tarde."
+            "value" : "Este dispositivo no puede obtener los datos de idioma que necesitan los borradores en inglés o alemán. Escribe tu CV a mano, impórtalo o descríbete en italiano, español, francés o portugués."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Préparation des données linguistiques pour le brouillon. Réessayez plus tard."
+            "value" : "Cet appareil ne peut pas obtenir les données linguistiques nécessaires aux brouillons en anglais ou en allemand. Rédigez votre CV vous-même, importez-le ou décrivez-vous en italien, espagnol, français ou portugais."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparazione dei dati linguistici per la bozza. Riprova più tardi."
+            "value" : "Questo dispositivo non riesce a ottenere i dati linguistici che servono alle bozze in inglese o tedesco. Scrivi il tuo CV a mano, importalo o descriviti in italiano, spagnolo, francese o portoghese."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparando os dados de idioma para o rascunho. Tente novamente mais tarde."
+            "value" : "Este dispositivo não consegue obter os dados de idioma de que os rascunhos em inglês ou alemão precisam. Escreva seu currículo manualmente, importe-o ou descreva-se em italiano, espanhol, francês ou português."
           }
         }
       }

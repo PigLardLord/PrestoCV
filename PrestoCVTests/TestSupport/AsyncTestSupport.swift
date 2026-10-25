@@ -6,12 +6,15 @@ actor HeldSleeps {
     private var sleepers: [UUID: CheckedContinuation<Void, Error>] = [:]
     private var cancelled: Set<UUID> = []
     private(set) var startedCount = 0
+    /// How long each sleep was asked to last, in the order they started.
+    private(set) var durations: [Duration] = []
     private var startWaiters = CountWaiters()
 
     var sleepingCount: Int { sleepers.count }
 
     func sleep(for duration: Duration) async throws {
         let id = UUID()
+        durations.append(duration)
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 start(id, continuation)

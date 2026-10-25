@@ -20,7 +20,7 @@ final class AIGenerationViewModel: ObservableObject {
 
     private let cvGenerationUseCase: CVGeneratorUseCase
     private let mapper: AIDraftMapper
-    private let languageData: LanguageDataRequesting
+    private let languageData: LanguageDataPreparation
     private let appLanguageCode: String?
     private let platform: AIPlatform
     /// Where the description of this creation is kept, until a draft is made from it. The screen then lets go of it for
@@ -37,10 +37,12 @@ final class AIGenerationViewModel: ObservableObject {
         let request: CVGenerationRequest
     }
 
-    /// - Parameter platform: Where the app runs, for the words of an unavailable model. The factory gives the platform of
-    ///   the process; the default keeps the tests the same on every machine.
+    /// - Parameters:
+    ///   - languageData: The wait for the language data that grounding a description needs, when the device has not got it.
+    ///   - platform: Where the app runs, for the words of an unavailable model. The factory gives the platform of the process; the
+    ///     default keeps the tests the same on every machine.
     init(
-        cvGenerationUseCase: CVGeneratorUseCase, mapper: AIDraftMapper, languageData: LanguageDataRequesting, appLanguageCode: String?,
+        cvGenerationUseCase: CVGeneratorUseCase, mapper: AIDraftMapper, languageData: LanguageDataPreparation, appLanguageCode: String?,
         session: AIDescriptionSession, platform: AIPlatform = .iPhoneOrIPad
     ) {
         self.cvGenerationUseCase = cvGenerationUseCase
@@ -92,7 +94,7 @@ final class AIGenerationViewModel: ObservableObject {
         guard mayAct(generation) else { return finish(generation) }
 
         do {
-            let generated = try await cvGenerationUseCase.generateCV(from: generation.request)
+            let generated = try await generateWithLanguageData(generation)
             guard mayAct(generation) else { return finish(generation) }
             draft = mapper.map(generated, writtenIn: generation.request.userPrompt)
             // The draft goes to the editor and this creation is complete: the next one starts with an empty description
@@ -102,11 +104,26 @@ final class AIGenerationViewModel: ObservableObject {
             // Neither an error nor a draft; cancel() has already reset the screen.
         } catch {
             guard mayAct(generation) else { return finish(generation) }
-            requestLanguageData(missingFor: error)
             errorMessage = message(for: error)
         }
 
         finish(generation)
+    }
+
+    /// The draft of `generation`. When the device has not got the language data that grounding the description needs, the system is
+    /// asked for it while the screen stays busy, and once the data is there the draft is generated once more, without another tap.
+    /// Only once: data the device still lacks then, or that does not come, ends as `languageDataUnavailable`.
+    private func generateWithLanguageData(_ generation: Generation) async throws -> GeneratedDraft {
+        do {
+            return try await cvGenerationUseCase.generateCV(from: generation.request)
+        } catch CVGenerationError.languageDataUnavailable(let language) {
+            guard mayAct(generation) else { throw CancellationError() }
+            guard await languageData.prepare(language: language) == .available else {
+                throw CVGenerationError.languageDataUnavailable(languageCode: language)
+            }
+            guard mayAct(generation) else { throw CancellationError() }
+            return try await cvGenerationUseCase.generateCV(from: generation.request)
+        }
     }
 
     /// The generation still owns the screen, and nothing has cancelled its task.
@@ -131,13 +148,6 @@ final class AIGenerationViewModel: ObservableObject {
 
     func clearError() {
         errorMessage = ""
-    }
-
-    /// The device has not got the language data that grounding the description needs: the system is asked for it, and the message
-    /// says the draft is being prepared, so the person tries again in a moment.
-    private func requestLanguageData(missingFor error: Error) {
-        guard case .languageDataUnavailable(let language)? = error as? CVGenerationError else { return }
-        languageData.requestLexicalClassData(forLanguage: language)
     }
 
     private func message(for error: Error) -> String {
