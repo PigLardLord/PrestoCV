@@ -54,7 +54,8 @@ are its planned replacement and are still empty.
     low level or of the ability denies the item ("I have no basic knowledge of German", "I cannot speak German even at a
     basic level"). A question claims nothing ("Do I speak French?"), nor do the words inside quotation marks (a mark at the
     end of a line opens a quote on the next one; a single mark after a letter or a digit may be an apostrophe, "patients'
-    records", "un po'", and closes none: a quote that only such a mark may close runs to the end of its line), nor the line
+    records", "un po'", and closes none: a quote that only such a mark may close, or only a mark that a quote inside it took,
+    runs to the end of its line), nor the line
     after a colon line that another person speaks ("My colleague wrote:"), nor what follows a relative that brings in
     another subject ("I work with a colleague who speaks French"); "which I use", "che uso", "tengo que hablar" and an item
     before the relative still claim, and a word that only ends like an infinitive keeps no person ("qui prépare", "che

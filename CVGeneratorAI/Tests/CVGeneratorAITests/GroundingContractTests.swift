@@ -418,7 +418,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 2068
+    static let rowsWhenWritten = 2076
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list. All of them are residual risks of the rules (ADR 0023) that the claim check of
@@ -3745,6 +3745,11 @@ enum GroundingRows {
     /// that a closing mark ends, and in a quote with a mark alone on its line, which is a symbol it holds when a later mark ends it.
     /// The inner quote starts with a letter and ends with a closing bracket: a mark right before a punctuation mark closes a quote, so
     /// an inner « before a bracket would close the outer one, and a single mark after a letter may be an apostrophe.
+    ///
+    /// A mark that an inner quote took never ends the quote that holds it, so two more rows exist for every pair of quotes that share a
+    /// closing mark (“…” inside a „…“, a „…” inside a “…”, a ‚…’ inside a ‘…’): an outer quote that only the inner quote's mark could
+    /// close, and an outer quote that closes with the mark of an inner quote that nothing closes. Each runs to the end of the line of
+    /// that mark, as no other mark ends it (the unit table in `QuotedSpeechNestingTests` holds every cell).
     private static func quotesInsideQuotes() -> [GroundingRow] {
         typealias Marks = (id: String, open: String, close: String)
         let pairs: [Marks] = [
@@ -3753,6 +3758,9 @@ enum GroundingRows {
             ("reversed-single-guillemets", "›", "‹"), ("low-and-high", "„", "“"), ("low-and-curly", "„", "”"),
             ("single-low-and-high", "‚", "‘"), ("single-low-and-curly", "‚", "’"),
         ]
+
+        let closersOfOpen = Dictionary(grouping: pairs, by: \.open).mapValues { Set($0.map(\.close)) }
+        var texts: Set<String> = []
 
         var rows: [GroundingRow] = []
         rows.append(row("a-quote-of-another-pair-inside-a-quote-does-not-end-it-de",
@@ -3774,6 +3782,25 @@ enum GroundingRows {
                                 "My colleague wrote \(outer.open)\nIn my table, the ditto symbol is:\n\(outer.close)\nI say:\(inner.open)Swift (ok)\(inner.close). I use Python.\nEnd of my message.\(outer.close)\nI speak French.",
                                 CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")], languages: [Language(name: "French")]),
                                 .exactly(CVData(languages: [Language(name: "French")]))))
+
+                let unclosedOuter = "\(outer.open)My colleague wrote:\(inner.open)Swift (ok)\(inner.close). I use Python.\nI speak French."
+                if closersOfOpen[outer.open, default: []].contains(inner.close), texts.insert(unclosedOuter).inserted {
+                    rows.append(row("a-quote-only-the-mark-of-\(nesting)-could-close-runs-to-the-end-of-its-line",
+                                    "\(within): the mark of the inner quote closes the outer pair too, but an inner quote took it, so nothing ends the outer quote and it runs to the end of that line: Swift and Python go, and French, on the next line, stays",
+                                    unclosedOuter,
+                                    CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")], languages: [Language(name: "French")]),
+                                    .exactly(CVData(languages: [Language(name: "French")]))))
+                }
+
+                let unclosedInner = "\(outer.open)My colleague wrote:\(inner.open)Swift (ok). I use Python.\(outer.close) I speak German.\nI speak French."
+                if closersOfOpen[inner.open, default: []].contains(outer.close), texts.insert(unclosedInner).inserted {
+                    rows.append(row("a-quote-of-\(nesting)-whose-inner-quote-nothing-closes-runs-to-the-end-of-its-line",
+                                    "\(within): the mark that closes the outer quote closes the inner pair too, but nothing else closes either, so the outer quote runs to the end of that line: Swift, Python and German go, and French, on the next line, stays",
+                                    unclosedInner,
+                                    CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")],
+                                           languages: [Language(name: "German"), Language(name: "French")]),
+                                    .exactly(CVData(languages: [Language(name: "French")]))))
+                }
             }
         }
         return rows

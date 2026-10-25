@@ -15,14 +15,17 @@ import Foundation
 ///   ("patients' records", "Hans’ Team"), an elision ("un po'", "jusqu' à") or a prime ("a 5' de la oficina"). It closes no quote for
 ///   sure. A quote closes at the first mark that does: a double mark, a guillemet, or a single mark after anything but a letter or a
 ///   digit ("…French.'").
-/// - A quote that only such a mark may close runs to the end of the line of the last of them. Whether the quote ends at that mark or
-///   goes on past it, nothing after it on its line is surely the person's; only a line break tells where another person's words end,
-///   as it does after a line that introduces them ("My colleague wrote:").
+/// - A quote that only such a mark may close, or only a mark that a quote opened inside it takes (see below), runs to the end of the
+///   line of the last of them. Whether the quote ends at that mark or goes on past it, nothing after it on its line is surely the
+///   person's; only a line break tells where another person's words end, as it does after a line that introduces them ("My
+///   colleague wrote:").
 /// - A mark that nothing may close quotes nothing: a stray mark, or an apostrophe that starts a word ("the '90s").
 /// - A quote may hold quotes of other pairs (#249): the quote of a German „…“ may hold a “…” or a ‚…‘, and a “…” may hold a „…“. A
 ///   closing mark closes the latest quote opened inside that it pairs with, whichever pair that is, so the “ that closes an inner „…“
 ///   is no end of the “…” that holds it, and the sentence after the inner quote is still quoted. A closing mark that closes none of
-///   them closes the quote. An opening mark that nothing closes leaves the quote to end at its first closing mark.
+///   them closes the quote. A mark that an inner quote took never closes the quote that holds it, whether the inner quote is closed
+///   or an opening mark nothing closes takes the mark of the outer pair: a quote with no other closing mark runs to the end of the
+///   line of the last mark that may close it ("“Er sagte „Hallo”. Ich benutze Swift." quotes both sentences).
 /// - A mark alone on its line closes the quote, so the line after it claims as usual, unless a later mark closes the quote for sure
 ///   and none of the quotes opened after the lone one takes it: the lone mark is then a symbol the quote holds, such as a ditto mark, and
 ///   the quote runs to that later mark ("My colleague wrote "", "In my table, the ditto symbol is:", """, "I speak French." and
@@ -59,15 +62,13 @@ enum QuotedSpeech {
                 index += 1
                 continue
             }
-            let marks = text.indices.dropFirst(index + 1).filter { closers.contains(text[$0]) && closes(at: $0, in: text) }
-            let first = closing(after: index, closers: closers, loneMarksAreSymbols: false, in: text)
-                ?? marks.first(where: { !mayEndAWord(at: $0, in: text) })
-            if let first {
+            if let first = closing(after: index, closers: closers, loneMarksAreSymbols: false, in: text) {
                 let close = isAlone(at: first, in: text)
                     ? closing(after: first, closers: closers, loneMarksAreSymbols: true, in: text) ?? first : first
                 inside.insert(integersIn: (index + 1)..<close)
                 index = close + 1
-            } else if let last = marks.last, let end = lineEnds.first(where: { $0 > last }) {
+            } else if let last = text.indices.dropFirst(index + 1).last(where: { closers.contains(text[$0]) && closes(at: $0, in: text) }),
+                      let end = lineEnds.first(where: { $0 > last }) {
                 inside.insert(integersIn: (index + 1)..<end)
                 index = end
             } else {
