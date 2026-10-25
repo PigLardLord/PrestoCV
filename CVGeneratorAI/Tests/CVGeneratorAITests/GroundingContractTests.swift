@@ -419,25 +419,23 @@ enum GroundingRows {
     static let rowsWhenWritten = 1802
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
-    /// fails and the id leaves this list.
+    /// fails and the id leaves this list. All of them are residual risks of the rules (ADR 0023) that the claim check of
+    /// ADR 0028 closes on the product path: `ClaimCheckEvaluation` (a), composed, fails on any item of theirs that both keep.
     static let notImplementedYet: Set<String> = [
-        // Text typed without accents: an open residual risk of ADR 0023 that #249 must close before release.
+        // Text typed without accents.
         "a-konjunktiv-typed-without-its-umlaut-claims-nothing-de",
-        // Whose words and whose title and place a claim gives: open residual risks of ADR 0023 that #249 must close before release.
+        // Whose words and whose title and place a claim gives.
         "speech-on-the-line-of-the-colon-claims-nothing",
         "the-title-of-a-person-the-claim-names-is-not-the-persons-en", "the-title-of-a-person-the-claim-names-is-not-the-persons-it",
         "the-title-of-a-person-the-claim-names-is-not-the-persons-de", "the-title-of-a-person-the-claim-names-is-not-the-persons-es",
         "the-title-of-a-person-the-claim-names-is-not-the-persons-fr", "the-title-of-a-person-the-claim-names-is-not-the-persons-pt",
-        // Whose verb follows a relative of the person, and the relatives of place: open residual risks of ADR 0023 that #249 must
-        // close before release.
+        // Whose verb follows a relative of the person, and the relatives of place.
         "a-noun-before-a-relative-of-the-person-is-another-subject-en", "a-noun-before-a-relative-of-the-person-is-another-subject-it",
         "a-noun-before-a-relative-of-the-person-is-another-subject-de", "a-noun-before-a-relative-of-the-person-is-another-subject-es",
         "a-noun-before-a-relative-of-the-person-is-another-subject-fr", "a-noun-before-a-relative-of-the-person-is-another-subject-pt",
         "a-relative-of-place-brings-in-another-subject-en", "a-relative-of-place-brings-in-another-subject-it",
         "a-relative-of-place-brings-in-another-subject-es", "a-relative-of-place-brings-in-another-subject-fr",
         "a-relative-of-place-brings-in-another-subject-pt",
-        // A mark alone on its line inside a quote: an open residual risk of ADR 0023 that #249 must close before release.
-        "a-mark-alone-on-its-line-inside-a-quote-closes-nothing",
     ]
 
     /// Rows whose desired output the sanitiser does not give, and whose leak the owner accepts as a residual risk (ADR 0023,
@@ -3479,7 +3477,7 @@ enum GroundingRows {
 
     /// Text typed without accents (#202, #249): the moods of supposition lose the mark that tells them from a fact. Spanish "seria"
     /// still withdraws through the Portuguese "seria" (would be), which also takes Spanish "seria" (serious): an accepted loss.
-    /// "wurde" for "würde" reads as a past and keeps its item: an open residual risk that #249 must close (`notImplementedYet`).
+    /// "wurde" for "würde" reads as a past and keeps its item (`notImplementedYet`): the claim check of ADR 0028 withdraws it.
     private static func textWithoutAccents() -> [GroundingRow] {
         var rows: [GroundingRow] = []
         rows.append(row("a-conditional-typed-without-its-accent-claims-nothing-es",
@@ -3665,7 +3663,8 @@ enum GroundingRows {
     /// A mark at the end of a line opens a quote that goes on with the next lines (#202), when a mark may close it there: a speech
     /// introduced without a colon, its words on the next line ("Mon collègue a écrit '", then "Je parle français.'"), claims nothing.
     /// With nothing to close it, the mark opens nothing, and the next line claims as usual. A mark alone on its line closes the quote,
-    /// though the quote may hold it as a symbol: an open residual risk that #249 must close (`notImplementedYet`).
+    /// unless a later mark closes it for sure and no opening mark after the lone one pairs with that later mark: the lone mark is then
+    /// a symbol the quote holds, such as a ditto mark, and the quote runs to the later mark.
     private static func marksAtTheEndOfALine() -> [GroundingRow] {
         typealias Speech = (language: String, description: String, name: String)
         var speeches: [Speech] = []
@@ -3697,10 +3696,26 @@ enum GroundingRows {
                         "My colleague wrote \"\nI use Swift.\n\"\nI speak French.\nI use \"clean code\".",
                         CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]),
                         .exactly(CVData(languages: [Language(name: "French")]))))
+        rows.append(row("a-mark-alone-on-its-line-closes-the-quote-before-a-possessive",
+                        "only a possessive follows the mark alone on the third line, and it closes nothing for sure: the lone mark closes the quote, Swift goes and French stays",
+                        "My colleague wrote '\nI use Swift.\n'\nI speak French.\nI keep my patients' records.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]),
+                        .exactly(CVData(languages: [Language(name: "French")]))))
         rows.append(row("a-mark-alone-on-its-line-inside-a-quote-closes-nothing",
                         "the mark alone on the third line is the colleague's ditto symbol, and the quote runs to the last line: no language",
                         "My colleague wrote \"\nIn my table, the ditto symbol is:\n\"\nI speak French.\nEnd of my message.\"",
                         CVData(languages: [Language(name: "French")]), .exactly(CVData())))
+        var dittoMarks: [Speech] = []
+        dittoMarks.append(("it", "Il mio collega ha scritto “\nNella mia tabella, il simbolo di ripetizione è:\n”\nParlo francese.\nFine del messaggio.”", "francese"))
+        dittoMarks.append(("de", "Mein Kollege schrieb „\nIn meiner Tabelle ist das Wiederholungszeichen:\n“\nIch spreche Französisch.\nEnde meiner Nachricht.“", "Französisch"))
+        dittoMarks.append(("es", "Mi colega escribió \"\nEn mi tabla, el símbolo de repetición es:\n\"\nHablo francés.\nFin de mi mensaje.\"", "francés"))
+        dittoMarks.append(("fr", "Mon collègue a écrit '\nDans mon tableau, le symbole de répétition est :\n'\nJe parle français.\nFin de mon message.'", "français"))
+        dittoMarks.append(("pt", "O meu colega escreveu ‘\nNa minha tabela, o símbolo de repetição é:\n’\nFalo francês.\nFim da mensagem.’", "francês"))
+        for v in dittoMarks {
+            rows.append(row("a-mark-alone-on-its-line-inside-a-quote-closes-nothing-\(v.language)",
+                            "the mark alone on the third line is the colleague's ditto symbol, and the quote runs to the last line: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
         return rows
     }
 
@@ -3801,8 +3816,8 @@ enum GroundingRows {
     /// A line that ends with a colon and does not speak for the person introduces someone else's words: the line after it claims
     /// nothing, all its sentences (#202). The line after that claims as usual, and so does the line after a colon line that the
     /// person speaks ("My languages:", "Skills:", "I worked with my team on:"). Words without marks after the colon on its own line
-    /// are read by their own clauses, and a sentence after the colon's keeps its item: an open residual risk that #249 must close
-    /// (`notImplementedYet`).
+    /// are read by their own clauses, and a sentence after the colon's keeps its item (`notImplementedYet`): the claim check of
+    /// ADR 0028 withdraws it.
     private static func speechAfterALineOfAnotherPerson() -> [GroundingRow] {
         typealias Speech = (language: String, description: String, name: String)
         var speeches: [Speech] = []
@@ -3975,8 +3990,8 @@ enum GroundingRows {
     }
 
     /// The person's title and place come from a clause that claims them, but nothing tells whose they are inside it (ADR 0023,
-    /// Consequences): "Io lavoro con un infermiere a Torino" gives the person the nurse's title. An open residual risk that #249 must
-    /// close (`notImplementedYet`).
+    /// Consequences): "Io lavoro con un infermiere a Torino" gives the person the nurse's title (`notImplementedYet`): the claim
+    /// check of ADR 0028 withdraws it.
     private static func titlesOfAnotherPersonInAClaim() -> [GroundingRow] {
         typealias Variant = (language: String, description: String, title: String)
         var variants: [Variant] = []
@@ -3994,11 +4009,11 @@ enum GroundingRows {
         }
     }
 
-    /// Two readings of a relative that the word rules do not build (ADR 0023, Consequences), open residual risks that #249 must close
-    /// (`notImplementedYet`): a noun subject before a relative that keeps the person ("The team that I lead uses Kotlin") gives the
-    /// person the noun's verb after it, and the relatives of place ("where", "dove", "où", "donde", "onde") are not in the relative
-    /// list ("Trabajo en una empresa donde todo el mundo habla inglés"). German writes a comma before "wo", and the clause it splits
-    /// off has a subject of its own: its row holds.
+    /// Two readings of a relative that the word rules do not build (ADR 0023, Consequences), residual risks that the claim check
+    /// of ADR 0028 closes (`notImplementedYet`): a noun subject before a relative that keeps the person ("The team that I lead
+    /// uses Kotlin") gives the person the noun's verb after it, and the relatives of place ("where", "dove", "où", "donde",
+    /// "onde") are not in the relative list ("Trabajo en una empresa donde todo el mundo habla inglés"). German writes a comma
+    /// before "wo", and the clause it splits off has a subject of its own: its row holds.
     private static func subjectsAroundARelative() -> [GroundingRow] {
         typealias Variant = (language: String, description: String, item: String)
         var teams: [Variant] = []

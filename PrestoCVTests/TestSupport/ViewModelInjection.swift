@@ -19,10 +19,11 @@ let englishDocumentLanguageDetector = DocumentLanguageDetector(preferredLanguage
 
 extension AppEnvironment {
     /// A device in English, on a fixed day in UTC, whose waits end only when cancelled, and whose clock moves only when
-    /// a test moves it
+    /// a test moves it. `arguments` are the launch arguments, none by default.
     static func fixed(
         clock: any Clock<Duration> = ManualClock(),
-        container: URL = FileManager.default.temporaryDirectory.appendingPathComponent("Container-\(UUID().uuidString)")
+        container: URL = FileManager.default.temporaryDirectory.appendingPathComponent("Container-\(UUID().uuidString)"),
+        arguments: [String] = []
     ) -> AppEnvironment {
         AppEnvironment(
             now: { testDay },
@@ -36,7 +37,7 @@ extension AppEnvironment {
             exportPreferencesFile: FileManager.default.temporaryDirectory.appendingPathComponent("export-preferences-\(UUID().uuidString).json"),
             container: container,
             removeFile: { try FileManager.default.removeItem(at: $0) },
-            arguments: [],
+            arguments: arguments,
             bundle: Bundle(for: AppRouter.self),
             platform: .iPhoneOrIPad
         )

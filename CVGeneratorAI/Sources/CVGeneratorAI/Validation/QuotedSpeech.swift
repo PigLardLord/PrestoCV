@@ -19,6 +19,10 @@ import Foundation
 ///   goes on past it, nothing after it on its line is surely the person's; only a line break tells where another person's words end,
 ///   as it does after a line that introduces them ("My colleague wrote:").
 /// - A mark that nothing may close quotes nothing: a stray mark, or an apostrophe that starts a word ("the '90s").
+/// - A mark alone on its line closes the quote, so the line after it claims as usual, unless a later mark closes the quote for sure
+///   and no opening mark after the lone one pairs with it: the lone mark is then a symbol the quote holds, such as a ditto mark, and
+///   the quote runs to that later mark ("My colleague wrote "", "In my table, the ditto symbol is:", """, "I speak French." and
+///   "End of my message."" on five lines quote all of the colleague's message).
 enum QuotedSpeech {
     /// The closing marks of each opening mark.
     private static let pairs: [Character: Set<Character>] = [
@@ -52,7 +56,10 @@ enum QuotedSpeech {
                 continue
             }
             let marks = text.indices.dropFirst(index + 1).filter { closers.contains(text[$0]) && closes(at: $0, in: text) }
-            if let close = marks.first(where: { !mayEndAWord(at: $0, in: text) }) {
+            if let first = marks.first(where: { !mayEndAWord(at: $0, in: text) }) {
+                let later = isAlone(at: first, in: text)
+                    ? unpairedClose(after: first, opening: text[index], among: marks, in: text) : nil
+                let close = later ?? first
                 inside.insert(integersIn: (index + 1)..<close)
                 index = close + 1
             } else if let last = marks.last, let end = lineEnds.first(where: { $0 > last }) {
@@ -99,8 +106,29 @@ enum QuotedSpeech {
             let next = text[index + 1]
             guard !next.isLetter, !next.isNumber else { return false }
         }
-        let isAlone = text[index - 1] == "\n" && (index + 1 == text.count || text[index + 1] == "\n")
-        return !text[index - 1].isWhitespace || spacedClosings.contains(text[index]) || isAlone
+        return !text[index - 1].isWhitespace || spacedClosings.contains(text[index]) || isAlone(at: index, in: text)
+    }
+
+    /// Whether the mark at `index` stands alone on its line.
+    private static func isAlone(at index: Int, in text: [Character]) -> Bool {
+        index > 0 && text[index - 1] == "\n" && (index + 1 == text.count || text[index + 1] == "\n")
+    }
+
+    /// The mark that closes the quote when the mark `alone` on its line is a symbol that the quote holds, such as a ditto mark: the
+    /// first later mark of `marks` that closes the quote for sure and that no opening mark after `alone` pairs with. Nil when there is
+    /// none, and the lone mark closes the quote. Other marks alone on their lines neither open nor close here.
+    private static func unpairedClose(after alone: Int, opening: Character, among marks: [Int], in text: [Character]) -> Int? {
+        let sure = Set(marks.filter { $0 > alone && !isAlone(at: $0, in: text) && !mayEndAWord(at: $0, in: text) })
+        var open = 0
+        for position in (alone + 1)..<text.count where !isAlone(at: position, in: text) {
+            if sure.contains(position) {
+                if open == 0 { return position }
+                open -= 1
+            } else if text[position] == opening, opens(at: position, in: text) {
+                open += 1
+            }
+        }
+        return nil
     }
 
     /// Whether the closing mark at `index` may end a word rather than a quote: a single mark right after a letter or a digit.

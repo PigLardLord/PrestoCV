@@ -15,7 +15,7 @@ enum EditorRequest: Hashable, Sendable {
     var storesAsItIs: Bool {
         guard case .new(_, let notice?) = self else { return false }
         switch notice {
-        case .aiDraft, .imported:
+        case .aiDraft, .aiDraftUnchecked, .imported:
             return true
         }
     }
