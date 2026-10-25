@@ -200,7 +200,7 @@ struct ReadingWorkTests {
         let analysed = probe.steps
         let layout = ExtractedLayout.pages(pages)
         let tight = ImportCV(pdfReader: ScriptedPDFReader(layout: layout), limits: limits(steps: analysed + 300_000))
-        #expect(failure(of: { try tight.read(layout) }) as? ImportError == .tooLarge)
+        #expect(failure(of: { try tight.read(layout) }) as? LimitReached == LimitReached(.steps))
         let roomy = ImportCV(pdfReader: ScriptedPDFReader(layout: layout), limits: limits(steps: analysed + 3_000_000))
         #expect(try roomy.read(layout).cv.experience.count == 2)
     }

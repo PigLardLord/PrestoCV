@@ -8,6 +8,7 @@
 import SwiftUI
 import PrestoCVCore
 import CVPDFExporter
+import DiagnosticLoggingOSLog
 import os
 
 private let launchLogger = Logger(subsystem: "com.PigLardLord.prestocv", category: "launch")
@@ -16,7 +17,9 @@ private let launchLogger = Logger(subsystem: "com.PigLardLord.prestocv", categor
 /// services, which the view model factory then hands out.
 @main
 struct PrestoCVApp: App {
-    private static let environment = AppEnvironment.device()
+    private static let environment = AppEnvironment.device(
+        diagnostics: OSLogDiagnosticLogger(subsystem: "com.PigLardLord.prestocv")
+    )
     private static let storage = LaunchEnvironment.storage(arguments: environment.arguments)
 
     var body: some Scene {

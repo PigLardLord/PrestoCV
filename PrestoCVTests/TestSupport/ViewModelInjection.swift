@@ -1,3 +1,4 @@
+import DiagnosticLogging
 import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
@@ -19,11 +20,13 @@ let englishDocumentLanguageDetector = DocumentLanguageDetector(preferredLanguage
 
 extension AppEnvironment {
     /// A device in English, on a fixed day in UTC, whose waits end only when cancelled, and whose clock moves only when
-    /// a test moves it. `arguments` are the launch arguments, none by default.
+    /// a test moves it. `arguments` are the launch arguments, none by default; `diagnostics` is where the import and the
+    /// AI draft log, nowhere by default.
     static func fixed(
         clock: any Clock<Duration> = ManualClock(),
         container: URL = FileManager.default.temporaryDirectory.appendingPathComponent("Container-\(UUID().uuidString)"),
-        arguments: [String] = []
+        arguments: [String] = [],
+        diagnostics: any DiagnosticLogger = SilentLogger()
     ) -> AppEnvironment {
         AppEnvironment(
             now: { testDay },
@@ -39,7 +42,8 @@ extension AppEnvironment {
             removeFile: { try FileManager.default.removeItem(at: $0) },
             arguments: arguments,
             bundle: Bundle(for: AppRouter.self),
-            platform: .iPhoneOrIPad
+            platform: .iPhoneOrIPad,
+            diagnostics: diagnostics
         )
     }
 }
