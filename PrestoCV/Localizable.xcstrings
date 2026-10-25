@@ -3312,6 +3312,47 @@
         }
       }
     },
+    "editor.notice.ai_draft.unchecked" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ihre Fähigkeiten, Sprachen, Interessen, Berufsbezeichnung und Ihren Ort konnten wir nicht prüfen, daher bleiben sie leer. Ergänzen Sie sie selbst."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We could not check your skills, languages, interests, job title and place, so they are left blank. Add them yourself."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No pudimos comprobar tus competencias, idiomas, intereses, título profesional y ubicación, así que quedan en blanco. Añádelos tú."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nous n'avons pas pu vérifier vos compétences, langues, centres d'intérêt, titre professionnel et lieu, ils restent donc vides. Ajoutez-les vous-même."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non abbiamo potuto controllare le tue competenze, lingue, interessi, qualifica professionale e città, quindi restano vuoti. Aggiungili tu."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não conseguimos verificar suas competências, idiomas, interesses, título profissional e localização, por isso ficam em branco. Adicione-os você mesmo."
+          }
+        }
+      }
+    },
     "editor.notice.imported" : {
       "extractionState" : "manual",
       "localizations" : {

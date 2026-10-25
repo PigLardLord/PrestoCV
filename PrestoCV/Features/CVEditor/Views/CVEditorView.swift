@@ -11,6 +11,10 @@ struct CVEditorView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
+    /// The editor's height, and the height of the notice above the form with all its lines: where the form is short of room,
+    /// `EditorChrome` gives the notice part of the editor, and the notice scrolls beyond it.
+    @State private var editorHeight: CGFloat = 0
+    @State private var noticeFullHeight: CGFloat = 0
 
     private var chrome: EditorChrome {
         EditorChrome(verticalSizeClass: verticalSizeClass, dynamicTypeSize: dynamicTypeSize)
@@ -130,7 +134,7 @@ struct CVEditorView: View {
             }
 
             if let notice = viewModel.notice {
-                EditorNoticeBanner(notice: notice)
+                noticeBanner(notice)
             }
 
             TabView {
@@ -177,6 +181,24 @@ struct CVEditorView: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel("editor.title".localized)
             .accessibilityHint("accessibility.editor_hint".localized)
+        }
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { editorHeight = $0 }
+    }
+
+    /// The notice above the form: all its lines, or, where the form is short of room, the height `EditorChrome` gives it, which
+    /// it scrolls in.
+    @ViewBuilder
+    private func noticeBanner(_ notice: EditorNotice) -> some View {
+        if let height = chrome.noticeHeight(fullHeight: noticeFullHeight, editorHeight: editorHeight) {
+            ScrollView {
+                EditorNoticeBanner(notice: notice)
+                    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { noticeFullHeight = $0 }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(height: height)
+        } else {
+            EditorNoticeBanner(notice: notice)
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { noticeFullHeight = $0 }
         }
     }
     

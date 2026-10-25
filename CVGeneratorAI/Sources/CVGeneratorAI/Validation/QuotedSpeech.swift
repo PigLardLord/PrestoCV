@@ -15,10 +15,21 @@ import Foundation
 ///   ("patients' records", "Hans’ Team"), an elision ("un po'", "jusqu' à") or a prime ("a 5' de la oficina"). It closes no quote for
 ///   sure. A quote closes at the first mark that does: a double mark, a guillemet, or a single mark after anything but a letter or a
 ///   digit ("…French.'").
-/// - A quote that only such a mark may close runs to the end of the line of the last of them. Whether the quote ends at that mark or
-///   goes on past it, nothing after it on its line is surely the person's; only a line break tells where another person's words end,
-///   as it does after a line that introduces them ("My colleague wrote:").
+/// - A quote that only such a mark may close, or only a mark that a quote opened inside it takes (see below), runs to the end of the
+///   line of the last of them. Whether the quote ends at that mark or goes on past it, nothing after it on its line is surely the
+///   person's; only a line break tells where another person's words end, as it does after a line that introduces them ("My
+///   colleague wrote:").
 /// - A mark that nothing may close quotes nothing: a stray mark, or an apostrophe that starts a word ("the '90s").
+/// - A quote may hold quotes of other pairs (#249): the quote of a German „…“ may hold a “…” or a ‚…‘, and a “…” may hold a „…“. A
+///   closing mark closes the latest quote opened inside that it pairs with, whichever pair that is, so the “ that closes an inner „…“
+///   is no end of the “…” that holds it, and the sentence after the inner quote is still quoted. A closing mark that closes none of
+///   them closes the quote. A mark that an inner quote took never closes the quote that holds it, whether the inner quote is closed
+///   or an opening mark nothing closes takes the mark of the outer pair: a quote with no other closing mark runs to the end of the
+///   line of the last mark that may close it ("“Er sagte „Hallo”. Ich benutze Swift." quotes both sentences).
+/// - A mark alone on its line closes the quote, so the line after it claims as usual, unless a later mark closes the quote for sure
+///   and none of the quotes opened after the lone one takes it: the lone mark is then a symbol the quote holds, such as a ditto mark, and
+///   the quote runs to that later mark ("My colleague wrote "", "In my table, the ditto symbol is:", """, "I speak French." and
+///   "End of my message."" on five lines quote all of the colleague's message).
 enum QuotedSpeech {
     /// The closing marks of each opening mark.
     private static let pairs: [Character: Set<Character>] = [
@@ -51,11 +62,13 @@ enum QuotedSpeech {
                 index += 1
                 continue
             }
-            let marks = text.indices.dropFirst(index + 1).filter { closers.contains(text[$0]) && closes(at: $0, in: text) }
-            if let close = marks.first(where: { !mayEndAWord(at: $0, in: text) }) {
+            if let first = closing(after: index, closers: closers, loneMarksAreSymbols: false, in: text) {
+                let close = isAlone(at: first, in: text)
+                    ? closing(after: first, closers: closers, loneMarksAreSymbols: true, in: text) ?? first : first
                 inside.insert(integersIn: (index + 1)..<close)
                 index = close + 1
-            } else if let last = marks.last, let end = lineEnds.first(where: { $0 > last }) {
+            } else if let last = text.indices.dropFirst(index + 1).last(where: { closers.contains(text[$0]) && closes(at: $0, in: text) }),
+                      let end = lineEnds.first(where: { $0 > last }) {
                 inside.insert(integersIn: (index + 1)..<end)
                 index = end
             } else {
@@ -99,8 +112,40 @@ enum QuotedSpeech {
             let next = text[index + 1]
             guard !next.isLetter, !next.isNumber else { return false }
         }
-        let isAlone = text[index - 1] == "\n" && (index + 1 == text.count || text[index + 1] == "\n")
-        return !text[index - 1].isWhitespace || spacedClosings.contains(text[index]) || isAlone
+        return !text[index - 1].isWhitespace || spacedClosings.contains(text[index]) || isAlone(at: index, in: text)
+    }
+
+    /// Whether the mark at `index` stands alone on its line.
+    private static func isAlone(at index: Int, in text: [Character]) -> Bool {
+        index > 0 && text[index - 1] == "\n" && (index + 1 == text.count || text[index + 1] == "\n")
+    }
+
+    /// The mark that closes the quote opened at `start`, which closes with one of `closers`: the first later mark that closes it for
+    /// sure and that no quote opened after `start` takes. Nil when there is none.
+    ///
+    /// The quote may hold quotes of its own, of any of the supported pairs: the quote of a German „…“ may hold a “…” or a ‚…‘, and
+    /// the ” that closes the first is no end of the quote that holds it. So the marks after `start` pair as they come: an opening
+    /// mark opens a quote, and a closing mark that closes one of the quotes opened inside, whichever pair, closes the latest of
+    /// them, and the quotes opened after that one with it. A closing mark of `closers` that closes none of them closes the quote.
+    /// A mark that may end a word (see `mayEndAWord(at:)`) neither opens nor closes.
+    /// - Parameter loneMarksAreSymbols: Whether the marks alone on their lines neither open nor close, because the quote is read
+    ///   past a mark alone on its line, which is a symbol the quote holds, such as a ditto mark.
+    private static func closing(
+        after start: Int, closers: Set<Character>, loneMarksAreSymbols: Bool, in text: [Character]
+    ) -> Int? {
+        var open: [Set<Character>] = []
+        for position in (start + 1)..<text.count where !(loneMarksAreSymbols && isAlone(at: position, in: text)) {
+            let mark = text[position]
+            if closes(at: position, in: text), !mayEndAWord(at: position, in: text) {
+                if let match = open.lastIndex(where: { $0.contains(mark) }) {
+                    open.removeSubrange(match...)
+                    continue
+                }
+                if closers.contains(mark) { return position }
+            }
+            if let nested = pairs[mark], opens(at: position, in: text) { open.append(nested) }
+        }
+        return nil
     }
 
     /// Whether the closing mark at `index` may end a word rather than a quote: a single mark right after a letter or a digit.

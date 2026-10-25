@@ -12,8 +12,8 @@ final class AIGenerationViewModel: ObservableObject {
     }
     @Published private(set) var isGenerating: Bool = false
     @Published private(set) var errorMessage: String = ""
-    /// The generated CV, not stored yet: the editor opens it for review and stores it as it is.
-    @Published private(set) var draft: CVModel?
+    /// The generated CV, not stored yet: the editor opens it for review, with the notice it calls for, and stores it as it is.
+    @Published private(set) var draft: AIDraft?
 
     /// The running generation started by `startGenerating()`, kept so `cancel()` can stop it.
     private(set) var generationTask: Task<Void, Never>?
@@ -92,9 +92,9 @@ final class AIGenerationViewModel: ObservableObject {
         guard mayAct(generation) else { return finish(generation) }
 
         do {
-            let cvData = try await cvGenerationUseCase.generateCV(from: generation.request)
+            let generated = try await cvGenerationUseCase.generateCV(from: generation.request)
             guard mayAct(generation) else { return finish(generation) }
-            draft = mapper.map(cvData, writtenIn: generation.request.userPrompt)
+            draft = mapper.map(generated, writtenIn: generation.request.userPrompt)
             // The draft goes to the editor and this creation is complete: the next one starts with an empty description
             session?.text = ""
             session = nil
