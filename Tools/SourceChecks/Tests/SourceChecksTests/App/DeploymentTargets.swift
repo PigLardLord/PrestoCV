@@ -113,11 +113,20 @@ enum DeploymentTargets {
     /// lines: a platform written in a comment or a string is none, and a platform that is not in the `platforms:`
     /// argument of a `Package` call (an unrelated `.iOS(` expression, a `.when(platforms:)` condition) is none either.
     ///
-    /// Whatever the reader cannot tell is a finding, because a manifest could hide any value there: a `platforms`
-    /// argument that is not a list written out, an element that is not a platform written out, a release that is not a
-    /// string or a `.vNN_N` constant, a `Package` that is not called, a `.platforms` read or change after the call, a
-    /// source that cannot be read to its end. A manifest of the app that declares no iOS platform is found too:
-    /// SwiftPM then builds it for its own, older default.
+    /// The check fails closed: whatever the reader does not read structurally is a finding, because a manifest could
+    /// hide any value there. That is:
+    /// - a source the lexer cannot read to its end or cannot tell code from text in: a string with an interpolation,
+    ///   a slash outside a string and a comment (a regular expression literal), a line comment with a Unicode line
+    ///   separator, anything not closed, and brackets that are not closed or do not match;
+    /// - an argument of a `Package` call that is not written `label: value`, a `platforms` argument that is not a list
+    ///   written out, a platform that is not written out as `.name(release)` or whose name is not one of SwiftPM's
+    ///   (or is `custom`), a release that is not a string or a `.vNN_N` constant, on iOS and on every other platform;
+    /// - a `Package` that is not called, a `.platforms` read or changed after the call;
+    /// - `SupportedPlatform` extended or declared again, which can give any platform name or release constant any value.
+    ///
+    /// A manifest of the app that declares no iOS platform is found too: SwiftPM then builds it for its own, older
+    /// default. What the check does not model is what the manifest does when it runs (`unsafeFlags`, a script that
+    /// writes a project file); only the declarations it reads are checked.
     static func findings(inManifest text: String, file: String, mustDeclareIOS: Bool) -> [Finding] {
         let tokens: [SwiftToken]
         switch SwiftLexer.tokens(of: text) {
@@ -125,11 +134,11 @@ enum DeploymentTargets {
         case .failure(let failure):
             return [Finding(
                 file: file, line: failure.line,
-                reason: "cannot be read to its end (\(failure.what)), so its platforms could hide any value"
+                reason: "cannot be read (\(failure.what)), so its platforms could hide any value"
             )]
         }
         guard let partners = bracketPartners(of: tokens) else {
-            return [Finding(file: file, line: 1, reason: "cannot be read to its end (its brackets do not match), so its platforms could hide any value")]
+            return [Finding(file: file, line: 1, reason: "cannot be read (its brackets are not closed or do not match), so its platforms could hide any value")]
         }
         let manifest = Manifest(file: file, tokens: tokens, partners: partners, mustDeclareIOS: mustDeclareIOS)
         return manifest.findings()
@@ -150,10 +159,42 @@ enum DeploymentTargets {
                     findings += readPackage(at: index)
                 } else if token.isIdentifier("platforms"), index > 0, tokens[index - 1].isPunctuation(".") {
                     findings.append(unreadable(token.line, "the platforms of a package are read or changed after its call"))
+                } else if token.isIdentifier("SupportedPlatform"), changesSupportedPlatform(at: index) {
+                    findings.append(unreadable(token.line, "SupportedPlatform is extended, declared again or aliased"))
                 }
             }
             if calls == 0 { findings.append(unreadable(1, "it has no Package call")) }
-            return findings.sorted { $0.line < $1.line }
+            var unique: [Finding] = []
+            for finding in findings.sorted(by: { $0.line < $1.line }) where !unique.contains(finding) { unique.append(finding) }
+            return unique
+        }
+
+        /// The words that start a declaration of a type, or an extension of one.
+        private static let typeDeclarations: Set<String> = ["extension", "struct", "class", "enum", "actor", "protocol"]
+
+        /// The words that start a statement, which end a type alias.
+        private static let statementStarts: Set<String> = [
+            "typealias", "extension", "struct", "class", "enum", "actor", "protocol", "func", "let", "var", "import",
+            "public", "package", "internal", "fileprivate", "private", "open", "final", "static", "init",
+        ]
+
+        /// Whether the type `SupportedPlatform` is extended (`extension SupportedPlatform {`, `extension
+        /// SupportedPlatform.IOSVersion {`), declared again (`struct SupportedPlatform`) or aliased
+        /// (`typealias Platform = SupportedPlatform`) here. Any of them can change what a platform name or a release
+        /// constant stands for, whatever the platforms list says. Using the type (`SupportedPlatform.iOS("26.5")`, a
+        /// `[SupportedPlatform]` annotation) changes nothing, and is read where it matters, in the list.
+        private func changesSupportedPlatform(at index: Int) -> Bool {
+            var before = index - 1
+            if before >= 1, tokens[before].isPunctuation("."), tokens[before - 1].isIdentifier("PackageDescription") { before -= 2 }
+            if before >= 0, tokens[before].kind == .identifier, Self.typeDeclarations.contains(tokens[before].text) { return true }
+            // An alias: `typealias` on the way back to the start of the statement.
+            var back = index - 1
+            while back >= 0, !tokens[back].isPunctuation(";"), !tokens[back].isPunctuation("{"), !tokens[back].isPunctuation("}") {
+                if tokens[back].isIdentifier("typealias") { return true }
+                if tokens[back].kind == .identifier, Self.statementStarts.contains(tokens[back].text) { return false }
+                back -= 1
+            }
+            return false
         }
 
         // MARK: Package call
@@ -169,8 +210,16 @@ enum DeploymentTargets {
             var findings: [Finding] = []
             var settled = false
             for argument in arguments(in: (index + 2)..<close) {
-                guard argument.count >= 2, tokens[argument.lowerBound].isIdentifier("platforms"),
-                      tokens[argument.lowerBound + 1].isPunctuation(":") else { continue }
+                guard argument.count >= 2, tokens[argument.lowerBound].kind == .identifier,
+                      tokens[argument.lowerBound + 1].isPunctuation(":") else {
+                    // `#if`, a positional argument, an expression: not read, so it could hold the platforms.
+                    findings.append(unreadable(
+                        tokens[min(argument.lowerBound, close)].line, "an argument of a Package call is not written label: value"
+                    ))
+                    settled = true
+                    continue
+                }
+                guard tokens[argument.lowerBound].isIdentifier("platforms") else { continue }
                 let reading = readPlatforms(argument.dropFirst(2), line: tokens[argument.lowerBound].line)
                 findings += reading.findings
                 settled = settled || reading.declaresIOS || !reading.findings.isEmpty
@@ -212,6 +261,9 @@ enum DeploymentTargets {
 
         // MARK: Platforms
 
+        /// The platforms SwiftPM has besides iOS. A name that is none of them is a finding: a manifest can add its own.
+        private static let otherPlatforms: Set<String> = ["macOS", "macCatalyst", "tvOS", "watchOS", "visionOS", "driverKit"]
+
         /// The value of `platforms:`: a list written out, of platforms written out, such as `.iOS("26.5")`.
         private func readPlatforms(_ value: Range<Int>, line: Int) -> (findings: [Finding], declaresIOS: Bool) {
             guard !value.isEmpty, tokens[value.lowerBound].isPunctuation("["), partners[value.lowerBound] == value.upperBound - 1 else {
@@ -238,6 +290,10 @@ enum DeploymentTargets {
                     if let reason = problem(with: release(in: arguments), written: written, setting: "The iOS platform") {
                         findings.append(Finding(file: file, line: name.line, reason: reason))
                     }
+                } else if !Self.otherPlatforms.contains(name.text) {
+                    findings.append(unreadable(name.line, ".\(name.text) is not a platform the check knows"))
+                } else if release(in: arguments) == nil {
+                    findings.append(unreadable(name.line, "the release of .\(name.text) is not written out as a string or a .vNN_N constant"))
                 }
             }
             return (findings, declaresIOS)
@@ -265,8 +321,9 @@ enum DeploymentTargets {
         }
     }
 
-    /// For each opening bracket, where it closes; `nil` when a closing bracket does not match the one it closes.
-    /// An opening bracket that is never closed has no entry.
+    /// For each opening bracket, where it closes; `nil` when a closing bracket does not match the one it closes, has
+    /// none to close, or when an opening bracket is never closed: a source whose brackets are not balanced is not one
+    /// the compiler would take as it reads.
     private static func bracketPartners(of tokens: [SwiftToken]) -> [Int: Int]? {
         let closing = [")": "(", "]": "[", "}": "{"]
         var open: [Int] = []
@@ -279,7 +336,7 @@ enum DeploymentTargets {
                 partners[last] = index
             }
         }
-        return partners
+        return open.isEmpty ? partners : nil
     }
 
     // MARK: Verdict

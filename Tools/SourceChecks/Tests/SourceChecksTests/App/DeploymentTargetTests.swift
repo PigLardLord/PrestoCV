@@ -230,11 +230,10 @@ struct DeploymentTargetTests {
         let star = "let package = Package(name: \"a/*b\", dependencies: [.package(url: \"a/*b\", from: \"1.0.0\")], platforms: [.iOS(\"26.0\")])"
         let brackets = "let package = Package(name: \"a)]}(\", platforms: [.iOS(\"26.0\")])"
         let escaped = "let package = Package(name: \"a\\\"//b\", platforms: [.iOS(\"26.0\")])"
-        let interpolated = "let package = Package(name: \"a\\(\"b)\")c\", platforms: [.iOS(\"26.0\")])"
         let raw = "let package = Package(name: #\"a\"//b\"#, platforms: [.iOS(\"26.0\")])"
         let multiline = "let package = Package(name: \"\"\"\n    x \"// /* \"quoted\"\n    \"\"\", platforms: [.iOS(\"26.0\")])"
 
-        for text in [slashes, star, brackets, escaped, interpolated, raw, multiline] {
+        for text in [slashes, star, brackets, escaped, raw, multiline] {
             let findings = Self.findings(in: text)
             #expect(findings.count == 1 && findings[0].reason.contains("below the minimum"), "\(text)\n\(findings)")
         }
@@ -313,6 +312,244 @@ struct DeploymentTargetTests {
         let findings = Self.findings(in: text)
 
         #expect(findings.count == 1 && findings[0].reason.contains("cannot be read"), "\(text)\n\(findings)")
+    }
+
+    // MARK: What the reader does not read
+
+    /// A way to write a string with an interpolation: the text around the code of the interpolation, and how many lines
+    /// below the start of the string the interpolation starts.
+    struct InterpolationForm: CustomTestStringConvertible, Sendable {
+        let name: String
+        let open: String
+        let close: String
+        let lineOffset: Int
+        var testDescription: String { name }
+    }
+
+    static let interpolationForms = [
+        InterpolationForm(name: "ordinary", open: "\"\\(", close: ")\"", lineOffset: 0),
+        InterpolationForm(name: "raw", open: "#\"\\#(", close: ")\"#", lineOffset: 0),
+        InterpolationForm(name: "raw with two hashes", open: "##\"\\##(", close: ")\"##", lineOffset: 0),
+        InterpolationForm(name: "multi-line", open: "\"\"\"\n    \\(", close: ")\n    \"\"\"", lineOffset: 1),
+        InterpolationForm(name: "raw multi-line", open: "#\"\"\"\n    \\#(", close: ")\n    \"\"\"#", lineOffset: 1),
+    ]
+
+    /// The manifest of a package that declares iOS 26.5, followed by a string with this code in an interpolation: the
+    /// string starts on line 5.
+    private static func manifest(interpolating code: String, in form: InterpolationForm) -> String {
+        Self.manifest(platforms: #"[.iOS("26.5")]"#) + "\nlet note = \(form.open)\(code)\(form.close)\n"
+    }
+
+    @Test("Code that changes the platforms inside an interpolation is found: the interpolation is code, and it is not read", arguments: interpolationForms)
+    func manifestInterpolationThatChangesThePlatformsIsFound(form: InterpolationForm) {
+        let text = Self.manifest(interpolating: #"{ package.platforms = [.iOS("26.0")]; return "x" }()"#, in: form)
+
+        for mustDeclareIOS in [true, false] {
+            let findings = Self.findings(in: text, mustDeclareIOS: mustDeclareIOS)
+
+            #expect(findings.map(\.line) == [5 + form.lineOffset], "\(form.name): \(findings)")
+            #expect(findings.first?.reason.contains("interpolation") == true, "\(form.name): \(findings)")
+            #expect(findings.first?.reason.contains("could hide any value") == true, "\(form.name): \(findings)")
+        }
+    }
+
+    @Test("A Package built inside an interpolation is found: it can be the one the manifest ends with", arguments: interpolationForms)
+    func manifestInterpolationThatBuildsAPackageIsFound(form: InterpolationForm) {
+        let text = Self.manifest(interpolating: #"Package(name: "Q", platforms: [.iOS("26.0")])"#, in: form)
+
+        for mustDeclareIOS in [true, false] {
+            let findings = Self.findings(in: text, mustDeclareIOS: mustDeclareIOS)
+
+            #expect(findings.map(\.line) == [5 + form.lineOffset], "\(form.name): \(findings)")
+            #expect(findings.first?.reason.contains("interpolation") == true, "\(form.name): \(findings)")
+        }
+    }
+
+    @Test("An interpolation inside the Package call is found too, wherever it is: nothing in a manifest is skipped unread", arguments: [
+        #"let package = Package(name: "a\(b)", platforms: [.iOS("26.5")])"#,
+        #"let package = Package(name: "P", platforms: [.iOS("26.5")], targets: [.target(name: "T", path: "\(dir)/T")])"#,
+        #"let package = Package(name: "P", platforms: [.iOS("\(release)")])"#,
+        #"let package = Package(name: "P", platforms: [.iOS("26.5")]); let n = "\("\("deep")")""#,
+    ])
+    func manifestInterpolationAnywhereIsFound(text: String) {
+        let findings = Self.findings(in: text)
+
+        #expect(findings.count == 1 && findings[0].reason.contains("interpolation"), "\(text)\n\(findings)")
+    }
+
+    @Test("A backslash and a parenthesis that are no interpolation are read: in a comment, in a raw string, after an escaped backslash")
+    func manifestTextThatIsNoInterpolationIsRead() {
+        let tail = "\n// let note = \"\\(x)\"\n/* \"\\(y)\" */\nlet raw = #\"\\(z)\"#\nlet escaped = \"\\\\(w)\"\nlet more = ##\"\\#(v)\"##\n"
+
+        #expect(Self.findings(in: Self.manifest(platforms: #"[.iOS("26.5")]"#) + tail).isEmpty)
+        #expect(Self.findings(in: Self.manifest(platforms: #"[.iOS("26.0")]"#) + tail).map(\.line) == [3])
+    }
+
+    @Test("A slash outside a string and a comment is found: a regular expression literal can hide the code that follows it", arguments: [
+        "let r = /\\//; package.platforms = [.iOS(\"26.0\")]",
+        "let r = /a\\/*b/\npackage.platforms = [.iOS(\"26.0\")]\nlet s = /a*/",
+        "let r = /\"/\npackage.platforms = [.iOS(\"26.0\")]",
+        "let half = 1 / 2",
+        "let share = 3 /\n 4",
+    ])
+    func manifestSlashIsFound(tail: String) {
+        let text = Self.manifest(platforms: #"[.iOS("26.5")]"#) + "\n" + tail
+
+        for mustDeclareIOS in [true, false] {
+            let findings = Self.findings(in: text, mustDeclareIOS: mustDeclareIOS)
+
+            #expect(findings.map(\.line) == [5], "\(tail)\n\(findings)")
+            #expect(findings.first?.reason.contains("regular expression") == true, "\(tail)\n\(findings)")
+        }
+    }
+
+    @Test("A carriage return ends a line comment, as it does for the compiler: the code after it is read, with its line")
+    func manifestCarriageReturnEndsALineComment() {
+        let hidden = Self.manifest(platforms: #"[.iOS("26.5")]"#) + "\n// note\rpackage.platforms = [.iOS(\"26.0\")]\n"
+
+        let findings = Self.findings(in: hidden)
+
+        #expect(findings.map(\.line) == [6], "\(findings)")
+        #expect(findings.first?.reason.contains("read or changed after its call") == true, "\(findings)")
+    }
+
+    @Test("A manifest with carriage returns, or carriage returns and line feeds, is read with the lines of the compiler", arguments: ["\r", "\r\n"])
+    func manifestLineEndingsAreRead(ending: String) {
+        let text = Self.manifest(platforms: #"[.macOS("26.0"), .iOS("26.0")]"#).replacingOccurrences(of: "\n", with: ending)
+
+        #expect(Self.findings(in: text).map(\.line) == [3], "\(text.debugDescription)")
+    }
+
+    @Test("A release written with an escape is found: the check does not evaluate escapes", arguments: [
+        #".iOS("26\u{2E}5")"#, #".iOS("\u{32}6.5")"#, #".iOS("26.5\n")"#, #".iOS("26\.5")"#,
+    ])
+    func manifestReleaseWithAnEscapeIsFound(platform: String) {
+        let findings = Self.findings(in: Self.manifest(platforms: "[\(platform)]"))
+
+        #expect(findings.count == 1 && findings[0].reason.contains("could hide any value"), "\(platform): \(findings)")
+    }
+
+    @Test("An argument of the Package call that is not written label: value is found: it is not read", arguments: [
+        "let package = Package(name: \"P\", platforms: [.iOS(\"26.5\")], #if DEBUG targets: [] #endif)",
+        "let package = Package(\"P\", platforms: [.iOS(\"26.5\")])",
+        "let package = Package(name: \"P\", platforms: [.iOS(\"26.5\")], extra)",
+        "let package = Package(name: \"P\", platforms: [.iOS(\"26.5\")], &targets)",
+    ])
+    func packageArgumentWithoutALabelIsFound(text: String) {
+        for mustDeclareIOS in [true, false] {
+            let findings = Self.findings(in: text, mustDeclareIOS: mustDeclareIOS)
+
+            #expect(findings.count == 1 && findings[0].reason.contains("argument of a Package call"), "\(text)\n\(findings)")
+        }
+    }
+
+    @Test("A condition among the arguments of the Package call is found, whichever branch has the platforms, in a product and in a tool")
+    func conditionInThePackageCallIsFound() {
+        let text = """
+        let package = Package(
+            name: "P",
+        #if os(Linux)
+            platforms: [.iOS("26.0")],
+        #else
+            platforms: [.iOS("26.5")],
+        #endif
+        )
+        """
+
+        for mustDeclareIOS in [true, false] {
+            let findings = Self.findings(in: text, mustDeclareIOS: mustDeclareIOS)
+
+            #expect(!findings.isEmpty, "mustDeclareIOS \(mustDeclareIOS)")
+            #expect(findings.contains { $0.reason.contains("argument of a Package call") }, "\(findings)")
+        }
+    }
+
+    @Test("A platform that is not one of SwiftPM's is found, whatever it is called: a manifest can add its own", arguments: [
+        #".macOS2("26.0")"#, #".android("26.0")"#, #".IOS("26.0")"#, #".ios("26.0")"#, #".iOSApp("26.0")"#,
+    ])
+    func manifestUnknownPlatformIsFound(platform: String) {
+        let text = Self.manifest(platforms: #"[.iOS("26.5"), \#(platform)]"#)
+
+        for mustDeclareIOS in [true, false] {
+            let findings = Self.findings(in: text, mustDeclareIOS: mustDeclareIOS)
+
+            #expect(findings.count == 1 && findings[0].reason.contains("not a platform the check knows"), "\(platform): \(findings)")
+        }
+    }
+
+    @Test("A custom platform is found: it can be named iOS")
+    func manifestCustomPlatformIsFound() {
+        let text = Self.manifest(platforms: #"[.iOS("26.5"), .custom("iOS", versionString: "26.0")]"#)
+
+        let findings = Self.findings(in: text)
+
+        #expect(findings.count == 1 && findings[0].reason.contains("custom platform"), "\(findings)")
+    }
+
+    @Test("The release of a platform other than iOS must be written out too: a string or a constant", arguments: [
+        ".macOS(minimum)", ".macOS(.v13 + 1)", ".tvOS()", ".watchOS(makeVersion())", ".macCatalyst(version: \"13.0\")", ".visionOS(1)",
+        ".macOS(\"13\\(minor)\")", ".driverKit(.v19, extra)",
+    ])
+    func manifestReleaseOfAnotherPlatformIsFound(platform: String) {
+        let text = Self.manifest(platforms: "[.iOS(\"26.5\"), \(platform)]")
+
+        for mustDeclareIOS in [true, false] {
+            let findings = Self.findings(in: text, mustDeclareIOS: mustDeclareIOS)
+
+            #expect(findings.count == 1 && findings[0].reason.contains("could hide any value"), "\(platform): \(findings)")
+        }
+    }
+
+    @Test("Every platform SwiftPM has, with a release written out, is read and is no finding", arguments: [
+        ".macOS(\"26.0\")", ".macOS(.v13)", ".macOS(.v10_15)", ".macCatalyst(.v13)", ".tvOS(\"17.0\")", ".watchOS(.v10)",
+        ".visionOS(.v1)", ".driverKit(.v19)", "SupportedPlatform.macOS(.v13)",
+    ])
+    func manifestKnownPlatformsAreNoFinding(platform: String) {
+        #expect(Self.findings(in: Self.manifest(platforms: "[.iOS(\"26.5\"), \(platform)]")).isEmpty, "\(platform)")
+    }
+
+    @Test("A manifest that adds to SupportedPlatform is found: the name of any platform could then mean any release", arguments: [
+        #"extension SupportedPlatform { static func tvOS(_ v: String) -> SupportedPlatform { .iOS("26.0") } }"#,
+        #"extension SupportedPlatform { static func macOS2(_ v: String) -> SupportedPlatform { .iOS("26.0") } }"#,
+        #"extension SupportedPlatform.IOSVersion { static let v26_5 = SupportedPlatform.IOSVersion(string: "26.0") }"#,
+        #"extension PackageDescription.SupportedPlatform { static var iOS26: SupportedPlatform { .iOS("26.0") } }"#,
+        #"extension  /* x */ SupportedPlatform { }"#,
+        #"typealias Version = SupportedPlatform.IOSVersion; extension Version { static let v26_5: Version = .v13 }"#,
+        #"struct SupportedPlatform { static func iOS(_ v: String) -> PackageDescription.SupportedPlatform { .iOS("26.0") } }"#,
+    ])
+    func manifestExtensionOfSupportedPlatformIsFound(declaration: String) {
+        let text = declaration + "\n" + Self.manifest(platforms: #"[.iOS("26.5"), .tvOS("26.0")]"#)
+
+        for mustDeclareIOS in [true, false] {
+            let findings = Self.findings(in: text, mustDeclareIOS: mustDeclareIOS)
+
+            #expect(findings.map(\.line) == [1], "\(declaration)\n\(findings)")
+            #expect(findings.first?.reason.contains("SupportedPlatform is extended") == true, "\(declaration)\n\(findings)")
+        }
+    }
+
+    @Test("Using SupportedPlatform without changing it is no finding: a type annotation, the explicit form of a platform")
+    func manifestUseOfSupportedPlatformIsNoFinding() {
+        let text = "let unused: SupportedPlatform = .tvOS(\"17.0\")\n"
+            + Self.manifest(platforms: #"[SupportedPlatform.iOS("26.5"), .macOS(.v14)]"#)
+
+        #expect(Self.findings(in: text).isEmpty)
+    }
+
+    @Test("A bracket that is never closed is found, wherever it is: what follows it could be read by the compiler in another way", arguments: [
+        "func f() {",
+        "let a = [",
+        "let b = (1 +",
+        "}",
+        "let c = [1, 2)",
+    ])
+    func manifestBracketThatIsNotClosedIsFound(tail: String) {
+        let text = Self.manifest(platforms: #"[.iOS("26.5")]"#) + "\n" + tail
+
+        let findings = Self.findings(in: text)
+
+        #expect(findings.count == 1 && findings[0].reason.contains("brackets"), "\(tail)\n\(findings)")
+        #expect(findings.first?.reason.contains("could hide any value") == true, "\(tail)\n\(findings)")
     }
 
     @Test("A manifest without a Package call, or that uses Package in another way, is found: its platforms cannot be read")

@@ -14,7 +14,8 @@ struct SwiftToken: Equatable {
     let kind: Kind
     /// An identifier, a number, or the one character of a punctuation mark; empty for a string.
     let text: String
-    /// What a string says, when it is on one line and holds nothing to evaluate: no escape, no interpolation.
+    /// What a string says, when it is on one line and holds nothing to evaluate: no escape. (A string with an
+    /// interpolation is never a token: the lexer fails on it.)
     let value: String?
     /// The line the token starts on, counted from 1.
     let line: Int
@@ -25,13 +26,22 @@ struct SwiftToken: Equatable {
 }
 
 /// Reads Swift source into tokens: it takes the comments away (block comments nest) and reads every string literal
-/// whole, raw (`#"…"#`), multiline (`"""`) and with interpolation (`\(…)`), so that a `//`, a bracket or `.iOS(` written
-/// in a comment or a string is never read as code.
+/// whole, plain, raw (`#"…"#`) and multiline (`"""`), so that a `//`, a bracket or `.iOS(` written in a comment or a
+/// string is never read as code.
 ///
-/// A source it cannot read to its end is a failure, not a partial result: a string or a comment that is not closed, an
-/// interpolation that is not closed, and a regular expression literal in the `#/…/#` form. A regular expression
-/// literal in the bare `/…/` form is not told from a division and is not read as one; no manifest of the repository
-/// writes one, and a quote in one would turn the rest of its line into a string that is not closed, which is a failure.
+/// It fails closed. A source it cannot read to its end, or in which it cannot tell code from text, is a failure and not
+/// a partial result, because the code it did not read could be anything:
+/// - a string, a quoted name or a comment that is not closed;
+/// - a string with an interpolation (`\(…)`, `\#(…)`, in a plain, raw or multiline string): the interpolation is code
+///   that runs, and it can change a package;
+/// - a slash outside a string and a comment: it can start a regular expression literal (`/…/`, `#/…/#`), which is
+///   told from a division only by the compiler, and which can hold a quote or a comment marker that hides the code that
+///   follows;
+/// - a line comment that holds a Unicode line separator (U+0085, U+2028, U+2029): a compiler is free to end the comment
+///   there, and the lexer does not guess.
+///
+/// A line ends at a line feed, a carriage return, or a carriage return and a line feed, as for the compiler; a line
+/// comment ends there. The lines it reports are counted the same way.
 enum SwiftLexer {
 
     struct Failure: Error, Equatable {
@@ -42,7 +52,7 @@ enum SwiftLexer {
     static func tokens(of source: String) -> Result<[SwiftToken], Failure> {
         var cursor = Cursor(scalars: Array(source.unicodeScalars))
         do {
-            return .success(try cursor.scan(insideInterpolation: false))
+            return .success(try cursor.scan())
         } catch let failure as Failure {
             return .failure(failure)
         } catch {
@@ -63,8 +73,9 @@ enum SwiftLexer {
             index + offset < scalars.count ? scalars[index + offset] : nil
         }
 
+        /// Moves on one scalar. A line feed is a line, and so is a carriage return that no line feed follows.
         mutating func advance() {
-            if scalars[index] == "\n" { line += 1 }
+            if scalars[index] == "\n" || (scalars[index] == "\r" && peek(1) != "\n") { line += 1 }
             index += 1
         }
 
@@ -76,18 +87,21 @@ enum SwiftLexer {
 
         // MARK: Scanning
 
-        /// The tokens up to the end of the source; or, inside an interpolation, up to the bracket that closes it.
-        mutating func scan(insideInterpolation: Bool) throws -> [SwiftToken] {
+        /// The tokens up to the end of the source.
+        mutating func scan() throws -> [SwiftToken] {
             var tokens: [SwiftToken] = []
-            var depth = 0
-            let interpolationLine = line
             while let scalar = peek() {
                 if scalar.properties.isWhitespace {
                     advance()
                 } else if has("//") {
-                    while let next = peek(), next != "\n" { advance() }
+                    try skipLineComment()
                 } else if has("/*") {
                     try skipBlockComment()
+                } else if scalar == "/" {
+                    throw Failure(
+                        line: line,
+                        what: "a slash outside a string and a comment, which could start a regular expression literal that is not read"
+                    )
                 } else if scalar == "\"" || scalar == "#" {
                     if let token = try scanStringOrDirective() { tokens.append(token) } else {
                         tokens.append(SwiftToken(kind: .punctuation, text: "#", value: nil, line: line))
@@ -100,17 +114,23 @@ enum SwiftLexer {
                 } else if SwiftLexer.isDigit(scalar) {
                     tokens.append(scanNumber())
                 } else {
-                    if insideInterpolation {
-                        if scalar == ")" && depth == 0 { advance(); return tokens }
-                        if scalar == "(" { depth += 1 }
-                        if scalar == ")" { depth -= 1 }
-                    }
                     tokens.append(SwiftToken(kind: .punctuation, text: String(scalar), value: nil, line: line))
                     advance()
                 }
             }
-            if insideInterpolation { throw Failure(line: interpolationLine, what: "an interpolation is not closed") }
             return tokens
+        }
+
+        /// A line comment, up to the end of its line. One that holds a Unicode line separator is a failure: where the
+        /// comment ends is then a question of the compiler, and a guess could read as code what the compiler skips, or
+        /// skip as a comment what the compiler runs.
+        private mutating func skipLineComment() throws {
+            while let next = peek(), next != "\n", next != "\r" {
+                if next == "\u{0085}" || next == "\u{2028}" || next == "\u{2029}" {
+                    throw Failure(line: line, what: "a comment holds a line separator, where a compiler may end it")
+                }
+                advance()
+            }
         }
 
         private mutating func skipBlockComment() throws {
@@ -157,15 +177,15 @@ enum SwiftLexer {
                 }
                 if scalar == "\\" && (0..<hashes).allSatisfy({ peek(1 + $0) == "#" }) {
                     plain = false
+                    let backslash = line
                     advance()
                     for _ in 0..<hashes { advance() }
                     if peek() == "(" {
-                        advance()
-                        _ = try scan(insideInterpolation: true)
+                        throw Failure(line: backslash, what: "a string holds an interpolation, which is code that is not read")
                     } else if peek() != nil {
                         advance()
                     }
-                } else if scalar == "\n" && !multiline {
+                } else if (scalar == "\n" || scalar == "\r") && !multiline {
                     throw Failure(line: start, what: "a string is not closed")
                 } else {
                     content.append(scalar)
@@ -185,7 +205,7 @@ enum SwiftLexer {
             let start = line
             advance()
             var name = ""
-            while let scalar = peek(), scalar != "`", scalar != "\n" {
+            while let scalar = peek(), scalar != "`", scalar != "\n", scalar != "\r" {
                 name.unicodeScalars.append(scalar)
                 advance()
             }
