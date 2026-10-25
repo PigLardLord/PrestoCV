@@ -23,26 +23,19 @@ struct AdaptiveStack<Content: View>: View {
 
 struct ExperienceRowView: View {
     @Binding var experience: Experience
-    let onDelete: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-            // Title and Delete button
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                    GrowingTextField("field.job_title".localized, text: $experience.title)
-                        .firstFieldOfRow()
-                        .font(.headline)
-                        .foregroundColor(DesignTokens.Colors.primary)
-                    
-                    GrowingTextField("field.company".localized, text: $experience.company)
-                        .font(.subheadline)
-                        .foregroundColor(DesignTokens.Colors.secondary)
-                }
+            // Title and company
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                GrowingTextField("field.job_title".localized, text: $experience.title)
+                    .firstFieldOfRow()
+                    .font(.headline)
+                    .foregroundColor(DesignTokens.Colors.primary)
                 
-                Spacer()
-                
-                DeleteButton(label: experience.displayName, action: onDelete)
+                GrowingTextField("field.company".localized, text: $experience.company)
+                    .font(.subheadline)
+                    .foregroundColor(DesignTokens.Colors.secondary)
             }
             
             // Location and Period
@@ -90,17 +83,12 @@ struct RowDescriptionEditor: View {
 
 struct SkillRowView: View {
     @Binding var skill: Skill
-    let onDelete: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-            HStack {
-                GrowingTextField("field.skill".localized, text: $skill.name)
-                    .firstFieldOfRow()
-                    .font(DesignTokens.Typography.subheadline.font)
-                Spacer()
-                DeleteButton(label: skill.displayName, action: onDelete)
-            }
+            GrowingTextField("field.skill".localized, text: $skill.name)
+                .firstFieldOfRow()
+                .font(DesignTokens.Typography.subheadline.font)
             
             SkillLevelView(level: skill.level, maxLevel: Skill.maxLevel) { star in
                 skill.chooseLevel(star)
@@ -112,30 +100,23 @@ struct SkillRowView: View {
 
 struct EducationRowView: View {
     @Binding var education: Education
-    let onDelete: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-            // Degree and Delete button
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-                    GrowingTextField("field.degree".localized, text: $education.degree)
-                        .firstFieldOfRow()
-                        .font(.headline)
-                        .foregroundColor(DesignTokens.Colors.primary)
-                    
-                    GrowingTextField("field.school".localized, text: $education.school)
-                        .font(.subheadline)
-                        .foregroundColor(DesignTokens.Colors.secondary)
-                    
-                    GrowingTextField("field.period".localized, text: $education.period)
-                        .font(.caption)
-                        .foregroundColor(DesignTokens.Colors.tertiary)
-                }
+            // Degree, school and period
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
+                GrowingTextField("field.degree".localized, text: $education.degree)
+                    .firstFieldOfRow()
+                    .font(.headline)
+                    .foregroundColor(DesignTokens.Colors.primary)
                 
-                Spacer()
+                GrowingTextField("field.school".localized, text: $education.school)
+                    .font(.subheadline)
+                    .foregroundColor(DesignTokens.Colors.secondary)
                 
-                DeleteButton(label: education.displayName, action: onDelete)
+                GrowingTextField("field.period".localized, text: $education.period)
+                    .font(.caption)
+                    .foregroundColor(DesignTokens.Colors.tertiary)
             }
             
             RowDescriptionEditor(text: $education.description)
@@ -146,19 +127,12 @@ struct EducationRowView: View {
 
 struct LanguageRowView: View {
     @Binding var language: Language
-    let onDelete: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-            HStack {
-                GrowingTextField("field.language".localized, text: $language.name)
-                    .firstFieldOfRow()
-                    .font(DesignTokens.Typography.body.font)
-                
-                Spacer()
-                
-                DeleteButton(label: language.displayName, action: onDelete)
-            }
+            GrowingTextField("field.language".localized, text: $language.name)
+                .firstFieldOfRow()
+                .font(DesignTokens.Typography.body.font)
             
             // The picker names itself: one "Level" label, not a second one beside it. Every level fits beside the
             // chevrons of the menu without breaking a word, so the rows of all languages share one size.
@@ -183,18 +157,13 @@ struct LanguageRowView: View {
 
 struct CertificationRowView: View {
     @Binding var certification: Certification
-    let onDelete: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-            HStack {
-                GrowingTextField("field.certification_name".localized, text: $certification.name)
-                    .firstFieldOfRow()
-                    .font(DesignTokens.Typography.subheadline.font)
-                    .fontWeight(.semibold)
-                Spacer()
-                DeleteButton(label: certification.displayName, action: onDelete)
-            }
+            GrowingTextField("field.certification_name".localized, text: $certification.name)
+                .firstFieldOfRow()
+                .font(DesignTokens.Typography.subheadline.font)
+                .fontWeight(.semibold)
             
             GrowingTextField("field.issuer".localized, text: $certification.issuer)
                 .font(DesignTokens.Typography.body.font)
@@ -238,25 +207,20 @@ struct CertificationRowView: View {
 
 struct SocialLinkRowView: View {
     @Binding var social: Social
-    let onDelete: () -> Void
     
     var body: some View {
-        HStack(spacing: DesignTokens.Spacing.md) {
-            AdaptiveStack(spacing: DesignTokens.Spacing.md) { isStacked in
-                GrowingTextField("field.platform".localized, text: $social.platform)
-                    .firstFieldOfRow()
-                    .font(DesignTokens.Typography.body.font)
-                    .frame(maxWidth: isStacked ? .infinity : DesignTokens.InputSize.textFieldMaxWidth, alignment: .leading)
-                
-                GrowingTextField("field.url".localized, text: $social.url)
-                    .textContentType(.URL)
-                    .keyboardType(.URL)
-                    .font(DesignTokens.Typography.callout.font)
-                    .foregroundColor(DesignTokens.Colors.accent)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+        AdaptiveStack(spacing: DesignTokens.Spacing.md) { isStacked in
+            GrowingTextField("field.platform".localized, text: $social.platform)
+                .firstFieldOfRow()
+                .font(DesignTokens.Typography.body.font)
+                .frame(maxWidth: isStacked ? .infinity : DesignTokens.InputSize.textFieldMaxWidth, alignment: .leading)
             
-            DeleteButton(label: social.displayName, action: onDelete)
+            GrowingTextField("field.url".localized, text: $social.url)
+                .textContentType(.URL)
+                .keyboardType(.URL)
+                .font(DesignTokens.Typography.callout.font)
+                .foregroundColor(DesignTokens.Colors.accent)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, DesignTokens.Spacing.xs)
     }
@@ -264,53 +228,16 @@ struct SocialLinkRowView: View {
 
 struct InterestRowView: View {
     @Binding var interest: String
-    let onDelete: () -> Void
     
     var body: some View {
-        HStack {
-            GrowingTextField("field.interest".localized, text: $interest)
-                .firstFieldOfRow()
-                .font(DesignTokens.Typography.body.font)
-            
-            Spacer()
-            
-            DeleteButton(label: InterestEntry(text: interest).displayName, action: onDelete)
-        }
-        .padding(.vertical, DesignTokens.Spacing.xs)
+        GrowingTextField("field.interest".localized, text: $interest)
+            .firstFieldOfRow()
+            .font(DesignTokens.Typography.body.font)
+            .padding(.vertical, DesignTokens.Spacing.xs)
     }
 }
 
 // MARK: - Helper Components
-
-/// The trash button of a row. Borderless, so that a tap on the rest of the row never reaches it, and
-/// large enough to be hit without hitting a neighbour.
-struct DeleteButton: View {
-    /// What the button deletes, for VoiceOver.
-    let label: String
-    let action: () -> Void
-    @Environment(\.rowDeletionAnchor) private var deletionAnchor
-    @State private var frames = ScreenFrames<String>()
-    private let frameKey = "trash"
-    
-    var body: some View {
-        Button {
-            deletionAnchor.rect = frames.rect(for: frameKey)
-            action()
-        } label: {
-            Image(systemName: "trash")
-                .font(DesignTokens.IconSize.small.font)
-                .foregroundColor(DesignTokens.Colors.error)
-                .frame(
-                    width: DesignTokens.InputSize.minimumTapTarget,
-                    height: DesignTokens.InputSize.minimumTapTarget
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.borderless)
-        .trackingScreenFrame(of: frameKey, in: frames)
-        .accessibilityLabel("accessibility.delete_row".localizedWithArgs(label))
-    }
-}
 
 struct CVEmptyStateView: View {
     let icon: String

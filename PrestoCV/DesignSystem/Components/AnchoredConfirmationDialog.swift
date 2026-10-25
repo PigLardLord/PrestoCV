@@ -63,7 +63,7 @@ extension View {
 
 // MARK: - Row Deletion Anchor
 
-/// Where the trash button that asked to delete a row is on the screen, so that the confirmation can point at it.
+/// Where the row whose delete button was swiped open is on the screen, so that the confirmation can point at it.
 final class RowDeletionAnchor {
     var rect: CGRect?
 }

@@ -99,11 +99,14 @@ struct CVEditorView: View {
         }
         .environment(\.rowDeletionAnchor, deletionAnchor)
         .anchoredConfirmationDialog(
-            "editor.delete_row.title".localized,
+            // The question names the kind of row, and the editor keeps it while the dialog closes
+            viewModel.deletionTitle,
             isPresented: isShowingDeleteConfirmation,
             titleVisibility: .visible,
             presenting: viewModel.pendingDeletion,
-            anchoredTo: deletionAnchor.rect
+            anchoredTo: deletionAnchor.rect,
+            // The row has slid sideways under the swipe: the dialog points at the row, not at its button
+            spanningWidth: true
         ) { deletion in
             Button("common.delete".localized, role: .destructive) {
                 withAnimation(DesignTokens.Animations.standardEaseInOut) {
@@ -112,7 +115,7 @@ struct CVEditorView: View {
             }
             Button("common.cancel".localized, role: .cancel) { }
         } message: { deletion in
-            Text("editor.delete_row.message".localizedWithArgs(deletion.rowName))
+            Text(deletion.message)
         }
         .sheet(isPresented: $showingExportSheet) {
             CVExportSheetView(viewModel: makeExportSheet(viewModel))
