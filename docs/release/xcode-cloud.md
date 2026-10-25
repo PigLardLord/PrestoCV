@@ -28,7 +28,7 @@ So a test in a plan finds its files in a bundle, never through `#filePath` ([R16
 | The example CVs and the other resources the app ships | The app bundle, through `Bundle(for:)` with a class of the app |
 | A package's test resources, such as the markup contract page of `CVDesignCatalogTests` and the golden files of `CVRenderingTests` | `Bundle.module`, declared in the package's manifest |
 | A document an app test compares with the app: `docs/design/app-icon.md` | The test bundle; the project copies it into `PrestoCVTests` |
-| The string catalog's source, the Swift sources, the project file and the privacy manifest | Nowhere in a plan. `Tools/SourceChecks` checks them, on the build host and on the Linux job |
+| The string catalog's source, the Swift sources, the project file, the package manifests and the privacy manifest | Nowhere in a plan. `Tools/SourceChecks` checks them, on the build host and on the Linux job |
 
 A test that read the source tree passed on a Mac, next to the sources, and failed on Xcode Cloud: that was #246. The architecture checker refuses `#filePath` and `#file` in every target that a plan runs, and a plan target without R16.
 
