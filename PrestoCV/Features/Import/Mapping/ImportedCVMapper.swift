@@ -87,6 +87,7 @@ struct ImportedCVMapper {
             switch item.reason {
             case .nameByPosition, .titleByPosition, .locationByPosition, .summaryWithoutHeading: reason = .byPosition
             case .roleOrEmployerByOrder: reason = .partsByOrder
+            case .entryBoundsUnsure: reason = .entryBounds
             case .periodUnreadable, .periodOpenEnd: reason = .period
             case .levelNotCEFR: reason = .languageNotAdded
             case .levelsDiffer: reason = .languageLevels

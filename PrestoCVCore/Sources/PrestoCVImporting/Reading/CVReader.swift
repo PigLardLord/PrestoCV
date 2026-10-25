@@ -2,26 +2,41 @@
 /// stays visible as text not imported, and the final gate checks every value against its spans.
 enum CVReader {
 
-    static func read(_ document: SourceDocument, leftOut: [LeftOutText]) -> ImportResult {
-        var findings = Findings(document: document)
+    /// - Throws: `CancellationError` once the task is cancelled; `ImportError.tooLarge` when the reading passes the
+    ///   budget of `work`.
+    static func read(_ document: SourceDocument, leftOut: [LeftOutText], work: AnalysisWork) throws -> ImportResult {
+        let (findings, sections) = try readSections(document, leftOut: leftOut, work: work)
+        let result = ImportResult(
+            document: document, cv: findings.cv, language: SectionSegmenter.language(of: sections, in: document),
+            unplaced: findings.unplaced.sorted { $0.span < $1.span }, leftOut: findings.leftOut
+        )
+        return Remainder.swept(ImportGrounding.enforced(result), sections: sections)
+    }
+
+    /// What the readers found in each section, before anything is checked.
+    static func readSections(
+        _ document: SourceDocument, leftOut: [LeftOutText], work: AnalysisWork
+    ) throws -> (findings: Findings, sections: [Section]) {
+        var findings = Findings(document: document, work: work)
         findings.leftOut = leftOut
         NoiseReader.read(into: &findings)
-        let sections = SectionSegmenter.sections(of: document)
+        let sections = try SectionSegmenter.sections(of: document, work: &findings.work)
 
         HeaderReader.read(
-            sections.filter { $0.kind == .header || $0.kind == .personal },
+            sections.filter { $0.kind == .header || $0.kind == .personal }, headingsThatCouldBeTheName: sections.filter(\.headingCouldBeTheName),
             hasSummarySection: sections.contains { $0.kind == .summary }, into: &findings
         )
         for section in sections {
+            try Task.checkCancellation()
             switch section.kind {
             case .header, .personal:
                 break
             case .summary:
                 readSummary(section, into: &findings)
             case .experience:
-                EntryReader.read(section, kind: .experience, into: &findings)
+                try EntryReader.read(section, kind: .experience, into: &findings)
             case .education:
-                EntryReader.read(section, kind: .education, into: &findings)
+                try EntryReader.read(section, kind: .education, into: &findings)
             case .skills:
                 ListReader.readSkills(section, into: &findings)
             case .interests:
@@ -37,11 +52,7 @@ enum CVReader {
                 }
             }
         }
-        let result = ImportResult(
-            document: document, cv: findings.cv, language: SectionSegmenter.language(of: sections, in: document),
-            unplaced: findings.unplaced.sorted { $0.span < $1.span }, leftOut: findings.leftOut
-        )
-        return ImportGrounding.enforced(result)
+        return (findings, sections)
     }
 
     /// The summary: the lines of its section, in order.

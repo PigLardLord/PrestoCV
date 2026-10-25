@@ -1,0 +1,11 @@
+{
+ "id": "traps/competenze-bracket-it", "language": "it", "form": "trap",
+ "person": {"name": "Marta Ferri", "title": "Elettricista", "email": "marta.ferri@example.net", "phone": "+39 333 000 0606",
+            "location": "Torino", "links": [], "summary": null},
+ "experience": [
+  {"role": "Elettricista", "employer": "Impianti Esempio S.r.l.", "location": "Torino", "start": [2019, 9], "end": "current", "details": 1}
+ ],
+ "education": [{"degree": "Laurea in Ingegneria elettrica", "school": "Università di Torino", "start": [2012, null], "end": [2015, null]}],
+ "skills": ["Cablaggio", "Diagnostica", "Lettura di schemi", "Precisione", "Lavoro di squadra"],
+ "languages": [], "certifications": [], "interests": []
+}

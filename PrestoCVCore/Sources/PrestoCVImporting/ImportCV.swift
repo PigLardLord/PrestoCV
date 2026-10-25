@@ -76,14 +76,15 @@ public struct ImportCV: Sendable {
         self.limits = limits
     }
 
-    /// Imports a pasted text.
-    public func importText(_ text: String) throws(ImportError) -> ImportResult {
-        guard text.unicodeScalars.count <= limits.maximumCharacters else { throw .tooLarge }
-        guard text.contains(where: { $0.isLetter }) else { throw .empty }
+    /// Imports a pasted text. Reading it is bounded by the same steps as a PDF's (`ImportLimits`). Lets
+    /// `CancellationError` through; every other failure is an `ImportError`.
+    public func importText(_ text: String) throws -> ImportResult {
+        guard text.unicodeScalars.count <= limits.maximumCharacters else { throw ImportError.tooLarge }
+        guard text.contains(where: { $0.isLetter }) else { throw ImportError.empty }
         let lines = PlainTextReader.lines(of: text).map { RawLine(text: $0) }
         let (document, leftOut) = DocumentBuilder.build(lines: lines, format: .pastedText)
-        guard !document.blocks.isEmpty else { throw .empty }
-        return CVReader.read(document, leftOut: leftOut)
+        guard !document.blocks.isEmpty else { throw ImportError.empty }
+        return try CVReader.read(document, leftOut: leftOut, work: AnalysisWork(budget: limits.maximumAnalysisSteps))
     }
 
     /// Imports a PDF's text. Lets `CancellationError` through; every other failure is an `ImportError`.
@@ -121,6 +122,6 @@ public struct ImportCV: Sendable {
         let (document, leftOut) = DocumentBuilder.build(lines: analysis.lines, format: .pdf)
         guard !document.blocks.isEmpty else { throw ImportError.noText }
         try Task.checkCancellation()
-        return CVReader.read(document, leftOut: analysis.leftOut + leftOut)
+        return try CVReader.read(document, leftOut: analysis.leftOut + leftOut, work: work)
     }
 }

@@ -10,6 +10,7 @@ Each invented person of people.py is written in several forms, and each form lis
 and, as PDFs with the words and boxes a PDF reader sees (`*.layout.json`):
   linkedin  LinkedIn's "Save to PDF": a sidebar, English headings, computed durations (one person per language);
   wordpdf   a one-column CV exported from a word processor (the other person per language);
+  railpdf   a CV whose headings stand right-aligned in a narrow column beside their sections (the other person too);
   lebenslaufpdf, europasspdf, and a scan without a text layer.
 
 Run it from the repository's root: python3 Tools/ImportFixtures/generate.py. The output is committed and reviewed like
@@ -483,6 +484,72 @@ def wordpdf(p):
     return layout, exp
 
 
+def railpdf(p):
+    """A CV whose section headings stand bold and right-aligned in a narrow column on the left, each beside the first line
+    of its section, ten points off the heading's right edge: the layout of a LaTeX CV's section titles and of many
+    templates (#287). The gap is narrower than the one between two cells of a table."""
+    lang, L = p["lang"], LANGUAGES[p["lang"]]
+    h = L["latex"]
+    layout = Layout()
+    left, edge, body, right, bottom = 40, 180, 190, 555, 770
+    width = right - body
+    y = 56
+    page = 0
+    pending = None
+
+    def line(text, size=9.3, bold=False, gap=0, indent=0, bullet=False, full=False):
+        """A line of a section, wrapped to its column; the heading waiting for a line is drawn beside the first."""
+        nonlocal y, page, pending
+        y += gap
+        column = right - left if full else width - indent - (12 if bullet else 0)
+        for index, part in enumerate(wrap(text, column, size, bold)):
+            if y > bottom:
+                layout.new_page()
+                page += 1
+                y = 56
+            if pending and index == 0:
+                assert text_width(pending, 9.5, True) <= edge - left, pending
+                layout.run(edge - text_width(pending, 9.5, True), y, pending, 9.5, True, page=page)
+                pending = None
+            if bullet and index == 0:
+                layout.run(body + indent, y, "\u2022", size, bold, page=page)
+            layout.run(left if full else body + indent + (12 if bullet else 0), y, part, size, bold, page=page)
+            y += size * 1.35
+
+    def section(heading, gap=14):
+        nonlocal y, pending
+        y += gap
+        pending = heading
+
+    line(f"{p['first']} {p['last']}", 22, True, full=True)
+    line(p["title"], 12, gap=2, full=True)
+    line(f"{p['address']} \u00b7 {p['phone']} \u00b7 {p['email']}", 9, gap=2, full=True)
+    section(h["profile"], 18)
+    line(p["summary"])
+    section(h["experience"])
+    for index, e in enumerate(p["experience"]):
+        line(e["role"], 11.5, True, gap=6 if index else 0)
+        line(f"{e['employer']}, {e['city']}", 9.5, True)
+        line(period_text(lang, e["start"], e["end"], "month", capital=True), 9)
+        for bullet in e["bullets"]:
+            line(bullet, bullet=True, indent=6)
+    section(h["education"])
+    for index, e in enumerate(p["education"]):
+        line(f"{period_text(lang, e['start'], e['end'], 'month')}: {e['degree']}, {e['school']}", gap=4 if index else 0)
+    section(h["skills"])
+    line(", ".join(p["skills"]))
+    section(h["languages"])
+    for name, level in p["languages"]:
+        line(f"{name} \u2013 {level_text(lang, level, 'word')}")
+    section(h["certifications"])
+    for n, i, yr in p["certifications"]:
+        line(f"{n}, {i}, {yr}")
+    section(h["interests"])
+    line(", ".join(p["interests"]))
+    exp = expected(p, "railpdf", location=p["address"], links=[])
+    return layout, exp
+
+
 def lebenslaufpdf(p):
     """The German tabular Lebenslauf as a PDF: labels and dates in the left column, the rest on the right."""
     lang = p["lang"]
@@ -706,6 +773,8 @@ def main():
         else:
             layout, exp = wordpdf(p)
             save(index, folder, "wordpdf", "layout", layout, exp)
+            layout, exp = railpdf(p)
+            save(index, folder, "railpdf", "layout", layout, exp)
         if p["id"] == "de-lena":
             layout, exp = lebenslaufpdf(p)
             save(index, folder, "lebenslaufpdf", "layout", layout, exp)

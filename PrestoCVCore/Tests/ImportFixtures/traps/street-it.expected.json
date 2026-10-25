@@ -1,0 +1,10 @@
+{
+ "id": "traps/street-it", "language": "it", "form": "trap",
+ "person": {"name": "Marta Ferri", "title": "Infermiera", "email": "marta.ferri@example.com", "phone": "3330000505",
+            "location": "Via Esempio 12, 20100 Milano", "links": [], "summary": null},
+ "experience": [
+  {"role": "Infermiera", "employer": "Ospedale Esempio", "location": null, "start": [2019, 3], "end": "current", "details": 1}
+ ],
+ "education": [{"degree": "Laurea in Infermieristica", "school": "Università Esempio", "start": [2013, null], "end": [2016, null]}],
+ "skills": [], "languages": [], "certifications": [], "interests": []
+}

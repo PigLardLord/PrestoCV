@@ -34,16 +34,21 @@ public enum ReadingRule: String, Hashable, Sendable {
 
 /// Why a value of an import should be checked by the person.
 public enum CheckReason: String, Hashable, Sendable {
-    /// The name was taken from its place at the top, with no label or mark that says it is the name.
+    /// The name was taken from its place at the top, with no label or mark that says it is the name, or a heading that
+    /// closed the head could have been it.
     case nameByPosition
     /// The professional title was taken from its place under the name.
     case titleByPosition
-    /// The place was taken from its place among the contacts, with no label.
+    /// The place was taken from its place among the contacts, with no label; or an entry's place was kept whole, as no
+    /// rule told where it starts.
     case locationByPosition
     /// The summary was taken from prose at the top, under no heading.
     case summaryWithoutHeading
     /// Nothing told the role from the employer: the CV's own order did.
     case roleOrEmployerByOrder
+    /// Nothing in the section told whether the lines next to the entry's dates are its own or the entry's beside it:
+    /// the more common layout decided.
+    case entryBoundsUnsure
     /// A date the rules could not make a period of, such as an end before the start.
     case periodUnreadable
     /// A period without an end: "2019 –".
@@ -115,7 +120,8 @@ public struct ImportedLanguage: Hashable, Sendable {
     public var name: Sourced<String>
     /// Only a CEFR level, or a native language, that the text states.
     public var level: Sourced<LanguageProficiency>?
-    /// The words that give a level the rules do not read as CEFR: "fluent", "buono", "Professional working".
+    /// The words that give a level the rules do not read as CEFR: "fluent", "buono", "Professional working". Only
+    /// when the language has no level: words beside a level are text not imported.
     public var levelWords: Sourced<String>?
 }
 
@@ -134,4 +140,47 @@ public struct UnplacedText: Hashable, Sendable {
     public let heading: String?
     public let text: String
     public let span: SourceSpan
+}
+
+extension ImportedCV {
+    /// The spans of every value of the CV. A new field of the CV joins this list: a test compares it with the spans
+    /// found by walking the CV.
+    var sourceSpans: [SourceSpan] {
+        var spans: [SourceSpan] = []
+        func add<Value>(_ value: Sourced<Value>?) { spans += value?.spans ?? [] }
+        add(person.name)
+        add(person.title)
+        add(person.email)
+        add(person.phone)
+        add(person.location)
+        add(person.summary)
+        for link in person.links { add(link.address) }
+        for entry in experience {
+            add(entry.role)
+            add(entry.employer)
+            add(entry.location)
+            add(entry.period)
+            entry.details.forEach { add($0) }
+        }
+        for entry in education {
+            add(entry.degree)
+            add(entry.school)
+            add(entry.location)
+            add(entry.period)
+            entry.details.forEach { add($0) }
+        }
+        skills.forEach { add($0) }
+        for language in languages {
+            add(language.name)
+            add(language.level)
+            add(language.levelWords)
+        }
+        for certification in certifications {
+            add(certification.name)
+            add(certification.issuer)
+            add(certification.year)
+        }
+        interests.forEach { add($0) }
+        return spans
+    }
 }
