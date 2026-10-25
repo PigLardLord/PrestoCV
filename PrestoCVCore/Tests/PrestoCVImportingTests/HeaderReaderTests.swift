@@ -505,6 +505,24 @@ struct HeaderReaderTests {
         #expect(labelled.cv.person.name?.check == nil)
     }
 
+    @Test("Before a profile's heading, after a section of contacts or of skills, a heading of the first level in the shape of a name is a section's, not the place (#301)")
+    func headingBeforeAProfile() throws {
+        let importer = ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard)
+        for between in ["## Contact\nperson@example.com", "person@example.com\n\n## Skills\nSwift"] {
+            let result = try importer.importText(
+                "Anna Weber\n\(between)\n\n# University Projects\nBuilt a scheduling application\n\n## Experience\n2019 - 2021 Nurse, Northgate Hospital"
+            )
+            let person = result.cv.person
+            #expect(person.name?.value == "Anna Weber" && person.name?.check == .nameByPosition, "\(between)")
+            #expect(person.title == nil && person.location == nil, "\(between)")
+            #expect(result.unplaced.map(\.text) == ["Built a scheduling application"], "\(between)")
+            #expect(result.unplaced.first?.heading == "University Projects", "\(between)")
+            let bare = try importer.importText("Anna Weber\n\(between)\n\n# University Projects\n\n## Experience\n2019 - 2021 Nurse, Northgate Hospital")
+            #expect(bare.cv.person.location == nil, "\(between)")
+            #expect(bare.unplaced.map(\.text) == ["University Projects"], "\(between)")
+        }
+    }
+
     @Test("A heading of the first level under a line in the shape of a name is no mark of the name: the first line keeps its evidence", arguments: [
         "Anna Weber", "Thomas Kiel",
     ])

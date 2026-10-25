@@ -109,6 +109,22 @@ struct SectionSegmenterTests {
         }
     }
 
+    @Test("Before a profile's heading too, a heading of the first level in the shape of a name is a section's when the head holds a name and its contacts before it (#301)")
+    func headingBeforeAProfile() {
+        for between in ["## Contact\nperson@example.com", "person@example.com\n\n## Skills\nSwift"] {
+            for lines in ["\nBuilt a scheduling application", ""] {
+                let (_, cut) = pasted("Anna Weber\n\(between)\n\n# University Projects\(lines)\n\n## Experience\n2019 - 2021 Nurse")
+                #expect(cut.dropFirst(2).map(\.kind) == [.unknown, .experience], "\(between) / \(lines)")
+                #expect(cut.map(\.headingCouldBeTheName) == [false, false, true, false], "\(between) / \(lines)")
+                #expect(cut.count == 4 && cut[2].blocks.count == (lines.isEmpty ? 0 : 1), "\(between) / \(lines)")
+            }
+        }
+        // The sidebar of a profile, the name after it: its head holds no name before the contacts
+        let (_, profile) = pasted("## Contact\nperson@example.com\n\n## Top Skills\nSwift\n\n# Anna Weber\nSenior Nurse\n\n## Summary\nCaring nurse with ten years on busy wards.")
+        #expect(profile.map(\.kind) == [.personal, .skills, .header, .summary])
+        #expect(profile.allSatisfy { !$0.headingCouldBeTheName })
+    }
+
     @Test("A name in a heading after the contacts stays in the head when nothing before them has the shape of a name (#301)")
     func nameHeadingAfterNoName() {
         // A piece after a contact of its line holds the place, a line of known places alone is a place, and a name with no

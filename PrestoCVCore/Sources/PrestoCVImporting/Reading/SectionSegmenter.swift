@@ -39,10 +39,17 @@ enum SectionSegmenter {
             }
             let firstCell = document.text(ofCell: 0, in: block)
             // LinkedIn's PDF copied as text gives its sidebar first: the profile starts at the name, a few lines before
-            // its summary or experience. The name is told by its shape, whatever its words: the head weighs it (#301)
+            // its summary or experience. The name is told by its shape, whatever its words: the head weighs it (#301).
+            // A heading of the first level, after a name of the head that its contacts follow, opens a section instead,
+            // as in the head ("Anna Weber / ## Contact / person@example.com / # University Projects / ## Experience")
             if sidebarKinds.contains(sections[sections.count - 1].kind), block.cells.count == 1, HeaderReader.hasNameShape(firstCell),
                startsProfile(after: position, in: document) {
-                sections.append(Section(kind: .header, heading: nil, blocks: [block], languages: []))
+                if case .heading(1) = block.kind,
+                   HeaderReader.holdsNameBeforeContacts(sections.filter { headKinds.contains($0.kind) }.flatMap(\.blocks).filter { $0.column == block.column }, in: document) {
+                    sections.append(Section(kind: .unknown, heading: block, blocks: [], languages: [], headingCouldBeTheName: true))
+                } else {
+                    sections.append(Section(kind: .header, heading: nil, blocks: [block], languages: []))
+                }
                 continue
             }
             if SectionVocabulary.isLanguageLabel(firstCell) {
