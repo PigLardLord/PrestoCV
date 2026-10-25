@@ -145,3 +145,5 @@ mv PrestoCV.away PrestoCV
 ```
 
 Here the checkout is `PrestoCV`; use the name of yours.
+
+Throwaway line, never merged: it makes a docs-only pull request to try the merge rule of #337.
