@@ -92,8 +92,9 @@ are its planned replacement and are still empty.
 - **Language data.** The verbs of English and German are read from the device's lexical class (`LexicalTagger`, the
   device's `DeviceLexicalTagger` in the app), which the device has once it has downloaded the language's data. Without
   it, `generateCV` throws `languageDataUnavailable` with the language, before the model runs, and the sanitiser throws it
-  too: such a description is never grounded another way. The app asks the system for the data and tells the person to try
-  again in a moment.
+  too: such a description is never grounded another way. The app asks the system for the data and waits for it for 60
+  seconds at most, with the screen saying so; when the data comes it generates once more, and when it does not it tells
+  the person the other ways to write the CV.
 
 ## Layout
 
