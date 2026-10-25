@@ -302,26 +302,63 @@ enum DeploymentTargets {
     /// version instead of `Package.swift`.
     private static let manifestName = try! NSRegularExpression(pattern: #"^Package(@swift-\d+(\.\d+){0,2})?\.swift$"#)
 
+    /// Why the scan could not tell what a folder holds. It fails rather than skips the folder: a manifest below it could
+    /// declare any release.
+    struct ScanFailure: Error, CustomStringConvertible {
+        let path: String
+        let reason: String
+        var description: String { "\(path) \(reason), so the manifests below it could hide any value" }
+    }
+
     /// The package manifests the check reads, with whether each must declare an iOS platform.
     ///
     /// The validation prototype is left out: nothing builds it and nothing of it ships (the architecture checker maps it
-    /// as excluded).
-    static func manifests(under root: URL) -> [(path: String, mustDeclareIOS: Bool)] {
+    /// as excluded). So are the hidden folders, `.build`, `DerivedData` and `node_modules`, which hold no package of the
+    /// app.
+    ///
+    /// Every other folder is read, or the scan fails with a `ScanFailure`: a folder that cannot be listed, an entry
+    /// that cannot be inspected, a root that is not there, and a link to a folder, which is not followed. None of
+    /// these is skipped, as the manifest it hides could declare any release. A link to a file is read as the file.
+    static func manifests(under root: URL) throws -> [(path: String, mustDeclareIOS: Bool)] {
         let skipped: Set<String> = [".build", "DerivedData", "node_modules"]
-        // The walk starts from the folder itself, as a link to it is not followed, and the paths are the ones the walk
-        // reports from there: they are never cut out of an absolute path, which a Mac writes two ways (/var, /private/var).
-        let base = root.resolvingSymlinksInPath()
-        guard let walk = FileManager.default.enumerator(atPath: base.path) else { return [] }
+        let files = FileManager.default
+        // The walk starts from the resolved folder and keeps the relative paths it builds itself: they are never cut out
+        // of an absolute path, which a Mac writes two ways (/var, /private/var).
+        let base = root.resolvingSymlinksInPath().path
         var manifests: [(path: String, mustDeclareIOS: Bool)] = []
-        for case let path as String in walk {
-            let name = (path as NSString).lastPathComponent
-            let url = base.appendingPathComponent(path)
-            if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
-                if name.hasPrefix(".") || skipped.contains(name) || path == "Prototypes" { walk.skipDescendants() }
-            } else if manifestName.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil {
-                manifests.append((path: path, mustDeclareIOS: !hostOnlyFolders.contains { path.hasPrefix($0 + "/") }))
+
+        func scan(_ folder: String) throws {
+            let names: [String]
+            do {
+                names = try files.contentsOfDirectory(atPath: folder.isEmpty ? base : "\(base)/\(folder)")
+            } catch {
+                throw ScanFailure(path: folder.isEmpty ? "." : folder, reason: "cannot be listed (\(error.localizedDescription))")
+            }
+            for name in names {
+                let path = folder.isEmpty ? name : "\(folder)/\(name)"
+                if name.hasPrefix(".") || skipped.contains(name) || path == "Prototypes" { continue }
+                let type: FileAttributeType?
+                do {
+                    type = try files.attributesOfItem(atPath: "\(base)/\(path)")[.type] as? FileAttributeType
+                } catch {
+                    throw ScanFailure(path: path, reason: "cannot be inspected (\(error.localizedDescription))")
+                }
+                if type == .typeDirectory {
+                    try scan(path)
+                } else if type == .typeSymbolicLink && isFolder("\(base)/\(path)") {
+                    throw ScanFailure(path: path, reason: "is a link to a folder, which the scan does not follow")
+                } else if manifestName.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil {
+                    manifests.append((path: path, mustDeclareIOS: !hostOnlyFolders.contains { path.hasPrefix($0 + "/") }))
+                }
             }
         }
+
+        try scan("")
         return manifests.sorted { $0.path < $1.path }
+    }
+
+    private static func isFolder(_ path: String) -> Bool {
+        var folder: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &folder) && folder.boolValue
     }
 }

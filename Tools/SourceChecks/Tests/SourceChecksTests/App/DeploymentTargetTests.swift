@@ -392,7 +392,7 @@ struct DeploymentTargetTests {
 
     @Test("Every package manifest of the repository sets an iOS release of 26.5 or later, outside the prototype")
     func manifestsHaveNoTargetBelowTheMinimum() throws {
-        let manifests = DeploymentTargets.manifests(under: Repository.root)
+        let manifests = try DeploymentTargets.manifests(under: Repository.root)
         let paths = Set(manifests.map(\.path))
         for linked in ["PrestoCVCore", "CVPDFExporter", "CVGeneratorAI", "PrestoCVApp", "CVPDFExporterExamples"] {
             try #require(paths.contains("\(linked)/Package.swift"), "The scan did not find \(linked)/Package.swift: found \(paths.sorted())")
@@ -421,8 +421,8 @@ struct DeploymentTargetTests {
     }
 
     @Test("The scan reads the manifests of the tools but not the prototype's, which nothing builds")
-    func scanSkipsOnlyThePrototype() {
-        let manifests = DeploymentTargets.manifests(under: Repository.root)
+    func scanSkipsOnlyThePrototype() throws {
+        let manifests = try DeploymentTargets.manifests(under: Repository.root)
 
         #expect(manifests.contains { $0.path == "Tools/SourceChecks/Package.swift" && !$0.mustDeclareIOS })
         #expect(manifests.contains { $0.path == "PrestoCVCore/Package.swift" && $0.mustDeclareIOS })
@@ -454,7 +454,7 @@ struct DeploymentTargetTests {
         ])
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let paths = DeploymentTargets.manifests(under: root).map(\.path)
+        let paths = try DeploymentTargets.manifests(under: root).map(\.path)
 
         #expect(paths == [
             "App/Package.swift", "App/Package@swift-5.9.1.swift", "App/Package@swift-6.0.swift", "App/Package@swift-6.swift",
@@ -471,7 +471,7 @@ struct DeploymentTargetTests {
         ])
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manifests = DeploymentTargets.manifests(under: root)
+        let manifests = try DeploymentTargets.manifests(under: root)
 
         #expect(manifests.map(\.path) == ["Backend/Package.swift", "Tools/Check/Package.swift", "Tools/Check/Package@swift-6.swift", "Toolset/Package.swift"])
         #expect(manifests.map(\.mustDeclareIOS) == [true, false, false, true])
@@ -489,11 +489,60 @@ struct DeploymentTargetTests {
         }
 
         for root in [real, link, real.resolvingSymlinksInPath(), URL(fileURLWithPath: real.path + "/")] {
-            let manifests = DeploymentTargets.manifests(under: root)
+            let manifests = try DeploymentTargets.manifests(under: root)
 
             #expect(manifests.map(\.path) == ["App/Package.swift", "Tools/Check/Package.swift"], "\(root.path): \(manifests.map(\.path))")
             #expect(manifests.map(\.mustDeclareIOS) == [true, false], "\(root.path)")
         }
+    }
+
+    // MARK: What the scan cannot read
+
+    @Test("A folder the scan cannot list fails it: a manifest below it could hide any value", .enabled(if: geteuid() != 0, "root lists any folder"))
+    func unreadableFolderFailsTheScan() throws {
+        let root = try Self.tree(of: ["App/Package.swift", "App/Locked/Deep/Package.swift"])
+        let locked = root.appendingPathComponent("App/Locked")
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: locked.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: locked.path)
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let failure = #expect(throws: DeploymentTargets.ScanFailure.self) { try DeploymentTargets.manifests(under: root) }
+
+        #expect(failure?.path == "App/Locked", "\(String(describing: failure))")
+        #expect(failure?.description.contains("could hide any value") == true, "\(String(describing: failure))")
+    }
+
+    @Test("A root that is not there fails the scan, instead of finding no manifest")
+    func missingRootFailsTheScan() {
+        let missing = FileManager.default.temporaryDirectory.appendingPathComponent("DeploymentTargetTests-missing-\(UUID().uuidString)")
+
+        #expect(throws: DeploymentTargets.ScanFailure.self) { try DeploymentTargets.manifests(under: missing) }
+    }
+
+    @Test("A link to a folder fails the scan: it is not followed, so what it leads to would be skipped unseen")
+    func linkToFolderFailsTheScan() throws {
+        let root = try Self.tree(of: ["Real/Package.swift", "App/Package.swift"])
+        try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent("App/Alias").path, withDestinationPath: "../Real")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let failure = #expect(throws: DeploymentTargets.ScanFailure.self) { try DeploymentTargets.manifests(under: root) }
+
+        #expect(failure?.path == "App/Alias", "\(String(describing: failure))")
+    }
+
+    @Test("A link to a manifest is a manifest, and a link named like a skipped folder is skipped like the folder")
+    func linksToFilesAndSkippedNames() throws {
+        let root = try Self.tree(of: ["Real/Package.swift", "App/Sources/Main.swift"])
+        try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent("App/Package.swift").path, withDestinationPath: "../Real/Package.swift")
+        try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent("App/node_modules").path, withDestinationPath: "../Real")
+        try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent("App/.cache").path, withDestinationPath: "../Real")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let paths = try DeploymentTargets.manifests(under: root).map(\.path)
+
+        #expect(paths == ["App/Package.swift", "Real/Package.swift"], "\(paths)")
     }
 
     @Test("A manifest of the app that declares no iOS platform is told where a package that never builds for iOS goes")
