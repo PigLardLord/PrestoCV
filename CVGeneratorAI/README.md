@@ -72,12 +72,15 @@ are its planned replacement and are still empty.
   and judges each skill, language, interest, the headline title and the place that the grounded draft still keeps: whose it
   is (the writer's, someone else's, or not mentioned) and how the description states it (as true, wished, conditional or
   denied). An item stays only when it is the writer's and stated as true, so the check can only withdraw; a language's
-  level goes with its language. It is one call per draft (`FoundationModelsClaimChecker`), with a fixed instruction,
-  greedy sampling and structured output, and a verdict the answer leaves out withdraws its item. Employers, schools,
-  dates and prose stay with the rules. When the check gives no answer (a failed call, or a refusal of the model's
-  guardrail), the draft keeps its jobs, schools, dates and prose, every item of the five kinds is withdrawn, and
-  `GeneratedDraft.personalItemsUnchecked` is true, so that the app can ask the person to add them; there is no retry and
-  no fallback to the rules alone. Cancellation passes through.
+  level goes with its language. It asks the model (`FoundationModelsClaimChecker`) in batches of at most 8 items, one
+  after the other, with a fixed instruction, greedy sampling and structured output, and it reads the answer with
+  `ClaimAnswer`: the items must be numbered 1 to n, each once, and an item is a fact only when the model quotes words of
+  the description that contain it, otherwise it is withdrawn. Employers, schools, dates and prose stay with the rules.
+  When the check gives no answer (a failed call, a refusal of the model's guardrail, an answer that does not number its
+  items 1 to n, or no end within its 60 seconds, `ClaimCheckLimits`), the draft keeps its jobs, schools, dates and
+  prose, every item of the five kinds is withdrawn, and `GeneratedDraft.personalItemsUnchecked` is true, so that the app
+  can ask the person to add them; there is no retry and no fallback to the rules alone. Such a draft may be empty, and
+  is still a draft. Cancellation passes through.
 - **The order of a CV.** The use case lists the jobs that go on now first, then the others by their latest year (the end,
   else the start), the newest first, as the grounded draft gives the years. A job with no year keeps its place among the
   others, and so do jobs of the same year.
@@ -135,12 +138,13 @@ the framework's availability and errors (`FoundationModelsServiceTests`) needs m
 framework.
 
 `ClaimCheckEvaluation` runs the second check on the real model, only when asked, on a Mac with Apple Intelligence on. It
-measures the contract (a), the adversarial set (b), the held-out set of the spike (c) and the held-out set written after
-the instruction was frozen (d), three times each. It fails on verdicts that differ between runs, and on any item that the
-draft keeps although the description does not claim it (a false keep):
+measures the contract (a), the adversarial set (b), the held-out set of the spike (c), the held-out set written after
+the instruction was frozen (d) and drafts of 22, 32 and 42 personal items (e), three times each. It fails on verdicts
+that differ between runs, and on any item that the draft keeps although the description does not claim it (a false
+keep):
 
 ```bash
-PRESTOCV_CLAIM_EVAL=abcd PRESTOCV_CLAIM_EVAL_OUT=/tmp/claim-eval swift test --filter ClaimCheckEvaluation
+PRESTOCV_CLAIM_EVAL=abcde PRESTOCV_CLAIM_EVAL_OUT=/tmp/claim-eval swift test --filter ClaimCheckEvaluation
 ```
 
 By default it runs the path of the product: the rules, then the check of what they keep. `PRESTOCV_CLAIM_EVAL_MODE=alone`

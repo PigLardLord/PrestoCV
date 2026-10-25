@@ -237,11 +237,19 @@ struct MeasuredDraft: Encodable, Equatable {
         self.seconds = seconds
         self.error = error.map { String(describing: $0) }
         self.unchecked = unchecked
-        if let generationError = error as? LanguageModelSession.GenerationError, case .guardrailViolation = generationError {
-            refused = true
-        } else {
-            refused = false
+        refused = error.map(Self.isGuardrailRefusal) ?? false
+    }
+
+    /// Whether `error` is the model's guardrail refusing the description. macOS 27 throws `LanguageModelError`; its older
+    /// `LanguageModelSession.GenerationError` is what earlier systems throw.
+    private static func isGuardrailRefusal(_ error: any Error) -> Bool {
+        if #available(macOS 27.0, iOS 27.0, *), let modelError = error as? LanguageModelError, case .guardrailViolation = modelError {
+            return true
         }
+        if let generationError = error as? LanguageModelSession.GenerationError, case .guardrailViolation = generationError {
+            return true
+        }
+        return false
     }
 
     /// The verdicts and what they kept, without the quotes and the time they took.
@@ -291,7 +299,8 @@ struct Summary: Encodable {
         rulesDrops = items.filter { $0.1.claimed && $0.1.verdict == "rules" }.count
         errors = first.filter { $0.error != nil }.count
         refusals = first.filter(\.refused).count
-        let times = runs.flatMap { $0.filter { !$0.items.isEmpty }.map(\.seconds) }.sorted()
+        // Only the drafts the check was called on: the rules leave the others nothing to check, and they take milliseconds.
+        let times = runs.flatMap { $0 }.filter { draft in draft.items.contains { $0.verdict != "rules" } }.map(\.seconds).sorted()
         medianSeconds = times.isEmpty ? 0 : times[times.count / 2]
         p95Seconds = times.isEmpty ? 0 : times[min(times.count - 1, Int(Double(times.count) * 0.95))]
         sameInEveryRun = runs.allSatisfy { $0.map(\.verdicts) == first.map(\.verdicts) }
