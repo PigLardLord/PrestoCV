@@ -130,25 +130,41 @@ struct DeploymentTargetTests {
 
     // MARK: Package manifests
 
+    /// A manifest whose `Package` call is given these platforms, on its third line.
+    private static func manifest(platforms: String) -> String {
+        "let package = Package(\n    name: \"P\",\n    platforms: \(platforms)\n)"
+    }
+
+    private static func findings(in text: String, mustDeclareIOS: Bool = true) -> [DeploymentTargets.Finding] {
+        DeploymentTargets.findings(inManifest: text, file: "P/Package.swift", mustDeclareIOS: mustDeclareIOS)
+    }
+
     @Test("An iOS platform of a manifest below 26.5 is found", arguments: [
         #".iOS("26.0")"#, #".iOS("26.4")"#, #".iOS("26")"#, #".iOS( "26.0" )"#,
         ".iOS(.v26)", ".iOS(.v26_4)", ".iOS(.v18)", ".iOS(.v16)", ".iOS(.v9)",
     ])
     func manifestPlatformBelowTheMinimumIsFound(platform: String) {
-        let text = "let package = Package(\n    name: \"P\",\n    platforms: [\(platform), .macOS(\"26.0\")]\n)"
-
-        let findings = DeploymentTargets.findings(inManifest: text, file: "P/Package.swift", mustDeclareIOS: true)
+        let findings = Self.findings(in: Self.manifest(platforms: "[\(platform), .macOS(\"26.0\")]"))
 
         #expect(findings.map(\.line) == [3], "\(platform): \(findings)")
     }
 
     @Test("An iOS platform of a manifest at 26.5 or later is not found", arguments: [
         #".iOS("26.5")"#, #".iOS("26.10")"#, #".iOS("27.0")"#, #".iOS("27")"#, ".iOS(.v26_5)", ".iOS(.v27)", ".iOS(.v28)",
+        #".iOS("26.5",)"#, #"SupportedPlatform.iOS("26.5")"#,
     ])
     func manifestPlatformAtTheMinimumIsNotFound(platform: String) {
-        let text = "platforms: [\(platform), .macOS(\"26.0\")],"
+        #expect(Self.findings(in: Self.manifest(platforms: "[\(platform), .macOS(\"26.0\")]")).isEmpty)
+    }
 
-        #expect(DeploymentTargets.findings(inManifest: text, file: "P/Package.swift", mustDeclareIOS: true).isEmpty)
+    @Test("An iOS platform written in other ways than the usual is read all the same", arguments: [
+        #".iOS ("26.0")"#, #". iOS("26.0")"#, ".iOS(\n        \"26.0\"\n    )", #"SupportedPlatform.iOS("26.0")"#,
+        #"SupportedPlatform . iOS ( "26.0" )"#, #".iOS("26.0",)"#,
+    ])
+    func manifestPlatformSpelledInAnotherWayIsRead(platform: String) {
+        let findings = Self.findings(in: Self.manifest(platforms: "[.macOS(\"26.0\"), \(platform)]"))
+
+        #expect(findings.count == 1 && findings[0].reason.contains("below the minimum"), "\(platform): \(findings)")
     }
 
     @Test("A platform on a line of its own, in a list over several lines, is found with its line")
@@ -163,61 +179,201 @@ struct DeploymentTargetTests {
         )
         """
 
-        #expect(DeploymentTargets.findings(inManifest: text, file: "P/Package.swift", mustDeclareIOS: true).map(\.line) == [5])
+        #expect(Self.findings(in: text).map(\.line) == [5])
     }
 
-    @Test("Every branch of a condition is read: the manifest of the Apple hosts is not the only one")
+    @Test("Every Package call is read, in every branch of a condition: the manifest of the Apple hosts is not the only one")
     func manifestBranchesAreAllRead() {
         let text = """
         #if os(Linux)
-        let platforms: [SupportedPlatform] = [.iOS("26.5")]
+        let package = Package(name: "P", platforms: [.iOS("26.5")])
         #else
-        let platforms: [SupportedPlatform] = [.iOS("26.0")]
+        let package = Package(name: "P", platforms: [.iOS("26.0")])
         #endif
         """
 
-        #expect(DeploymentTargets.findings(inManifest: text, file: "P/Package.swift", mustDeclareIOS: true).map(\.line) == [4])
+        #expect(Self.findings(in: text).map(\.line) == [4])
     }
 
     @Test("A platform in a comment is not a declaration, and does not make a manifest declare one")
-    func manifestCommentsAreIgnored() {
-        let commented = "// platforms: [.iOS(\"26.0\")]\nplatforms: [.iOS(\"26.5\")], // was .iOS(\"26.0\")"
-        let onlyCommented = "// platforms: [.iOS(\"26.5\")]\nplatforms: [.macOS(\"26.0\")]"
+    func manifestLineCommentsAreIgnored() {
+        let commented = "// platforms: [.iOS(\"26.0\")]\nlet package = Package(name: \"P\", platforms: [.iOS(\"26.5\")]) // was .iOS(\"26.0\")"
+        let onlyCommented = "// platforms: [.iOS(\"26.5\")]\nlet package = Package(name: \"P\", platforms: [.macOS(\"26.0\")])"
 
-        #expect(DeploymentTargets.findings(inManifest: commented, file: "P/Package.swift", mustDeclareIOS: true).isEmpty)
-        #expect(DeploymentTargets.findings(inManifest: onlyCommented, file: "P/Package.swift", mustDeclareIOS: true).count == 1)
+        #expect(Self.findings(in: commented).isEmpty)
+        #expect(Self.findings(in: onlyCommented).count == 1)
+    }
+
+    @Test("A platform in a block comment is not a declaration either, and nested comments end where the outer one ends")
+    func manifestBlockCommentsAreIgnored() {
+        let hidesTheOnlyIOS = Self.manifest(platforms: #"[/* .iOS("26.5"), */ .macOS("26.0")]"#)
+        let nested = Self.manifest(platforms: #"[/* a /* b */ .iOS("26.5"), */ .macOS("26.0")]"#)
+        let hidesALowOne = Self.manifest(platforms: #"[.iOS("26.5") /* , .iOS("26.0") */, .macOS("26.0")]"#)
+        let outsideTheNesting = Self.manifest(platforms: #"[/* a /* b */ c */ .iOS("26.0")]"#)
+
+        #expect(Self.findings(in: hidesTheOnlyIOS).count == 1, "\(Self.findings(in: hidesTheOnlyIOS))")
+        #expect(Self.findings(in: nested).count == 1, "\(Self.findings(in: nested))")
+        #expect(Self.findings(in: hidesALowOne).isEmpty, "\(Self.findings(in: hidesALowOne))")
+        #expect(Self.findings(in: outsideTheNesting).first?.reason.contains("below the minimum") == true)
+    }
+
+    @Test("A comment over several lines does not shift the lines of what follows")
+    func manifestCommentsKeepTheLines() {
+        let text = "/* one\n   two\n   three */\n// four\nlet package = Package(\n    name: \"P\",\n    platforms: [.iOS(\"26.0\")]\n)"
+
+        #expect(Self.findings(in: text).map(\.line) == [7])
+    }
+
+    @Test("A comment marker or a bracket inside a string is no comment and no bracket")
+    func manifestStringsHideTheirContent() {
+        let slashes = "let package = Package(name: \"P\", dependencies: [.package(url: \"https://x.y/z\", from: \"1.0.0\")], platforms: [.iOS(\"26.0\")])"
+        let star = "let package = Package(name: \"a/*b\", dependencies: [.package(url: \"a/*b\", from: \"1.0.0\")], platforms: [.iOS(\"26.0\")])"
+        let brackets = "let package = Package(name: \"a)]}(\", platforms: [.iOS(\"26.0\")])"
+        let escaped = "let package = Package(name: \"a\\\"//b\", platforms: [.iOS(\"26.0\")])"
+        let interpolated = "let package = Package(name: \"a\\(\"b)\")c\", platforms: [.iOS(\"26.0\")])"
+        let raw = "let package = Package(name: #\"a\"//b\"#, platforms: [.iOS(\"26.0\")])"
+        let multiline = "let package = Package(name: \"\"\"\n    x \"// /* \"quoted\"\n    \"\"\", platforms: [.iOS(\"26.0\")])"
+
+        for text in [slashes, star, brackets, escaped, interpolated, raw, multiline] {
+            let findings = Self.findings(in: text)
+            #expect(findings.count == 1 && findings[0].reason.contains("below the minimum"), "\(text)\n\(findings)")
+        }
+    }
+
+    @Test("An iOS platform that is not in the platforms of a Package call is no declaration")
+    func manifestPlatformOutsideThePackageCallIsNoDeclaration() {
+        let text = "let unused: SupportedPlatform = .iOS(\"26.5\")\nlet package = Package(name: \"P\", platforms: [.macOS(\"26.0\")])"
+        let inAString = "let note = \"\"\"\n    platforms: [.iOS(\"26.5\")]\n    \"\"\"\nlet package = Package(name: \"P\", platforms: [.macOS(\"26.0\")])"
+        let lowOutside = "let unused: SupportedPlatform = .iOS(\"26.0\")\nlet package = Package(name: \"P\", platforms: [.iOS(\"26.5\")])"
+
+        #expect(Self.findings(in: text).map(\.reason).allSatisfy { $0.contains("declares no iOS platform") } && Self.findings(in: text).count == 1)
+        #expect(Self.findings(in: inAString).count == 1)
+        #expect(Self.findings(in: lowOutside).isEmpty, "A release that no Package call declares does not set the minimum")
     }
 
     @Test("A platform that does not say a release is found: it could hide any value", arguments: [
-        ".iOS(minimum)", ".iOS(.v26_5 + 1)", ".iOS(\"26.\\(minor)\")", ".iOS(", ".iOS()",
+        ".iOS(minimum)", ".iOS(.v26_5 + 1)", ".iOS(\"26.\\(minor)\")", ".iOS()", ".iOS(26.5)", ".iOS(version: \"26.0\")",
+        ".iOS(\"26.5\", \"26.0\")", ".iOS(\"\"\"\n26.5\n\"\"\")", ".iOS(\"26.5.0.1\")", ".iOS(.v26_5.self)",
     ])
     func manifestPlatformThatIsNoReleaseIsFound(platform: String) {
-        let text = "platforms: [\(platform)]"
+        let findings = Self.findings(in: Self.manifest(platforms: "[\(platform)]"))
 
-        #expect(DeploymentTargets.findings(inManifest: text, file: "P/Package.swift", mustDeclareIOS: true).count == 1, "\(platform)")
+        #expect(findings.count == 1 && findings[0].reason.contains("could hide any value"), "\(platform): \(findings)")
+    }
+
+    @Test("A platforms list that cannot be read is found: it could hide any value", arguments: [
+        "platforms",
+        "makePlatforms()",
+        #"[.iOS("26.5")] + [.iOS("26.0")]"#,
+        #"[.iOS("26.5")] + extra"#,
+        #"[.iOS("26.5"), platform]"#,
+        #"[.iOS("26.5"), makePlatform()]"#,
+        #"[.iOS("26.5"), .iOS]"#,
+        #"[.iOS("26.5"), ] as [SupportedPlatform]"#,
+        #"nil"#,
+    ])
+    func manifestPlatformsThatCannotBeReadAreFound(platforms: String) {
+        let findings = Self.findings(in: Self.manifest(platforms: platforms), mustDeclareIOS: false)
+
+        #expect(findings.count == 1 && findings[0].reason.contains("could hide any value"), "\(platforms): \(findings)")
+    }
+
+    @Test("A platforms list taken from a variable is found, however the variable is set")
+    func manifestPlatformsFromAVariableAreFound() {
+        let text = """
+        #if os(Linux)
+        let platforms: [SupportedPlatform] = [.macOS("26.0")]
+        #else
+        let platforms: [SupportedPlatform] = [.iOS("26.0")]
+        #endif
+        let package = Package(name: "P", platforms: platforms)
+        """
+
+        #expect(Self.findings(in: text).map(\.line) == [6])
+    }
+
+    @Test("A platforms list read or changed after the Package call is found")
+    func manifestPlatformsChangedAfterTheCallAreFound() {
+        let assigned = Self.manifest(platforms: #"[.iOS("26.5")]"#) + "\npackage.platforms = [.iOS(\"26.0\")]"
+        let appended = Self.manifest(platforms: #"[.iOS("26.5")]"#) + "\npackage.platforms?.append(.iOS(\"26.0\"))"
+
+        for text in [assigned, appended] {
+            let findings = Self.findings(in: text)
+            #expect(findings.map(\.line) == [5], "\(text)\n\(findings)")
+        }
+    }
+
+    @Test("A source that cannot be read to its end is found: a string or a comment that is not closed", arguments: [
+        "let package = Package(name: \"P, platforms: [.iOS(\"26.5\")])",
+        "let package = Package(name: \"P\", platforms: [.iOS(\"26.5\")]) /* never closed",
+        "let package = Package(name: \"P\", platforms: [.iOS(\"26.5\")]) \"\"\"\n never closed",
+        "let package = Package(name: \"a\\(\", platforms: [.iOS(\"26.5\")])",
+    ])
+    func manifestThatCannotBeReadToItsEndIsFound(text: String) {
+        let findings = Self.findings(in: text)
+
+        #expect(findings.count == 1 && findings[0].reason.contains("cannot be read"), "\(text)\n\(findings)")
+    }
+
+    @Test("A manifest without a Package call, or that uses Package in another way, is found: its platforms cannot be read")
+    func manifestWithoutAPackageCallIsFound() {
+        let none = "import PackageDescription\n// let package = Package(name: \"P\", platforms: [.iOS(\"26.5\")])"
+        let alias = "typealias Manifest = Package\nlet package = Manifest(name: \"P\", platforms: [.iOS(\"26.0\")])"
+        let unclosed = "let package = Package(name: \"P\", platforms: [.iOS(\"26.5\")]"
+
+        for text in [none, alias, unclosed] {
+            let findings = Self.findings(in: text, mustDeclareIOS: false)
+            #expect(findings.count == 1 && findings[0].reason.contains("could hide any value"), "\(text)\n\(findings)")
+        }
+    }
+
+    @Test("The type Package.Dependency is no use of Package as a manifest, but another member of Package is")
+    func manifestPackageDependencyTypeIsNotAFinding() {
+        let dependencyType = "var dependencies: [Package.Dependency] = []\n" + Self.manifest(platforms: #"[.iOS("26.5")]"#)
+        let initializer = "let package = Package.init(name: \"P\", platforms: [.iOS(\"26.0\")])"
+        let metatype = "let kind = Package.self\n" + Self.manifest(platforms: #"[.iOS("26.5")]"#)
+
+        #expect(Self.findings(in: dependencyType).isEmpty, "\(Self.findings(in: dependencyType))")
+        for text in [initializer, metatype] {
+            let findings = Self.findings(in: text)
+            #expect(findings.count == 1 && findings[0].reason.contains("could hide any value"), "\(text)\n\(findings)")
+        }
+    }
+
+    @Test("A Package call qualified by its module is read")
+    func manifestPackageCallQualifiedByItsModuleIsRead() {
+        let text = "let package = PackageDescription.Package(name: \"P\", platforms: [.iOS(\"26.0\")])"
+
+        #expect(Self.findings(in: text).count == 1)
     }
 
     @Test("A manifest of the app that declares no iOS platform is found: SwiftPM then builds it for an older default")
     func productManifestWithoutIOSIsFound() {
-        let text = "let package = Package(name: \"P\", platforms: [.macOS(\"26.0\")])"
+        let withMacOnly = "let package = Package(name: \"P\", platforms: [.macOS(\"26.0\")])"
+        let withNone = "let package = Package(name: \"P\")"
+        let emptyList = "let package = Package(name: \"P\", platforms: [])"
 
-        #expect(DeploymentTargets.findings(inManifest: text, file: "P/Package.swift", mustDeclareIOS: true).count == 1)
-        #expect(DeploymentTargets.findings(inManifest: "let package = Package(name: \"P\")", file: "P/Package.swift", mustDeclareIOS: true).count == 1)
+        for text in [withMacOnly, withNone, emptyList] {
+            let findings = Self.findings(in: text)
+            #expect(findings.count == 1 && findings[0].reason.contains("declares no iOS platform"), "\(text)\n\(findings)")
+        }
     }
 
     @Test("A tool's manifest need not declare iOS, but if it does the release counts")
     func toolManifestMayOmitIOS() {
-        let macOnly = "platforms: [.macOS(.v13)]"
-
-        #expect(DeploymentTargets.findings(inManifest: macOnly, file: "Tools/T/Package.swift", mustDeclareIOS: false).isEmpty)
-        #expect(DeploymentTargets.findings(inManifest: "platforms: [.iOS(.v16)]", file: "Tools/T/Package.swift", mustDeclareIOS: false).count == 1)
+        #expect(Self.findings(in: Self.manifest(platforms: "[.macOS(.v13)]"), mustDeclareIOS: false).isEmpty)
+        #expect(Self.findings(in: "let package = Package(name: \"T\")", mustDeclareIOS: false).isEmpty)
+        #expect(Self.findings(in: Self.manifest(platforms: "[.iOS(.v16)]"), mustDeclareIOS: false).count == 1)
     }
 
     @Test("A platform used as a condition, not declared, is not read as a declaration")
     func platformConditionIsNotADeclaration() {
-        let text = "platforms: [.iOS(\"26.5\")]\n.target(name: \"T\", dependencies: [.product(name: \"D\", package: \"D\", condition: .when(platforms: [.iOS]))])"
+        let condition = ".target(name: \"T\", dependencies: [.product(name: \"D\", package: \"D\", condition: .when(platforms: [.iOS]))])"
+        let declared = "let package = Package(name: \"P\", platforms: [.iOS(\"26.5\")], targets: [\(condition)])"
+        let notDeclared = "let package = Package(name: \"P\", platforms: [.macOS(\"26.0\")], targets: [\(condition)])"
 
-        #expect(DeploymentTargets.findings(inManifest: text, file: "P/Package.swift", mustDeclareIOS: true).isEmpty)
+        #expect(Self.findings(in: declared).isEmpty)
+        #expect(Self.findings(in: notDeclared).count == 1)
     }
 
     // MARK: The repository

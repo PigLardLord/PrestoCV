@@ -109,43 +109,177 @@ enum DeploymentTargets {
 
     // MARK: Package manifests
 
-    /// A `.iOS(` platform and what stands in its brackets; the closing bracket is missing when the call goes on to
-    /// another line.
-    private static let manifestPlatform = try! NSRegularExpression(pattern: #"\.iOS\(([^)]*)(\)?)"#)
-
-    /// The iOS platforms of a manifest that name a release below the minimum, or none that can be read. A manifest of
-    /// the app that declares no iOS platform is found too: SwiftPM then builds it for its own, older default.
+    /// The platforms every `Package` call of a manifest declares, read from the tokens of the source and not from its
+    /// lines: a platform written in a comment or a string is none, and a platform that is not in the `platforms:`
+    /// argument of a `Package` call (an unrelated `.iOS(` expression, a `.when(platforms:)` condition) is none either.
+    ///
+    /// Whatever the reader cannot tell is a finding, because a manifest could hide any value there: a `platforms`
+    /// argument that is not a list written out, an element that is not a platform written out, a release that is not a
+    /// string or a `.vNN_N` constant, a `Package` that is not called, a `.platforms` read or change after the call, a
+    /// source that cannot be read to its end. A manifest of the app that declares no iOS platform is found too:
+    /// SwiftPM then builds it for its own, older default.
     static func findings(inManifest text: String, file: String, mustDeclareIOS: Bool) -> [Finding] {
-        var findings: [Finding] = []
-        var declaresIOS = false
-        for (index, raw) in text.components(separatedBy: "\n").enumerated() {
-            let line = raw.components(separatedBy: "//").first ?? ""
-            for match in manifestPlatform.matches(in: line, range: NSRange(line.startIndex..., in: line)) {
-                declaresIOS = true
-                let argument = Range(match.range(at: 1), in: line).map { String(line[$0]).trimmingCharacters(in: .whitespaces) } ?? ""
-                let closed = match.range(at: 2).length > 0
-                let release = closed ? release(ofPlatformArgument: argument) : nil
-                if let reason = problem(with: release, written: ".iOS(\(argument)\(closed ? ")" : "")", setting: "The iOS platform") {
-                    findings.append(Finding(file: file, line: index + 1, reason: reason))
-                }
-            }
+        let tokens: [SwiftToken]
+        switch SwiftLexer.tokens(of: text) {
+        case .success(let read): tokens = read
+        case .failure(let failure):
+            return [Finding(
+                file: file, line: failure.line,
+                reason: "cannot be read to its end (\(failure.what)), so its platforms could hide any value"
+            )]
         }
-        if mustDeclareIOS && !declaresIOS {
-            findings.append(Finding(
-                file: file, line: 1,
-                reason: "declares no iOS platform: SwiftPM then builds the package for an older default release than \(minimum)"
-            ))
+        guard let partners = bracketPartners(of: tokens) else {
+            return [Finding(file: file, line: 1, reason: "cannot be read to its end (its brackets do not match), so its platforms could hide any value")]
         }
-        return findings
+        let manifest = Manifest(file: file, tokens: tokens, partners: partners, mustDeclareIOS: mustDeclareIOS)
+        return manifest.findings()
     }
 
-    /// The release that stands in the brackets of `.iOS(…)`: a string, `"26.5"`, or a constant, `.v26_5`.
-    private static func release(ofPlatformArgument argument: String) -> IOSRelease? {
-        if argument.count >= 2, argument.hasPrefix("\""), argument.hasSuffix("\"") {
-            return IOSRelease(version: String(argument.dropFirst().dropLast()))
+    private struct Manifest {
+        let file: String
+        let tokens: [SwiftToken]
+        let partners: [Int: Int]
+        let mustDeclareIOS: Bool
+
+        func findings() -> [Finding] {
+            var findings: [Finding] = []
+            var calls = 0
+            for (index, token) in tokens.enumerated() {
+                if token.isIdentifier("Package") {
+                    if !isDependencyType(at: index) { calls += 1 }
+                    findings += readPackage(at: index)
+                } else if token.isIdentifier("platforms"), index > 0, tokens[index - 1].isPunctuation(".") {
+                    findings.append(unreadable(token.line, "the platforms of a package are read or changed after its call"))
+                }
+            }
+            if calls == 0 { findings.append(unreadable(1, "it has no Package call")) }
+            return findings.sorted { $0.line < $1.line }
         }
-        if argument.hasPrefix(".") { return IOSRelease(constant: String(argument.dropFirst())) }
-        return nil
+
+        // MARK: Package call
+
+        /// A `Package` identifier: a call, whose `platforms:` argument is read, or something else, which is a finding.
+        private func readPackage(at index: Int) -> [Finding] {
+            let line = tokens[index].line
+            if isDependencyType(at: index) { return [] }
+            guard index + 1 < tokens.count, tokens[index + 1].isPunctuation("(") else {
+                return [unreadable(line, "Package is used other than as a call")]
+            }
+            guard let close = partners[index + 1] else { return [unreadable(line, "a Package call is not closed")] }
+            var findings: [Finding] = []
+            var settled = false
+            for argument in arguments(in: (index + 2)..<close) {
+                guard argument.count >= 2, tokens[argument.lowerBound].isIdentifier("platforms"),
+                      tokens[argument.lowerBound + 1].isPunctuation(":") else { continue }
+                let reading = readPlatforms(argument.dropFirst(2), line: tokens[argument.lowerBound].line)
+                findings += reading.findings
+                settled = settled || reading.declaresIOS || !reading.findings.isEmpty
+            }
+            if mustDeclareIOS && !settled {
+                findings.append(Finding(
+                    file: file, line: line,
+                    reason: "declares no iOS platform: SwiftPM then builds the package for an older default release than \(minimum)"
+                ))
+            }
+            return findings
+        }
+
+        /// `Package.Dependency`, the type of a dependency: it is no way to make a package, and manifests write it.
+        private func isDependencyType(at index: Int) -> Bool {
+            index + 2 < tokens.count && tokens[index + 1].isPunctuation(".") && tokens[index + 2].isIdentifier("Dependency")
+        }
+
+        /// The ranges of the arguments between two tokens, split at the commas that are not inside another bracket.
+        /// A comma after the last argument ends it; it does not start another.
+        private func arguments(in range: Range<Int>) -> [Range<Int>] {
+            var ranges: [Range<Int>] = []
+            var begin = range.lowerBound
+            var index = range.lowerBound
+            while index < range.upperBound {
+                if tokens[index].isOpening, let close = partners[index] {
+                    index = close + 1
+                    continue
+                }
+                if tokens[index].isPunctuation(",") {
+                    ranges.append(begin..<index)
+                    begin = index + 1
+                }
+                index += 1
+            }
+            if begin < range.upperBound { ranges.append(begin..<range.upperBound) }
+            return ranges
+        }
+
+        // MARK: Platforms
+
+        /// The value of `platforms:`: a list written out, of platforms written out, such as `.iOS("26.5")`.
+        private func readPlatforms(_ value: Range<Int>, line: Int) -> (findings: [Finding], declaresIOS: Bool) {
+            guard !value.isEmpty, tokens[value.lowerBound].isPunctuation("["), partners[value.lowerBound] == value.upperBound - 1 else {
+                return ([unreadable(line, "the platforms are not a list written out")], false)
+            }
+            var findings: [Finding] = []
+            var declaresIOS = false
+            for element in arguments(in: (value.lowerBound + 1)..<(value.upperBound - 1)) {
+                // `.iOS("26.5")`, or `SupportedPlatform.iOS("26.5")`.
+                var dot = element.lowerBound
+                if !element.isEmpty, tokens[dot].isIdentifier("SupportedPlatform") { dot += 1 }
+                guard dot + 2 < element.upperBound, tokens[dot].isPunctuation("."), tokens[dot + 1].kind == .identifier,
+                      tokens[dot + 2].isPunctuation("("), partners[dot + 2] == element.upperBound - 1 else {
+                    findings.append(unreadable(tokens[min(element.lowerBound, tokens.count - 1)].line, "a platform is not written out as .name(release)"))
+                    continue
+                }
+                let name = tokens[dot + 1]
+                let arguments = (dot + 3)..<(element.upperBound - 1)
+                if name.text == "custom" {
+                    findings.append(unreadable(name.line, "a custom platform can be named iOS"))
+                } else if name.text == "iOS" {
+                    declaresIOS = true
+                    let written = ".iOS(\(describe(arguments)))"
+                    if let reason = problem(with: release(in: arguments), written: written, setting: "The iOS platform") {
+                        findings.append(Finding(file: file, line: name.line, reason: reason))
+                    }
+                }
+            }
+            return (findings, declaresIOS)
+        }
+
+        /// The release in the brackets of `.iOS(…)`: a string, `"26.5"`, or a constant, `.v26_5`; nothing else.
+        private func release(in range: Range<Int>) -> IOSRelease? {
+            var argument = Array(tokens[range])
+            if argument.last?.isPunctuation(",") == true { argument.removeLast() }
+            if argument.count == 1, argument[0].kind == .string, let value = argument[0].value {
+                return IOSRelease(version: value)
+            }
+            if argument.count == 2, argument[0].isPunctuation("."), argument[1].kind == .identifier {
+                return IOSRelease(constant: argument[1].text)
+            }
+            return nil
+        }
+
+        private func describe(_ range: Range<Int>) -> String {
+            tokens[range].map { $0.kind == .string ? "\"\($0.value ?? "…")\"" : $0.text }.joined(separator: " ")
+        }
+
+        private func unreadable(_ line: Int, _ what: String) -> Finding {
+            Finding(file: file, line: line, reason: "\(what), so the platforms of the manifest could hide any value")
+        }
+    }
+
+    /// For each opening bracket, where it closes; `nil` when a closing bracket does not match the one it closes.
+    /// An opening bracket that is never closed has no entry.
+    private static func bracketPartners(of tokens: [SwiftToken]) -> [Int: Int]? {
+        let closing = [")": "(", "]": "[", "}": "{"]
+        var open: [Int] = []
+        var partners: [Int: Int] = [:]
+        for (index, token) in tokens.enumerated() where token.kind == .punctuation {
+            if token.isOpening {
+                open.append(index)
+            } else if let wanted = closing[token.text] {
+                guard let last = open.popLast(), tokens[last].text == wanted else { return nil }
+                partners[last] = index
+            }
+        }
+        return partners
     }
 
     // MARK: Verdict
