@@ -20,7 +20,7 @@ import Foundation
 ///   as it does after a line that introduces them ("My colleague wrote:").
 /// - A mark that nothing may close quotes nothing: a stray mark, or an apostrophe that starts a word ("the '90s").
 /// - A mark alone on its line closes the quote, so the line after it claims as usual, unless a later mark closes the quote for sure
-///   and no opening mark after the lone one pairs with it: the lone mark is then a symbol the quote holds, such as a ditto mark, and
+///   and no opening mark after the lone one, of any pair, pairs with it: the lone mark is then a symbol the quote holds, such as a ditto mark, and
 ///   the quote runs to that later mark ("My colleague wrote "", "In my table, the ditto symbol is:", """, "I speak French." and
 ///   "End of my message."" on five lines quote all of the colleague's message).
 enum QuotedSpeech {
@@ -58,7 +58,7 @@ enum QuotedSpeech {
             let marks = text.indices.dropFirst(index + 1).filter { closers.contains(text[$0]) && closes(at: $0, in: text) }
             if let first = marks.first(where: { !mayEndAWord(at: $0, in: text) }) {
                 let later = isAlone(at: first, in: text)
-                    ? unpairedClose(after: first, opening: text[index], among: marks, in: text) : nil
+                    ? unpairedClose(after: first, among: marks, in: text) : nil
                 let close = later ?? first
                 inside.insert(integersIn: (index + 1)..<close)
                 index = close + 1
@@ -117,15 +117,19 @@ enum QuotedSpeech {
     /// The mark that closes the quote when the mark `alone` on its line is a symbol that the quote holds, such as a ditto mark: the
     /// first later mark of `marks` that closes the quote for sure and that no opening mark after `alone` pairs with. Nil when there is
     /// none, and the lone mark closes the quote. Other marks alone on their lines neither open nor close here.
-    private static func unpairedClose(after alone: Int, opening: Character, among marks: [Int], in text: [Character]) -> Int? {
+    ///
+    /// An opening mark of any of the supported pairs counts, not only a repeat of `opening`: the quote of a German „…“ may hold a
+    /// “…” of its own, and the ” that closes it is no end of the quote. A closing mark pairs with the latest opening mark that it
+    /// closes; one that closes none of them ends the quote.
+    private static func unpairedClose(after alone: Int, among marks: [Int], in text: [Character]) -> Int? {
         let sure = Set(marks.filter { $0 > alone && !isAlone(at: $0, in: text) && !mayEndAWord(at: $0, in: text) })
-        var open = 0
+        var open: [Set<Character>] = []
         for position in (alone + 1)..<text.count where !isAlone(at: position, in: text) {
             if sure.contains(position) {
-                if open == 0 { return position }
-                open -= 1
-            } else if text[position] == opening, opens(at: position, in: text) {
-                open += 1
+                guard let match = open.lastIndex(where: { $0.contains(text[position]) }) else { return position }
+                open.removeSubrange(match...)
+            } else if let closers = pairs[text[position]], opens(at: position, in: text) {
+                open.append(closers)
             }
         }
         return nil

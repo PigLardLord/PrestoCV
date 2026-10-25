@@ -416,7 +416,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1802
+    static let rowsWhenWritten = 1805
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list. All of them are residual risks of the rules (ADR 0023) that the claim check of
@@ -3716,6 +3716,21 @@ enum GroundingRows {
                             "the mark alone on the third line is the colleague's ditto symbol, and the quote runs to the last line: no language",
                             v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
         }
+        // The opening marks after a lone mark count whatever pair they belong to: a quote of another pair does not end the first one
+        rows.append(row("a-mark-alone-on-its-line-closes-the-quote-before-a-quote-of-another-pair-de",
+                        "the lone mark on the third line closes the colleague's quote; the ” that ends the motto closes the motto, not the colleague's quote: Swift goes, Python stays",
+                        "Mein Kollege schrieb „\nIch benutze Swift.\n“\nIch benutze Python.\nMein Motto ist “Sauberer Code”.",
+                        CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")]),
+                        .exactly(CVData(skills: [Skill(name: "Python")])), language: "de"))
+        rows.append(row("a-mark-alone-on-its-line-inside-a-quote-that-holds-a-quote-of-another-pair-de",
+                        "the lone mark on the third line is the colleague's ditto symbol, a quote of another pair closes inside the message, and the message runs to its last line: no language",
+                        "Mein Kollege schrieb „\nIn meiner Tabelle ist das Wiederholungszeichen:\n“\nIch spreche “schnell” Französisch.\nEnde meiner Nachricht.“",
+                        CVData(languages: [Language(name: "Französisch")]), .exactly(CVData()), language: "de"))
+        rows.append(row("a-mark-alone-on-its-line-inside-a-quote-that-a-closing-mark-of-another-pair-ends-de",
+                        "a ” closes the colleague's quote for sure after the lone mark and no opening mark pairs with it: the lone mark is a symbol the message holds, so Swift and Python go and Deutsch stays",
+                        "Mein Kollege schrieb „\nIch benutze Swift.\n“\nIch benutze Python.”\nIch spreche Deutsch.",
+                        CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")], languages: [Language(name: "Deutsch")]),
+                        .exactly(CVData(languages: [Language(name: "Deutsch")])), language: "de"))
         return rows
     }
 
