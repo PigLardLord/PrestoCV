@@ -9,7 +9,8 @@ struct CVEditableSection<Item, RowContent: View>: View {
     let addButtonTitle: String
     
     @Binding var items: [Item]
-    let rowContent: (Binding<Item>, @escaping () -> Void) -> RowContent
+    let rowContent: (Binding<Item>) -> RowContent
+    let deleteLabel: (Item) -> String
     let onAdd: () -> Void
     let onRemove: (Int) -> Void
     @State private var newRowFocus = NewRowFocus()
@@ -21,7 +22,8 @@ struct CVEditableSection<Item, RowContent: View>: View {
         emptyStateSubtitle: String,
         addButtonTitle: String,
         items: Binding<[Item]>,
-        @ViewBuilder rowContent: @escaping (Binding<Item>, @escaping () -> Void) -> RowContent,
+        @ViewBuilder rowContent: @escaping (Binding<Item>) -> RowContent,
+        deleteLabel: @escaping (Item) -> String,
         onAdd: @escaping () -> Void,
         onRemove: @escaping (Int) -> Void
     ) {
@@ -32,6 +34,7 @@ struct CVEditableSection<Item, RowContent: View>: View {
         self.addButtonTitle = addButtonTitle
         self._items = items
         self.rowContent = rowContent
+        self.deleteLabel = deleteLabel
         self.onAdd = onAdd
         self.onRemove = onRemove
     }
@@ -44,6 +47,7 @@ struct CVEditableSection<Item, RowContent: View>: View {
                 emptyStateTitle: emptyStateTitle,
                 emptyStateSubtitle: emptyStateSubtitle,
                 rowContent: rowContent,
+                deleteLabel: deleteLabel,
                 onRemove: onRemove
             )
             .environment(\.newRowFocus, newRowFocus)

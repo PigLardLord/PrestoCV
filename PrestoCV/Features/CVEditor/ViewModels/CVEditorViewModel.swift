@@ -18,6 +18,9 @@ final class CVEditorViewModel: ObservableObject {
     /// What VoiceOver is told about saving, each time there is something to tell.
     @Published private(set) var saveAnnouncement: SaveAnnouncement?
     @Published private(set) var pendingDeletion: PendingDeletion?
+    /// The question of the confirmation to delete a row. It stays once the request is gone: the dialog is still on the
+    /// screen while it closes, and its title must not go blank.
+    private(set) var deletionTitle = ""
     /// What each contact field said when the person last left it: its check, which typing does not change.
     @Published private(set) var leftContactText: [ContactField: String] = [:]
     /// The message shown above a new CV, set by the screen that opened it.
@@ -279,15 +282,26 @@ final class CVEditorViewModel: ObservableObject {
             return
         }
         guard row.isBlank else {
-            pendingDeletion = PendingDeletion(section: section, index: index, rowName: row.displayName)
+            let deletion = PendingDeletion(section: section, index: index, rowName: row.displayName, rowIdentity: row.identity)
+            deletionTitle = deletion.title
+            pendingDeletion = deletion
             return
         }
         removeRow(of: section, at: index)
     }
 
+    /// Removes the row that `deletion` asked about, once the person has said yes. An answer to a question that is no
+    /// longer the one asked (it was cancelled, answered already, or another took its place) removes nothing, and nor
+    /// does one for a place that another row has taken: the rows below a removed row move up into its index.
     @MainActor
     func confirmDeletion(_ deletion: PendingDeletion) {
+        guard pendingDeletion == deletion else {
+            return
+        }
         pendingDeletion = nil
+        guard row(of: deletion.section, at: deletion.index)?.identity == deletion.rowIdentity else {
+            return
+        }
         removeRow(of: deletion.section, at: deletion.index)
     }
 
@@ -363,8 +377,14 @@ final class CVEditorViewModel: ObservableObject {
         case .languages: return cv.languages[safe: index]
         case .certifications: return cv.certifications[safe: index]
         case .social: return cv.social[safe: index]
-        case .interests: return cv.interests[safe: index].map(InterestEntry.init)
+        case .interests: return interestEntry(at: index)
         }
+    }
+
+    /// The interest at `index`, with the number of interests that say the same: a list can hold one text twice.
+    private func interestEntry(at index: Int) -> InterestEntry? {
+        guard let text = cv.interests[safe: index] else { return nil }
+        return InterestEntry(text: text, copies: cv.interests.filter { $0 == text }.count)
     }
 
     @MainActor
