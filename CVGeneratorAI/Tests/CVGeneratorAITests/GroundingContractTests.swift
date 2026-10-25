@@ -418,7 +418,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1805
+    static let rowsWhenWritten = 2068
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list. All of them are residual risks of the rules (ADR 0023) that the claim check of
@@ -3660,6 +3660,7 @@ enum GroundingRows {
                         "I work with “Swift” every day.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData())))
         rows += singleMarksAfterAWord()
         rows += marksAtTheEndOfALine()
+        rows += quotesInsideQuotes()
         return rows
     }
 
@@ -3734,6 +3735,47 @@ enum GroundingRows {
                         "Mein Kollege schrieb „\nIch benutze Swift.\n“\nIch benutze Python.”\nIch spreche Deutsch.",
                         CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")], languages: [Language(name: "Deutsch")]),
                         .exactly(CVData(languages: [Language(name: "Deutsch")])), language: "de"))
+        return rows
+    }
+
+    /// A quote may hold a quote of another pair (#249): the quote of a German „…“ holds a “…” or a ‚…‘, a “…” holds a „…“. A closing
+    /// mark closes the latest open quote that it pairs with, whichever pair that is, and only a mark that closes none of them ends the
+    /// quote that holds them. So the words after the inner quote, up to the mark that ends the outer one, are still quoted, and the
+    /// line after it claims as usual. Every pair of the six languages is the outer one once for each other pair it holds, in a quote
+    /// that a closing mark ends, and in a quote with a mark alone on its line, which is a symbol it holds when a later mark ends it.
+    /// The inner quote starts with a letter and ends with a closing bracket: a mark right before a punctuation mark closes a quote, so
+    /// an inner « before a bracket would close the outer one, and a single mark after a letter may be an apostrophe.
+    private static func quotesInsideQuotes() -> [GroundingRow] {
+        typealias Marks = (id: String, open: String, close: String)
+        let pairs: [Marks] = [
+            ("straight-double", "\"", "\""), ("straight-single", "'", "'"), ("curly-double", "“", "”"), ("curly-single", "‘", "’"),
+            ("guillemets", "«", "»"), ("reversed-guillemets", "»", "«"), ("single-guillemets", "‹", "›"),
+            ("reversed-single-guillemets", "›", "‹"), ("low-and-high", "„", "“"), ("low-and-curly", "„", "”"),
+            ("single-low-and-high", "‚", "‘"), ("single-low-and-curly", "‚", "’"),
+        ]
+
+        var rows: [GroundingRow] = []
+        rows.append(row("a-quote-of-another-pair-inside-a-quote-does-not-end-it-de",
+                        "the “ that closes the motto is no end of the colleague's quote, which a lone ” on its own line only seems to close: Swift goes, and Deutsch, on the last line, stays",
+                        "Mein Kollege schrieb “\nIn meiner Tabelle ist das Wiederholungszeichen:\n”\nMein Motto ist „Sauberer Code“. Ich benutze Swift.\nEnde meiner Nachricht.”\nIch spreche Deutsch.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "Deutsch")]),
+                        .exactly(CVData(languages: [Language(name: "Deutsch")])), language: "de"))
+        for outer in pairs {
+            for inner in pairs where inner.open != outer.open {
+                let nesting = "\(inner.id)-inside-a-quote-of-\(outer.id)"
+                let within = "\(inner.open)\(inner.close) inside \(outer.open)\(outer.close)"
+                rows.append(row("the-sentence-after-a-quote-of-\(nesting)-is-quoted",
+                                "\(within): the inner quote closes with its own mark before the full stop, and the next sentence is still the colleague's: Swift and Python go, and French, on the next line, stays",
+                                "\(outer.open)My colleague wrote:\(inner.open)Swift (ok)\(inner.close). I use Python.\(outer.close)\nI speak French.",
+                                CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")], languages: [Language(name: "French")]),
+                                .exactly(CVData(languages: [Language(name: "French")]))))
+                rows.append(row("a-mark-alone-on-its-line-before-a-quote-of-\(nesting)-closes-nothing",
+                                "\(within): the mark alone on the third line is the colleague's symbol, the inner quote closes with its own mark before the full stop, and the message runs to its end: Swift and Python go, and French, on the last line, stays",
+                                "My colleague wrote \(outer.open)\nIn my table, the ditto symbol is:\n\(outer.close)\nI say:\(inner.open)Swift (ok)\(inner.close). I use Python.\nEnd of my message.\(outer.close)\nI speak French.",
+                                CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")], languages: [Language(name: "French")]),
+                                .exactly(CVData(languages: [Language(name: "French")]))))
+            }
+        }
         return rows
     }
 
