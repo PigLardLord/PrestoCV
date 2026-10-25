@@ -1,0 +1,12 @@
+{
+ "id": "traps/language-unlisted-de", "language": "de", "form": "trap",
+ "person": {"name": "Jonas Falk", "title": "Datenanalyst", "email": "jonas.falk@example.com", "phone": null,
+            "location": null, "links": [], "summary": null},
+ "experience": [
+  {"role": "Datenanalyst", "employer": "Beispiel Analytik GmbH", "location": null, "start": [2018, 3], "end": "current", "details": 1}
+ ],
+ "education": [{"degree": "BSc Statistik", "school": "Beispiel-Universität", "start": [2012, null], "end": [2015, null]}],
+ "skills": [],
+ "languages": [{"name": "Deutsch", "level": "native"}, {"name": "Quechua", "level": "c1"}, {"name": "Tigrinya", "level": "a2"}],
+ "certifications": [], "interests": []
+}

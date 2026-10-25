@@ -28,10 +28,13 @@ final class ScrollingUITests: XCTestCase {
     }
 
     /// Without the keyboard an element is brought to the upper half, clear of a tab bar over the lower part; scrolling
-    /// back, it may stay in the lower half.
+    /// back, or when the scroll is told not to ask for the upper half, it may stay in the lower half.
     func testWithoutTheKeyboardAnElementComesToTheUpperHalf() {
         XCTAssertEqual(withoutTheKeyboard.tops(forHeight: 44, upwards: false), 100...317)
         XCTAssertEqual(withoutTheKeyboard.tops(forHeight: 44, upwards: true), 100...634)
+        XCTAssertEqual(withoutTheKeyboard.tops(forHeight: 44, upwards: false, toTheUpperHalf: false), 100...634)
+        XCTAssertTrue(withoutTheKeyboard.holds(place(top: 500, height: 44), upwards: false, toTheUpperHalf: false))
+        XCTAssertFalse(withoutTheKeyboard.holds(place(top: 500, height: 44), upwards: false))
     }
 
     /// An element too tall to have its middle in the upper half while it is below the bar may be anywhere it fits below
@@ -62,6 +65,86 @@ final class ScrollingUITests: XCTestCase {
         }
     }
 
+    // MARK: - Where a swipe along a row starts
+
+    /// On an iPhone the content runs to the margin, and the swipe starts where it always did: at nine tenths of the
+    /// row's width, a tenth of its height down.
+    func testASwipeOnAnIPhoneStartsAtNineTenthsOfTheRow() {
+        let iPhone = TapRoom(top: 103, bottom: 874, screen: CGRect(x: 0, y: 0, width: 402, height: 874))
+        let row = CGRect(x: 0, y: 300, width: 402, height: 95)
+        let start = iPhone.swipeStart(in: row, contentRight: 386)
+        XCTAssertEqual(start.x, 361.8, accuracy: 0.01)
+        XCTAssertEqual(start.y, 311.4, accuracy: 0.01)
+        XCTAssertEqual(iPhone.swipeStart(in: row, contentRight: nil), start, "Without the content, as before")
+    }
+
+    /// On the outer screen of the iPhone Duo the content ends well left of nine tenths of the row: the swipe starts
+    /// inside it, not in the margin beside it.
+    func testASwipeStartsInsideTheContentOfARowWhoseMarginIsWide() {
+        let row = CGRect(x: 0, y: 200.7, width: 466, height: 95)
+        let start = withoutTheKeyboard.swipeStart(in: row, contentRight: 382)
+        XCTAssertEqual(start.x, 374, accuracy: 0.01)
+        XCTAssertEqual(start.y, 212.1, accuracy: 0.01)
+    }
+
+    /// A row whose content ends far to the left is still swiped from its upper part, not from its left end.
+    func testASwipeNeverStartsLeftOfThreeTenthsOfTheRow() {
+        let row = CGRect(x: 16, y: 200, width: 434, height: 95)
+        XCTAssertEqual(withoutTheKeyboard.swipeStart(in: row, contentRight: 40).x, 16 + 434 * 0.3, accuracy: 0.01)
+    }
+
+    /// A row scrolled up leaves its upper part under the navigation bar, and a swipe there lands on the bar: it starts
+    /// below it. At the other end it stays above the strip of the keyboard, and inside the row.
+    func testASwipeStartsWhereATouchLandsOnTheRow() {
+        let bar = TapRoom(top: 126, bottom: 678, screen: screen)
+        let tall = CGRect(x: 0, y: 82, width: 466, height: 270)
+        XCTAssertEqual(bar.swipeStart(in: tall, contentRight: 382).y, 134, accuracy: 0.01, "Not at 114, under the bar")
+
+        let low = CGRect(x: 0, y: 320, width: 466, height: 95)
+        XCTAssertEqual(withTheKeyboard.swipeStart(in: low, contentRight: 382).y, 324, accuracy: 0.01, "Above the strip at 332")
+
+        let short = CGRect(x: 0, y: 300, width: 466, height: 20)
+        XCTAssertEqual(withoutTheKeyboard.swipeStart(in: short, contentRight: 382).y, 304, accuracy: 0.01, "Inside a row 20 points tall")
+    }
+
+    // MARK: - Where a tap closes a popover
+
+    /// On the outer screen of the iPhone Duo the question about a row is a popover of 240 by 227 points beside the row.
+    /// The tap goes to the middle of the largest band outside it, here the one above it. Before, it went low on the
+    /// screen, at 95 hundredths of its height, which is inside the popover when the row is low in the list.
+    func testATapThatClosesAPopoverFallsInTheLargestBandAroundIt() {
+        let popover = CGRect(x: 71, y: 425.7, width: 240, height: 227.3)
+        let point = withoutTheKeyboard.pointOutside(popover)
+        XCTAssertEqual(point.x, 233, accuracy: 0.01)
+        XCTAssertEqual(point.y, 212.85, accuracy: 0.01)
+        XCTAssertFalse(popover.contains(point), "The tap would land in the popover")
+        XCTAssertTrue(screen.contains(point))
+    }
+
+    /// The largest band may also be beside the popover: on a wide screen a popover by the left edge leaves most of the
+    /// screen to its right.
+    func testATapThatClosesAPopoverMayFallBesideIt() {
+        let wide = CGRect(x: 0, y: 0, width: 820, height: 1180)
+        let popover = CGRect(x: 100, y: 300, width: 300, height: 400)
+        let point = TapRoom(top: 70, bottom: 1180, screen: wide).pointOutside(popover)
+        XCTAssertEqual(point.x, 610, accuracy: 0.01, "The middle of the band to the right: 400 to 820")
+        XCTAssertEqual(point.y, 590, accuracy: 0.01)
+        XCTAssertFalse(popover.contains(point), "The tap would land in the popover")
+    }
+
+    /// Without a popover to avoid, because there is none or it is not on the screen, or when it covers the whole screen
+    /// and leaves no band, the tap falls low on the screen, as it did.
+    func testATapThatClosesAPopoverFallsLowWhereNothingIsToBeAvoided() {
+        let low = withoutTheKeyboard.pointOutside(nil)
+        XCTAssertEqual(low.x, 233, accuracy: 0.01)
+        XCTAssertEqual(low.y, 644.1, accuracy: 0.01)
+
+        let everything = CGRect(x: -10, y: -10, width: 500, height: 700)
+        XCTAssertEqual(withoutTheKeyboard.pointOutside(everything), low, "No band is left")
+        let elsewhere = CGRect(x: 1000, y: 0, width: 100, height: 100)
+        XCTAssertEqual(withoutTheKeyboard.pointOutside(elsewhere), low, "A popover that is not on the screen is nothing to avoid")
+    }
+
     // MARK: - When the element cannot be reached
 
     /// A scroll that ends without the element where it can be tapped fails the test, instead of letting the next tap
@@ -75,6 +158,29 @@ final class ScrollingUITests: XCTestCase {
         XCTExpectFailure("The element is not in the app", options: options) {
             app.scrollTo(app.buttons["An element that is not in the app"], maxSteps: 2)
         }
+    }
+
+    // MARK: - Walking the form
+
+    /// A list is lazy: a short screen holds only some of the rows of a tab in the tree at a time. Walking the form from its
+    /// top to its end shows all of them at some stop, and ends.
+    func testWalkingTheFormShowsEveryRowOfATab() throws {
+        continueAfterFailure = false
+        let app = launchedOnTheFirstRun()
+        app.buttons["Create My First CV"].tap()
+        let experience = app.buttons["Experience"].firstMatch
+        XCTAssertTrue(experience.waitForExistence(timeout: 10), "The editor should show its tabs")
+        experience.tap()
+
+        let adds = ["Add Experience", "Add Education", "Add Skill"]
+        var seen = Set<String>()
+        var stops = 0
+        app.walkTheForm {
+            stops += 1
+            seen.formUnion(app.buttons.matching(NSPredicate(format: "label IN %@", adds)).allElementsBoundByIndex.map(\.label))
+        }
+        XCTAssertGreaterThanOrEqual(stops, 1, "The form should be visited at its top at least")
+        XCTAssertEqual(seen, Set(adds), "Every button that adds a row should be seen at some stop of the walk, in \(stops) stops")
     }
 
     // MARK: - Where the tab bar is

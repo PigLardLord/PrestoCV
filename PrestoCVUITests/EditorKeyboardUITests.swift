@@ -95,7 +95,7 @@ final class EditorKeyboardUITests: XCTestCase {
         school.tap()
         assertAboveTheKeyboard(school, "The school of the new education")
         school.typeText("Sapienza University of Rome")
-        XCTAssertEqual(school.value as? String, "Sapienza University of Rome", "Everything typed should arrive in the school")
+        assertTyped("Sapienza University of Rome", in: school, "the school")
     }
 
     /// Each row added to the Experience tab takes the focus in its first field and comes up above the keyboard that
@@ -129,7 +129,7 @@ final class EditorKeyboardUITests: XCTestCase {
         XCTAssertTrue(newField.waitForExistence(timeout: 10), "\(button) should add a row with a \(label)")
         assertAboveTheKeyboard(newField, "The \(label) of the row added with \(button)")
         newField.typeText(text)
-        XCTAssertEqual(newField.value as? String, text, "Everything typed should arrive in the \(label) of the new row")
+        assertTyped(text, in: newField, "the \(label) of the new row")
     }
 
     /// Closes the keyboard with its Done button, if it is up.
@@ -164,6 +164,14 @@ final class EditorKeyboardUITests: XCTestCase {
         field.tap()
         assertAboveTheKeyboard(field, name)
         field.typeText(text)
+        assertTyped(text, in: field, name)
+    }
+
+    /// Waits until everything typed has arrived in `field`. `typeText` returns while the app is still taking in the last
+    /// keystrokes, so a read right after it can see the first letters only ("Tria" of "Triage").
+    private func assertTyped(_ text: String, in field: XCUIElement, _ name: String) {
+        let arrived = NSPredicate { _, _ in field.value as? String == text }
+        _ = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: arrived, object: nil)], timeout: 10)
         XCTAssertEqual(field.value as? String, text, "Everything typed should arrive in \(name)")
     }
 

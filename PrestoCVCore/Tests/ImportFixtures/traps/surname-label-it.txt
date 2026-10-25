@@ -1,0 +1,15 @@
+Nome: Maria
+Cognome: Rossi
+E-mail: maria.rossi@example.com
+Telefono: +39 333 000 0505
+
+Esperienza professionale
+Cameriera
+Trattoria Esempio
+06/2019 - 09/2023
+- Servizio ai tavoli
+
+Istruzione
+Diploma alberghiero
+Istituto Esempio
+2014 - 2019

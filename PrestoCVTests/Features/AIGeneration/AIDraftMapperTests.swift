@@ -337,6 +337,32 @@ struct AIDraftMapperTests {
         #expect(received == ["Sono infermiera."])
     }
 
+    // MARK: - Generated draft (ADR 0028)
+
+    @Test("A generated draft keeps whether its personal items went unchecked, and opens with the notice that matches",
+          arguments: [(false, EditorNotice.aiDraft), (true, EditorNotice.aiDraftUnchecked)])
+    func generatedDraftCarriesTheCheck(unchecked: Bool, notice: EditorNotice) {
+        let generated = GeneratedDraft(cvData: CVData(personalInfo: CVGeneratorAI.PersonalInfo(name: "Maria Rossi")),
+                                       personalItemsUnchecked: unchecked)
+
+        let draft = AIDraftMapper(labels: labels, languageOfText: { _ in "it" }).map(generated, writtenIn: "Sono infermiera.")
+
+        #expect(draft.personalItemsUnchecked == unchecked)
+        #expect(draft.notice == notice)
+        #expect(draft.cv.personalInfo.name == "Maria Rossi", "The CV is mapped as any other draft")
+        #expect(draft.cv.documentLanguage == "it")
+    }
+
+    @Test("A generated draft with nothing in it but the notice that the check gave no answer is still a draft to open")
+    func emptyUncheckedDraftOpens() {
+        let draft = AIDraftMapper(labels: labels, languageOfText: { _ in "it" })
+            .map(GeneratedDraft(cvData: CVData(), personalItemsUnchecked: true), writtenIn: "Sono infermiera.")
+
+        #expect(draft.notice == .aiDraftUnchecked)
+        #expect(draft.cv.skills.isEmpty && draft.cv.languages.isEmpty && draft.cv.interests.isEmpty)
+        #expect(draft.cv.personalInfo.title.isEmpty && draft.cv.personalInfo.location.isEmpty)
+    }
+
     // MARK: - Identity
 
     @Test("Every entry gets its own id")

@@ -90,6 +90,8 @@ final class ImportViewModel: ObservableObject {
             imported = mapper.map(try importer.importText(text))
         } catch let error as ImportError {
             failure = ImportFailure(error)
+        } catch is CancellationError {
+            // The screen went away: nothing to tell
         } catch {
             failure = .unreadable
         }

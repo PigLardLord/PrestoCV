@@ -69,6 +69,72 @@ struct SectionSegmenterTests {
         #expect(found[2].1 == "Il mio motto")
     }
 
+    @Test("A heading of the first level with the shape of a name stays in the head, whatever its words; after the head it opens a section")
+    func nameHeading() {
+        for name in ["Thomas Kiel", "Rebecca Cook", "Anna Weber"] {
+            let found = sections("person@example.com\n\n# \(name)\nNurse\n\n## Experience\n2019 - 2021 Nurse")
+            #expect(found.map(\.0) == [.header, .experience], "\(name)")
+            #expect(found[0].2 == ["person@example.com", name, "Nurse"], "\(name)")
+            let later = sections("# Giulia Bianchi\n## Esperienza\n- Assistenza\n# \(name)\nSempre avanti")
+            #expect(later.map(\.0) == [.header, .experience, .unknown], "\(name)")
+            #expect(later.count == 3 && later[2].1 == name, "\(name)")
+        }
+    }
+
+    @Test("A heading of the first level after a line in the shape of a name and the head's contacts opens a section, whatever its shape (#301)")
+    func headingAfterTheNameAndContacts() {
+        for name in ["Anna Weber", "Thomas Kiel", "Rebecca Cook", "Anna Weber, RN"] {
+            for contacts in ["person@example.com", "Nurse\nperson@example.com", "+44 20 7946 0000 | person@example.com"] {
+                let found = sections("\(name)\n\(contacts)\n\n# University Projects\nBuilt a scheduling application")
+                #expect(found.map(\.0) == [.header, .unknown], "\(name) / \(contacts)")
+                #expect(found.count == 2 && found[1].1 == "University Projects", "\(name) / \(contacts)")
+                #expect(found.count == 2 && found[1].2 == ["Built a scheduling application"], "\(name) / \(contacts)")
+            }
+            let sameLine = sections("\(name) | person@example.com\n\n# University Projects\nBuilt a scheduling application")
+            #expect(sameLine.map(\.0) == [.header, .unknown], "\(name)")
+            let personal = sections("\(name)\n## Contact\nperson@example.com\n\n# University Projects\nBuilt a scheduling application")
+            #expect(personal.map(\.0) == [.header, .personal, .unknown], "\(name)")
+        }
+    }
+
+    @Test("A section opened in the head at a heading in the shape of a name is one whose heading could have been the name (#301)")
+    func headingThatCouldBeTheName() {
+        let (_, cut) = pasted("Anna Weber\nperson@example.com\n\n# University Projects\nBuilt a scheduling application\n\n# Thomas Kiel\nNurse")
+        #expect(cut.map(\.kind) == [.header, .unknown, .unknown])
+        // After another section, a heading is only a heading
+        #expect(cut.map(\.headingCouldBeTheName) == [false, true, false])
+        for heading in ["# Experience", "## University Projects", "# Projects at university"] {
+            let (_, other) = pasted("Anna Weber\nperson@example.com\n\n\(heading)\n2019 - 2021 Nurse")
+            #expect(other.count == 2 && !other[1].headingCouldBeTheName, "\(heading)")
+        }
+    }
+
+    @Test("Before a profile's heading too, a heading of the first level in the shape of a name is a section's when the head holds a name and its contacts before it (#301)")
+    func headingBeforeAProfile() {
+        for between in ["## Contact\nperson@example.com", "person@example.com\n\n## Skills\nSwift"] {
+            for lines in ["\nBuilt a scheduling application", ""] {
+                let (_, cut) = pasted("Anna Weber\n\(between)\n\n# University Projects\(lines)\n\n## Experience\n2019 - 2021 Nurse")
+                #expect(cut.dropFirst(2).map(\.kind) == [.unknown, .experience], "\(between) / \(lines)")
+                #expect(cut.map(\.headingCouldBeTheName) == [false, false, true, false], "\(between) / \(lines)")
+                #expect(cut.count == 4 && cut[2].blocks.count == (lines.isEmpty ? 0 : 1), "\(between) / \(lines)")
+            }
+        }
+        // The sidebar of a profile, the name after it: its head holds no name before the contacts
+        let (_, profile) = pasted("## Contact\nperson@example.com\n\n## Top Skills\nSwift\n\n# Anna Weber\nSenior Nurse\n\n## Summary\nCaring nurse with ten years on busy wards.")
+        #expect(profile.map(\.kind) == [.personal, .skills, .header, .summary])
+        #expect(profile.allSatisfy { !$0.headingCouldBeTheName })
+    }
+
+    @Test("A name in a heading after the contacts stays in the head when nothing before them has the shape of a name (#301)")
+    func nameHeadingAfterNoName() {
+        // A piece after a contact of its line holds the place, a line of known places alone is a place, and a name with no
+        // contact after it leaves the heading to the head's evidence
+        for head in ["person@example.com | Greater Wexby", "Berlin Germany\nperson@example.com", "Anna Weber"] {
+            let found = sections("\(head)\n\n# Thomas Kiel\nNurse\n\n## Experience\n2019 - 2021 Nurse")
+            #expect(found.map(\.0) == [.header, .experience], "\(head)")
+        }
+    }
+
     @Test("A Europass row of the mother tongue opens the languages and stays in them")
     func europassLanguageRows() {
         let found = sections("CAPACITÀ E COMPETENZE PERSONALI\nMADRELINGUA\tItaliano\nALTRE LINGUE\tInglese")

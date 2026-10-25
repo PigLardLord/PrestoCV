@@ -91,6 +91,15 @@
   "pdf": "it-marco/wordpdf.pdf"
  },
  {
+  "id": "it-marco/railpdf",
+  "language": "it",
+  "form": "railpdf",
+  "kind": "layout",
+  "expected": "it-marco/railpdf.expected.json",
+  "source": "it-marco/railpdf.layout.json",
+  "pdf": "it-marco/railpdf.pdf"
+ },
+ {
   "id": "de-lena/chat",
   "language": "de",
   "form": "chat",
@@ -182,6 +191,15 @@
   "pdf": "de-jonas/wordpdf.pdf"
  },
  {
+  "id": "de-jonas/railpdf",
+  "language": "de",
+  "form": "railpdf",
+  "kind": "layout",
+  "expected": "de-jonas/railpdf.expected.json",
+  "source": "de-jonas/railpdf.layout.json",
+  "pdf": "de-jonas/railpdf.pdf"
+ },
+ {
   "id": "en-emily/chat",
   "language": "en",
   "form": "chat",
@@ -246,6 +264,15 @@
   "expected": "en-james/wordpdf.expected.json",
   "source": "en-james/wordpdf.layout.json",
   "pdf": "en-james/wordpdf.pdf"
+ },
+ {
+  "id": "en-james/railpdf",
+  "language": "en",
+  "form": "railpdf",
+  "kind": "layout",
+  "expected": "en-james/railpdf.expected.json",
+  "source": "en-james/railpdf.layout.json",
+  "pdf": "en-james/railpdf.pdf"
  },
  {
   "id": "es-lucia/chat",
@@ -314,6 +341,15 @@
   "pdf": "es-javier/wordpdf.pdf"
  },
  {
+  "id": "es-javier/railpdf",
+  "language": "es",
+  "form": "railpdf",
+  "kind": "layout",
+  "expected": "es-javier/railpdf.expected.json",
+  "source": "es-javier/railpdf.layout.json",
+  "pdf": "es-javier/railpdf.pdf"
+ },
+ {
   "id": "fr-camille/chat",
   "language": "fr",
   "form": "chat",
@@ -378,6 +414,15 @@
   "expected": "fr-thomas/wordpdf.expected.json",
   "source": "fr-thomas/wordpdf.layout.json",
   "pdf": "fr-thomas/wordpdf.pdf"
+ },
+ {
+  "id": "fr-thomas/railpdf",
+  "language": "fr",
+  "form": "railpdf",
+  "kind": "layout",
+  "expected": "fr-thomas/railpdf.expected.json",
+  "source": "fr-thomas/railpdf.layout.json",
+  "pdf": "fr-thomas/railpdf.pdf"
  },
  {
   "id": "pt-mariana/chat",
@@ -446,6 +491,23 @@
   "pdf": "pt-joao/wordpdf.pdf"
  },
  {
+  "id": "pt-joao/railpdf",
+  "language": "pt",
+  "form": "railpdf",
+  "kind": "layout",
+  "expected": "pt-joao/railpdf.expected.json",
+  "source": "pt-joao/railpdf.layout.json",
+  "pdf": "pt-joao/railpdf.pdf"
+ },
+ {
+  "id": "traps/achievements-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/achievements-en.expected.json",
+  "source": "traps/achievements-en.txt"
+ },
+ {
   "id": "traps/bars-it",
   "language": "it",
   "form": "trap",
@@ -462,12 +524,60 @@
   "source": "traps/colon-dates-fr.txt"
  },
  {
+  "id": "traps/competenze-bracket-it",
+  "language": "it",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/competenze-bracket-it.expected.json",
+  "source": "traps/competenze-bracket-it.txt"
+ },
+ {
   "id": "traps/consent-it",
   "language": "it",
   "form": "trap",
   "kind": "text",
   "expected": "traps/consent-it.expected.json",
   "source": "traps/consent-it.txt"
+ },
+ {
+  "id": "traps/credentials-de",
+  "language": "de",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/credentials-de.expected.json",
+  "source": "traps/credentials-de.txt"
+ },
+ {
+  "id": "traps/credentials-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/credentials-en.expected.json",
+  "source": "traps/credentials-en.txt"
+ },
+ {
+  "id": "traps/data-course-de",
+  "language": "de",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/data-course-de.expected.json",
+  "source": "traps/data-course-de.txt"
+ },
+ {
+  "id": "traps/dates-above-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/dates-above-en.expected.json",
+  "source": "traps/dates-above-en.txt"
+ },
+ {
+  "id": "traps/dates-above-it",
+  "language": "it",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/dates-above-it.expected.json",
+  "source": "traps/dates-above-it.txt"
  },
  {
   "id": "traps/datos-personales-es",
@@ -478,6 +588,14 @@
   "source": "traps/datos-personales-es.txt"
  },
  {
+  "id": "traps/employer-area-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/employer-area-en.expected.json",
+  "source": "traps/employer-area-en.txt"
+ },
+ {
   "id": "traps/employer-first-en",
   "language": "en",
   "form": "trap",
@@ -486,12 +604,108 @@
   "source": "traps/employer-first-en.txt"
  },
  {
+  "id": "traps/employer-state-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/employer-state-en.expected.json",
+  "source": "traps/employer-state-en.txt"
+ },
+ {
+  "id": "traps/ferramentas-pt",
+  "language": "pt",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/ferramentas-pt.expected.json",
+  "source": "traps/ferramentas-pt.txt"
+ },
+ {
+  "id": "traps/herramientas-es",
+  "language": "es",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/herramientas-es.expected.json",
+  "source": "traps/herramientas-es.txt"
+ },
+ {
+  "id": "traps/language-notes-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/language-notes-en.expected.json",
+  "source": "traps/language-notes-en.txt"
+ },
+ {
+  "id": "traps/language-own-line-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/language-own-line-en.expected.json",
+  "source": "traps/language-own-line-en.txt"
+ },
+ {
+  "id": "traps/language-unlisted-de",
+  "language": "de",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/language-unlisted-de.expected.json",
+  "source": "traps/language-unlisted-de.txt"
+ },
+ {
   "id": "traps/linkedin-text-pt",
   "language": "pt",
   "form": "trap",
   "kind": "text",
   "expected": "traps/linkedin-text-pt.expected.json",
   "source": "traps/linkedin-text-pt.txt"
+ },
+ {
+  "id": "traps/lone-city-fr",
+  "language": "fr",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/lone-city-fr.expected.json",
+  "source": "traps/lone-city-fr.txt"
+ },
+ {
+  "id": "traps/name-city-word-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/name-city-word-en.expected.json",
+  "source": "traps/name-city-word-en.txt"
+ },
+ {
+  "id": "traps/pasiones-es",
+  "language": "es",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/pasiones-es.expected.json",
+  "source": "traps/pasiones-es.txt"
+ },
+ {
+  "id": "traps/postcode-pt",
+  "language": "pt",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/postcode-pt.expected.json",
+  "source": "traps/postcode-pt.txt"
+ },
+ {
+  "id": "traps/qualificacoes-pt",
+  "language": "pt",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/qualificacoes-pt.expected.json",
+  "source": "traps/qualificacoes-pt.txt"
+ },
+ {
+  "id": "traps/realisations-fr",
+  "language": "fr",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/realisations-fr.expected.json",
+  "source": "traps/realisations-fr.txt"
  },
  {
   "id": "traps/references-en",
@@ -510,11 +724,83 @@
   "source": "traps/seit-de.txt"
  },
  {
+  "id": "traps/stack-technique-fr",
+  "language": "fr",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/stack-technique-fr.expected.json",
+  "source": "traps/stack-technique-fr.txt"
+ },
+ {
+  "id": "traps/street-es",
+  "language": "es",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/street-es.expected.json",
+  "source": "traps/street-es.txt"
+ },
+ {
+  "id": "traps/street-it",
+  "language": "it",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/street-it.expected.json",
+  "source": "traps/street-it.txt"
+ },
+ {
+  "id": "traps/surname-label-it",
+  "language": "it",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/surname-label-it.expected.json",
+  "source": "traps/surname-label-it.txt"
+ },
+ {
+  "id": "traps/tech-stack-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/tech-stack-en.expected.json",
+  "source": "traps/tech-stack-en.txt"
+ },
+ {
+  "id": "traps/technische-kenntnisse-de",
+  "language": "de",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/technische-kenntnisse-de.expected.json",
+  "source": "traps/technische-kenntnisse-de.txt"
+ },
+ {
+  "id": "traps/tecnologie-it",
+  "language": "it",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/tecnologie-it.expected.json",
+  "source": "traps/tecnologie-it.txt"
+ },
+ {
+  "id": "traps/two-places-it",
+  "language": "it",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/two-places-it.expected.json",
+  "source": "traps/two-places-it.txt"
+ },
+ {
   "id": "traps/us-style-en",
   "language": "en",
   "form": "trap",
   "kind": "text",
   "expected": "traps/us-style-en.expected.json",
   "source": "traps/us-style-en.txt"
+ },
+ {
+  "id": "traps/weiterbildung-kurse-de",
+  "language": "de",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/weiterbildung-kurse-de.expected.json",
+  "source": "traps/weiterbildung-kurse-de.txt"
  }
 ]

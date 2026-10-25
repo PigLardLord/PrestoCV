@@ -1,9 +1,10 @@
-/// The work of a PDF's page analysis, in steps: each pass over its words, lines or cells counts the steps it takes. A
-/// PDF's geometry is untrusted input (R8): an analysis that would run past its budget refuses the layout, and one whose
-/// task is cancelled stops at its next count.
+/// The work of reading a CV, in steps: each pass over a PDF's words, lines or cells, and each search over the lines of
+/// a section, counts the steps it takes. The text of a CV, pasted or read from a PDF, is untrusted input (R8): a
+/// reading that would run past its budget refuses the text, and one whose task is cancelled stops at its next count.
+/// A PDF is analysed and read within one budget.
 struct AnalysisWork {
     private let budget: Int
-    private var steps = 0
+    private(set) var steps = 0
 
     init(budget: Int) {
         self.budget = budget

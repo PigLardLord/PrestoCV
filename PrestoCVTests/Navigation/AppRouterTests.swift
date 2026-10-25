@@ -69,10 +69,21 @@ struct AppRouterTests {
         router.navigate(to: .aiGeneration)
         let draft = CVModel(name: "Drafted by AI")
 
-        router.navigateToEditorWithAIDraft(draft)
+        router.navigateToEditorWithAIDraft(AIDraft(cv: draft, personalItemsUnchecked: false))
 
         #expect(router.currentRoute == .cvEditor(.new(template: draft, notice: .aiDraft)))
         #expect(router.navigationPath.count == 1)
+    }
+
+    @Test("An AI draft whose personal items could not be checked opens with the notice that says so (ADR 0028)")
+    func uncheckedDraftOpensWithItsNotice() {
+        let router = AppRouter(isAIShipped: true)
+        router.navigate(to: .aiGeneration)
+        let draft = CVModel(name: "Drafted by AI")
+
+        router.navigateToEditorWithAIDraft(AIDraft(cv: draft, personalItemsUnchecked: true))
+
+        #expect(router.currentRoute == .cvEditor(.new(template: draft, notice: .aiDraftUnchecked)))
     }
 
     @Test("Picking a CV of the list opens it as stored")
@@ -89,7 +100,7 @@ struct AppRouterTests {
     @Test("Each editor opens on its own request: nothing of the one before reaches the next")
     func eachEditorOpensOnItsOwnRequest() {
         let router = AppRouter()
-        router.navigateToEditorWithAIDraft(CVModel(name: "Drafted by AI"))
+        router.navigateToEditorWithAIDraft(AIDraft(cv: CVModel(name: "Drafted by AI"), personalItemsUnchecked: false))
         router.navigateToRoot()
         let template = CVModel(name: "Template")
 

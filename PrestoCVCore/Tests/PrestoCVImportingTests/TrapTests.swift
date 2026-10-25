@@ -54,6 +54,37 @@ struct TrapTests {
         #expect(found.leftOut.contains { $0.reason == .pageNumber && $0.text == "Page 1 of 1" })
     }
 
+    @Test("An entry's second place stays visible as text not imported, in the section it came from")
+    func secondPlace() throws {
+        let found = try result("traps/two-places-it")
+        #expect(found.cv.experience.map { $0.location?.value } == ["Verona, Italia"])
+        #expect(found.cv.education.map { $0.location?.value } == ["Padova, Italia"])
+        #expect(found.unplaced.map { "\($0.section): \($0.text)" } == ["experience: Vicenza, Italia", "education: Treviso, Italia"])
+    }
+
+    @Test("The note after a language's level stays visible with its language")
+    func languageNotes() throws {
+        let found = try result("traps/language-notes-en")
+        #expect(found.cv.languages.map { $0.level?.value } == [.native, .b2, .a2, nil])
+        #expect(found.cv.languages.last?.levelWords?.value == "basic")
+        #expect(found.unplaced.map(\.text) == ["Spanish: B2 (school grade 2, trip to Madrid 2019)", "German: A2 (evening course)"])
+    }
+
+    @Test("A surname given by label is part of the name; nothing is left behind")
+    func surnameLabel() throws {
+        let found = try result("traps/surname-label-it")
+        #expect(found.cv.person.name?.value == "Maria Rossi")
+        #expect(found.unplaced.isEmpty)
+        #expect(found.leftOut.isEmpty)
+    }
+
+    @Test("A course on data protection is a certification, not a consent")
+    func dataCourse() throws {
+        let found = try result("traps/data-course-de")
+        #expect(found.cv.certifications.map(\.name.value) == ["DSGVO-Grundlagen für die kommunale Praxis (1 Tag)", "Erste Hilfe Kurs"])
+        #expect(found.leftOut.filter { $0.reason == .consent }.isEmpty)
+    }
+
     @Test("A review list flags what the rules are unsure of, in every language")
     func reviewList() throws {
         let words = try result("de-jonas/chat").reviewList

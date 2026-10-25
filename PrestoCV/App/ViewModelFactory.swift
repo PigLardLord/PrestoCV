@@ -172,10 +172,20 @@ final class ViewModelFactory {
         return { useCase.availability() }
     }
 
+    /// The generation on the device's model, whose draft the rules (ADR 0023) and the claim check (ADR 0028) limit to what the
+    /// description states. A debug build can script the model and the check for a UI test.
     @MainActor
     private func makeCVGeneratorUseCase() -> CVGeneratorUseCase {
+        #if DEBUG
+        let service = AIDraftScript.service(arguments: environment.arguments) ?? FoundationModelsService()
+        let claimChecker = AIDraftScript.claimChecker(arguments: environment.arguments) ?? FoundationModelsClaimChecker()
+        #else
+        let service: any CVGenerationService = FoundationModelsService()
+        let claimChecker: any ClaimChecking = FoundationModelsClaimChecker()
+        #endif
         return CVGeneratorUseCase(
-            service: FoundationModelsService(),
+            service: service,
+            claimChecker: claimChecker,
             sanitizer: CVDataSanitizer(languageOfText: DescriptionLanguageDetector.languageTag(of:), lexicalClasses: DeviceLexicalTagger())
         )
     }
