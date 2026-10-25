@@ -31,7 +31,7 @@ struct CVExportSheetLanguageTests {
             preferencesStore: InMemoryExportPreferencesStore(),
             documentLanguageSink: sink,
             exportPolicy: .standard,
-            documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: ["it-IT"], read: NaturalLanguageReader.read),
+            documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: ["it-IT"], read: { NaturalLanguageReader.read($0) }),
             appLocale: Locale(identifier: "en"),
             previewDebounce: .zero
         )

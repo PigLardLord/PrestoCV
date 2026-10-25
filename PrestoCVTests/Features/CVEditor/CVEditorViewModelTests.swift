@@ -619,7 +619,7 @@ struct CVEditorViewModelTests {
         await gate.waitUntilSomeoneWaits()
         #expect(await !mockUseCase.getCVCalled, "The CV is not read while an editor that was just left is storing it")
 
-        await gate.open()
+        gate.open()
         await loading.value
 
         #expect(await mockUseCase.getCVCalled)
@@ -667,7 +667,7 @@ struct CVEditorViewModelTests {
         viewModel.cv.personalInfo.name = "Jane Doe"
         #expect(viewModel.viewState.isLoaded, "The form stays in use while the store works")
         await useCase.openGate()
-        await firstSave.value
+        _ = await firstSave.value
         await viewModel.saveNow()
 
         #expect(await useCase.createCVCallCount == 1)

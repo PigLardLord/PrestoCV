@@ -157,7 +157,7 @@ final class ViewModelFactory {
     /// Reads the language a CV is written in with the system's recognizer, for the Automatic document language, and
     /// falls back to the person's languages.
     private func makeDocumentLanguageDetector() -> DocumentLanguageDetector {
-        DocumentLanguageDetector(preferredLanguages: environment.preferredLanguages(), read: NaturalLanguageReader.read)
+        DocumentLanguageDetector(preferredLanguages: environment.preferredLanguages(), read: { NaturalLanguageReader.read($0) })
     }
 
     @MainActor
@@ -186,7 +186,7 @@ final class ViewModelFactory {
         return CVGeneratorUseCase(
             service: service,
             claimChecker: claimChecker,
-            sanitizer: CVDataSanitizer(languageOfText: DescriptionLanguageDetector.languageTag(of:), lexicalClasses: DeviceLexicalTagger())
+            sanitizer: CVDataSanitizer(languageOfText: { DescriptionLanguageDetector.languageTag(of: $0) }, lexicalClasses: DeviceLexicalTagger())
         )
     }
 

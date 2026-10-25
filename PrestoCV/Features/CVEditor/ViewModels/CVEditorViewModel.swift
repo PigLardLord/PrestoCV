@@ -34,7 +34,7 @@ final class CVEditorViewModel: ObservableObject {
     /// Returns once the editors that were left have stored what they showed, so that a CV is read as they left it.
     private let awaitLeftEditors: @MainActor () async -> Void
     /// Told why a write failed, which the banner does not say.
-    private let reportSaveFailure: @MainActor (any Error) -> Void
+    private let reportSaveFailure: @MainActor @Sendable (any Error) -> Void
     /// Writes the form to the store; nil until the form shows a CV.
     private var autosave: Autosave<CVModel>?
     /// A failure has been announced, and the CV has not been saved since.
@@ -106,7 +106,7 @@ final class CVEditorViewModel: ObservableObject {
         documentLanguageDetector: DocumentLanguageDetector,
         clock: any Clock<Duration>,
         awaitLeftEditors: @escaping @MainActor () async -> Void,
-        reportSaveFailure: @escaping @MainActor (any Error) -> Void
+        reportSaveFailure: @escaping @MainActor @Sendable (any Error) -> Void
     ) {
         self.request = request
         self.cvManagementUseCase = cvManagementUseCase

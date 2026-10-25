@@ -15,7 +15,7 @@ func waitUntilCancelled(_ duration: Duration) async throws {
 }
 
 /// Reads the language of a CV with the system's recognizer, and falls back to English
-let englishDocumentLanguageDetector = DocumentLanguageDetector(preferredLanguages: ["en"], read: NaturalLanguageReader.read)
+let englishDocumentLanguageDetector = DocumentLanguageDetector(preferredLanguages: ["en"], read: { NaturalLanguageReader.read($0) })
 
 extension AppEnvironment {
     /// A device in English, on a fixed day in UTC, whose waits end only when cancelled, and whose clock moves only when
@@ -31,7 +31,7 @@ extension AppEnvironment {
             timeZone: .gmt,
             appLanguage: "en",
             preferredLanguages: { ["en"] },
-            sleep: waitUntilCancelled,
+            sleep: { try await waitUntilCancelled($0) },
             clock: clock,
             temporaryDirectory: FileManager.default.temporaryDirectory,
             exportPreferencesFile: FileManager.default.temporaryDirectory.appendingPathComponent("export-preferences-\(UUID().uuidString).json"),
@@ -64,7 +64,7 @@ extension CVEditorViewModel {
         documentLanguageDetector: DocumentLanguageDetector = englishDocumentLanguageDetector,
         clock: any Clock<Duration> = ManualClock(),
         awaitLeftEditors: @escaping @MainActor () async -> Void = {},
-        reportSaveFailure: @escaping @MainActor (any Error) -> Void = { _ in }
+        reportSaveFailure: @escaping @MainActor @Sendable (any Error) -> Void = { _ in }
     ) {
         let request: EditorRequest
         if let cvId {

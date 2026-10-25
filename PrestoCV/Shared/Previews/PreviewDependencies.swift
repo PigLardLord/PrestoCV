@@ -15,7 +15,7 @@ enum PreviewDependencies {
     static let samples: SampleCVRepositoryProtocol = PreviewSampleCVRepository()
 
     /// Reads the language of a preview's CV, and falls back to English
-    static let documentLanguageDetector = DocumentLanguageDetector(preferredLanguages: ["en"], read: NaturalLanguageReader.read)
+    static let documentLanguageDetector = DocumentLanguageDetector(preferredLanguages: ["en"], read: { NaturalLanguageReader.read($0) })
 
     /// An editor of a new, blank CV, which saves into the CVs of the preview
     @MainActor
