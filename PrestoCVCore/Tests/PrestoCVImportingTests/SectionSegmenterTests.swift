@@ -81,6 +81,32 @@ struct SectionSegmenterTests {
         }
     }
 
+    @Test("A heading of the first level after a line in the shape of a name and the head's contacts opens a section, whatever its shape (#301)")
+    func headingAfterTheNameAndContacts() {
+        for name in ["Anna Weber", "Thomas Kiel", "Rebecca Cook", "Anna Weber, RN"] {
+            for contacts in ["person@example.com", "Nurse\nperson@example.com", "+44 20 7946 0000 | person@example.com"] {
+                let found = sections("\(name)\n\(contacts)\n\n# University Projects\nBuilt a scheduling application")
+                #expect(found.map(\.0) == [.header, .unknown], "\(name) / \(contacts)")
+                #expect(found.count == 2 && found[1].1 == "University Projects", "\(name) / \(contacts)")
+                #expect(found.count == 2 && found[1].2 == ["Built a scheduling application"], "\(name) / \(contacts)")
+            }
+            let sameLine = sections("\(name) | person@example.com\n\n# University Projects\nBuilt a scheduling application")
+            #expect(sameLine.map(\.0) == [.header, .unknown], "\(name)")
+            let personal = sections("\(name)\n## Contact\nperson@example.com\n\n# University Projects\nBuilt a scheduling application")
+            #expect(personal.map(\.0) == [.header, .personal, .unknown], "\(name)")
+        }
+    }
+
+    @Test("A name in a heading after the contacts stays in the head when nothing before them has the shape of a name (#301)")
+    func nameHeadingAfterNoName() {
+        // A piece after a contact of its line holds the place, a line of known places alone is a place, and a name with no
+        // contact after it leaves the heading to the head's evidence
+        for head in ["person@example.com | Greater Wexby", "Berlin Germany\nperson@example.com", "Anna Weber"] {
+            let found = sections("\(head)\n\n# Thomas Kiel\nNurse\n\n## Experience\n2019 - 2021 Nurse")
+            #expect(found.map(\.0) == [.header, .experience], "\(head)")
+        }
+    }
+
     @Test("A Europass row of the mother tongue opens the languages and stays in them")
     func europassLanguageRows() {
         let found = sections("CAPACITÀ E COMPETENZE PERSONALI\nMADRELINGUA\tItaliano\nALTRE LINGUE\tInglese")

@@ -632,6 +632,7 @@ struct EntryReaderTests {
     @Test("An employer with its city and state: the city and the state are the place, the employer is no part of it", arguments: [
         ("Harbor Law Firm, Medford, Ohio", "Harbor Law Firm", "Medford, Ohio"),
         ("Larkin Hardware, Akron, OH", "Larkin Hardware", "Akron, OH"),
+        ("Larkin Hardware, Akron, Ohio", "Larkin Hardware", "Akron, Ohio"),
         ("Harbor Dental Studio, Austin, Texas", "Harbor Dental Studio", "Austin, Texas"),
         ("Larkin Hardware, Calgary, Alberta", "Larkin Hardware", "Calgary, Alberta"),
         ("Northgate Hospital, Leeds, West Yorkshire, United Kingdom", "Northgate Hospital", "Leeds, West Yorkshire, United Kingdom"),
@@ -648,6 +649,7 @@ struct EntryReaderTests {
         """)
         #expect(found.cv.experience.map { $0.employer?.value } == [employer, "Northgate Mill"], "\(line)")
         #expect(found.cv.experience.map { $0.location?.value } == [place, "Seattle, WA"], "\(line)")
+        #expect(found.cv.experience.map { $0.location?.check } == [nil, nil], "\(line)")
         #expect(found.cv.experience.map { $0.role?.value } == ["Executive assistant", "Administrative assistant"], "\(line)")
     }
 
@@ -664,5 +666,51 @@ struct EntryReaderTests {
         """)
         #expect(found.cv.experience.first?.employer?.value == "Northgate Hospital", "\(place)")
         #expect(found.cv.experience.first?.location?.value == place, "\(place)")
+        #expect(found.cv.experience.first?.location?.check == nil, "\(place)")
+    }
+
+    @Test("A place that only the place lists would cut from its employer is kept whole and flagged; no part of it becomes the employer", arguments: [
+        ("Curitiba, Paraná, Brasil", nil, "Curitiba, Paraná, Brasil"),
+        ("Acme Ltda, Curitiba, Paraná, Brasil", "Acme Ltda", "Curitiba, Paraná, Brasil"),
+        ("Northgate Hospital, Medford, Brasil", "Northgate Hospital", "Medford, Brasil"),
+        // The price: an employer that no list knows, before a city no list knows and its country, is read with the place
+        ("Larkin Hardware, Medford, Brasil", nil, "Larkin Hardware, Medford, Brasil"),
+    ] as [(String, String?, String)])
+    func placeKeptWhole(line: String, employer: String?, place: String) throws {
+        let found = read("""
+        Experience
+        Analista
+        \(line)
+        2019 - 2021
+        """)
+        try #require(found.cv.experience.count == 1, "\(line)")
+        let entry = found.cv.experience[0]
+        #expect(entry.role?.value == "Analista", "\(line)")
+        #expect(entry.employer?.value == employer, "\(line)")
+        #expect(entry.location?.value == place, "\(line)")
+        // A cut that a word of an organisation makes is no guess
+        #expect(entry.location?.check == (line.hasPrefix("Northgate") ? nil : .locationByPosition), "\(line)")
+    }
+
+    @Test("A place kept whole is in the review list, with the place as its text, in experience and in education")
+    func placeKeptWholeIsReviewed() throws {
+        let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText("""
+        Anna Weber
+        person@example.com
+
+        Experience
+        Analista
+        Curitiba, Paraná, Brasil
+        2019 - 2021
+
+        Education
+        Bachelor of Arts
+        Curitiba, Paraná, Brasil
+        2015 - 2019
+        """)
+        #expect(result.cv.experience.first?.employer == nil)
+        #expect(result.cv.education.first?.school == nil)
+        #expect(result.reviewList.contains(ReviewItem(field: .experience(0), reason: .locationByPosition, text: "Curitiba, Paraná, Brasil")))
+        #expect(result.reviewList.contains(ReviewItem(field: .education(0), reason: .locationByPosition, text: "Curitiba, Paraná, Brasil")))
     }
 }

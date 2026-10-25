@@ -38,7 +38,8 @@ public enum CheckReason: String, Hashable, Sendable {
     case nameByPosition
     /// The professional title was taken from its place under the name.
     case titleByPosition
-    /// The place was taken from its place among the contacts, with no label.
+    /// The place was taken from its place among the contacts, with no label; or an entry's place was kept whole, as no
+    /// rule told where it starts.
     case locationByPosition
     /// The summary was taken from prose at the top, under no heading.
     case summaryWithoutHeading

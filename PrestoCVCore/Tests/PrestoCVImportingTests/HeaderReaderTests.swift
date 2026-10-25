@@ -465,6 +465,57 @@ struct HeaderReaderTests {
         #expect(found.cv.person.title?.value == "Nurse", "\(before)\(name)")
     }
 
+    // MARK: A heading after the name (#301)
+
+    @Test("A heading of the first level after the name and its contacts is a section, not the name, the title or the place", arguments: [
+        "Anna Weber", "Thomas Kiel", "Rebecca Cook",
+    ], ["", "Nurse\n"])
+    func headingAfterTheNameAndContacts(name: String, title: String) throws {
+        let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText(
+            "\(name)\n\(title)person@example.com\n\n# University Projects\nBuilt a scheduling application"
+        )
+        let person = result.cv.person
+        #expect(person.name?.value == name, "\(name) / \(title)")
+        #expect(person.name?.check == (name == "Anna Weber" ? nil : .nameByPosition), "\(name) / \(title)")
+        #expect(person.title?.value == (title.isEmpty ? nil : "Nurse"), "\(name) / \(title)")
+        #expect(person.location == nil, "\(name) / \(title)")
+        #expect(result.unplaced.map(\.text) == ["Built a scheduling application"], "\(name) / \(title)")
+        #expect(result.unplaced.first?.heading == "University Projects", "\(name) / \(title)")
+    }
+
+    @Test("A heading of the first level under a line in the shape of a name is no mark of the name: the first line keeps its evidence", arguments: [
+        "Anna Weber", "Thomas Kiel",
+    ])
+    func headingUnderTheName(name: String) {
+        // The first line with a title of its own is the name, and the heading is no title
+        let titled = header("\(name)\nNurse\n\n# University Projects\nBuilt a scheduling application")
+        #expect(titled.cv.person.name?.value == name, "\(name)")
+        #expect(titled.cv.person.name?.check == (name == "Anna Weber" ? nil : .nameByPosition), "\(name)")
+        #expect(titled.cv.person.title?.value == "Nurse", "\(name)")
+        let contactAfter = header("\(name)\nNurse\n\n# University Projects\nperson@example.com")
+        #expect(contactAfter.cv.person.name?.value == name, "\(name)")
+        #expect(contactAfter.cv.person.title?.value == "Nurse", "\(name)")
+        // Right under the first line, the heading is its title, and the two are to be checked
+        let bare = header("\(name)\n\n# University Projects\nBuilt a scheduling application")
+        #expect(bare.cv.person.name?.value == name, "\(name)")
+        #expect(bare.cv.person.name?.check == .nameByPosition, "\(name)")
+        #expect(bare.cv.person.title?.value == "University Projects", "\(name)")
+        #expect(bare.cv.person.title?.check == .titleByPosition, "\(name)")
+    }
+
+    @Test("The price of a heading that is no mark under a line in the shape of a name: a name in it under a place no list knows is flagged with it")
+    func nameHeadingUnderAnUnknownPlace() {
+        let found = header("Greater Wexby\n# Anna Weber\nNurse")
+        #expect(found.cv.person.name?.value == "Greater Wexby")
+        #expect(found.cv.person.name?.check == .nameByPosition)
+        #expect(found.cv.person.title?.value == "Anna Weber")
+        #expect(found.cv.person.title?.check == .titleByPosition)
+        // Under a line of known places alone, the heading is still the name
+        let known = header("Berlin Germany\n# Anna Weber\nNurse")
+        #expect(known.cv.person.name?.value == "Anna Weber")
+        #expect(known.cv.person.title?.value == "Nurse")
+    }
+
     @Test("The profile of LinkedIn's text starts at its name after the sidebar, whatever the name's and the last skill's words", arguments: [
         "Thomas Kiel", "Rebecca Cook", "Anna Weber",
     ], ["Wound care", "Patient Safety"])

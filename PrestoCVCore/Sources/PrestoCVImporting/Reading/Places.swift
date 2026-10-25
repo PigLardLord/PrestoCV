@@ -57,6 +57,15 @@ enum Places {
         return regions.contains(words.map { $0.folded }.joined(separator: " "))
     }
 
+    /// Whether a piece names a country, or a nation of the United Kingdom: "Brasil", "United Kingdom", "England". A state,
+    /// a province or a region is none: before a country, a part no list knows may be a city or an employer, and before a
+    /// state it is the city.
+    static func isCountry(_ text: String) -> Bool {
+        countryNames.contains(text.words.map { $0.folded }.joined(separator: " "))
+    }
+
+    private static let countryNames: Set<String> = Set((countries + nations).map { $0.words.map { $0.folded }.joined(separator: " ") })
+
     /// A city of one to three words, then a state, a province or a country: "Akron, OH", "Austin, Texas", "Calgary, Alberta".
     /// The states are no places by themselves: "Virginia Woolf" and "Denzel Washington" are names.
     private static func hasRegionTail(_ text: String) -> Bool {

@@ -242,6 +242,8 @@ enum EntryReader {
         var part: Part
         /// The part came from a connector or a word, not from the order.
         var isMarked: Bool
+        /// A place whose start no rule tells: the person checks it.
+        var isUnsure = false
     }
 
     /// The segments of an entry's lines without its dates and durations, each with the part it reads as.
@@ -295,18 +297,23 @@ enum EntryReader {
         }
         let parts = piece.split(by: [", "])
         // "Leeds, United Kingdom": short capitalised parts that end with a known country or region are one place
-        if let start = placeStart(in: parts), let last = parts.last {
-            let lower = cellRange(of: parts[start], in: piece).lowerBound
+        if let place = placeStart(in: parts), let last = parts.last {
+            let lower = cellRange(of: parts[place.start], in: piece).lowerBound
             let upper = cellRange(of: last, in: piece).upperBound
-            return parts[..<start].map { classify($0, kind: kind) } + [Segment(piece: piece.sub(lower..<upper), part: .location, isMarked: true)]
+            return parts[..<place.start].map { classify($0, kind: kind) }
+                + [Segment(piece: piece.sub(lower..<upper), part: .location, isMarked: true, isUnsure: place.isUnsure)]
         }
         return parts.map { classify($0, kind: kind) }
     }
 
     /// Where the place starts in the parts of a line that ends with a country or a region: the city before it, and the
     /// regions before that, as in "Springfield, Illinois, United States". What comes before the city, "Harbor Law Firm,
-    /// Medford, Ohio", is no part of the place.
-    private static func placeStart(in parts: [Piece]) -> Int? {
+    /// Medford, Ohio", is no part of the place. The lists cut the place from what comes before it only where they tell the
+    /// city: a known city, or a part before an area by its form or before a region that is no country. Before a country a
+    /// part no list knows may be the city or the employer ("Curitiba, Paraná, Brasil"), so the run of short capitalised
+    /// parts back to an organisation, a role, a school or a degree is the place, unsure, and no part of it moves to the
+    /// employer (ADR 0027, #301).
+    private static func placeStart(in parts: [Piece]) -> (start: Int, isUnsure: Bool)? {
         guard parts.count >= 2, let last = parts.last, Places.isCountryOrRegion(last.text) else { return nil }
         var start = parts.count - 2
         while start > 0, Places.isCountryOrRegion(parts[start].text) { start -= 1 }
@@ -315,11 +322,25 @@ enum EntryReader {
         if start > 0, Places.isArea(parts[start].text) || (!Places.isPlaceOnly(parts[start].text) && Places.isPlaceOnly(parts[start - 1].text)) {
             start -= 1
         }
-        let isPlace = parts[start...].allSatisfy {
-            $0.words.count <= 3 && $0.text.first?.isUppercase == true && !EntryVocabulary.isOrganisation($0.text)
-                && !EntryVocabulary.isRole($0.text) && !EntryVocabulary.isSchool($0.text) && !EntryVocabulary.isDegree($0.text)
-        }
-        return isPlace ? start : nil
+        guard parts[start...].allSatisfy(hasPlaceShape) else { return nil }
+        guard start > 0, !isCityByTheLists(parts[start], before: parts[start + 1]) else { return (start, false) }
+        let cut = start
+        while start > 0, hasPlaceShape(parts[start - 1]) { start -= 1 }
+        return (start, start < cut)
+    }
+
+    /// A part that can be a part of a place: up to three words, capitalised, that name no organisation, role, school or
+    /// degree.
+    private static func hasPlaceShape(_ part: Piece) -> Bool {
+        part.words.count <= 3 && part.text.first?.isUppercase == true && !EntryVocabulary.isOrganisation(part.text)
+            && !EntryVocabulary.isRole(part.text) && !EntryVocabulary.isSchool(part.text) && !EntryVocabulary.isDegree(part.text)
+    }
+
+    /// Whether the lists tell `part` as the city that starts a place: a city they know, or a part before an area by its
+    /// form ("Leeds, West Yorkshire") or before a region that is no country ("Medford, Ohio").
+    private static func isCityByTheLists(_ part: Piece, before next: Piece) -> Bool {
+        (Places.isPlaceOnly(part.text) && !Places.isCountryOrRegion(part.text)) || Places.isArea(next.text)
+            || (Places.isCountryOrRegion(next.text) && !Places.isCountry(next.text))
     }
 
     static func classify(_ piece: Piece, kind: Kind) -> Segment {
@@ -446,17 +467,20 @@ enum EntryReader {
     }
 
     /// The places of an entry, in order: one quote for each run of location segments that only a separator parts, so
-    /// "Leeds, United Kingdom" is one place and the same two on two lines are two.
+    /// "Leeds, United Kingdom" is one place and the same two on two lines are two. A place with an unsure part is to be
+    /// checked.
     private static func locationGroups(_ segments: [Segment], in document: SourceDocument) -> [Sourced<String>] {
-        var groups: [[Piece]] = []
-        for piece in segments.map(\.piece).sorted(by: { $0.span < $1.span }) {
-            if let last = groups.last?.last, !hasContentBetween(last, piece, in: document) {
-                groups[groups.count - 1].append(piece)
+        var groups: [[Segment]] = []
+        for segment in segments.sorted(by: { $0.piece.span < $1.piece.span }) {
+            if let last = groups.last?.last, !hasContentBetween(last.piece, segment.piece, in: document) {
+                groups[groups.count - 1].append(segment)
             } else {
-                groups.append([piece])
+                groups.append([segment])
             }
         }
-        return groups.map { covering($0[0], $0[$0.count - 1], in: document) }
+        return groups.map { group in
+            covering(group[0].piece, group[group.count - 1].piece, in: document, check: group.contains(where: \.isUnsure) ? .locationByPosition : nil)
+        }
     }
 
     /// Whether a letter, a digit or a line break comes between two pieces.
@@ -465,9 +489,9 @@ enum EntryReader {
     }
 
     /// One quote from the start of `first` to the end of `last`, in one line.
-    private static func covering(_ first: Piece, _ last: Piece, in document: SourceDocument) -> Sourced<String> {
+    private static func covering(_ first: Piece, _ last: Piece, in document: SourceDocument, check: CheckReason? = nil) -> Sourced<String> {
         let span = SourceSpan(first.span.lowerBound, last.span.upperBound)
-        return Sourced(value: document.text(of: span), spans: [span])
+        return Sourced(value: document.text(of: span), spans: [span], check: check)
     }
 
     static func periodValue(_ piece: Piece, _ period: ImportedPeriod) -> Sourced<ImportedPeriod> {

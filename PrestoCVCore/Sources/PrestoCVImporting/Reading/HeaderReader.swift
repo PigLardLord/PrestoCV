@@ -57,25 +57,20 @@ enum HeaderReader {
                     }
                     continue
                 }
+                let line = LineContacts(cells)
                 var rest: [Piece] = []
-                var hasContacts = false
-                var firstContact: Int?
-                for cell in cells {
-                    let contacts = ContactReader.read(cell)
-                    hasContacts = hasContacts || !contacts.isEmpty
-                    let spans = contacts.emails.flatMap(\.spans) + contacts.phones.flatMap(\.spans) + contacts.links.flatMap(\.address.spans)
-                    if let start = spans.map(\.lowerBound).min() { firstContact = min(firstContact ?? start, start) }
+                for contacts in line.cells {
                     emails += contacts.emails.map { ($0, section) }
                     phones += contacts.phones.map { ($0, section) }
                     findings.cv.person.links += contacts.links
                     rest += contacts.rest + keepingNames(contacts.unknownLabels, in: section, into: &findings)
                 }
-                if hasContacts { contactBlocks.insert(block.index) }
+                if line.hasContacts { contactBlocks.insert(block.index) }
                 rest.sort { $0.span < $1.span }
                 for (index, piece) in rest.enumerated() {
                     candidates.append(Candidate(
-                        piece: piece, block: block, section: section, blockHasContacts: hasContacts, isFirstInBlock: index == 0,
-                        followsContact: firstContact.map { $0 < piece.span.lowerBound } ?? false
+                        piece: piece, block: block, section: section, blockHasContacts: line.hasContacts, isFirstInBlock: index == 0,
+                        followsContact: line.follows(piece)
                     ))
                 }
             }
@@ -203,6 +198,56 @@ enum HeaderReader {
 
     // MARK: Contacts
 
+    /// The contacts in the cells of a line, and where the first of them starts.
+    private struct LineContacts {
+        private(set) var cells: [ContactReader.Contacts] = []
+        private var firstContact: Int?
+
+        init(_ pieces: [Piece]) {
+            for piece in pieces {
+                let contacts = ContactReader.read(piece)
+                let spans = contacts.emails.flatMap(\.spans) + contacts.phones.flatMap(\.spans) + contacts.links.flatMap(\.address.spans)
+                if let start = spans.map(\.lowerBound).min() { firstContact = min(firstContact ?? start, start) }
+                cells.append(contacts)
+            }
+        }
+
+        var hasContacts: Bool { cells.contains { !$0.isEmpty } }
+
+        /// Whether a piece of the line comes after its first contact.
+        func follows(_ piece: Piece) -> Bool {
+            firstContact.map { $0 < piece.span.lowerBound } ?? false
+        }
+    }
+
+    /// Whether the head, given as its blocks in order, holds a line in the shape of a name that its contacts follow, on the
+    /// line itself or under it: "Anna Weber / person@example.com", "Anna Weber, RN | +44 20 7946 0000", or a name and a
+    /// contact given by their labels. A heading of the first level after such a line opens a section, whatever its shape
+    /// (#301). A piece after a contact of its line holds the place, and a line of known places alone is a place: neither is
+    /// such a line.
+    static func holdsNameBeforeContacts(_ blocks: [SourceBlock], in document: SourceDocument) -> Bool {
+        var hasName = false
+        for block in blocks {
+            let cells = Piece.cells(of: block, in: document)
+            if let (label, _) = labelled(cells) {
+                switch label {
+                case .name, .firstName, .lastName: hasName = true
+                case .phone, .email, .web: if hasName { return true }
+                case .address, .birth, .nationality, .maritalStatus, .gender, .fax, .other: break
+                }
+                continue
+            }
+            let line = LineContacts(cells)
+            let pieces = line.cells.flatMap { $0.rest + $0.unknownLabels.filter(isContent) }
+            if let first = pieces.min(by: { $0.span < $1.span }), !line.follows(first), let name = nameShaped(first)?.name,
+               !Places.isPlaceOnly(name.text) {
+                hasName = true
+            }
+            if hasName && line.hasContacts { return true }
+        }
+        return false
+    }
+
     /// The first e-mail address and phone number are the person's; any other one stays visible as text not imported.
     private static func takeContacts(emails: [(Sourced<EmailAddress>, Section)], phones: [(Sourced<PhoneNumber>, Section)], into findings: inout Findings) {
         for (index, (email, section)) in emails.enumerated() {
@@ -266,15 +311,26 @@ enum HeaderReader {
     /// name even on weak evidence; it is sure only when no list knows it, no other line has a title under it, and it is the
     /// only marked line, or the first line with a title of its own (one without the shape of a name) or with no other line
     /// that could be the name. A piece that follows a contact of its own line is the head's place: it is not its first
-    /// line, it has no title under it, and it could not be the name.
+    /// line, it has no title under it, and it could not be the name. A heading of the first level under a line in the shape
+    /// of a name, in its column, is no mark and has no title: its shape tells it from a heading no better than its words do,
+    /// so the line above keeps its evidence and the heading stays a line that could be the name ("Anna Weber / Nurse /
+    /// # University Projects"). A line made only of known places above it, or a piece after a contact, takes no mark away.
     private static func headName(of candidates: [Candidate], in document: SourceDocument) -> HeadName? {
         let window = candidates.indices.prefix(6).filter { candidates[$0].isFirstInBlock }
         let readings = window.compactMap { nameReading(at: $0, in: candidates) }
         let indices = Set(readings.map(\.index))
-        let titled = indices.filter { !candidates[$0].followsContact && hasTitle(under: $0, in: candidates, readings: indices) }
+        func isUnderAName(_ index: Int) -> Bool {
+            candidates[index].block.kind == .heading(level: 1) && readings.contains { above in
+                above.index < index && candidates[above.index].block.column == candidates[index].block.column
+                    && !candidates[above.index].followsContact && !Places.isPlaceOnly(above.name.text)
+            }
+        }
+        let titled = indices.filter {
+            !candidates[$0].followsContact && !isUnderAName($0) && hasTitle(under: $0, in: candidates, readings: indices)
+        }
         let first = candidates.indices.first { !candidates[$0].followsContact }
         func isMarked(_ index: Int) -> Bool {
-            candidates[index].block.kind == .heading(level: 1) || isLargestText(candidates[index].block, in: document)
+            (candidates[index].block.kind == .heading(level: 1) && !isUnderAName(index)) || isLargestText(candidates[index].block, in: document)
         }
         func evidence(_ reading: NameReading) -> Int {
             let mark = isMarked(reading.index) ? 4 : 0
@@ -295,15 +351,20 @@ enum HeaderReader {
     /// The line at `index` read as a name: without its credentials, whole, or without a code that may also be a state's,
     /// which counts against it ("Jane Rowe, MD" is a name, "Silver Spring, MD" a place).
     private static func nameReading(at index: Int, in candidates: [Candidate]) -> NameReading? {
-        let piece = candidates[index].piece
+        guard let shaped = nameShaped(candidates[index].piece) else { return nil }
+        return NameReading(index: index, name: shaped.name, split: shaped.split, doubt: doubt(shaped.name.text) + (shaped.isAmbiguous ? listWeight : 0))
+    }
+
+    /// A piece in the shape of a name: without its credentials, whole, or without a code that may also be a state's.
+    private static func nameShaped(_ piece: Piece) -> (name: Piece, split: Credentials.Split?, isAmbiguous: Bool)? {
         if let split = Credentials.split(piece, allowingAmbiguous: false), hasNameShape(split.name.text) {
-            return NameReading(index: index, name: split.name, split: split, doubt: doubt(split.name.text))
+            return (split.name, split, false)
         }
         if hasNameShape(piece.text) {
-            return NameReading(index: index, name: piece, split: nil, doubt: doubt(piece.text))
+            return (piece, nil, false)
         }
         if let split = Credentials.split(piece, allowingAmbiguous: true), hasNameShape(split.name.text) {
-            return NameReading(index: index, name: split.name, split: split, doubt: doubt(split.name.text) + listWeight)
+            return (split.name, split, true)
         }
         return nil
     }
@@ -355,13 +416,18 @@ enum HeaderReader {
     private static func keepingNames(_ labels: [Piece], in section: Section, into findings: inout Findings) -> [Piece] {
         var kept: [Piece] = []
         for label in labels {
-            if hasNameShape(label.text) || Places.isKnownPlace(label.text) {
+            if isContent(label) {
                 kept.append(label)
             } else {
                 findings.unplace(label, in: section)
             }
         }
         return kept
+    }
+
+    /// Whether a label the vocabulary does not know is the content of its line: a name or a place.
+    private static func isContent(_ label: Piece) -> Bool {
+        hasNameShape(label.text) || Places.isKnownPlace(label.text)
     }
 
     /// A name with nothing against it, for a line that no other line of a head weighs: the shape of a name, and no word

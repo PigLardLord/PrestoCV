@@ -56,8 +56,8 @@ enum SectionSegmenter {
                 sections.append(Section(kind: match.kind, heading: block, blocks: [block], languages: match.languages))
                 continue
             }
-            let isInHead = headKinds.contains(sections[sections.count - 1].kind)
-            if let match = heading(block, in: document, isFirst: sections.count == 1 && sections[0].blocks.isEmpty, isInHead: isInHead) {
+            let head = headKinds.contains(sections[sections.count - 1].kind) ? headBlocks(of: sections, in: block.column) : nil
+            if let match = heading(block, in: document, isFirst: sections.count == 1 && sections[0].blocks.isEmpty, head: head) {
                 sections.append(Section(kind: match.kind, heading: block, blocks: [], languages: match.languages))
                 continue
             }
@@ -71,6 +71,12 @@ enum SectionSegmenter {
     /// The sections the head of the CV is read from.
     private static let headKinds: Set<SectionKind> = [.header, .personal]
 
+    /// The blocks of the head that a block of `column` closes, in order: the head's sections at the end, in that column.
+    private static func headBlocks(of sections: [Section], in column: Int?) -> [SourceBlock] {
+        let head = sections.reversed().prefix { headKinds.contains($0.kind) }.reversed()
+        return head.flatMap(\.blocks).filter { $0.column == column }
+    }
+
     /// Whether a summary or an experience heading follows within four blocks.
     private static func startsProfile(after position: Int, in document: SourceDocument) -> Bool {
         document.blocks.dropFirst(position + 1).prefix(4).contains { block in
@@ -80,9 +86,12 @@ enum SectionSegmenter {
     }
 
     /// The section a block opens, if it is a heading: a heading of the vocabulary, alone in its block; or one the
-    /// vocabulary does not know but the text marks as a heading. In the head, a heading of the first level with the shape
-    /// of a name is the name, whatever its words ("# Thomas Kiel" after the contacts); after the head it is a heading.
-    private static func heading(_ block: SourceBlock, in document: SourceDocument, isFirst: Bool, isInHead: Bool) -> SectionVocabulary.Match? {
+    /// vocabulary does not know but the text marks as a heading. In the head, given as its blocks so far, a heading of the
+    /// first level with the shape of a name is the name, whatever its words ("# Thomas Kiel" after the contacts), unless
+    /// the head already holds a line in the shape of a name that its contacts follow: the shape tells a name from a heading
+    /// no better than the words, so the heading then opens a section ("Anna Weber / person@example.com / # University
+    /// Projects", #301). After the head it is a heading.
+    private static func heading(_ block: SourceBlock, in document: SourceDocument, isFirst: Bool, head: [SourceBlock]?) -> SectionVocabulary.Match? {
         guard block.kind != .listItem, block.kind != .tableHeader else { return nil }
         let cells = block.cells.map { document.text(of: $0) }
         let nonEmpty = cells.filter { !$0.isEmpty }
@@ -92,7 +101,8 @@ enum SectionSegmenter {
         }
         guard !isFirst, isMarkedAsHeading(block, text: text) else { return nil }
         // The name at the top of a chat answer, after its opening sentence, the contacts or the document's title
-        if case .heading(1) = block.kind, isInHead, HeaderReader.hasNameShape(text) { return nil }
+        if case .heading(1) = block.kind, let head, HeaderReader.hasNameShape(text),
+           !HeaderReader.holdsNameBeforeContacts(head, in: document) { return nil }
         return SectionVocabulary.Match(kind: .unknown, languages: [])
     }
 
