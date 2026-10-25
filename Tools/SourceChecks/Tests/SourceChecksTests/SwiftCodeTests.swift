@@ -102,6 +102,43 @@ struct SwiftCodeTests {
         #expect(SwiftCode(Self.declarations).member(startingWith: "func missing") == nil)
     }
 
+    private static let nested = """
+        struct A {
+            var value = 1
+            struct B {
+                var value: Int {
+                    1
+                }
+            }
+        }
+        """
+
+    @Test("A member can be looked for within the lines of another, where a name of the same kind is not the first")
+    func memberWithin() throws {
+        let code = SwiftCode(Self.nested)
+        let inner = try #require(code.member(startingWith: "struct B"))
+
+        #expect(code.member(startingWith: "var value") == 1..<2)
+        #expect(code.member(startingWith: "var value", within: inner) == 3..<6)
+        #expect(code.member(startingWith: "var value", within: 4..<5) == nil)
+    }
+
+    // MARK: - A pattern over several lines
+
+    @Test("A pattern that runs over a line break is found on the line where it starts", arguments: [
+        ("call(\n    of: 1)\nother()", [0]),
+        ("a\nb\ncall(\n    of: 1)", [2]),
+        ("a\r\ncall(\r\n    of: 1)", [1]),
+        ("call(of: 1)\ncall(\n of: 2)\ncall(1)", [0, 1]),
+        ("// call(\n of: 1)", []),
+        ("call( // of\n of: 1)", [0]),
+    ] as [(String, [Int])])
+    func patternOverLines(source: String, lines: [Int]) throws {
+        let call = try NSRegularExpression(pattern: #"\bcall\s*\(\s*of\b"#)
+
+        #expect(SwiftCode(source).lines(matching: call) == lines)
+    }
+
     @Test("The skeleton holds the braces of the code, and none of a string or a comment")
     func skeletonBraces() {
         let skeleton = SwiftCode(Self.declarations).skeleton.joined(separator: "\n")

@@ -28,11 +28,14 @@ struct SwiftCode {
 
     // MARK: Members
 
-    /// The lines of a declaration: from the one that opens with `header` (`private` may come before it) to the one that
-    /// closes its braces. A declaration whose first line holds no brace, such as a stored property, is that line.
-    func member(startingWith header: String) -> Range<Int>? {
-        guard let start = skeleton.firstIndex(where: { line in
-            let text = line.drop { $0 == " " }
+    /// The lines of a declaration: from the first one that opens with `header` (`private` may come before it), within
+    /// `scope` when it is given, to the one that closes its braces. A declaration whose first line holds no brace, such as a
+    /// stored property, is that line; so is one whose signature runs over several lines, which makes the range too small
+    /// and never too big: a check that allows the code of a member only in its range is stricter, not blinder.
+    func member(startingWith header: String, within scope: Range<Int>? = nil) -> Range<Int>? {
+        let lines = scope ?? skeleton.indices
+        guard let start = lines.first(where: { index in
+            let text = skeleton[index].drop { $0 == " " }
             return text.hasPrefix(header) || text.hasPrefix("private " + header)
         }) else { return nil }
         var depth = 0
@@ -46,9 +49,20 @@ struct SwiftCode {
         return nil
     }
 
-    /// The lines of the code that hold `pattern`
+    /// The lines of the code where `pattern` starts. The pattern may run over several lines (`\s` takes a line break), so a
+    /// call split after its parenthesis is found on the line of its name.
     func lines(matching pattern: NSRegularExpression) -> [Int] {
-        code.indices.filter { pattern.firstMatch(in: code[$0], range: NSRange(code[$0].startIndex..., in: code[$0])) != nil }
+        let text = code.joined(separator: "\n")
+        var starts: [Int] = []
+        var offset = 0
+        for line in code {
+            starts.append(offset)
+            offset += line.utf16.count + 1
+        }
+        let found = pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)).map { match in
+            (starts.lastIndex { $0 <= match.range.location }) ?? 0
+        }
+        return Array(Set(found)).sorted()
     }
 
     // MARK: Blanking

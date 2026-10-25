@@ -6,8 +6,9 @@ import Foundation
 /// The suites that print PDFs with the real renderer read each PDF back with PDFKit (`PDFLayout`), and the attributed text
 /// of a page is by far the dearest read, and the only dear one: PDFKit looks up each embedded font by name, fails, and logs a
 /// note for every run of text. Read for every PDF, it took about a quarter of the time of the suites and left about a million
-/// notes, a third of a gigabyte of log, in each run. Only the tests that compare the sizes of the fonts need them. These
-/// checks keep it that way: the cost would come back with one new `attributedString`.
+/// notes, a third of a gigabyte of log, in each run. Only the tests that compare the sizes of the fonts need them, so the
+/// layout reads them on the first ask and keeps them (`Fonts`). These checks keep it that way: the cost would come back
+/// with one new `attributedString`, or with a read of the sizes in the init of the layout or in the init of `Fonts`.
 ///
 /// The checks read the code of the files, not their comments: a comment may name what it explains, and code may not hide
 /// behind one (`SwiftCode`).
@@ -22,30 +23,55 @@ struct PDFReadBackTests {
     /// The property that holds the attributed text of a page
     private static let attributedText = try! NSRegularExpression(pattern: #"\battributedString\b"#)
 
-    /// What the init of the layout may not name: the read of the fonts, and the sizes it finds
-    private static let fontWords = try! NSRegularExpression(pattern: #"\b(attributedString|fontSizes)\b"#)
+    /// A call of the function that reads the fonts of a document: its name and `of`, with a line break allowed between them
+    private static let readerCall = try! NSRegularExpression(pattern: #"\bfontSizes\s*\(\s*of\b"#)
 
-    /// What is wrong in the source of `PDFLayout`: where it reads the attributed text of a page outside the code that finds
-    /// the sizes of the fonts, and where its init asks for them
+    /// The name of the property, and of the functions, that find, ask for and compare the sizes of the fonts
+    private static let fontSizesName = try! NSRegularExpression(pattern: #"\bfontSizes\b"#)
+
+    /// The name of the sizes that `Fonts` keeps, and of the set that the reader fills
+    private static let sizesName = try! NSRegularExpression(pattern: #"\bsizes\b"#)
+
+    /// What is wrong in the source of `PDFLayout`: where the reading of the fonts is outside the code that is made for it.
+    ///
+    /// The reading is lazy when four members are the only code that names it, and the rest of the file, the init of the
+    /// layout and the init of `Fonts` among it, names none of it:
+    /// - `static func fontSizes(of:)` reads the attributed text of the pages and finds the sizes;
+    /// - the `sizes` of `Fonts` is the only call of it, and keeps the result;
+    /// - `var fontSizes` of the layout asks `Fonts`;
+    /// - `func fontSizes(matching:)` compares the sizes of two layouts.
+    ///
+    /// The members are the only ranges that allow a name, so a member that is not found, or found shorter than it is, makes a
+    /// problem rather than a gap.
     static func problems(in source: String) -> [String] {
         let code = SwiftCode(source)
-        guard let reader = code.member(startingWith: "static func fontSizes(of "),
-              let initializer = code.member(startingWith: "init?(pdf ") else {
-            return ["PDFLayout has a function fontSizes(of:) and an init?(pdf:margins:); if one moved, update this check"]
+        guard let property = code.member(startingWith: "var fontSizes:"),
+              let comparison = code.member(startingWith: "func fontSizes(matching "),
+              let reader = code.member(startingWith: "static func fontSizes(of "),
+              let holder = code.member(startingWith: "final class Fonts"),
+              let lazyRead = code.member(startingWith: "var sizes:", within: holder) else {
+            return ["PDFLayout has var fontSizes:, func fontSizes(matching:), static func fontSizes(of:) and a class Fonts with a var sizes; if one moved, update this check"]
         }
 
+        let rules: [(word: String, pattern: NSRegularExpression, allowed: [Range<Int>], allowedNames: String)] = [
+            ("the attributed text", attributedText, [reader], "fontSizes(of:)"),
+            ("a call of fontSizes(of:)", readerCall, [reader, lazyRead], "the sizes of Fonts"),
+            ("fontSizes", fontSizesName, [property, comparison, reader, lazyRead], "fontSizes, fontSizes(of:), fontSizes(matching:) and the sizes of Fonts"),
+            ("sizes", sizesName, [property, reader, lazyRead], "fontSizes, fontSizes(of:) and the sizes of Fonts"),
+        ]
         var problems: [String] = []
-        let reads = code.lines(matching: attributedText)
-        if reads.isEmpty {
-            problems.append("The check finds no read of the attributed text in the source")
+        for rule in rules {
+            let lines = code.lines(matching: rule.pattern)
+            let outside = lines.filter { line in !rule.allowed.contains { $0.contains(line) } }
+            if !outside.isEmpty {
+                problems.append("Lines \(outside.map { $0 + 1 }) name \(rule.word) outside \(rule.allowedNames), where the fonts may be read for every PDF")
+            }
+            if lines.isEmpty {
+                problems.append("The check finds no \(rule.word) in the source")
+            }
         }
-        let outside = reads.filter { !reader.contains($0) }
-        if !outside.isEmpty {
-            problems.append("Lines \(outside.map { $0 + 1 }) read the attributed text outside fontSizes(of:)")
-        }
-        let early = code.lines(matching: fontWords).filter { initializer.contains($0) }
-        if !early.isEmpty {
-            problems.append("Lines \(early.map { $0 + 1 }) of the init read the fonts, which only the font-size tests need")
+        if !code.lines(matching: readerCall).contains(where: lazyRead.contains) {
+            problems.append("The sizes of Fonts do not call fontSizes(of:), the one reader of the fonts")
         }
         return problems
     }
@@ -65,7 +91,7 @@ struct PDFReadBackTests {
         #expect(readers == [Self.layoutPath], "The attributed text of a page costs a log note per run of text: read it only in PDFLayout's font-size code, found in \(readers)")
     }
 
-    @Test("PDFLayout reads the attributed text only in its font-size code, and creating a layout reads no font")
+    @Test("PDFLayout names the reading of the fonts only in the code that finds, keeps, asks for and compares their sizes: creating a layout reads none")
     func layoutReadsTheFontsOnlyForTheirSizes() throws {
         let problems = Self.problems(in: try layoutSource())
 
@@ -129,34 +155,82 @@ struct PDFReadBackTests {
     }
 
     private static let afterFontsAreSet = "        self.fonts = Fonts(pdf: data)\n"
+    private static let initOfFonts = "        init(pdf: Data) { self.pdf = pdf }\n"
     private static let beforeComparison = "    func fontSizes(matching other: PDFLayout) -> Bool {\n"
     private static let readInInit = "        _ = PDFDocument(data: data)?.page(at: 0)?.attributedString\n"
+    private static let signature = "    init?(pdf url: URL, margins: Int) {\n"
+    private static let guardOfInit = "        guard let data = try? Data(contentsOf: url) else { return nil }\n"
 
     static let accepted = [
         Change(name: "a line comment naming the read in the init",
                old: afterFontsAreSet,
                new: "        self.fonts = Fonts(pdf: data) // not attributedString, not fontSizes\n"),
         Change(name: "a doc comment naming the read in the init",
-               old: "    init?(pdf url: URL, margins: Int) {\n",
-               new: "    /// Reads no attributedString and asks for no fontSizes\n    init?(pdf url: URL, margins: Int) {\n"),
+               old: signature,
+               new: "    /// Reads no attributedString and asks for no fontSizes\n" + signature),
         Change(name: "a block comment naming the read in the init",
                old: afterFontsAreSet,
                new: "        /* attributedString\n           fontSizes */\n" + afterFontsAreSet),
+        Change(name: "a comment naming the sizes in the init of Fonts",
+               old: initOfFonts,
+               new: initOfFonts + "        // the sizes are found in fontSizes(of:), when fonts.sizes is asked for\n"),
         Change(name: "a comment naming the read in another member",
                old: beforeComparison,
                new: "    /// attributedString is dear\n" + beforeComparison),
+        Change(name: "an init whose signature runs over two lines",
+               old: signature,
+               new: "    init?(pdf url: URL,\n          margins: Int) {\n"),
     ]
 
     static let refused = [
+        // The attributed text
         Change(name: "the read of the attributed text in the init",
                old: afterFontsAreSet,
                new: afterFontsAreSet + readInInit),
         Change(name: "the read of the attributed text in another member",
                old: beforeComparison,
                new: "    func warm(_ document: PDFDocument) { _ = document.page(at: 0)?.attributedString }\n" + beforeComparison),
+        Change(name: "the read of the attributed text in the init of Fonts",
+               old: initOfFonts,
+               new: "        init(pdf: Data) {\n            self.pdf = pdf\n            _ = PDFDocument(data: pdf)?.page(at: 0)?.attributedString\n        }\n"),
+        // The sizes, asked for or found when the layout is made
         Change(name: "the sizes asked for in the init",
                old: afterFontsAreSet,
                new: afterFontsAreSet + "        _ = fontSizes\n"),
+        Change(name: "the sizes of Fonts asked for in the init",
+               old: afterFontsAreSet,
+               new: afterFontsAreSet + "        _ = fonts.sizes\n"),
+        Change(name: "the sizes of Fonts asked for in the init, on a line of their own",
+               old: afterFontsAreSet,
+               new: afterFontsAreSet + "        _ = self.fonts\n            .sizes\n"),
+        Change(name: "the sizes asked for in the init through a key path",
+               old: afterFontsAreSet,
+               new: afterFontsAreSet + "        _ = self[keyPath: \\.fontSizes]\n"),
+        Change(name: "the sizes found in the init",
+               old: afterFontsAreSet,
+               new: afterFontsAreSet + "        _ = Self.fontSizes(of: PDFDocument(data: data)!)\n"),
+        Change(name: "the sizes found in the init, with the call cut after its parenthesis",
+               old: afterFontsAreSet,
+               new: afterFontsAreSet + "        _ = Self.fontSizes(\n            of: PDFDocument(data: data)!)\n"),
+        Change(name: "the sizes asked for in the init whose signature runs over two lines",
+               old: signature + guardOfInit,
+               new: "    init?(pdf url: URL,\n          margins: Int) {\n" + guardOfInit + "        _ = PDFDocument(data: Data())?.page(at: 0)?.attributedString\n"),
+        Change(name: "the sizes found in the init of Fonts",
+               old: initOfFonts,
+               new: "        init(pdf: Data) {\n            self.pdf = pdf\n            _ = PDFLayout.fontSizes(of: PDFDocument(data: pdf)!)\n        }\n"),
+        Change(name: "the sizes found by a stored property",
+               old: "    private let fonts: Fonts\n",
+               new: "    private let fonts: Fonts\n    private let eager = PDFLayout.fontSizes(of: PDFDocument())\n"),
+        Change(name: "the sizes asked for by another member",
+               old: beforeComparison,
+               new: "    func warm() { _ = fonts.sizes }\n" + beforeComparison),
+        Change(name: "the sizes found by the property on every ask",
+               old: "    var fontSizes: Set<Double> { fonts.sizes }\n",
+               new: "    var fontSizes: Set<Double> { PDFLayout.fontSizes(of: PDFDocument()!) }\n"),
+        Change(name: "the sizes of Fonts not found by calling the reader",
+               old: "found = PDFLayout.fontSizes(of: document)",
+               new: "found = []"),
+        // Code that a comment or a string must not hide, and a check that must not go blind
         Change(name: "code after a block comment on its line",
                old: afterFontsAreSet,
                new: afterFontsAreSet + "        /* a */ _ = PDFDocument(data: data)?.page(at: 0)?.attributedString\n"),
@@ -169,6 +243,9 @@ struct PDFReadBackTests {
         Change(name: "no function that finds the sizes",
                old: "private static func fontSizes(of document: PDFDocument)",
                new: "private static func sizesOfFonts(in document: PDFDocument)"),
+        Change(name: "no class that keeps the sizes",
+               old: "private final class Fonts: Sendable {",
+               new: "private final class FontHolder: Sendable {"),
     ]
 
     @Test("A comment may name what it explains", arguments: accepted)
@@ -183,7 +260,7 @@ struct PDFReadBackTests {
         #expect(Self.problems(in: Self.model) == [])
     }
 
-    @Test("Code that reads the fonts early is refused, wherever the comments and the strings leave it", arguments: refused)
+    @Test("Code that reads the fonts when a layout is made, or reads them outside the code made for it, is refused", arguments: refused)
     func earlyReadsAreRefused(change: Change) throws {
         let source = try change.applied(to: Self.model)
 
