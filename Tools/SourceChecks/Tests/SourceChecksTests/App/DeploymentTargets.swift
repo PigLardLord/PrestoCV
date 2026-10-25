@@ -178,7 +178,7 @@ enum DeploymentTargets {
             if mustDeclareIOS && !settled {
                 findings.append(Finding(
                     file: file, line: line,
-                    reason: "declares no iOS platform: SwiftPM then builds the package for an older default release than \(minimum)"
+                    reason: "declares no iOS platform: SwiftPM then builds the package for an older default release than \(minimum) (a package that never builds for iOS goes in DeploymentTargets.hostOnlyFolders)"
                 ))
             }
             return findings
@@ -292,10 +292,20 @@ enum DeploymentTargets {
 
     // MARK: Manifests of the repository
 
+    /// The folders of packages that build and run on a host, a Mac or a Linux machine, and never for iOS: their
+    /// manifests may declare no iOS platform. Every other manifest must declare one, or SwiftPM builds it for an older
+    /// default release. A package that never builds for iOS and lives elsewhere is added here, with the reason in the
+    /// pull request that adds it.
+    static let hostOnlyFolders = ["Tools"]
+
+    /// A manifest file: `Package.swift`, or `Package@swift-6.0.swift`, which SwiftPM picks for a toolchain of that
+    /// version instead of `Package.swift`.
+    private static let manifestName = try! NSRegularExpression(pattern: #"^Package(@swift-\d+(\.\d+){0,2})?\.swift$"#)
+
     /// The package manifests the check reads, with whether each must declare an iOS platform.
     ///
-    /// The manifests of `Tools/` build and run on a Mac or Linux host, so they may declare none. The validation
-    /// prototype is left out: nothing builds it and nothing of it ships (the architecture checker maps it as excluded).
+    /// The validation prototype is left out: nothing builds it and nothing of it ships (the architecture checker maps it
+    /// as excluded).
     static func manifests(under root: URL) -> [(path: String, mustDeclareIOS: Bool)] {
         let skipped: Set<String> = [".build", "DerivedData", "node_modules"]
         guard let walk = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isDirectoryKey]) else { return [] }
@@ -305,8 +315,8 @@ enum DeploymentTargets {
             let name = url.lastPathComponent
             if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
                 if name.hasPrefix(".") || skipped.contains(name) || path == "Prototypes" { walk.skipDescendants() }
-            } else if name == "Package.swift" {
-                manifests.append((path: path, mustDeclareIOS: !path.hasPrefix("Tools/")))
+            } else if manifestName.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil {
+                manifests.append((path: path, mustDeclareIOS: !hostOnlyFolders.contains { path.hasPrefix($0 + "/") }))
             }
         }
         return manifests.sorted { $0.path < $1.path }

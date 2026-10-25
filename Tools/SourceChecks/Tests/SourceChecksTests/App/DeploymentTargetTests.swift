@@ -417,4 +417,59 @@ struct DeploymentTargetTests {
         #expect(!manifests.contains { $0.path.hasPrefix("Prototypes/") })
         #expect(!manifests.contains { $0.path.contains("/.build/") })
     }
+
+    // MARK: Which manifests are scanned
+
+    /// A tree with a manifest at each of these paths, in a folder of its own.
+    private static func tree(of paths: [String]) throws -> URL {
+        // Resolved: a Mac's temporary folder is a link (/var to /private/var), and the scan reports paths from its root.
+        let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+            .appendingPathComponent("DeploymentTargetTests-\(UUID().uuidString)")
+        for path in paths {
+            let url = root.appendingPathComponent(path)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data().write(to: url)
+        }
+        return root
+    }
+
+    @Test("A manifest named for a tools version is scanned like Package.swift: SwiftPM picks it for that toolchain")
+    func versionedManifestsAreScanned() throws {
+        let root = try Self.tree(of: [
+            "App/Package.swift", "App/Package@swift-6.swift", "App/Package@swift-6.0.swift", "App/Package@swift-5.9.1.swift",
+            "App/Package@swift-6.0.0.1.swift", "App/Package@swift-.swift", "App/Package@swift-6.swift.bak", "App/Package@6.swift",
+            "App/Packages.swift", "App/NotPackage.swift", "App/Sources/Package@swift-6.swift",
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let paths = DeploymentTargets.manifests(under: root).map(\.path)
+
+        #expect(paths == [
+            "App/Package.swift", "App/Package@swift-5.9.1.swift", "App/Package@swift-6.0.swift", "App/Package@swift-6.swift",
+            "App/Sources/Package@swift-6.swift",
+        ], "\(paths)")
+    }
+
+    @Test("Only the folders for tools that run on a host may omit iOS: any other manifest must declare it")
+    func onlyHostOnlyFoldersMayOmitIOS() throws {
+        let root = try Self.tree(of: [
+            "Tools/Check/Package.swift", "Tools/Check/Package@swift-6.swift", "Backend/Package.swift", "Toolset/Package.swift",
+            "Prototypes/ADRValidation/Package.swift", "App/.hidden/Package.swift", "App/.build/Package.swift",
+            "App/DerivedData/Package.swift", "App/node_modules/Package.swift",
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let manifests = DeploymentTargets.manifests(under: root)
+
+        #expect(manifests.map(\.path) == ["Backend/Package.swift", "Tools/Check/Package.swift", "Tools/Check/Package@swift-6.swift", "Toolset/Package.swift"])
+        #expect(manifests.map(\.mustDeclareIOS) == [true, false, false, true])
+        #expect(DeploymentTargets.hostOnlyFolders == ["Tools"])
+    }
+
+    @Test("A manifest of the app that declares no iOS platform is told where a package that never builds for iOS goes")
+    func missingIOSReasonNamesTheRemedy() {
+        let findings = Self.findings(in: "let package = Package(name: \"P\")")
+
+        #expect(findings.count == 1 && findings[0].reason.contains("hostOnlyFolders"), "\(findings)")
+    }
 }
