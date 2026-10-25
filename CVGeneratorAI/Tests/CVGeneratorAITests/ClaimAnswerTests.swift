@@ -128,6 +128,64 @@ struct ClaimAnswerTests {
         }
     }
 
+    // MARK: - A quote does not leave out what withdraws the claim
+
+    @Test("A quote that leaves out a word of negation, wish or condition from its own clause is not backed",
+          arguments: [
+              ("I do not speak German.", "I speak German"),                      // inside: a negation
+              ("I don't speak German.", "I speak German"),                       // inside: "n't"
+              ("I never speak German.", "I speak German"),                       // inside: a negation
+              ("I would like to speak German.", "I speak German"),               // inside: a wish
+              ("I want to learn and speak German.", "I speak German"),           // inside: a wish, three words skipped
+              ("I speak English, not German.", "I speak German"),                // inside, across a comma
+              ("I do not speak German.", "speak German"),                        // before: the quote starts after the negation
+              ("I will speak German.", "speak German"),                          // before: a future
+              ("I speak German if needed.", "I speak German"),                   // after: a condition
+              ("I speak German without a doubt.", "I speak German"),             // after: "without"
+              ("Non parlo tedesco.", "parlo tedesco"),                           // before, in Italian
+              ("Ich spreche kein Deutsch.", "Ich spreche Deutsch"),              // inside, in German
+          ])
+    func quoteThatLeavesOutAWithdrawal(sentence: String, quote: String) throws {
+        let value = ["German", "Deutsch", "tedesco"].first { sentence.contains($0) }!
+        let entries = [ClaimVerdictEntry(item: 1, quote: quote, stance: .fact)]
+
+        #expect(try judged(entries, of: [ClaimCandidate(kind: .language, value: value)], in: sentence).map(\.stance) == [.notMentioned],
+                "\(quote) | \(sentence)")
+    }
+
+    @Test("A quote with the word of negation, wish or condition in it, as the description has it, is backed")
+    func quoteThatKeepsTheWithdrawal() throws {
+        for (sentence, quote) in [
+            ("I do not speak German.", "I do not speak German"),
+            ("I would like to speak German.", "would like to speak German"),
+            ("I speak German if needed.", "I speak German if needed"),
+        ] {
+            let entries = [ClaimVerdictEntry(item: 1, quote: quote, stance: .fact)]
+            #expect(try judged(entries, of: [ClaimCandidate(kind: .language, value: "German")], in: sentence).map(\.stance) == [.fact], "\(quote)")
+        }
+    }
+
+    @Test("A word of another clause is not left out of the quote: the clause ends at a comma or a full stop")
+    func quoteLeavesOutAnotherClause() throws {
+        for (sentence, quote) in [
+            ("I would like to learn Spanish, and I speak German.", "I speak German"),
+            ("I do not speak French, but I speak German.", "I speak German"),
+            ("I speak German, but I do not speak French.", "I speak German"),
+            ("I do not speak French. I speak German.", "I speak German"),
+            ("I speak English, German and, if needed, Spanish.", "I speak German"),
+        ] {
+            let entries = [ClaimVerdictEntry(item: 1, quote: quote, stance: .fact)]
+            #expect(try judged(entries, of: [ClaimCandidate(kind: .language, value: "German")], in: sentence).map(\.stance) == [.fact], "\(quote) | \(sentence)")
+        }
+    }
+
+    @Test("A quote may leave out a qualifier of ability")
+    func quoteLeavesOutAnAbility() throws {
+        let entries = [ClaimVerdictEntry(item: 1, quote: "I speak German", stance: .fact)]
+
+        #expect(try judged(entries, of: [ClaimCandidate(kind: .language, value: "German")], in: "I can speak German.").map(\.stance) == [.fact])
+    }
+
     @Test("A quote whose words are not in the order of the description is not backed")
     func quoteInAnotherOrder() throws {
         let entries = [ClaimVerdictEntry(item: 1, quote: "German speak I", stance: .fact)]
