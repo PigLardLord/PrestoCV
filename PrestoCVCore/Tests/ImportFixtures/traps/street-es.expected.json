@@ -1,0 +1,10 @@
+{
+ "id": "traps/street-es", "language": "es", "form": "trap",
+ "person": {"name": "Mateo Vargas", "title": null, "email": "mateo.vargas@example.com", "phone": "600 000 505",
+            "location": "Calle Mayor 12, 28013 Madrid", "links": [], "summary": null},
+ "experience": [
+  {"role": "Técnico de sistemas", "employer": "Servicios Ejemplo S.L.", "location": null, "start": [2019, 3], "end": "current", "details": 1}
+ ],
+ "education": [{"degree": "Grado en Informática", "school": "Universidad Ejemplo", "start": [2013, null], "end": [2017, null]}],
+ "skills": [], "languages": [], "certifications": [], "interests": []
+}

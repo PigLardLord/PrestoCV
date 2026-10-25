@@ -1,0 +1,15 @@
+{
+ "id": "traps/data-course-de", "language": "de", "form": "trap",
+ "person": {"name": "Jonas Beispiel", "title": "Verwaltungsfachangestellter", "email": "jonas.beispiel@example.com", "phone": null,
+            "location": null, "links": [], "summary": null},
+ "experience": [
+  {"role": "Verwaltungsfachangestellter", "employer": "Stadtverwaltung Beispielstadt", "location": null, "start": [2018, 4], "end": "current", "details": 1}
+ ],
+ "education": [{"degree": "Verwaltungsfachangestellter", "school": "Stadt Beispielstadt", "start": [2015, null], "end": [2018, null]}],
+ "skills": [], "languages": [],
+ "certifications": [
+  {"name": "DSGVO-Grundlagen für die kommunale Praxis (1 Tag)", "year": 2024},
+  {"name": "Erste Hilfe Kurs", "year": 2023}
+ ],
+ "interests": []
+}

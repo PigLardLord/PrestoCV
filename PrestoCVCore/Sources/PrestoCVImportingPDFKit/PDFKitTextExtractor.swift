@@ -68,12 +68,16 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
         try Task.checkCancellation()
         let attributed = page.attributedString
         let styled = attributed?.length == text.length
+        var colours = Colours(attributed: styled ? attributed : nil)
 
         var words: [ExtractedWord] = []
+        // The level of each word's colour, nil for a word of several colours or of none known
+        var levels: [Int?] = []
         var current = ""
         var ink = CGRect.null
         var fontSize = 0.0
         var isBold = true
+        var level: Int?
         let wordsLeft = budget.words
         func close() throws {
             if !current.isEmpty, !ink.isNull {
@@ -85,11 +89,13 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
                     text: current, frame: Rect(x: ink.minX - bounds.minX, y: middle - height / 2, width: ink.width, height: height),
                     fontSize: fontSize, isBold: isBold
                 ))
+                levels.append(level)
             }
             current = ""
             ink = .null
             fontSize = 0
             isBold = true
+            level = nil
         }
 
         var index = 0
@@ -123,6 +129,8 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
                 if gap > reach / 3 || gap < -reach || !sameLine { try close() }
             }
             if !box.isEmpty {
+                let colour = colours.level(at: index)
+                level = current.isEmpty || level == colour ? colour : nil
                 current += character
                 ink = ink.isNull ? box : ink.union(box)
                 fontSize = max(fontSize, style.size)
@@ -133,7 +141,49 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
         }
         try close()
         budget.words -= words.count
-        return ExtractedPage(width: size.width, height: size.height, words: words)
+        return ExtractedPage(
+            width: size.width, height: size.height, words: try withInkWeights(words, levels: levels, on: page, bounds: bounds)
+        )
+    }
+
+    /// The words, bold where their fonts say it or their strokes are clearly heavier than the page's: PDFKit gives back
+    /// a plain font for a font it cannot name, and a PDF's headings are bold in the ink only (`InkWeight`). A word is
+    /// measured at the level of its colour, so that what the page draws across it is not taken for its ink.
+    private static func withInkWeights(_ words: [ExtractedWord], levels: [Int?], on page: PDFPage, bounds: CGRect) throws -> [ExtractedWord] {
+        let heavy = try InkWeight.heavyWords(on: page, bounds: bounds, words: words, levels: levels)
+        return zip(words, heavy).map { word, heavy in
+            heavy && !word.isBold ? ExtractedWord(text: word.text, frame: word.frame, fontSize: word.fontSize, isBold: true) : word
+        }
+    }
+
+    /// The grey levels of a page's text colours, read a run of one colour at a time.
+    struct Colours {
+        let attributed: NSAttributedString?
+        private let converter = InkWeight.Levels()
+        private var run = NSRange(location: 0, length: 0)
+        private var runLevel: Int?
+
+        init(attributed: NSAttributedString?) {
+            self.attributed = attributed
+        }
+
+        /// The level of the colour the character at `index` is drawn in, as the page is drawn: nil when the text has no
+        /// style or the character no colour.
+        mutating func level(at index: Int) -> Int? {
+            guard let attributed, index < attributed.length else { return nil }
+            if !NSLocationInRange(index, run) {
+                var range = NSRange(location: index, length: 1)
+                let value = attributed.attribute(.foregroundColor, at: index, effectiveRange: &range)
+                #if canImport(UIKit)
+                let colour = (value as? UIColor)?.cgColor
+                #else
+                let colour = (value as? NSColor)?.cgColor
+                #endif
+                run = range
+                runLevel = colour.flatMap(converter.level(of:))
+            }
+            return runLevel
+        }
     }
 
     /// The font size at a character, and whether its font is bold: by its traits, or by its name, as many PDF fonts

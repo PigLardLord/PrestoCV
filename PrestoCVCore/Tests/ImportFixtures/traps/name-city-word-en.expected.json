@@ -1,0 +1,9 @@
+{
+ "id": "traps/name-city-word-en", "language": "en", "form": "trap",
+ "person": {"name": "Thomas Kiel", "title": "Staff Nurse", "email": "thomas.kiel@example.com", "phone": "555-010-0171",
+            "location": "Leeds, West Yorkshire, United Kingdom", "links": [], "summary": null},
+ "experience": [
+  {"role": "Staff Nurse", "employer": "Example General Hospital", "location": null, "start": [2019, 3], "end": "current", "details": 1}
+ ],
+ "education": [], "skills": [], "languages": [], "certifications": [], "interests": []
+}

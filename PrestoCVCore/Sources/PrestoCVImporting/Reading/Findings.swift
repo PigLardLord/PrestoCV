@@ -6,9 +6,13 @@ struct Findings {
     var leftOut: [LeftOutText] = []
     /// The blocks a reader has already taken as noise.
     var consumedBlocks: Set<Int> = []
+    /// The work of the reading so far: a search that grows faster than the text counts its steps here before it starts
+    /// (R8). It carries on from the work of a PDF's page analysis, so that a PDF has one budget.
+    var work: AnalysisWork
 
-    init(document: SourceDocument) {
+    init(document: SourceDocument, work: AnalysisWork) {
         self.document = document
+        self.work = work
     }
 
     mutating func unplace(_ piece: Piece, in section: Section) {
@@ -16,6 +20,11 @@ struct Findings {
         unplaced.append(UnplacedText(
             section: section.kind, heading: section.heading.map { document.text(of: $0.span) }, text: piece.text, span: piece.span
         ))
+    }
+
+    /// A value that was read and is not used, as text not imported: the text of each of its spans.
+    mutating func unplace(_ value: Sourced<String>, in section: Section) {
+        for span in value.spans { unplace(Piece(text: document.text(of: span), span: span), in: section) }
     }
 
     /// The whole block as text not imported, its cells joined as the canonical text joins them.

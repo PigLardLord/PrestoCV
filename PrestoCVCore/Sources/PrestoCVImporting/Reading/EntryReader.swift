@@ -1,10 +1,10 @@
 import PrestoCVDomain
 
 /// Reads the entries of an experience or education section (ADR 0027). Entries are anchored to their dates; whether a
-/// CV puts the dates before or after the entry's other lines is learned from the section itself. The labelled rows of
-/// the Europass and the formato europeo are read by their labels. Within an entry, the role and the employer (or the
-/// degree and the school) are told apart by a connector ("at", "presso", "bei"), by their words, or, failing both, by
-/// the order the section's other entries use, and then the entry is flagged.
+/// CV puts the dates before or after the entry's other lines is read from the whole section (`EntryLayout`). The
+/// labelled rows of the Europass and the formato europeo are read by their labels. Within an entry, the role and the
+/// employer (or the degree and the school) are told apart by a connector ("at", "presso", "bei"), by their words, or,
+/// failing both, by the order the section's other entries use, and then the entry is flagged.
 enum EntryReader {
 
     enum Kind { case experience, education }
@@ -35,9 +35,11 @@ enum EntryReader {
         var tail: [Line] = []
         var body: [Line] = []
         var inheritedEmployer: Piece?
+        /// The section's two readings part the lines next to this entry's date differently, and neither fits better.
+        var boundsUnsure = false
     }
 
-    static func read(_ section: Section, kind: Kind, into findings: inout Findings) {
+    static func read(_ section: Section, kind: Kind, into findings: inout Findings) throws {
         let lines = section.blocks.filter { !findings.consumedBlocks.contains($0.index) }
             .map { line($0, cells: section.cells(of: $0, in: findings.document)) }
         for line in lines where line.isDurationOnly {
@@ -50,7 +52,7 @@ enum EntryReader {
         if labelled >= 2 {
             readLabelled(lines, section: section, kind: kind, into: &findings)
         } else {
-            let drafts = entries(of: lines, section: section, findings: &findings)
+            let drafts = try entries(of: lines, section: section, kind: kind, findings: &findings)
             let order = sectionOrder(drafts, kind: kind)
             for draft in drafts {
                 append(draft, kind: kind, order: order, section: section, into: &findings)
@@ -104,10 +106,11 @@ enum EntryReader {
         for cell in cells {
             for match in DateReader.periods(in: cell.text) {
                 let before = cell.text[..<match.range.lowerBound].trimmingSpaces()
-                let after = cell.text[match.range.upperBound...].trimmingSpaces()
+                // The text after the period as a string of its own: a range read in it indexes that string
+                let after = String(cell.text[match.range.upperBound...].trimmingSpaces())
                 let opensCell = before.isEmpty || before.last.map { "|·•—–-,(:/[*".contains($0) } == true
                 let closesCell = after.isEmpty || after.first.map { "|·•—–-,):/]*".contains($0) } == true
-                    || DurationReader.ranges(in: String(after)).first?.lowerBound == after.startIndex
+                    || DurationReader.ranges(in: after).first?.lowerBound == after.startIndex
                 if isBullet ? before.isEmpty : (opensCell || closesCell) {
                     return (cell.sub(match.range), match.period)
                 }
@@ -118,26 +121,19 @@ enum EntryReader {
 
     // MARK: Entries by their dates
 
-    private static func entries(of lines: [Line], section: Section, findings: inout Findings) -> [Draft] {
-        let usable = lines.filter { !$0.isDurationOnly }
-        let anchors = usable.indices.filter { usable[$0].period != nil && (!usable[$0].isBullet || usable.allSatisfy { $0.isBullet }) }
+    private static func entries(of lines: [Line], section: Section, kind: Kind, findings: inout Findings) throws -> [Draft] {
+        // A table's row of column names heads no entry: it stays visible
+        for line in lines where isColumnHeader(line) {
+            for cell in line.cells { findings.unplace(cell, in: section) }
+        }
+        let usable = lines.filter { !$0.isDurationOnly && !isColumnHeader($0) }
+        let isOnlyBullets = usable.allSatisfy { $0.isBullet }
+        let anchors = usable.indices.filter { usable[$0].period != nil && (!usable[$0].isBullet || isOnlyBullets) }
         guard !anchors.isEmpty else { return entriesWithoutDates(usable) }
 
-        // How many lines before each date belong to its entry
-        var heads: [Int] = []
-        for (position, anchor) in anchors.enumerated() {
-            let floor = position == 0 ? 0 : anchors[position - 1] + 1
-            var count = 0
-            var index = anchor - 1
-            while index >= floor, !usable[index].isBody {
-                count += 1
-                index -= 1
-            }
-            heads.append(count)
-        }
-        let datesFirst = heads.filter { $0 == 0 }.count * 2 > heads.count
-        let positive = heads.filter { $0 > 0 }
-        let typicalHead = mode(positive) ?? 0
+        // Which lines belong to which date, read both ways over the whole section
+        let usuallyDatesFirst = opensWithItsFirstDate(usable, anchors: anchors, in: findings.document)
+        let layout = try EntryLayout.reading(usable, anchors: anchors, kind: kind, usuallyDatesFirst: usuallyDatesFirst, work: &findings.work)
 
         // LinkedIn groups a company's roles: the line before the company's total duration names it
         var groupStarts: [Int: Piece] = [:]
@@ -145,24 +141,19 @@ enum EntryReader {
             if let employer = lines[index - 1].cells.first { groupStarts[lines[index - 1].block.index] = employer }
         }
 
+        // Lines before the first entry, and a range that sums up the section, stay visible
+        let firstEntry = layout.opensWithSummary ? 1 : 0
+        let shown = firstEntry < anchors.count ? layout.starts[firstEntry] : usable.count
+        for line in usable[..<shown] {
+            for cell in line.cells { findings.unplace(cell, in: section) }
+        }
         var drafts: [Draft] = []
-        var starts: [Int] = []
-        for (position, anchor) in anchors.enumerated() {
-            let head = datesFirst ? 0 : min(heads[position], max(typicalHead, position == 0 ? heads[position] : 0))
-            starts.append(anchor - head)
-        }
-        // Lines before the first entry stay visible
-        if let first = starts.first {
-            for line in usable[..<first] {
-                for cell in line.cells { findings.unplace(cell, in: section) }
-            }
-        }
         var group: Piece?
-        for (position, anchor) in anchors.enumerated() {
-            let start = starts[position]
-            let end = position + 1 < starts.count ? starts[position + 1] : usable.count
+        for position in anchors.indices.dropFirst(firstEntry) {
+            let anchor = anchors[position]
+            let entry = layout.range(of: position, lineCount: usable.count)
             var draft = Draft()
-            draft.head = Array(usable[start..<anchor])
+            draft.head = Array(usable[entry.lowerBound..<anchor])
             // A group's roles share its company until a role names a company of its own
             if let employer = draft.head.lazy.compactMap({ groupStarts[$0.block.index] }).first {
                 group = employer
@@ -171,15 +162,43 @@ enum EntryReader {
             }
             draft.anchor = usable[anchor]
             var index = anchor + 1
-            while index < end, !usable[index].isBody, usable[index].period == nil {
+            while index < entry.upperBound, !usable[index].isBody, usable[index].period == nil {
                 draft.tail.append(usable[index])
                 index += 1
             }
-            draft.body = Array(usable[index..<end])
+            draft.body = Array(usable[index..<entry.upperBound])
             if let employer = group, draft.head.count < 2 { draft.inheritedEmployer = employer }
+            draft.boundsUnsure = layout.unsure.contains(position)
             drafts.append(draft)
         }
         return drafts
+    }
+
+    /// A table's row of column names: two cells or more, each an entry label ("Zeitraum | Schule | Abschluss").
+    private static func isColumnHeader(_ line: Line) -> Bool {
+        let names = line.cells.flatMap { $0.split(by: Separators.strong) }.map { $0.trimmed() }
+        return names.count >= 2 && line.period == nil && names.allSatisfy { EntryVocabulary.entryLabel($0.text) != nil }
+    }
+
+    /// Whether the section opens with its first entry's date, the line holding nothing before it: the more common
+    /// layout when the two readings fit the section equally (a date at the end of the first line says nothing, that
+    /// line holds its entry's head).
+    private static func opensWithItsFirstDate(_ usable: [Line], anchors: [Int], in document: SourceDocument) -> Bool {
+        guard anchors[0] == 0, let first = surroundings(of: usable[0], in: document) else { return false }
+        return !hasContent(first.before)
+    }
+
+    /// The text of the line before and after its period.
+    private static func surroundings(of line: Line, in document: SourceDocument) -> (before: String, after: String)? {
+        guard let period = line.period?.piece, line.block.span.lowerBound <= period.span.lowerBound,
+              period.span.upperBound <= line.block.span.upperBound else { return nil }
+        return (document.text(of: SourceSpan(line.block.span.lowerBound, period.span.lowerBound)),
+                document.text(of: SourceSpan(period.span.upperBound, line.block.span.upperBound)))
+    }
+
+    /// Whether the text holds a letter or a digit, not only marks.
+    private static func hasContent(_ text: String) -> Bool {
+        text.contains { $0.isLetter || $0.isNumber }
     }
 
     /// Entries with no dates: a new entry at each line of a head that follows a body or a gap.
@@ -215,11 +234,6 @@ enum EntryReader {
             || EntryVocabulary.roleEmployerConnectors.contains { text.contains($0) }
     }
 
-    private static func mode(_ values: [Int]) -> Int? {
-        let counts = Dictionary(values.map { ($0, 1) }, uniquingKeysWith: +)
-        return counts.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }.first?.key
-    }
-
     // MARK: The parts of an entry
 
     enum Part: Equatable { case primary, secondary, location, unknown, address }
@@ -229,6 +243,8 @@ enum EntryReader {
         var part: Part
         /// The part came from a connector or a word, not from the order.
         var isMarked: Bool
+        /// A place whose start no rule tells: the person checks it.
+        var isUnsure = false
     }
 
     /// The segments of an entry's lines without its dates and durations, each with the part it reads as.
@@ -239,20 +255,13 @@ enum EntryReader {
             var removed = line.durations
             if let period = line.period?.piece { removed.append(period) }
             for cell in line.cells {
-                let ranges = removed.filter { cell.span.contains($0.span) }.map { cellRange(of: $0, in: cell) }
+                let ranges = removed.filter { cell.span.contains($0.span) }.map { cell.range(of: $0.span) }
                 for piece in cell.removing(ranges).flatMap({ $0.split(by: Separators.strong + [" - "]) }) {
                     segments += split(piece, kind: kind)
                 }
             }
         }
         return segments
-    }
-
-    private static func cellRange(of piece: Piece, in cell: Piece) -> Range<String.Index> {
-        let scalars = cell.text.unicodeScalars
-        let lower = scalars.index(scalars.startIndex, offsetBy: piece.span.lowerBound - cell.span.lowerBound)
-        let upper = scalars.index(scalars.startIndex, offsetBy: piece.span.upperBound - cell.span.lowerBound)
-        return lower..<upper
     }
 
     /// A segment split at a role's connector ("Developer at Acme") or at its commas, each part classified. A place in
@@ -282,12 +291,50 @@ enum EntryReader {
         }
         let parts = piece.split(by: [", "])
         // "Leeds, United Kingdom": short capitalised parts that end with a known country or region are one place
-        if parts.count >= 2, let last = parts.last, Places.isCountryOrRegion(last.text),
-           parts.allSatisfy({ $0.words.count <= 3 && $0.text.first?.isUppercase == true && !EntryVocabulary.isOrganisation($0.text)
-               && !EntryVocabulary.isRole($0.text) && !EntryVocabulary.isSchool($0.text) && !EntryVocabulary.isDegree($0.text) }) {
-            return [Segment(piece: piece, part: .location, isMarked: true)]
+        if let place = placeStart(in: parts), let last = parts.last {
+            let lower = piece.range(of: parts[place.start].span).lowerBound
+            let upper = piece.range(of: last.span).upperBound
+            return parts[..<place.start].map { classify($0, kind: kind) }
+                + [Segment(piece: piece.sub(lower..<upper), part: .location, isMarked: true, isUnsure: place.isUnsure)]
         }
         return parts.map { classify($0, kind: kind) }
+    }
+
+    /// Where the place starts in the parts of a line that ends with a country or a region: the city before it, and the
+    /// regions before that, as in "Springfield, Illinois, United States". What comes before the city, "Harbor Law Firm,
+    /// Medford, Ohio", is no part of the place. The lists cut the place from what comes before it only where they tell the
+    /// city: a known city, or a part before an area by its form or before a region that is no country. Before a country a
+    /// part no list knows may be the city or the employer ("Curitiba, Paraná, Brasil"), so the run of short capitalised
+    /// parts back to an organisation, a role, a school or a degree is the place, unsure, and no part of it moves to the
+    /// employer (ADR 0027, #301).
+    private static func placeStart(in parts: [Piece]) -> (start: Int, isUnsure: Bool)? {
+        guard parts.count >= 2, let last = parts.last, Places.isCountryOrRegion(last.text) else { return nil }
+        var start = parts.count - 2
+        while start > 0, Places.isCountryOrRegion(parts[start].text) { start -= 1 }
+        // A city before an area the rules do not know: "Leeds, West Yorkshire, United Kingdom". An area by its form, or a known
+        // city before a part that is none, belongs to the place; "Harbor Law Firm, Medford, Ohio" keeps its employer.
+        if start > 0, Places.isArea(parts[start].text) || (!Places.isPlaceOnly(parts[start].text) && Places.isPlaceOnly(parts[start - 1].text)) {
+            start -= 1
+        }
+        guard parts[start...].allSatisfy(hasPlaceShape) else { return nil }
+        guard start > 0, !isCityByTheLists(parts[start], before: parts[start + 1]) else { return (start, false) }
+        let cut = start
+        while start > 0, hasPlaceShape(parts[start - 1]) { start -= 1 }
+        return (start, start < cut)
+    }
+
+    /// A part that can be a part of a place: up to three words, capitalised, that name no organisation, role, school or
+    /// degree.
+    private static func hasPlaceShape(_ part: Piece) -> Bool {
+        part.words.count <= 3 && part.text.first?.isUppercase == true && !EntryVocabulary.isOrganisation(part.text)
+            && !EntryVocabulary.isRole(part.text) && !EntryVocabulary.isSchool(part.text) && !EntryVocabulary.isDegree(part.text)
+    }
+
+    /// Whether the lists tell `part` as the city that starts a place: a city they know, or a part before an area by its
+    /// form ("Leeds, West Yorkshire") or before a region that is no country ("Medford, Ohio").
+    private static func isCityByTheLists(_ part: Piece, before next: Piece) -> Bool {
+        (Places.isPlaceOnly(part.text) && !Places.isCountryOrRegion(part.text)) || Places.isArea(next.text)
+            || (Places.isCountryOrRegion(next.text) && !Places.isCountry(next.text))
     }
 
     static func classify(_ piece: Piece, kind: Kind) -> Segment {
@@ -313,7 +360,7 @@ enum EntryReader {
             if isDegree { return Segment(piece: piece, part: .primary, isMarked: true) }
         }
         if isPlace { return Segment(piece: piece, part: .location, isMarked: true) }
-        if isAddress(text) { return Segment(piece: piece, part: .address, isMarked: true) }
+        if Places.isAddress(text) { return Segment(piece: piece, part: .address, isMarked: true) }
         return Segment(piece: piece, part: .unknown, isMarked: false)
     }
 
@@ -322,17 +369,6 @@ enum EntryReader {
         return ["gmbh", "ag", "spa", "srl", "ltd", "inc", "llc", "sa", "sl", "sarl", "lda", "kg"].contains(where: words.contains)
             || ["s.p.a", "s.r.l", "s.a.", "e.v"].contains { text.folded.contains($0) }
     }
-
-    /// A street and number, or a postal code.
-    private static func isAddress(_ text: String) -> Bool {
-        if Places.hasPostalCode(text) { return true }
-        let words = text.words.map { $0.folded }
-        guard text.contains(where: \.isNumber) else { return false }
-        return words.contains { streetWords.contains($0) || $0.hasSuffix("strasse") || $0.hasSuffix("straße".folded) || $0.hasSuffix("weg") || $0.hasSuffix("platz") }
-    }
-
-    private static let streetWords: Set<String> = Set(["via", "viale", "piazza", "corso", "largo", "str", "strasse", "weg", "platz", "allee",
-        "calle", "avenida", "av", "plaza", "paseo", "rua", "avenue", "rue", "boulevard", "bd", "street", "st", "road", "rd", "lane", "travessa", "largo"].map(\.folded))
 
     /// The order in which the section's entries put their two main parts, learned from the entries that mark both.
     struct Order: Equatable {
@@ -386,10 +422,14 @@ enum EntryReader {
                 extra.append(segment)
             }
         }
-        let location = locationValue(locations, in: findings.document)
+        // An entry has one place: the first; any other place line stays visible
+        let places = locationGroups(locations, in: findings.document)
+        let location = places.first
         let period = draft.anchor?.period.map { periodValue($0.piece, $0.value) }
         let details = (extra.map(\.piece) + draft.body.flatMap(\.cells)).map { $0.quote() }
-        let check: CheckReason? = byOrder && (primary != nil && secondary != nil) ? .roleOrEmployerByOrder : nil
+        // Lines that may be another entry's come first: they may also be why the parts were read by their order
+        let check: CheckReason? = draft.boundsUnsure ? .entryBoundsUnsure
+            : byOrder && (primary != nil && secondary != nil) ? .roleOrEmployerByOrder : nil
         switch kind {
         case .experience:
             var entry = ImportedExperience()
@@ -399,8 +439,9 @@ enum EntryReader {
             entry.period = period
             entry.details = details
             entry.check = check
-            guard entry.role != nil || entry.employer != nil || entry.period != nil else { return unplace(details, in: section, &findings) }
+            guard entry.role != nil || entry.employer != nil || entry.period != nil else { return unplace(details + places, in: section, &findings) }
             findings.cv.experience.append(entry)
+            unplace(Array(places.dropFirst()), in: section, &findings)
         case .education:
             var entry = ImportedEducation()
             entry.degree = primary?.piece.quote()
@@ -409,32 +450,42 @@ enum EntryReader {
             entry.period = period
             entry.details = details
             entry.check = check
-            guard entry.degree != nil || entry.school != nil || entry.period != nil else { return unplace(details, in: section, &findings) }
+            guard entry.degree != nil || entry.school != nil || entry.period != nil else { return unplace(details + places, in: section, &findings) }
             findings.cv.education.append(entry)
+            unplace(Array(places.dropFirst()), in: section, &findings)
         }
     }
 
-    private static func unplace(_ details: [Sourced<String>], in section: Section, _ findings: inout Findings) {
-        for detail in details {
-            guard let span = detail.spans.first else { continue }
-            findings.unplace(Piece(text: detail.value, span: span), in: section)
+    private static func unplace(_ values: [Sourced<String>], in section: Section, _ findings: inout Findings) {
+        for value in values { findings.unplace(value, in: section) }
+    }
+
+    /// The places of an entry, in order: one quote for each run of location segments that only a separator parts, so
+    /// "Leeds, United Kingdom" is one place and the same two on two lines are two. A place with an unsure part is to be
+    /// checked.
+    private static func locationGroups(_ segments: [Segment], in document: SourceDocument) -> [Sourced<String>] {
+        var groups: [[Segment]] = []
+        for segment in segments.sorted(by: { $0.piece.span < $1.piece.span }) {
+            if let last = groups.last?.last, !hasContentBetween(last.piece, segment.piece, in: document) {
+                groups[groups.count - 1].append(segment)
+            } else {
+                groups.append([segment])
+            }
+        }
+        return groups.map { group in
+            covering(group[0].piece, group[group.count - 1].piece, in: document, check: group.contains(where: \.isUnsure) ? .locationByPosition : nil)
         }
     }
 
-    /// The place of an entry: one quote from its first location segment to its last, when they are in one block;
-    /// otherwise the first.
-    private static func locationValue(_ segments: [Segment], in document: SourceDocument) -> Sourced<String>? {
-        let pieces = segments.map(\.piece).sorted { $0.span < $1.span }
-        guard let first = pieces.first, let last = pieces.last else { return nil }
-        return covering(first, last, in: document)
+    /// Whether a letter, a digit or a line break comes between two pieces.
+    private static func hasContentBetween(_ first: Piece, _ second: Piece, in document: SourceDocument) -> Bool {
+        document.text(of: SourceSpan(first.span.upperBound, second.span.lowerBound)).contains { $0.isLetter || $0.isNumber || $0 == "\n" || $0 == "\t" }
     }
 
-    /// One quote from the start of `first` to the end of `last`, when no line break comes between them.
-    private static func covering(_ first: Piece, _ last: Piece, in document: SourceDocument) -> Sourced<String> {
+    /// One quote from the start of `first` to the end of `last`, in one line.
+    private static func covering(_ first: Piece, _ last: Piece, in document: SourceDocument, check: CheckReason? = nil) -> Sourced<String> {
         let span = SourceSpan(first.span.lowerBound, last.span.upperBound)
-        let text = document.text(of: span)
-        guard !text.contains("\n") else { return first.quote() }
-        return Sourced(value: text, spans: [span])
+        return Sourced(value: document.text(of: span), spans: [span], check: check)
     }
 
     static func periodValue(_ piece: Piece, _ period: ImportedPeriod) -> Sourced<ImportedPeriod> {
@@ -465,6 +516,8 @@ enum EntryReader {
     // MARK: Labelled rows
 
     private static func readLabelled(_ lines: [Line], section: Section, kind: Kind, into findings: inout Findings) {
+        // Nothing in the rows leaves text out: what a row's period leaves over is asked of the text left out before it
+        let leftOut = SpanIndex(findings.leftOut.compactMap(\.span))
         var entries: [[(EntryVocabulary.EntryLabel?, [Piece])]] = []
         var current: [(EntryVocabulary.EntryLabel?, [Piece])] = []
         var pendingLabel: EntryVocabulary.EntryLabel?
@@ -496,25 +549,38 @@ enum EntryReader {
             var secondary: Piece?
             var location: Sourced<String>?
             var details: [Sourced<String>] = []
+            // An entry has one value for each of its parts; any other value of a row is kept as a detail, and a second
+            // place or period stays visible as text not imported
+            func setLocation(_ value: Sourced<String>) {
+                if location == nil { location = value } else { findings.unplace(value, in: section) }
+            }
             for (label, values) in rows {
                 switch label {
                 case .period:
-                    if let value = values.first, let match = DateReader.periods(in: value.text).first {
+                    if period == nil, let value = values.first, let match = DateReader.periods(in: value.text).first {
                         period = periodValue(value.sub(match.range), match.period)
+                        for rest in value.removing([match.range]) where !leftOut.holds(rest.span) { findings.unplace(rest, in: section) }
+                        for rest in values.dropFirst() { findings.unplace(rest, in: section) }
                     } else {
                         details += values.map { $0.quote(check: .periodUnreadable) }
                     }
                 case .employer, .school:
-                    let parts = values.first?.split(by: [", "]) ?? []
-                    secondary = parts.first
-                    if parts.count > 1, let first = parts.dropFirst().first, let last = parts.last {
-                        location = covering(first, last, in: findings.document)
+                    guard secondary == nil, let first = values.first else {
+                        details += values.map { $0.quote() }
+                        continue
                     }
+                    let parts = first.split(by: [", "])
+                    secondary = parts.first
+                    if parts.count > 1, let second = parts.dropFirst().first, let last = parts.last {
+                        setLocation(covering(second, last, in: findings.document))
+                    }
+                    for rest in values.dropFirst() { findings.unplace(rest, in: section) }
                 case .role, .qualification:
-                    primary = values.first
+                    if primary == nil { primary = values.first } else { details += values.prefix(1).map { $0.quote() } }
                     details += values.dropFirst().map { $0.quote() }
                 case .location:
-                    location = values.first?.quote()
+                    if let first = values.first { setLocation(first.quote()) }
+                    for rest in values.dropFirst() { findings.unplace(rest, in: section) }
                 case .sector, .duties, .subjects, .level, nil:
                     details += values.map { $0.quote() }
                 }

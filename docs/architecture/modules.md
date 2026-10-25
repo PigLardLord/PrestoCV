@@ -24,7 +24,7 @@ Test targets and test-support targets are described below each package. The chec
 | `PrestoCVApplication` | application | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVDomain`, Foundation |
 | `PrestoCVPersistence` | outbound adapter | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Glibc, Darwin, Android |
 | `PrestoCVImporting` | domain + application (CV Import) | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVDomain`, Foundation |
-| `PrestoCVImportingPDFKit` | outbound adapter | iOS, macOS | `PrestoCVImporting`, PDFKit, UIKit, AppKit, Foundation |
+| `PrestoCVImportingPDFKit` | outbound adapter | iOS, macOS | `PrestoCVImporting`, PDFKit, UIKit, AppKit, CoreGraphics, Foundation |
 
 **`PrestoCVDomain`**
 - **`CV`**, the aggregate:
@@ -81,14 +81,14 @@ Test targets and test-support targets are described below each package. The chec
   - `SectionVocabulary` and the segmentation by headings in six languages, Europass and Lebenslauf labels included;
   - the readers of names, contacts, dates and periods, entries, skills, languages and levels, certifications and interests.
 - **The draft, `ImportedCV`:** every value is `Sourced`, with the spans it quotes and the rule that read it, if any. Values the rules are unsure of carry a check reason, and the review list collects them. Text that fits no field is kept as text not imported; noise is left out with its reason. A final gate checks every value against its spans.
-- **The use case, `ImportCV`:** pasted text, or a PDF through the port **`PDFTextExtracting`** (untyped `throws`, cancellable). Typed `ImportError`: empty, too large, too many pages, encrypted, unreadable, no text (a scan).
+- **The use case, `ImportCV`:** pasted text, or a PDF through the port **`PDFTextExtracting`**; both are untyped `throws` and cancellable, and both are read within one budget of work. Typed `ImportError`: empty, too large, too many pages, encrypted, unreadable, no text (a scan).
 - No platform condition, no Apple-only import, no bundle (R11, R18). It is built for Android with the rest of `PrestoCVCore`.
 
-**`PrestoCVImportingPDFKit`** implements `PDFTextExtracting` with PDFKit: each page's words with their box, font size and weight, in PDFKit's order, and nothing decided about the reading order, which the core decides. It checks the size, the page count and the encryption before it reads any text, refuses a page whose text is longer than the characters left before it reads the page's glyphs, counts the words as it reads them, and stops in the middle of a page once its task is cancelled. `characterBounds(at:)` has no box for the line breaks of `PDFPage.string`, so the adapter walks the two together. Every file is wrapped in `#if canImport(PDFKit)`.
+**`PrestoCVImportingPDFKit`** implements `PDFTextExtracting` with PDFKit: each page's words with their box, font size and weight, in PDFKit's order, and nothing decided about the reading order, which the core decides. It checks the size, the page count and the encryption before it reads any text, refuses a page whose text is longer than the characters left before it reads the page's glyphs, counts the words as it reads them, and stops in the middle of a page once its task is cancelled. A word whose font PDFKit cannot name comes back without its weight, so the adapter draws the page with CoreGraphics and marks a word bold when its strokes are clearly heavier than the page's ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)). `characterBounds(at:)` has no box for the line breaks of `PDFPage.string`, so the adapter walks the two together. Every file is wrapped in `#if canImport(PDFKit)`.
 
 **Test support and tests.**
-- **`PrestoCVImportingTests`** may import `PrestoCVImporting`, `PrestoCVDomain`, Testing, Foundation. It holds the unit tests of every rule and the **contract table**: the synthetic corpus under `PrestoCVCore/Tests/ImportFixtures/` (texts, recorded page layouts and their PDFs, each with the fields it states), measured per language and form. No real CV is ever committed.
-- **`PrestoCVImportingPDFKitTests`** (Apple hosts) may import `PrestoCVImportingPDFKit`, `PrestoCVImporting`, Testing, Foundation, PDFKit, and CoreText, with which it draws hostile pages when it runs. Its contract test reads the fixture PDFs with PDFKit and compares the words with the recorded layouts that the Linux tests use.
+- **`PrestoCVImportingTests`** may import `PrestoCVImporting`, `PrestoCVDomain`, Testing, Foundation. It holds the unit tests of every rule and the **contract table**: the synthetic corpus under `PrestoCVCore/Tests/ImportFixtures/` (texts, recorded page layouts and their PDFs, each with the fields it states), measured per language and form, and checked line by line: every line of every fixture is covered by a value, a text not imported or a left-out piece. No real CV is ever committed.
+- **`PrestoCVImportingPDFKitTests`** (Apple hosts) may import `PrestoCVImportingPDFKit`, `PrestoCVImporting`, Testing, Foundation, PDFKit, CoreGraphics, and CoreText, with which it draws hostile pages when it runs. Its contract test reads the fixture PDFs with PDFKit and compares the words with the recorded layouts that the Linux tests use.
 - `PrestoCVCoreTestSupport` may import `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Synchronization. It holds:
   - `InMemoryCVRepository`, `SteppingClock`, `SequentialIDGenerator`;
   - `ManualClock`, a `Clock` that moves only when a test moves it, for the timing of `Autosave`;

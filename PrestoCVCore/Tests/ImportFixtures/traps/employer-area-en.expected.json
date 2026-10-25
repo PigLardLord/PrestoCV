@@ -1,0 +1,11 @@
+{
+ "id": "traps/employer-area-en", "language": "en", "form": "trap",
+ "person": {"name": "Dana Whitfield", "title": null, "email": "dana.whitfield@example.com", "phone": "555-555-0142",
+            "location": "Austin, Texas", "links": [], "summary": null},
+ "experience": [
+  {"role": "Executive assistant", "employer": "Harbor Law Firm", "location": "Leeds, West Yorkshire, United Kingdom", "start": [2015, 3], "end": "current", "details": 1},
+  {"role": "Sales associate", "employer": "Larkin Hardware", "location": "Reading, Berkshire, England", "start": [2011, 6], "end": [2015, 3], "details": 1},
+  {"role": "Clerk", "employer": "Northgate Mill", "location": "Lyon, Auvergne-Rhône-Alpes, France", "start": [2008, 5], "end": [2011, 5], "details": 1}
+ ],
+ "education": [], "skills": [], "languages": [], "certifications": [], "interests": []
+}

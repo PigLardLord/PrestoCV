@@ -1,0 +1,94 @@
+{
+ "id": "traps/dates-above-it",
+ "language": "it",
+ "form": "trap",
+ "person": {
+  "name": "Marta Esposito",
+  "title": "Operatrice socio-sanitaria",
+  "email": "marta.esposito@example.com",
+  "phone": "+39 333 000 0202",
+  "location": "Bologna",
+  "links": [],
+  "summary": null
+ },
+ "experience": [
+  {
+   "role": "Tirocinante",
+   "employer": "Ospedale Esempio",
+   "location": "Bologna",
+   "start": [
+    2020,
+    null
+   ],
+   "end": [
+    2021,
+    null
+   ],
+   "details": 1
+  },
+  {
+   "role": "Addetta alle pulizie",
+   "employer": "Verdi Srl",
+   "location": "Bologna",
+   "start": [
+    2019,
+    null
+   ],
+   "end": [
+    2020,
+    null
+   ],
+   "details": 1
+  },
+  {
+   "role": "Commessa",
+   "employer": "Negozio Blu",
+   "location": "Modena",
+   "start": [
+    2018,
+    null
+   ],
+   "end": [
+    2019,
+    null
+   ],
+   "details": 1
+  }
+ ],
+ "education": [
+  {
+   "degree": "Diploma",
+   "school": "Istituto Esempio",
+   "location": "Bologna",
+   "start": [
+    2016,
+    null
+   ],
+   "end": [
+    2018,
+    null
+   ]
+  },
+  {
+   "degree": "Attestato",
+   "school": "Liceo Prova",
+   "location": "Bologna",
+   "start": [
+    2013,
+    null
+   ],
+   "end": [
+    2016,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "Assistenza alla persona",
+  "Pulizia",
+  "Servizio clienti"
+ ],
+ "languages": [],
+ "certifications": [],
+ "interests": []
+}

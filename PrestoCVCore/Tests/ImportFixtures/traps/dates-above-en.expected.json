@@ -1,0 +1,94 @@
+{
+ "id": "traps/dates-above-en",
+ "language": "en",
+ "form": "trap",
+ "person": {
+  "name": "Daniel Okoye",
+  "title": "Healthcare Assistant",
+  "email": "daniel.okoye@example.com",
+  "phone": "+44 7700 900321",
+  "location": "Leeds, UK",
+  "links": [],
+  "summary": null
+ },
+ "experience": [
+  {
+   "role": "Trainee",
+   "employer": "Northgate Hospital",
+   "location": "Leeds",
+   "start": [
+    2020,
+    null
+   ],
+   "end": [
+    2021,
+    null
+   ],
+   "details": 1
+  },
+  {
+   "role": "Cleaner",
+   "employer": "Verdi Ltd",
+   "location": "Leeds",
+   "start": [
+    2019,
+    null
+   ],
+   "end": [
+    2020,
+    null
+   ],
+   "details": 1
+  },
+  {
+   "role": "Shop assistant",
+   "employer": "Blue Shop",
+   "location": "Rome",
+   "start": [
+    2018,
+    null
+   ],
+   "end": [
+    2019,
+    null
+   ],
+   "details": 1
+  }
+ ],
+ "education": [
+  {
+   "degree": "Diploma",
+   "school": "Northgate School",
+   "location": "Leeds",
+   "start": [
+    2016,
+    null
+   ],
+   "end": [
+    2018,
+    null
+   ]
+  },
+  {
+   "degree": "Certificate",
+   "school": "Verdi College",
+   "location": "Leeds",
+   "start": [
+    2013,
+    null
+   ],
+   "end": [
+    2016,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "Patient care",
+  "Cleaning",
+  "Customer service"
+ ],
+ "languages": [],
+ "certifications": [],
+ "interests": []
+}

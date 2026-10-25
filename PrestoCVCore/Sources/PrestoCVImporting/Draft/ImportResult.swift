@@ -54,6 +54,7 @@ public struct ReviewItem: Hashable, Sendable {
             if let reason = entry.check {
                 items.append(ReviewItem(field: .experience(index), reason: reason, text: [entry.role?.value, entry.employer?.value].compactMap { $0 }.joined(separator: " — ")))
             }
+            add(.experience(index), entry.location)
             if let period = entry.period, let reason = period.check {
                 items.append(ReviewItem(field: .experiencePeriod(index), reason: reason, text: [entry.role?.value, entry.employer?.value].compactMap { $0 }.joined(separator: " — ")))
             }
@@ -62,6 +63,7 @@ public struct ReviewItem: Hashable, Sendable {
             if let reason = entry.check {
                 items.append(ReviewItem(field: .education(index), reason: reason, text: [entry.degree?.value, entry.school?.value].compactMap { $0 }.joined(separator: " — ")))
             }
+            add(.education(index), entry.location)
             if let period = entry.period, let reason = period.check {
                 items.append(ReviewItem(field: .educationPeriod(index), reason: reason, text: [entry.degree?.value, entry.school?.value].compactMap { $0 }.joined(separator: " — ")))
             }
