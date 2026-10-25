@@ -297,6 +297,7 @@ private struct RenderedPixels {
 
     init(of view: some View, in scheme: ColorScheme) throws {
         let renderer = ImageRenderer(content: view.frame(minWidth: 8, minHeight: 8).environment(\.colorScheme, scheme))
+        renderer.scale = Self.scale
         let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
         var rgba: [UInt8] = []
         var drawn = false
@@ -312,7 +313,7 @@ private struct RenderedPixels {
                 return true
             }
         }
-        try #require(drawn)
+        try #require(drawn, "The view was drawn into a bitmap of the test's own")
         self.rgba = rgba
     }
 

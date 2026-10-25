@@ -433,8 +433,8 @@ struct ButtonScan {
     // MARK: Blanking
 
     /// The source with its comments and the text of its string literals turned into spaces. Line breaks stay, and so
-    /// does the code of an interpolation.
-    private static func blank(_ source: [Character]) -> [Character] {
+    /// does the code of an interpolation. Other scans of code read it too.
+    static func blank(_ source: [Character]) -> [Character] {
         var blanked = source
         /// The open string literals, innermost last: how each ends, and the depth of the brackets of the
         /// interpolation being read in it, or nil while reading its text
