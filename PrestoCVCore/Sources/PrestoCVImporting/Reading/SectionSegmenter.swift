@@ -45,7 +45,7 @@ enum SectionSegmenter {
             if sidebarKinds.contains(sections[sections.count - 1].kind), block.cells.count == 1, HeaderReader.hasNameShape(firstCell),
                startsProfile(after: position, in: document) {
                 if case .heading(1) = block.kind,
-                   HeaderReader.holdsNameBeforeContacts(sections.filter { headKinds.contains($0.kind) }.flatMap(\.blocks).filter { $0.column == block.column }, in: document) {
+                   HeaderReader.contactsAfterAName(sections.filter { headKinds.contains($0.kind) }.flatMap(\.blocks).filter { $0.column == block.column }, in: document) != nil {
                     sections.append(Section(kind: .unknown, heading: block, blocks: [], languages: [], headingCouldBeTheName: true))
                 } else {
                     sections.append(Section(kind: .header, heading: nil, blocks: [block], languages: []))
@@ -119,7 +119,7 @@ enum SectionSegmenter {
         // The name at the top of a chat answer, after its opening sentence, the contacts or the document's title
         var couldBeTheName = false
         if case .heading(1) = block.kind, let head, HeaderReader.hasNameShape(text) {
-            guard HeaderReader.holdsNameBeforeContacts(head, in: document) else { return nil }
+            guard HeaderReader.contactsAfterAName(head, in: document) != nil else { return nil }
             couldBeTheName = true
         }
         return (SectionVocabulary.Match(kind: .unknown, languages: []), couldBeTheName)

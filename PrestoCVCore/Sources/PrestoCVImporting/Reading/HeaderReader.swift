@@ -28,6 +28,9 @@ enum HeaderReader {
         var names = LabelledName()
         // The blocks that hold a contact: a line next to one of them can be the place
         var contactBlocks = Set<Int>()
+        let blocks = sections.flatMap { $0.blocks.filter { !findings.consumedBlocks.contains($0.index) } }
+        // The head's name and its contacts end at this block, across its columns: no later line is evidence of the name
+        let closing = contactsAfterAName(blocks, in: findings.document)?.index
 
         for section in sections {
             for block in section.blocks where !findings.consumedBlocks.contains(block.index) {
@@ -99,7 +102,7 @@ enum HeaderReader {
 
         var taken = Set<Int>()
         var head: HeadName?
-        if findings.cv.person.name == nil, let chosen = headName(of: candidates, in: findings.document) {
+        if findings.cv.person.name == nil, let chosen = headName(of: candidates, closedAt: closing, in: findings.document) {
             head = chosen
             let reading = chosen.reading
             let candidate = candidates[reading.index]
@@ -232,19 +235,20 @@ enum HeaderReader {
         }
     }
 
-    /// Whether the head, given as its blocks in order, holds a line in the shape of a name that its contacts follow, on the
-    /// line itself or under it: "Anna Weber / person@example.com", "Anna Weber, RN | +44 20 7946 0000", or a name and a
-    /// contact given by their labels. A heading of the first level after such a line opens a section, whatever its shape
-    /// (#301). A piece after a contact of its line holds the place, and a line of known places alone is a place: neither is
-    /// such a line.
-    static func holdsNameBeforeContacts(_ blocks: [SourceBlock], in document: SourceDocument) -> Bool {
+    /// The block of the head, given as its blocks in reading order, where a line in the shape of a name is followed by its
+    /// contacts, on the line itself or under it: "Anna Weber / person@example.com", "Anna Weber, RN | +44 20 7946 0000",
+    /// or a name and a contact given by their labels. No line after it is evidence of the name, and a heading of the first
+    /// level after it, in its column, opens a section, whatever its shape (#301). A piece after a contact of its line
+    /// holds the place, and a line of known places alone is a place: neither is such a line. Nil when the head has none,
+    /// as when its contacts come first.
+    static func contactsAfterAName(_ blocks: [SourceBlock], in document: SourceDocument) -> SourceBlock? {
         var hasName = false
         for block in blocks {
             let cells = Piece.cells(of: block, in: document)
             if let (label, _) = labelled(cells) {
                 switch label {
                 case .name, .firstName, .lastName: hasName = true
-                case .phone, .email, .web: if hasName { return true }
+                case .phone, .email, .web: if hasName { return block }
                 case .address, .birth, .nationality, .maritalStatus, .gender, .fax, .other: break
                 }
                 continue
@@ -255,9 +259,9 @@ enum HeaderReader {
                !Places.isPlaceOnly(name.text) {
                 hasName = true
             }
-            if hasName && line.hasContacts { return true }
+            if hasName && line.hasContacts { return block }
         }
-        return false
+        return nil
     }
 
     /// The first e-mail address and phone number are the person's; any other one stays visible as text not imported.
@@ -323,26 +327,32 @@ enum HeaderReader {
     /// name even on weak evidence; it is sure only when no list knows it, no other line has a title under it, and it is the
     /// only marked line, or the first line with a title of its own (one without the shape of a name) or with no other line
     /// that could be the name. A piece that follows a contact of its own line is the head's place: it is not its first
-    /// line, it has no title under it, and it could not be the name. A heading of the first level under a line in the shape
-    /// of a name, in its column, is no mark and has no title: its shape tells it from a heading no better than its words do,
-    /// so the line above keeps its evidence and the heading stays a line that could be the name ("Anna Weber / Nurse /
-    /// # University Projects"). A line made only of known places above it, or a piece after a contact, takes no mark away.
-    private static func headName(of candidates: [Candidate], in document: SourceDocument) -> HeadName? {
+    /// line, it has no title under it, and it could not be the name.
+    ///
+    /// A mark tells the name only where no name has come before it, which the shape of a line cannot tell: a line after
+    /// the `closing` block, where a line in the shape of a name and its contacts end, in any column of the head, gains no
+    /// evidence, neither a mark of any kind nor a title ("Anna Weber / person@example.com / Community Outreach", the last
+    /// line the largest); nor does a heading of the first level under a line in the shape of a name, in any column ("Anna
+    /// Weber / Nurse / # University Projects"). Such a line stays one that could be the name, so the name is to be checked
+    /// unless a mark of its own makes it sure. A line made only of known places above it, or a piece after a contact,
+    /// takes no evidence away.
+    private static func headName(of candidates: [Candidate], closedAt closing: Int?, in document: SourceDocument) -> HeadName? {
         let window = candidates.indices.prefix(6).filter { candidates[$0].isFirstInBlock }
         let readings = window.compactMap { nameReading(at: $0, in: candidates) }
         let indices = Set(readings.map(\.index))
-        func isUnderAName(_ index: Int) -> Bool {
-            candidates[index].block.kind == .heading(level: 1) && readings.contains { above in
-                above.index < index && candidates[above.index].block.column == candidates[index].block.column
-                    && !candidates[above.index].followsContact && !Places.isPlaceOnly(above.name.text)
+        func gainsNoEvidence(_ index: Int) -> Bool {
+            if let closing, candidates[index].block.index > closing { return true }
+            return candidates[index].block.kind == .heading(level: 1) && readings.contains { above in
+                above.index < index && !candidates[above.index].followsContact && !Places.isPlaceOnly(above.name.text)
             }
         }
         let titled = indices.filter {
-            !candidates[$0].followsContact && !isUnderAName($0) && hasTitle(under: $0, in: candidates, readings: indices)
+            !candidates[$0].followsContact && !gainsNoEvidence($0) && hasTitle(under: $0, in: candidates, readings: indices)
         }
         let first = candidates.indices.first { !candidates[$0].followsContact }
         func isMarked(_ index: Int) -> Bool {
-            (candidates[index].block.kind == .heading(level: 1) && !isUnderAName(index)) || isLargestText(candidates[index].block, in: document)
+            !gainsNoEvidence(index)
+                && (candidates[index].block.kind == .heading(level: 1) || isLargestText(candidates[index].block, in: document))
         }
         func evidence(_ reading: NameReading) -> Int {
             let mark = isMarked(reading.index) ? 4 : 0
