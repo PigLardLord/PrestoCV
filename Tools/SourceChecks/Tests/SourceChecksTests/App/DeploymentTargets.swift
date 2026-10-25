@@ -59,25 +59,52 @@ enum DeploymentTargets {
 
     // MARK: Project file
 
-    /// The key of the build setting, with or without a condition (`IPHONEOS_DEPLOYMENT_TARGET[config=Debug]`), and its
-    /// value when that is a string.
+    /// The build setting that sets the oldest iOS release.
+    static let projectKey = "IPHONEOS_DEPLOYMENT_TARGET"
+
+    /// The key as the project file writes it: quoted, with any number of conditions (`[config=Debug]`,
+    /// `[sdk=iphoneos*][arch=arm64]`), and its value when that is a string.
     private static let projectSetting = try! NSRegularExpression(
-        pattern: #""IPHONEOS_DEPLOYMENT_TARGET(?:\[[^\]]*\])?"\s*:\s*(?:"([^"]*)")?"#
+        pattern: #""IPHONEOS_DEPLOYMENT_TARGET(?:\[[^\]]*\])*"\s*:\s*(?:"([^"]*)")?"#
     )
 
-    /// The settings of the project file that set an iOS release below the minimum, or none that can be read.
-    static func findings(inProject text: String, file: String) -> [Finding] {
+    /// What the check made of the project file: how many settings it read, and what is wrong with them.
+    struct ProjectReading {
+        let settingsRead: Int
+        let findings: [Finding]
+    }
+
+    /// Reads every build setting of the project file that sets an iOS release.
+    ///
+    /// A line that names the key more often than the reader found a setting on it is a finding too: it spells the
+    /// setting in a form the reader does not know (unquoted, with `=`, in single quotes), and a reader that skipped it
+    /// would pass while the minimum was lowered.
+    static func read(project text: String, file: String) -> ProjectReading {
         var findings: [Finding] = []
+        var settingsRead = 0
         for (index, line) in text.components(separatedBy: "\n").enumerated() {
-            for match in projectSetting.matches(in: line, range: NSRange(line.startIndex..., in: line)) {
+            let matches = projectSetting.matches(in: line, range: NSRange(line.startIndex..., in: line))
+            for match in matches {
+                settingsRead += 1
                 let value = Range(match.range(at: 1), in: line).map { String(line[$0]) }
                 let written = value ?? line.trimmingCharacters(in: .whitespaces)
-                if let reason = problem(with: value.flatMap { IOSRelease(version: $0) }, written: written, setting: "IPHONEOS_DEPLOYMENT_TARGET") {
+                if let reason = problem(with: value.flatMap { IOSRelease(version: $0) }, written: written, setting: projectKey) {
                     findings.append(Finding(file: file, line: index + 1, reason: reason))
                 }
             }
+            if line.components(separatedBy: projectKey).count - 1 > matches.count {
+                findings.append(Finding(
+                    file: file, line: index + 1,
+                    reason: "\(projectKey) is named in a form the check does not read, so it could set any release: \(line.trimmingCharacters(in: .whitespaces))"
+                ))
+            }
         }
-        return findings
+        return ProjectReading(settingsRead: settingsRead, findings: findings)
+    }
+
+    /// The settings of the project file that set an iOS release below the minimum, or none that can be read.
+    static func findings(inProject text: String, file: String) -> [Finding] {
+        read(project: text, file: file).findings
     }
 
     // MARK: Package manifests

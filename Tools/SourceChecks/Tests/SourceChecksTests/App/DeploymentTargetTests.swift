@@ -55,6 +55,57 @@ struct DeploymentTargetTests {
         #expect(findings.map(\.line) == [2])
     }
 
+    @Test("A setting with several conditions is read like the others")
+    func projectSettingOfSeveralConditionsIsRead() {
+        let text = """
+        "IPHONEOS_DEPLOYMENT_TARGET": "26.5",
+        "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]": "26.0",
+        "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*][config=Debug][arch=x86_64]": "26.4",
+        "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]": "26.5",
+        """
+
+        let findings = DeploymentTargets.findings(inProject: text, file: Self.projectFile)
+
+        #expect(findings.map(\.line) == [2, 3], "\(findings)")
+    }
+
+    @Test("A setting that is written in another way than the file's own is found, with its line: it is not read", arguments: [
+        "IPHONEOS_DEPLOYMENT_TARGET = 26.0;",
+        "IPHONEOS_DEPLOYMENT_TARGET: \"26.0\",",
+        "\"IPHONEOS_DEPLOYMENT_TARGET\" = \"26.0\";",
+        "'IPHONEOS_DEPLOYMENT_TARGET': '26.0',",
+        "\"MY_IPHONEOS_DEPLOYMENT_TARGET\": \"26.0\",",
+        "\"OTHER_FLAGS\": \"-DIPHONEOS_DEPLOYMENT_TARGET=26.0\",",
+    ])
+    func projectSettingThatIsNotReadIsFound(line: String) {
+        let text = "\"IPHONEOS_DEPLOYMENT_TARGET\": \"26.5\",\n\(line)\n"
+
+        let findings = DeploymentTargets.findings(inProject: text, file: Self.projectFile)
+
+        #expect(findings.map(\.line) == [2], "\(line): \(findings)")
+        #expect(findings.first?.reason.contains("does not read") == true, "\(findings)")
+    }
+
+    @Test("A line with a setting that is read and one that is not is found for the one that is not")
+    func projectLineWithOneSettingReadAndOneNotIsFound() {
+        let text = "\"IPHONEOS_DEPLOYMENT_TARGET\": \"26.5\", IPHONEOS_DEPLOYMENT_TARGET = 26.0;"
+
+        #expect(DeploymentTargets.findings(inProject: text, file: Self.projectFile).count == 1)
+    }
+
+    @Test("The reading counts the settings it read, and a project that sets none reads none")
+    func projectReadingCountsTheSettings() {
+        let text = """
+        "IPHONEOS_DEPLOYMENT_TARGET": "26.5",
+        "IPHONEOS_DEPLOYMENT_TARGET[config=Debug]": "26.5",
+        "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]": "27.0",
+        """
+
+        #expect(DeploymentTargets.read(project: text, file: Self.projectFile).settingsRead == 3)
+        #expect(DeploymentTargets.read(project: "IPHONEOS_DEPLOYMENT_TARGET = 26.5;", file: Self.projectFile).settingsRead == 0)
+        #expect(DeploymentTargets.read(project: "{}", file: Self.projectFile).settingsRead == 0)
+    }
+
     @Test("A setting that does not say a release is found: it could hide any value", arguments: [
         "\"IPHONEOS_DEPLOYMENT_TARGET\": \"$(inherited)\",",
         "\"IPHONEOS_DEPLOYMENT_TARGET\": \"\",",
@@ -171,14 +222,16 @@ struct DeploymentTargetTests {
 
     // MARK: The repository
 
-    @Test("The project sets its deployment targets, and none is below 26.5")
+    @Test("The project sets its deployment targets, the check reads every one, and none is below 26.5")
     func projectHasNoTargetBelowTheMinimum() throws {
         let text = try String(contentsOf: Repository.root.appendingPathComponent(Self.projectFile), encoding: .utf8)
-        try #require(text.contains("IPHONEOS_DEPLOYMENT_TARGET"), "A project that sets none would pass without being checked")
 
-        let findings = DeploymentTargets.findings(inProject: text, file: Self.projectFile)
+        let reading = DeploymentTargets.read(project: text, file: Self.projectFile)
 
-        #expect(findings.isEmpty, "The oldest supported iOS is \(DeploymentTargets.minimum) (#180):\n\(findings.map(\.description).joined(separator: "\n"))")
+        try #require(reading.settingsRead > 0, "A project whose settings are not read would pass without being checked")
+        let named = text.components(separatedBy: DeploymentTargets.projectKey).count - 1
+        #expect(reading.settingsRead == named, "The project names \(DeploymentTargets.projectKey) \(named) times and the check read \(reading.settingsRead)")
+        #expect(reading.findings.isEmpty, "The oldest supported iOS is \(DeploymentTargets.minimum) (#180):\n\(reading.findings.map(\.description).joined(separator: "\n"))")
     }
 
     @Test("Every package manifest of the repository sets an iOS release of 26.5 or later, outside the prototype")
