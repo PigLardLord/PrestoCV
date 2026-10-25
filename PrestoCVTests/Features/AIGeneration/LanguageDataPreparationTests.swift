@@ -33,7 +33,7 @@ struct LanguageDataPreparationTests {
         #expect(await wait.value == .available)
     }
 
-    @Test("The bound is 60 seconds, and holds when the system never answers and ignores the cancel; the late answer is dropped")
+    @Test("The bound is 60 seconds, and ends the wait with notAvailable when the system never answers, though it ignores the cancel")
     func boundEndsTheWait() async {
         system.outcome = nil
         let preparation = makePreparation()
@@ -41,12 +41,31 @@ struct LanguageDataPreparationTests {
         let wait = Task { await preparation.prepare(language: "en") }
         await system.waitUntilHeld(1)
         await sleeps.waitUntilStarted(1)
-        #expect(await sleeps.durations == [.seconds(60)])
+        #expect(await sleeps.durations == [LanguageDataPreparation.bound])
         #expect(LanguageDataPreparation.bound == .seconds(60))
         await sleeps.endAll()
 
         #expect(await wait.value == .notAvailable)
+        #expect(system.requests == ["en"])
+        system.answerHeld(.notAvailable)  // Lets go of the request that was held; the test needs no answer from it
+    }
+
+    @Test("An answer that comes after the bound is harmless: it does not resume the ended wait a second time")
+    func lateAnswerIsHarmless() async {
+        system.outcome = nil
+        let preparation = makePreparation()
+        let wait = Task { await preparation.prepare(language: "en") }
+        await system.waitUntilHeld(1)
+        await sleeps.waitUntilStarted(1)
+        await sleeps.endAll()
+        #expect(await wait.value == .notAvailable)
+
         system.answerHeld(.available)
+
+        // The preparation is as usable as before: the next wait is answered by its own request
+        system.outcome = .available
+        #expect(await preparation.prepare(language: "en") == .available)
+        #expect(system.requests == ["en", "en"])
     }
 
     @Test("The bound is given to the preparation, which waits that long")

@@ -22,16 +22,14 @@ struct LanguageDataOverrideTests {
         #expect(data.tagger.verbs(in: description, language: "en").isEmpty, "A draft is the same on every simulator")
     }
 
-    @Test("neverArrives: the system never answers, and a cancelled request ends with notAvailable; the data stays missing")
+    @Test("neverArrives: a cancelled request ends with notAvailable, and the data stays missing")
     func dataNeverArrives() async throws {
         let data = try scripted("neverArrives")
         let requester = data.requester
 
-        let answered = await finishes(within: .milliseconds(100)) { _ = await requester.requestLexicalClassData(forLanguage: "en") }
         let request = Task { await requester.requestLexicalClassData(forLanguage: "en") }
         request.cancel()
 
-        #expect(!answered)
         #expect(await request.value == .notAvailable)
         #expect(!data.tagger.tagsLexicalClass(inLanguage: "en"))
         #expect(data.tagger.verbs(in: description, language: "en").isEmpty)

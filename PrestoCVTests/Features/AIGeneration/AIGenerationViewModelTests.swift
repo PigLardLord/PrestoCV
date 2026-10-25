@@ -278,7 +278,7 @@ struct AIGenerationViewModelTests {
         #expect(!viewModel.isGenerating)
         #expect(!viewModel.isWaitingForLanguageData)
         #expect(viewModel.canGenerate)
-        languageData.answerHeld(.notAvailable)
+        languageData.answerHeld(.notAvailable)  // Lets go of the request that was held; the test needs no answer from it
     }
 
     @Test("The wait for the data is a phase of its own on the busy screen, and the screen goes back to the model's writing once the data is there")
@@ -308,6 +308,30 @@ struct AIGenerationViewModelTests {
 
         #expect(viewModel.draft?.cv.personalInfo.name == "John Doe")
         #expect(!viewModel.isWaitingForLanguageData)
+    }
+
+    @Test("Data that comes after the bound is not lost: the next Generate writes the draft at once, without asking the system again")
+    func dataAfterTheBoundServesTheNextTap() async {
+        let tagger = ArrivingLexicalTagger()
+        languageData.outcome = nil
+        languageData.onAvailable = tagger.dataArrives
+        let viewModel = makeViewModel(lexicalClasses: tagger)
+        viewModel.prompt = validPrompt
+        viewModel.startGenerating()
+        await languageData.waitUntilHeld(1)
+        await sleeps.waitUntilStarted(1)
+        await sleeps.endAll()
+        await viewModel.generationTask?.value
+        #expect(viewModel.errorMessage == "ai.unavailable.language_data_not_ready".localized)
+
+        languageData.outcome = .notAvailable  // A second request, if the screen made one, would end at once and fail below
+        languageData.answerHeld(.available)
+        await viewModel.generateCV()
+
+        #expect(languageData.requests == ["en"], "The data is on the device: nothing is asked for again")
+        #expect(viewModel.draft?.cv.personalInfo.name == "John Doe")
+        #expect(viewModel.errorMessage.isEmpty)
+        #expect(service.generateRequests.count == 1)
     }
 
     @Test("Once the data arrives the draft is generated again, without another tap")
@@ -343,26 +367,29 @@ struct AIGenerationViewModelTests {
         #expect(!viewModel.isGenerating)
     }
 
-    @Test("cancel while the app waits for the data returns the screen to idle at once, and the late data generates nothing")
+    @Test("cancel while the app waits for the data returns the screen to idle at once, with no message and no draft, and the model is never asked")
     func cancelWhileWaitingForLanguageData() async {
-        let tagger = ArrivingLexicalTagger()
         languageData.outcome = nil
-        languageData.onAvailable = tagger.dataArrives
-        let viewModel = makeViewModel(lexicalClasses: tagger)
+        let viewModel = makeViewModel(lexicalClasses: FakeLexicalTagger.withoutData)
         viewModel.prompt = validPrompt
 
         viewModel.startGenerating()
         await languageData.waitUntilHeld(1)
         let task = viewModel.generationTask
+        #expect(viewModel.isWaitingForLanguageData)
         viewModel.cancel()
+        #expect(!viewModel.isGenerating, "The screen is idle at once, before the task has ended")
+        #expect(!viewModel.isWaitingForLanguageData)
         await task?.value
 
         #expect(!viewModel.isGenerating)
+        #expect(!viewModel.isWaitingForLanguageData)
         #expect(viewModel.errorMessage.isEmpty)
-        #expect(viewModel.canGenerate)
-        languageData.answerHeld(.available)
         #expect(viewModel.draft == nil)
+        #expect(viewModel.canGenerate)
+        #expect(languageData.requests == ["en"])
         #expect(service.generateRequests.isEmpty)
+        languageData.answerHeld(.notAvailable)  // Lets go of the request that was held; the test needs no answer from it
     }
 
     @Test("The same state follows the error wherever the generator raises it")
