@@ -194,7 +194,8 @@ struct LockedDeviceTests {
     }
 
     // A CV file that cannot be opened (mode 0) stands for one that is protected while the device is locked: both
-    // fail at `open`. The real protection class is checked on a device, which neither the simulator nor Linux can do.
+    // fail at `open`. Only a test that runs on a physical device checks the protection class itself, and no automated gate
+    // runs there (ADR 0009).
     @Test("a CV that cannot be opened is reported, never lost or quarantined, and listed again once it can", .enabled(if: !isRoot))
     func locksAndUnlocks() async throws {
         let dir = tempDir()

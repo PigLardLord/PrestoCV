@@ -412,7 +412,7 @@ struct FileRepositoryTests {
     }
 
     #if os(iOS)
-    @Test("a stored CV has complete data protection: it cannot be read while the device is locked",
+    @Test("a stored CV is written with complete data protection",
           .enabled(if: !runningInSimulator, "the simulator neither applies nor reports data protection"))
     func dataProtection() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
