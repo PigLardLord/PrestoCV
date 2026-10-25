@@ -86,3 +86,13 @@ struct OnboardingViewModelTests {
         #expect(mockOnboardingUseCase.checkOnboardingRequiredCalled)
     }
 }
+
+// MARK: - Gate proof (throwaway)
+
+@Suite("Gate proof")
+struct GateProofTests {
+    @Test("a deliberately failing test, to see the Mac mini check end in failure")
+    func failsOnPurpose() {
+        #expect(1 + 1 == 3)
+    }
+}
