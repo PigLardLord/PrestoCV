@@ -83,8 +83,7 @@ final class UncheckedAIDraftUITests: XCTestCase {
 
         XCTAssertTrue(notice.waitForExistence(timeout: 30), "The editor should say what could not be checked, in one element")
         add(app.keptScreenshot(named: "Unchecked AI draft - largest text"))
-        let screen = app.windows.firstMatch.frame
-        XCTAssertGreaterThanOrEqual(notice.frame.minY, screen.minY, "The notice should start on screen")
+        XCTAssertNil(whyTheNoticeCannotBeRead(), "The notice should be readable at the largest text size")
 
         XCTAssertNil(whyTheFirstFieldIsOutOfReach(), "The form should still be reachable below the notice")
         add(app.keptScreenshot(named: "Unchecked AI draft - largest text, form"))
@@ -113,11 +112,35 @@ final class UncheckedAIDraftUITests: XCTestCase {
         }
         XCTAssertTrue(notice.waitForExistence(timeout: 10), "The notice should stay, in one element, in landscape")
         add(app.keptScreenshot(named: shot))
-        let screen = app.windows.firstMatch.frame
-        XCTAssertGreaterThanOrEqual(notice.frame.minY, screen.minY, "The notice should start on screen")
+        XCTAssertNil(whyTheNoticeCannotBeRead(), "The notice should be readable in landscape")
 
         XCTAssertNil(whyTheFirstFieldIsOutOfReach(), "The form should still be reachable below the notice in landscape")
         add(app.keptScreenshot(named: shot + ", form"))
+    }
+
+    /// The shortest part of the notice that the box shows, in points: the height of a control that a finger can use, and about one
+    /// line of the notice at the largest text size.
+    private let shortestReadablePart: CGFloat = 44
+
+    /// Why the notice cannot be read where it stands, or nil when it can. Either it is on the screen in full, or it is taller than
+    /// the box the editor gives it where the form is short of room and scrolls in that box. The frame that the tests report for an
+    /// element in a scrolling box is the frame of its whole content, which can reach below the screen, so it says nothing about what
+    /// the box shows. The scroll view's own frame starts at the top of the screen, under the navigation bar, and ends where the form
+    /// begins: the box shows the notice from where the notice starts down to there, and that must be a line of it, on the screen.
+    private func whyTheNoticeCannotBeRead() -> String? {
+        let screen = app.windows.firstMatch.frame.insetBy(dx: -1, dy: -1)
+        let frame = notice.frame
+        let boxes = app.scrollViews
+            .containing(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", reminder, unchecked))
+            .allElementsBoundByIndex.map(\.frame).sorted { $0.height < $1.height }
+        let seen = "the notice \(frame), the window \(app.windows.firstMatch.frame), the scroll views around the notice \(boxes)"
+
+        guard frame.minX >= screen.minX, frame.maxX <= screen.maxX else { return "The notice is not on the screen across: \(seen)" }
+        guard !screen.contains(frame) else { return nil }
+        guard let box = boxes.first else { return "The notice is not on the screen in full and is in no scroll view: \(seen)" }
+        guard box.minY <= frame.minY + 1, box.maxY <= screen.maxY else { return "The box of the notice is not on the screen: \(seen)" }
+        guard min(box.maxY, frame.maxY) - frame.minY >= shortestReadablePart else { return "The box shows less than a line of the notice: \(seen)" }
+        return nil
     }
 
     /// Why the first field of the form cannot be put under a finger, or nil when it can. A short screen shows it below the notice
