@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Xcode Cloud runs this after every xcodebuild action, and a failure here fails the build. Every step runs and the
-# script fails at the end, so one build shows all that is wrong.
+# Xcode Cloud runs this after every xcodebuild action, and a failure here fails the build. The pull request check on the
+# Mac mini runs it too (docs/release/xcode-cloud.md), with CI_XCODEBUILD_ACTION=build-for-testing and
+# CI_PULL_REQUEST_TARGET_BRANCH=main. Every step runs and the script fails at the end, so one build shows all that is wrong.
+# Each failed step is named in a line "ci_post_xcodebuild: FAILED: <step>", and the last line says how many steps ran:
+# a check that reads this output needs both, because a script that ran no step fails nothing.
 #   archive            checks the archive, so one that is wrong never reaches TestFlight;
 #   build-for-testing  runs what ADR 0006 needs on a Mac beyond the app tests: the package tests, the architecture check
 #                      and its self-test (they see the Apple-only branches of the manifests), the self-test of the archive
@@ -11,7 +14,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ACTION="${CI_XCODEBUILD_ACTION:-}"
 status=0
-step() { echo "+ $*"; "$@" || status=1; }
+ran=0
+failed=0
+step() {
+  echo "+ $*"
+  ran=$((ran + 1))
+  "$@" || { echo "ci_post_xcodebuild: FAILED: $*"; failed=$((failed + 1)); status=1; }
+}
 
 if [ "${CI_XCODEBUILD_EXIT_CODE:-0}" != 0 ]; then
   echo "ci_post_xcodebuild: xcodebuild $ACTION failed with exit code $CI_XCODEBUILD_EXIT_CODE, so there is nothing to check"
@@ -49,4 +58,5 @@ case "$ACTION" in
     echo "ci_post_xcodebuild: action '$ACTION' has nothing to check"
     ;;
 esac
+echo "ci_post_xcodebuild: ${ACTION:-no action} ran $ran steps, $failed failed"
 exit "$status"
