@@ -119,13 +119,28 @@ struct ImportedCVMapperTests {
         #expect(draft.review.items == [ImportReview.Item(field: .experience(2), reason: .partsByOrder, text: "Night Shift — Corner Market Example")])
     }
 
+    @Test("Entries whose lines could be read with the date before or after them are listed to check")
+    func entryBoundsToCheck() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Experience
+        2018 – 2019
+        Developer at Acme Ltd
+        2020 – 2025
+        Cleaner at Verdi Ltd
+        2010 – 2020
+        """))
+
+        #expect(draft.review.items.map(\.field) == [.experience(1), .experience(2), .experience(3)])
+        #expect(draft.review.items.allSatisfy { $0.reason == .entryBounds })
+    }
+
     @Test("Every reason and field of the review has a text in the string catalog")
     func reviewIsWorded() {
         let items = [
             ImportReview.Item(field: .name, reason: .byPosition, text: ""), ImportReview.Item(field: .title, reason: .partsByOrder, text: ""),
             ImportReview.Item(field: .location, reason: .period, text: ""), ImportReview.Item(field: .summary, reason: .languageNotAdded, text: ""),
             ImportReview.Item(field: .experience(1), reason: .languageLevels, text: ""), ImportReview.Item(field: .education(1), reason: .byPosition, text: ""),
-            ImportReview.Item(field: .language, reason: .byPosition, text: ""),
+            ImportReview.Item(field: .language, reason: .byPosition, text: ""), ImportReview.Item(field: .experience(2), reason: .entryBounds, text: ""),
         ]
         for item in items {
             #expect(item.fieldKey.localized != item.fieldKey, "\(item.fieldKey) is missing from the string catalog")

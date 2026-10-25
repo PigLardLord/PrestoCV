@@ -213,7 +213,7 @@ for (file, target, source, tree) in parsed {
 
 // MARK: 5. modules.md, both directions
 
-let frameworks: Set<String> = ["Glibc", "Darwin", "Android", "Dispatch", "Foundation", "Observation", "WebKit", "UIKit", "AppKit", "FoundationModels", "Testing", "SwiftUI", "PDFKit", "QuickLook", "UniformTypeIdentifiers", "Synchronization"]
+let frameworks: Set<String> = ["Glibc", "Darwin", "Android", "Dispatch", "Foundation", "Observation", "WebKit", "UIKit", "AppKit", "FoundationModels", "Testing", "SwiftUI", "PDFKit", "QuickLook", "UniformTypeIdentifiers", "Synchronization", "CoreGraphics", "CoreText"]
 if let modulesPath = value(after: "--modules") {
     var documented: [String: Set<String>?] = [:]
     let modulesText = (try? String(contentsOfFile: modulesPath, encoding: .utf8)) ?? ""
