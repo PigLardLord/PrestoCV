@@ -299,8 +299,11 @@ enum DeploymentTargets {
     static let hostOnlyFolders = ["Tools"]
 
     /// A manifest file: `Package.swift`, or `Package@swift-6.0.swift`, which SwiftPM picks for a toolchain of that
-    /// version instead of `Package.swift`.
-    private static let manifestName = try! NSRegularExpression(pattern: #"^Package(@swift-\d+(\.\d+){0,2})?\.swift$"#)
+    /// version instead of `Package.swift`. Any case: on a case-insensitive volume, which a Mac has by default, a file
+    /// named `package.swift` is found as `Package.swift`.
+    private static let manifestName = try! NSRegularExpression(
+        pattern: #"^Package(@swift-\d+(\.\d+){0,2})?\.swift$"#, options: .caseInsensitive
+    )
 
     /// Why the scan could not tell what a folder holds. It fails rather than skips the folder: a manifest below it could
     /// declare any release.
@@ -316,9 +319,11 @@ enum DeploymentTargets {
     /// as excluded). So are the hidden folders, `.build`, `DerivedData` and `node_modules`, which hold no package of the
     /// app.
     ///
-    /// Every other folder is read, or the scan fails with a `ScanFailure`: a folder that cannot be listed, an entry
-    /// that cannot be inspected, a root that is not there, and a link to a folder, which is not followed. None of
-    /// these is skipped, as the manifest it hides could declare any release. A link to a file is read as the file.
+    /// Every other entry is positively classified, or the scan fails with a `ScanFailure`: a folder is entered, a
+    /// regular file is a manifest when its name says so, and nothing else passes. So a folder that cannot be listed, an
+    /// entry that cannot be inspected, a root that is not there, a link (to a folder, a file or nothing: it is not
+    /// followed, and its target is never looked up, as a lookup that fails would read as "not a folder"), and a pipe, a
+    /// socket or a device all fail the scan. None is skipped, as the manifest it hides could declare any release.
     static func manifests(under root: URL) throws -> [(path: String, mustDeclareIOS: Bool)] {
         let skipped: Set<String> = [".build", "DerivedData", "node_modules"]
         let files = FileManager.default
@@ -343,22 +348,22 @@ enum DeploymentTargets {
                 } catch {
                     throw ScanFailure(path: path, reason: "cannot be inspected (\(error.localizedDescription))")
                 }
-                if type == .typeDirectory {
+                switch type {
+                case .typeDirectory:
                     try scan(path)
-                } else if type == .typeSymbolicLink && isFolder("\(base)/\(path)") {
-                    throw ScanFailure(path: path, reason: "is a link to a folder, which the scan does not follow")
-                } else if manifestName.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil {
-                    manifests.append((path: path, mustDeclareIOS: !hostOnlyFolders.contains { path.hasPrefix($0 + "/") }))
+                case .typeRegular:
+                    if manifestName.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil {
+                        manifests.append((path: path, mustDeclareIOS: !hostOnlyFolders.contains { path.hasPrefix($0 + "/") }))
+                    }
+                case .typeSymbolicLink:
+                    throw ScanFailure(path: path, reason: "is a link, which the scan does not follow")
+                default:
+                    throw ScanFailure(path: path, reason: "is neither a folder, a file nor a link")
                 }
             }
         }
 
         try scan("")
         return manifests.sorted { $0.path < $1.path }
-    }
-
-    private static func isFolder(_ path: String) -> Bool {
-        var folder: ObjCBool = false
-        return FileManager.default.fileExists(atPath: path, isDirectory: &folder) && folder.boolValue
     }
 }

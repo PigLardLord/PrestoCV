@@ -462,6 +462,16 @@ struct DeploymentTargetTests {
         ], "\(paths)")
     }
 
+    @Test("A manifest is found whatever its case: on a case-insensitive volume, which a Mac has by default, SwiftPM picks it up")
+    func manifestNamesAreMatchedWithoutCase() throws {
+        let root = try Self.tree(of: ["App/package.swift", "Lib/PACKAGE@SWIFT-6.0.SWIFT", "Other/Package@Swift-5.9.swift", "Other/package.swift.bak"])
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let paths = try DeploymentTargets.manifests(under: root).map(\.path)
+
+        #expect(paths == ["App/package.swift", "Lib/PACKAGE@SWIFT-6.0.SWIFT", "Other/Package@Swift-5.9.swift"], "\(paths)")
+    }
+
     @Test("Only the folders for tools that run on a host may omit iOS: any other manifest must declare it")
     func onlyHostOnlyFoldersMayOmitIOS() throws {
         let root = try Self.tree(of: [
@@ -532,17 +542,72 @@ struct DeploymentTargetTests {
         #expect(failure?.path == "App/Alias", "\(String(describing: failure))")
     }
 
-    @Test("A link to a manifest is a manifest, and a link named like a skipped folder is skipped like the folder")
-    func linksToFilesAndSkippedNames() throws {
+    @Test("A link to a file fails the scan too, whatever its name: the scan never classifies a link by its target")
+    func linkToFileFailsTheScan() throws {
+        for name in ["Package.swift", "Package@swift-6.swift", "Notes.md"] {
+            let root = try Self.tree(of: ["Real/Package.swift", "App/Sources/Main.swift"])
+            defer { try? FileManager.default.removeItem(at: root) }
+            try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent("App/\(name)").path, withDestinationPath: "../Real/Package.swift")
+
+            let failure = #expect(throws: DeploymentTargets.ScanFailure.self, "a link named \(name)") { try DeploymentTargets.manifests(under: root) }
+
+            #expect(failure?.path == "App/\(name)", "\(String(describing: failure))")
+        }
+    }
+
+    @Test("A link whose target is missing fails the scan: nothing says what it was meant to lead to")
+    func danglingLinkFailsTheScan() throws {
+        let root = try Self.tree(of: ["App/Package.swift"])
+        try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent("App/Alias").path, withDestinationPath: "../Nowhere")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let failure = #expect(throws: DeploymentTargets.ScanFailure.self) { try DeploymentTargets.manifests(under: root) }
+
+        #expect(failure?.path == "App/Alias", "\(String(describing: failure))")
+    }
+
+    @Test("A link to a folder the scan cannot reach fails it: the link is not told from a link to a file", .enabled(if: geteuid() != 0, "root reaches any folder"))
+    func linkToUnreachableFolderFailsTheScan() throws {
+        let root = try Self.tree(of: ["App/Package.swift"])
+        let outside = FileManager.default.temporaryDirectory.appendingPathComponent("DeploymentTargetTests-outside-\(UUID().uuidString)")
+        let locked = outside.appendingPathComponent("Locked")
+        try FileManager.default.createDirectory(at: locked.appendingPathComponent("Deep"), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent("App/Alias").path, withDestinationPath: locked.appendingPathComponent("Deep").path)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: locked.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: locked.path)
+            try? FileManager.default.removeItem(at: outside)
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let failure = #expect(throws: DeploymentTargets.ScanFailure.self) { try DeploymentTargets.manifests(under: root) }
+
+        #expect(failure?.path == "App/Alias", "\(String(describing: failure))")
+    }
+
+    @Test("An entry that is neither a folder, a file nor a link fails the scan: it is not left unclassified")
+    func otherEntryFailsTheScan() throws {
+        let root = try Self.tree(of: ["App/Package.swift"])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pipe = root.appendingPathComponent("App/Pipe")
+        try #require(mkfifo(pipe.path, 0o644) == 0, "mkfifo failed: errno \(errno)")
+
+        let failure = #expect(throws: DeploymentTargets.ScanFailure.self) { try DeploymentTargets.manifests(under: root) }
+
+        #expect(failure?.path == "App/Pipe", "\(String(describing: failure))")
+    }
+
+    @Test("A link named like a skipped folder is skipped like the folder, as nothing of the app lives there")
+    func linksNamedLikeSkippedFoldersAreSkipped() throws {
         let root = try Self.tree(of: ["Real/Package.swift", "App/Sources/Main.swift"])
-        try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent("App/Package.swift").path, withDestinationPath: "../Real/Package.swift")
-        try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent("App/node_modules").path, withDestinationPath: "../Real")
-        try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent("App/.cache").path, withDestinationPath: "../Real")
+        for name in ["node_modules", "DerivedData", ".build", ".cache"] {
+            try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent("App/\(name)").path, withDestinationPath: "../Real")
+        }
         defer { try? FileManager.default.removeItem(at: root) }
 
         let paths = try DeploymentTargets.manifests(under: root).map(\.path)
 
-        #expect(paths == ["App/Package.swift", "Real/Package.swift"], "\(paths)")
+        #expect(paths == ["Real/Package.swift"], "\(paths)")
     }
 
     @Test("A manifest of the app that declares no iOS platform is told where a package that never builds for iOS goes")
