@@ -8,7 +8,8 @@ import Foundation
 /// note for every run of text. Read for every PDF, it took about a quarter of the time of the suites and left about a million
 /// notes, a third of a gigabyte of log, in each run. Only the tests that compare the sizes of the fonts need them, so the
 /// layout reads them on the first ask and keeps them (`Fonts`). These checks keep it that way: the cost would come back
-/// with one new `attributedString`, or with a read of the sizes in the init of the layout or in the init of `Fonts`.
+/// with one new `attributedString`, or with a read of the sizes in the init of the layout or in the init of `Fonts`, or in a
+/// helper of another test file that an init calls.
 ///
 /// The checks read the code of the files, not their comments: a comment may name what it explains, and code may not hide
 /// behind one (`SwiftCode`).
@@ -76,6 +77,42 @@ struct PDFReadBackTests {
         return problems
     }
 
+    /// The tests that ask a layout for the sizes of its fonts, and the member of each where it does: the one that compares
+    /// what the printed PDF is set in with what the design says
+    private static let askers: [(path: String, member: String)] = [
+        ("PrestoCVTests/Features/Export/OnePagePDFTests.swift", "func expectReadable("),
+    ]
+
+    /// What is wrong in the sources of the app's tests, the layout aside: where they name `fontSizes`.
+    ///
+    /// The name is the only way to the fonts from another file: the `Fonts` holder, the reader and the memo of the layout
+    /// are private. An init can call anything, in any file, so a helper that names it, an extension of the layout or a
+    /// function of its own, would read the fonts every time a layout is made and the layout would look as lazy as before.
+    /// A test asks for the sizes in the member of `askers` and nowhere else; a member that is not found, or that no longer
+    /// asks, is a problem, so that the list cannot go stale.
+    static func problems(inTests files: [RepositorySources.File]) -> [String] {
+        var problems: [String] = []
+        for file in files where file.path != layoutPath {
+            let code = SwiftCode(file.text)
+            let member = askers.first { $0.path == file.path }.flatMap { code.member(startingWith: $0.member) }
+            let outside = code.lines(matching: fontSizesName).filter { line in !(member?.contains(line) ?? false) }
+            if !outside.isEmpty {
+                problems.append("\(file.path): lines \(outside.map { $0 + 1 }) name fontSizes, which only \(askers.map(\.member)) may, so that making a layout reads no fonts")
+            }
+        }
+        for asker in askers {
+            let code = files.first { $0.path == asker.path }.map { SwiftCode($0.text) }
+            guard let member = code?.member(startingWith: asker.member) else {
+                problems.append("\(asker.path) has no \(asker.member); if it moved or was renamed, update this check")
+                continue
+            }
+            if !(code?.lines(matching: fontSizesName).contains(where: member.contains) ?? false) {
+                problems.append("\(asker.member) in \(asker.path) no longer asks for the sizes of the fonts: take it out of the list of this check")
+            }
+        }
+        return problems
+    }
+
     private func layoutSource() throws -> String {
         try String(contentsOf: Repository.root.appendingPathComponent(Self.layoutPath), encoding: .utf8)
     }
@@ -89,6 +126,14 @@ struct PDFReadBackTests {
 
         let readers = files.filter { !SwiftCode($0.text).lines(matching: Self.attributedText).isEmpty }.map(\.path)
         #expect(readers == [Self.layoutPath], "The attributed text of a page costs a log note per run of text: read it only in PDFLayout's font-size code, found in \(readers)")
+    }
+
+    @Test("No other test source names the sizes of the fonts than the one that compares them: no helper asks for them when a layout is made")
+    func onlyTheComparisonAsksForTheFontSizes() throws {
+        let files = try RepositorySources.swiftFiles(in: "PrestoCVTests")
+        let problems = Self.problems(inTests: files)
+
+        #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
     }
 
     @Test("PDFLayout names the reading of the fonts only in the code that finds, keeps, asks for and compares their sizes: creating a layout reads none")
@@ -265,5 +310,70 @@ struct PDFReadBackTests {
         let source = try change.applied(to: Self.model)
 
         #expect(!Self.problems(in: source).isEmpty, "\(change.name) goes unseen")
+    }
+
+    // MARK: - The check of the tests' sources itself
+
+    /// The sources of a few tests, as the check reads them
+    struct Tree: CustomTestStringConvertible, Sendable {
+        let name: String
+        let files: [RepositorySources.File]
+        var testDescription: String { name }
+    }
+
+    private static let askerPath = "PrestoCVTests/Features/Export/OnePagePDFTests.swift"
+
+    /// The tests that compare the sizes, small enough to change one thing in
+    private static let asker = """
+        struct OnePagePDFTests {
+            func other(_ layout: PDFLayout) {
+                _ = layout.pageCount
+            }
+
+            private func expectReadable(_ printed: PDFLayout, comparedTo own: PDFLayout) {
+                #expect(!printed.fontSizes.isEmpty)
+                #expect(printed.fontSizes(matching: own), "became \\(printed.fontSizes.sorted())")
+            }
+        }
+        """
+
+    private static func tree(_ name: String, asker: String = asker, adding extra: [(path: String, text: String)] = []) -> Tree {
+        Tree(name: name, files: ([(askerPath, asker)] + extra).map { RepositorySources.File(path: $0.0, text: $0.1) })
+    }
+
+    static let acceptedTrees = [
+        tree("the tests that compare the sizes, and a test that does not"),
+        tree("a comment naming the sizes in another file", adding: [("PrestoCVTests/TestSupport/Other.swift", "// the layout asks fontSizes on demand\nstruct Other {}")]),
+        tree("the layout itself, which has its own check", adding: [(layoutPath, "var fontSizes: Set<Double> { fonts.sizes }")]),
+    ]
+
+    static let refusedTrees = [
+        tree("an extension of the layout in another file that asks for the sizes",
+             adding: [("PrestoCVTests/TestSupport/Warm.swift", "extension PDFLayout {\n    func warm() { _ = fontSizes }\n}")]),
+        tree("a function in another file that asks a layout for its sizes",
+             adding: [("PrestoCVTests/TestSupport/Touch.swift", "func touch(_ layout: PDFLayout) { _ = layout.fontSizes }")]),
+        tree("a key path to the sizes in another file",
+             adding: [("PrestoCVTests/TestSupport/Path.swift", "let sizes = \\PDFLayout.fontSizes")]),
+        tree("a comparison of the sizes in another file",
+             adding: [("PrestoCVTests/TestSupport/Same.swift", "func same(_ a: PDFLayout, _ b: PDFLayout) -> Bool { a.fontSizes(matching: b) }")]),
+        tree("the sizes asked for by another member of the tests that compare them",
+             asker: asker.replacing("_ = layout.pageCount", with: "_ = layout.fontSizes")),
+        tree("the tests that compare the sizes no longer ask for them",
+             asker: asker.replacing("#expect(!printed.fontSizes.isEmpty)", with: "#expect(printed.pageCount > 0)")
+                         .replacing("#expect(printed.fontSizes(matching: own), \"became \\(printed.fontSizes.sorted())\")", with: "#expect(printed.pageCount == own.pageCount)")),
+        tree("the member that compares the sizes was renamed",
+             asker: asker.replacing("func expectReadable(", with: "func expectLegible(")),
+        Tree(name: "the file of the tests that compare the sizes is gone",
+             files: [RepositorySources.File(path: "PrestoCVTests/TestSupport/Other.swift", text: "struct Other {}")]),
+    ]
+
+    @Test("Only the member that compares the sizes of the fonts may name them in the tests' sources", arguments: acceptedTrees)
+    func comparisonsAreAccepted(tree: Tree) {
+        #expect(Self.problems(inTests: tree.files) == [])
+    }
+
+    @Test("A helper that names the sizes of the fonts in any other place is refused: it could ask for them when a layout is made", arguments: refusedTrees)
+    func helpersAreRefused(tree: Tree) {
+        #expect(!Self.problems(inTests: tree.files).isEmpty, "\(tree.name) goes unseen")
     }
 }
