@@ -180,6 +180,19 @@ struct AIGenerationViewModelTests {
         #expect(viewModel.errorMessage.isEmpty, "A check without an answer is not an error")
     }
 
+    @Test("A description of nothing but personal items, with a claim check that gives no answer, still opens a draft with the notice (ADR 0028)")
+    func uncheckedEmptyDraftStillOpens() async {
+        service.generateResult = .success(CVData(skills: [CVGeneratorAI.Skill(name: "Excel")]))
+        let viewModel = makeViewModel(claimChecker: FakeClaimChecker(fails: true))
+        viewModel.prompt = "I use Excel every day."
+
+        await viewModel.generateCV()
+
+        #expect(viewModel.draft?.notice == .aiDraftUnchecked)
+        #expect(viewModel.draft?.cv.skills.isEmpty == true, "The skill the check could not judge is left for the person to add")
+        #expect(viewModel.errorMessage.isEmpty, "A check without an answer is not an error, even when it leaves nothing")
+    }
+
     @Test("generateCV sends the description and the app language")
     func generateCVSendsTheRequest() async {
         let viewModel = makeViewModel(appLanguageCode: "de")

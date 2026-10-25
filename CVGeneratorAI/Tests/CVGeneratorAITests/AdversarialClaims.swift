@@ -246,4 +246,45 @@ enum AdversarialSet {
         s("fh-pt-ha", "pt", "Sou contadora em Fortaleza há cinco anos.", (.title, "contadora", true), (.place, "Fortaleza", true)),
         s("fh-pt-nao-gosto", "pt", "Não gosto de futebol, mas jogo xadrez.", (.interest, "futebol", false), (.interest, "xadrez", true)),
     ]
+
+    // MARK: - Long drafts
+
+    /// Drafts of 22, 32 and 42 personal items, as a long CV has: a list of skills, three languages, three interests, a title and a
+    /// place the writer claims, and the items of someone else, a wish, a denial and a condition that the check must withdraw.
+    static let longDrafts: [Sentence] = [22, 32, 42].map(longDraft(items:))
+
+    private static let skillPool = [
+        "Python", "SQL", "Docker", "Kubernetes", "Swift", "Kotlin", "Excel", "Figma", "Photoshop", "Terraform", "Ansible", "Jenkins",
+        "Git", "Linux", "Bash", "Rust", "Scala", "Haskell", "Elixir", "Ruby", "TypeScript", "React", "Django", "Flask", "Redis",
+        "Kafka", "Grafana", "Prometheus",
+    ]
+
+    private static func longDraft(items count: Int) -> Sentence {
+        let claimedSkills = Array(skillPool.prefix(count - 14))
+        let description = """
+            I'm a nurse in Turin.
+            Skills: \(claimedSkills.joined(separator: ", ")).
+            I speak English, German and Italian.
+            In my free time I like chess, hiking and cooking.
+            I'd like to learn Korean.
+            My sister speaks Japanese.
+            I have never used COBOL.
+            My colleague uses Fortran and Perl every day.
+            If I had time, I would play golf.
+            """
+        return s("long-\(count)", "en", description,
+                 (.title, "nurse", true), (.place, "Turin", true),
+                 (.language, "English", true), (.language, "German", true), (.language, "Italian", true),
+                 (.interest, "chess", true), (.interest, "hiking", true), (.interest, "cooking", true),
+                 (.language, "Korean", false), (.language, "Japanese", false), (.skill, "COBOL", false),
+                 (.skill, "Fortran", false), (.skill, "Perl", false), (.interest, "golf", false))
+            .adding(claimedSkills.map { ClaimCandidate(kind: .skill, value: $0) })
+    }
+}
+
+private extension AdversarialSet.Sentence {
+    /// The same sentence with more items the writer claims.
+    func adding(_ claimed: [ClaimCandidate]) -> AdversarialSet.Sentence {
+        AdversarialSet.Sentence(id: id, language: language, description: description, items: items + claimed.map { ($0, true) })
+    }
 }

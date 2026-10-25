@@ -34,7 +34,8 @@ public final class CVGeneratorUseCase {
     ///   newest; and whether the personal items were withdrawn because the check gave no answer
     /// - Throws: CVGenerationError if the service is unavailable, the device lacks the language data that grounding the description
     ///   needs (asked before the model runs), or generation or validation fails; CancellationError if the task was cancelled. A
-    ///   claim check that fails or refuses throws nothing: the draft comes back without its personal items (ADR 0028).
+    ///   claim check that fails, refuses or runs out of time throws nothing: the draft comes back without its personal items, even
+    ///   if that leaves it empty (ADR 0028).
     public func generateCV(from request: CVGenerationRequest) async throws -> GeneratedDraft {
         if case .unavailable(let reason) = service.availability() {
             throw CVGenerationError.unavailable(reason)
@@ -48,7 +49,10 @@ public final class CVGeneratorUseCase {
         let checked = try await ClaimWithdrawal.checking(grounded, in: request.userPrompt, with: claimChecker)
         let cvData = JobOrder.ordered(checked.cvData)
 
-        try validator.validateCVData(cvData)
+        // A check that gave no answer withdrew every personal item itself, and says so: the person adds them by hand, so the draft
+        // is judged on what the rules kept, never on what is left. A check that ran and withdrew everything leaves a draft that
+        // says nothing about the writer, and that is an empty result (ADR 0028).
+        try validator.validateCVData(checked.personalItemsUnchecked ? grounded : cvData)
 
         return GeneratedDraft(cvData: cvData, personalItemsUnchecked: checked.personalItemsUnchecked)
     }

@@ -35,6 +35,7 @@ public struct ClaimJudgement: Equatable, Sendable {
 /// A second, independent check of a grounded draft (ADR 0028): whether the person's description states each personal item as a
 /// fact about the writer. It can only withdraw: an item stays when both the rules (ADR 0023) and this check keep it.
 public protocol ClaimChecking: Sendable {
-    /// What the check says of each candidate, in the order given. An answer that leaves a candidate out withdraws it.
+    /// What the check says of each candidate, in the order given: one judgement for each, no more and no fewer. A check that cannot
+    /// say so throws, and an answer of another length counts as one that threw: the draft is then unchecked.
     func judgements(of candidates: [ClaimCandidate], in description: String) async throws -> [ClaimJudgement]
 }

@@ -2,16 +2,22 @@
 import Foundation
 import FoundationModels
 
-/// The claim check on Apple's on-device model (ADR 0028): one call per draft judges every candidate, with a fixed instruction, greedy
+/// The claim check on Apple's on-device model (ADR 0028): one call judges a batch of candidates, with a fixed instruction, greedy
 /// decoding and structured output. For each candidate the model quotes its sentence and says whose it is and how the sentence states
-/// it; only the writer's item stated as true is a fact. A candidate the answer leaves out counts as not mentioned: the check fails
-/// closed.
+/// it; only the writer's item stated as true is a fact, and only when the quote is words of the description that contain the item
+/// (`ClaimAnswer`). An answer that does not number the items 1 to n, each once, is no answer: it throws, and the draft is unchecked.
 @available(iOS 26, macOS 26, *)
 public struct FoundationModelsClaimChecker: ClaimChecking {
     public init() {}
 
     public func judgements(of candidates: [ClaimCandidate], in description: String) async throws -> [ClaimJudgement] {
         guard !candidates.isEmpty else { return [] }
+        let entries = try await answer(to: candidates, in: description)
+        return try ClaimAnswer.judgements(from: entries, of: candidates, in: description)
+    }
+
+    /// What the model answers to a batch of candidates, as it numbered it and before it is read as judgements (`ClaimAnswer`).
+    func answer(to candidates: [ClaimCandidate], in description: String) async throws -> [ClaimVerdictEntry] {
         let session = LanguageModelSession(instructions: Self.instructions)
         let response = try await session.respond(
             to: Self.prompt(for: candidates, in: description),
@@ -19,11 +25,7 @@ public struct FoundationModelsClaimChecker: ClaimChecking {
             includeSchemaInPrompt: true,
             options: GenerationOptions(samplingMode: .greedy)
         )
-        var judgements: [Int: ClaimJudgement] = [:]
-        for verdict in response.content.verdicts where judgements[verdict.item] == nil {
-            judgements[verdict.item] = ClaimJudgement(stance: verdict.stance, quote: verdict.quote)
-        }
-        return candidates.indices.map { judgements[$0 + 1] ?? ClaimJudgement(stance: .notMentioned, quote: "") }
+        return response.content.verdicts.map { ClaimVerdictEntry(item: $0.item, quote: $0.quote, stance: $0.stance) }
     }
 
     static let instructions = """

@@ -353,6 +353,16 @@ struct AIDraftMapperTests {
         #expect(draft.cv.documentLanguage == "it")
     }
 
+    @Test("A generated draft with nothing in it but the notice that the check gave no answer is still a draft to open")
+    func emptyUncheckedDraftOpens() {
+        let draft = AIDraftMapper(labels: labels, languageOfText: { _ in "it" })
+            .map(GeneratedDraft(cvData: CVData(), personalItemsUnchecked: true), writtenIn: "Sono infermiera.")
+
+        #expect(draft.notice == .aiDraftUnchecked)
+        #expect(draft.cv.skills.isEmpty && draft.cv.languages.isEmpty && draft.cv.interests.isEmpty)
+        #expect(draft.cv.personalInfo.title.isEmpty && draft.cv.personalInfo.location.isEmpty)
+    }
+
     // MARK: - Identity
 
     @Test("Every entry gets its own id")

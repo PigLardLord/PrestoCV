@@ -28,7 +28,9 @@ struct GroundingContractTests {
         }
 
         if GroundingRows.notImplementedYet.contains(row.id) {
-            withKnownIssue("ADR 0023 not implemented yet") { try check() }
+            withKnownIssue("ADR 0023 not implemented yet; the claim check closes it (measured on macOS 27.0.1 only; iOS 26 device check pending)") {
+                try check()
+            }
         } else if GroundingRows.residualRisks.contains(row.id) {
             withKnownIssue("ADR 0023, Consequences: a residual risk the owner accepts") { try check() }
         } else {
@@ -420,7 +422,8 @@ enum GroundingRows {
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list. All of them are residual risks of the rules (ADR 0023) that the claim check of
-    /// ADR 0028 closes on the product path: `ClaimCheckEvaluation` (a), composed, fails on any item of theirs that both keep.
+    /// ADR 0028 closes on the product path: `ClaimCheckEvaluation` (a), composed, fails on any item of theirs that both keep. That
+    /// is measured on macOS 27.0.1 only; the iOS 26 device check is pending.
     static let notImplementedYet: Set<String> = [
         // Text typed without accents.
         "a-konjunktiv-typed-without-its-umlaut-claims-nothing-de",

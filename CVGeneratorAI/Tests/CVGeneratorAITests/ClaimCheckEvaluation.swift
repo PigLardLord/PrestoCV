@@ -5,14 +5,17 @@ import FoundationModels
 @testable import CVGeneratorAI
 
 // The claim check of ADR 0028 on the real on-device model. It runs only when PRESTOCV_CLAIM_EVAL names the parts to run ("a", "b",
-// "c", "d", in any combination), on an Apple host with Apple Intelligence, and writes what it measured as JSON to the folder
+// "c", "d", "e", in any combination), on an Apple host with Apple Intelligence, and writes what it measured as JSON to the folder
 // PRESTOCV_CLAIM_EVAL_OUT, a summary per part and the verdicts of every run.
 //
-// - composed, the default: the path of the product. The rules ground the draft, the check judges the personal items they keep, and
-//   the withdrawal applies its verdicts (`ClaimWithdrawal.checking`). An item the description does not claim that the result keeps is
-//   a false keep, and fails the run, in every part.
+// - composed, the default: the path of the product. The rules ground the draft, the check judges the personal items they keep in
+//   batches within its time, and the withdrawal applies its verdicts (`ClaimWithdrawal.checking`). An item the description does not
+//   claim that the result keeps is a false keep, and fails the run, in every part. A check that gives no answer (an `unchecked`
+//   draft) keeps no personal item, so it is counted, never a false keep; so is a fact the quote proof demoted (`quoteDrops`).
 // - alone (PRESTOCV_CLAIM_EVAL_MODE=alone): the check judges every listed item without the rules, as when the instruction is tuned. A
 //   false keep fails (b), (c) and (d); on (a) it is measured only, since the rules drop those items before the check.
+//
+// Part (e) is drafts of 22, 32 and 42 personal items: the batching and the time limit of the check at the size of a long CV.
 //
 // Every part runs three times (PRESTOCV_CLAIM_EVAL_RUNS), and its verdicts must be the same each time.
 
@@ -53,6 +56,12 @@ struct ClaimCheckEvaluation {
         try await measure("frozen", AdversarialSet.frozenHeldOut.map(EvaluationCase.init), falseKeepsFail: true)
     }
 
+    @Test("(e) long drafts of 22, 32 and 42 personal items")
+    func longDrafts() async throws {
+        guard evaluation.contains("e") else { return }
+        try await measure("long", AdversarialSet.longDrafts.map(EvaluationCase.init), falseKeepsFail: true)
+    }
+
     // MARK: - Measuring
 
     private func measure(_ name: String, _ cases: [EvaluationCase], falseKeepsFail: Bool) async throws {
@@ -84,40 +93,51 @@ struct ClaimCheckEvaluation {
             grounded = try CVDataSanitizer().sanitize(evaluationCase.draft, against: evaluationCase.description)
             checked = try await ClaimWithdrawal.checking(grounded, in: evaluationCase.description, with: checker)
         } catch {
-            return MeasuredDraft(evaluationCase, items: [], seconds: seconds(since: start), error: error)
+            return MeasuredDraft(evaluationCase, items: [], seconds: seconds(since: start), error: error, unchecked: false)
         }
         let seconds = seconds(since: start)
         let judged = await checker.judged
         let groundedItems = ClaimCandidates.of(grounded), keptItems = ClaimCandidates.of(checked.cvData)
 
+        let modelStances = await checker.modelStances
+
         let items = evaluationCase.items.map { item in
-            let verdict: String, quote: String
+            let verdict: String, quote: String, modelStance: String
             if let candidate = groundedItems.first(where: { ClaimItems.overlaps($0, item.candidate) }) {
                 let judgement = judged[candidate]
-                verdict = judgement?.stance.rawValue ?? (checked.personalItemsUnchecked ? "error" : "missing")
+                // The batches that were answered before the check gave up count for nothing: no item stays.
+                verdict = checked.personalItemsUnchecked ? "unchecked" : (judgement?.stance.rawValue ?? "missing")
                 quote = judgement?.quote ?? ""
+                modelStance = modelStances[candidate]?.rawValue ?? ""
             } else {
                 verdict = "rules"
                 quote = ""
+                modelStance = ""
             }
-            return MeasuredItem(item, verdict: verdict, quote: quote, kept: keptItems.contains { ClaimItems.overlaps($0, item.candidate) })
+            return MeasuredItem(item, verdict: verdict, quote: quote, modelStance: modelStance,
+                                kept: keptItems.contains { ClaimItems.overlaps($0, item.candidate) })
         }
-        return MeasuredDraft(evaluationCase, items: items, seconds: seconds, error: await checker.failure)
+        return MeasuredDraft(evaluationCase, items: items, seconds: seconds, error: await checker.failure,
+                             unchecked: checked.personalItemsUnchecked)
     }
 
     /// The check alone, on every listed item.
     private static func judgeAlone(_ evaluationCase: EvaluationCase) async -> MeasuredDraft {
         let start = ContinuousClock.now
         do {
-            let judgements = try await FoundationModelsClaimChecker().judgements(of: evaluationCase.items.map(\.candidate),
-                                                                                in: evaluationCase.description)
-            let items = zip(evaluationCase.items, judgements).map { item, judgement in
-                MeasuredItem(item, verdict: judgement.stance.rawValue, quote: judgement.quote, kept: judgement.stance == .fact)
+            let candidates = evaluationCase.items.map(\.candidate)
+            var judgements: [ClaimJudgement] = []
+            for first in stride(from: 0, to: candidates.count, by: ClaimCheckLimits.standard.batchSize) {
+                let batch = Array(candidates[first..<min(first + ClaimCheckLimits.standard.batchSize, candidates.count)])
+                judgements += try await FoundationModelsClaimChecker().judgements(of: batch, in: evaluationCase.description)
             }
-            return MeasuredDraft(evaluationCase, items: items, seconds: seconds(since: start), error: nil)
+            let items = zip(evaluationCase.items, judgements).map { item, judgement in
+                MeasuredItem(item, verdict: judgement.stance.rawValue, quote: judgement.quote, modelStance: "", kept: judgement.stance == .fact)
+            }
+            return MeasuredDraft(evaluationCase, items: items, seconds: seconds(since: start), error: nil, unchecked: false)
         } catch {
-            let items = evaluationCase.items.map { MeasuredItem($0, verdict: "error", quote: "", kept: false) }
-            return MeasuredDraft(evaluationCase, items: items, seconds: seconds(since: start), error: error)
+            let items = evaluationCase.items.map { MeasuredItem($0, verdict: "error", quote: "", modelStance: "", kept: false) }
+            return MeasuredDraft(evaluationCase, items: items, seconds: seconds(since: start), error: error, unchecked: true)
         }
     }
 
@@ -175,19 +195,26 @@ struct MeasuredItem: Encodable, Equatable {
     let kind: String
     let value: String
     let claimed: Bool
-    /// The stance of the check; "rules" when the rules dropped the item before the check, "error" when the check gave no answer.
+    /// The stance of the check; "rules" when the rules dropped the item before the check, "unchecked" or "error" when the check gave
+    /// no answer.
     let verdict: String
     let quote: String
+    /// The stance the model gave, before its quote was proved (`ClaimAnswer`); empty when it is not known.
+    let modelStance: String
     let kept: Bool
 
-    init(_ item: (candidate: ClaimCandidate, claimed: Bool), verdict: String, quote: String, kept: Bool) {
+    init(_ item: (candidate: ClaimCandidate, claimed: Bool), verdict: String, quote: String, modelStance: String, kept: Bool) {
         kind = item.candidate.kind.rawValue
         value = item.candidate.value
         claimed = item.claimed
         self.verdict = verdict
         self.quote = quote
+        self.modelStance = modelStance
         self.kept = kept
     }
+
+    /// A fact of the model that the proof of its quote turned into "not mentioned".
+    var droppedByItsQuote: Bool { modelStance == ClaimStance.fact.rawValue && verdict == ClaimStance.notMentioned.rawValue }
 }
 
 struct MeasuredDraft: Encodable, Equatable {
@@ -199,14 +226,17 @@ struct MeasuredDraft: Encodable, Equatable {
     let error: String?
     /// Whether the model's guardrail refused the description.
     let refused: Bool
+    /// Whether the check gave no answer, so that the draft lost every personal item it judges.
+    let unchecked: Bool
 
-    init(_ evaluationCase: EvaluationCase, items: [MeasuredItem], seconds: Double, error: (any Error)?) {
+    init(_ evaluationCase: EvaluationCase, items: [MeasuredItem], seconds: Double, error: (any Error)?, unchecked: Bool) {
         id = evaluationCase.id
         language = evaluationCase.language
         tag = evaluationCase.tag
         self.items = items
         self.seconds = seconds
         self.error = error.map { String(describing: $0) }
+        self.unchecked = unchecked
         if let generationError = error as? LanguageModelSession.GenerationError, case .guardrailViolation = generationError {
             refused = true
         } else {
@@ -215,7 +245,7 @@ struct MeasuredDraft: Encodable, Equatable {
     }
 
     /// The verdicts and what they kept, without the quotes and the time they took.
-    var verdicts: [String] { items.map { "\($0.kind)|\($0.value)|\($0.verdict)|\($0.kept)" } + [error == nil ? "" : "error"] }
+    var verdicts: [String] { items.map { "\($0.kind)|\($0.value)|\($0.verdict)|\($0.kept)" } + [error == nil ? "" : "error", unchecked ? "unchecked" : ""] }
 }
 
 struct Summary: Encodable {
@@ -227,8 +257,13 @@ struct Summary: Encodable {
     let claimed: Int
     /// "<draft id>: <kind> <value>" for each item the writer does not claim that the result keeps.
     let falseKeeps: [String]
-    /// Claimed items the check withdrew.
+    /// Claimed items the check withdrew, not counting those of an unchecked draft.
     let falseDrops: [String]
+    /// Claimed items whose fact the proof of the quote turned into "not mentioned" (see `ClaimAnswer`): each is a false drop.
+    let quoteDrops: [String]
+    /// Drafts whose check gave no answer, so that they lost every personal item it judges (a failure, a refusal, an answer that did not
+    /// number the items 1 to n, or the time limit).
+    let unchecked: Int
     /// Claimed items the rules dropped before the check (composed only).
     let rulesDrops: Int
     let errors: Int
@@ -250,7 +285,9 @@ struct Summary: Encodable {
         falseKeeps = Array(Set(runs.flatMap { run in
             run.flatMap { draft in draft.items.filter { !$0.claimed && $0.kept }.map { label((draft.id, $0)) } }
         })).sorted()
-        falseDrops = items.filter { $0.1.claimed && !$0.1.kept && $0.1.verdict != "rules" }.map(label)
+        falseDrops = items.filter { $0.1.claimed && !$0.1.kept && !["rules", "unchecked", "error"].contains($0.1.verdict) }.map(label)
+        quoteDrops = items.filter { $0.1.claimed && $0.1.droppedByItsQuote }.map(label)
+        unchecked = first.filter(\.unchecked).count
         rulesDrops = items.filter { $0.1.claimed && $0.1.verdict == "rules" }.count
         errors = first.filter { $0.error != nil }.count
         refusals = first.filter(\.refused).count
@@ -261,15 +298,20 @@ struct Summary: Encodable {
     }
 }
 
-/// The real claim check, keeping what it said, for the measurement of the path the product takes.
+/// The real claim check, keeping what it said, for the measurement of the path the product takes: the judgement of each candidate and
+/// the stance the model gave it before the proof of its quote.
 actor RecordingClaimChecker: ClaimChecking {
     private(set) var judged: [ClaimCandidate: ClaimJudgement] = [:]
+    private(set) var modelStances: [ClaimCandidate: ClaimStance] = [:]
     private(set) var failure: (any Error)?
 
     func judgements(of candidates: [ClaimCandidate], in description: String) async throws -> [ClaimJudgement] {
         do {
-            let judgements = try await FoundationModelsClaimChecker().judgements(of: candidates, in: description)
+            let entries = try await FoundationModelsClaimChecker().answer(to: candidates, in: description)
+            let judgements = try ClaimAnswer.judgements(from: entries, of: candidates, in: description)
             for (candidate, judgement) in zip(candidates, judgements) { judged[candidate] = judgement }
+            // The answer numbers the items 1 to n, each once, or the judgements above would have thrown.
+            for (candidate, entry) in zip(candidates, entries.sorted { $0.item < $1.item }) { modelStances[candidate] = entry.stance }
             return judgements
         } catch {
             failure = error

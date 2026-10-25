@@ -231,18 +231,19 @@ struct CVGeneratorUseCaseTests {
         #expect(draft.cvData.interests == ["chess", "Hiking"])
     }
 
-    @Test("An item the answer leaves without a verdict is withdrawn")
-    func missingVerdictWithdraws() async throws {
+    @Test("An answer that leaves an item without a verdict is no answer: every personal item goes, and the draft says so")
+    func missingVerdictIsNoAnswer() async throws {
         let checker = FakeClaimChecker(verdictLimit: 2)
 
         let draft = try await generator(drafting: example.draft, checker: checker)
             .generateCV(from: CVGenerationRequest(userPrompt: example.description))
 
-        #expect(draft.cvData.personalInfo.title == "primary school teacher")
-        #expect(draft.cvData.personalInfo.location == "Bologna")
+        #expect(draft.cvData.personalInfo.title == nil)
+        #expect(draft.cvData.personalInfo.location == nil)
+        #expect(draft.cvData.skills.isEmpty)
         #expect(draft.cvData.languages.isEmpty)
         #expect(draft.cvData.interests.isEmpty)
-        #expect(draft.personalItemsUnchecked == false)
+        #expect(draft.personalItemsUnchecked)
     }
 
     @Test("A check that fails withdraws all five kinds, keeps the jobs, the schools, their dates and the achievements, and says so",
@@ -275,15 +276,37 @@ struct CVGeneratorUseCaseTests {
         #expect(draft == GeneratedDraft(cvData: FakeCVGenerationService.sample, personalItemsUnchecked: false))
     }
 
-    @Test("A draft the failed check leaves empty is reported as empty")
-    func emptyAfterWithdrawal() async {
+    @Test("A draft that the failed check leaves empty is still a draft, with its notice")
+    func emptyAfterFailedCheckIsStillADraft() async throws {
         let checker = FakeClaimChecker(failure: CVGenerationError.generationFailed)
+        let generated = CVData(skills: [Skill(name: "Swift")], interests: ["chess"])
+
+        let draft = try await generator(drafting: generated, checker: checker)
+            .generateCV(from: CVGenerationRequest(userPrompt: "I know Swift and Python. In my free time I like chess and hiking."))
+
+        #expect(draft == GeneratedDraft(cvData: CVData(), personalItemsUnchecked: true))
+    }
+
+    @Test("A draft that the check itself leaves empty is reported as empty")
+    func emptyAfterTheCheckIsEmpty() async {
+        let checker = FakeClaimChecker(stances: ["Swift": .wish, "chess": .otherPerson])
         let generated = CVData(skills: [Skill(name: "Swift")], interests: ["chess"])
 
         await #expect(throws: CVGenerationError.emptyResult) {
             try await generator(drafting: generated, checker: checker)
                 .generateCV(from: CVGenerationRequest(userPrompt: "I know Swift and Python. In my free time I like chess and hiking."))
         }
+    }
+
+    @Test("A draft the rules left empty is reported as empty, and the check is not asked")
+    func emptyBeforeTheCheckIsEmpty() async {
+        let checker = FakeClaimChecker(failure: CVGenerationError.generationFailed)
+
+        await #expect(throws: CVGenerationError.emptyResult) {
+            try await generator(drafting: CVData(skills: [Skill(name: "Haskell")]), checker: checker)
+                .generateCV(from: CVGenerationRequest(userPrompt: "I know Swift and Python. In my free time I like chess and hiking."))
+        }
+        #expect(await checker.calls.isEmpty)
     }
 
     @Test("A cancelled check gives no draft")
@@ -298,11 +321,14 @@ struct CVGeneratorUseCaseTests {
 
     @Test("A check that fails with an error of its own after the task was cancelled gives no draft")
     func failureAfterCancellationGivesNoDraft() async {
-        let checker = FakeClaimChecker(failure: CVGenerationError.generationFailed, cancelsItsTask: true)
+        let (asked, signal) = AsyncStream.makeStream(of: Void.self)
+        let checker = FakeClaimChecker(failure: CVGenerationError.generationFailed, hangs: true, whenAsked: { signal.yield() })
         let useCase = generator(drafting: example.draft, checker: checker)
         let request = CVGenerationRequest(userPrompt: example.description)
 
         let generation = Task { try await useCase.generateCV(from: request) }
+        for await _ in asked { break }
+        generation.cancel()
 
         await #expect(throws: CancellationError.self) {
             try await generation.value
