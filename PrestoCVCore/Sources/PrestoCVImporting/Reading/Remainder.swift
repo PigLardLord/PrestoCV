@@ -11,8 +11,11 @@ enum Remainder {
         spans += result.unplaced.map(\.span)
         spans += result.leftOut.compactMap(\.span)
         spans += sections.compactMap(\.headingSpan)
+        // The section of a passage is the first one that holds it in one of its blocks
+        let blocks = sections.enumerated().flatMap { place, section in section.blocks.map { (span: $0.span, section: place) } }
+        let holders = SpanIndex(blocks.map(\.span))
         for piece in lost(in: result.document, by: spans) {
-            let section = sections.first { $0.blocks.contains { $0.span.contains(piece.span) } }
+            let section = holders.firstHolding(piece.span).map { sections[blocks[$0].section] }
             swept.unplaced.append(UnplacedText(
                 section: section?.kind ?? .unknown, heading: section?.heading.map { result.document.text(of: $0.span) },
                 text: piece.text, span: piece.span

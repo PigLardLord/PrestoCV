@@ -217,17 +217,18 @@ enum HeaderReader {
     private struct LineContacts {
         private(set) var cells: [ContactReader.Contacts] = []
         private var firstContact: Int?
+        /// Whether a cell of the line holds a contact: told once, for the line may have a cell for each character.
+        private(set) var hasContacts = false
 
         init(_ pieces: [Piece]) {
             for piece in pieces {
                 let contacts = ContactReader.read(piece)
                 let spans = contacts.emails.flatMap(\.spans) + contacts.phones.flatMap(\.spans) + contacts.links.flatMap(\.address.spans)
                 if let start = spans.map(\.lowerBound).min() { firstContact = min(firstContact ?? start, start) }
+                if !contacts.isEmpty { hasContacts = true }
                 cells.append(contacts)
             }
         }
-
-        var hasContacts: Bool { cells.contains { !$0.isEmpty } }
 
         /// Whether a piece of the line comes after its first contact.
         func follows(_ piece: Piece) -> Bool {
@@ -242,26 +243,73 @@ enum HeaderReader {
     /// holds the place, and a line of known places alone is a place: neither is such a line. Nil when the head has none,
     /// as when its contacts come first.
     static func contactsAfterAName(_ blocks: [SourceBlock], in document: SourceDocument) -> SourceBlock? {
+        var readings = HeadReadings()
+        return contactsAfterAName(blocks, in: document, readings: &readings)
+    }
+
+    /// The same, with the blocks read from `readings`, which keeps what each block was read as.
+    static func contactsAfterAName(_ blocks: [SourceBlock], in document: SourceDocument, readings: inout HeadReadings) -> SourceBlock? {
         var hasName = false
         for block in blocks {
-            let cells = Piece.cells(of: block, in: document)
-            if let (label, _) = labelled(cells) {
+            switch readings.line(of: block, in: document) {
+            case .label(let label):
                 switch label {
                 case .name, .firstName, .lastName: hasName = true
                 case .phone, .email, .web: if hasName { return block }
                 case .address, .birth, .nationality, .maritalStatus, .gender, .fax, .other: break
                 }
-                continue
+            case .line(let startsAName, let hasContacts):
+                if startsAName { hasName = true }
+                if hasName && hasContacts { return block }
             }
-            let line = LineContacts(cells)
-            let pieces = line.cells.flatMap { $0.rest + $0.unknownLabels.filter(isContent) }
-            if let first = pieces.min(by: { $0.span < $1.span }), !line.follows(first), let name = nameShaped(first)?.name,
-               !Places.isPlaceOnly(name.text) {
-                hasName = true
-            }
-            if hasName && line.hasContacts { return block }
         }
         return nil
+    }
+
+    /// What the check of the head reads in a block, which depends on the block alone.
+    enum HeadLine {
+        /// A labelled detail: "Name: …", or a row whose first cell is a label.
+        case label(EntryVocabulary.PersonalLabel)
+        /// A line: whether a piece of it has the shape of a name and comes before its contacts, and whether it holds a contact.
+        case line(startsAName: Bool, hasContacts: Bool)
+    }
+
+    /// What the blocks of the head were read as for that check, by block. The head is looked at again for each heading that
+    /// could be the name, and the head grows by the heading that is not: a block is read once, however many times the head
+    /// is looked at, and each look costs a few steps for each block of it (R8).
+    struct HeadReadings {
+        /// The steps of a look at one block of the head that was read: the walk over it and the gathering of the head.
+        static let stepsToLook = 4
+
+        private var lines: [Int: HeadLine] = [:]
+
+        /// Reads the blocks that were not read, counting each one and its characters against `work`.
+        mutating func read(_ blocks: [SourceBlock], in document: SourceDocument, work: inout AnalysisWork) throws {
+            for block in blocks where lines[block.index] == nil {
+                try work.count(1 + block.span.count)
+                lines[block.index] = HeaderReader.headLine(of: block, in: document)
+            }
+        }
+
+        mutating func line(of block: SourceBlock, in document: SourceDocument) -> HeadLine {
+            if let known = lines[block.index] { return known }
+            let line = HeaderReader.headLine(of: block, in: document)
+            lines[block.index] = line
+            return line
+        }
+    }
+
+    private static func headLine(of block: SourceBlock, in document: SourceDocument) -> HeadLine {
+        let cells = Piece.cells(of: block, in: document)
+        if let (label, _) = labelled(cells) { return .label(label) }
+        let line = LineContacts(cells)
+        let pieces = line.cells.flatMap { $0.rest + $0.unknownLabels.filter(isContent) }
+        var startsAName = false
+        if let first = pieces.min(by: { $0.span < $1.span }), !line.follows(first), let name = nameShaped(first)?.name,
+           !Places.isPlaceOnly(name.text) {
+            startsAName = true
+        }
+        return .line(startsAName: startsAName, hasContacts: line.hasContacts)
     }
 
     /// The first e-mail address and phone number are the person's; any other one stays visible as text not imported.

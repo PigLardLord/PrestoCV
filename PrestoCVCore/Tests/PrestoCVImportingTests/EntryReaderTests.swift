@@ -8,7 +8,11 @@ struct EntryReaderTests {
         let (document, sections) = pasted(text)
         var findings = Findings(document: document)
         for section in sections where section.kind == .experience || section.kind == .education {
-            EntryReader.read(section, kind: kind, into: &findings)
+            do {
+                try EntryReader.read(section, kind: kind, into: &findings)
+            } catch {
+                Issue.record("The entries were not read: \(error)")
+            }
         }
         return findings
     }

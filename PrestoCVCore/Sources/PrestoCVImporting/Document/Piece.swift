@@ -1,19 +1,33 @@
 // MARK: - A piece of the text with its span
 
 /// A piece of the canonical text and its span, cut and trimmed without losing where it is.
+///
+/// A line of the text can be a hundred thousand characters long, and a reader cuts it at every match: a cut costs what it
+/// cuts, and finding where it cuts costs no more than finding the place (R8). The span counts scalars, the string
+/// counts UTF-16 units from its start in constant time, and the two differ by the scalars of two units, which the piece
+/// knows by their places.
 struct Piece: Equatable {
     let text: String
     let span: SourceSpan
+    /// The places, in UTF-16 units from the start of the text, of the scalars that take two units, in order.
+    private let twoUnitScalars: [Int]
 
     init(text: String, span: SourceSpan) {
+        self.init(text: text, span: span, twoUnitScalars: Piece.twoUnitScalars(in: text))
+    }
+
+    private init(text: String, span: SourceSpan, twoUnitScalars: [Int]) {
         self.text = text
         self.span = span
+        self.twoUnitScalars = twoUnitScalars
     }
 
     init(cell: Int, of block: SourceBlock, in document: SourceDocument) {
         let span = block.cells.indices.contains(cell) ? block.cells[cell] : SourceSpan(block.span.lowerBound, block.span.lowerBound)
         self.init(text: document.text(of: span), span: span)
     }
+
+    static func == (lhs: Piece, rhs: Piece) -> Bool { lhs.text == rhs.text && lhs.span == rhs.span }
 
     /// The pieces of every cell of a block.
     static func cells(of block: SourceBlock, in document: SourceDocument) -> [Piece] {
@@ -22,42 +36,111 @@ struct Piece: Equatable {
 
     var isEmpty: Bool { text.isEmpty }
 
+    private static func twoUnitScalars(in text: String) -> [Int] {
+        var places: [Int] = []
+        var unit = 0
+        for scalar in text.unicodeScalars {
+            if scalar.value > 0xFFFF {
+                places.append(unit)
+                unit += 2
+            } else {
+                unit += 1
+            }
+        }
+        return places
+    }
+
     /// The part of the piece in a range of its text.
     func sub(_ range: Range<String.Index>) -> Piece {
-        let scalars = text.unicodeScalars
-        let lower = scalars.distance(from: scalars.startIndex, to: range.lowerBound)
-        let upper = scalars.distance(from: scalars.startIndex, to: range.upperBound)
-        return Piece(text: String(text[range]), span: SourceSpan(span.lowerBound + lower, span.lowerBound + upper))
+        let units = text.utf16
+        let lowerUnit = units.distance(from: units.startIndex, to: range.lowerBound)
+        let upperUnit = units.distance(from: units.startIndex, to: range.upperBound)
+        let before = countOfTwoUnitScalars(below: lowerUnit)
+        let through = countOfTwoUnitScalars(below: upperUnit)
+        return Piece(
+            text: String(text[range]),
+            span: SourceSpan(span.lowerBound + lowerUnit - before, span.lowerBound + upperUnit - through),
+            twoUnitScalars: twoUnitScalars[before..<through].map { $0 - lowerUnit }
+        )
+    }
+
+    /// The range of the text that a span of the same text covers, cut to the piece. The span counts scalars from the
+    /// start of the piece and the text counts units, so the place is found as `sub` finds it, by the scalars of two
+    /// units before it: counting scalars from the start of the text for each span is the square of the text (R8).
+    func range(of other: SourceSpan) -> Range<String.Index> {
+        let lower = index(ofScalar: other.lowerBound - span.lowerBound)
+        let upper = index(ofScalar: other.upperBound - span.lowerBound)
+        return lower..<max(lower, upper)
+    }
+
+    /// The place of the scalar at an offset from the start of the piece, the offset cut to 0...count of scalars.
+    private func index(ofScalar offset: Int) -> String.Index {
+        let scalar = max(0, min(offset, span.count))
+        // The j-th scalar of two units is the scalar number twoUnitScalars[j] - j, and these numbers only grow
+        var low = 0
+        var high = twoUnitScalars.count
+        while low < high {
+            let middle = (low + high) / 2
+            if twoUnitScalars[middle] - middle < scalar { low = middle + 1 } else { high = middle }
+        }
+        let units = text.utf16
+        return units.index(units.startIndex, offsetBy: scalar + low, limitedBy: units.endIndex) ?? units.endIndex
+    }
+
+    /// How many scalars of two units start before the unit.
+    private func countOfTwoUnitScalars(below unit: Int) -> Int {
+        var low = 0
+        var high = twoUnitScalars.count
+        while low < high {
+            let middle = (low + high) / 2
+            if twoUnitScalars[middle] < unit { low = middle + 1 } else { high = middle }
+        }
+        return low
     }
 
     /// Without the characters of the set at both ends, nor a bracket at either end that the piece does not close or
-    /// open.
+    /// open. The brackets are counted once and the ends move inward in one pass: a piece of a hundred thousand brackets
+    /// is trimmed in one read, not one read for each bracket it takes off.
     func trimmed() -> Piece {
-        let characters = Piece.isTrimmable
-        var piece = self
+        var start = text.startIndex
+        var end = text.endIndex
+        var opens = 0
+        var closes = 0
+        for character in text {
+            if Piece.isOpening(character) { opens += 1 } else if Piece.isClosing(character) { closes += 1 }
+        }
         while true {
-            guard let start = piece.text.firstIndex(where: { !characters($0) }),
-                  let last = piece.text.lastIndex(where: { !characters($0) }) else {
-                return piece.sub(piece.text.endIndex..<piece.text.endIndex)
-            }
-            piece = piece.sub(start..<piece.text.index(after: last))
-            let opens = piece.text.filter { $0 == "(" || $0 == "[" }.count
-            let closes = piece.text.filter { $0 == ")" || $0 == "]" }.count
-            if let lastCharacter = piece.text.last, lastCharacter == "(" || lastCharacter == "[" {
-                piece = piece.sub(piece.text.startIndex..<piece.text.index(before: piece.text.endIndex))
-            } else if let first = piece.text.first, first == ")" || first == "]" {
-                piece = piece.sub(piece.text.index(after: piece.text.startIndex)..<piece.text.endIndex)
-            } else if let first = piece.text.first, first == "(" || first == "[", opens > closes {
-                piece = piece.sub(piece.text.index(after: piece.text.startIndex)..<piece.text.endIndex)
-            } else if let lastCharacter = piece.text.last, lastCharacter == ")" || lastCharacter == "]", closes > opens {
-                piece = piece.sub(piece.text.startIndex..<piece.text.index(before: piece.text.endIndex))
-            } else if piece.text.first == "(" && piece.text.last == ")" && opens == 1 && closes == 1 {
-                piece = piece.sub(piece.text.index(after: piece.text.startIndex)..<piece.text.index(before: piece.text.endIndex))
+            while start < end, Piece.isTrimmable(text[start]) { start = text.index(after: start) }
+            guard start < end else { return sub(end..<end) }
+            while end > start, Piece.isTrimmable(text[text.index(before: end)]) { end = text.index(before: end) }
+            let first = text[start]
+            let last = text[text.index(before: end)]
+            if Piece.isOpening(last) {
+                end = text.index(before: end)
+                opens -= 1
+            } else if Piece.isClosing(first) {
+                start = text.index(after: start)
+                closes -= 1
+            } else if Piece.isOpening(first), opens > closes {
+                start = text.index(after: start)
+                opens -= 1
+            } else if Piece.isClosing(last), closes > opens {
+                end = text.index(before: end)
+                closes -= 1
+            } else if first == "(", last == ")", opens == 1, closes == 1 {
+                start = text.index(after: start)
+                end = text.index(before: end)
+                opens = 0
+                closes = 0
             } else {
-                return piece
+                return sub(start..<end)
             }
         }
     }
+
+    private static func isOpening(_ character: Character) -> Bool { character == "(" || character == "[" }
+
+    private static func isClosing(_ character: Character) -> Bool { character == ")" || character == "]" }
 
     /// White space, separators, the symbols and emoji used as icons, and an unmatched bracket at either end.
     static func isTrimmable(_ character: Character) -> Bool {

@@ -6,9 +6,13 @@ struct Findings {
     var leftOut: [LeftOutText] = []
     /// The blocks a reader has already taken as noise.
     var consumedBlocks: Set<Int> = []
+    /// The work of the reading so far: a search that grows faster than the text counts its steps here before it starts
+    /// (R8). It carries on from the work of a PDF's page analysis, so that a PDF has one budget.
+    var work: AnalysisWork
 
-    init(document: SourceDocument) {
+    init(document: SourceDocument, work: AnalysisWork) {
         self.document = document
+        self.work = work
     }
 
     mutating func unplace(_ piece: Piece, in section: Section) {
@@ -26,11 +30,6 @@ struct Findings {
     /// The whole block as text not imported, its cells joined as the canonical text joins them.
     mutating func unplace(_ block: SourceBlock, in section: Section) {
         unplace(Piece(text: document.text(of: block.span), span: block.span), in: section)
-    }
-
-    /// Whether the piece is already text left out, such as a duration that LinkedIn computes.
-    func isLeftOut(_ piece: Piece) -> Bool {
-        leftOut.contains { $0.span?.contains(piece.span) == true }
     }
 
     mutating func leaveOut(_ piece: Piece, _ reason: LeftOutText.Reason) {

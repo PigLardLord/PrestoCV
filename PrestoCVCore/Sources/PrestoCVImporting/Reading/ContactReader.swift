@@ -31,14 +31,18 @@ enum ContactReader {
                 consumed.append(range)
             }
         }
-        for range in tokenRanges(in: text) where !consumed.contains(where: { $0.overlaps(range) }) {
+        // The words are apart from each other, and so are the numbers: a candidate meets only what was read before its
+        // loop, and finding that is a search in order, not a look at each of the ranges (R8)
+        let addresses = Taken(consumed)
+        for range in tokenRanges(in: text) where !addresses.overlaps(range) {
             let candidate = piece.sub(range)
             if let link = link(candidate) {
                 contacts.links.append(link)
                 consumed.append(range)
             }
         }
-        for range in phoneRanges(in: text, hinted: label == .phone, beside: consumed) where !consumed.contains(where: { $0.overlaps(range) }) {
+        let beside = Taken(consumed)
+        for range in phoneRanges(in: text, hinted: label == .phone, beside: consumed) where !beside.overlaps(range) {
             let candidate = piece.sub(range)
             if let phone = PhoneNumber(candidate.text) {
                 contacts.phones.append(Sourced(value: phone, spans: [candidate.span]))
@@ -47,6 +51,33 @@ enum ContactReader {
         }
         split(piece, around: consumed, into: &contacts)
         return contacts
+    }
+
+    /// The places of the text that the contacts read so far take, in order and apart from each other, so that whether a
+    /// candidate meets one is found by halving them.
+    private struct Taken {
+        private var ranges: [Range<String.Index>] = []
+
+        init(_ taken: [Range<String.Index>]) {
+            for range in taken.sorted(by: { $0.lowerBound < $1.lowerBound }) {
+                if let last = ranges.last, range.lowerBound < last.upperBound {
+                    ranges[ranges.count - 1] = last.lowerBound..<max(last.upperBound, range.upperBound)
+                } else {
+                    ranges.append(range)
+                }
+            }
+        }
+
+        func overlaps(_ range: Range<String.Index>) -> Bool {
+            guard !range.isEmpty else { return false }
+            var low = 0
+            var high = ranges.count
+            while low < high {
+                let middle = (low + high) / 2
+                if ranges[middle].upperBound <= range.lowerBound { low = middle + 1 } else { high = middle }
+            }
+            return low < ranges.count && ranges[low].lowerBound < range.upperBound
+        }
     }
 
     // MARK: What is left of the line
@@ -220,6 +251,7 @@ enum ContactReader {
     /// the line, which count as the edge of a number as the text's own edges do.
     private static func phoneRanges(in text: String, hinted: Bool, beside taken: [Range<String.Index>]) -> [Range<String.Index>] {
         var ranges: [Range<String.Index>] = []
+        let edges = Edges(taken)
         var index = text.startIndex
         let allowed: Set<Character> = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", " ", "+", "(", ")", ".", "/", "-"]
         while index < text.endIndex {
@@ -233,29 +265,67 @@ enum ContactReader {
             }
             var end = index
             while end < text.endIndex, allowed.contains(text[end]) { end = text.index(after: end) }
+            let run = end
             while end > index, !(text[text.index(before: end)].isNumber) { end = text.index(before: end) }
-            let shape = Shape(text: text, range: index..<end, taken: taken)
-            if isPhone(shape, marker: marker(before: index, in: text), hinted: hinted) {
-                ranges.append(index..<end)
-                index = end
-            } else {
-                index = end > index ? end : text.index(after: index)
+            // No digit in the run of characters of a number: no place in it starts one ("+ + + +"), and it is passed in one step
+            guard end > index else {
+                index = run
+                continue
             }
+            let shape = Shape(text: text, range: index..<end, edges: edges)
+            let start = index
+            if isPhone(shape, marker: { marker(before: start, in: text) }, hinted: hinted) {
+                ranges.append(start..<end)
+            }
+            index = end
         }
         return ranges
     }
 
     private enum Marker { case phone, fax, none }
 
+    /// How many characters before a number its label is looked for: the longest label of the vocabulary is a few words, and a
+    /// number is read once for each place it could start, so the text before it is not read from its start each time (R8).
+    private static let markerReach = 120
+
+    private static func isMarkerSeparator(_ character: Character) -> Bool {
+        character == " " || character == ":" || character == "|" || character == "·"
+    }
+
     /// The label right before a number: "Tel.:", "Handy", "Phone number", "📞", or "Fax".
     private static func marker(before index: String.Index, in text: String) -> Marker {
-        let before = text[..<index].trimmingSpaces()
-        if let last = before.last, Piece.isIcon(last), "📞📱☎✆".contains(last) { return .phone }
-        let words = before.split(whereSeparator: { $0 == " " || $0 == ":" || $0 == "|" || $0 == "·" }).suffix(3)
-        guard let lastWord = words.last else { return .none }
+        var end = index
+        while end > text.startIndex, text[text.index(before: end)].isWhitespace { end = text.index(before: end) }
+        guard end > text.startIndex else { return .none }
+        let last = text[text.index(before: end)]
+        if Piece.isIcon(last), "📞📱☎✆".contains(last) { return .phone }
+        var start = end
+        var reach = 0
+        while start > text.startIndex, reach < markerReach {
+            start = text.index(before: start)
+            reach += 1
+        }
+        var words = text[start..<end].split(whereSeparator: isMarkerSeparator)
+        // The first word of the reach is cut short, when the reach starts inside a word: it is no word of the label
+        if start > text.startIndex, !isMarkerSeparator(text[start]), !isMarkerSeparator(text[text.index(before: start)]) {
+            words = Array(words.dropFirst())
+        }
+        let lastWords = words.suffix(3)
+        guard let lastWord = lastWords.last else { return .none }
         if SectionVocabulary.key(String(lastWord)) == "fax" { return .fax }
-        let suffixes = (1...words.count).map { words.suffix($0).joined(separator: " ") }
+        let suffixes = (1...lastWords.count).map { lastWords.suffix($0).joined(separator: " ") }
         return suffixes.contains(where: isPhoneLabel) ? .phone : .none
+    }
+
+    /// Where the other contacts of the line start and end: a place found by its index, not by a look at each contact.
+    private struct Edges {
+        let starts: Set<String.Index>
+        let ends: Set<String.Index>
+
+        init(_ taken: [Range<String.Index>]) {
+            starts = Set(taken.map(\.lowerBound))
+            ends = Set(taken.map(\.upperBound))
+        }
     }
 
     /// A candidate number with what surrounds it in its text.
@@ -265,36 +335,39 @@ enum ContactReader {
         /// Whether it stands alone in its text or between two separators, as a number of a line of contacts does.
         let isAlone: Bool
 
-        init(text: String, range: Range<String.Index>, taken: [Range<String.Index>]) {
+        init(text: String, range: Range<String.Index>, edges: Edges) {
             candidate = text[range]
             digits = String(candidate.filter(\.isNumber))
-            isAlone = Shape.isEdge(before: range.lowerBound, in: text, taken: taken) && Shape.isEdge(after: range.upperBound, in: text, taken: taken)
+            isAlone = Shape.isEdge(before: range.lowerBound, in: text, edges: edges) && Shape.isEdge(after: range.upperBound, in: text, edges: edges)
         }
 
         private static let separators: Set<Character> = ["|", "·", "•", "—", "–", ";", "‧", "∙", "▪", "⋅"]
 
-        private static func isEdge(before index: String.Index, in text: String, taken: [Range<String.Index>]) -> Bool {
+        private static func isEdge(before index: String.Index, in text: String, edges: Edges) -> Bool {
             var lower = index
             while lower > text.startIndex, text[text.index(before: lower)].isWhitespace {
                 lower = text.index(before: lower)
                 if text[lower] == "\t" { return true }
             }
-            return lower == text.startIndex || separators.contains(text[text.index(before: lower)]) || taken.contains { $0.upperBound == lower }
+            return lower == text.startIndex || separators.contains(text[text.index(before: lower)]) || edges.ends.contains(lower)
         }
 
-        private static func isEdge(after index: String.Index, in text: String, taken: [Range<String.Index>]) -> Bool {
+        private static func isEdge(after index: String.Index, in text: String, edges: Edges) -> Bool {
             var upper = index
             while upper < text.endIndex, text[upper].isWhitespace {
                 if text[upper] == "\t" { return true }
                 upper = text.index(after: upper)
             }
-            return upper == text.endIndex || separators.contains(text[upper]) || taken.contains { $0.lowerBound == upper }
+            return upper == text.endIndex || separators.contains(text[upper]) || edges.starts.contains(upper)
         }
     }
 
-    private static func isPhone(_ shape: Shape, marker: Marker, hinted: Bool) -> Bool {
+    /// `marker` is read only for a number that has the digits of a phone number: most places that start a number do not.
+    private static func isPhone(_ shape: Shape, marker readMarker: () -> Marker, hinted: Bool) -> Bool {
         let candidate = shape.candidate
-        guard (7...17).contains(shape.digits.count), marker != .fax else { return false }
+        guard (7...17).contains(shape.digits.count) else { return false }
+        let marker = readMarker()
+        guard marker != .fax else { return false }
         // A date or a period is no phone number
         // The range of a period is in the string it was read in: read it in a string of its own, not in a slice
         let text = String(candidate)

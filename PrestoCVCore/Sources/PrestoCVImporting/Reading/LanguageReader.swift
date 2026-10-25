@@ -81,7 +81,7 @@ enum LanguageReader {
     /// Where a language starts in an item, by the first rule that fits: a name the lists know, a name beside a level in
     /// the item, or a name that is the whole item when a level is the next item or the next line.
     private static func start(ofLanguageIn item: Piece, levelNext: Bool) -> (name: Piece, level: Sourced<LanguageProficiency>?, rest: [Piece])? {
-        if let name = languageName(in: item) { return (name, nil, item.removing([range(of: name, in: item)])) }
+        if let name = languageName(in: item) { return (name, nil, item.removing([item.range(of: name.span)])) }
         if let (name, level) = LanguageEvidence.nameWithLevel(in: item) { return (name, level, []) }
         if levelNext, LanguageEvidence.isName(item) { return (item, nil, []) }
         return nil
@@ -156,13 +156,6 @@ enum LanguageReader {
         piece.text.words.first { LanguageVocabulary.isName(String($0)) }.map { piece.sub($0.startIndex..<$0.endIndex) }
     }
 
-    private static func range(of name: Piece, in item: Piece) -> Range<String.Index> {
-        let scalars = item.text.unicodeScalars
-        let lower = scalars.index(scalars.startIndex, offsetBy: name.span.lowerBound - item.span.lowerBound)
-        let upper = scalars.index(scalars.startIndex, offsetBy: name.span.upperBound - item.span.lowerBound)
-        return lower..<upper
-    }
-
     // MARK: Levels
 
     /// A CEFR level, or the words of a native language, in a piece, and the rest of the piece. Different CEFR levels
@@ -173,7 +166,7 @@ enum LanguageReader {
         }
         let levels = cefrLevels(in: piece)
         guard let first = levels.first, levels.allSatisfy({ $0.1 == first.1 }) else { return nil }
-        return (Sourced(value: first.1, spans: levels.map(\.0.span), reading: .languageLevel), piece.removing(levels.map { range(of: $0.0, in: piece) }))
+        return (Sourced(value: first.1, spans: levels.map(\.0.span), reading: .languageLevel), piece.removing(levels.map { piece.range(of: $0.0.span) }))
     }
 
     /// Every CEFR level a piece states, with where.
@@ -218,7 +211,7 @@ enum LanguageReader {
         guard let last = findings.cv.languages.indices.last, findings.cv.languages[last].level == nil else { return false }
         let levels = cefrLevels(in: piece)
         if !levels.isEmpty {
-            let rest = piece.removing(levels.map { range(of: $0.0, in: piece) })
+            let rest = piece.removing(levels.map { piece.range(of: $0.0.span) })
             guard rest.allSatisfy({ levelWordsPiece($0) != nil }) else { return false }
             if levels.allSatisfy({ $0.1 == levels[0].1 }) {
                 if let words = findings.cv.languages[last].levelWords { findings.unplace(words, in: section) }

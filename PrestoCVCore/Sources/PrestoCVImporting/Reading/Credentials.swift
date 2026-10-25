@@ -45,9 +45,7 @@ enum Credentials {
         }
 
         guard let first = credentials.first, !name.isEmpty else { return nil }
-        let scalars = piece.text.unicodeScalars
-        let offset = max(0, min(first.span.lowerBound - piece.span.lowerBound, scalars.count))
-        let start = scalars.index(scalars.startIndex, offsetBy: offset)
+        let start = piece.range(of: first.span).lowerBound
         return Split(name: name, credentials: credentials, tail: piece.sub(start..<piece.text.endIndex).trimmed(), isAmbiguous: isAmbiguous)
     }
 

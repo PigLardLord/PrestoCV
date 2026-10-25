@@ -28,9 +28,12 @@ struct Section: Equatable {
 /// Splits the document into sections at its headings (ADR 0027).
 enum SectionSegmenter {
 
-    static func sections(of document: SourceDocument) -> [Section] {
+    /// - Throws: `ImportError.tooLarge` when looking again at the head for each heading that could be the name would pass
+    ///   the budget of `work`, and `CancellationError` once the task is cancelled.
+    static func sections(of document: SourceDocument, work: inout AnalysisWork) throws -> [Section] {
         var sections: [Section] = [Section(kind: .header, heading: nil, blocks: [], languages: [])]
         var column = document.blocks.first?.column
+        var readings = HeaderReader.HeadReadings()
         for (position, block) in document.blocks.enumerated() {
             // A second column starts with its own head: a sidebar that opens with the contacts
             if block.column != column {
@@ -45,7 +48,9 @@ enum SectionSegmenter {
             if sidebarKinds.contains(sections[sections.count - 1].kind), block.cells.count == 1, HeaderReader.hasNameShape(firstCell),
                startsProfile(after: position, in: document) {
                 if case .heading(1) = block.kind,
-                   HeaderReader.contactsAfterAName(sections.filter { headKinds.contains($0.kind) }.flatMap(\.blocks).filter { $0.column == block.column }, in: document) != nil {
+                   try contactsAfterAName(
+                    in: sections.filter { headKinds.contains($0.kind) }, column: block.column, document: document, readings: &readings, work: &work
+                   ) {
                     sections.append(Section(kind: .unknown, heading: block, blocks: [], languages: [], headingCouldBeTheName: true))
                 } else {
                     sections.append(Section(kind: .header, heading: nil, blocks: [block], languages: []))
@@ -66,8 +71,10 @@ enum SectionSegmenter {
                 sections.append(Section(kind: match.kind, heading: block, blocks: [block], languages: match.languages))
                 continue
             }
-            let head = headKinds.contains(sections[sections.count - 1].kind) ? headBlocks(of: sections, in: block.column) : nil
-            if let opening = heading(block, in: document, isFirst: sections.count == 1 && sections[0].blocks.isEmpty, head: head) {
+            if let opening = try heading(
+                block, in: document, isFirst: sections.count == 1 && sections[0].blocks.isEmpty,
+                headIn: headKinds.contains(sections[sections.count - 1].kind) ? sections : nil, readings: &readings, work: &work
+            ) {
                 sections.append(Section(
                     kind: opening.match.kind, heading: block, blocks: [], languages: opening.match.languages,
                     headingCouldBeTheName: opening.couldBeTheName
@@ -84,6 +91,27 @@ enum SectionSegmenter {
     /// The sections the head of the CV is read from.
     private static let headKinds: Set<SectionKind> = [.header, .personal]
 
+    /// Whether the contacts of the head follow a name, read from the head's `sections`: the head is read again for each
+    /// heading of the first level that has the shape of a name, which the head grows by when it is no section's. A block of
+    /// the head is read once (`readings`), and each look at the head counts a few steps for each of its blocks, whatever
+    /// they are (R8).
+    private static func contactsAfterAName(
+        in headSections: [Section], column: Int?, document: SourceDocument,
+        readings: inout HeaderReader.HeadReadings, work: inout AnalysisWork
+    ) throws -> Bool {
+        try work.count(headSections.count)
+        let head = headSections.flatMap(\.blocks).filter { $0.column == column }
+        return try follows(head, in: document, readings: &readings, work: &work)
+    }
+
+    private static func follows(
+        _ head: [SourceBlock], in document: SourceDocument, readings: inout HeaderReader.HeadReadings, work: inout AnalysisWork
+    ) throws -> Bool {
+        try work.count(head.count * HeaderReader.HeadReadings.stepsToLook)
+        try readings.read(head, in: document, work: &work)
+        return HeaderReader.contactsAfterAName(head, in: document, readings: &readings) != nil
+    }
+
     /// The blocks of the head that a block of `column` closes, in order: the head's sections at the end, in that column.
     private static func headBlocks(of sections: [Section], in column: Int?) -> [SourceBlock] {
         let head = sections.reversed().prefix { headKinds.contains($0.kind) }.reversed()
@@ -99,15 +127,17 @@ enum SectionSegmenter {
     }
 
     /// The section a block opens, if it is a heading: a heading of the vocabulary, alone in its block; or one the
-    /// vocabulary does not know but the text marks as a heading. In the head, given as its blocks so far, a heading of the
-    /// first level with the shape of a name is the name, whatever its words ("# Thomas Kiel" after the contacts), unless
-    /// the head already holds a line in the shape of a name that its contacts follow: the shape tells a name from a heading
-    /// no better than the words, so the heading then opens a section ("Anna Weber / person@example.com / # University
-    /// Projects", #301). Such a heading could still have been the name ("Greater Wexby / person@example.com / # Anna
-    /// Weber"), and the section says so. After the head it is a heading.
+    /// vocabulary does not know but the text marks as a heading. In the head, given as the sections so far when the
+    /// block comes in it, a heading of the first level with the shape of a name is the name, whatever its words
+    /// ("# Thomas Kiel" after the contacts), unless the head already holds a line in the shape of a name that its
+    /// contacts follow: the shape tells a name from a heading no better than the words, so the heading then opens a
+    /// section ("Anna Weber / person@example.com / # University Projects", #301). Such a heading could still have been
+    /// the name ("Greater Wexby / person@example.com / # Anna Weber"), and the section says so. After the head it is a
+    /// heading.
     private static func heading(
-        _ block: SourceBlock, in document: SourceDocument, isFirst: Bool, head: [SourceBlock]?
-    ) -> (match: SectionVocabulary.Match, couldBeTheName: Bool)? {
+        _ block: SourceBlock, in document: SourceDocument, isFirst: Bool, headIn sections: [Section]?,
+        readings: inout HeaderReader.HeadReadings, work: inout AnalysisWork
+    ) throws -> (match: SectionVocabulary.Match, couldBeTheName: Bool)? {
         guard block.kind != .listItem, block.kind != .tableHeader else { return nil }
         let cells = block.cells.map { document.text(of: $0) }
         let nonEmpty = cells.filter { !$0.isEmpty }
@@ -118,8 +148,10 @@ enum SectionSegmenter {
         guard !isFirst, isMarkedAsHeading(block, text: text) else { return nil }
         // The name at the top of a chat answer, after its opening sentence, the contacts or the document's title
         var couldBeTheName = false
-        if case .heading(1) = block.kind, let head, HeaderReader.hasNameShape(text) {
-            guard HeaderReader.contactsAfterAName(head, in: document) != nil else { return nil }
+        if case .heading(1) = block.kind, let sections, HeaderReader.hasNameShape(text) {
+            // The head is gathered and read again only here, for a heading that could be the name
+            let head = headBlocks(of: sections, in: block.column)
+            guard try follows(head, in: document, readings: &readings, work: &work) else { return nil }
             couldBeTheName = true
         }
         return (SectionVocabulary.Match(kind: .unknown, languages: []), couldBeTheName)

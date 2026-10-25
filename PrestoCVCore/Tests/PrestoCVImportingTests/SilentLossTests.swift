@@ -97,7 +97,7 @@ struct SilentLossTests {
     func readersAlone() throws {
         for entry in try Corpus.entries() {
             let result = try Corpus.importResult(of: entry)
-            let found = CVReader.readSections(result.document, leftOut: result.leftOut.filter { $0.span == nil })
+            let found = try CVReader.readSections(result.document, leftOut: result.leftOut.filter { $0.span == nil }, work: .standard)
             var spans = Coverage.spans(in: found.findings.cv)
             spans += found.findings.unplaced.map(\.span)
             spans += found.findings.leftOut.compactMap(\.span)

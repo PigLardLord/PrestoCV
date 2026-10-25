@@ -17,11 +17,15 @@ struct EntryLayout: Equatable {
 
     /// The layout of a section's lines, given its dates (`anchors`). `usuallyDatesFirst` is the layout to keep when
     /// both readings fit equally.
-    static func reading(_ lines: [EntryReader.Line], anchors: [Int], kind: EntryReader.Kind, usuallyDatesFirst: Bool) -> EntryLayout {
+    /// - Throws: `ImportError.tooLarge` when scoring the readings of the dates after their heads would pass the budget
+    ///   of `work`, and `CancellationError` once the task is cancelled.
+    static func reading(
+        _ lines: [EntryReader.Line], anchors: [Int], kind: EntryReader.Kind, usuallyDatesFirst: Bool, work: inout AnalysisWork
+    ) throws -> EntryLayout {
         let evidence = Evidence(lines, anchors: anchors, kind: kind)
         var datesFirst = EntryLayout(starts: anchors)
         datesFirst.opensWithSummary = evidence.isSummary(0, entry: datesFirst.range(of: 0, lineCount: lines.count))
-        let datesAfter = evidence.bestReadingWithDatesAfter()
+        let datesAfter = try evidence.bestReadingWithDatesAfter(work: &work)
         guard datesAfter != datesFirst else { return datesFirst }
         let first = evidence.score(of: datesFirst, side: .datesFirst)
         let after = evidence.score(of: datesAfter, side: .datesAfter)
@@ -196,12 +200,18 @@ private extension EntryLayout {
         /// date alone takes at least one line when it has any above it. Of readings that score the same, the one
         /// nearest the section's own pattern wins: each date takes as many lines as the first entry's head has (the
         /// first head after a leading range alone), and a date whose line names both parts takes none.
-        func bestReadingWithDatesAfter() -> EntryLayout {
+        func bestReadingWithDatesAfter(work: inout AnalysisWork) throws -> EntryLayout {
             let pattern = heads[0] == 0 && dateAlone[0]
                 ? anchors.indices.dropFirst().filter { dateAlone[$0] && heads[$0] > 0 }.map { heads[$0] }.min() ?? 0
                 : heads[0]
             let choices = anchors.indices.map { dateAlone[$0] && heads[$0] > 0 ? Array(1...heads[$0]) : Array(0...heads[$0]) }
             let target = anchors.indices.map { complete[$0] ? 0 : min(heads[$0], pattern) }
+            // Every choice of a date is scored against every choice of the date before, so the work grows as the square of
+            // the lines the dates take from above: counted before the first of them is scored (R8)
+            let last = anchors.count - 1
+            try work.count(choices.indices.dropFirst().reduce(choices[0].count + choices[last].count) {
+                $0 + choices[$1].count * choices[$1 - 1].count
+            })
 
             // best[position][choice]: the best fit of the entries before this date, given the lines this date takes
             var best: [[Fit]] = [choices[0].map { taken in
@@ -219,7 +229,6 @@ private extension EntryLayout {
                     return Self.first(of: candidates)
                 })
             }
-            let last = anchors.count - 1
             let ends = choices[last].indices.map { index in
                 let fit = best[last][index]
                 let entry = anchors[last] - choices[last][index]..<lines.count

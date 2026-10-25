@@ -39,7 +39,7 @@ enum EntryReader {
         var boundsUnsure = false
     }
 
-    static func read(_ section: Section, kind: Kind, into findings: inout Findings) {
+    static func read(_ section: Section, kind: Kind, into findings: inout Findings) throws {
         let lines = section.blocks.filter { !findings.consumedBlocks.contains($0.index) }
             .map { line($0, cells: section.cells(of: $0, in: findings.document)) }
         for line in lines where line.isDurationOnly {
@@ -52,7 +52,7 @@ enum EntryReader {
         if labelled >= 2 {
             readLabelled(lines, section: section, kind: kind, into: &findings)
         } else {
-            let drafts = entries(of: lines, section: section, kind: kind, findings: &findings)
+            let drafts = try entries(of: lines, section: section, kind: kind, findings: &findings)
             let order = sectionOrder(drafts, kind: kind)
             for draft in drafts {
                 append(draft, kind: kind, order: order, section: section, into: &findings)
@@ -121,18 +121,19 @@ enum EntryReader {
 
     // MARK: Entries by their dates
 
-    private static func entries(of lines: [Line], section: Section, kind: Kind, findings: inout Findings) -> [Draft] {
+    private static func entries(of lines: [Line], section: Section, kind: Kind, findings: inout Findings) throws -> [Draft] {
         // A table's row of column names heads no entry: it stays visible
         for line in lines where isColumnHeader(line) {
             for cell in line.cells { findings.unplace(cell, in: section) }
         }
         let usable = lines.filter { !$0.isDurationOnly && !isColumnHeader($0) }
-        let anchors = usable.indices.filter { usable[$0].period != nil && (!usable[$0].isBullet || usable.allSatisfy { $0.isBullet }) }
+        let isOnlyBullets = usable.allSatisfy { $0.isBullet }
+        let anchors = usable.indices.filter { usable[$0].period != nil && (!usable[$0].isBullet || isOnlyBullets) }
         guard !anchors.isEmpty else { return entriesWithoutDates(usable) }
 
         // Which lines belong to which date, read both ways over the whole section
-        let layout = EntryLayout.reading(usable, anchors: anchors, kind: kind,
-                                         usuallyDatesFirst: opensWithItsFirstDate(usable, anchors: anchors, in: findings.document))
+        let usuallyDatesFirst = opensWithItsFirstDate(usable, anchors: anchors, in: findings.document)
+        let layout = try EntryLayout.reading(usable, anchors: anchors, kind: kind, usuallyDatesFirst: usuallyDatesFirst, work: &findings.work)
 
         // LinkedIn groups a company's roles: the line before the company's total duration names it
         var groupStarts: [Int: Piece] = [:]
@@ -254,20 +255,13 @@ enum EntryReader {
             var removed = line.durations
             if let period = line.period?.piece { removed.append(period) }
             for cell in line.cells {
-                let ranges = removed.filter { cell.span.contains($0.span) }.map { cellRange(of: $0, in: cell) }
+                let ranges = removed.filter { cell.span.contains($0.span) }.map { cell.range(of: $0.span) }
                 for piece in cell.removing(ranges).flatMap({ $0.split(by: Separators.strong + [" - "]) }) {
                     segments += split(piece, kind: kind)
                 }
             }
         }
         return segments
-    }
-
-    private static func cellRange(of piece: Piece, in cell: Piece) -> Range<String.Index> {
-        let scalars = cell.text.unicodeScalars
-        let lower = scalars.index(scalars.startIndex, offsetBy: piece.span.lowerBound - cell.span.lowerBound)
-        let upper = scalars.index(scalars.startIndex, offsetBy: piece.span.upperBound - cell.span.lowerBound)
-        return lower..<upper
     }
 
     /// A segment split at a role's connector ("Developer at Acme") or at its commas, each part classified. A place in
@@ -298,8 +292,8 @@ enum EntryReader {
         let parts = piece.split(by: [", "])
         // "Leeds, United Kingdom": short capitalised parts that end with a known country or region are one place
         if let place = placeStart(in: parts), let last = parts.last {
-            let lower = cellRange(of: parts[place.start], in: piece).lowerBound
-            let upper = cellRange(of: last, in: piece).upperBound
+            let lower = piece.range(of: parts[place.start].span).lowerBound
+            let upper = piece.range(of: last.span).upperBound
             return parts[..<place.start].map { classify($0, kind: kind) }
                 + [Segment(piece: piece.sub(lower..<upper), part: .location, isMarked: true, isUnsure: place.isUnsure)]
         }
@@ -522,6 +516,8 @@ enum EntryReader {
     // MARK: Labelled rows
 
     private static func readLabelled(_ lines: [Line], section: Section, kind: Kind, into findings: inout Findings) {
+        // Nothing in the rows leaves text out: what a row's period leaves over is asked of the text left out before it
+        let leftOut = SpanIndex(findings.leftOut.compactMap(\.span))
         var entries: [[(EntryVocabulary.EntryLabel?, [Piece])]] = []
         var current: [(EntryVocabulary.EntryLabel?, [Piece])] = []
         var pendingLabel: EntryVocabulary.EntryLabel?
@@ -563,7 +559,7 @@ enum EntryReader {
                 case .period:
                     if period == nil, let value = values.first, let match = DateReader.periods(in: value.text).first {
                         period = periodValue(value.sub(match.range), match.period)
-                        for rest in value.removing([match.range]) where !findings.isLeftOut(rest) { findings.unplace(rest, in: section) }
+                        for rest in value.removing([match.range]) where !leftOut.holds(rest.span) { findings.unplace(rest, in: section) }
                         for rest in values.dropFirst() { findings.unplace(rest, in: section) }
                     } else {
                         details += values.map { $0.quote(check: .periodUnreadable) }
