@@ -310,7 +310,8 @@ struct Grounding {
             quotable: ProseQuotes(sources: (dated + graduation).map { ProseQuotes.Source($0) }, language: explainer.language),
             quotableByAchievements: ProseQuotes(sources: joined.map { ProseQuotes.Source(clauses.clause(at: $0)) }, language: explainer.language),
             verbAchievements: Set(subject.achievements.indices.filter { isQuoteOfAVerb(subject.achievements[$0], of: subject) }),
-            holders: holders
+            holders: holders,
+            ownHolder: subject.holder
         )
     }
 
@@ -353,7 +354,8 @@ struct Grounding {
     /// and names the entry, or in one that names no other entry and holds nothing but explained words, the person's own quotes among
     /// them. A title that the description gives only in the clause of another entry ("head nurse at Beta"), or in one about someone
     /// else ("my sister is a nurse at Acme"), is not this entry's, nor is a word of the name of an employer or a school
-    /// ("contabile" in "Studio Contabile Merlini"): it stands as the title only outside those names. A clause of no entry says
+    /// ("contabile" in "Studio Contabile Merlini"), nor the whole of the entry's own ("contabile" for a job at "Contabile", unless the
+    /// clause writes it once more): it stands as the title only outside those names. A clause of no entry says
     /// what the person is now ("I am a nurse in Leeds"): for a job that the description says is over it states no title, so the
     /// title stands there only if the clause of the job gives it. A degree persists.
     func supportsTitle(_ title: [String], of index: Int, person: [[String]]) -> Bool {
@@ -362,7 +364,7 @@ struct Grounding {
         return clauses.places.contains { place in
             guard reading.speaks(at: place) else { return false }
             let clause = facts(at: place, naming: subject.names, by: subject)
-            let spans = clause.standaloneSpans(of: title, amongQuotes: holders)
+            let spans = clause.spans(of: title, besideNames: holders, ownName: subject.holder)
             guard !spans.isEmpty else { return false }
             guard !subject.isEducation || spans.contains(where: { !isOnlyVerbs($0, in: clause) }) else { return false }
             if !subject.isFoundByItsTitle && naming[index].contains(place) { return true }

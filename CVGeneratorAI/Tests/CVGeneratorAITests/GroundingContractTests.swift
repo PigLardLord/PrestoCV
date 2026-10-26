@@ -399,6 +399,7 @@ enum GroundingRows {
         rows += omittedEmployersInManyWords()
         rows += titlesOfOthers()
         rows += aNameGroundsNothingElse()
+        rows += aNameThatIsTheFieldGroundsNothingElse()
         rows += schoolsAndCertifications()
         rows += entryNamesWithoutAnArticle()
         rows += degreesThatNameNoDegree()
@@ -4723,62 +4724,62 @@ enum GroundingRows {
 
     // MARK: The name of an employer or a school grounds nothing but itself (#202)
 
+    private typealias NameVariant = (language: String, name: String, field: String, inName: String, beside: String)
+    private static let nameTitles: [NameVariant] = [
+        ("en", "Greenway Nurse Care", "nurse", "Before that, from 2015 to 2018, I worked at Greenway Nurse Care.",
+         "Before that, from 2015 to 2018, I worked as a nurse at Greenway Nurse Care."),
+        ("it", "Studio Contabile Merlini", "contabile", "Prima, dal 2013 al 2017, ho lavorato allo Studio Contabile Merlini.",
+         "Prima, dal 2013 al 2017, ho lavorato come contabile allo Studio Contabile Merlini."),
+        ("de", "Café Barista Mitte", "Barista", "Davor habe ich von 2016 bis 2019 im Café Barista Mitte gearbeitet.",
+         "Davor habe ich von 2016 bis 2019 als Barista im Café Barista Mitte gearbeitet."),
+        ("es", "Gestoría Contable Aranda", "contable", "Antes, de 2014 a 2018, trabajé en la Gestoría Contable Aranda.",
+         "Antes, de 2014 a 2018, trabajé como contable en la Gestoría Contable Aranda."),
+        ("fr", "Atelier Menuisier Dupont", "menuisier", "Avant, de 2016 à 2020, j'ai travaillé chez Atelier Menuisier Dupont.",
+         "Avant, de 2016 à 2020, j'ai travaillé comme menuisier chez Atelier Menuisier Dupont."),
+        ("pt", "Padaria Padeiro Feliz", "padeiro", "Antes, de 2014 a 2018, trabalhei na Padaria Padeiro Feliz.",
+         "Antes, de 2014 a 2018, trabalhei como padeiro na Padaria Padeiro Feliz."),
+    ]
+    private static let namePlaces: [NameVariant] = [
+        ("en", "Bristol Royal Infirmary", "Bristol", "Before that, from 2015 to 2018, I worked at Bristol Royal Infirmary.",
+         "Before that, from 2015 to 2018, I worked at Bristol Royal Infirmary in Bristol."),
+        ("it", "Clinica Villa Verona", "Verona", "Prima, dal 2013 al 2017, ho lavorato alla Clinica Villa Verona.",
+         "Prima, dal 2013 al 2017, ho lavorato alla Clinica Villa Verona a Verona."),
+        ("de", "Klinikum Kassel Nord", "Kassel", "Davor habe ich von 2016 bis 2019 im Klinikum Kassel Nord gearbeitet.",
+         "Davor habe ich von 2016 bis 2019 im Klinikum Kassel Nord in Kassel gearbeitet."),
+        ("es", "Hospital de Valencia", "Valencia", "Antes, de 2014 a 2018, trabajé en el Hospital de Valencia.",
+         "Antes, de 2014 a 2018, trabajé en el Hospital de Valencia en Valencia."),
+        ("fr", "Hôpital de Lyon", "Lyon", "Avant, de 2016 à 2020, j'ai travaillé à l'Hôpital de Lyon.",
+         "Avant, de 2016 à 2020, j'ai travaillé à l'Hôpital de Lyon à Lyon."),
+        ("pt", "Centro de Saúde de Vale Verde", "Vale Verde", "Antes, de 2014 a 2018, trabalhei no Centro de Saúde de Vale Verde.",
+         "Antes, de 2014 a 2018, trabalhei no Centro de Saúde de Vale Verde em Vale Verde."),
+    ]
+    private static let nameDegrees: [NameVariant] = [
+        ("en", "Nursing College of Leeds", "Nursing", "I studied at the Nursing College of Leeds.",
+         "I studied Nursing at the Nursing College of Leeds."),
+        ("it", "Scuola di Infermieristica Careggi", "Infermieristica", "Ho studiato alla Scuola di Infermieristica Careggi.",
+         "Ho studiato Infermieristica alla Scuola di Infermieristica Careggi."),
+        ("de", "Fachschule für Physiotherapie Kassel", "Physiotherapie", "Ich habe an der Fachschule für Physiotherapie Kassel studiert.",
+         "Ich habe Physiotherapie an der Fachschule für Physiotherapie Kassel studiert."),
+        ("es", "Escuela de Enfermería Turia", "Enfermería", "Estudié en la Escuela de Enfermería Turia.",
+         "Estudié Enfermería en la Escuela de Enfermería Turia."),
+        ("fr", "École de Cuisine Dumas", "Cuisine", "J'ai étudié à l'École de Cuisine Dumas.",
+         "J'ai étudié la Cuisine à l'École de Cuisine Dumas."),
+        ("pt", "Escola de Enfermagem do Mondego", "Enfermagem", "Estudei na Escola de Enfermagem do Mondego.",
+         "Estudei Enfermagem na Escola de Enfermagem do Mondego."),
+    ]
+    private static let nameDates: [String: (from: String, to: String)] = [
+        "en": ("2015", "2018"), "it": ("2013", "2017"), "de": ("2016", "2019"), "es": ("2014", "2018"), "fr": ("2016", "2020"),
+        "pt": ("2014", "2018"),
+    ]
+
     /// ADR 0023, rule (b): a quote is a statement only where the description says it as itself. The words of the name of an
     /// employer or a school are not a statement about a title, a place or a degree: "contabile" in "Studio Contabile Merlini" is not
     /// the job of the person, nor "Vale Verde" in "Centro de Saúde de Vale Verde" its place. The same word beside the name, or in
     /// a clause of its own, stays.
     private static func aNameGroundsNothingElse() -> [GroundingRow] {
-        typealias Variant = (language: String, name: String, field: String, inName: String, beside: String)
-        let titles: [Variant] = [
-            ("en", "Greenway Nurse Care", "nurse", "Before that, from 2015 to 2018, I worked at Greenway Nurse Care.",
-             "Before that, from 2015 to 2018, I worked as a nurse at Greenway Nurse Care."),
-            ("it", "Studio Contabile Merlini", "contabile", "Prima, dal 2013 al 2017, ho lavorato allo Studio Contabile Merlini.",
-             "Prima, dal 2013 al 2017, ho lavorato come contabile allo Studio Contabile Merlini."),
-            ("de", "Café Barista Mitte", "Barista", "Davor habe ich von 2016 bis 2019 im Café Barista Mitte gearbeitet.",
-             "Davor habe ich von 2016 bis 2019 als Barista im Café Barista Mitte gearbeitet."),
-            ("es", "Gestoría Contable Aranda", "contable", "Antes, de 2014 a 2018, trabajé en la Gestoría Contable Aranda.",
-             "Antes, de 2014 a 2018, trabajé como contable en la Gestoría Contable Aranda."),
-            ("fr", "Atelier Menuisier Dupont", "menuisier", "Avant, de 2016 à 2020, j'ai travaillé chez Atelier Menuisier Dupont.",
-             "Avant, de 2016 à 2020, j'ai travaillé comme menuisier chez Atelier Menuisier Dupont."),
-            ("pt", "Padaria Padeiro Feliz", "padeiro", "Antes, de 2014 a 2018, trabalhei na Padaria Padeiro Feliz.",
-             "Antes, de 2014 a 2018, trabalhei como padeiro na Padaria Padeiro Feliz."),
-        ]
-        let places: [Variant] = [
-            ("en", "Bristol Royal Infirmary", "Bristol", "Before that, from 2015 to 2018, I worked at Bristol Royal Infirmary.",
-             "Before that, from 2015 to 2018, I worked at Bristol Royal Infirmary in Bristol."),
-            ("it", "Clinica Villa Verona", "Verona", "Prima, dal 2013 al 2017, ho lavorato alla Clinica Villa Verona.",
-             "Prima, dal 2013 al 2017, ho lavorato alla Clinica Villa Verona a Verona."),
-            ("de", "Klinikum Kassel Nord", "Kassel", "Davor habe ich von 2016 bis 2019 im Klinikum Kassel Nord gearbeitet.",
-             "Davor habe ich von 2016 bis 2019 im Klinikum Kassel Nord in Kassel gearbeitet."),
-            ("es", "Hospital de Valencia", "Valencia", "Antes, de 2014 a 2018, trabajé en el Hospital de Valencia.",
-             "Antes, de 2014 a 2018, trabajé en el Hospital de Valencia en Valencia."),
-            ("fr", "Hôpital de Lyon", "Lyon", "Avant, de 2016 à 2020, j'ai travaillé à l'Hôpital de Lyon.",
-             "Avant, de 2016 à 2020, j'ai travaillé à l'Hôpital de Lyon à Lyon."),
-            ("pt", "Centro de Saúde de Vale Verde", "Vale Verde", "Antes, de 2014 a 2018, trabalhei no Centro de Saúde de Vale Verde.",
-             "Antes, de 2014 a 2018, trabalhei no Centro de Saúde de Vale Verde em Vale Verde."),
-        ]
-        let degrees: [Variant] = [
-            ("en", "Nursing College of Leeds", "Nursing", "I studied at the Nursing College of Leeds.",
-             "I studied Nursing at the Nursing College of Leeds."),
-            ("it", "Scuola di Infermieristica Careggi", "Infermieristica", "Ho studiato alla Scuola di Infermieristica Careggi.",
-             "Ho studiato Infermieristica alla Scuola di Infermieristica Careggi."),
-            ("de", "Fachschule für Physiotherapie Kassel", "Physiotherapie", "Ich habe an der Fachschule für Physiotherapie Kassel studiert.",
-             "Ich habe Physiotherapie an der Fachschule für Physiotherapie Kassel studiert."),
-            ("es", "Escuela de Enfermería Turia", "Enfermería", "Estudié en la Escuela de Enfermería Turia.",
-             "Estudié Enfermería en la Escuela de Enfermería Turia."),
-            ("fr", "École de Cuisine Dumas", "Cuisine", "J'ai étudié à l'École de Cuisine Dumas.",
-             "J'ai étudié la Cuisine à l'École de Cuisine Dumas."),
-            ("pt", "Escola de Enfermagem do Mondego", "Enfermagem", "Estudei na Escola de Enfermagem do Mondego.",
-             "Estudei Enfermagem na Escola de Enfermagem do Mondego."),
-        ]
-        let dates: [String: (from: String, to: String)] = [
-            "en": ("2015", "2018"), "it": ("2013", "2017"), "de": ("2016", "2019"), "es": ("2014", "2018"), "fr": ("2016", "2020"),
-            "pt": ("2014", "2018"),
-        ]
-
         var rows: [GroundingRow] = []
-        for v in titles {
-            let years = dates[v.language] ?? ("2015", "2018")
+        for v in nameTitles {
+            let years = nameDates[v.language] ?? ("2015", "2018")
             let draft = CVData(experience: [job(v.field, v.name, from: years.from, to: years.to)])
             rows.append(row("the-name-of-an-employer-gives-no-title-\(v.language)",
                             "\(v.field) is a word of the name of the employer, and the description gives no title for the job: the title goes",
@@ -4788,8 +4789,8 @@ enum GroundingRows {
                             "\(v.field) stands as itself before the name of the employer: it stays",
                             v.beside, draft, .unchanged, language: v.language))
         }
-        for v in places {
-            let years = dates[v.language] ?? ("2015", "2018")
+        for v in namePlaces {
+            let years = nameDates[v.language] ?? ("2015", "2018")
             let draft = CVData(experience: [job("", v.name, from: years.from, to: years.to, location: v.field)])
             rows.append(row("the-name-of-an-employer-gives-no-place-\(v.language)",
                             "\(v.field) is a word of the name of the employer, and the description gives no place for the job: the place goes",
@@ -4799,7 +4800,7 @@ enum GroundingRows {
                             "\(v.field) stands as itself after the name of the employer: it stays",
                             v.beside, draft, .unchanged, language: v.language))
         }
-        for v in degrees {
+        for v in nameDegrees {
             let draft = CVData(education: [study(v.field, at: v.name)])
             rows.append(row("the-name-of-a-school-gives-no-degree-\(v.language)",
                             "\(v.field) is a word of the name of the school, and the description gives no degree: the degree goes",
@@ -4809,6 +4810,133 @@ enum GroundingRows {
                             "\(v.field) stands as itself before the name of the school: it stays",
                             v.beside, draft, .unchanged, language: v.language))
         }
+        return rows
+    }
+
+    // MARK: A name that is the whole field grounds nothing else (#202)
+
+    /// The same rule when the name of the employer or the school is the very text of the field: the model copies "Bristol Royal
+    /// Infirmary" into the place of the job it names, the employer into the title, the school into the degree. Every occurrence of
+    /// the text is then the name's, and the field stands only where the clause writes the text once more than the name takes ("I
+    /// worked at Bristol in Bristol"). A name of a longer text than the field is the rule above.
+    private static func aNameThatIsTheFieldGroundsNothingElse() -> [GroundingRow] {
+        typealias Single = (language: String, name: String, inName: String, twice: String)
+        let titles: [Single] = [
+            ("en", "Barista", "Before that, from 2015 to 2018, I worked at Barista.",
+             "Before that, from 2015 to 2018, I worked as a Barista at Barista."),
+            ("it", "Cuoco", "Prima, dal 2013 al 2017, ho lavorato da Cuoco.",
+             "Prima, dal 2013 al 2017, ho lavorato come Cuoco da Cuoco."),
+            ("de", "Barista", "Davor habe ich von 2016 bis 2019 bei Barista gearbeitet.",
+             "Davor habe ich von 2016 bis 2019 als Barista bei Barista gearbeitet."),
+            ("es", "Panadero", "Antes, de 2014 a 2018, trabajé en Panadero.",
+             "Antes, de 2014 a 2018, trabajé como Panadero en Panadero."),
+            ("fr", "Menuisier", "Avant, de 2016 à 2020, j'ai travaillé chez Menuisier.",
+             "Avant, de 2016 à 2020, j'ai travaillé comme Menuisier chez Menuisier."),
+            ("pt", "Padeiro", "Antes, de 2014 a 2018, trabalhei no Padeiro.",
+             "Antes, de 2014 a 2018, trabalhei como Padeiro no Padeiro."),
+        ]
+        let places: [Single] = [
+            ("en", "Bristol", "Before that, from 2015 to 2018, I worked at Bristol.",
+             "Before that, from 2015 to 2018, I worked at Bristol in Bristol."),
+            ("it", "Verona", "Prima, dal 2013 al 2017, ho lavorato presso Verona.",
+             "Prima, dal 2013 al 2017, ho lavorato presso Verona a Verona."),
+            ("de", "Kassel", "Davor habe ich von 2016 bis 2019 bei Kassel gearbeitet.",
+             "Davor habe ich von 2016 bis 2019 bei Kassel in Kassel gearbeitet."),
+            ("es", "Valencia", "Antes, de 2014 a 2018, trabajé en Valencia.",
+             "Antes, de 2014 a 2018, trabajé en Valencia en Valencia."),
+            ("fr", "Lyon", "Avant, de 2016 à 2020, j'ai travaillé chez Lyon.",
+             "Avant, de 2016 à 2020, j'ai travaillé chez Lyon à Lyon."),
+            ("pt", "Coimbra", "Antes, de 2014 a 2018, trabalhei na Coimbra.",
+             "Antes, de 2014 a 2018, trabalhei na Coimbra em Coimbra."),
+        ]
+        let degrees: [Single] = [
+            ("en", "Cookery", "I studied at Cookery.", "I studied Cookery at Cookery."),
+            ("it", "Infermieristica", "Ho studiato a Infermieristica.", "Ho studiato Infermieristica a Infermieristica."),
+            ("de", "Physiotherapie", "Ich habe bei Physiotherapie studiert.", "Ich habe Physiotherapie bei Physiotherapie studiert."),
+            ("es", "Enfermería", "Estudié en Enfermería.", "Estudié Enfermería en Enfermería."),
+            ("fr", "Cuisine", "J'ai étudié à Cuisine.", "J'ai étudié la Cuisine à Cuisine."),
+            ("pt", "Enfermagem", "Estudei em Enfermagem.", "Estudei Enfermagem em Enfermagem."),
+        ]
+
+        var rows: [GroundingRow] = []
+        for v in nameTitles {
+            let years = nameDates[v.language] ?? ("2015", "2018")
+            rows.append(row("a-copy-of-the-name-of-an-employer-gives-no-title-\(v.language)",
+                            "the title \(v.name) is the name of the employer, copied: the title goes",
+                            v.inName, CVData(experience: [job(v.name, v.name, from: years.from, to: years.to)]),
+                            .keeping([Drop("experience[0].title", "the title is the name of the employer")]), language: v.language))
+        }
+        for v in namePlaces {
+            let years = nameDates[v.language] ?? ("2015", "2018")
+            rows.append(row("a-copy-of-the-name-of-an-employer-gives-no-place-\(v.language)",
+                            "the place \(v.name) is the name of the employer, copied: the place goes",
+                            v.inName, CVData(experience: [job("", v.name, from: years.from, to: years.to, location: v.name)]),
+                            .keeping([Drop("experience[0].location", "the place is the name of the employer")]), language: v.language))
+        }
+        for v in nameDegrees {
+            rows.append(row("a-copy-of-the-name-of-a-school-gives-no-degree-\(v.language)",
+                            "the degree \(v.name) is the name of the school, copied: the degree goes",
+                            v.inName, CVData(education: [study(v.name, at: v.name)]),
+                            .keeping([Drop("education[0].degree", "the degree is the name of the school")]), language: v.language))
+        }
+        for v in titles {
+            let years = nameDates[v.language] ?? ("2015", "2018")
+            let draft = CVData(experience: [job(v.name, v.name, from: years.from, to: years.to)])
+            rows.append(row("an-employer-named-as-the-title-gives-no-title-\(v.language)",
+                            "\(v.name) is the employer and nothing else in the clause: the title goes",
+                            v.inName, draft, .keeping([Drop("experience[0].title", "the title is the name of the employer")]),
+                            language: v.language))
+            rows.append(row("a-title-written-again-beside-the-employer-stays-\(v.language)",
+                            "\(v.name) is written twice, once as the employer and once as the title: it stays as both",
+                            v.twice, draft, .unchanged, language: v.language))
+        }
+        for v in places {
+            let years = nameDates[v.language] ?? ("2015", "2018")
+            let draft = CVData(experience: [job("", v.name, from: years.from, to: years.to, location: v.name)])
+            rows.append(row("an-employer-named-as-the-place-gives-no-place-\(v.language)",
+                            "\(v.name) is the employer and nothing else in the clause: the place goes",
+                            v.inName, draft, .keeping([Drop("experience[0].location", "the place is the name of the employer")]),
+                            language: v.language))
+            rows.append(row("a-place-written-again-beside-the-employer-stays-\(v.language)",
+                            "\(v.name) is written twice, once as the employer and once as the place: it stays as both",
+                            v.twice, draft, .unchanged, language: v.language))
+        }
+        for v in degrees {
+            let draft = CVData(education: [study(v.name, at: v.name)])
+            rows.append(row("a-school-named-as-the-degree-gives-no-degree-\(v.language)",
+                            "\(v.name) is the school and nothing else in the clause: the degree goes",
+                            v.inName, draft, .keeping([Drop("education[0].degree", "the degree is the name of the school")]),
+                            language: v.language))
+            rows.append(row("a-degree-written-again-beside-the-school-stays-\(v.language)",
+                            "\(v.name) is written twice, once as the school and once as the degree: it stays as both",
+                            v.twice, draft, .unchanged, language: v.language))
+        }
+
+        // The name that is the whole field is the entry's own: the name of another entry says nothing about this one.
+        rows.append(row("an-issuer-named-as-the-employer-of-another-entry-stays-en",
+                        "Siemens is the employer of the job, and the issuer of the BLS in the clause of the BLS: the issuer stays",
+                        "I worked at Siemens from 2015 to 2018. I have a BLS from Siemens.",
+                        CVData(experience: [job("", "Siemens", from: "2015", to: "2018")],
+                               certifications: [Certification(name: "BLS", issuer: "Siemens")]),
+                        .unchanged))
+        rows.append(row("an-issuer-named-as-the-employer-of-another-entry-stays-it",
+                        "Siemens is the employer of the job, and the issuer of the BLS in the clause of the BLS: the issuer stays",
+                        "Ho lavorato presso Siemens dal 2015 al 2018. Ho un BLS di Siemens.",
+                        CVData(experience: [job("", "Siemens", from: "2015", to: "2018")],
+                               certifications: [Certification(name: "BLS", issuer: "Siemens")]),
+                        .unchanged, language: "it"))
+        rows.append(row("a-place-named-as-the-school-of-another-entry-stays-en",
+                        "Lincoln is the school of the study, and the place of the job in the clause of the job: the place stays",
+                        "I studied Law at Lincoln from 2010 to 2014. I worked at Acme in Lincoln from 2015 to 2018.",
+                        CVData(experience: [job("", "Acme", from: "2015", to: "2018", location: "Lincoln")],
+                               education: [study("Law", at: "Lincoln", from: "2010", to: "2014")]),
+                        .unchanged))
+        rows.append(row("a-place-named-as-the-school-of-another-entry-stays-it",
+                        "Ferrara is the school of the study, and the place of the job in the clause of the job: the place stays",
+                        "Ho studiato Giurisprudenza a Ferrara dal 2010 al 2014. Ho lavorato presso Acme a Ferrara dal 2015 al 2018.",
+                        CVData(experience: [job("", "Acme", from: "2015", to: "2018", location: "Ferrara")],
+                               education: [study("Giurisprudenza", at: "Ferrara", from: "2010", to: "2014")]),
+                        .unchanged, language: "it"))
         return rows
     }
 
