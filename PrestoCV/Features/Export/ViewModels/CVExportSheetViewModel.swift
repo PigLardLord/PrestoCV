@@ -96,6 +96,10 @@ final class CVExportSheetViewModel: ObservableObject {
     private var generation = 0
     /// The sheet is on screen, from `start()` to `stop()`: a change of the selection makes its preview
     private var isShown = false
+    /// The full PDF covers the sheet, from `showFullPDF()` until the cover itself has gone (`fullPDFDidDismiss()`). It
+    /// is told by the cover and not read from `fullPDF`: Done clears `fullPDF` at once, while the cover is still on its
+    /// way out and the sheet is still going on and off screen under it.
+    private var isCovered = false
     /// The selection is being set to the look the CV keeps, which is not a choice of the person
     private var isStartingFromTheCVsLook = false
 
@@ -158,11 +162,6 @@ final class CVExportSheetViewModel: ObservableObject {
         sharePDF.map { String(format: String(localized: "export.page_count"), $0.pageCount) }
     }
 
-    /// The PDF can be opened full screen once it is rendered
-    var canShowFullPDF: Bool {
-        sharePDF != nil
-    }
-
     /// What the preview says to VoiceOver when it shows the pages of the PDF, which a tap opens full screen: "Show the
     /// full PDF, 2 pages"; nil until the PDF is rendered
     var fullPDFAccessibilityLabel: String? {
@@ -213,6 +212,16 @@ final class CVExportSheetViewModel: ObservableObject {
             documentLanguage: cv.chosenDocumentLanguage
         )
         automaticDocumentLanguage = documentLanguageDetector.automaticLanguage(for: cv)
+    }
+
+    /// The sheet was torn down without going off screen, as when it is closed from outside while the full PDF covers it:
+    /// the PDF it made is removed with it, as `stop()` does.
+    isolated deinit {
+        guard let staleFile = sharePDF?.url else { return }
+        let service = exportService
+        Task {
+            await service.cleanupTempFile(at: staleFile)
+        }
     }
 
     /// The sheet shows: the templates are loaded, which selects the CV's own design and so makes the first preview.
@@ -276,6 +285,7 @@ final class CVExportSheetViewModel: ObservableObject {
     @discardableResult
     func stop() -> Task<Void, Never> {
         isShown = false
+        isCovered = false
         refreshTask?.cancel()
         refreshTask = nil
         generation += 1
@@ -292,23 +302,34 @@ final class CVExportSheetViewModel: ObservableObject {
         }
     }
 
-    /// The sheet's content went off screen. When the full PDF covers the sheet it has not gone away, and its PDF stays
+    /// The sheet's content went off screen. While the full PDF covers the sheet it has not gone away, and its PDF stays
     /// for the full PDF to show and the button to share; otherwise the sheet is closing, as in `stop()`.
+    ///
+    /// The cover decides, not the PDF it shows: a Done before the cover is fully up clears `fullPDF` before the sheet
+    /// goes off screen, and the sheet is back on screen right after. Only the cover going away ends the covering.
     /// - Returns: The task that removes the file, for a caller that wants to wait for it
     @discardableResult
     func sheetDisappeared() -> Task<Void, Never> {
-        guard fullPDF == nil else { return Task {} }
+        guard !isCovered else { return Task {} }
         return stop()
     }
 
     /// Opens the PDF that the button shares full screen, over the sheet; nothing opens until the PDF is rendered
     func showFullPDF() {
-        fullPDF = sharePDF
+        guard let pdf = sharePDF else { return }
+        fullPDF = pdf
+        isCovered = true
     }
 
-    /// Closes the full PDF, back to the sheet as it was: the PDF and the choices are kept
+    /// Closes the full PDF, back to the sheet as it was: the PDF and the choices are kept. The cover is still on screen
+    /// until it tells that it has gone (`fullPDFDidDismiss()`).
     func closeFullPDF() {
         fullPDF = nil
+    }
+
+    /// The cover of the full PDF has gone: the sheet is the one on screen again
+    func fullPDFDidDismiss() {
+        isCovered = false
     }
 
     /// The preview could not be shown by the web view; a cancelled load is not a failure

@@ -121,7 +121,9 @@ struct CVExportSheetView: View {
         .fullScreenCover(item: Binding(
             get: { viewModel.fullPDF },
             set: { if $0 == nil { viewModel.closeFullPDF() } }
-        )) { pdf in
+        ), onDismiss: {
+            viewModel.fullPDFDidDismiss()
+        }) { pdf in
             FullPDFView(pdf: pdf) { viewModel.closeFullPDF() }
         }
         // Where the sheet does not fill the screen, as on iPad, it is as tall as a page: the preview keeps its room
