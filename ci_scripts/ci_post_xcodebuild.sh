@@ -32,7 +32,7 @@ case "$ACTION" in
     step "$ROOT/Tools/Release/check-archive.sh" "${CI_ARCHIVE_PATH:?ci_post_xcodebuild: CI_ARCHIVE_PATH is not set}"
     ;;
   build-for-testing)
-    for package in PrestoCVCore CVPDFExporter CVGeneratorAI; do
+    for package in DiagnosticLogging PrestoCVCore CVPDFExporter CVGeneratorAI; do
       step swift test --package-path "$ROOT/$package"
     done
     step swift test --package-path "$ROOT/Tools/SourceChecks"

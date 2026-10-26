@@ -18,7 +18,7 @@ The checker applies to **production targets**: domain, application, integration,
 
 ## R1. Packages are isolated; contexts depend only along documented edges
 
-- **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI` never import one another. Translation between them happens only in `PrestoCVIntegration`.
+- **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI` never import one another. Translation between them happens only in `PrestoCVIntegration`. Each may import `DiagnosticLogging`, a leaf package with no product types, and only its port target ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)).
 - **Inside a package, contexts depend only along the edges listed in [modules.md](modules.md).** There are two such edges today, and each goes one way:
   - in `CVPDFExporter`, Document Rendering is downstream of Design Catalog (`CVRendering` imports `CVDesignCatalog`);
   - in `PrestoCVCore`, CV Import is downstream of CV Authoring (`PrestoCVImporting` imports `PrestoCVDomain`), so that it reads the CV's value objects and period rule instead of copying them ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)).
@@ -256,7 +256,7 @@ A test target that a test plan runs, on a simulator or a device, reads files onl
 - **Resources the app ships**, such as the example CVs, are read from the app bundle the tests run in.
 - **A package's test resources** are declared in its manifest and read through `Bundle.module`. The markup contract page is one: `CVDesignCatalogTests` copies it.
 - **A document that an app test compares with the app**, such as `docs/design/app-icon.md`, is copied into the test bundle by the project.
-- **Checks of source text** are tests of the `Tools/SourceChecks` package ([modules.md](modules.md#tools)). `swift test` runs them where the repository is: on the Linux CI job, on the Mac mini's pull request check and on the Xcode Cloud build host. They cover the string catalog, the rules the app's views follow and release hygiene. A check that also needs the app's types or UIKit stays an app test, fed from a bundle.
+- **Checks of source text** are tests of the `Tools/SourceChecks` package ([modules.md](modules.md#tools)). `swift test` runs them where the repository is: on the Linux CI job, on the Mac mini's pull request check and on the Xcode Cloud build host. They cover the string catalog, the rules the app's views follow, how the tests render views off screen and release hygiene. A check that also needs the app's types or UIKit stays an app test, fed from a bundle.
 - `#filePath` and `#file` may still be the default value of a `StaticString` parameter, while the function only forwards it, unchanged, as the `file:` argument of a call. That is how XCTest reports where an assertion failed. Any other use of the parameter is refused: `String(describing:)`, an interpolation, `.description`, `withUTF8Buffer` or a copy into a variable can turn it into a path of the checkout.
 - A test that writes into the checkout on purpose, behind an environment variable that only a developer sets, is an exception in `rules.json`. Two exist: the golden file's update ([ADR 0011](adr/0011-typed-html-builder.md)) and the thumbnails of version 1's bundled designs ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)).
 

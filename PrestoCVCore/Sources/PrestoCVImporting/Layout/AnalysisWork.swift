@@ -11,11 +11,11 @@ struct AnalysisWork {
     }
 
     /// Counts the steps of a pass.
-    /// - Throws: `CancellationError` once the task is cancelled; `ImportError.tooLarge` past the budget.
+    /// - Throws: `CancellationError` once the task is cancelled; `LimitReached` with its steps past the budget.
     mutating func count(_ steps: Int) throws {
         try Task.checkCancellation()
         self.steps += steps
-        guard self.steps <= budget else { throw ImportError.tooLarge }
+        guard self.steps <= budget else { throw LimitReached(.steps) }
     }
 
     /// The steps of a sort of `count` elements, or of as many binary searches in them.

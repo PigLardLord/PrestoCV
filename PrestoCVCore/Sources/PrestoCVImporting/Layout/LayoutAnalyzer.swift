@@ -12,10 +12,10 @@ enum LayoutAnalyzer {
         var leftOut: [LeftOutText]
     }
 
-    /// - Throws: `ImportError.tooLarge` over the limits of words, lines, cells or steps; `CancellationError`.
+    /// - Throws: `LimitReached` over the limits of words, lines, cells or steps; `CancellationError`.
     static func analyze(_ pages: [ExtractedPage], limits: ImportLimits, work: inout AnalysisWork) throws -> Analysis {
         let wordCount = pages.reduce(0) { $0 + $1.words.count }
-        guard wordCount <= limits.maximumWords else { throw ImportError.tooLarge }
+        guard wordCount <= limits.maximumWords else { throw LimitReached(.words) }
         try work.count(wordCount)
         var leftOut: [LeftOutText] = []
         var pageLines: [[PageLine]] = []
@@ -27,14 +27,14 @@ enum LayoutAnalyzer {
         for page in pages {
             let groups = try lineWords(of: page, work: &work)
             lineCount += groups.count
-            guard lineCount <= limits.maximumLines else { throw ImportError.tooLarge }
+            guard lineCount <= limits.maximumLines else { throw LimitReached(.lines) }
             pageGroups.append(groups)
         }
         let headings = try HeadingRails(lines: pageGroups, of: pages, bodySize: bodySize, work: &work)
         for (index, groups) in pageGroups.enumerated() {
             let found = lines(of: groups, headingEnds: headings.headingEnds[index], number: index + 1)
             cellCount += found.reduce(0) { $0 + $1.cells.count }
-            guard cellCount <= limits.maximumCells else { throw ImportError.tooLarge }
+            guard cellCount <= limits.maximumCells else { throw LimitReached(.cells) }
             pageLines.append(found)
         }
         try work.count(2 * lineCount)
