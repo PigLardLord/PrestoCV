@@ -2,12 +2,12 @@
 # Makes the App Store screenshots of every locale of docs/release/store-listing.md: captures six screens per language
 # of the app on simulators, then puts each caption of the listing above its screenshot, at the store size.
 #
-#   Tools/Release/store-screenshots.sh --output <dir> [--devices iphone-6.3,iphone,ipad] [--languages en,de,es,fr,it,pt]
+#   Tools/Release/store-screenshots.sh --output <dir> [--devices iphone,ipad] [--languages en,de,es,fr,it,pt]
 #                                      [--ios <version>] [--simulator-prefix <name>] [--compose-only] [--listing <file>]
 #
 # Runs on a Mac with Xcode 27 or later. Devices:
 #   iphone      iPhone 6.9-inch, on an iPhone 17 Pro Max: 1320 x 2868
-#   iphone-6.3  iPhone 6.3-inch, on an iPhone 17 Pro: 1206 x 2622
+#   iphone-6.3  iPhone 6.3-inch, on an iPhone 17 Pro: 1206 x 2622 (not in the default: only if App Store Connect asks for it)
 #   ipad        iPad 13-inch, on an iPad Pro 13-inch (M5): 2064 x 2752
 #
 # For each device it uses the simulator "<prefix> <device>" (default prefix "PrestoCV store"), made on the first run
@@ -28,7 +28,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-OUTPUT=""; DEVICES="iphone-6.3,iphone,ipad"; LANGUAGES="en,de,es,fr,it,pt"; IOS=""; PREFIX="PrestoCV store"; COMPOSE_ONLY=0
+OUTPUT=""; DEVICES="iphone,ipad"; LANGUAGES="en,de,es,fr,it,pt"; IOS=""; PREFIX="PrestoCV store"; COMPOSE_ONLY=0
 LISTING="$ROOT/docs/release/store-listing.md"
 while [ $# -gt 0 ]; do
     case "$1" in
