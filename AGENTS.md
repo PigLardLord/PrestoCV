@@ -20,7 +20,7 @@
 - `swift test --package-path Tools/SourceChecks` runs the checks of source text: the string catalog, the rules the app's views follow, how the tests render views off screen, release hygiene. They read the repository, so they are not in the test plans.
 - CI runs on every pull request:
   - on GitHub Actions (`.github/workflows/ci.yml`), on Linux: the architecture check (with the baseline compared to the base branch), its self-test and the source checks; and, in a job of its own, the build of every Linux target for Android with the Swift SDK for Android (ADR 0026);
-  - on Xcode Cloud, on macOS (ADR 0024): the architecture check and its self-test, the package tests, the source checks, the builds of `PrestoCVApp` and `CVPDFExporterExamples`, and the `CI` test plan (the app tests and the exporter's simulator tests) on an iPhone and an iPad simulator, on machines that have only the built products. Xcode Cloud also builds and uploads releases to TestFlight; its settings are in `docs/release/xcode-cloud.md`.
+  - on the Mac mini, on macOS (ADR 0029): the commit status `Mac mini · CI` on the head commit. It holds the `CI` test plan (the app tests and the exporter's simulator tests) on an iPhone and an iPad simulator, and `ci_scripts/ci_post_xcodebuild.sh`: the architecture check and its self-test, the package tests, the source checks, the builds of `PrestoCVApp` and `CVPDFExporterExamples`. A pull request merges when its branch contains the latest `main` and the checks are green on its head, `Mac mini · CI` included unless the pull request changes only `docs/` and `*.md` files. Xcode Cloud checks no pull request: it tests, archives and uploads releases to TestFlight (ADR 0024), and its settings and the check's are in `docs/release/xcode-cloud.md`.
 - `open PrestoCV.xcodeproj` launches Xcode with the configured schemes; prefer running previews via the `PrestoCV` scheme.
 
 ## Coding Style & Naming Conventions
@@ -34,7 +34,7 @@
 - Prefer lightweight spies like the mocks in `PrestoCVTests/PrestoCVTests.swift:18` and assert with `#expect` to keep diagnostics consistent.
 - Aim for full coverage on onboarding and exporting flows before requesting review; add regression tests before modifying core models.
 - Run both `swift test` and simulator-based UI tests for changes touching navigation or exporter integrations.
-- A test that a test plan runs reads files only from bundles: the app's resources from the app bundle, a package's test resources through `Bundle.module`. Xcode Cloud runs the plans on machines without the repository, so a check that reads source text goes into `Tools/SourceChecks` (R16).
+- A test that a test plan runs reads files only from bundles: the app's resources from the app bundle, a package's test resources through `Bundle.module`. The Test action of the Release workflow runs the plans on machines without the repository, so a check that reads source text goes into `Tools/SourceChecks` (R16).
 
 ## Reviews
 - **Delta only.** Each review round covers only what changed since the last reviewed commit. Record that commit locally as `refs/reviewed/<branch>`, and list the reviewed commits in the pull request so another machine can continue. A full-branch review happens twice at most: the first one and the final gate. Commit before reviewing, because reviews read commits, not the working tree.

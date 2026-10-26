@@ -256,7 +256,7 @@ A test target that a test plan runs, on a simulator or a device, reads files onl
 - **Resources the app ships**, such as the example CVs, are read from the app bundle the tests run in.
 - **A package's test resources** are declared in its manifest and read through `Bundle.module`. The markup contract page is one: `CVDesignCatalogTests` copies it.
 - **A document that an app test compares with the app**, such as `docs/design/app-icon.md`, is copied into the test bundle by the project.
-- **Checks of source text** are tests of the `Tools/SourceChecks` package ([modules.md](modules.md#tools)). `swift test` runs them where the repository is: on the Linux CI job and on the Xcode Cloud build host. They cover the string catalog, the rules the app's views follow, how the tests render views off screen and release hygiene. A check that also needs the app's types or UIKit stays an app test, fed from a bundle.
+- **Checks of source text** are tests of the `Tools/SourceChecks` package ([modules.md](modules.md#tools)). `swift test` runs them where the repository is: on the Linux CI job, on the Mac mini's pull request check and on the Xcode Cloud build host. They cover the string catalog, the rules the app's views follow, how the tests render views off screen and release hygiene. A check that also needs the app's types or UIKit stays an app test, fed from a bundle.
 - `#filePath` and `#file` may still be the default value of a `StaticString` parameter, while the function only forwards it, unchanged, as the `file:` argument of a call. That is how XCTest reports where an assertion failed. Any other use of the parameter is refused: `String(describing:)`, an interpolation, `.description`, `withUTF8Buffer` or a copy into a variable can turn it into a path of the checkout.
 - A test that writes into the checkout on purpose, behind an environment variable that only a developer sets, is an exception in `rules.json`. Two exist: the golden file's update ([ADR 0011](adr/0011-typed-html-builder.md)) and the thumbnails of version 1's bundled designs ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)).
 
@@ -267,7 +267,7 @@ Legacy test targets follow this rule too, since the same test plan runs them.
 **Enforced by:**
 - **checker:** the `sourceTreePath` detector, in every target whose rules list R16, legacy targets included.
 - **checker:** every `.xctestplan` in the repository is read. A target that a plan runs must be in `rules.json` and must have R16.
-- **CI:** Xcode Cloud's Test action, which runs the tests without the repository.
+- **CI:** the Test action of Xcode Cloud's Release workflow, which runs the tests without the repository.
 
 ## R17. Dependencies come in through the initialiser
 
