@@ -110,12 +110,6 @@ public struct ImportCV: Sendable {
         }
     }
 
-    /// Reads what a PDF reader saw, without logging. Lets `CancellationError` through; a bound of the limits reached is
-    /// a `LimitReached`, and every other failure an `ImportError`.
-    func read(_ layout: ExtractedLayout) throws -> ImportResult {
-        try reading(layout).reading.result
-    }
-
     // MARK: Reading
 
     private func readText(_ text: String) throws -> CVReader.Reading {

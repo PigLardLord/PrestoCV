@@ -1,3 +1,5 @@
+import DiagnosticLogging
+import DiagnosticLoggingTestSupport
 import Foundation
 import Testing
 @testable import PrestoCVImporting
@@ -190,7 +192,7 @@ struct ReadingWorkTests {
     }
 
     @Test("A PDF's reading counts against the budget of its analysis")
-    func theReadingOfAPDFSharesTheBudget() throws {
+    func theReadingOfAPDFSharesTheBudget() async throws {
         let pages = pages(lines: 800)
         var probe = AnalysisWork(budget: .max / 2)
         let analysis = try LayoutAnalyzer.analyze(pages, limits: limits(steps: .max / 2), work: &probe)
@@ -199,9 +201,15 @@ struct ReadingWorkTests {
         // The analysis alone fits its budget, and the 640 thousand readings of the dates do not fit what is left
         let analysed = probe.steps
         let layout = ExtractedLayout.pages(pages)
-        let tight = ImportCV(pdfReader: ScriptedPDFReader(layout: layout), limits: limits(steps: analysed + 300_000))
-        #expect(failure(of: { try tight.read(layout) }) as? LimitReached == LimitReached(.steps))
+        let logger = RecordingLogger()
+        let tight = ImportCV(
+            pdfReader: ScriptedPDFReader(layout: layout), limits: limits(steps: analysed + 300_000), logger: logger, clock: ContinuousClock()
+        )
+        var failure: (any Error)?
+        do { _ = try await tight.importPDF(Data([1])) } catch { failure = error }
+        #expect(failure as? ImportError == .tooLarge)
+        #expect(logger.entry("import.failed")?.fields.contains(.token("limit", "steps")) == true)
         let roomy = ImportCV(pdfReader: ScriptedPDFReader(layout: layout), limits: limits(steps: analysed + 3_000_000))
-        #expect(try roomy.read(layout).cv.experience.count == 2)
+        #expect(try await roomy.importPDF(Data([1])).cv.experience.count == 2)
     }
 }

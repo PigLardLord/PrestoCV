@@ -84,9 +84,9 @@ struct SilentLossTests {
     // MARK: The corpus
 
     @Test("Every line of every fixture is in a value, in the text not imported, in the text left out or in a heading")
-    func corpus() throws {
+    func corpus() async throws {
         for entry in try Corpus.entries() {
-            let result = try Corpus.importResult(of: entry)
+            let result = try await Corpus.importResult(of: entry)
             let lost = Coverage.lost(result)
             #expect(lost.isEmpty, "\(entry.id): lost \(Coverage.describe(lost))")
             #expect(Coverage.overlaps(result.unplaced).isEmpty, "\(entry.id): shown twice \(Coverage.overlaps(result.unplaced))")
@@ -94,9 +94,9 @@ struct SilentLossTests {
     }
 
     @Test("The readers place or unplace the corpus themselves: nothing waits for the final sweep")
-    func readersAlone() throws {
+    func readersAlone() async throws {
         for entry in try Corpus.entries() {
-            let result = try Corpus.importResult(of: entry)
+            let result = try await Corpus.importResult(of: entry)
             let found = try CVReader.readSections(result.document, leftOut: result.leftOut.filter { $0.span == nil }, work: .standard)
             var spans = Coverage.spans(in: found.findings.cv)
             spans += found.findings.unplaced.map(\.span)
@@ -128,9 +128,9 @@ struct SilentLossTests {
     }
 
     @Test("The spans a CV holds are all found by its own list, which a new field must join")
-    func sourceSpansAreComplete() throws {
+    func sourceSpansAreComplete() async throws {
         for entry in try Corpus.entries() {
-            let cv = try Corpus.importResult(of: entry).cv
+            let cv = try await Corpus.importResult(of: entry).cv
             #expect(Set(cv.sourceSpans) == Set(Coverage.spans(in: cv)), "\(entry.id): the list of spans differs from the spans the CV holds")
         }
     }
