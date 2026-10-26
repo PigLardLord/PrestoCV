@@ -172,7 +172,7 @@ extension LaunchEnvironmentTests {
 
     @Test("A seed that cannot be written is logged as an error with the kind of failure and no text of it")
     func aSeedThatCannotBeWrittenIsLogged() throws {
-        // A file name over the 255 bytes of a name on the device's volume: the folder is made, and the file is not
+        // A file name over the 255 bytes of a name on the device's volume: the file cannot be written
         let name = String(repeating: "a", count: 300) + ".json"
         let log = LogSpy()
         let storage = LaunchEnvironment.storage(arguments: folderArguments(seed: seed("{\"\(name)\":\"{}\"}")), diagnostics: log)
@@ -191,6 +191,45 @@ extension LaunchEnvironmentTests {
             return
         }
         #expect(!entry.line.contains("aaaa"), "The line should not hold the name of the file: \(entry.line)")
+    }
+
+    @Test("A seed that cannot be written leaves no folder, so that the next launch on the same folder is seeded again and does not take half of the seed for the whole")
+    func aSeedThatCannotBeWrittenLeavesNoFolder() throws {
+        // One file that can be written and one that cannot: whatever the order they are written in, none is left
+        let name = String(repeating: "a", count: 300) + ".json"
+        let folder = UUID().uuidString
+        let failing = ["PrestoCV", "-PrestoCVUITestsStorage", folder, "-PrestoCVUITestsSeed",
+                       seed("{\"\(name)\":\"{}\",\"cv_1.json\":\"{}\"}")]
+        let cvs = try LaunchEnvironment.storage(arguments: failing, diagnostics: SilentLogger()).cvs()
+        let directory = cvs.deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let left = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        #expect(!left.contains(cvs.lastPathComponent), "Half of a seed is not a seed: \(left)")
+        #expect(left.filter { $0.hasPrefix(cvs.lastPathComponent) }.isEmpty, "The folder the seed is made in is not left either: \(left)")
+
+        let again = ["PrestoCV", "-PrestoCVUITestsStorage", folder, "-PrestoCVUITestsSeed", seed(#"{"cv_2.json":"{}"}"#)]
+        let relaunched = try LaunchEnvironment.storage(arguments: again, diagnostics: SilentLogger()).cvs()
+        #expect(relaunched == cvs)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: cvs.path) == ["cv_2.json"], "The next launch seeds the folder")
+    }
+
+    @Test("A folder that a launch killed in the middle of a seed left is not taken for the CVs, and the next seed starts from nothing")
+    func aSeedFolderLeftByAKilledLaunchIsCleared() throws {
+        let folder = UUID().uuidString
+        let arguments = ["PrestoCV", "-PrestoCVUITestsStorage", folder, "-PrestoCVUITestsSeed", seed(#"{"cv_1.json":"{}"}"#)]
+        let unseeded = LaunchEnvironment.storage(arguments: ["PrestoCV", "-PrestoCVUITestsStorage", folder], diagnostics: SilentLogger())
+        let directory = try unseeded.cvs().deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        // What a launch killed while it seeds leaves: the folder it makes the seed in, with half of an earlier seed
+        let staging = directory.appendingPathComponent("CVs.seeding", isDirectory: true)
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: staging.appendingPathComponent("from_the_killed_launch.json"))
+
+        let seeded = try LaunchEnvironment.storage(arguments: arguments, diagnostics: SilentLogger()).cvs()
+
+        #expect(try FileManager.default.contentsOfDirectory(atPath: seeded.path) == ["cv_1.json"])
+        #expect(!FileManager.default.fileExists(atPath: staging.path), "The seed is made in the folder, and the folder is moved")
     }
 
     @Test("A seed that is written logs nothing")

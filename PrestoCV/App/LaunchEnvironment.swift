@@ -183,17 +183,23 @@ enum LaunchEnvironment {
         }
     }
 
-    /// Writes the files into a new folder before the app reads it. A folder that exists already holds what an earlier
-    /// launch of the test saved, and the seed would overwrite it, so it is left as it is. A file that cannot be written
+    /// Writes the files into a new folder before the app reads it. They are written into a folder beside it, which is
+    /// moved to its place when every file is there: a seed that fails (or a launch that is killed) in the middle leaves
+    /// no folder for the next launch to take for the whole seed. A folder that exists already holds what an earlier
+    /// launch of the test saved, and the seed would overwrite it, so it is left as it is. A seed that cannot be written
     /// leaves the test without it, and the log says why.
     private static func seed(_ files: [String: String], into directory: URL, diagnostics: any DiagnosticLogger) {
         guard !files.isEmpty, !isFolder(directory) else { return }
+        let staging = directory.appendingPathExtension("seeding")
         do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try? FileManager.default.removeItem(at: staging)
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
             for (name, content) in files {
-                try Data(content.utf8).write(to: directory.appendingPathComponent(name), options: .atomic)
+                try Data(content.utf8).write(to: staging.appendingPathComponent(name), options: .atomic)
             }
+            try FileManager.default.moveItem(at: staging, to: directory)
         } catch {
+            try? FileManager.default.removeItem(at: staging)
             diagnostics.error(.launch, "launch.seedFailed", .count("files", files.count), .error(error))
         }
     }

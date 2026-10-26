@@ -106,7 +106,7 @@ A draft ends with one of `draft.finished`, `draft.cancelled`, `draft.refused`, `
 
 | Event | Level | Fields | When |
 |---|---|---|---|
-| `launch.seedFailed` | error | `files` (the CV files the test handed over), `error` | The CV files a UI test hands over could not be written into the new storage folder, so the test starts without them. |
+| `launch.seedFailed` | error | `files` (the CV files the test handed over), `error` | The CV files a UI test hands over could not be written into the new storage folder (they are written beside it and moved to it when every file is there, so no half-seeded folder is left), so the test starts without them. |
 
 ## Adding a line
 
