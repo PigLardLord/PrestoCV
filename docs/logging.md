@@ -78,11 +78,11 @@ The tables list every event the code writes; the source checks fail when the cod
 | Event | Level | Fields | When |
 |---|---|---|---|
 | `pdf.read` | info | `pages`, `words` | PDFKit read the words of a PDF's pages. |
-| `pdf.limit` | notice | `limit` | The PDF reader stopped at a bound of the reading: `bytes`, `pages`, `characters` or `words`. |
+| `pdf.limit` | notice | `limit` | The PDF reader stopped at a bound of the reading: `bytes`, `pages`, `characters` or `words`. It throws that bound as a `LimitReached`, so `import.failed` names it too. |
 | `import.sections` | info | one count per kind of section recognised, such as `experience=2` | The text was read into sections. |
 | `import.unrecognised` | notice | `headings`, `unplaced` | A heading the vocabulary does not know, or text that no rule placed. |
 | `import.finished` | info | `kind` (`pdf` or `text`), `pages` (a PDF only), `characters`, `sections`, `elapsed` | The draft is ready for the review. |
-| `import.failed` | error | `kind`, `error`, `limit` (when a bound was reached), `elapsed` | The import failed, and the person is told why. |
+| `import.failed` | error | `kind`, `error`, `limit` (when a bound was reached, whether the core or the PDF reader found it: `bytes`, `pages`, `characters`, `words`, `lines`, `cells` or `steps`), `elapsed` | The import failed, and the person is told why. |
 | `import.cancelled` | info | `kind`, `elapsed` | The screen went away while the import ran. |
 
 ### The AI draft (category `draft`)

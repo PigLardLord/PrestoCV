@@ -51,14 +51,15 @@ struct PDFKitLoggingTests {
         #expect(read.fields == [.count("pages", 2), .count("words", 6)])
     }
 
-    @Test("A limit that stops the reading is logged by its name, as a notice", arguments: [
-        (10, 5, 20_000, "characters", ImportError.tooLarge), (10, 100_000, 3, "words", .tooLarge), (1, 100_000, 20_000, "pages", .tooManyPages),
+    @Test("A limit that stops the reading is logged by its name, as a notice, and thrown as that limit", arguments: [
+        (10, 5, 20_000, "characters", LimitReached(.characters)), (10, 100_000, 3, "words", LimitReached(.words)),
+        (1, 100_000, 20_000, "pages", LimitReached(.pages)),
     ])
-    func limit(pages: Int, characters: Int, words: Int, name: String, error: ImportError) async throws {
+    func limit(pages: Int, characters: Int, words: Int, name: String, reached: LimitReached) async throws {
         let logger = RecordingLogger()
         let pdf = try drawnPDF([["Lena Hartmann", "Elektrikerin in Leipzig"], ["Berufserfahrung"]])
 
-        await #expect(throws: error) {
+        await #expect(throws: reached) {
             try await PDFKitTextExtractor(logger: logger).layout(ofPDF: pdf, limits: limits(pages: pages, characters: characters, words: words))
         }
 
@@ -76,11 +77,31 @@ struct PDFKitLoggingTests {
             maximumWords: 20_000, maximumLines: 2_000, maximumCells: 4_000, maximumAnalysisSteps: 10_000_000
         )
 
-        await #expect(throws: ImportError.tooLarge) {
+        await #expect(throws: LimitReached(.bytes)) {
             try await PDFKitTextExtractor(logger: logger).layout(ofPDF: try drawnPDF([["Lena"]]), limits: tight)
         }
 
         #expect(logger.entry("pdf.limit")?.line == "pdf.limit limit=bytes")
+    }
+
+    @Test("Through the import, a limit the reader stops at fails it as that limit, and the failure names it", arguments: [
+        (10, 5, 20_000, "characters", ImportError.tooLarge), (10, 100_000, 3, "words", .tooLarge), (1, 100_000, 20_000, "pages", .tooManyPages),
+    ])
+    func limitThroughTheImport(pages: Int, characters: Int, words: Int, name: String, error: ImportError) async throws {
+        let logger = RecordingLogger()
+        let pdf = try drawnPDF([["Lena Hartmann", "Elektrikerin in Leipzig"], ["Berufserfahrung"]])
+        let importer = ImportCV(
+            pdfReader: PDFKitTextExtractor(logger: logger), limits: limits(pages: pages, characters: characters, words: words),
+            logger: logger, clock: ContinuousClock()
+        )
+
+        await #expect(throws: error) { try await importer.importPDF(pdf) }
+
+        #expect(logger.events == ["pdf.limit", "import.failed"])
+        let failed = try #require(logger.entry("import.failed"))
+        #expect(failed.level == .error)
+        #expect(failed.value("limit") == .token(name))
+        #expect(failed.value("error") == .error(type: "ImportError", code: String(describing: error)))
     }
 
     @Test("No word of the PDF reaches the log, through the reader or the import")

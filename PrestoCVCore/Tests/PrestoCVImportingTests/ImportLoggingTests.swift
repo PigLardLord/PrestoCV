@@ -126,6 +126,23 @@ struct ImportLoggingTests {
         #expect(logger.entry("import.failed")?.fields.dropFirst().first == .error(ImportError.unreadable))
     }
 
+    @Test("A limit that the PDF reader names fails the import as the core's own limits do, and is logged with its name", arguments: [
+        (LimitReached.Limit.bytes, ImportError.tooLarge, "bytes"), (.pages, .tooManyPages, "pages"), (.characters, .tooLarge, "characters"),
+        (.words, .tooLarge, "words"), (.lines, .tooLarge, "lines"), (.cells, .tooLarge, "cells"), (.steps, .tooLarge, "steps"),
+    ])
+    func readerLimit(limit: LimitReached.Limit, error: ImportError, name: String) async throws {
+        let logger = RecordingLogger()
+        await #expect(throws: error) {
+            try await importer(ScriptedPDFReader(error: LimitReached(limit)), logger: logger).importPDF(Data([1]))
+        }
+
+        let failed = try #require(logger.entry("import.failed"))
+        #expect(failed.level == .error)
+        #expect(failed.fields.map(\.key) == ["kind", "error", "limit", "elapsed"])
+        #expect(failed.value("error") == .error(type: "ImportError", code: String(describing: error)))
+        #expect(failed.value("limit") == .token(name))
+    }
+
     @Test("A scan without a text layer is logged as one")
     func scan() async throws {
         let logger = RecordingLogger()

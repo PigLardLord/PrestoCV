@@ -8,8 +8,10 @@ extension LogCategory {
     public static let importing = LogCategory("import")
 }
 
-/// A bound of `ImportLimits` that the reading reached. The reading stops there; the use case logs which bound it was,
-/// then throws the `ImportError` that the app words. A reader of PDFs names the bound it reached the same way.
+/// A bound of `ImportLimits` that the reading reached. The reading stops there; the use case logs which bound it was
+/// (`import.failed` with its `limit`), then throws the `ImportError` that the app words. A reader of PDFs names the bound it
+/// reached the same way: it throws this error, which the use case takes as its own, instead of an `ImportError` of its
+/// own, so that both ways of reaching a bound end in the same failure and the same entry.
 public struct LimitReached: Error, Equatable, Sendable {
     public enum Limit: Equatable, Sendable {
         case bytes, pages, characters, words, lines, cells, steps

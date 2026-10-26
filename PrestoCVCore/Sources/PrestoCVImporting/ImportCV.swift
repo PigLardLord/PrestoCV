@@ -4,8 +4,10 @@ import Foundation
 // MARK: - The port
 
 /// Reads the text of a PDF: each page's words with their box and style, in the reader's order (ADR 0027). The core
-/// decides the reading order. Cancellation passes, so it throws untyped errors; the use case turns any other error
-/// into an `ImportError`.
+/// decides the reading order. Cancellation passes, so it throws untyped errors. Three kinds of error pass as they are: a
+/// `CancellationError`, an `ImportError` (a PDF that is encrypted, empty or unreadable), and a `LimitReached` when the
+/// reader stopped at a bound of `ImportLimits`, which the use case words as `ImportError.tooLarge` or `.tooManyPages` and
+/// logs with the bound's name. The use case turns any other error into `ImportError.unreadable`.
 public protocol PDFTextExtracting: Sendable {
     func layout(ofPDF data: Data, limits: ImportLimits) async throws -> ExtractedLayout
 }
@@ -130,6 +132,8 @@ public struct ImportCV: Sendable {
             layout = try await pdfReader.layout(ofPDF: data, limits: limits)
         } catch let error as ImportError {
             throw error
+        } catch let reached as LimitReached {
+            throw reached
         } catch is CancellationError {
             throw CancellationError()
         } catch {

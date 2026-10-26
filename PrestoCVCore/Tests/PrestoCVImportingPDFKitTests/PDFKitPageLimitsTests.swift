@@ -49,19 +49,19 @@ struct PDFKitPageLimitsTests {
     func oversizedPage() async throws {
         // Ten lines of 200 words of four letters: 8,000 letters, and some 10,000 characters with the spaces
         let page = try drawnPDF(rows: 10, line: String(repeating: "abcd ", count: 200), size: 4, width: 2_400)
-        await #expect(throws: ImportError.tooLarge) {
+        await #expect(throws: LimitReached(.characters)) {
             try await PDFKitTextExtractor().layout(ofPDF: page, limits: limits(characters: 9_000, words: 20_000))
         }
         // A million characters in less than 200 kilobytes
         let million = try drawnPDF(rows: 1_000, line: String(repeating: "abcdefghi ", count: 100), size: 4, width: 2_400)
         #expect(million.count < 200_000)
-        await #expect(throws: ImportError.tooLarge) { try await PDFKitTextExtractor().layout(ofPDF: million, limits: .standard) }
+        await #expect(throws: LimitReached(.characters)) { try await PDFKitTextExtractor().layout(ofPDF: million, limits: .standard) }
     }
 
     @Test("The words are counted as they are read: a page with more words than are left is refused")
     func wordsCountedWhileRead() async throws {
         let page = try drawnPDF(rows: 10, line: String(repeating: "abcd ", count: 200), size: 4, width: 2_400)
-        await #expect(throws: ImportError.tooLarge) {
+        await #expect(throws: LimitReached(.words)) {
             try await PDFKitTextExtractor().layout(ofPDF: page, limits: limits(characters: 100_000, words: 1_000))
         }
     }
@@ -69,7 +69,7 @@ struct PDFKitPageLimitsTests {
     @Test("One huge word over the characters left is refused; within them, its reading stops in its middle when cancelled")
     func hugeWord() async throws {
         let word = try drawnPDF(rows: 1, line: String(repeating: "a", count: 500_000), size: 0.05, width: 14_400)
-        await #expect(throws: ImportError.tooLarge) { try await PDFKitTextExtractor().layout(ofPDF: word, limits: .standard) }
+        await #expect(throws: LimitReached(.characters)) { try await PDFKitTextExtractor().layout(ofPDF: word, limits: .standard) }
 
         let read = try await readCancelled(word, limits: limits(characters: 1_000_000, words: 20_000))
         #expect(throws: CancellationError.self) { try read.get() }

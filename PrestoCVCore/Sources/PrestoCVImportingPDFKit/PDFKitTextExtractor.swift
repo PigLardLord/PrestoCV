@@ -14,7 +14,8 @@ import AppKit
 /// promise one, and the core orders the words, tested on Linux. It opens no connection and keeps nothing.
 ///
 /// It logs the pages and the words it read, and the limit that stopped it (ADR 0030): counts and names, never a word.
-/// The import logs every failure by its kind.
+/// It throws that limit as a `LimitReached`, as the port allows, and the import turns it into the failure the person is
+/// told about and logs every failure by its kind, the limit's name with it.
 public struct PDFKitTextExtractor: PDFTextExtracting {
     private let logger: any DiagnosticLogger
 
@@ -29,7 +30,7 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
             return .pages(pages)
         } catch let reached as LimitReached {
             logger.notice(.importing, "pdf.limit", .token("limit", reached.logName))
-            throw reached.importError
+            throw reached
         }
     }
 
