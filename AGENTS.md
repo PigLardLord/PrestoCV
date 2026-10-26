@@ -17,7 +17,7 @@
 - `xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'` runs app unit + UI tests. Add `-testPlan CI` to leave out the UI tests, which are Xcode's template launch tests and take most of an hour.
 - `swift test --package-path PrestoCVCore` validates the core package in isolation.
 - `Tools/ArchitectureCheck/check.sh` runs the architecture checker on the whole repository (see `Tools/ArchitectureCheck/README.md`).
-- `swift test --package-path Tools/SourceChecks` runs the checks of source text: the string catalog, the rules the app's views follow, release hygiene. They read the repository, so they are not in the test plans.
+- `swift test --package-path Tools/SourceChecks` runs the checks of source text: the string catalog, the rules the app's views follow, how the tests render views off screen, release hygiene. They read the repository, so they are not in the test plans.
 - CI runs on every pull request:
   - on GitHub Actions (`.github/workflows/ci.yml`), on Linux: the architecture check (with the baseline compared to the base branch), its self-test and the source checks; and, in a job of its own, the build of every Linux target for Android with the Swift SDK for Android (ADR 0026);
   - on Xcode Cloud, on macOS (ADR 0024): the architecture check and its self-test, the package tests, the source checks, the builds of `PrestoCVApp` and `CVPDFExporterExamples`, and the `CI` test plan (the app tests and the exporter's simulator tests) on an iPhone and an iPad simulator, on machines that have only the built products. Xcode Cloud also builds and uploads releases to TestFlight; its settings are in `docs/release/xcode-cloud.md`.
