@@ -646,8 +646,11 @@ enum InventedFacts {
 
         if presentWords.contains(words.joined(separator: " ")) {
             if let said = presentSaid(words, by: entry, own: own, against: source) { return said }
-            if leaf.steps.first?.name == "experience", role == "endDate", ownYears.count == 1 {
-                return (.derived, "the present, for a job whose sentence gives one year")
+            if leaf.steps.first?.name == "experience", role == "endDate", ownYears.count == 1, let entry {
+                if own.contains(where: { says(goesOn: source.masked($0, of: entry)) }) {
+                    return (.derived, "the present, for a job whose sentence gives one year and says it goes on")
+                }
+                return (.review, "the present, for a job whose sentence gives one year but no word that says it goes on")
             }
             return (.review, "the present, other than the end of a job whose sentence gives one year")
         }
@@ -745,11 +748,16 @@ enum InventedFacts {
             return holds(source.words, run: words) ? (.quote, "a phrase of the description") : nil
         }
         let holders = source.holders(of: words)
-        if holders.contains(where: { own.contains($0) }) { return (.quote, "a phrase of the sentence of the entry") }
+        if own.contains(where: { holds(source.masked($0, of: entry), run: words) }) {
+            return (.quote, "a phrase of the sentence of the entry")
+        }
         if holders.isEmpty { return nil }
         if entry.owners.isEmpty { return (.review, "no sentence of the description names this employer or school") }
-        if holders.contains(where: { entry.owners.contains($0) }) {
+        if entry.owners.contains(where: { source.shared.contains($0) && holds(source.masked($0, of: entry), run: words) }) {
             return (.review, "the present is said only in a sentence that names several entries")
+        }
+        if entry.owners.contains(where: { holders.contains($0) }) {
+            return (.review, "the present is taken from the name of the employer or the school")
         }
         if holders.contains(where: { !source.owned.contains($0) }) {
             return (.review, "the present is said in a sentence that names no employer or school")
@@ -818,6 +826,20 @@ enum InventedFacts {
 
     private static func isDigit(_ character: Character) -> Bool {
         ("0"..."9").contains(character)
+    }
+
+    /// Whether a sentence says that a job goes on: a word of the present, or "since" (with one year in the sentence it says the
+    /// job goes on). A job that ended ("until 2020", "in 2019") has none of them. Folded words, in the six languages.
+    private static func says(goesOn sentence: [String]) -> Bool {
+        goesOn.contains { holds(sentence, run: $0) }
+    }
+
+    private static var goesOn: [[String]] {
+        let more: Set<String> = [
+            "still", "tuttora", "adesso", "momentan", "ahora", "agora", "maintenant", "actuellement",
+            "since", "dal", "dall", "seit", "desde", "depuis",
+        ]
+        return presentWords.union(more).map { $0.split(separator: " ").map(String.init) }
     }
 
     /// "Present" and its translations in the six languages of the app, folded.

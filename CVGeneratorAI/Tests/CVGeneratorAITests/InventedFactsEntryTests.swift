@@ -366,6 +366,8 @@ struct PresentCase: Sendable, CustomTestStringConvertible {
     let present: String
     let kind: InventedFacts.Class
     let reason: String
+    /// The first employer; a name that holds a word of the present is the case of two rows.
+    var company = "Alpha Corp"
 
     var testDescription: String { label }
 
@@ -373,7 +375,7 @@ struct PresentCase: Sendable, CustomTestStringConvertible {
         func end(_ target: String) -> String? { path == target ? present : nil }
         return CVData(
             experience: [
-                Experience(company: "Alpha Corp", endDate: end("experience[0].endDate")),
+                Experience(company: company, endDate: end("experience[0].endDate")),
                 Experience(company: "Beta Ltd", endDate: end("experience[1].endDate")),
             ],
             education: [Education(institution: "Gamma University", endDate: end("education[0].endDate"))]
@@ -397,5 +399,13 @@ struct PresentCase: Sendable, CustomTestStringConvertible {
         PresentCase(label: "Italian: the job whose sentence says it", description: italian, path: "experience[1].endDate", present: "Ad oggi", kind: .quote, reason: "sentence of the entry"),
         PresentCase(label: "German: the job that ended", description: german, path: "experience[0].endDate", present: "Bis heute", kind: .invented, reason: "another entry"),
         PresentCase(label: "German: the job whose sentence says it", description: german, path: "experience[1].endDate", present: "Bis heute", kind: .quote, reason: "sentence of the entry"),
+        PresentCase(label: "one year and no word that says the job goes on", description: "I worked at Alpha Corp in 2019. I studied at Gamma University and graduated in 2015.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "no word that says it goes on"),
+        PresentCase(label: "one year that ends the job", description: "I worked at Alpha Corp until 2020. I studied at Gamma University and graduated in 2015.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "no word that says it goes on"),
+        PresentCase(label: "one year and a word of the present", description: "I currently work at Alpha Corp, where I started in 2019.", path: "experience[0].endDate", present: "Present", kind: .derived, reason: "says it goes on"),
+        PresentCase(label: "one year and a since", description: "Since 2019 I work at Alpha Corp.", path: "experience[0].endDate", present: "Present", kind: .derived, reason: "says it goes on"),
+        PresentCase(label: "Italian: one year and a dal", description: "Lavoro in Alpha Corp dal 2019.", path: "experience[0].endDate", present: "Presente", kind: .derived, reason: "says it goes on"),
+        PresentCase(label: "German: one year and a seit", description: "Ich arbeite seit 2018 bei Alpha Corp.", path: "experience[0].endDate", present: "heute", kind: .derived, reason: "says it goes on"),
+        PresentCase(label: "a word of the present in the name of the employer is no word of the sentence", description: "I worked at Now Hiring Ltd in 2019.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "no word that says it goes on", company: "Now Hiring Ltd"),
+        PresentCase(label: "the name of the employer is no present for the job", description: "I worked at Today Magazine until 2020.", path: "experience[0].endDate", present: "Today", kind: .review, reason: "name of the employer", company: "Today Magazine"),
     ]
 }
