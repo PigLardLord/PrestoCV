@@ -22,11 +22,12 @@ The current app and packages are the legacy code the migration replaces, one con
 | `docs/architecture/` | The target architecture: overview and migration strategy, rules R1–R18, modules and allowed imports, glossary, ADRs. |
 | `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). |
 | `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The current packages (legacy, being replaced). |
+| `DiagnosticLogging/`, `docs/logging.md` | The diagnostic log (ADR 0030): one interface that carries no CV content, its decorators and its unified log adapter; the guide says how to read the log, what each event holds and how to add one. |
 | `CVPDFExporter/Docs/` | The document markup contract that designs follow, which the exporter's tests hold the code to. |
 | `Tools/ArchitectureCheck/` | The checker that enforces the rules, and its pre-commit hook. |
-| `Tools/SourceChecks/` | The checks of source text: the string catalog, the rules the app's views follow, release hygiene, the deployment targets. They read the repository, so they run with `swift test`, not in the test plans. |
+| `Tools/SourceChecks/` | The checks of source text: the string catalog, the rules the app's views follow, how the tests render views off screen, release hygiene, the deployment targets. They read the repository, so they run with `swift test`, not in the test plans. |
 | `Tools/Localization/` | `l10n_manager.py`, which adds, reads, lists, checks and updates the texts of the string catalog. Run it from the repository root. |
-| `ci_scripts/`, `TestPlans/`, `docs/release/` | The releases: Xcode Cloud's build scripts, the test plans, the settings of its workflows, and the App Store listing in every language with the notes for App Review (`docs/release/store-listing.md`, checked by `Tools/Release/check-store-listing.py`). |
+| `ci_scripts/`, `TestPlans/`, `docs/release/` | The releases and the Apple checks: the build scripts that Xcode Cloud and the pull request check run, the test plans, the settings of the workflows and of the check, and the App Store listing in every language with the notes for App Review (`docs/release/store-listing.md`, checked by `Tools/Release/check-store-listing.py`). |
 | `Prototypes/ADRValidation/` | The throwaway prototype that validated the ADRs. It is outside the app's build; its README says how to run it. |
 
 ## Building and testing
@@ -37,6 +38,7 @@ You need Xcode 27, which reads the project in its JSON format (`PrestoCV.xcodepr
 xcodebuild -project PrestoCV.xcodeproj -scheme PrestoCV -configuration Debug build
 xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
 xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -testPlan CI -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
+swift test --package-path DiagnosticLogging
 swift test --package-path PrestoCVCore
 swift test --package-path Tools/SourceChecks
 Tools/ArchitectureCheck/check.sh
@@ -55,14 +57,15 @@ On Linux, the packages contain only the new targets. They build today and stay e
 
 ## Releasing
 
-Xcode Cloud tests version 1, archives it, signs it and uploads it to TestFlight ([ADR 0024](docs/architecture/adr/0024-run-apple-ci-and-releases-on-xcode-cloud.md)). It runs three workflows:
-- **Pull Request:** a pull request to `main` runs the `CI` test plan on an iPhone and an iPad simulator. GitHub shows the result in the pull request.
-- **Main:** a merge to `main` tests, archives and uploads a build to TestFlight for the internal testers.
+Xcode Cloud archives version 1, signs it and uploads it to TestFlight, and tests it again before a store build ([ADR 0024](docs/architecture/adr/0024-run-apple-ci-and-releases-on-xcode-cloud.md)). It runs two workflows:
+- **Main:** a merge to `main` archives a build and uploads it to TestFlight for the internal testers. It runs no tests: the pull request check tested that tree before the merge.
 - **Release:** a GitHub Release with a tag such as `v1.2.3`, or a push to a branch such as `release/1.2.3`, tests that commit, archives version 1.2.3 and uploads it to TestFlight.
 
 Nothing submits a build for App Review: the owner does it in App Store Connect, with Add for Review.
 
-The repository side is `ci_scripts/` (it sets an archive's version from its tag or branch, checks the archive with `Tools/Release/check-archive.sh` before the upload, and runs the architecture check, the package tests, the source checks and the package builds), `TestPlans/`, and the `DEVELOPMENT_TEAM` of the project. Xcode Cloud signs the build itself, so the repository holds no key and no secret. `docs/release/xcode-cloud.md` has the exact settings of the three workflows, the one-time setup, and the steps to cut a release.
+Xcode Cloud checks no pull request. A pull request is checked on the Mac mini ([ADR 0029](docs/architecture/adr/0029-check-pull-requests-on-the-mac-mini.md)): the commit status `Mac mini · CI` on its head runs the `CI` test plan on an iPhone and an iPad simulator, and the Apple checks of `ci_scripts/ci_post_xcodebuild.sh`. A pull request merges when its branch contains the latest `main` and the checks are green on its head.
+
+The repository side is `ci_scripts/` (it sets an archive's version from its tag or branch, checks the archive with `Tools/Release/check-archive.sh` before the upload, and runs the architecture check, the package tests, the source checks and the package builds, in a Release build and in the pull request check), `TestPlans/`, and the `DEVELOPMENT_TEAM` of the project. Xcode Cloud signs the build itself, so the repository holds no key and no secret. `docs/release/xcode-cloud.md` has the exact settings of the two workflows, why the Pull Request workflow stays disabled, the one-time setup, and the steps to cut a release.
 
 ## Contributing
 

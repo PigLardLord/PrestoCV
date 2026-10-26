@@ -3,7 +3,8 @@ import PrestoCVCore
 
 /// What the user sees before having any CV: it fills the empty state of the CV list. The import of a CV the person
 /// already has leads; the AI draft, where the device shows it, the examples and a blank CV follow. At the accessibility
-/// sizes and in landscape on an iPhone the ways to start come before the welcome (see `FirstRunLayout`).
+/// sizes and in landscape on an iPhone the ways to start come before the welcome (see `FirstRunLayout`), and at the
+/// accessibility sizes they sit close together, so that they fit a short screen (see `FirstRunActionDensity`).
 struct FirstRunView: View {
     @StateObject private var viewModel: NewCVChoicesViewModel
     @EnvironmentObject var router: AppRouter
@@ -12,6 +13,10 @@ struct FirstRunView: View {
     @State private var explainedReason: AIEntry.Reason?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    
+    private var density: FirstRunActionDensity {
+        FirstRunActionDensity.resolve(dynamicTypeSize: dynamicTypeSize)
+    }
     
     /// The view model is built once, when the view first appears, and survives every re-render of the list.
     init(viewModel: @autoclosure @escaping () -> NewCVChoicesViewModel) {
@@ -78,7 +83,7 @@ struct FirstRunView: View {
     
     /// The choices in the order of the view model. The import leads, and is the primary button.
     private var actionSection: some View {
-        VStack(spacing: DesignTokens.Spacing.lg) {
+        VStack(spacing: density.spacing) {
             ForEach(viewModel.choices, id: \.self) { choice in
                 action(for: choice)
             }
@@ -91,12 +96,12 @@ struct FirstRunView: View {
     private func action(for choice: NewCVChoice) -> some View {
         switch choice {
         case .importCV:
-            PrimaryButton(title: "onboarding.import.button".localized, icon: "doc.on.clipboard") {
+            PrimaryButton(title: "onboarding.import.button".localized, icon: density.symbol("doc.on.clipboard")) {
                 router.navigate(to: .importCV)
             }
             .accessibilityIdentifier("firstrun.import")
         case .aiDraft:
-            SecondaryButton.text(title: "onboarding.ai.button".localized, icon: "sparkles", action: openAIDraft)
+            SecondaryButton.text(title: "onboarding.ai.button".localized, icon: density.symbol("sparkles"), action: openAIDraft)
         case .aiDraftUnavailable(let reason):
             unavailableAIDraft(reason)
         case .example:
@@ -109,10 +114,10 @@ struct FirstRunView: View {
     }
     
     /// The AI draft, dimmed, with the line that says why. A tap, or an activation by VoiceOver, Voice Control or Switch
-    /// Control, shows the full explanation.
+    /// Control, shows the full explanation, which grows to every text size.
     private func unavailableAIDraft(_ reason: AIEntry.Reason) -> some View {
         VStack(spacing: DesignTokens.Spacing.xs) {
-            SecondaryButton.text(title: "onboarding.ai.button".localized, icon: "sparkles") {
+            SecondaryButton.text(title: "onboarding.ai.button".localized, icon: density.symbol("sparkles")) {
                 explainedReason = reason
             }
             .opacity(DesignTokens.Opacity.subtle)
@@ -120,6 +125,7 @@ struct FirstRunView: View {
             
             Text(reason.lineKey.localized)
                 .typography(.caption1)
+                .dynamicTypeSize(...FirstRunActionDensity.largestReasonLineSize)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)
                 .accessibilityHidden(true)

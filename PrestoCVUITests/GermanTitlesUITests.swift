@@ -27,7 +27,7 @@ final class GermanTitlesUITests: XCTestCase {
     func testTheTitleOfANewCVIsWhole() throws {
         openANewCV()
 
-        assertTheTitleIsWhole(font: Self.inlineTitleFont)
+        assertTheTitleIsWhole(fonts: [Self.inlineTitleFont])
     }
 
     /// A CV that is saved without a name of its own or of the person in it. The line under the title says it is saved.
@@ -40,7 +40,7 @@ final class GermanTitlesUITests: XCTestCase {
         let saved = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Auf diesem Gerät gespeichert")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 10), "The editor should save the CV by itself")
 
-        assertTheTitleIsWhole(font: Self.subtitledTitleFont)
+        assertTheTitleIsWhole(fonts: [Self.subtitledTitleFont])
     }
 
     /// The large title above the description of the AI draft.
@@ -51,7 +51,7 @@ final class GermanTitlesUITests: XCTestCase {
         let description = app.textViews.matching(NSPredicate(format: "label == %@", "Ihr beruflicher Werdegang")).firstMatch
         XCTAssertTrue(description.waitForExistence(timeout: 10), "The AI draft should open the AI screen")
 
-        assertTheTitleIsWhole(font: Self.largeTitleFont)
+        assertTheTitleIsWhole(fonts: Self.largeTitleFonts)
     }
 
     // MARK: - Helpers
@@ -62,10 +62,11 @@ final class GermanTitlesUITests: XCTestCase {
     private static let subtitledTitleFont = UIFont.systemFont(
         ofSize: UIFont.preferredFont(forTextStyle: .subheadline).pointSize, weight: .semibold
     )
-    /// A large title at the normal text size: the large title style, bold.
-    private static let largeTitleFont = UIFont.systemFont(
-        ofSize: UIFont.preferredFont(forTextStyle: .largeTitle).pointSize, weight: .bold
-    )
+    /// A large title at the normal text size: the large title style, bold. A short screen, as the outer screen of the
+    /// iPhone Duo, draws it smaller, in the size of the first title style.
+    private static let largeTitleFonts = [UIFont.TextStyle.largeTitle, .title1].map {
+        UIFont.systemFont(ofSize: UIFont.preferredFont(forTextStyle: $0).pointSize, weight: .bold)
+    }
 
     private func openANewCV() {
         let start = app.buttons["Meinen ersten Lebenslauf erstellen"]
@@ -75,13 +76,17 @@ final class GermanTitlesUITests: XCTestCase {
     }
 
     /// The title of the bar, which the bar is named after, is drawn as wide as its text needs. A bar with a large
-    /// title also holds the small one it shows once scrolled, so the widest of them is the one on screen.
-    private func assertTheTitleIsWhole(font: UIFont, file: StaticString = #filePath, line: UInt = #line) {
+    /// title also holds the small one it shows once scrolled, so the widest of them is the one on screen. Its text is
+    /// measured in the one of `fonts` whose line height is closest to the height of the title: a title takes one line,
+    /// since the bar cuts one that does not fit.
+    private func assertTheTitleIsWhole(fonts: [UIFont], file: StaticString = #filePath, line: UInt = #line) {
         let bar = app.navigationBars.firstMatch
         let text = bar.identifier
         let titles = bar.staticTexts.matching(NSPredicate(format: "label == %@", text))
         XCTAssertTrue(titles.firstMatch.waitForExistence(timeout: 10), "The bar should show its title, \"\(text)\"", file: file, line: line)
-        let drawn = titles.allElementsBoundByIndex.map(\.frame.width).max() ?? 0
+        let shown = titles.allElementsBoundByIndex.map(\.frame).max { $0.width < $1.width } ?? .zero
+        let font = fonts.min { abs($0.lineHeight - shown.height) < abs($1.lineHeight - shown.height) } ?? fonts[0]
+        let drawn = shown.width
         let needed = (text as NSString).size(withAttributes: [.font: font]).width
         XCTAssertGreaterThanOrEqual(
             drawn + 1, needed,

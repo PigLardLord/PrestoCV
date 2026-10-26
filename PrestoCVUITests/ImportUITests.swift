@@ -70,6 +70,24 @@ final class ImportUITests: XCTestCase {
         add(app.keptScreenshot(named: "Import - experience"))
     }
 
+    /// A long pasted CV scrolls inside the box it is pasted in, which keeps its height, and the import under the box can
+    /// be scrolled to. Before, the box grew with the text and took the import far below it, where a swipe on the text,
+    /// which moved the text and not the screen, could not bring it.
+    func testALongPastedCVScrollsInsideItsBox() throws {
+        UIPasteboard.general.string = String(decoding: try fixture("chat", "txt"), as: UTF8.self)
+        openTheImport()
+        let box = app.textViews["import.text"]
+        XCTAssertTrue(box.waitForExistence(timeout: 10), "The import screen should have a box to paste in")
+        let emptyHeight = box.frame.height
+        XCTAssertTrue(pasteButton.waitForExistence(timeout: 10))
+        pasteButton.tap()
+        let pasted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS 'Jonas Becker'"), object: box)
+        XCTAssertEqual(XCTWaiter.wait(for: [pasted], timeout: 10), .completed, "The CV should be pasted in the box")
+
+        XCTAssertEqual(box.frame.height, emptyHeight, accuracy: 1, "The box should keep its height, and the CV scroll inside it")
+        app.scrollTo(app.buttons["Import this text"])
+    }
+
     func testAPastedPDFOpensInTheEditor() throws {
         UIPasteboard.general.setData(try fixture("linkedin", "pdf"), forPasteboardType: "com.adobe.pdf")
         openTheImport()

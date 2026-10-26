@@ -2,15 +2,21 @@
 /// stays visible as text not imported, and the final gate checks every value against its spans.
 enum CVReader {
 
-    /// - Throws: `CancellationError` once the task is cancelled; `ImportError.tooLarge` when the reading passes the
-    ///   budget of `work`.
-    static func read(_ document: SourceDocument, leftOut: [LeftOutText], work: AnalysisWork) throws -> ImportResult {
+    /// What reading a document gave: the result, and the sections the document was split into, which the log counts.
+    struct Reading {
+        var result: ImportResult
+        var sections: [Section]
+    }
+
+    /// - Throws: `CancellationError` once the task is cancelled; `LimitReached` with its steps when the reading passes
+    ///   the budget of `work`.
+    static func read(_ document: SourceDocument, leftOut: [LeftOutText], work: AnalysisWork) throws -> Reading {
         let (findings, sections) = try readSections(document, leftOut: leftOut, work: work)
         let result = ImportResult(
             document: document, cv: findings.cv, language: SectionSegmenter.language(of: sections, in: document),
             unplaced: findings.unplaced.sorted { $0.span < $1.span }, leftOut: findings.leftOut
         )
-        return Remainder.swept(ImportGrounding.enforced(result), sections: sections)
+        return Reading(result: Remainder.swept(ImportGrounding.enforced(result), sections: sections), sections: sections)
     }
 
     /// What the readers found in each section, before anything is checked.

@@ -74,8 +74,7 @@ final class NewCVAIEntryUITests: XCTestCase {
             "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
         ] + storage
         app.launch()
-        // The list's only button in the bar is the one that adds a CV
-        let addCV = app.navigationBars.buttons.firstMatch
+        let addCV = app.barButton("Hinzufügen")
         XCTAssertTrue(addCV.waitForExistence(timeout: 20), "The list should offer to add a CV")
         addCV.tap()
 
@@ -95,7 +94,7 @@ final class NewCVAIEntryUITests: XCTestCase {
 
         XCTAssertTrue(app.text(Self.notOnThisDeviceInGerman).waitForExistence(timeout: 10), "A tap should show the full explanation")
         add(app.keptScreenshot(named: "New CV, German, largest text, device not eligible, explanation"))
-        app.navigationBars.buttons["Fertig"].tap()
+        app.barButton("Fertig").tap()
     }
 
     /// The cards of the screen, from the top: the import, the AI card, the examples, the empty CV.
