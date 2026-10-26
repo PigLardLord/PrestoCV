@@ -298,8 +298,12 @@ struct Grounding {
         let joining = joiningPlaces(of: index)
         let pure = joining.filter { clauses.clause(at: $0).words.allSatisfy(explainer.isTimePhrase) }
         let graduating = subject.isEducation ? joining.filter { !pure.contains($0) && explainer.isGraduationPhrase(clauses.clause(at: $0).words) } : []
-        let dated = (backing[index].union(pure)).sorted(by: Self.isBefore).map { stated($0, of: index) }
-        let graduation = graduating.sorted(by: Self.isBefore).map(clauses.clause(at:))
+        let found = (backing[index].union(pure)).sorted(by: Self.isBefore).map { stated($0, of: index) }
+        // A year written with a word of graduating or completing ("2016 ... abgeschlossen") is the year the study ended, whichever
+        // clause writes it: it is never the start. So for a study such a clause is a graduation clause, not a dated one.
+        let completes = found.map { subject.isEducation && $0.words.contains(where: explainer.saysGraduating) }
+        let dated = found.indices.filter { !completes[$0] }.map { found[$0] }
+        let graduation = graduating.sorted(by: Self.isBefore).map(clauses.clause(at:)) + found.indices.filter { completes[$0] }.map { found[$0] }
         let joined = joining.filter { !pure.contains($0) && !graduating.contains($0) }.sorted(by: Self.isBefore)
 
         return EntryEvidence(

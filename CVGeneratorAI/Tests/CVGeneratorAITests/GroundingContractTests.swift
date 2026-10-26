@@ -294,7 +294,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 2158
+    static let rowsWhenWritten = 2176
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list. All of them are residual risks of the rules (ADR 0023) that the claim check of
@@ -352,6 +352,7 @@ enum GroundingRows {
         rows += wordsAfterAnEmployerPreposition()
         rows += datesFromATimePhrase()
         rows += graduationPhrases()
+        rows += aCompletionYearIsNeverAStart()
         rows += achievementsOfGraduating()
         rows += hedgesInProse()
         rows += modalityInProse()
@@ -1647,6 +1648,40 @@ enum GroundingRows {
                             "2012 is written once, in a graduation phrase: a study keeps it as its end date only",
                             v.schoolAndGraduation, CVData(education: [study(v.degree, at: v.school, from: "2012", to: "2012")]),
                             .exactly(CVData(education: [study(v.degree, at: v.school, to: "2012")])), language: v.language))
+        }
+        return rows
+    }
+
+    // MARK: A completion year is never a start date (no-go round 3)
+
+    /// A year written with a verb of finishing a course ("I completed my degree at Alpha University in 2016") is the year the study
+    /// ended: the draft's end date may take it, its start date never (ADR 0023, rule (c), dates). A year written with a start
+    /// ("since 2014") stays the start date.
+    private static func aCompletionYearIsNeverAStart() -> [GroundingRow] {
+        typealias Variant = (language: String, completed: String, started: String, school: String)
+        let variants: [Variant] = [
+            ("en", "I completed my degree at Alpha University in 2016.", "I studied at Alpha University since 2014.", "Alpha University"),
+            ("it", "Ho conseguito la laurea all'Università Alpha nel 2016.", "Ho studiato all'Università Alpha dal 2014.", "Università Alpha"),
+            ("de", "Ich habe 2016 mein Studium an der Universität Alpha abgeschlossen.",
+             "Ich habe seit 2014 an der Universität Alpha studiert.", "Universität Alpha"),
+            ("es", "Terminé mis estudios en la Universidad Alfa en 2016.", "Estudié en la Universidad Alfa desde 2014.", "Universidad Alfa"),
+            ("fr", "J'ai terminé mes études à l'université Alpha en 2016.", "J'ai étudié à l'université Alpha depuis 2014.", "université Alpha"),
+            ("pt", "Concluí os estudos na Universidade Alfa em 2016.", "Estudei na Universidade Alfa desde 2014.", "Universidade Alfa"),
+        ]
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-completion-year-is-no-start-\(v.language)",
+                            "2016 is written with a verb of finishing: the study ended then, it did not start then",
+                            v.completed, CVData(education: [study(at: v.school, from: "2016")]),
+                            .exactly(CVData(education: [study(at: v.school)])), language: v.language))
+            rows.append(row("a-completion-year-stays-the-end-\(v.language)",
+                            "2016 is written with a verb of finishing: the end date of the study keeps it",
+                            v.completed, CVData(education: [study(at: v.school, to: "2016")]),
+                            .exactly(CVData(education: [study(at: v.school, to: "2016")])), language: v.language))
+            rows.append(row("a-stated-start-year-stays-the-start-\(v.language)",
+                            "2014 is written with a word for the start (since, seit, desde): the start date of the study keeps it",
+                            v.started, CVData(education: [study(at: v.school, from: "2014")]),
+                            .exactly(CVData(education: [study(at: v.school, from: "2014")])), language: v.language))
         }
         return rows
     }
@@ -5147,10 +5182,10 @@ enum GroundingRows {
         let certificates = "I have a BLS from the Italian Resuscitation Council in 2023 and a PALS from the American Heart Association in 2019."
 
         rows.append(row("school-omitted-school-lends-its-dates",
-                        "Beta University's 2014 is not Alpha University's when the draft leaves Beta out",
+                        "Beta University's 2014 is not Alpha University's when the draft leaves Beta out; 2010 is written with graduated, so it is not a start",
                         "At Alpha University in 2010 I graduated and at Beta University in 2014 I did a master.",
                         CVData(education: [study(at: "Alpha University", from: "2010", to: "2014")]),
-                        .exactly(CVData(education: [study(at: "Alpha University", from: "2010")]))))
+                        .exactly(CVData(education: [study(at: "Alpha University")]))))
         rows.append(row("school-joined-clause-after",
                         "graduated in 2012 is a graduation phrase: it joins the clause of the school next to it and gives the degree its year",
                         "I studied Education Sciences at the University of Bologna and graduated in 2012.",
@@ -5793,6 +5828,7 @@ enum GroundingRows {
         drops.append(Drop("experience[3].description", "assisted, administrative and tasks are words the description does not use"))
         drops.append(Drop("experience[3].achievements[0]", "the same words"))
         drops.append(Drop("education[0].endDate", "2012 is the end of another job; the clause of the studies gives 2009"))
+        drops.append(Drop("education[0].startDate", "2009 is written with graduated: the year of the degree is never the start of the studies"))
         for index in 0..<5 {
             drops.append(Drop("skills[\(index)].level", "the description names the skills and says nothing of their level"))
         }
@@ -5808,7 +5844,6 @@ enum GroundingRows {
                             because: "a PALS certificate from 2019 is a verbless clause split off by and: it belongs to renewed in 2023, whose verb is not a listed one")
         let rewrites = [
             Rewrite("experience[3].startDate", to: "2009", "I started in 2009 as a nursing assistant at the Mauriziano hospital is explained"),
-            Rewrite("education[0].startDate", to: "2009", "the year the clause of the studies gives (it is the year of the degree: the ADR does not tell them apart)"),
         ]
         return row("probe-long-en",
                    "kept: the contacts, name, place, the four employers and titles, the Mauriziano start, the degree, skills, languages, interests, BLS and ACLS",

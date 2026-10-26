@@ -14,6 +14,11 @@ struct Explainer {
         word.isNumber || Vocabulary.isTimePhrase(word.folded, in: language)
     }
 
+    /// Whether the word says graduating or completing a course.
+    func saysGraduating(_ word: Word) -> Bool {
+        Vocabulary.isGraduating(word.folded, in: language)
+    }
+
     /// Whether the words are a graduation phrase: a time phrase that also holds words of graduating and the words that go with
     /// them, and at least one word of graduating.
     func isGraduationPhrase(_ words: [Word]) -> Bool {

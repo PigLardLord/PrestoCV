@@ -338,7 +338,8 @@ struct SanitizerOmittedEntryTests {
 
         let alpha = try sanitized(draft, from: description).education.first
 
-        #expect(alpha?.startDate == "2010")
+        // 2010 is written with "graduated": the year of the degree, never the start (ADR 0023). Beta's 2014 is not Alpha's.
+        #expect(alpha?.startDate == nil)
         #expect(alpha?.endDate == nil)
     }
 
