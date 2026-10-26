@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Checks an archive before it is uploaded: the bundle identifier, the display name, the version and build, the privacy
-# manifest, the encryption declaration, the app icon, and the document type that "Open in PrestoCV" needs. That type is
+# manifest, the encryption declaration, the app icon, the oldest iOS release the app supports (MinimumOSVersion, which
+# Xcode writes from IPHONEOS_DEPLOYMENT_TARGET: the check reads what the archive says, not what the sources set, so a
+# target that no source check can read is found here), and the document type that "Open in PrestoCV" needs. That type is
 # PDF only, with role Viewer and rank Alternate, and the app never opens it in place; the app declares no type of its own
 # (no exported or imported type declaration). PrestoCVTests/App/AppInfoPlistTests.swift requires the same of the source
 # Info.plist, so change both together. Fails on the first thing that is wrong.
@@ -9,6 +11,8 @@
 #
 # Tools/Release/check-archive-selftest.sh tests this check on fake archives.
 set -euo pipefail
+# The oldest iOS release the app supports (#180). Tools/SourceChecks requires it to be the release its own check holds.
+MINIMUM_OS_VERSION="26.5"
 ARCHIVE="${1:?usage: check-archive.sh <archive>}"
 APP="$ARCHIVE/Products/Applications/PrestoCV.app"
 PLIST="$APP/Info.plist"
@@ -49,5 +53,24 @@ in_place="$(plist_value LSSupportsOpeningDocumentsInPlace)"
 for declaration in UTExportedTypeDeclarations UTImportedTypeDeclarations; do
   if read_key "$declaration" >/dev/null; then fail "the app declares $declaration"; fi
 done
+
+# The oldest iOS release the archive runs on. It is compared as numbers, so that 26.10 is later than 26.5.
+# release_at_least <release> <minimum>: both are one to three numbers separated by dots.
+release_at_least() {
+  local IFS=.
+  local -a release=($1) minimum=($2)
+  local part
+  for part in 0 1 2; do
+    local have=$((10#${release[part]:-0})) want=$((10#${minimum[part]:-0}))
+    [ "$have" -gt "$want" ] && return 0
+    [ "$have" -lt "$want" ] && return 1
+  done
+  return 0
+}
+plist_type MinimumOSVersion >/dev/null || fail "MinimumOSVersion is missing"
+[ "$(plist_type MinimumOSVersion)" = "string" ] || fail "MinimumOSVersion is not a string"
+minimum_os="$(plist_value MinimumOSVersion)"
+[[ "$minimum_os" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] || fail "MinimumOSVersion is not a release: $minimum_os"
+release_at_least "$minimum_os" "$MINIMUM_OS_VERSION" || fail "MinimumOSVersion is $minimum_os, below $MINIMUM_OS_VERSION"
 
 echo "$(read_key CFBundleDisplayName) $(read_key CFBundleShortVersionString) ($(read_key CFBundleVersion)), $(read_key CFBundleIdentifier): archive checks passed"

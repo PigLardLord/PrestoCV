@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Self-test of check-archive.sh. It builds minimal fake archives (an Info.plist, the privacy manifest) and runs the check
 # on each. One archive passes: PDF as the only document type, a viewer of alternate rank, never opened in place. Each of
-# the others breaks one rule of the document type and must fail with its own message. Runs on macOS, where
+# the others breaks one rule of the document type, or of the minimum iOS release, and must fail with its own message. Runs on macOS, where
 # check-archive.sh reads the plist with PlistBuddy.
 #
 #   Tools/Release/check-archive-selftest.sh
@@ -12,6 +12,9 @@ CHECK="$HERE/check-archive.sh"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 pass=0; fail=0; count=0
+
+# The minimum iOS release an archive has unless a check says otherwise (the oldest release the app supports, #180).
+MIN_OS='<key>MinimumOSVersion</key><string>26.5</string>'
 
 # The keys every archive has, whatever it declares about documents.
 BASE='<key>CFBundleIdentifier</key><string>com.PigLardLord.prestocv</string>
@@ -49,6 +52,7 @@ check() {
   {
     echo '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>'
     echo "$BASE"
+    echo "${OS_KEYS-$MIN_OS}"
     printf '%s\n' "$@"
     echo '</dict></plist>'
   } > "$app/Info.plist"
@@ -61,6 +65,25 @@ check() {
 }
 
 check "PDF only, viewer, alternate, not in place" "" "$VALID_TYPES" "$COPIED"
+
+# check_os <name> <message the check must fail with, or "" when it must pass> <the plist keys for the minimum iOS release,
+# or "" for none>
+check_os() { local name="$1" message="$2" keys="$3"; OS_KEYS="$keys" check "$name" "$message" "$VALID_TYPES" "$COPIED"; }
+os_release() { printf '<key>MinimumOSVersion</key><string>%s</string>' "$1"; }
+
+for release in 26.5 26.5.0 26.5.1 26.6 26.10 27 27.0 27.0.1 100.0; do
+  check_os "minimum iOS $release" "" "$(os_release "$release")"
+done
+for release in 26 26.0 26.4 26.4.9 26.04 18.0 17.6.1 1.0 0; do
+  check_os "minimum iOS $release" "MinimumOSVersion is $release, below 26.5" "$(os_release "$release")"
+done
+check_os "no minimum iOS" "MinimumOSVersion is missing" ""
+for release in abc 26.x 26. .5 26..5 26.5.0.1 v26.5 "26.5 " ""; do
+  check_os "minimum iOS \"$release\" is no release" "MinimumOSVersion is not a release: $release" "$(os_release "$release")"
+done
+check_os "minimum iOS as a real" "MinimumOSVersion is not a string" "<key>MinimumOSVersion</key><real>26.5</real>"
+check_os "minimum iOS as an integer" "MinimumOSVersion is not a string" "<key>MinimumOSVersion</key><integer>27</integer>"
+check_os "minimum iOS as a dictionary" "MinimumOSVersion is not a string" "<key>MinimumOSVersion</key><dict/>"
 
 check "no document type" "the app declares no document type" "$COPIED"
 check "an empty list of document types" "the app declares no document type" "$(document_types)" "$COPIED"
