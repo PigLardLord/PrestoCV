@@ -647,10 +647,10 @@ enum InventedFacts {
         if presentWords.contains(words.joined(separator: " ")) {
             if let said = presentSaid(words, by: entry, own: own, against: source) { return said }
             if leaf.steps.first?.name == "experience", role == "endDate", ownYears.count == 1, let entry {
-                if own.contains(where: { says(goesOn: source.masked($0, of: entry)) }) {
-                    return (.derived, "the present, for a job whose sentence gives one year and says it goes on")
+                if own.contains(where: { says(sinceYearIn: source.masked($0, of: entry)) }) {
+                    return (.derived, "the present, for a job whose sentence gives one year and a since before the year")
                 }
-                return (.review, "the present, for a job whose sentence gives one year but no word that says it goes on")
+                return (.review, "the present, for a job whose sentence gives one year but no since before it")
             }
             return (.review, "the present, other than the end of a job whose sentence gives one year")
         }
@@ -839,6 +839,20 @@ enum InventedFacts {
     /// job goes on). A job that ended ("until 2020", "in 2019") has none of them. Folded words, in the six languages.
     private static func says(goesOn sentence: [String]) -> Bool {
         goesOn.contains { holds(sentence, run: $0) }
+    }
+
+    /// Whether a sentence dates a job from a year: "since", "dal", "seit", "desde" or "depuis" and then the year, with nothing
+    /// between them but the words of a date (a month, a day, "de", "dem", "the"). Any other word between them ("dal mio ufficio
+    /// nel 2018", "since I like cooking") is another sense of the word, and the sentence then says nothing about the present.
+    private static func says(sinceYearIn sentence: [String]) -> Bool {
+        let since: Set<String> = ["since", "dal", "dall", "seit", "desde", "depuis"]
+        let small: Set<String> = ["de", "del", "of", "the", "el", "la", "le", "il", "dem", "den"]
+        return sentence.indices.contains { start in
+            guard since.contains(sentence[start]) else { return false }
+            let rest = sentence[(start + 1)...]
+            guard let year = rest.firstIndex(where: isYear) else { return false }
+            return sentence[(start + 1)..<year].allSatisfy { monthNames[$0] != nil || isSmallNumber($0) || small.contains($0) }
+        }
     }
 
     private static var goesOn: [[String]] {
