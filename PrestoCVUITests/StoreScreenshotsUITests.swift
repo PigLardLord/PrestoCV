@@ -93,11 +93,12 @@ final class StoreScreenshotsUITests: XCTestCase {
     /// 3. A CV with only the facts of that description: what it does not mention is blank
     ///
     /// On iPhone the section bar floats over the lower part of the form, and the form is taller than the room between
-    /// the bars. The form goes up until the city, the last fact of the description, sits just under the navigation
-    /// bar, with its small label behind the bar's Done button: no title is left behind the navigation bar, and the
-    /// blank fields with their hints stay above the section bar, which floats over the empty summary. The city field
-    /// moves with the push of the editor and with the scroll, so the screen is taken once it has stopped moving after
-    /// both: the navigation bar has finished its transition by then.
+    /// the bars. The form goes up until the heading of the first section, with the facts, sits just under the
+    /// navigation bar (the one with the name of the CV and "Saved on this device"). Every fact and every blank field
+    /// with its hint is then in view, down to the hint of the empty summary, which ends just above the section bar:
+    /// the bar floats over the empty box of the summary. Behind the navigation bar there is only the name of the CV and
+    /// its language, which the bar blurs, and no text is cut in two by the edge of either bar. The form moves with the
+    /// push of the editor and with the scroll, so each position is read once the heading has stopped moving.
     private func captureTheFactsOnly() throws {
         let app = try launch(with: fixture.draftFiles())
         let draft = row(named: fixture.draftName, in: app)
@@ -106,23 +107,36 @@ final class StoreScreenshotsUITests: XCTestCase {
         let location = app.textFields.matching(labeled(text("field.location"))).firstMatch
         XCTAssertTrue(location.waitForExistence(timeout: 10), "The editor should open on the CV")
         waitUntilStill(location)
+        let form = app.collectionViews.firstMatch
         let sectionBar = app.tabBars.firstMatch
         if sectionBar.exists && sectionBar.frame.minY > app.frame.height / 2 {
-            scroll(app, by: location.frame.minY - app.navigationBars.firstMatch.frame.maxY)
-            waitUntilStill(location)
-            assertNoText(of: app.collectionViews.firstMatch, under: sectionBar)
+            let heading = form.staticTexts.matching(labeled(text("section.personal_info"))).firstMatch
+            XCTAssertTrue(heading.exists, "The editor should show the section with the facts")
+            // A point behind the edge of the bar: the heading has room above its text, and the hint of the summary
+            // stays a few points over the section bar
+            scroll(app, until: heading, isBelowTheNavigationBarBy: -1)
+            assertNoText(of: form, under: sectionBar)
         }
+        assertNoTextCut(of: form, byTheEdgeOf: app.navigationBars.firstMatch)
         attachScreenshot(3, showing: location)
     }
 
-    /// 4. The ways to start a CV: blank or from an example. The AI draft has its own screenshot, so its card is left out,
-    /// as on a device without Apple Intelligence.
+    /// 4. The ways to start a CV: import a CV, the AI draft, an example, or a blank CV, all of them offered. The
+    /// simulator cannot run the on-device model, so the debug override offers the AI draft, as on a device with Apple
+    /// Intelligence: the card is not dimmed, and does not say why it cannot be used.
     private func captureTheNewCVChoices() throws {
-        let app = try launch(with: fixture.listFiles(), arguments: ["-AIAvailabilityOverride", "deviceNotEligible"])
+        let app = try launch(with: fixture.listFiles(), arguments: ["-AIAvailabilityOverride", "available"])
         XCTAssertTrue(row(named: fixture.completeName, in: app).waitForExistence(timeout: 30), "The list should show the CVs")
         app.navigationBars.buttons.firstMatch.tap()
         let example = app.buttons.matching(labeled(text("template.example.title"), containing: true)).firstMatch
         XCTAssertTrue(example.waitForExistence(timeout: 10), "The New CV screen should offer the examples")
+        let aiDraft = app.buttons.matching(labeled(text("ai.card.title"), containing: true)).firstMatch
+        XCTAssertTrue(aiDraft.exists, "The New CV screen should offer the AI draft")
+        let announcement = aiDraft.value as? String ?? ""
+        XCTAssertFalse(announcement.mentions(text("ai.entry.unavailable")),
+                       "The AI draft should be live, not dimmed: it announces \"\(announcement)\"")
+        XCTAssertTrue(aiDraft.label.mentions(text("ai.card.subtitle")),
+                      "The AI draft should say what it does, not why it cannot: its label is \"\(aiDraft.label)\"")
         attachScreenshot(4, showing: example)
     }
 
@@ -193,6 +207,40 @@ final class StoreScreenshotsUITests: XCTestCase {
         from.press(forDuration: 0.1, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.5)
     }
 
+    /// Drags the form until the top of `element` is `gap` points under the navigation bar, give or take 3.
+    ///
+    /// A drag loses the first points of its travel before the form follows the finger, and a drag shorter than that
+    /// moves nothing at all: a correction of a few points has to ask for more than it needs. The first long drag
+    /// shows how many points are lost, and the next ones add them.
+    private func scroll(_ app: XCUIApplication, until element: XCUIElement, isBelowTheNavigationBarBy gap: CGFloat) {
+        var lost: CGFloat = 0
+        for _ in 0..<4 {
+            waitUntilStill(element)
+            let before = element.frame.minY
+            let error = before - (app.navigationBars.firstMatch.frame.maxY + gap)
+            if abs(error) <= 3 { return }
+            let drag = error > 0 ? error + lost : error - lost
+            scroll(app, by: drag)
+            waitUntilStill(element)
+            let moved = (before - element.frame.minY) * (drag > 0 ? 1 : -1)
+            lost = moved > 1 ? max(0, abs(drag) - moved) : lost + 5
+        }
+        waitUntilStill(element)
+        let off = element.frame.minY - (app.navigationBars.firstMatch.frame.maxY + gap)
+        XCTAssertLessThanOrEqual(abs(off), 3, "The form should stop \(gap) points under the navigation bar, and it is \(off) points off")
+    }
+
+    /// Fails if the lower edge of the bar cuts a text or a field of the form in two, by more than the 5 points of
+    /// padding that a heading has around its text. What lies wholly under the bar has scrolled away, and the bar blurs
+    /// it, but half a line under the bar reads as a mistake.
+    private func assertNoTextCut(of form: XCUIElement, byTheEdgeOf bar: XCUIElement) {
+        let edge = bar.frame.maxY
+        let cut = (form.staticTexts.allElementsBoundByIndex + form.textFields.allElementsBoundByIndex)
+            .filter { $0.frame.minY < edge - 5 && $0.frame.maxY > edge + 5 }
+            .map(\.label)
+        XCTAssertTrue(cut.isEmpty, "The navigation bar should cut no text, and it cuts \(cut)")
+    }
+
     /// Fails if a text or a field of the form is under the bar, which would hide it
     private func assertNoText(of form: XCUIElement, under bar: XCUIElement) {
         let covered = (form.staticTexts.allElementsBoundByIndex + form.textFields.allElementsBoundByIndex)
@@ -237,5 +285,12 @@ final class StoreScreenshotsUITests: XCTestCase {
         )
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+}
+
+private extension String {
+    /// Whether `part` is in the text, in either of its Unicode forms (see `labeled(_:containing:)`).
+    func mentions(_ part: String) -> Bool {
+        precomposedStringWithCanonicalMapping.contains(part.precomposedStringWithCanonicalMapping)
     }
 }
