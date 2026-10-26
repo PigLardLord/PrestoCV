@@ -12,6 +12,7 @@
       "identifier" : "23E2E8A327562C01000F2E5D",
       "name" : "PrestoCV"
     },
+    "testTimeoutsEnabled" : true,
     "userAttachmentLifetime" : "keepAlways"
   },
   "testTargets" : [

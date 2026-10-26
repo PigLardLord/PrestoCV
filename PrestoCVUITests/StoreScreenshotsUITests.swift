@@ -16,7 +16,10 @@ final class StoreScreenshotsUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        executionTimeAllowance = 900
+        // Ends a test that hangs. Xcode enforces it only because the StoreScreenshots plan turns test timeouts on, and
+        // rounds it up to a whole minute. The waits of a passing run add up to about 1,100 seconds at the very most (each
+        // one can take its whole timeout and pass), and the launches of the app some minutes: a slow language passes.
+        executionTimeAllowance = 1800
         XCUIDevice.shared.orientation = .portrait
     }
 

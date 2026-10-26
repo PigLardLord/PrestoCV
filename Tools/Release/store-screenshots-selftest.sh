@@ -8,7 +8,8 @@
 #   - put the simulator back (status bar cleared, shut down) and release the lock on every way out: the end, a failure
 #     and a signal, which stops the capture at once,
 #   - leave no capture of an earlier run to be composed: a language whose test failed has none, and --compose-only
-#     composes only a complete set.
+#     composes only a complete set,
+#   - run its tests where Xcode enforces their time allowance: the plan turns test timeouts on.
 #
 #   Tools/Release/store-screenshots-selftest.sh
 set -u
@@ -279,6 +280,10 @@ run -- --simulator-prefix "PrestoCV store"
 expect "a lock that another run is taking over" "exit $RC, want 75" [ "$RC" = 75 ]
 expect "  touches no simulator" "xcrun was called" no_calls
 rm -rf "$LOCK" "$LOCK.takeover"
+
+# The test sets a time allowance for each language, and Xcode enforces it only where the plan turns test timeouts on
+PLAN="$HERE/../../TestPlans/StoreScreenshots.xctestplan"
+expect "the StoreScreenshots plan" "does not turn test timeouts on, so a test that hangs is never ended" grep -q '"testTimeoutsEnabled" : true' "$PLAN"
 
 echo "store-screenshots-selftest: $pass passed, $fail failed"
 [ "$fail" = 0 ]
