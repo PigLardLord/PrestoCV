@@ -90,6 +90,18 @@ struct ReleaseHygieneTests {
         #expect(offenders.isEmpty, "Console output outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
+    // MARK: Test hooks
+
+    @Test("The launch argument that hands CV files to the app is read only by Debug builds")
+    func theSeedOfTheUITestsIsReadOnlyInDebugBuilds() {
+        let reads = Self.shippedLines().filter { $0.code.contains("PrestoCVUITestsSeed") || $0.code.contains("seedFiles(") }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the seed: update it with the code")
+        #expect(offenders.isEmpty, "The seed of the UI tests outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
     // MARK: Privacy manifest
 
     /// The categories of required-reason APIs (Apple's list), each with a pattern for the calls and keys that use them.
