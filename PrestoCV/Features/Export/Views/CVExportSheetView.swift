@@ -9,6 +9,8 @@ struct CVExportSheetView: View {
     @StateObject private var previewCoordinator = HTMLPreviewCoordinator()
     /// The PDF in the share sheet, while the share sheet is open
     @State private var sharingPDF: ExportedPDF?
+    /// VoiceOver's focus on the button that shows the full PDF, which is put back there when the full PDF is closed
+    @AccessibilityFocusState private var fullPDFButtonHasFocus: Bool
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -123,6 +125,7 @@ struct CVExportSheetView: View {
             set: { if $0 == nil { viewModel.closeFullPDF() } }
         ), onDismiss: {
             viewModel.fullPDFDidDismiss()
+            fullPDFButtonHasFocus = true
         }) { pdf in
             FullPDFView(pdf: pdf) { viewModel.closeFullPDF() }
         }
@@ -181,30 +184,45 @@ struct CVExportSheetView: View {
         .animation(DesignTokens.Animations.fastEaseInOut, value: viewModel.previewHTML)
     }
 
-    /// The pages of the rendered PDF in the preview, to scroll through. A tap on them shows the PDF full screen; for
-    /// VoiceOver the preview is that button, with the number of pages.
+    /// The pages of the rendered PDF in the preview, to scroll through. A tap on them shows the PDF full screen, and so
+    /// does the button over their corner, which is how VoiceOver, a keyboard, a pointer, Switch Control and Voice Control
+    /// get there: the pages themselves are for the eye and the finger.
     private func pdfPreview(of pdf: ExportedPDF) -> some View {
-        PDFPreviewView(url: pdf.url)
-            .overlay(alignment: .bottomTrailing) {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(DesignTokens.Typography.footnote.font)
-                    .foregroundColor(DesignTokens.Colors.primary)
-                    .padding(DesignTokens.Spacing.xs)
-                    .background(.regularMaterial, in: Circle())
-                    .padding(DesignTokens.Spacing.xs)
-                    // The sign stays small at the largest text sizes, where it would cover the page
-                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-                    .accessibilityHidden(true)
-            }
+        PDFPreviewView(url: pdf.url, isForTheEyeOnly: true)
+            .accessibilityHidden(true)
             .onTapGesture {
                 viewModel.showFullPDF()
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(viewModel.fullPDFAccessibilityLabel ?? "")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction {
-                viewModel.showFullPDF()
+            .overlay(alignment: .bottomTrailing) {
+                showFullPDFButton
             }
+    }
+
+    /// Shows the PDF full screen; for VoiceOver it says how many pages the PDF has
+    private var showFullPDFButton: some View {
+        Button {
+            viewModel.showFullPDF()
+        } label: {
+            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                .font(DesignTokens.Typography.footnote.font)
+                .foregroundColor(DesignTokens.Colors.primary)
+                .padding(DesignTokens.Spacing.xs)
+                .background(.regularMaterial, in: Circle())
+                // The room around the sign is part of the button, up to what a finger can hit
+                .frame(
+                    minWidth: DesignTokens.InputSize.minimumTapTarget,
+                    minHeight: DesignTokens.InputSize.minimumTapTarget
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .hoverEffect(.highlight)
+        .accessibilityLabel(viewModel.fullPDFAccessibilityLabel ?? "")
+        .accessibilityFocused($fullPDFButtonHasFocus)
+        // The sign stays small at the largest text sizes, where it would cover the page
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        // It lies on a page, which is on paper in a dark interface too: the sign and its material are light on it
+        .environment(\.colorScheme, .light)
     }
 
     /// Under the preview: how many pages the PDF has, and the language of its headings with a way to change it. Side by

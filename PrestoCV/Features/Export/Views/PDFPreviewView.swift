@@ -78,14 +78,20 @@ final class PDFPagesView: PDFView {
 /// The pages of a rendered PDF, one under the other, to scroll through
 struct PDFPreviewView: UIViewRepresentable {
     let url: URL
+    /// The pages are only to look at, because something else stands for them to assistive technology. PDFKit gives their
+    /// text to it, and SwiftUI's `accessibilityHidden` marks its own node without setting a flag on this view, so the view
+    /// is hidden here too.
+    var isForTheEyeOnly = false
 
     func makeUIView(context: Context) -> PDFPagesView {
         let view = PDFPagesView()
         view.document = PDFDocument(url: url)
+        view.accessibilityElementsHidden = isForTheEyeOnly
         return view
     }
 
     func updateUIView(_ view: PDFPagesView, context: Context) {
+        view.accessibilityElementsHidden = isForTheEyeOnly
         guard view.document?.documentURL != url else { return }
         view.document = PDFDocument(url: url)
     }
