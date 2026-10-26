@@ -285,24 +285,35 @@ private enum WCAG {
 }
 
 /// The pixels of a view drawn off screen, as sRGB bytes.
+///
+/// The view is drawn by `ImageRenderer.render`, with Core Graphics, into a bitmap the test owns, before `init` returns.
+/// `ImageRenderer.cgImage` is not used: it draws on the GPU and waits a bounded time (about two seconds) for the Metal
+/// pipelines it needs. On a freshly erased simulator those are compiled on first use, and while the Metal compiler is
+/// busy the compile can outlast the wait: the image then comes back empty.
 @MainActor
 private struct RenderedPixels {
+    private static let scale: CGFloat = 2
     private let rgba: [UInt8]
 
     init(of view: some View, in scheme: ColorScheme) throws {
         let renderer = ImageRenderer(content: view.frame(minWidth: 8, minHeight: 8).environment(\.colorScheme, scheme))
-        renderer.scale = 2
-        let image = try #require(renderer.cgImage)
+        renderer.scale = Self.scale
         let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
-        var rgba = [UInt8](repeating: 0, count: image.width * image.height * 4)
-        let drawn = rgba.withUnsafeMutableBytes { buffer in
-            guard let context = CGContext(data: buffer.baseAddress, width: image.width, height: image.height, bitsPerComponent: 8,
-                                          bytesPerRow: image.width * 4, space: space,
-                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
-            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
-            return true
+        var rgba: [UInt8] = []
+        var drawn = false
+        renderer.render(rasterizationScale: Self.scale) { size, render in
+            let width = Int((size.width * Self.scale).rounded(.up)), height = Int((size.height * Self.scale).rounded(.up))
+            rgba = [UInt8](repeating: 0, count: width * height * 4)
+            drawn = rgba.withUnsafeMutableBytes { buffer in
+                guard let context = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                                              bytesPerRow: width * 4, space: space,
+                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+                context.scaleBy(x: Self.scale, y: Self.scale)
+                render(context)
+                return true
+            }
         }
-        try #require(drawn)
+        try #require(drawn, "The view was drawn into a bitmap of the test's own")
         self.rgba = rgba
     }
 
