@@ -155,6 +155,10 @@ expect "  leaves no lock" "$LOCK is left" no_lock
 expect "  exports the six screenshots" "the captures are: $(captures iphone en)" [ "$(captures iphone en)" = "$six" ]
 expect "  leaves no half-made set" "a .partial is left" no_partial
 expect "  composes them" "the composer did not run" composed
+# simctl takes an ISO 8601 date-time with fractional seconds and reads it in the simulator's time zone, so that the offset must
+# be the one of the Mac on that day: a date makes the iPad's bar the same in every capture, and 09:41 is the local time of it
+fixed_clock() { grep -qE '^xcrun simctl status_bar OWN-UDID override --time 2007-01-09T09:41:00\.000[+-][0-9]{2}:[0-9]{2} ' "$LOG"; }
+expect "  sets the clock to a fixed date at 9:41 local time" "the override has no ISO date-time at 09:41" fixed_clock
 
 # 2. The name of the simulators is reserved to the tool: another name is refused before anything is erased
 run -- --simulator-prefix "MyTests"

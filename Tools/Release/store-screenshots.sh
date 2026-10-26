@@ -15,7 +15,7 @@
 # with "PrestoCV store": that name is reserved to it, and no other simulator may carry it. It builds the
 # StoreScreenshots test plan, which holds only StoreScreenshotsUITests, once. Then, for each language, it erases the
 # simulator, so that no choice of the last language is left, and boots it in that language and region, so that the
-# system's own screens (the share sheet) and the clock speak it too: the status bar at 9:41 (09:41 where the region
+# system's own screens (the share sheet) and the clock speak it too: the status bar at 9:41 on a fixed date (09:41 where the region
 # writes it so), full battery and full signal, the light appearance, and a keyboard without autocorrection, spell check
 # or predictions, which would change or underline the description the test types. It runs the language's test, handing
 # it the app's texts in that language from the string catalog (the test does not read the source tree), and exports the
@@ -257,8 +257,17 @@ prepare() {
     xcrun simctl shutdown "$udid"
     boot "$udid"
     xcrun simctl ui "$udid" appearance light
-    xcrun simctl status_bar "$udid" override --time 9:41 --dataNetwork wifi --wifiMode active --wifiBars 3 \
+    xcrun simctl status_bar "$udid" override --time "$(status_bar_time)" --dataNetwork wifi --wifiMode active --wifiBars 3 \
         --cellularMode active --cellularBars 4 --operatorName "" --batteryState charged --batteryLevel 100
+}
+
+# The clock of the status bar: simctl reads an ISO 8601 date-time (with fractional seconds) in the Mac's time zone, so the
+# offset is the Mac's on that day. A bare "9:41" leaves the real date on the iPad's bar, so a capture would carry the day it
+# was made. The date is fixed, and 9:41 is the local time of it.
+status_bar_time() {
+    python3 -c 'import datetime
+offset = datetime.datetime(2007, 1, 9, 9, 41).astimezone().strftime("%z")
+print("2007-01-09T09:41:00.000%s:%s" % (offset[:3], offset[3:]))'
 }
 
 # The app's texts in a language, from its string catalog, as the test takes them: a JSON object from key to text, in
