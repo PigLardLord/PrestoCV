@@ -8,9 +8,10 @@ import Foundation
 ///   does not hold yet is written only once it is worth storing: a blank one left untouched leaves nothing behind.
 /// - **After a write:** the content is compared with the store again. A change made while the write ran, or one that
 ///   undid it, is written next: by the pause that follows, or by the flush that was waiting.
-/// - **If a write fails:** the content stays in memory, the status says so, the cause goes to the diagnostic boundary,
-///   and the next change or `flush()` tries again. The failure stays while that write runs (`retrying`), and goes once a
-///   write succeeds, or once the content is found to be what the store holds, because nothing is left to retry.
+/// - **If a write fails:** the content stays in memory, the status says so, the error the write threw goes to
+///   `onWriteFailure`, and the next change or `flush()` tries again. The failure stays while that write runs
+///   (`retrying`), and goes once a write succeeds, or once the content is found to be what the store holds, because
+///   nothing is left to retry.
 /// - **If a write is cancelled:** that is no failure. The content stays to be written, a pause starts so that it is
 ///   written without another change, and `flush()` passes the cancellation on.
 ///
@@ -83,8 +84,9 @@ public final class Autosave<Content: Equatable & Sendable> {
     ///   - isStored: Whether the store holds the CV already.
     ///   - isWorthStoring: Whether content the store does not hold yet should be stored.
     ///   - clock: The clock the pause is measured on.
-    ///   - onWriteFailure: Told the cause of each write that fails, which the status does not carry: a full disk, a
-    ///     permission and an encoding error all read as `failed`.
+    ///   - onWriteFailure: Given the error of each write that fails, which the status does not carry: a full disk, a
+    ///     permission and an encoding error all read as `failed`. It holds what the write throws: through `SaveCV` that is
+    ///     `AuthoringError.unavailable`, which no longer has the repository's `FailureCause`.
     ///   - write: Stores the content. It is told whether the store holds the CV already, so that it creates the CV the
     ///     first time and updates it afterwards, and needs nothing of the editor that made it: a write that ends after
     ///     the editor is gone still stores what it was given.

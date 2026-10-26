@@ -17,16 +17,17 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     let directory: URL
     let clock: any TimeSource
     let maxFileBytes: Int
+    /// The options of every write, from the protection class the composition root gave: complete unless it said otherwise.
+    nonisolated let writeOptions: Data.WritingOptions
     var quarantine: URL { directory.appendingPathComponent("Quarantine", isDirectory: true) }
 
-    public init(directory: URL, clock: any TimeSource, maxFileBytes: Int = 5 * 1024 * 1024) {
-        self.directory = directory; self.clock = clock; self.maxFileBytes = maxFileBytes
+    public init(directory: URL, clock: any TimeSource, options: StoreOptions = StoreOptions()) {
+        self.directory = directory; self.clock = clock
+        self.maxFileBytes = options.maxFileBytes; self.writeOptions = options.writing
     }
 
     static let suffix = ".cv.json"
     static let uuidPattern = "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
-    /// Atomic, and on Apple platforms unreadable while the device is locked. The simulator does not apply protection.
-    static let writeOptions: Data.WritingOptions = [.atomic, .completeFileProtection]
     private func url(_ id: CVID) -> URL { directory.appendingPathComponent(id.raw.uuidString + Self.suffix) }
 
     // MARK: Locking
@@ -124,16 +125,19 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     /// Writes only what this repository will be able to read back: the encoded file must be within the size
     /// cap and must decode, through the same strict path as a read, to the same CV. Otherwise nothing is
     /// written and the previous version stays (review round 2: the writer accepted what the reader rejects).
+    ///
+    /// A failure keeps the error it came from, as a domain and a code (R7); the text the user sees does not depend on it.
     private func write(_ cv: CV) throws(RepositoryError) {
         let name = url(cv.id).lastPathComponent
-        guard let created = cv.createdAt, let updated = cv.updatedAt else { throw .writeFailed(file: name) }
+        // `stored(revision:at:)` sets both dates, and a read always returns them, so a CV without them would not read back.
+        guard let createdAt = cv.createdAt, let updatedAt = cv.updatedAt else { throw .wouldNotReadBack(file: name) }
         let data: Data
-        do { data = try CVFileV1(cv, createdAt: created, updatedAt: updated).encoded() } catch { throw .writeFailed(file: name) }
+        do { data = try CVFileV1(cv, createdAt: createdAt, updatedAt: updatedAt).encoded() } catch { throw .writeFailed(file: name, cause: FailureCause(error)) }
         guard data.count <= maxFileBytes else { throw .wouldNotReadBack(file: name) }
         do {
             guard try CVFileV1.decode(data).toDomain() == cv else { throw RepositoryError.wouldNotReadBack(file: name) }
         } catch { throw .wouldNotReadBack(file: name) }
-        do { try data.write(to: url(cv.id), options: Self.writeOptions) } catch { throw .writeFailed(file: name) }
+        do { try data.write(to: url(cv.id), options: writeOptions) } catch { throw .writeFailed(file: name, cause: FailureCause(error)) }
     }
 
     /// Timestamps are stored with whole-second precision (ISO 8601), so they are normalised before use;
@@ -178,7 +182,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         try withStoreLock { () throws(RepositoryError) in
             guard let existing = try current(id) else { throw .notFound(id) }
             guard existing.revision == revision else { throw .conflict(id, storedRevision: existing.revision) }
-            do { try FileManager.default.removeItem(at: url(id)) } catch { throw .writeFailed(file: url(id).lastPathComponent) }
+            do { try FileManager.default.removeItem(at: url(id)) } catch { throw .writeFailed(file: url(id).lastPathComponent, cause: FailureCause(error)) }
         }
     }
 
@@ -252,7 +256,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
             case .newer(let v): throw .upgradeRequired(file: name, version: v)
             case .corrupt: throw .corrupt(file: name)
             }
-            do { try FileManager.default.moveItem(at: source, to: target) } catch { throw .writeFailed(file: original) }
+            do { try FileManager.default.moveItem(at: source, to: target) } catch { throw .writeFailed(file: original, cause: FailureCause(error)) }
             return cv
         }
     }
@@ -265,7 +269,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
             victims += quarantined.filter { $0 == name || $0.hasSuffix("~" + name) }.map { quarantine.appendingPathComponent($0) }
             for v in victims {
                 guard try Self.exists(v) else { continue }
-                do { try FileManager.default.removeItem(at: v) } catch { throw .writeFailed(file: v.lastPathComponent) }
+                do { try FileManager.default.removeItem(at: v) } catch { throw .writeFailed(file: v.lastPathComponent, cause: FailureCause(error)) }
             }
         }
     }
@@ -279,7 +283,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
                 let modified: Date?
                 do { modified = try FileManager.default.attributesOfItem(atPath: u.path)[.modificationDate] as? Date } catch { throw .unreadable(file: n) }
                 guard let modified, modified < date else { continue }
-                do { try FileManager.default.removeItem(at: u); removed += 1 } catch { throw .writeFailed(file: n) }
+                do { try FileManager.default.removeItem(at: u); removed += 1 } catch { throw .writeFailed(file: n, cause: FailureCause(error)) }
             }
             return removed
         }

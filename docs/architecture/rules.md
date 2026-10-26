@@ -110,6 +110,7 @@ Only `PrestoCVComposition` creates infrastructure: repositories, stores, rendere
 ## R7. Errors are typed per context and translated at the boundary
 
 - **Each context has its own error type.** Errors carry codes and file names, never paths or free-form strings.
+- **A failed write keeps its cause,** as a domain and a code (`FailureCause`), so that a failed test and a direct caller of the repository can name it. It applies to the failures a repository maps to `writeFailed`; the other classified outcomes (a read, a lock, a listing, a quarantine) are codes and keep none. The use cases translate it to `AuthoringError.unavailable` and the cause stops there, until a diagnostic boundary records it. The text the user sees does not depend on it.
 - **`CancellationError` is always passed through unchanged.**
 - **Errors are translated once, where they cross a boundary.** For example, `SaveCV` turns repository errors into `AuthoringError`. Presentation never matches the shape of a port's errors.
 - **Nothing swallows an error.** There is no `try?` and no empty `catch` in production code. A tolerated failure is mapped explicitly to a typed outcome with `do`/`catch`.
