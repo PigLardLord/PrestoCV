@@ -19,6 +19,8 @@ struct ImportReview: Hashable, Sendable {
             case byPosition
             /// Nothing told the role from the employer, or the degree from the school.
             case partsByOrder
+            /// The lines next to the entry's dates may be the entry's beside it: the more common layout decided.
+            case entryBounds
             /// A date that could not be read as a period, or a period with no end.
             case period
             /// A language whose level the text gives in words, or not at all: the CV needs a level, so it was not added.
@@ -48,6 +50,7 @@ struct ImportReview: Hashable, Sendable {
             switch reason {
             case .byPosition: return "import.review.reason.position"
             case .partsByOrder: return "import.review.reason.order"
+            case .entryBounds: return "import.review.reason.bounds"
             case .period: return "import.review.reason.period"
             case .languageNotAdded: return "import.review.reason.language"
             case .languageLevels: return "import.review.reason.levels"

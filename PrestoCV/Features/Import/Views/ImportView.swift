@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// The screen that brings in a CV the person already has: a text pasted from a chat assistant, Word, an e-mail or
-/// LinkedIn, or a PDF from Files. The CV it reads opens in the editor, unsaved, with what to check.
+/// LinkedIn, or a PDF from Files. The CV it reads opens in the editor, which stores it as it is, with what to check.
 struct ImportView: View {
     @EnvironmentObject var router: AppRouter
     @StateObject private var viewModel: ImportViewModel
@@ -124,11 +124,13 @@ struct ImportView: View {
                 .labelStyle(.titleAndIcon)
                 .accessibilityIdentifier("import.paste")
             }
-            // A text editor has no label of its own: VoiceOver names it by the title above it
+            // A text editor has no label of its own: VoiceOver names it by the title above it. The box keeps its height
+            // and a long CV scrolls inside it: a box that grew with the text took the import far below it, and a swipe
+            // on the text moved the text, not the screen
             TextEditor(text: $viewModel.text)
                 .accessibilityLabel("import.text.title".localized)
                 .accessibilityIdentifier("import.text")
-                .frame(minHeight: 220)
+                .frame(height: 220)
                 .padding(DesignTokens.Spacing.sm)
                 .background(DesignTokens.Colors.backgroundSecondary)
                 .cornerRadius(DesignTokens.CornerRadius.md)

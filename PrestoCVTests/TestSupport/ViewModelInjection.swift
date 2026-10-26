@@ -1,3 +1,4 @@
+import DiagnosticLogging
 import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
@@ -18,10 +19,15 @@ func waitUntilCancelled(_ duration: Duration) async throws {
 let englishDocumentLanguageDetector = DocumentLanguageDetector(preferredLanguages: ["en"], read: NaturalLanguageReader.read)
 
 extension AppEnvironment {
-    /// A device in English, on a fixed day in UTC, whose waits end only when cancelled
+    /// A device in English, on a fixed day in UTC, whose waits end only when cancelled (or as `sleep` says), and whose clock
+    /// moves only when a test moves it. `arguments` are the launch arguments, none by default; `diagnostics` is where the
+    /// import and the AI draft log, nowhere by default.
     static func fixed(
-        newEditingID: @escaping () -> UUID = { UUID() },
-        container: URL = FileManager.default.temporaryDirectory.appendingPathComponent("Container-\(UUID().uuidString)")
+        clock: any Clock<Duration> = ManualClock(),
+        container: URL = FileManager.default.temporaryDirectory.appendingPathComponent("Container-\(UUID().uuidString)"),
+        sleep: @escaping @Sendable (Duration) async throws -> Void = waitUntilCancelled,
+        arguments: [String] = [],
+        diagnostics: any DiagnosticLogger = SilentLogger()
     ) -> AppEnvironment {
         AppEnvironment(
             now: { testDay },
@@ -29,15 +35,16 @@ extension AppEnvironment {
             timeZone: .gmt,
             appLanguage: "en",
             preferredLanguages: { ["en"] },
-            sleep: waitUntilCancelled,
-            newEditingID: newEditingID,
+            sleep: sleep,
+            clock: clock,
             temporaryDirectory: FileManager.default.temporaryDirectory,
             exportPreferencesFile: FileManager.default.temporaryDirectory.appendingPathComponent("export-preferences-\(UUID().uuidString).json"),
             container: container,
             removeFile: { try FileManager.default.removeItem(at: $0) },
-            arguments: [],
+            arguments: arguments,
             bundle: Bundle(for: AppRouter.self),
-            platform: .iPhoneOrIPad
+            platform: .iPhoneOrIPad,
+            diagnostics: diagnostics
         )
     }
 }
@@ -50,34 +57,34 @@ let gregorianUTC: Calendar = {
 }()
 
 extension CVEditorViewModel {
-    /// An editor whose Automatic document language falls back to English. To give it another detector, use the
-    /// initialiser that takes every dependency.
+    /// An editor as the tests open it: `cvId` opens a stored CV; otherwise `initialCV`, or a blank CV, opens as a new
+    /// CV with `notice`: stored as it is with the AI or the import notice, and once it is changed without one. Its
+    /// Automatic document language falls back to English. Its pause before a save ends only when the test moves `clock`,
+    /// so a test that does not move it sees what `saveNow()` and leaving store.
     convenience init(
         cvId: String?,
         initialCV: CVModel? = nil,
         notice: EditorNotice? = nil,
-        restoring restoredEdits: UnsavedEdits? = nil,
         cvManagementUseCase: CVManagementUseCaseProtocol,
-        unsavedEdits: UnsavedEditsKeeper? = nil,
-        sleep: @escaping (Duration) async throws -> Void = waitUntilCancelled
+        documentLanguageDetector: DocumentLanguageDetector = englishDocumentLanguageDetector,
+        clock: any Clock<Duration> = ManualClock(),
+        awaitLeftEditors: @escaping @MainActor () async -> Void = {},
+        reportSaveFailure: @escaping @MainActor (any Error) -> Void = { _ in }
     ) {
+        let request: EditorRequest
+        if let cvId {
+            request = .stored(cvId: cvId)
+        } else {
+            request = .new(template: initialCV ?? CVModel(), notice: notice)
+        }
         self.init(
-            cvId: cvId,
-            initialCV: initialCV,
-            notice: notice,
-            restoring: restoredEdits,
+            request: request,
             cvManagementUseCase: cvManagementUseCase,
-            documentLanguageDetector: englishDocumentLanguageDetector,
-            unsavedEdits: unsavedEdits,
-            sleep: sleep
+            documentLanguageDetector: documentLanguageDetector,
+            clock: clock,
+            awaitLeftEditors: awaitLeftEditors,
+            reportSaveFailure: reportSaveFailure
         )
-    }
-}
-
-extension UnsavedEditsKeeper {
-    /// A keeper whose waits after a change end only when cancelled
-    convenience init(editing: UUID, claim: UnsavedEditsClaim? = nil, useCase: UnsavedEditsUseCaseProtocol) {
-        self.init(editing: editing, claim: claim, useCase: useCase, wait: waitUntilCancelled)
     }
 }
 
@@ -87,7 +94,8 @@ extension CVListViewModel {
         cvManagementUseCase: CVManagementUseCaseProtocol,
         now: @escaping () -> Date = { testDay },
         calendar: @escaping () -> Calendar = { gregorianUTC },
-        sleep: @escaping (Duration) async throws -> Void = waitUntilCancelled
+        sleep: @escaping (Duration) async throws -> Void = waitUntilCancelled,
+        awaitLeftEditors: @escaping @MainActor () async -> Void = {}
     ) {
         self.init(
             cvManagementUseCase: cvManagementUseCase,
@@ -95,15 +103,9 @@ extension CVListViewModel {
             locale: Locale(identifier: "en"),
             now: now,
             calendar: calendar,
-            sleep: sleep
+            sleep: sleep,
+            awaitLeftEditors: awaitLeftEditors
         )
-    }
-}
-
-extension UnsavedEditsOfferViewModel {
-    /// An offer that tells its time in English, in UTC
-    convenience init(useCase: UnsavedEditsUseCaseProtocol?, cvs: CVManagementUseCaseProtocol) {
-        self.init(useCase: useCase, cvs: cvs, locale: Locale(identifier: "en"), timeZone: .gmt)
     }
 }
 

@@ -65,7 +65,8 @@
   "IOSPDFRenderer",
   "MacPDFRenderer",
   "FoundationModelsDrafter",
-  "PDFKitTextExtractor"
+  "PDFKitTextExtractor",
+  "OSLogDiagnosticLogger"
  ],
  "serviceSuffixes": [
   "UseCase",
@@ -87,7 +88,8 @@
   "Renderer",
   "Engine",
   "Requester",
-  "Factory"
+  "Factory",
+  "Logger"
  ],
  "exceptions": [
   {
@@ -217,7 +219,8 @@
    "path": "PrestoCVCore/Sources/PrestoCVImporting",
    "allowedImports": [
     "PrestoCVDomain",
-    "Foundation"
+    "Foundation",
+    "DiagnosticLogging"
    ],
    "rules": [
     "R1",
@@ -240,7 +243,9 @@
     "Testing",
     "Foundation",
     "PrestoCVImporting",
-    "PrestoCVDomain"
+    "PrestoCVDomain",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport"
    ],
    "rules": []
   },
@@ -252,7 +257,9 @@
     "PDFKit",
     "UIKit",
     "AppKit",
-    "Foundation"
+    "CoreGraphics",
+    "Foundation",
+    "DiagnosticLogging"
    ],
    "rules": [
     "R1",
@@ -273,7 +280,10 @@
     "PDFKit",
     "PrestoCVImporting",
     "PrestoCVImportingPDFKit",
-    "CoreText"
+    "CoreGraphics",
+    "CoreText",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport"
    ],
    "rules": [
     "R16"
@@ -705,6 +715,82 @@
    ]
   },
   {
+   "name": "DiagnosticLogging",
+   "path": "DiagnosticLogging/Sources/DiagnosticLogging",
+   "allowedImports": [
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14",
+    "R17",
+    "R18"
+   ]
+  },
+  {
+   "name": "DiagnosticLoggingOSLog",
+   "path": "DiagnosticLogging/Sources/DiagnosticLoggingOSLog",
+   "allowedImports": [
+    "DiagnosticLogging",
+    "os"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "DiagnosticLoggingTestSupport",
+   "path": "DiagnosticLogging/Sources/DiagnosticLoggingTestSupport",
+   "kind": "test",
+   "allowedImports": [
+    "DiagnosticLogging",
+    "Foundation",
+    "Synchronization"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
+   "name": "DiagnosticLoggingTests",
+   "path": "DiagnosticLogging/Tests/DiagnosticLoggingTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
+   "name": "DiagnosticLoggingOSLogTests",
+   "path": "DiagnosticLogging/Tests/DiagnosticLoggingOSLogTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "DiagnosticLogging",
+    "DiagnosticLoggingOSLog",
+    "os"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
    "name": "PrestoCVCore",
    "path": "PrestoCVCore/Sources/PrestoCVCore",
    "kind": "legacy",
@@ -781,7 +867,9 @@
    "name": "CVGeneratorAI",
    "path": "CVGeneratorAI/Sources/CVGeneratorAI",
    "kind": "legacy",
-   "allowedImports": [],
+   "allowedImports": [
+    "DiagnosticLogging"
+   ],
    "rules": []
   },
   {
@@ -789,7 +877,9 @@
    "path": "CVGeneratorAI/Tests/CVGeneratorAITests",
    "kind": "legacy",
    "allowedImports": [
-    "CVGeneratorAI"
+    "CVGeneratorAI",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport"
    ],
    "rules": []
   },
@@ -924,6 +1014,18 @@
   {
    "name": "PrestoCVAppManifest",
    "path": "PrestoCVApp/Package.swift",
+   "kind": "manifest",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m",
+    "R15"
+   ]
+  },
+  {
+   "name": "DiagnosticLoggingManifest",
+   "path": "DiagnosticLogging/Package.swift",
    "kind": "manifest",
    "allowedImports": [
     "PackageDescription"

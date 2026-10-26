@@ -17,10 +17,17 @@ enum PreviewDependencies {
     /// Reads the language of a preview's CV, and falls back to English
     static let documentLanguageDetector = DocumentLanguageDetector(preferredLanguages: ["en"], read: NaturalLanguageReader.read)
 
-    /// The editor of a new CV
+    /// An editor of a new, blank CV, which saves into the CVs of the preview
     @MainActor
     static func editor() -> CVEditorViewModel {
-        CVEditorViewModel(cvId: nil, cvManagementUseCase: cvManagement(), documentLanguageDetector: documentLanguageDetector, sleep: { _ in })
+        CVEditorViewModel(
+            request: .new(template: CVModel(), notice: nil),
+            cvManagementUseCase: cvManagement(),
+            documentLanguageDetector: documentLanguageDetector,
+            clock: ContinuousClock(),
+            awaitLeftEditors: {},
+            reportSaveFailure: { _ in }
+        )
     }
 
     /// The export sheet of `cv`, which hands the language chosen to `sink`
@@ -51,7 +58,8 @@ enum PreviewDependencies {
             locale: Locale(identifier: "en"),
             now: { Date(timeIntervalSinceReferenceDate: 800_000_000) },
             calendar: { Calendar(identifier: .gregorian) },
-            sleep: { _ in }
+            sleep: { _ in },
+            awaitLeftEditors: {}
         )
     }
 

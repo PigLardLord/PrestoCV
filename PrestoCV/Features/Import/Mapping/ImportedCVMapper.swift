@@ -3,7 +3,7 @@ import PrestoCVCore
 import PrestoCVImporting
 import enum PrestoCVDomain.LanguageProficiency
 
-/// A CV read from the person's text, unsaved, and what the editor shows about it.
+/// A CV read from the person's text, not stored yet, and what the editor shows about it.
 struct ImportedDraft: Equatable, Sendable {
     let cv: CVModel
     let review: ImportReview
@@ -87,6 +87,7 @@ struct ImportedCVMapper {
             switch item.reason {
             case .nameByPosition, .titleByPosition, .locationByPosition, .summaryWithoutHeading: reason = .byPosition
             case .roleOrEmployerByOrder: reason = .partsByOrder
+            case .entryBoundsUnsure: reason = .entryBounds
             case .periodUnreadable, .periodOpenEnd: reason = .period
             case .levelNotCEFR: reason = .languageNotAdded
             case .levelsDiffer: reason = .languageLevels

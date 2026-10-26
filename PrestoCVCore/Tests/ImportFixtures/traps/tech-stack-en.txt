@@ -1,0 +1,18 @@
+Alex Morgan
+Mobile Developer
+Leeds, UK · alex.morgan@example.com · 07700 900411
+
+EXPERIENCE
+Mobile Developer – Acme Apps Ltd, Leeds
+March 2021 – Present
+Built the booking app in Swift.
+
+Junior Developer – Example Software Ltd, York
+June 2018 – February 2021
+
+EDUCATION
+BSc Computer Science – Example University, Leeds (2015 – 2018)
+
+TECH STACK
+Swift, SwiftUI, Combine
+Kotlin, Docker

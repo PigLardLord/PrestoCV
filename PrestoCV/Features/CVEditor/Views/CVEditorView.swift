@@ -11,6 +11,10 @@ struct CVEditorView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
+    /// The editor's height, and the height of the notice above the form with all its lines: where the form is short of room,
+    /// `EditorChrome` gives the notice part of the editor, and the notice scrolls beyond it.
+    @State private var editorHeight: CGFloat = 0
+    @State private var noticeFullHeight: CGFloat = 0
 
     private var chrome: EditorChrome {
         EditorChrome(verticalSizeClass: verticalSizeClass, dynamicTypeSize: dynamicTypeSize)
@@ -35,44 +39,41 @@ struct CVEditorView: View {
             editorView
         }
         .screenTitle(viewModel.screenTitle)
-        // Back and the edge swipe would leave without the discard confirmation that Cancel asks for
+        // The quiet proof that the editor saves by itself, and that the CV stays on the device
+        .navigationSubtitle(viewModel.subtitle)
+        // Back is the editor's own, so that it stores what the form shows before it leaves, and stays, with the failure,
+        // when that cannot be done: the system's Back would leave first, and the edits would go with the editor
         .navigationBarBackButtonHidden(true)
+        // The swipe that goes back goes through the same Back when the form holds edits the store does not
+        .guardsBackSwipe(
+            canLeaveAtOnce: { viewModel.storeHoldsWhatTheFormShows },
+            leave: { Task { await router.leaveEditor(viewModel) } }
+        )
         .toolbar {
-            // Leading: Cancel, with confirmation if there are unsaved changes, or Done once everything is saved
+            // Leading: Back. Trailing: export, in every layout, as its symbol, which leaves the title its room in every
+            // language
             ToolbarItem(placement: .navigationBarLeading) {
-                BarButton(
-                    title: exitTitle, systemImage: "xmark", screenTextSize: dynamicTypeSize,
-                    action: handleCancelTap
-                )
-                .foregroundColor(DesignTokens.Colors.accent)
+                Button {
+                    Task { await router.leaveEditor(viewModel) }
+                } label: {
+                    Label("common.back".localized, systemImage: "chevron.backward")
+                        .labelStyle(.iconOnly)
+                }
+                .accessibilityIdentifier("BackButton")
+                .accessibilityShowsLargeContentViewer {
+                    Label("common.back".localized, systemImage: "chevron.backward")
+                }
             }
-            
-            // Trailing, in one capsule: export, in every layout, then Save with its unsaved-changes dot. Both show their
-            // symbols, which leave the title its room in every language, also in portrait on an iPhone
             ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: DesignTokens.Spacing.xs) {
-                    Button {
-                        showingExportSheet = true
-                    } label: {
-                        Label("export.button.title".localized, systemImage: "square.and.arrow.up")
-                            .labelStyle(.iconOnly)
-                    }
-                    .disabled(!viewModel.canExport)
-                    .accessibilityShowsLargeContentViewer {
-                        Label("export.button.title".localized, systemImage: "square.and.arrow.up")
-                    }
-
-                    UnsavedChangesIndicator.warning(isVisible: viewModel.hasUnsavedChanges)
-                    Button(action: handleSaveTap) {
-                        Label("common.save".localized, systemImage: "checkmark")
-                            .labelStyle(.iconOnly)
-                    }
-                    .disabled(!viewModel.isSaveButtonEnabled)
-                    .foregroundColor(saveButtonColor)
-                    .fontWeight(.semibold)
-                    .accessibilityShowsLargeContentViewer {
-                        Label("common.save".localized, systemImage: "checkmark")
-                    }
+                Button {
+                    showingExportSheet = true
+                } label: {
+                    Label("export.button.title".localized, systemImage: "square.and.arrow.up")
+                        .labelStyle(.iconOnly)
+                }
+                .disabled(!viewModel.canExport)
+                .accessibilityShowsLargeContentViewer {
+                    Label("export.button.title".localized, systemImage: "square.and.arrow.up")
                 }
             }
         }
@@ -86,29 +87,26 @@ struct CVEditorView: View {
         .onChange(of: scenePhase) { _, phase in
             Task { await viewModel.sceneDidChange(isActive: phase == .active) }
         }
-        .onChange(of: viewModel.showsSavedConfirmation) { _, isShown in
-            if isShown {
-                AccessibilityNotification.Announcement("editor.saved".localized).post()
+        // However the editor is left, what it still shows is stored at once, and the list waits for that
+        .onDisappear {
+            router.editorDisappeared(viewModel)
+        }
+        // VoiceOver hears that a change could not be saved, each time, and that it is saved once a write succeeds again
+        .onChange(of: viewModel.saveAnnouncement) { _, announcement in
+            if let announcement {
+                AccessibilityNotification.Announcement(announcement.text).post()
             }
-        }
-        .alert("common.error".localized, isPresented: .constant(viewModel.isShowingError)) {
-            Button("common.ok".localized, action: viewModel.clearError)
-        } message: {
-            Text(viewModel.errorMessage)
-        }
-        .alert("dialog.discard_changes.title".localized, isPresented: $viewModel.showingCancelConfirmation) {
-            Button("common.discard".localized, role: .destructive, action: handleDiscardChanges)
-            Button("editor.keep_editing".localized, role: .cancel) { router.keepEditing() }
-        } message: {
-            Text("dialog.discard_changes.message".asLoclizedKey)
         }
         .environment(\.rowDeletionAnchor, deletionAnchor)
         .anchoredConfirmationDialog(
-            "editor.delete_row.title".localized,
+            // The question names the kind of row, and the editor keeps it while the dialog closes
+            viewModel.deletionTitle,
             isPresented: isShowingDeleteConfirmation,
             titleVisibility: .visible,
             presenting: viewModel.pendingDeletion,
-            anchoredTo: deletionAnchor.rect
+            anchoredTo: deletionAnchor.rect,
+            // The row has slid sideways under the swipe: the dialog points at the row, not at its button
+            spanningWidth: true
         ) { deletion in
             Button("common.delete".localized, role: .destructive) {
                 withAnimation(DesignTokens.Animations.standardEaseInOut) {
@@ -117,7 +115,7 @@ struct CVEditorView: View {
             }
             Button("common.cancel".localized, role: .cancel) { }
         } message: { deletion in
-            Text("editor.delete_row.message".localizedWithArgs(deletion.rowName))
+            Text(deletion.message)
         }
         .sheet(isPresented: $showingExportSheet) {
             CVExportSheetView(viewModel: makeExportSheet(viewModel))
@@ -128,11 +126,17 @@ struct CVEditorView: View {
     
     private var editorView: some View {
         VStack(spacing: 0) {
-            if let notice = viewModel.notice {
-                EditorNoticeBanner(notice: notice)
+            if viewModel.showsSaveFailure {
+                InlineNotice(message: "editor.save_failed".localized, actionTitle: "common.retry".localized) {
+                    Task { await viewModel.retrySaving() }
+                }
+                .accessibilityIdentifier("editor.save_failed")
             }
 
-            // Each tab shows the confirmation of a save itself, below the tab bar that iPad shows at the top
+            if let notice = viewModel.notice {
+                noticeBanner(notice)
+            }
+
             TabView {
                 PersonalInfoSection(
                     cv: $viewModel.cv,
@@ -148,7 +152,6 @@ struct CVEditorView: View {
                     .keyboardDoneButton()
                     .keepsClearOfTheKeyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
-                    .savedConfirmation(isShown: viewModel.showsSavedConfirmation)
                     .tabItem {
                         Label("section.basics".localized, systemImage: "person.circle")
                     }
@@ -158,7 +161,6 @@ struct CVEditorView: View {
                     .keyboardDoneButton()
                     .keepsClearOfTheKeyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
-                    .savedConfirmation(isShown: viewModel.showsSavedConfirmation)
                     .tabItem {
                         Label("section.experience".localized, systemImage: "briefcase")
                     }
@@ -168,7 +170,6 @@ struct CVEditorView: View {
                     .keyboardDoneButton()
                     .keepsClearOfTheKeyboardDoneButton()
                     .hidesTabBar(while: keyboard.isVisible)
-                    .savedConfirmation(isShown: viewModel.showsSavedConfirmation)
                     .tabItem {
                         Label("section.details".localized, systemImage: "list.bullet.circle")
                     }
@@ -181,16 +182,23 @@ struct CVEditorView: View {
             .accessibilityLabel("editor.title".localized)
             .accessibilityHint("accessibility.editor_hint".localized)
         }
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { editorHeight = $0 }
     }
-    
-    private var saveButtonColor: Color {
-        viewModel.isSaveButtonEnabled ? DesignTokens.Colors.accent : DesignTokens.Colors.disabledButtonForeground
-    }
-    
-    private var exitTitle: String {
-        switch viewModel.exit {
-        case .cancel: return "common.cancel".localized
-        case .done: return "common.done".localized
+
+    /// The notice above the form: all its lines, or, where the form is short of room, the height `EditorChrome` gives it, which
+    /// it scrolls in.
+    @ViewBuilder
+    private func noticeBanner(_ notice: EditorNotice) -> some View {
+        if let height = chrome.noticeHeight(fullHeight: noticeFullHeight, editorHeight: editorHeight) {
+            ScrollView {
+                EditorNoticeBanner(notice: notice)
+                    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { noticeFullHeight = $0 }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(height: height)
+        } else {
+            EditorNoticeBanner(notice: notice)
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { noticeFullHeight = $0 }
         }
     }
     
@@ -204,25 +212,6 @@ struct CVEditorView: View {
                 }
             }
         )
-    }
-    
-    // MARK: - Action Handlers
-    
-    private func handleCancelTap() {
-        if viewModel.requestLeaving() {
-            router.closeEditor()
-        }
-    }
-    
-    private func handleSaveTap() {
-        Task {
-            await viewModel.handleSaveButtonTap()
-        }
-    }
-    
-    private func handleDiscardChanges() {
-        viewModel.confirmCancel()
-        router.closeEditor()
     }
 }
 

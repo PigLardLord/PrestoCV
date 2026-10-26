@@ -47,7 +47,7 @@ enum ImportFailure: Equatable {
 }
 
 /// The screen that turns a CV someone already has into a new one: pasted text, or a PDF from Files (ADR 0027). It
-/// holds no rule of its own: the import reads, the mapper builds the unsaved CV, and the editor opens it.
+/// holds no rule of its own: the import reads, the mapper builds the CV, and the editor opens and stores it.
 @MainActor
 final class ImportViewModel: ObservableObject {
 
@@ -55,7 +55,7 @@ final class ImportViewModel: ObservableObject {
     @Published var text = ""
     @Published private(set) var isImporting = false
     @Published private(set) var failure: ImportFailure?
-    /// The CV read from the text or the file, unsaved: the editor opens it for review.
+    /// The CV read from the text or the file, not stored yet: the editor opens it for review and stores it as it is.
     @Published private(set) var imported: ImportedDraft?
 
     private let importer: ImportCV
@@ -90,6 +90,8 @@ final class ImportViewModel: ObservableObject {
             imported = mapper.map(try importer.importText(text))
         } catch let error as ImportError {
             failure = ImportFailure(error)
+        } catch is CancellationError {
+            // The screen went away: nothing to tell
         } catch {
             failure = .unreadable
         }

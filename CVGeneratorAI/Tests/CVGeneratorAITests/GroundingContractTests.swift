@@ -28,7 +28,9 @@ struct GroundingContractTests {
         }
 
         if GroundingRows.notImplementedYet.contains(row.id) {
-            withKnownIssue("ADR 0023 not implemented yet") { try check() }
+            withKnownIssue("ADR 0023 not implemented yet; the claim check closes it (measured on macOS 27.0.1 only; iOS 26 device check pending)") {
+                try check()
+            }
         } else if GroundingRows.residualRisks.contains(row.id) {
             withKnownIssue("ADR 0023, Consequences: a residual risk the owner accepts") { try check() }
         } else {
@@ -416,28 +418,27 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1802
+    static let rowsWhenWritten = 2076
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
-    /// fails and the id leaves this list.
+    /// fails and the id leaves this list. All of them are residual risks of the rules (ADR 0023) that the claim check of
+    /// ADR 0028 closes on the product path: `ClaimCheckEvaluation` (a), composed, fails on any item of theirs that both keep. That
+    /// is measured on macOS 27.0.1 only; the iOS 26 device check is pending.
     static let notImplementedYet: Set<String> = [
-        // Text typed without accents: an open residual risk of ADR 0023 that #249 must close before release.
+        // Text typed without accents.
         "a-konjunktiv-typed-without-its-umlaut-claims-nothing-de",
-        // Whose words and whose title and place a claim gives: open residual risks of ADR 0023 that #249 must close before release.
+        // Whose words and whose title and place a claim gives.
         "speech-on-the-line-of-the-colon-claims-nothing",
         "the-title-of-a-person-the-claim-names-is-not-the-persons-en", "the-title-of-a-person-the-claim-names-is-not-the-persons-it",
         "the-title-of-a-person-the-claim-names-is-not-the-persons-de", "the-title-of-a-person-the-claim-names-is-not-the-persons-es",
         "the-title-of-a-person-the-claim-names-is-not-the-persons-fr", "the-title-of-a-person-the-claim-names-is-not-the-persons-pt",
-        // Whose verb follows a relative of the person, and the relatives of place: open residual risks of ADR 0023 that #249 must
-        // close before release.
+        // Whose verb follows a relative of the person, and the relatives of place.
         "a-noun-before-a-relative-of-the-person-is-another-subject-en", "a-noun-before-a-relative-of-the-person-is-another-subject-it",
         "a-noun-before-a-relative-of-the-person-is-another-subject-de", "a-noun-before-a-relative-of-the-person-is-another-subject-es",
         "a-noun-before-a-relative-of-the-person-is-another-subject-fr", "a-noun-before-a-relative-of-the-person-is-another-subject-pt",
         "a-relative-of-place-brings-in-another-subject-en", "a-relative-of-place-brings-in-another-subject-it",
         "a-relative-of-place-brings-in-another-subject-es", "a-relative-of-place-brings-in-another-subject-fr",
         "a-relative-of-place-brings-in-another-subject-pt",
-        // A mark alone on its line inside a quote: an open residual risk of ADR 0023 that #249 must close before release.
-        "a-mark-alone-on-its-line-inside-a-quote-closes-nothing",
     ]
 
     /// Rows whose desired output the sanitiser does not give, and whose leak the owner accepts as a residual risk (ADR 0023,
@@ -3479,7 +3480,7 @@ enum GroundingRows {
 
     /// Text typed without accents (#202, #249): the moods of supposition lose the mark that tells them from a fact. Spanish "seria"
     /// still withdraws through the Portuguese "seria" (would be), which also takes Spanish "seria" (serious): an accepted loss.
-    /// "wurde" for "würde" reads as a past and keeps its item: an open residual risk that #249 must close (`notImplementedYet`).
+    /// "wurde" for "würde" reads as a past and keeps its item (`notImplementedYet`): the claim check of ADR 0028 withdraws it.
     private static func textWithoutAccents() -> [GroundingRow] {
         var rows: [GroundingRow] = []
         rows.append(row("a-conditional-typed-without-its-accent-claims-nothing-es",
@@ -3659,13 +3660,15 @@ enum GroundingRows {
                         "I work with “Swift” every day.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData())))
         rows += singleMarksAfterAWord()
         rows += marksAtTheEndOfALine()
+        rows += quotesInsideQuotes()
         return rows
     }
 
     /// A mark at the end of a line opens a quote that goes on with the next lines (#202), when a mark may close it there: a speech
     /// introduced without a colon, its words on the next line ("Mon collègue a écrit '", then "Je parle français.'"), claims nothing.
     /// With nothing to close it, the mark opens nothing, and the next line claims as usual. A mark alone on its line closes the quote,
-    /// though the quote may hold it as a symbol: an open residual risk that #249 must close (`notImplementedYet`).
+    /// unless a later mark closes it for sure and no opening mark after the lone one pairs with that later mark: the lone mark is then
+    /// a symbol the quote holds, such as a ditto mark, and the quote runs to the later mark.
     private static func marksAtTheEndOfALine() -> [GroundingRow] {
         typealias Speech = (language: String, description: String, name: String)
         var speeches: [Speech] = []
@@ -3697,10 +3700,109 @@ enum GroundingRows {
                         "My colleague wrote \"\nI use Swift.\n\"\nI speak French.\nI use \"clean code\".",
                         CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]),
                         .exactly(CVData(languages: [Language(name: "French")]))))
+        rows.append(row("a-mark-alone-on-its-line-closes-the-quote-before-a-possessive",
+                        "only a possessive follows the mark alone on the third line, and it closes nothing for sure: the lone mark closes the quote, Swift goes and French stays",
+                        "My colleague wrote '\nI use Swift.\n'\nI speak French.\nI keep my patients' records.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]),
+                        .exactly(CVData(languages: [Language(name: "French")]))))
         rows.append(row("a-mark-alone-on-its-line-inside-a-quote-closes-nothing",
                         "the mark alone on the third line is the colleague's ditto symbol, and the quote runs to the last line: no language",
                         "My colleague wrote \"\nIn my table, the ditto symbol is:\n\"\nI speak French.\nEnd of my message.\"",
                         CVData(languages: [Language(name: "French")]), .exactly(CVData())))
+        var dittoMarks: [Speech] = []
+        dittoMarks.append(("it", "Il mio collega ha scritto “\nNella mia tabella, il simbolo di ripetizione è:\n”\nParlo francese.\nFine del messaggio.”", "francese"))
+        dittoMarks.append(("de", "Mein Kollege schrieb „\nIn meiner Tabelle ist das Wiederholungszeichen:\n“\nIch spreche Französisch.\nEnde meiner Nachricht.“", "Französisch"))
+        dittoMarks.append(("es", "Mi colega escribió \"\nEn mi tabla, el símbolo de repetición es:\n\"\nHablo francés.\nFin de mi mensaje.\"", "francés"))
+        dittoMarks.append(("fr", "Mon collègue a écrit '\nDans mon tableau, le symbole de répétition est :\n'\nJe parle français.\nFin de mon message.'", "français"))
+        dittoMarks.append(("pt", "O meu colega escreveu ‘\nNa minha tabela, o símbolo de repetição é:\n’\nFalo francês.\nFim da mensagem.’", "francês"))
+        for v in dittoMarks {
+            rows.append(row("a-mark-alone-on-its-line-inside-a-quote-closes-nothing-\(v.language)",
+                            "the mark alone on the third line is the colleague's ditto symbol, and the quote runs to the last line: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        // The opening marks after a lone mark count whatever pair they belong to: a quote of another pair does not end the first one
+        rows.append(row("a-mark-alone-on-its-line-closes-the-quote-before-a-quote-of-another-pair-de",
+                        "the lone mark on the third line closes the colleague's quote; the ” that ends the motto closes the motto, not the colleague's quote: Swift goes, Python stays",
+                        "Mein Kollege schrieb „\nIch benutze Swift.\n“\nIch benutze Python.\nMein Motto ist “Sauberer Code”.",
+                        CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")]),
+                        .exactly(CVData(skills: [Skill(name: "Python")])), language: "de"))
+        rows.append(row("a-mark-alone-on-its-line-inside-a-quote-that-holds-a-quote-of-another-pair-de",
+                        "the lone mark on the third line is the colleague's ditto symbol, a quote of another pair closes inside the message, and the message runs to its last line: no language",
+                        "Mein Kollege schrieb „\nIn meiner Tabelle ist das Wiederholungszeichen:\n“\nIch spreche “schnell” Französisch.\nEnde meiner Nachricht.“",
+                        CVData(languages: [Language(name: "Französisch")]), .exactly(CVData()), language: "de"))
+        rows.append(row("a-mark-alone-on-its-line-inside-a-quote-that-a-closing-mark-of-another-pair-ends-de",
+                        "a ” closes the colleague's quote for sure after the lone mark and no opening mark pairs with it: the lone mark is a symbol the message holds, so Swift and Python go and Deutsch stays",
+                        "Mein Kollege schrieb „\nIch benutze Swift.\n“\nIch benutze Python.”\nIch spreche Deutsch.",
+                        CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")], languages: [Language(name: "Deutsch")]),
+                        .exactly(CVData(languages: [Language(name: "Deutsch")])), language: "de"))
+        return rows
+    }
+
+    /// A quote may hold a quote of another pair (#249): the quote of a German „…“ holds a “…” or a ‚…‘, a “…” holds a „…“. A closing
+    /// mark closes the latest open quote that it pairs with, whichever pair that is, and only a mark that closes none of them ends the
+    /// quote that holds them. So the words after the inner quote, up to the mark that ends the outer one, are still quoted, and the
+    /// line after it claims as usual. Every pair of the six languages is the outer one once for each other pair it holds, in a quote
+    /// that a closing mark ends, and in a quote with a mark alone on its line, which is a symbol it holds when a later mark ends it.
+    /// The inner quote starts with a letter and ends with a closing bracket: a mark right before a punctuation mark closes a quote, so
+    /// an inner « before a bracket would close the outer one, and a single mark after a letter may be an apostrophe.
+    ///
+    /// A mark that an inner quote took never ends the quote that holds it, so two more rows exist for every pair of quotes that share a
+    /// closing mark (“…” inside a „…“, a „…” inside a “…”, a ‚…’ inside a ‘…’): an outer quote that only the inner quote's mark could
+    /// close, and an outer quote that closes with the mark of an inner quote that nothing closes. Each runs to the end of the line of
+    /// that mark, as no other mark ends it (the unit table in `QuotedSpeechNestingTests` holds every cell).
+    private static func quotesInsideQuotes() -> [GroundingRow] {
+        typealias Marks = (id: String, open: String, close: String)
+        let pairs: [Marks] = [
+            ("straight-double", "\"", "\""), ("straight-single", "'", "'"), ("curly-double", "“", "”"), ("curly-single", "‘", "’"),
+            ("guillemets", "«", "»"), ("reversed-guillemets", "»", "«"), ("single-guillemets", "‹", "›"),
+            ("reversed-single-guillemets", "›", "‹"), ("low-and-high", "„", "“"), ("low-and-curly", "„", "”"),
+            ("single-low-and-high", "‚", "‘"), ("single-low-and-curly", "‚", "’"),
+        ]
+
+        let closersOfOpen = Dictionary(grouping: pairs, by: \.open).mapValues { Set($0.map(\.close)) }
+        var texts: Set<String> = []
+
+        var rows: [GroundingRow] = []
+        rows.append(row("a-quote-of-another-pair-inside-a-quote-does-not-end-it-de",
+                        "the “ that closes the motto is no end of the colleague's quote, which a lone ” on its own line only seems to close: Swift goes, and Deutsch, on the last line, stays",
+                        "Mein Kollege schrieb “\nIn meiner Tabelle ist das Wiederholungszeichen:\n”\nMein Motto ist „Sauberer Code“. Ich benutze Swift.\nEnde meiner Nachricht.”\nIch spreche Deutsch.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "Deutsch")]),
+                        .exactly(CVData(languages: [Language(name: "Deutsch")])), language: "de"))
+        for outer in pairs {
+            for inner in pairs where inner.open != outer.open {
+                let nesting = "\(inner.id)-inside-a-quote-of-\(outer.id)"
+                let within = "\(inner.open)\(inner.close) inside \(outer.open)\(outer.close)"
+                rows.append(row("the-sentence-after-a-quote-of-\(nesting)-is-quoted",
+                                "\(within): the inner quote closes with its own mark before the full stop, and the next sentence is still the colleague's: Swift and Python go, and French, on the next line, stays",
+                                "\(outer.open)My colleague wrote:\(inner.open)Swift (ok)\(inner.close). I use Python.\(outer.close)\nI speak French.",
+                                CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")], languages: [Language(name: "French")]),
+                                .exactly(CVData(languages: [Language(name: "French")]))))
+                rows.append(row("a-mark-alone-on-its-line-before-a-quote-of-\(nesting)-closes-nothing",
+                                "\(within): the mark alone on the third line is the colleague's symbol, the inner quote closes with its own mark before the full stop, and the message runs to its end: Swift and Python go, and French, on the last line, stays",
+                                "My colleague wrote \(outer.open)\nIn my table, the ditto symbol is:\n\(outer.close)\nI say:\(inner.open)Swift (ok)\(inner.close). I use Python.\nEnd of my message.\(outer.close)\nI speak French.",
+                                CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")], languages: [Language(name: "French")]),
+                                .exactly(CVData(languages: [Language(name: "French")]))))
+
+                let unclosedOuter = "\(outer.open)My colleague wrote:\(inner.open)Swift (ok)\(inner.close). I use Python.\nI speak French."
+                if closersOfOpen[outer.open, default: []].contains(inner.close), texts.insert(unclosedOuter).inserted {
+                    rows.append(row("a-quote-only-the-mark-of-\(nesting)-could-close-runs-to-the-end-of-its-line",
+                                    "\(within): the mark of the inner quote closes the outer pair too, but an inner quote took it, so nothing ends the outer quote and it runs to the end of that line: Swift and Python go, and French, on the next line, stays",
+                                    unclosedOuter,
+                                    CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")], languages: [Language(name: "French")]),
+                                    .exactly(CVData(languages: [Language(name: "French")]))))
+                }
+
+                let unclosedInner = "\(outer.open)My colleague wrote:\(inner.open)Swift (ok). I use Python.\(outer.close) I speak German.\nI speak French."
+                if closersOfOpen[inner.open, default: []].contains(outer.close), texts.insert(unclosedInner).inserted {
+                    rows.append(row("a-quote-of-\(nesting)-whose-inner-quote-nothing-closes-runs-to-the-end-of-its-line",
+                                    "\(within): the mark that closes the outer quote closes the inner pair too, but nothing else closes either, so the outer quote runs to the end of that line: Swift, Python and German go, and French, on the next line, stays",
+                                    unclosedInner,
+                                    CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")],
+                                           languages: [Language(name: "German"), Language(name: "French")]),
+                                    .exactly(CVData(languages: [Language(name: "French")]))))
+                }
+            }
+        }
         return rows
     }
 
@@ -3801,8 +3903,8 @@ enum GroundingRows {
     /// A line that ends with a colon and does not speak for the person introduces someone else's words: the line after it claims
     /// nothing, all its sentences (#202). The line after that claims as usual, and so does the line after a colon line that the
     /// person speaks ("My languages:", "Skills:", "I worked with my team on:"). Words without marks after the colon on its own line
-    /// are read by their own clauses, and a sentence after the colon's keeps its item: an open residual risk that #249 must close
-    /// (`notImplementedYet`).
+    /// are read by their own clauses, and a sentence after the colon's keeps its item (`notImplementedYet`): the claim check of
+    /// ADR 0028 withdraws it.
     private static func speechAfterALineOfAnotherPerson() -> [GroundingRow] {
         typealias Speech = (language: String, description: String, name: String)
         var speeches: [Speech] = []
@@ -3975,8 +4077,8 @@ enum GroundingRows {
     }
 
     /// The person's title and place come from a clause that claims them, but nothing tells whose they are inside it (ADR 0023,
-    /// Consequences): "Io lavoro con un infermiere a Torino" gives the person the nurse's title. An open residual risk that #249 must
-    /// close (`notImplementedYet`).
+    /// Consequences): "Io lavoro con un infermiere a Torino" gives the person the nurse's title (`notImplementedYet`): the claim
+    /// check of ADR 0028 withdraws it.
     private static func titlesOfAnotherPersonInAClaim() -> [GroundingRow] {
         typealias Variant = (language: String, description: String, title: String)
         var variants: [Variant] = []
@@ -3994,11 +4096,11 @@ enum GroundingRows {
         }
     }
 
-    /// Two readings of a relative that the word rules do not build (ADR 0023, Consequences), open residual risks that #249 must close
-    /// (`notImplementedYet`): a noun subject before a relative that keeps the person ("The team that I lead uses Kotlin") gives the
-    /// person the noun's verb after it, and the relatives of place ("where", "dove", "où", "donde", "onde") are not in the relative
-    /// list ("Trabajo en una empresa donde todo el mundo habla inglés"). German writes a comma before "wo", and the clause it splits
-    /// off has a subject of its own: its row holds.
+    /// Two readings of a relative that the word rules do not build (ADR 0023, Consequences), residual risks that the claim check
+    /// of ADR 0028 closes (`notImplementedYet`): a noun subject before a relative that keeps the person ("The team that I lead
+    /// uses Kotlin") gives the person the noun's verb after it, and the relatives of place ("where", "dove", "où", "donde",
+    /// "onde") are not in the relative list ("Trabajo en una empresa donde todo el mundo habla inglés"). German writes a comma
+    /// before "wo", and the clause it splits off has a subject of its own: its row holds.
     private static func subjectsAroundARelative() -> [GroundingRow] {
         typealias Variant = (language: String, description: String, item: String)
         var teams: [Variant] = []

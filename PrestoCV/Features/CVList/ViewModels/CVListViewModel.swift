@@ -34,6 +34,8 @@ final class CVListViewModel: ObservableObject {
     private let now: () -> Date
     private let waitBetweenTicks: (Duration) async throws -> Void
     private let calendar: () -> Calendar
+    /// Returns once the editors that were left have stored what they showed.
+    private let awaitLeftEditors: @MainActor () async -> Void
     /// Counts the reads that were started and the changes that went through. A read publishes what it found only if
     /// nothing was counted since it started: a newer read, and the rows that a change was applied to, win over a
     /// read that began earlier and was overtaken, whenever that one finishes.
@@ -80,14 +82,18 @@ final class CVListViewModel: ObservableObject {
     ///   - calendar: What counts as a day when a save is told in days. It is asked for each time a text is made, so
     ///     that a change of the time zone of the device moves the days with it.
     ///   - sleep: How the clock of the list waits between two ticks.
+    ///   - awaitLeftEditors: Returns once the editors that were left have stored what they showed. The store is read only
+    ///     after it, so that a CV just edited is listed as the editor left it.
     init(
         cvManagementUseCase: CVManagementUseCaseProtocol,
         storedCVChanges: ChangeStoredCV<CVModel>,
         locale: Locale,
         now: @escaping () -> Date,
         calendar: @escaping () -> Calendar,
-        sleep: @escaping (Duration) async throws -> Void
+        sleep: @escaping (Duration) async throws -> Void,
+        awaitLeftEditors: @escaping @MainActor () async -> Void
     ) {
+        self.awaitLeftEditors = awaitLeftEditors
         self.cvManagementUseCase = cvManagementUseCase
         self.storedCVChanges = storedCVChanges
         self.locale = locale
@@ -160,6 +166,8 @@ final class CVListViewModel: ObservableObject {
     /// error, or, once a change has gone through that no read has confirmed yet, by the notice that the list is
     /// stale. A successful read makes the list up to date.
     func loadCVs() async {
+        // The editor just left may still be storing its CV: a list read before that would miss it, or show it as it was
+        await awaitLeftEditors()
         readSequence += 1
         let thisRead = readSequence
         if viewState.data == nil {

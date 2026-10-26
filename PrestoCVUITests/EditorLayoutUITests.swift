@@ -47,15 +47,20 @@ final class EditorLayoutUITests: XCTestCase {
     }
 
     /// A bar below the form took its height on every device: the export control sits in the navigation bar, in
-    /// portrait and in landscape, on an iPhone and on an iPad.
+    /// portrait and in landscape, on an iPhone and on an iPad. The outer screen of the iPhone Duo stays upright for
+    /// every app, Safari too: there, only portrait is checked.
     func testTheExportControlIsInTheNavigationBarInBothOrientations() throws {
         launch()
         assertOneExportControlInTheNavigationBar(context: "in portrait")
 
-        rotate(to: .landscapeLeft)
+        if !app.turn(to: .landscapeLeft) {
+            try XCTSkipUnless(safariTurns(), "This screen stays upright for every app, as the outer screen of the iPhone Duo; portrait passed")
+            XCTFail("The screen should turn to landscape")
+            return
+        }
         assertOneExportControlInTheNavigationBar(context: "in landscape")
 
-        rotate(to: .portrait)
+        XCTAssertTrue(app.turn(to: .portrait), "The screen should turn back to portrait")
         assertOneExportControlInTheNavigationBar(context: "back in portrait")
     }
 
@@ -105,11 +110,12 @@ final class EditorLayoutUITests: XCTestCase {
         XCTAssertLessThanOrEqual(gap, points, "The personal details should follow the document language row")
     }
 
-    /// The editor offers to preview and export once, in its navigation bar, and leaves no bar below the form: the form
-    /// reaches the bottom of the screen, save the strip of the home indicator, which is narrower than any button.
+    /// The editor offers to preview and export once, in its bar (the navigation bar, or the vertical bar of the iPhone
+    /// Duo), and leaves no bar below the form: the form reaches the bottom of the screen, save the strip of the home
+    /// indicator, which is narrower than any button.
     private func assertOneExportControlInTheNavigationBar(context: String) {
-        let barExport = app.navigationBars.buttons["Preview & export"]
-        XCTAssertTrue(barExport.waitForExistence(timeout: 10), "The navigation bar should offer to preview and export \(context)")
+        let barExport = app.barButton("Preview & export")
+        XCTAssertTrue(barExport.waitForExistence(timeout: 10), "The bar should offer to preview and export \(context)")
         let exportControls = app.buttons.matching(NSPredicate(format: "label == 'Preview & export'"))
         XCTAssertEqual(exportControls.count, 1, "The editor should offer to preview and export only once \(context)")
 
@@ -119,12 +125,12 @@ final class EditorLayoutUITests: XCTestCase {
         XCTAssertGreaterThan(form.frame.maxY, window.frame.maxY - 44, "Nothing should sit below the form \(context)")
     }
 
-    /// Turns the device and waits until the screen has turned with it.
-    private func rotate(to orientation: UIDeviceOrientation) {
-        XCUIDevice.shared.orientation = orientation
-        let window = app.windows.firstMatch
-        let turned = NSPredicate { _, _ in (window.frame.width > window.frame.height) == orientation.isLandscape }
-        let waited = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: turned, object: nil)], timeout: 10)
-        XCTAssertEqual(waited, .completed, "The screen should turn to \(orientation.isLandscape ? "landscape" : "portrait")")
+    /// Whether Safari's screen turns to landscape with the device already turned, as on every screen that turns: a
+    /// screen where Safari stays upright too has no landscape, and one where only the app stays upright is a defect.
+    private func safariTurns() -> Bool {
+        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
+        safari.launch()
+        defer { safari.terminate() }
+        return safari.turn(to: .landscapeLeft)
     }
 }

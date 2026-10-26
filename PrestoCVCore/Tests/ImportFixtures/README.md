@@ -21,12 +21,16 @@ read by `ContractTableTests` in `PrestoCVImportingTests` and, for the PDFs, by t
   - `lebenslauf.txt`: the German tabular Lebenslauf copied from its Word table (the German people);
   - `linkedin.pdf`: LinkedIn's "Save to PDF", with its sidebar (one person per language);
   - `wordpdf.pdf`: a one-column CV from a word processor (the other person per language);
+  - `railpdf.pdf`: the headings right-aligned in a narrow column, each beside the first line of its section (the other
+    person per language);
   - `lebenslaufpdf.pdf` and `europasspdf.pdf`: the tabular forms as PDFs.
 
   A PDF comes with `*.layout.json`: the words and boxes a PDF reader sees, which the Linux tests read.
 - **`traps/`**: hand-written CVs in other styles, each with the trap it sets: references with their contacts, levels
   drawn as bars, "seit 2019" and a signature, the consent to data processing, an employer before the role, the one-line
-  headers of a US résumé, LinkedIn's PDF copied as text with its sidebar first, labelled personal details.
+  headers of a US résumé, LinkedIn's PDF copied as text with its sidebar first, labelled personal details, an entry
+  with two place lines, the notes after a language's level, a surname given by label, a course on data protection, the native level on the line under its language, languages
+  outside the vocabulary told by their level.
 - **`scan/scan.pdf`**: a PDF with no text layer.
 - **`*.expected.json`**: the fields each fixture states, which the table compares with what the import found.
 - **`index.json`**: every fixture, its language, form and files.

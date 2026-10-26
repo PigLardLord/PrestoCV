@@ -130,10 +130,10 @@ enum Corpus {
         }
     }
 
-    /// Imports a fixture, a text as pasted text and a layout as a PDF's.
-    static func importResult(of entry: Entry) throws -> ImportResult {
-        let importer = ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard)
-        if entry.kind == "text" { return try importer.importText(try text(of: entry)) }
-        return try importer.read(.pages(try pages(of: entry)))
+    /// Imports a fixture, a text as pasted text and a layout as the PDF a reader that saw it gives.
+    static func importResult(of entry: Entry) async throws -> ImportResult {
+        if entry.kind == "text" { return try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText(try text(of: entry)) }
+        let reader = ScriptedPDFReader(layout: .pages(try pages(of: entry)))
+        return try await ImportCV(pdfReader: reader, limits: .standard).importPDF(Data([1]))
     }
 }

@@ -1,0 +1,13 @@
+{
+ "id": "traps/tecnologie-it", "language": "it", "form": "trap",
+ "person": {"name": "Elena Gallo", "title": "Sviluppatrice mobile", "email": "elena.gallo@example.net", "phone": "+39 333 000 0505", "location": "Bologna", "links": [], "summary": null},
+ "experience": [
+  {"role": "Sviluppatrice mobile", "employer": "App Esempio S.r.l.", "location": "Bologna", "start": [2021, 3], "end": "current", "details": 1},
+  {"role": "Sviluppatrice junior", "employer": "Software Esempio S.r.l.", "location": "Modena", "start": [2018, 6], "end": [2021, 2], "details": 0}
+ ],
+ "education": [
+  {"degree": "Laurea in Informatica", "school": "Università di Bologna", "start": [2015, null], "end": [2018, null]}
+ ],
+ "skills": ["Swift", "SwiftUI", "Combine", "Kotlin", "Docker"],
+ "languages": [], "certifications": [], "interests": []
+}

@@ -190,11 +190,23 @@ The iOS renderer paginates with `UIPrintPageRenderer`, which keeps a block whole
 
 ### A short CV on one page
 
-A short CV often runs a few lines over one page, and its last sections, kept whole, would then be alone on a second page. `OnePageFit` says when the iOS renderer prints such a CV on one page instead:
+A short CV often runs over one page by a few lines, and its last sections, kept whole, would then be alone on a second page. `OnePageFit` says how the iOS renderer prints such a CV on one page instead. A CV is a candidate when it takes two pages with the design's own spacing; a CV of one page, or of three or more, is printed once, as its design lays it out.
 
-- the renderer paginates the CV as its design lays it out. When that takes two pages, it sets the class `fit-one-page` on the root element and paginates again, and keeps that print when it takes one page; otherwise it clears the class and prints the two pages as before. A CV of one page, or of three or more, is paginated once;
-- each bundled design says how it tightens, with rules under `html.fit-one-page`: it closes up the space between its blocks and between its lines, and keeps its fonts, its widths and the page margins. The bounds keep the page easy to read: Professional and Minimal take back about a fifth of a page, Modern, which is compact already, less. A CV that runs further over keeps its two pages;
-- a design without such rules is always printed as it lays itself out.
+The renderer tries two steps on a candidate, lightest first, and keeps the first print that takes one page:
+
+1. **Tightening** (class `fit-one-page` on the root element): the space between blocks and between lines closes up a little. The foot margin of the page stays.
+2. **Compact** (classes `fit-one-page` and `fit-one-page-compact`): the space closes up to the least that is still easy to read; the small lists (languages, profiles, certificates) of the designs that stack them run along a line instead of down a column; and the margin at the foot of the page shrinks from the page's margin to `OnePageFit.minimumBottomMargin`, which is 10 mm.
+
+A CV that no step brings onto one page is printed as its design lays it out. That print is drawn before the page changes, so it is the same, page for page, as without `OnePageFit`: a long CV keeps its page breaks, and so does a CV of two pages that is too long to fit.
+
+What a step never does:
+- change the size of the text, narrow the page's side margins or the text column, or scale the page;
+- set the lines closer than 1.2 times the size of the text;
+- take the margin at the foot of the page below 10 mm.
+
+The text of the compact print reads in the order of the design's own print: an item that a design stacks, such as a profile's platform over its address, is set on one line so that the platform comes before its address. WebKit prints Modern scaled to fit, and the scale follows the height of the printable area, so its text comes out a fraction of a percent smaller when the foot margin shrinks (the name is 28.9 pt instead of 29.0 pt), as it does for any change of the page's margin without a step; the CSS sets the same sizes.
+
+Each bundled design says how it tightens, with rules under `html.fit-one-page` and `html.fit-one-page-compact`; a rule of a step starts at the root element, so it cannot reach a page that is not tightened. `OnePageFitTests` holds the designs to what they may set (spacing and the layout of lists, never a font size, a width or a transform), to the line height and to the least space they keep between sections and entries, and they read the cascade to hold Modern's first entry of a section flush under its heading in every step. A design without such rules is printed as it lays itself out. The version of a design goes up when its rules change, so that an installed copy is replaced.
 
 ### Regenerating the thumbnails
 

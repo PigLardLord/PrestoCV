@@ -5,11 +5,20 @@ import PrestoCVCore
 enum EditorRequest: Hashable, Sendable {
     /// The CV stored under this id.
     case stored(cvId: String)
-    /// A CV that was never stored, starting from a template: a blank CV, an example or an AI draft, with the notice the
-    /// editor shows above it.
+    /// A CV that was never stored, starting from a template: a blank CV, an example, an AI draft or a CV imported from
+    /// the person's text or PDF, with the notice the editor shows above it.
     case new(template: CVModel, notice: EditorNotice?)
-    /// Edits an earlier run of the app kept, with the claim the window took on them to restore them.
-    case restoring(RestoredUnsavedEdits)
+
+    /// Whether the editor stores the CV as it opens, without waiting for a change. An AI draft and an imported CV were
+    /// made from what the person gave, and nothing else holds them: the system's copy of an opened PDF is deleted. A
+    /// blank CV or an example is stored only once it is changed, so one left untouched leaves nothing behind.
+    var storesAsItIs: Bool {
+        guard case .new(_, let notice?) = self else { return false }
+        switch notice {
+        case .aiDraft, .aiDraftUnchecked, .imported:
+            return true
+        }
+    }
 
     static func == (lhs: EditorRequest, rhs: EditorRequest) -> Bool {
         switch (lhs, rhs) {
@@ -17,9 +26,6 @@ enum EditorRequest: Hashable, Sendable {
             return lhsId == rhsId
         case let (.new(lhsTemplate, lhsNotice), .new(rhsTemplate, rhsNotice)):
             return lhsTemplate == rhsTemplate && lhsNotice == rhsNotice
-        case let (.restoring(lhsEdits), .restoring(rhsEdits)):
-            // Each restore holds a claim of its own: two restores of the same edits are two requests
-            return lhsEdits === rhsEdits
         default:
             return false
         }
@@ -34,9 +40,6 @@ enum EditorRequest: Hashable, Sendable {
             hasher.combine(1)
             hasher.combine(template.id)
             hasher.combine(notice)
-        case .restoring(let restored):
-            hasher.combine(2)
-            hasher.combine(ObjectIdentifier(restored))
         }
     }
 }

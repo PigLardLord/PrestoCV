@@ -1,0 +1,12 @@
+{
+ "id": "traps/language-own-line-en", "language": "en", "form": "trap",
+ "person": {"name": "Elena Brandt", "title": "Data Analyst", "email": "elena.brandt@example.com", "phone": null,
+            "location": null, "links": [], "summary": null},
+ "experience": [
+  {"role": "Data Analyst", "employer": "Example Analytics Ltd", "location": null, "start": [2018, 3], "end": "current", "details": 1}
+ ],
+ "education": [{"degree": "BSc Statistics", "school": "University of Example", "start": [2012, null], "end": [2015, null]}],
+ "skills": [],
+ "languages": [{"name": "English", "level": "native"}, {"name": "Spanish", "level": "b2"}, {"name": "French", "level": null}],
+ "certifications": [], "interests": []
+}

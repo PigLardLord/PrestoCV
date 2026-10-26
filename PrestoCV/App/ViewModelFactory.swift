@@ -5,6 +5,9 @@ import CVPDFExporter
 import PrestoCVImporting
 import PrestoCVImportingPDFKit
 import struct PrestoCVApplication.ChangeStoredCV
+import os
+
+private let editorLogger = Logger(subsystem: "com.PigLardLord.prestocv", category: "editor")
 
 /// The composition root of the screens: it makes every view model, with the real services and the part of the device's
 /// environment each one needs. No view model makes a dependency of its own.
@@ -12,28 +15,25 @@ final class ViewModelFactory {
     private let dependencyContainer: PrestoCVCore.DependencyContainerProtocol
     private let sampleRepository: SampleCVRepositoryProtocol
     private let cvManagementUseCase: CVManagementUseCaseProtocol
-    private let unsavedEditsUseCase: UnsavedEditsUseCaseProtocol?
     private let environment: AppEnvironment
     /// The description typed on the AI screen, kept until a draft is made from it.
     private let aiDescriptionSession = AIDescriptionSession()
+    /// The saves of the editors that were left, which the router starts and the list and the editors wait for.
+    private let leftEditorSaves = LeftEditorSaves()
     /// The copies the system makes of the PDFs opened in the app, which the import and the router let go.
     private var openedFileCopies: OpenedFileCopies {
         OpenedFileCopies(container: environment.container, removeFile: environment.removeFile)
     }
     
-    /// - Parameters:
-    ///   - unsavedEditsUseCase: Nil when the unsaved edits cannot be kept on this device: the editor works without them.
-    ///   - environment: What the view models read from the device.
+    /// - Parameter environment: What the view models read from the device.
     init(
         dependencyContainer: PrestoCVCore.DependencyContainerProtocol,
         cvManagementUseCase: CVManagementUseCaseProtocol,
-        unsavedEditsUseCase: UnsavedEditsUseCaseProtocol?,
         environment: AppEnvironment
     ) throws {
         self.dependencyContainer = dependencyContainer
         self.sampleRepository = try dependencyContainer.makeSampleCVRepository()
         self.cvManagementUseCase = cvManagementUseCase
-        self.unsavedEditsUseCase = unsavedEditsUseCase
         self.environment = environment
     }
     
@@ -51,33 +51,24 @@ final class ViewModelFactory {
             locale: environment.appLocale,
             now: environment.now,
             calendar: environment.calendar,
-            sleep: environment.sleep
+            sleep: environment.sleep,
+            awaitLeftEditors: leftEditorSaves.allEnded
         )
     }
 
-    /// The offer to restore the edits an earlier run of the app left unsaved.
-    @MainActor
-    func makeUnsavedEditsOfferViewModel() -> UnsavedEditsOfferViewModel {
-        UnsavedEditsOfferViewModel(
-            useCase: unsavedEditsUseCase,
-            cvs: cvManagementUseCase,
-            locale: environment.appLocale,
-            timeZone: environment.timeZone
-        )
-    }
-    
-    /// The editor of `request`. Restored edits go on being kept as the editing they belong to, with the claim the
-    /// window took on them; any other editing gets a new one.
+    /// The editor of `request`, which saves what it shows by itself. A failed write is logged with its cause.
     @MainActor
     func makeCVEditorViewModel(for request: EditorRequest) -> CVEditorViewModel {
-        switch request {
-        case .stored(let cvId):
-            return makeCVEditorViewModel(cvId: cvId)
-        case .new(let template, let notice):
-            return makeCVEditorViewModel(initialCV: template, notice: notice)
-        case .restoring(let restored):
-            return makeCVEditorViewModel(restoring: restored)
-        }
+        CVEditorViewModel(
+            request: request,
+            cvManagementUseCase: cvManagementUseCase,
+            documentLanguageDetector: makeDocumentLanguageDetector(),
+            clock: environment.clock,
+            awaitLeftEditors: leftEditorSaves.allEnded,
+            reportSaveFailure: { error in
+                editorLogger.error("A change to a CV could not be saved: \(error.localizedDescription, privacy: .private)")
+            }
+        )
     }
     
     /// The export sheet of a CV of the list: the language chosen in it is stored with the CV.
@@ -88,8 +79,8 @@ final class ViewModelFactory {
         }
     }
     
-    /// The export sheet of the CV an editor shows: the language chosen in it goes into the form, which saves it with
-    /// the rest of the edits.
+    /// The export sheet of the CV an editor shows: the language chosen in it goes into the form, which saves it by
+    /// itself.
     @MainActor
     func makeExportSheetViewModel(editing editor: CVEditorViewModel) -> CVExportSheetViewModel {
         makeExportSheetViewModel(cv: editor.cv) { language in
@@ -108,27 +99,36 @@ final class ViewModelFactory {
         )
     }
 
+    /// The AI screen. When the device has not got the language data a description needs, it asks the system for it and waits at
+    /// most `LanguageDataPreparation.bound` (a debug launch can shorten it); the grounding then reads the data the system gave.
     @MainActor
     func makeAIGenerationViewModel() -> AIGenerationViewModel {
+        let languageData = makeLanguageData()
         return AIGenerationViewModel(
-            cvGenerationUseCase: makeCVGeneratorUseCase(),
+            cvGenerationUseCase: makeCVGeneratorUseCase(lexicalClasses: languageData.tagger),
             mapper: AIDraftMapper(
                 labels: makeAIDraftLabels(),
                 languageOfText: DescriptionLanguageDetector.languageTag(of:)
             ),
-            languageData: NaturalLanguageDataRequester(),
+            languageData: LanguageDataPreparation(requester: languageData.requester, bound: languageData.bound, sleep: environment.sleep),
             appLanguageCode: environment.appLanguage,
             session: aiDescriptionSession,
             platform: environment.platform
         )
     }
 
-    /// The import of a CV the person already has: pasted text, or a PDF read with PDFKit, both on the device.
+    /// The import of a CV the person already has: pasted text, or a PDF read with PDFKit, both on the device. It logs what it
+    /// read and how it failed to the app's log (ADR 0030).
     @MainActor
     func makeImportViewModel() -> ImportViewModel {
         let limits = ImportLimits.standard
         return ImportViewModel(
-            importer: ImportCV(pdfReader: PDFKitTextExtractor(), limits: limits),
+            importer: ImportCV(
+                pdfReader: PDFKitTextExtractor(logger: environment.diagnostics),
+                limits: limits,
+                logger: environment.diagnostics,
+                clock: environment.clock
+            ),
             mapper: ImportedCVMapper(),
             fileReader: ChosenFileReader(maximumBytes: limits.maximumPDFBytes, copies: openedFileCopies)
         )
@@ -137,7 +137,7 @@ final class ViewModelFactory {
     /// The router of the screens. It lets go of a PDF opened in the app that no import will read.
     @MainActor
     func makeAppRouter() -> AppRouter {
-        AppRouter(releaseFile: openedFileCopies.release)
+        AppRouter(releaseFile: openedFileCopies.release, leftEditorSaves: leftEditorSaves)
     }
 
     // MARK: - Private Composition Root
@@ -170,32 +170,6 @@ final class ViewModelFactory {
     }
 
     @MainActor
-    private func makeCVEditorViewModel(
-        cvId: String? = nil,
-        initialCV: CVModel? = nil,
-        notice: EditorNotice? = nil,
-        restoring restored: RestoredUnsavedEdits? = nil
-    ) -> CVEditorViewModel {
-        CVEditorViewModel(
-            cvId: cvId,
-            initialCV: initialCV,
-            notice: notice,
-            restoring: restored?.edits,
-            cvManagementUseCase: cvManagementUseCase,
-            documentLanguageDetector: makeDocumentLanguageDetector(),
-            unsavedEdits: unsavedEditsUseCase.map {
-                UnsavedEditsKeeper(
-                    editing: restored?.edits.id ?? environment.newEditingID(),
-                    claim: restored?.takeClaim(),
-                    useCase: $0,
-                    wait: environment.sleep
-                )
-            },
-            sleep: LaunchEnvironment.savedConfirmationWait(arguments: environment.arguments, sleep: environment.sleep)
-        )
-    }
-
-    @MainActor
     private func makeAIAvailabilityProvider() -> AIAvailabilityProvider {
         #if DEBUG
         if let forced = AIAvailabilityOverride.current(arguments: environment.arguments) {
@@ -203,15 +177,39 @@ final class ViewModelFactory {
         }
         #endif
 
-        let useCase = makeCVGeneratorUseCase()
+        let useCase = makeCVGeneratorUseCase(lexicalClasses: DeviceLexicalTagger())
         return { useCase.availability() }
     }
 
+    /// What tells the verbs of English and German, what asks the system for their data, and how long the wait for it lasts: the
+    /// device's framework and the app's bound, or, in a debug build, the data a UI test scripted.
     @MainActor
-    private func makeCVGeneratorUseCase() -> CVGeneratorUseCase {
+    private func makeLanguageData() -> (tagger: any LexicalTagger, requester: any LanguageDataRequesting, bound: Duration) {
+        #if DEBUG
+        if let scripted = LanguageDataOverride.current(arguments: environment.arguments) {
+            return (scripted.tagger, scripted.requester, scripted.bound)
+        }
+        #endif
+        return (DeviceLexicalTagger(), NaturalLanguageDataRequester(), LanguageDataPreparation.bound)
+    }
+
+    /// The generation on the device's model, whose draft the rules (ADR 0023) and the claim check (ADR 0028) limit to what the
+    /// description states, telling verbs with `lexicalClasses`. A debug build can script the model and the check for a UI test.
+    @MainActor
+    private func makeCVGeneratorUseCase(lexicalClasses: any LexicalTagger) -> CVGeneratorUseCase {
+        #if DEBUG
+        let service = AIDraftScript.service(arguments: environment.arguments) ?? FoundationModelsService()
+        let claimChecker = AIDraftScript.claimChecker(arguments: environment.arguments) ?? FoundationModelsClaimChecker()
+        #else
+        let service: any CVGenerationService = FoundationModelsService()
+        let claimChecker: any ClaimChecking = FoundationModelsClaimChecker()
+        #endif
         return CVGeneratorUseCase(
-            service: FoundationModelsService(),
-            sanitizer: CVDataSanitizer(languageOfText: DescriptionLanguageDetector.languageTag(of:), lexicalClasses: DeviceLexicalTagger())
+            service: service,
+            claimChecker: claimChecker,
+            logger: environment.diagnostics,
+            clock: environment.clock,
+            sanitizer: CVDataSanitizer(languageOfText: DescriptionLanguageDetector.languageTag(of:), lexicalClasses: lexicalClasses)
         )
     }
 

@@ -37,13 +37,15 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
     ///   - pageLoadTimeout: How long the HTML may take to load before the render fails.
     ///   - readinessTimeout: How long the page may take to say that its fonts and images are ready.
     ///   - onReadinessTimeout: What happens when it takes longer.
+    ///   - onePageFit: How a CV of two pages is tightened onto one; `OnePageFit.disabled` prints it as its design lays it out.
     public init(
         pageLoadTimeout: Duration = .seconds(30),
         readinessTimeout: Duration = .seconds(5),
-        onReadinessTimeout: ReadinessTimeoutPolicy = .drawAnyway
+        onReadinessTimeout: ReadinessTimeoutPolicy = .drawAnyway,
+        onePageFit: OnePageFit = OnePageFit()
     ) {
         self.pageBreakManager = PageBreakManager()
-        self.onePageFit = OnePageFit()
+        self.onePageFit = onePageFit
         self.pageLoadTimeout = pageLoadTimeout
         self.readinessTimeout = readinessTimeout
         self.onReadinessTimeout = onReadinessTimeout
@@ -66,9 +68,9 @@ public final class EnhancedWKWebViewPDFRenderer: NSObject {
             try await loadHTML(enhancedHTML, in: webView)
             try await awaitContentReadiness(in: webView)
 
-            let renderer = try await paginate(webView, options: options)
+            let pdf = try await printPDF(webView, options: options)
             try Task.checkCancellation()
-            return try generatePDF(with: renderer, options: options)
+            return pdf
         } catch is CancellationError {
             throw CancellationError()
         } catch let error as PDFExportError {
@@ -257,27 +259,38 @@ private extension EnhancedWKWebViewPDFRenderer {
         }
     }
 
-    /// The pages of the CV as its design lays them out, or with the design's spacing tightened when that brings a CV
-    /// of two pages onto one (`OnePageFit`)
-    func paginate(_ webView: WKWebView, options: ExportOptions) async throws -> PagePrintRenderer {
-        let renderer = makePrintRenderer(for: webView, options: options)
-        guard onePageFit.triesTightening(pageCount: renderer.numberOfPages) else { return renderer }
-
-        try await setTightened(true, in: webView)
-        let tightened = makePrintRenderer(for: webView, options: options)
-        if onePageFit.keepsTightened(pageCount: tightened.numberOfPages) {
-            return tightened
+    /// The PDF of the CV as its design lays it out, or, when that takes two pages, with the design's spacing tightened by
+    /// the lightest step of `OnePageFit` that brings the CV onto one page.
+    ///
+    /// The design's own print is drawn before the page changes, and returned when no step brings the CV onto one page:
+    /// a print made again after a step, with its smaller foot margin, does not always break its pages where the first one did.
+    func printPDF(_ webView: WKWebView, options: ExportOptions) async throws -> Data {
+        let own = makePrintRenderer(for: webView, options: options)
+        guard onePageFit.triesTightening(pageCount: own.numberOfPages) else {
+            return try generatePDF(with: own, options: options)
         }
+        let ownPDF = Result { try generatePDF(with: own, options: options) }
 
-        try await setTightened(false, in: webView)
-        return makePrintRenderer(for: webView, options: options)
+        for step in onePageFit.steps {
+            try await setTightened(step, in: webView)
+            let bottomMargin = onePageFit.bottomMargin(during: step, normal: options.margins.bottom)
+            let tightened = makePrintRenderer(for: webView, options: options, bottomMargin: bottomMargin)
+            if onePageFit.keepsTightened(pageCount: tightened.numberOfPages) {
+                return try generatePDF(with: tightened, options: options)
+            }
+        }
+        return try ownPDF.get()
     }
 
-    /// Sets or clears the class under which the design tightens its spacing, on the root element of the page
-    func setTightened(_ tightened: Bool, in webView: WKWebView) async throws {
+    /// Puts the classes of `step` on the root element of the page, and takes off the classes that only other steps set
+    func setTightened(_ step: OnePageFit.Step, in webView: WKWebView) async throws {
+        let all = Set(onePageFit.steps.flatMap(\.classNames)).sorted()
         _ = try await webView.callAsyncJavaScript(
-            "document.documentElement.classList.toggle(className, tightened);",
-            arguments: ["className": OnePageFit.className, "tightened": tightened],
+            """
+            const root = document.documentElement;
+            for (const name of all) { root.classList.toggle(name, wanted.includes(name)); }
+            """,
+            arguments: ["all": all, "wanted": step.classNames],
             in: nil,
             contentWorld: .page
         )
@@ -286,7 +299,8 @@ private extension EnhancedWKWebViewPDFRenderer {
     /// Uses UIPrintPageRenderer, which paginates at the page size with margins;
     /// WKWebView.pdf() does not respect CSS @page rules reliably.
     /// The renderer lays out the page as it is when it is made, so it is made again after the page changes.
-    func makePrintRenderer(for webView: WKWebView, options: ExportOptions) -> PagePrintRenderer {
+    /// `bottomMargin` is the margin at the foot of each page; the page's own margin when nil.
+    func makePrintRenderer(for webView: WKWebView, options: ExportOptions, bottomMargin: Double? = nil) -> PagePrintRenderer {
         // Configure print formatter
         let printFormatter = webView.viewPrintFormatter()
 
@@ -302,7 +316,7 @@ private extension EnhancedWKWebViewPDFRenderer {
             x: options.margins.left,
             y: options.margins.top,
             width: options.pageSize.width - options.margins.left - options.margins.right,
-            height: options.pageSize.height - options.margins.top - options.margins.bottom
+            height: options.pageSize.height - options.margins.top - (bottomMargin ?? options.margins.bottom)
         )
 
         // Set the maximum content width to prevent scaling
