@@ -21,7 +21,8 @@ enum CertificationReader {
                     }
                     year = Sourced(value: value, spans: [cell.sub(last.range).span], reading: .year)
                 }
-                let cut = dates.map(\.range).filter { !isPartOfBracketedWords($0, in: cell) }
+                let brackets = Brackets(of: cell, ifDatesIn: dates)
+                let cut = dates.map(\.range).filter { !brackets.holdWords(around: $0) }
                 parts += cell.removing(cut).flatMap { $0.split(by: Separators.strong + [" - ", ", "]) }
             }
             guard let name = parts.first else {
@@ -38,11 +39,43 @@ enum CertificationReader {
         }
     }
 
-    /// A date inside a bracket that holds other words, "Course (Pro, 2024)", is a part of those words: it is read as the
-    /// year, and it stays in the text, so that the bracket stays whole.
-    private static func isPartOfBracketedWords(_ date: Range<String.Index>, in cell: Piece) -> Bool {
-        guard let bracket = cell.bracketedRanges().first(where: { $0.contains(date.lowerBound) }) else { return false }
-        return cell.text[bracket.lowerBound..<date.lowerBound].contains(where: \.isLetter)
-            || cell.text[date.upperBound..<bracket.upperBound].contains(where: \.isLetter)
+    /// The brackets of a cell, each with the places of its first and its last letter, read in one pass over the cell: a cell
+    /// holds many dates, and none of them reads the cell's brackets or its letters again (R8).
+    private struct Brackets {
+        private struct Bracket {
+            let range: Range<String.Index>
+            let firstLetter: String.Index?
+            let lastLetter: String.Index?
+        }
+
+        private let brackets: [Bracket]
+
+        /// The brackets of the cell, when it has dates to be told from them.
+        init(of cell: Piece, ifDatesIn dates: [DateMatch]) {
+            guard !dates.isEmpty else {
+                brackets = []
+                return
+            }
+            brackets = cell.bracketedRanges().map { range in
+                let inside = cell.text[range]
+                return Bracket(range: range, firstLetter: inside.firstIndex(where: \.isLetter), lastLetter: inside.lastIndex(where: \.isLetter))
+            }
+        }
+
+        /// Whether the date is inside a bracket that holds other words, "Course (Pro, 2024)": it is a part of those words, so
+        /// it is read as the year, and it stays in the text, so that the bracket stays whole.
+        func holdWords(around date: Range<String.Index>) -> Bool {
+            var low = 0
+            var high = brackets.count
+            while low < high {
+                let middle = (low + high) / 2
+                if brackets[middle].range.upperBound <= date.lowerBound { low = middle + 1 } else { high = middle }
+            }
+            guard low < brackets.count, brackets[low].range.lowerBound <= date.lowerBound else { return false }
+            let bracket = brackets[low]
+            if let first = bracket.firstLetter, first < date.lowerBound { return true }
+            if let last = bracket.lastLetter, last >= date.upperBound { return true }
+            return false
+        }
     }
 }

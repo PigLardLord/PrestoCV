@@ -1,0 +1,11 @@
+{
+ "id": "traps/pasiones-es", "language": "es", "form": "trap",
+ "person": {"name": "Lucía Navarro", "title": "Diseñadora gráfica", "email": "lucia.navarro@example.org", "phone": "600 000 808",
+            "location": "Valencia", "links": [], "summary": null},
+ "experience": [
+  {"role": "Diseñadora gráfica", "employer": "Estudio Ejemplo S.L.", "location": "Valencia", "start": [2020, 1], "end": "current", "details": 1}
+ ],
+ "education": [{"degree": "Grado en Diseño", "school": "Universidad de Valencia", "start": [2015, null], "end": [2019, null]}],
+ "skills": [], "languages": [], "certifications": [],
+ "interests": ["Senderismo", "fotografía"]
+}

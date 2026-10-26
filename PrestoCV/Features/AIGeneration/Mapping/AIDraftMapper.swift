@@ -2,6 +2,17 @@ import Foundation
 import PrestoCVCore
 import CVGeneratorAI
 
+/// A CV drafted by AI, not stored yet, and whether its personal items were left blank because the claim check gave no answer
+/// (ADR 0028). The editor opens it with the notice that matches.
+struct AIDraft: Equatable, Sendable {
+    let cv: CVModel
+    let personalItemsUnchecked: Bool
+
+    var notice: EditorNotice {
+        personalItemsUnchecked ? .aiDraftUnchecked : .aiDraft
+    }
+}
+
 /// Turns what the on-device model produced into a CV the editor can open.
 ///
 /// Pure: the same CV data and labels always give the same CV (apart from fresh ids). It lives in
@@ -11,6 +22,14 @@ struct AIDraftMapper {
     let labels: AIDraftLabels
     /// The BCP 47 tag of the language a text is written in, or nil when it cannot tell
     let languageOfText: (String) -> String?
+
+    /// The draft of a generation, with whether its personal items went unchecked.
+    /// - Parameters:
+    ///   - draft: What the generation gave from the description.
+    ///   - description: The person's own text.
+    func map(_ draft: GeneratedDraft, writtenIn description: String) -> AIDraft {
+        AIDraft(cv: map(draft.cvData, writtenIn: description), personalItemsUnchecked: draft.personalItemsUnchecked)
+    }
 
     /// - Parameters:
     ///   - cvData: What the model produced from the description.

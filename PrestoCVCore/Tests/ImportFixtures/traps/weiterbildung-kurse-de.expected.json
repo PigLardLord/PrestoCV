@@ -1,0 +1,12 @@
+{
+ "id": "traps/weiterbildung-kurse-de", "language": "de", "form": "trap",
+ "person": {"name": "Katrin Lorenz", "title": "Elektronikerin", "email": "katrin.lorenz@example.org", "phone": "+49 151 000 0707",
+            "location": "Erfurt", "links": [], "summary": null},
+ "experience": [
+  {"role": "Elektronikerin", "employer": "Beispiel Technik GmbH", "location": null, "start": [2019, 3], "end": "current", "details": 1}
+ ],
+ "education": [{"degree": "Elektronikerin für Betriebstechnik", "school": "Beispiel Berufsschule Erfurt", "start": [2015, null], "end": [2018, null]}],
+ "skills": [], "languages": [],
+ "certifications": [{"name": "Schweißerlehrgang", "year": 2020}, {"name": "Erste-Hilfe-Kurs", "year": 2022}],
+ "interests": []
+}

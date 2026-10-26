@@ -65,9 +65,10 @@ final class AppRouter: ObservableObject {
         openEditor(.new(template: template, notice: nil))
     }
 
-    /// Opens a CV drafted by AI, which the editor stores as it is, with a notice asking the person to check it
-    func navigateToEditorWithAIDraft(_ draft: CVModel) {
-        openEditor(.new(template: draft, notice: .aiDraft))
+    /// Opens a CV drafted by AI, which the editor stores as it is, with a notice asking the person to check it, and saying
+    /// which items were left blank when the claim check gave no answer (ADR 0028)
+    func navigateToEditorWithAIDraft(_ draft: AIDraft) {
+        openEditor(.new(template: draft.cv, notice: draft.notice))
     }
 
     /// Opens a CV read from the person's text or PDF, which the editor stores as it is, with a notice that leads to what

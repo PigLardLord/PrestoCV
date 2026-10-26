@@ -1,4 +1,5 @@
 import Testing
+import DiagnosticLogging
 import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
@@ -87,7 +88,7 @@ struct FileExportPreferencesStoreTests {
 
     @Test("the default file lives in Application Support, outside UserDefaults")
     func defaultFileIsInApplicationSupport() {
-        let path = AppEnvironment.device().exportPreferencesFile.path
+        let path = AppEnvironment.device(diagnostics: SilentLogger()).exportPreferencesFile.path
 
         #expect(path.contains("Application Support"))
         #expect(path.hasSuffix("export-preferences.json"))

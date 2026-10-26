@@ -1,4 +1,5 @@
 #if canImport(PDFKit)
+import DiagnosticLogging
 import Foundation
 import PDFKit
 import PrestoCVImporting
@@ -11,18 +12,36 @@ import AppKit
 /// Reads a PDF's words with PDFKit: each word with its box in page space (origin at the top left), its font size and
 /// whether it is bold, in PDFKit's order (ADR 0027). It decides nothing about the reading order: PDFKit does not
 /// promise one, and the core orders the words, tested on Linux. It opens no connection and keeps nothing.
+///
+/// It logs the pages and the words it read, and the limit that stopped it (ADR 0030): counts and names, never a word.
+/// It throws that limit as a `LimitReached`, as the port allows, and the import turns it into the failure the person is
+/// told about and logs every failure by its kind, the limit's name with it.
 public struct PDFKitTextExtractor: PDFTextExtracting {
+    private let logger: any DiagnosticLogger
 
-    public init() {}
+    public init(logger: any DiagnosticLogger) {
+        self.logger = logger
+    }
 
     public func layout(ofPDF data: Data, limits: ImportLimits) async throws -> ExtractedLayout {
+        do {
+            let pages = try read(data, limits: limits)
+            logger.info(.importing, "pdf.read", .count("pages", pages.count), .count("words", pages.reduce(0) { $0 + $1.words.count }))
+            return .pages(pages)
+        } catch let reached as LimitReached {
+            logger.notice(.importing, "pdf.limit", .token("limit", reached.logName))
+            throw reached
+        }
+    }
+
+    private func read(_ data: Data, limits: ImportLimits) throws -> [ExtractedPage] {
         try Task.checkCancellation()
-        guard data.count <= limits.maximumPDFBytes else { throw ImportError.tooLarge }
+        guard data.count <= limits.maximumPDFBytes else { throw LimitReached(.bytes) }
         guard let document = PDFDocument(data: data) else { throw ImportError.unreadable }
         // A PDF that opens with no password has `isLocked` false even when it is encrypted
         guard !document.isLocked else { throw ImportError.encrypted }
         guard document.pageCount > 0 else { throw ImportError.empty }
-        guard document.pageCount <= limits.maximumPages else { throw ImportError.tooManyPages }
+        guard document.pageCount <= limits.maximumPages else { throw LimitReached(.pages) }
         var pages: [ExtractedPage] = []
         var budget = Budget(characters: limits.maximumCharacters, words: limits.maximumWords)
         for index in 0..<document.pageCount {
@@ -30,7 +49,7 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
             guard let page = document.page(at: index) else { continue }
             pages.append(try Self.words(of: page, budget: &budget))
         }
-        return .pages(pages)
+        return pages
     }
 
     // MARK: Words
@@ -57,27 +76,31 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
     /// included, is counted as a pasted text is, in UTF-16 units, and a page over the characters left is refused before
     /// its style and its glyphs are read. Its words are counted as they are read, and the reading stops once its task
     /// is cancelled.
-    /// - Throws: `ImportError.tooLarge` over the characters or the words left; `CancellationError`.
+    /// - Throws: `LimitReached` over the characters or the words left; `CancellationError`.
     static func words(of page: PDFPage, budget: inout Budget) throws -> ExtractedPage {
         let bounds = page.bounds(for: .cropBox)
         let size = page.rotation % 180 == 0 ? bounds.size : CGSize(width: bounds.height, height: bounds.width)
         guard let string = page.string else { return ExtractedPage(width: size.width, height: size.height, words: []) }
         let text = string as NSString
-        guard text.length <= budget.characters else { throw ImportError.tooLarge }
+        guard text.length <= budget.characters else { throw LimitReached(.characters) }
         budget.characters -= text.length
         try Task.checkCancellation()
         let attributed = page.attributedString
         let styled = attributed?.length == text.length
+        var colours = Colours(attributed: styled ? attributed : nil)
 
         var words: [ExtractedWord] = []
+        // The level of each word's colour, nil for a word of several colours or of none known
+        var levels: [Int?] = []
         var current = ""
         var ink = CGRect.null
         var fontSize = 0.0
         var isBold = true
+        var level: Int?
         let wordsLeft = budget.words
         func close() throws {
             if !current.isEmpty, !ink.isNull {
-                guard words.count < wordsLeft else { throw ImportError.tooLarge }
+                guard words.count < wordsLeft else { throw LimitReached(.words) }
                 // Page space has its origin at the bottom left; the core's at the top left
                 let middle = bounds.maxY - ink.midY
                 let height = 0.925 * fontSize
@@ -85,11 +108,13 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
                     text: current, frame: Rect(x: ink.minX - bounds.minX, y: middle - height / 2, width: ink.width, height: height),
                     fontSize: fontSize, isBold: isBold
                 ))
+                levels.append(level)
             }
             current = ""
             ink = .null
             fontSize = 0
             isBold = true
+            level = nil
         }
 
         var index = 0
@@ -123,6 +148,8 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
                 if gap > reach / 3 || gap < -reach || !sameLine { try close() }
             }
             if !box.isEmpty {
+                let colour = colours.level(at: index)
+                level = current.isEmpty || level == colour ? colour : nil
                 current += character
                 ink = ink.isNull ? box : ink.union(box)
                 fontSize = max(fontSize, style.size)
@@ -133,7 +160,49 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
         }
         try close()
         budget.words -= words.count
-        return ExtractedPage(width: size.width, height: size.height, words: words)
+        return ExtractedPage(
+            width: size.width, height: size.height, words: try withInkWeights(words, levels: levels, on: page, bounds: bounds)
+        )
+    }
+
+    /// The words, bold where their fonts say it or their strokes are clearly heavier than the page's: PDFKit gives back
+    /// a plain font for a font it cannot name, and a PDF's headings are bold in the ink only (`InkWeight`). A word is
+    /// measured at the level of its colour, so that what the page draws across it is not taken for its ink.
+    private static func withInkWeights(_ words: [ExtractedWord], levels: [Int?], on page: PDFPage, bounds: CGRect) throws -> [ExtractedWord] {
+        let heavy = try InkWeight.heavyWords(on: page, bounds: bounds, words: words, levels: levels)
+        return zip(words, heavy).map { word, heavy in
+            heavy && !word.isBold ? ExtractedWord(text: word.text, frame: word.frame, fontSize: word.fontSize, isBold: true) : word
+        }
+    }
+
+    /// The grey levels of a page's text colours, read a run of one colour at a time.
+    struct Colours {
+        let attributed: NSAttributedString?
+        private let converter = InkWeight.Levels()
+        private var run = NSRange(location: 0, length: 0)
+        private var runLevel: Int?
+
+        init(attributed: NSAttributedString?) {
+            self.attributed = attributed
+        }
+
+        /// The level of the colour the character at `index` is drawn in, as the page is drawn: nil when the text has no
+        /// style or the character no colour.
+        mutating func level(at index: Int) -> Int? {
+            guard let attributed, index < attributed.length else { return nil }
+            if !NSLocationInRange(index, run) {
+                var range = NSRange(location: index, length: 1)
+                let value = attributed.attribute(.foregroundColor, at: index, effectiveRange: &range)
+                #if canImport(UIKit)
+                let colour = (value as? UIColor)?.cgColor
+                #else
+                let colour = (value as? NSColor)?.cgColor
+                #endif
+                run = range
+                runLevel = colour.flatMap(converter.level(of:))
+            }
+            return runLevel
+        }
     }
 
     /// The font size at a character, and whether its font is bold: by its traits, or by its name, as many PDF fonts

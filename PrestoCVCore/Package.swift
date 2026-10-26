@@ -9,6 +9,8 @@ var products: [Product] = [
     .library(name: "PrestoCVCoreTestSupport", targets: ["PrestoCVCoreTestSupport"]),
     .library(name: "PrestoCVImporting", targets: ["PrestoCVImporting"]),
 ]
+let logging = Target.Dependency.product(name: "DiagnosticLogging", package: "DiagnosticLogging")
+let loggingTestSupport = Target.Dependency.product(name: "DiagnosticLoggingTestSupport", package: "DiagnosticLogging")
 var targets: [Target] = [
     .target(name: "PrestoCVDomain"),
     .target(name: "PrestoCVApplication", dependencies: ["PrestoCVDomain"]),
@@ -17,17 +19,24 @@ var targets: [Target] = [
     .testTarget(name: "PrestoCVAuthoringTests", dependencies: ["PrestoCVDomain", "PrestoCVApplication", "PrestoCVCoreTestSupport"]),
     .testTarget(name: "PrestoCVPersistenceTests", dependencies: ["PrestoCVPersistence", "PrestoCVDomain", "PrestoCVApplication", "PrestoCVCoreTestSupport"]),
     // CV Import (ADR 0027): downstream of Authoring, whose value objects it reads.
-    .target(name: "PrestoCVImporting", dependencies: ["PrestoCVDomain"]),
+    // It logs its decisions through the logger it is given (ADR 0030).
+    .target(name: "PrestoCVImporting", dependencies: ["PrestoCVDomain", logging]),
     // The synthetic corpus is shared with the PDFKit reader's tests, so it sits next to both test targets.
-    .testTarget(name: "PrestoCVImportingTests", dependencies: ["PrestoCVImporting", "PrestoCVDomain"], resources: [.copy("../ImportFixtures")]),
+    .testTarget(
+        name: "PrestoCVImportingTests", dependencies: ["PrestoCVImporting", "PrestoCVDomain", logging, loggingTestSupport],
+        resources: [.copy("../ImportFixtures")]
+    ),
 ]
 
 // Apple-only adapter (the platform column of docs/architecture/modules.md): not part of a Linux build.
 #if !os(Linux)
 products.append(.library(name: "PrestoCVImportingPDFKit", targets: ["PrestoCVImportingPDFKit"]))
 targets += [
-    .target(name: "PrestoCVImportingPDFKit", dependencies: ["PrestoCVImporting"]),
-    .testTarget(name: "PrestoCVImportingPDFKitTests", dependencies: ["PrestoCVImportingPDFKit", "PrestoCVImporting"], resources: [.copy("../ImportFixtures")]),
+    .target(name: "PrestoCVImportingPDFKit", dependencies: ["PrestoCVImporting", logging]),
+    .testTarget(
+        name: "PrestoCVImportingPDFKitTests", dependencies: ["PrestoCVImportingPDFKit", "PrestoCVImporting", logging, loggingTestSupport],
+        resources: [.copy("../ImportFixtures")]
+    ),
 ]
 #endif
 
@@ -44,5 +53,7 @@ let package = Package(
     name: "PrestoCVCore",
     platforms: [.iOS("26.5"), .macOS("26.0")],
     products: products,
+    // The one edge between the packages (docs/architecture/modules.md): the logging interface, which has no dependency.
+    dependencies: [.package(path: "../DiagnosticLogging")],
     targets: targets
 )

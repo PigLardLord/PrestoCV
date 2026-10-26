@@ -1,9 +1,10 @@
+import DiagnosticLogging
 import Foundation
 
 /// What the app reads from the device: the clock, the calendar and the time zone, the languages, its folders, its
-/// launch arguments and the platform it runs on. The app reads them once, at its entry point (`AppEnvironment.device()`),
-/// and the view model factory hands each view model and service the part it needs, so that nothing else reads the device
-/// and tests give fixed ones.
+/// launch arguments and the platform it runs on, and where it writes its diagnostic log. The app reads them once, at its
+/// entry point (`AppEnvironment.device(diagnostics:)`), and the view model factory hands each view model and service the
+/// part it needs, so that nothing else reads the device and tests give fixed ones.
 struct AppEnvironment {
     /// The clock of the app
     let now: @Sendable () -> Date
@@ -17,8 +18,8 @@ struct AppEnvironment {
     let preferredLanguages: () -> [String]
     /// How the app waits
     let sleep: @Sendable (Duration) async throws -> Void
-    /// The clock the editors measure the pause before they save on, and the list the pause before it stores what was chosen
-    /// in an export sheet
+    /// The clock the editors measure the pause before they save on, the list the pause before it stores what was chosen in
+    /// an export sheet, and the import and the AI draft time their steps on
     let clock: any Clock<Duration>
     /// Where each export gets a folder of its own
     let temporaryDirectory: URL
@@ -36,6 +37,8 @@ struct AppEnvironment {
     let bundle: Bundle
     /// Where the app runs, as the AI entry tells it apart: an iPhone or an iPad, or a Mac that runs the iPad app
     let platform: AIPlatform
+    /// Where the import and the AI draft write what they did (ADR 0030): the unified log on the device
+    let diagnostics: any DiagnosticLogger
 
     /// The locale of the texts that format dates and the names of languages: the language of the app, which is what the
     /// rest of the texts are in, and not the region of the device, which can differ from it
@@ -45,8 +48,8 @@ struct AppEnvironment {
 }
 
 extension AppEnvironment {
-    /// The device the app runs on
-    static func device() -> AppEnvironment {
+    /// The device the app runs on, with the log the app writes to
+    static func device(diagnostics: any DiagnosticLogger) -> AppEnvironment {
         AppEnvironment(
             now: { Date() },
             calendar: { .autoupdatingCurrent },
@@ -61,7 +64,8 @@ extension AppEnvironment {
             removeFile: { try FileManager.default.removeItem(at: $0) },
             arguments: ProcessInfo.processInfo.arguments,
             bundle: .main,
-            platform: .current
+            platform: .current,
+            diagnostics: diagnostics
         )
     }
 }

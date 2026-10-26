@@ -12,28 +12,35 @@ enum LayoutAnalyzer {
         var leftOut: [LeftOutText]
     }
 
-    /// - Throws: `ImportError.tooLarge` over the limits of words, lines, cells or steps; `CancellationError`.
+    /// - Throws: `LimitReached` over the limits of words, lines, cells or steps; `CancellationError`.
     static func analyze(_ pages: [ExtractedPage], limits: ImportLimits, work: inout AnalysisWork) throws -> Analysis {
         let wordCount = pages.reduce(0) { $0 + $1.words.count }
-        guard wordCount <= limits.maximumWords else { throw ImportError.tooLarge }
+        guard wordCount <= limits.maximumWords else { throw LimitReached(.words) }
         try work.count(wordCount)
         var leftOut: [LeftOutText] = []
         var pageLines: [[PageLine]] = []
         var lineCount = 0
         var cellCount = 0
-        for (index, page) in pages.enumerated() {
-            let found = try lines(of: page, number: index + 1, work: &work)
-            lineCount += found.count
+        try work.count(AnalysisWork.sortSteps(wordCount))
+        let bodySize = median(pages.flatMap { $0.words.map(\.fontSize) }) ?? 10
+        var pageGroups: [[[ExtractedWord]]] = []
+        for page in pages {
+            let groups = try lineWords(of: page, work: &work)
+            lineCount += groups.count
+            guard lineCount <= limits.maximumLines else { throw LimitReached(.lines) }
+            pageGroups.append(groups)
+        }
+        let headings = try HeadingRails(lines: pageGroups, of: pages, bodySize: bodySize, work: &work)
+        for (index, groups) in pageGroups.enumerated() {
+            let found = lines(of: groups, headingEnds: headings.headingEnds[index], number: index + 1)
             cellCount += found.reduce(0) { $0 + $1.cells.count }
-            guard lineCount <= limits.maximumLines, cellCount <= limits.maximumCells else { throw ImportError.tooLarge }
+            guard cellCount <= limits.maximumCells else { throw LimitReached(.cells) }
             pageLines.append(found)
         }
         try work.count(2 * lineCount)
         removeRepeated(&pageLines, pages: pages, leftOut: &leftOut)
 
         let allCells = pageLines.flatMap { $0.flatMap(\.cells) }
-        try work.count(AnalysisWork.sortSteps(wordCount))
-        let bodySize = median(pages.flatMap { $0.words.map(\.fontSize) }) ?? 10
         let split = try columns(of: allCells, width: pages.first?.width ?? 595, work: &work)
 
         try work.count(lineCount + cellCount)
@@ -127,17 +134,15 @@ enum LayoutAnalyzer {
 
         /// Where the text starts past a list marker: a wrapped line of the item starts there too.
         var textStart: Double? {
-            guard let first = cells.first?.words.first else { return nil }
-            if bulletMarks.contains(first.text), let second = cells.first?.words.dropFirst().first { return second.frame.x }
-            return first.frame.x
+            cells.first.map { LayoutAnalyzer.textStart(of: $0.words[...]) }
         }
     }
 
     private static let bulletMarks: Set<String> = ["•", "-", "–", "▪", "◦", "●", "■", "►", "➢", "*", "·", "o", "\u{F0B7}"]
 
-    /// The words of a page grouped into lines by their height on the page, and each line into cells at its wide gaps. A
-    /// word without a box on the page, one not finite or of a negative size, cannot be placed and is no text.
-    static func lines(of page: ExtractedPage, number: Int, work: inout AnalysisWork) throws -> [PageLine] {
+    /// The words of a page grouped into lines by their height on the page, each line's words from left to right. A word
+    /// without a box on the page, one not finite or of a negative size, cannot be placed and is no text.
+    private static func lineWords(of page: ExtractedPage, work: inout AnalysisWork) throws -> [[ExtractedWord]] {
         let words = page.words.filter { !$0.text.allSatisfy(\.isWhitespace) && isPlaceable($0.frame) }
             .sorted { ($0.frame.y, $0.frame.x) < ($1.frame.y, $1.frame.x) }
         try work.count(2 * AnalysisWork.sortSteps(page.words.count))
@@ -158,12 +163,23 @@ enum LayoutAnalyzer {
                 open.append(groups.count - 1)
             }
         }
-        return groups.map { group in
-            let sorted = group.sorted { $0.frame.x < $1.frame.x }
+        return groups.map { $0.sorted { $0.frame.x < $1.frame.x } }
+    }
+
+    /// The lines of a page, each split into cells at its wide gaps.
+    ///
+    /// A section's heading in a column of its own, right-aligned to the left of its section's first line, stands closer to
+    /// that line than two cells of a table do. So a line's first cell also ends where `headingEnds` says a heading drawn
+    /// in such a column ends: `HeadingRails` reads them (#287).
+    ///
+    /// - Parameter groups: The words of each line, from left to right, at least one word in each.
+    private static func lines(of groups: [[ExtractedWord]], headingEnds: [Int?], number: Int) -> [PageLine] {
+        groups.enumerated().map { index, sorted in
             var cells: [[ExtractedWord]] = [[sorted[0]]]
-            for (previous, word) in zip(sorted, sorted.dropFirst()) {
+            for (offset, (previous, word)) in zip(sorted, sorted.dropFirst()).enumerated() {
                 let gap = word.frame.x - previous.frame.maxX
-                if gap > max(8, 1.5 * max(previous.fontSize, word.fontSize)) {
+                let size = max(previous.fontSize, word.fontSize)
+                if gap > max(8, 1.5 * size) || headingEnds[index] == offset + 1 {
                     cells.append([word])
                 } else {
                     cells[cells.count - 1].append(word)
@@ -171,6 +187,15 @@ enum LayoutAnalyzer {
             }
             return PageLine(page: number, cells: cells.map(Cell.init))
         }.sorted { ($0.frame.y, $0.frame.x) < ($1.frame.y, $1.frame.x) }
+    }
+
+    /// Where the text of words, left to right, starts: past a list marker if they start with one.
+    ///
+    /// - Parameter words: At least one word.
+    private static func textStart(of words: ArraySlice<ExtractedWord>) -> Double {
+        let first = words.startIndex
+        if bulletMarks.contains(words[first].text), words.count > 1 { return words[first + 1].frame.x }
+        return words[first].frame.x
     }
 
     private static func isPlaceable(_ frame: Rect) -> Bool {
@@ -295,7 +320,7 @@ enum LayoutAnalyzer {
     }
 
     /// The first index of a sorted array where `isPast` holds, or its count: `isPast` must hold from some index on.
-    private static func firstIndex<Value>(in sorted: [Value], where isPast: (Value) -> Bool) -> Int {
+    static func firstIndex<Value>(in sorted: [Value], where isPast: (Value) -> Bool) -> Int {
         var low = 0
         var high = sorted.count
         while low < high {

@@ -85,6 +85,24 @@ struct ImportViewModelTests {
         #expect(viewModel.failure?.messageKey.localized != viewModel.failure?.messageKey)
     }
 
+    @Test("A text whose reading takes more steps than the limit allows is refused with the same message")
+    func tooMuchWork() {
+        let viewModel = ImportViewModel(
+            importer: ImportCV(pdfReader: ScriptedPDFReader(), limits: ImportLimits(
+                maximumPDFBytes: 10, maximumPages: 1, maximumCharacters: 100_000,
+                maximumWords: 10, maximumLines: 10, maximumCells: 10, maximumAnalysisSteps: 500_000
+            )),
+            mapper: ImportedCVMapper(), fileReader: ScriptedFileReader()
+        )
+        // A thousand lines on each side of a date: a million readings of the dates to score
+        let lines = String(repeating: "a\n", count: 1_000)
+        viewModel.text = "Experience\n" + lines + "2020 – 2021\n" + lines + "2019 – 2020\n"
+        viewModel.importText()
+
+        #expect(viewModel.failure == .tooLarge)
+        #expect(viewModel.imported == nil)
+    }
+
     @Test("A PDF from Files is read and imported, and the screen is busy meanwhile only")
     func pdfFromFiles() async {
         let viewModel = makeViewModel(reader: ScriptedPDFReader(layout: .pages([page])))

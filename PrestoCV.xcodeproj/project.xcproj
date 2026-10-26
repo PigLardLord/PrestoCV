@@ -20,11 +20,15 @@
     }, {
       "kind": "local",
       "path": "CVGeneratorAI",
+    }, {
+      "kind": "local",
+      "path": "DiagnosticLogging",
     },
   ],
   "files": [
     { "path": "CVGeneratorAI" },
     { "path": "CVPDFExporter" },
+    { "path": "DiagnosticLogging" },
     { "path": "<PROJECT>/PrestoCVCore" },
     {
       "kind": "folder",
@@ -72,6 +76,12 @@
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "product-name": "CVPDFExporter",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "product-name": "DiagnosticLogging",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "product-name": "DiagnosticLoggingOSLog",
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "product-name": "PrestoCVCore",
