@@ -28,11 +28,12 @@ struct EditorRequestTests {
             .new(template: template, notice: nil),
             .new(template: template, notice: nil),
             .new(template: template, notice: .aiDraft),
+            .new(template: template, notice: .aiDraftUnchecked),
             .new(template: template, notice: .imported(Self.review)),
             .new(template: CVModel(name: "Draft"), notice: nil),
         ]
 
-        #expect(requests.count == 4, "The same template with the same notice is one request")
+        #expect(requests.count == 5, "The same template with the same notice is one request")
     }
 
     @Test("Requests of different kinds are never the same, even for the same CV")
@@ -50,6 +51,7 @@ struct EditorRequestTests {
         let cv = CVModel(personalInfo: PersonalInfo(name: "Lena Hartmann"))
 
         #expect(EditorRequest.new(template: cv, notice: .aiDraft).storesAsItIs)
+        #expect(EditorRequest.new(template: cv, notice: .aiDraftUnchecked).storesAsItIs, "A draft whose personal items were withdrawn too")
         #expect(EditorRequest.new(template: cv, notice: .imported(Self.review)).storesAsItIs)
         #expect(EditorRequest.new(template: cv, notice: .imported(ImportReview(items: [], notImported: ""))).storesAsItIs,
                 "An import with nothing to check is stored too")

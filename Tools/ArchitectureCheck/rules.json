@@ -252,6 +252,7 @@
     "PDFKit",
     "UIKit",
     "AppKit",
+    "CoreGraphics",
     "Foundation"
    ],
    "rules": [
@@ -273,6 +274,7 @@
     "PDFKit",
     "PrestoCVImporting",
     "PrestoCVImportingPDFKit",
+    "CoreGraphics",
     "CoreText"
    ],
    "rules": [

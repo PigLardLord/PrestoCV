@@ -5,13 +5,17 @@ import SwiftUI
 /// with proper accessibility support and design token integration
 struct LoadingView: View {
     let message: LocalizedStringKey
+    /// What VoiceOver reads for the whole view. It reads "Processing..." unless the view says better what it waits for.
+    let voiceOverLabel: LocalizedStringKey
     let style: Style
     
     init(
         message: LocalizedStringKey = "common.processing".asLoclizedKey,
+        voiceOverLabel: LocalizedStringKey = "common.processing".asLoclizedKey,
         style: Style = .default
     ) {
         self.message = message
+        self.voiceOverLabel = voiceOverLabel
         self.style = style
     }
     
@@ -29,7 +33,7 @@ struct LoadingView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: style.fillsContainer ? .infinity : nil)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(LocalizedStringKey("common.processing"))
+        .accessibilityLabel(voiceOverLabel)
         .accessibilityAddTraits(.updatesFrequently)
     }
     

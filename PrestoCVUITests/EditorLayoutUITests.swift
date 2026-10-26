@@ -52,12 +52,12 @@ final class EditorLayoutUITests: XCTestCase {
         launch()
         assertOneExportControlInTheNavigationBar(context: "in portrait")
 
-        guard turn(to: .landscapeLeft) else {
+        guard app.turn(to: .landscapeLeft) else {
             throw XCTSkip("This screen does not turn to landscape, as the outer screen of the iPhone Duo; portrait passed")
         }
         assertOneExportControlInTheNavigationBar(context: "in landscape")
 
-        XCTAssertTrue(turn(to: .portrait), "The screen should turn back to portrait")
+        XCTAssertTrue(app.turn(to: .portrait), "The screen should turn back to portrait")
         assertOneExportControlInTheNavigationBar(context: "back in portrait")
     }
 
@@ -120,14 +120,5 @@ final class EditorLayoutUITests: XCTestCase {
         XCTAssertTrue(form.exists, "The editor should show its form \(context)")
         let window = app.windows.firstMatch
         XCTAssertGreaterThan(form.frame.maxY, window.frame.maxY - 44, "Nothing should sit below the form \(context)")
-    }
-
-    /// Turns the device and waits until the screen has turned with it.
-    /// - Returns: Whether the screen turned: the outer screen of the iPhone Duo stays in portrait.
-    private func turn(to orientation: UIDeviceOrientation) -> Bool {
-        XCUIDevice.shared.orientation = orientation
-        let window = app.windows.firstMatch
-        let turned = NSPredicate { _, _ in (window.frame.width > window.frame.height) == orientation.isLandscape }
-        return XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: turned, object: nil)], timeout: 10) == .completed
     }
 }

@@ -99,15 +99,18 @@ final class ViewModelFactory {
         )
     }
 
+    /// The AI screen. When the device has not got the language data a description needs, it asks the system for it and waits at
+    /// most `LanguageDataPreparation.bound` (a debug launch can shorten it); the grounding then reads the data the system gave.
     @MainActor
     func makeAIGenerationViewModel() -> AIGenerationViewModel {
+        let languageData = makeLanguageData()
         return AIGenerationViewModel(
-            cvGenerationUseCase: makeCVGeneratorUseCase(),
+            cvGenerationUseCase: makeCVGeneratorUseCase(lexicalClasses: languageData.tagger),
             mapper: AIDraftMapper(
                 labels: makeAIDraftLabels(),
                 languageOfText: DescriptionLanguageDetector.languageTag(of:)
             ),
-            languageData: NaturalLanguageDataRequester(),
+            languageData: LanguageDataPreparation(requester: languageData.requester, bound: languageData.bound, sleep: environment.sleep),
             appLanguageCode: environment.appLanguage,
             session: aiDescriptionSession,
             platform: environment.platform
@@ -168,15 +171,37 @@ final class ViewModelFactory {
         }
         #endif
 
-        let useCase = makeCVGeneratorUseCase()
+        let useCase = makeCVGeneratorUseCase(lexicalClasses: DeviceLexicalTagger())
         return { useCase.availability() }
     }
 
+    /// What tells the verbs of English and German, what asks the system for their data, and how long the wait for it lasts: the
+    /// device's framework and the app's bound, or, in a debug build, the data a UI test scripted.
     @MainActor
-    private func makeCVGeneratorUseCase() -> CVGeneratorUseCase {
+    private func makeLanguageData() -> (tagger: any LexicalTagger, requester: any LanguageDataRequesting, bound: Duration) {
+        #if DEBUG
+        if let scripted = LanguageDataOverride.current(arguments: environment.arguments) {
+            return (scripted.tagger, scripted.requester, scripted.bound)
+        }
+        #endif
+        return (DeviceLexicalTagger(), NaturalLanguageDataRequester(), LanguageDataPreparation.bound)
+    }
+
+    /// The generation on the device's model, whose draft the rules (ADR 0023) and the claim check (ADR 0028) limit to what the
+    /// description states, telling verbs with `lexicalClasses`. A debug build can script the model and the check for a UI test.
+    @MainActor
+    private func makeCVGeneratorUseCase(lexicalClasses: any LexicalTagger) -> CVGeneratorUseCase {
+        #if DEBUG
+        let service = AIDraftScript.service(arguments: environment.arguments) ?? FoundationModelsService()
+        let claimChecker = AIDraftScript.claimChecker(arguments: environment.arguments) ?? FoundationModelsClaimChecker()
+        #else
+        let service: any CVGenerationService = FoundationModelsService()
+        let claimChecker: any ClaimChecking = FoundationModelsClaimChecker()
+        #endif
         return CVGeneratorUseCase(
-            service: FoundationModelsService(),
-            sanitizer: CVDataSanitizer(languageOfText: DescriptionLanguageDetector.languageTag(of:), lexicalClasses: DeviceLexicalTagger())
+            service: service,
+            claimChecker: claimChecker,
+            sanitizer: CVDataSanitizer(languageOfText: DescriptionLanguageDetector.languageTag(of:), lexicalClasses: lexicalClasses)
         )
     }
 

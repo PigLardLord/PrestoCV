@@ -1436,6 +1436,47 @@
         }
       }
     },
+    "ai.generation.language_data_message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Sprachdaten für Ihre Beschreibung werden geladen …"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Getting the language data your description needs..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obteniendo los datos de idioma que necesita tu descripción..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récupération des données linguistiques dont votre description a besoin..."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recupero dei dati linguistici di cui ha bisogno la tua descrizione..."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obtendo os dados de idioma de que sua descrição precisa..."
+          }
+        }
+      }
+    },
     "ai.generation.loading_message" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1647,37 +1688,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Sprachdaten für den Entwurf werden vorbereitet. Versuchen Sie es später noch einmal."
+            "value" : "Dieses Gerät kann die Sprachdaten nicht laden, die Entwürfe auf Englisch oder Deutsch benötigen. Schreiben Sie Ihren Lebenslauf von Hand, importieren Sie ihn oder beschreiben Sie sich auf Italienisch, Spanisch, Französisch oder Portugiesisch."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparing language data for the draft. Try again later."
+            "value" : "This device cannot get the language data that drafts in English or German need. Write your CV by hand, import it, or describe yourself in Italian, Spanish, French or Portuguese."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparando los datos de idioma para el borrador. Inténtalo de nuevo más tarde."
+            "value" : "Este dispositivo no puede obtener los datos de idioma que necesitan los borradores en inglés o alemán. Escribe tu CV a mano, impórtalo o descríbete en italiano, español, francés o portugués."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Préparation des données linguistiques pour le brouillon. Réessayez plus tard."
+            "value" : "Cet appareil ne peut pas obtenir les données linguistiques nécessaires aux brouillons en anglais ou en allemand. Rédigez votre CV vous-même, importez-le ou décrivez-vous en italien, espagnol, français ou portugais."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparazione dei dati linguistici per la bozza. Riprova più tardi."
+            "value" : "Questo dispositivo non riesce a ottenere i dati linguistici che servono alle bozze in inglese o tedesco. Scrivi il tuo CV a mano, importalo o descriviti in italiano, spagnolo, francese o portoghese."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preparando os dados de idioma para o rascunho. Tente novamente mais tarde."
+            "value" : "Este dispositivo não consegue obter os dados de idioma de que os rascunhos em inglês ou alemão precisam. Escreva seu currículo manualmente, importe-o ou descreva-se em italiano, espanhol, francês ou português."
           }
         }
       }
@@ -2943,43 +2984,289 @@
         }
       }
     },
-    "editor.delete_row.title" : {
+    "editor.delete_row.title.certification" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diesen Eintrag löschen?"
+            "value" : "Dieses Zertifikat löschen?"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delete this item?"
+            "value" : "Delete this certification?"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "¿Eliminar este elemento?"
+            "value" : "¿Eliminar esta certificación?"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Supprimer cet élément ?"
+            "value" : "Supprimer cette certification ?"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminare questo elemento?"
+            "value" : "Eliminare questa certificazione?"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Excluir este item?"
+            "value" : "Excluir esta certificação?"
+          }
+        }
+      }
+    },
+    "editor.delete_row.title.education" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Ausbildung löschen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this education entry?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar esta formación?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer cette formation ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminare questa formazione?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir esta formação?"
+          }
+        }
+      }
+    },
+    "editor.delete_row.title.experience" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Berufserfahrung löschen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this experience?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar esta experiencia?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer cette expérience ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminare questa esperienza?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir esta experiência?"
+          }
+        }
+      }
+    },
+    "editor.delete_row.title.interest" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Interesse löschen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this interest?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar este interés?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer ce centre d’intérêt ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminare questo interesse?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir este interesse?"
+          }
+        }
+      }
+    },
+    "editor.delete_row.title.language" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Sprache löschen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this language?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar este idioma?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer cette langue ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminare questa lingua?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir este idioma?"
+          }
+        }
+      }
+    },
+    "editor.delete_row.title.skill" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Fähigkeit löschen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this skill?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar esta competencia?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer cette compétence ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminare questa competenza?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir esta competência?"
+          }
+        }
+      }
+    },
+    "editor.delete_row.title.social_link" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Profil löschen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this social link?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar este perfil?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer ce profil ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminare questo profilo?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir este perfil?"
           }
         }
       }
@@ -3062,6 +3349,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rascunho escrito pela IA a partir da sua descrição. Confira cada campo antes de enviar o currículo. O que você não mencionou fica em branco."
+          }
+        }
+      }
+    },
+    "editor.notice.ai_draft.unchecked" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ihre Fähigkeiten, Sprachen, Interessen, Berufsbezeichnung und Ihren Ort konnten wir nicht prüfen, daher bleiben sie leer. Ergänzen Sie sie selbst."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We could not check your skills, languages, interests, job title and place, so they are left blank. Add them yourself."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No pudimos comprobar tus competencias, idiomas, intereses, título profesional y ubicación, así que quedan en blanco. Añádelos tú."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nous n'avons pas pu vérifier vos compétences, langues, centres d'intérêt, titre professionnel et lieu, ils restent donc vides. Ajoutez-les vous-même."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non abbiamo potuto controllare le tue competenze, lingue, interessi, qualifica professionale e città, quindi restano vuoti. Aggiungili tu."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não conseguimos verificar suas competências, idiomas, interesses, título profissional e localização, por isso ficam em branco. Adicione-os você mesmo."
           }
         }
       }
@@ -8515,6 +8843,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Não importado"
+          }
+        }
+      }
+    },
+    "import.review.reason.bounds" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Zeilen neben diesen Daten gehören vielleicht zum vorherigen oder nächsten Eintrag: Prüfen Sie sie."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The lines next to these dates may belong to the entry before or after: check them."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las líneas junto a estas fechas pueden ser de la entrada anterior o de la siguiente: revísalas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les lignes autour de ces dates appartiennent peut-être à l'entrée précédente ou suivante : vérifiez-les."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le righe vicino a queste date potrebbero appartenere alla voce precedente o successiva: controllale."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As linhas junto a estas datas podem pertencer à entrada anterior ou seguinte: verifique-as."
           }
         }
       }
