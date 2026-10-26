@@ -131,7 +131,7 @@ struct InventedFactsTests {
         #expect(own.finding(at: "personalInfo.phone")?.kind == .quote)
 
         draft.phone = String(phone.dropFirst(4))
-        #expect(InventedFacts.count(draft.cv, for: input).finding(at: "personalInfo.phone")?.kind == .quote)
+        #expect(InventedFacts.count(draft.cv, for: input).finding(at: "personalInfo.phone")?.kind == .derived)
 
         draft.email = "someone@example.org"
         draft.phone = "+39 333 999 0000"

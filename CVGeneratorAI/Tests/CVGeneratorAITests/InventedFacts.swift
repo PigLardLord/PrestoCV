@@ -179,17 +179,22 @@ enum InventedFacts {
         /// The sentences that name at least one entry.
         let owned: Set<Int>
         let emails: Set<String>
-        /// The digits of every run that looks like a phone number.
-        let phones: [String]
-        let links: Set<String>
+        /// Every run of the description that is written as a phone number: not a date, not a range of years.
+        let phones: [PhoneNumber]
+        /// The web addresses, domains and handles of the description, as `link(_:)` writes them.
+        let addresses: [String]
+        /// The domains of the email addresses of the description.
+        let emailDomains: Set<String>
 
         init(_ description: String, cv: CVData) {
             words = InventedFacts.words(of: description)
             vocabulary = Set(words)
             sentences = InventedFacts.sentences(of: description)
             emails = Set(description.matches(of: /[\w.+-]+@[\w-]+(\.[\w-]+)+/).map { $0.output.0.lowercased() })
-            phones = description.matches(of: /\+?\d[\d ()\/.-]{4,}\d/).map { String($0.output.filter(InventedFacts.isDigit)) }
-            links = Set(description.split(whereSeparator: \.isWhitespace).map { InventedFacts.link(String($0)) })
+            phones = description.matches(of: /\+?\d[\d ()\/.-]{4,}\d/).compactMap { PhoneNumber(String($0.output)) }.filter(\.isPhoneShaped)
+            let found = InventedFacts.addresses(in: description)
+            addresses = found.addresses
+            emailDomains = found.emailDomains
 
             let sentences = sentences
             func entry(_ kind: Entry.Kind, _ index: Int, _ label: String) -> Entry {
@@ -246,14 +251,138 @@ enum InventedFacts {
         }
     }
 
-    /// A web address without its scheme, `www.`, the punctuation around it or a closing slash.
+    private static let linkPunctuation = CharacterSet(charactersIn: "()<>[]\"'.,;:!?")
+
+    /// A web address without its scheme, `www.`, the punctuation around it, the `@` of a handle or a closing slash.
     private static func link(_ text: String) -> String {
-        var address = text.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "()<>[]\"'.,;:!?"))
+        var address = text.lowercased().trimmingCharacters(in: linkPunctuation)
+        if address.hasPrefix("@") { address.removeFirst() }
         for prefix in ["https://", "http://", "www."] where address.hasPrefix(prefix) {
             address.removeFirst(prefix.count)
         }
         while address.hasSuffix("/") { address.removeLast() }
         return address
+    }
+
+    /// Whether a text is written as a domain, with an optional path: dotted labels that end in two letters or more.
+    private static func isDomainShaped(_ address: String) -> Bool {
+        let host = address.prefix { $0 != "/" && $0 != "?" && $0 != "#" }
+        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.count >= 2, let last = labels.last, last.count >= 2, last.allSatisfy(\.isLetter) else { return false }
+        return labels.allSatisfy { !$0.isEmpty && $0.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" } }
+    }
+
+    /// The addresses that a description gives: web addresses (with a scheme or `www.`), domains and `@handles`, and the
+    /// domains of its email addresses. A word that is none of them is not an address.
+    private static func addresses(in description: String) -> (addresses: [String], emailDomains: Set<String>) {
+        var addresses: [String] = []
+        var domains: Set<String> = []
+        for token in description.split(whereSeparator: \.isWhitespace) {
+            let text = String(token).trimmingCharacters(in: linkPunctuation)
+            if let at = text.firstIndex(of: "@") {
+                let rest = text[text.index(after: at)...]
+                if at == text.startIndex {
+                    if !rest.isEmpty, !rest.contains("@") { addresses.append(link(text)) }
+                } else {
+                    let domain = link(String(rest))
+                    if isDomainShaped(domain) { domains.insert(domain) }
+                }
+                continue
+            }
+            let lowered = text.lowercased()
+            let schemed = ["http://", "https://", "www."].contains { lowered.hasPrefix($0) }
+            let address = link(text)
+            if schemed || isDomainShaped(address) { addresses.append(address) }
+        }
+        return (addresses, domains)
+    }
+
+    /// A phone number as its digits, without the leading `+` or `00` that only say a country code follows.
+    private struct PhoneNumber {
+        enum Relation { case same, countryCode, part }
+
+        let digits: String
+        let international: Bool
+        /// The length of the country code when it is written apart from the rest (`+39 333 ...`).
+        let codeLength: Int?
+        /// Only years, days and months: a range of years or a date, whatever its digits.
+        let isDateLike: Bool
+
+        init?(_ text: String) {
+            let trimmed = text.drop(while: { $0.isWhitespace || $0 == "(" })
+            let plus = trimmed.hasPrefix("+")
+            let abroad = plus || trimmed.hasPrefix("00")
+            let body = plus ? trimmed.dropFirst() : (abroad ? trimmed.dropFirst(2) : trimmed)
+            let digits = String(body.filter(InventedFacts.isDigit))
+            guard !digits.isEmpty else { return nil }
+            self.digits = digits
+            international = abroad
+            let lead = body.prefix(while: InventedFacts.isDigit)
+            codeLength = abroad && (1...3).contains(lead.count) && lead.count < body.count ? lead.count : nil
+            let groups = body.split(whereSeparator: { !InventedFacts.isDigit($0) })
+            isDateLike = groups.contains(where: Self.isYear) && groups.allSatisfy { Self.isYear($0) || Self.isDayOrMonth($0) }
+        }
+
+        /// A number of 7 to 15 digits that is no date: what the description can give as a phone number.
+        var isPhoneShaped: Bool { !isDateLike && (7...15).contains(digits.count) }
+
+        private static func isYear(_ group: Substring) -> Bool {
+            group.count == 4 && (1900...2100).contains(Int(group) ?? 0)
+        }
+
+        private static func isDayOrMonth(_ group: Substring) -> Bool {
+            group.count <= 2 && (Int(group) ?? 99) <= 31
+        }
+
+        /// How the number is written at home: without the country code, with or without the trunk 0.
+        private var nationalForms: Set<String> {
+            guard international else { return [] }
+            return Set((codeLength.map { [$0] } ?? [1, 2, 3]).flatMap { length -> [String] in
+                let rest = String(digits.dropFirst(length))
+                guard !rest.isEmpty else { return [] }
+                return rest.hasPrefix("0") ? [rest, String(rest.dropFirst())] : [rest, "0" + rest]
+            })
+        }
+
+        /// How this number is the other one: the same digits, the same number with the country code added or left out, or a
+        /// piece of it (six digits or more). Nil when it is none of them.
+        func relation(to other: PhoneNumber) -> Relation? {
+            if digits == other.digits, international == other.international { return .same }
+            if international != other.international {
+                let (abroad, home) = international ? (self, other) : (other, self)
+                if abroad.nationalForms.contains(home.digits) { return .countryCode }
+            }
+            let (short, long) = digits.count <= other.digits.count ? (digits, other.digits) : (other.digits, digits)
+            return short.count >= 6 && long.contains(short) ? .part : nil
+        }
+    }
+
+    private static func phone(_ value: String, against source: Source) -> (Class, String) {
+        guard let number = PhoneNumber(value), number.digits.count >= 6 else {
+            return (.invented, "a phone number the description lacks")
+        }
+        let relations = source.phones.compactMap { number.relation(to: $0) }
+        if relations.contains(.same) { return (.quote, "a phone number of the description") }
+        if relations.contains(.countryCode) {
+            return (.derived, "a phone number of the description, with the country code added or left out")
+        }
+        if relations.contains(.part) { return (.review, "a piece of a phone number of the description") }
+        return (.invented, "a phone number the description lacks")
+    }
+
+    private static func address(_ value: String, against source: Source) -> (Class, String) {
+        let address = link(value)
+        if source.addresses.contains(address) { return (.quote, "an address of the description") }
+        if address.count >= 3, source.addresses.contains(where: { $0.contains(address) || address.contains($0) }) {
+            return (.review, "a piece of an address of the description, or more than it")
+        }
+        if source.emailDomains.contains(String(address.prefix { $0 != "/" })) {
+            return (.review, "the domain of an email of the description")
+        }
+        if !address.contains("."), !address.contains("/"), holds(source.words, run: words(of: address)) {
+            return (.review, "a word of the description, not an address")
+        }
+        return (.invented, "an address the description lacks")
     }
 
     // MARK: - Classes
@@ -321,14 +450,12 @@ enum InventedFacts {
                 : finding(.invented, "an email the description lacks")
 
         case .phone:
-            let digits = String(value.filter(isDigit))
-            let given = digits.count >= 6 && source.phones.contains { $0.hasSuffix(digits) }
-            return given ? finding(.quote, "a phone number of the description") : finding(.invented, "a phone number the description lacks")
+            let (kind, reason) = phone(value, against: source)
+            return finding(kind, reason)
 
         case .link:
-            return source.links.contains(link(value))
-                ? finding(.quote, "an address of the description")
-                : finding(.invented, "an address the description lacks")
+            let (kind, reason) = address(value, against: source)
+            return finding(kind, reason)
 
         case .date:
             let (kind, reason) = date(of: leaf, value: value, in: cv, against: source)
