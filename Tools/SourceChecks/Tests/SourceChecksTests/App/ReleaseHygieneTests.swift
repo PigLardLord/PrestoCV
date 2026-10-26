@@ -13,7 +13,7 @@ struct ReleaseHygieneTests {
     private static let root = Repository.root
 
     /// The package products the app links, with the sources of each: their code ships in the app.
-    private static let linkedProducts = [
+    static let linkedProducts = [
         "PrestoCVCore": "PrestoCVCore/Sources/PrestoCVCore",
         "CVPDFExporter": "CVPDFExporter/Sources/CVPDFExporter",
         "CVGeneratorAI": "CVGeneratorAI/Sources/CVGeneratorAI",
@@ -26,7 +26,7 @@ struct ReleaseHygieneTests {
     ]
 
     /// The sources whose code ships with the app.
-    private static let shippedFolders = ["PrestoCV"] + linkedProducts.values.sorted()
+    static let shippedFolders = ["PrestoCV"] + linkedProducts.values.sorted()
 
     private struct Line {
         let file: String
