@@ -114,8 +114,15 @@ struct CVExportSheetView: View {
                 }
             }
             .onDisappear {
-                viewModel.stop()
+                viewModel.sheetDisappeared()
             }
+        }
+        // The PDF full screen covers the sheet without closing it: the PDF it shows is the one the button shares
+        .fullScreenCover(item: Binding(
+            get: { viewModel.fullPDF },
+            set: { if $0 == nil { viewModel.closeFullPDF() } }
+        )) { pdf in
+            FullPDFView(pdf: pdf) { viewModel.closeFullPDF() }
         }
         // Where the sheet does not fill the screen, as on iPad, it is as tall as a page: the preview keeps its room
         // above the language and the button
@@ -132,7 +139,7 @@ struct CVExportSheetView: View {
                     .overlay {
                         // Once the PDF is rendered, its pages replace the first page of the preview
                         if let pdf = viewModel.sharePDF {
-                            PDFPreviewView(url: pdf.url)
+                            pdfPreview(of: pdf)
                         }
                     }
                     .padding(8) // Add padding around WebView for the white border
@@ -170,6 +177,32 @@ struct CVExportSheetView: View {
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)
         .animation(DesignTokens.Animations.fastEaseInOut, value: viewModel.previewHTML)
+    }
+
+    /// The pages of the rendered PDF in the preview, to scroll through. A tap on them shows the PDF full screen; for
+    /// VoiceOver the preview is that button, with the number of pages.
+    private func pdfPreview(of pdf: ExportedPDF) -> some View {
+        PDFPreviewView(url: pdf.url)
+            .overlay(alignment: .bottomTrailing) {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(DesignTokens.Typography.footnote.font)
+                    .foregroundColor(DesignTokens.Colors.primary)
+                    .padding(DesignTokens.Spacing.xs)
+                    .background(.regularMaterial, in: Circle())
+                    .padding(DesignTokens.Spacing.xs)
+                    // The sign stays small at the largest text sizes, where it would cover the page
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                    .accessibilityHidden(true)
+            }
+            .onTapGesture {
+                viewModel.showFullPDF()
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(viewModel.fullPDFAccessibilityLabel ?? "")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction {
+                viewModel.showFullPDF()
+            }
     }
 
     /// Under the preview: how many pages the PDF has, and the language of its headings with a way to change it. Side by

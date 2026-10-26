@@ -56,6 +56,8 @@ final class CVExportSheetViewModel: ObservableObject {
     @Published private(set) var isPreviewLoading = false
     @Published private(set) var isPreparingPDF = false
     @Published private(set) var sharePDF: ExportedPDF?
+    /// The PDF shown full screen, while it is open: always the PDF that the share button shares
+    @Published private(set) var fullPDF: ExportedPDF?
     /// Why no PDF is made for this CV, in words the user can act on; nil when the CV can be exported
     @Published private(set) var shareBlocker: String?
     /// What the PDF lacks, though it is made, in words the user can act on; nil when it lacks nothing
@@ -154,6 +156,17 @@ final class CVExportSheetViewModel: ObservableObject {
     /// than the page in view should not come as a surprise
     var pageCountText: String? {
         sharePDF.map { String(format: String(localized: "export.page_count"), $0.pageCount) }
+    }
+
+    /// The PDF can be opened full screen once it is rendered
+    var canShowFullPDF: Bool {
+        sharePDF != nil
+    }
+
+    /// What the preview says to VoiceOver when it shows the pages of the PDF, which a tap opens full screen: "Show the
+    /// full PDF, 2 pages"; nil until the PDF is rendered
+    var fullPDFAccessibilityLabel: String? {
+        sharePDF.map { String(localized: "export.preview.open \($0.pageCount)") }
     }
 
     var aspectRatio: CGFloat {
@@ -277,6 +290,25 @@ final class CVExportSheetViewModel: ObservableObject {
                 await service.cleanupTempFile(at: staleFile)
             }
         }
+    }
+
+    /// The sheet's content went off screen. When the full PDF covers the sheet it has not gone away, and its PDF stays
+    /// for the full PDF to show and the button to share; otherwise the sheet is closing, as in `stop()`.
+    /// - Returns: The task that removes the file, for a caller that wants to wait for it
+    @discardableResult
+    func sheetDisappeared() -> Task<Void, Never> {
+        guard fullPDF == nil else { return Task {} }
+        return stop()
+    }
+
+    /// Opens the PDF that the button shares full screen, over the sheet; nothing opens until the PDF is rendered
+    func showFullPDF() {
+        fullPDF = sharePDF
+    }
+
+    /// Closes the full PDF, back to the sheet as it was: the PDF and the choices are kept
+    func closeFullPDF() {
+        fullPDF = nil
     }
 
     /// The preview could not be shown by the web view; a cancelled load is not a failure
@@ -408,9 +440,11 @@ final class CVExportSheetViewModel: ObservableObject {
         errorMessage = ExportErrorMessage.message(for: error, during: activity)
     }
 
+    /// Lets the PDF go, which closes the full PDF with it: no viewer shows a file that is about to be removed
     private func takeSharePDF() -> URL? {
         let url = sharePDF?.url
         sharePDF = nil
+        fullPDF = nil
         return url
     }
 
