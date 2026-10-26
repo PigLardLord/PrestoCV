@@ -17,13 +17,8 @@ struct SwiftCode {
     let skeleton: [String]
 
     init(_ source: String) {
-        code = Self.lines(of: Self.blanked(source, strings: false))
-        skeleton = Self.lines(of: Self.blanked(source, strings: true))
-    }
-
-    /// The lines of a text, an empty one included
-    static func lines(of text: String) -> [String] {
-        text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map(String.init)
+        code = Self.blanked(source, strings: false)
+        skeleton = Self.blanked(source, strings: true)
     }
 
     // MARK: Members
@@ -53,30 +48,24 @@ struct SwiftCode {
     /// call split after its parenthesis is found on the line of its name.
     func lines(matching pattern: NSRegularExpression) -> [Int] {
         let text = code.joined(separator: "\n")
-        var starts: [Int] = []
-        var offset = 0
-        for line in code {
-            starts.append(offset)
-            offset += line.utf16.count + 1
-        }
         let found = pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)).map { match in
-            (starts.lastIndex { $0 <= match.range.location }) ?? 0
+            text.utf16.prefix(match.range.location).filter { $0 == 10 }.count
         }
         return Array(Set(found)).sorted()
     }
 
     // MARK: Blanking
 
+    /// A string literal being read: what ends it (the quotes, and the `#` of a raw string), what starts an escape in it, and
+    /// the depth of the parentheses of the interpolation being read in it, or nil while reading its text
     private struct Literal {
-        /// What ends it: the quote or quotes, and the `#` of a raw string
         let closer: [Unicode.Scalar]
-        /// What starts an escape in it: a backslash, and the `#` of a raw string
         let escape: [Unicode.Scalar]
-        /// The depth of the parentheses of the interpolation being read in it, or nil while reading its text
         var interpolation: Int?
     }
 
-    private static func blanked(_ source: String, strings blankStrings: Bool) -> String {
+    /// The lines of the source, an empty one included, with its comments, and its strings if `blankStrings`, turned into spaces
+    private static func blanked(_ source: String, strings blankStrings: Bool) -> [String] {
         let text = Array(source.unicodeScalars)
         var result = text
         var literals: [Literal] = []
@@ -157,6 +146,6 @@ struct SwiftCode {
                 index += 1
             }
         }
-        return String(String.UnicodeScalarView(result))
+        return String(String.UnicodeScalarView(result)).split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map(String.init)
     }
 }
