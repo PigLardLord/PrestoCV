@@ -29,13 +29,18 @@ struct DraftingInputsTests {
             for fact in input.facts {
                 #expect(!fact.forms.isEmpty, "\(input.id): \(fact)")
                 for form in fact.forms {
-                    #expect(input.description.range(of: form, options: .caseInsensitive) != nil, "\(input.id): \(form)")
+                    #expect(input.states(form), "\(input.id): \(form)")
                 }
             }
             for trap in input.traps {
-                #expect(input.description.range(of: trap, options: .caseInsensitive) != nil, "\(input.id): \(trap)")
+                #expect(input.states(trap), "\(input.id): \(trap)")
             }
         }
+    }
+
+    @Test("A phrase is stated only as whole words that follow each other", arguments: StatedCase.all)
+    func statesWholeWords(_ item: StatedCase) {
+        #expect(item.input.states(item.phrase) == item.stated, "\(item)")
     }
 
     @Test("Every input states a name, a title and two employers; the descriptions with traps have nine traps",
@@ -143,4 +148,39 @@ private struct Catalog: Decodable {
     }
 
     let strings: [String: Entry]
+}
+
+/// A phrase and a description, and whether the description states the phrase.
+struct StatedCase: Sendable, CustomTestStringConvertible {
+    let phrase: String
+    let description: String
+    let stated: Bool
+
+    var testDescription: String { "\"\(phrase)\" in \"\(description)\" is \(stated)" }
+
+    var input: DraftingInput {
+        DraftingInput(id: "stated", kind: .plain, language: "en", description: description, facts: [], traps: [])
+    }
+
+    static let all: [StatedCase] = [
+        StatedCase(phrase: "20", description: "We grew from 12 to 20 nurses.", stated: true),
+        StatedCase(phrase: "20", description: "I joined in 2024 and left in 2020.", stated: false),
+        StatedCase(phrase: "20", description: "I managed 20.5 beds and 20,000 euro.", stated: false),
+        StatedCase(phrase: "20", description: "A team of 20, mostly nurses.", stated: true),
+        StatedCase(phrase: "Tom", description: "Tomorrow I start; my colleague tom said so.", stated: true),
+        StatedCase(phrase: "Tom", description: "Tomorrow I start; the tomato season ends.", stated: false),
+        StatedCase(phrase: "SAP", description: "I can use SAP and Excel.", stated: true),
+        StatedCase(phrase: "SAP", description: "I know the sapphire trade.", stated: false),
+        StatedCase(phrase: "grace.lowe@example.com", description: "Write to Grace.Lowe@example.com.", stated: true),
+        StatedCase(phrase: "grace.lowe@example.com", description: "Write to ms.grace.lowe@example.com.", stated: false),
+        StatedCase(phrase: "Riverside Clinic", description: "I left Riverside  Clinic, then Kestrel.", stated: true),
+        StatedCase(phrase: "Riverside Clinic", description: "Riverside Hospital and the Clinic.", stated: false),
+        StatedCase(phrase: "Zürich", description: "He lives in ZÜRICH.", stated: true),
+        StatedCase(phrase: "Grace", description: "Grace's team and Graceland.", stated: true),
+        StatedCase(phrase: "Riverside Clinic", description: "Riverside, Clinic.", stated: true),
+        StatedCase(phrase: "+49 170 1234567", description: "Call +49 170 1234567 today.", stated: true),
+        StatedCase(phrase: "+49 170 1234567", description: "Call +49 170 12345678 today.", stated: false),
+        StatedCase(phrase: "", description: "Anything at all.", stated: false),
+        StatedCase(phrase: "...", description: "Anything at all.", stated: false),
+    ]
 }

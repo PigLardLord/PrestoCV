@@ -45,6 +45,42 @@ struct DraftingInput: Sendable, CustomTestStringConvertible {
     var testDescription: String { id }
 }
 
+extension DraftingInput {
+    /// Whether the description states `phrase`: its words, in any case, one right after the other and each of them whole. The trap
+    /// "20" is not in "2024" or "20.5 beds", "Tom" is not in "Tomorrow", and an address is not in a longer one.
+    func states(_ phrase: String) -> Bool {
+        let wanted = Self.words(phrase)
+        let stated = Self.words(description)
+        guard !wanted.isEmpty, wanted.count <= stated.count else { return false }
+        return (0...(stated.count - wanted.count)).contains { Array(stated[$0..<($0 + wanted.count)]) == wanted }
+    }
+
+    /// The words of `text` in lowercase: runs of letters and digits, where one of `.,@/:+_-` between two of them keeps them in one
+    /// word, so that a number, an address or a compound is a single word. Where in doubt the words stay together: a phrase is then
+    /// not found, which a test shows, instead of found in the middle of something else.
+    static func words(_ text: String) -> [String] {
+        let characters = Array(text.lowercased())
+        var words: [String] = []
+        var current = ""
+        for (index, character) in characters.enumerated() {
+            if character.isLetter || character.isNumber {
+                current.append(character)
+                continue
+            }
+            let next = characters.indices.contains(index + 1) ? characters[index + 1] : nil
+            let joins = ".,@/:+_-".contains(character) && !current.isEmpty && (next?.isLetter == true || next?.isNumber == true)
+            if joins {
+                current.append(character)
+            } else if !current.isEmpty {
+                words.append(current)
+                current = ""
+            }
+        }
+        if !current.isEmpty { words.append(current) }
+        return words
+    }
+}
+
 /// The 18 inputs of the drafting evaluation: the 6 example descriptions of the app, read from its string catalog so that they
 /// cannot drift, and 2 written descriptions per language. Every person, address and number in them is invented.
 enum DraftingInputs {
