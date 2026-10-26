@@ -117,12 +117,18 @@ final class ViewModelFactory {
         )
     }
 
-    /// The import of a CV the person already has: pasted text, or a PDF read with PDFKit, both on the device.
+    /// The import of a CV the person already has: pasted text, or a PDF read with PDFKit, both on the device. It logs what it
+    /// read and how it failed to the app's log (ADR 0030).
     @MainActor
     func makeImportViewModel() -> ImportViewModel {
         let limits = ImportLimits.standard
         return ImportViewModel(
-            importer: ImportCV(pdfReader: PDFKitTextExtractor(), limits: limits),
+            importer: ImportCV(
+                pdfReader: PDFKitTextExtractor(logger: environment.diagnostics),
+                limits: limits,
+                logger: environment.diagnostics,
+                clock: environment.clock
+            ),
             mapper: ImportedCVMapper(),
             fileReader: ChosenFileReader(maximumBytes: limits.maximumPDFBytes, copies: openedFileCopies)
         )
@@ -201,6 +207,8 @@ final class ViewModelFactory {
         return CVGeneratorUseCase(
             service: service,
             claimChecker: claimChecker,
+            logger: environment.diagnostics,
+            clock: environment.clock,
             sanitizer: CVDataSanitizer(languageOfText: DescriptionLanguageDetector.languageTag(of:), lexicalClasses: lexicalClasses)
         )
     }

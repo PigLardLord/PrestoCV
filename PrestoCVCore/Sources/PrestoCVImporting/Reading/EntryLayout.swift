@@ -17,8 +17,8 @@ struct EntryLayout: Equatable {
 
     /// The layout of a section's lines, given its dates (`anchors`). `usuallyDatesFirst` is the layout to keep when
     /// both readings fit equally.
-    /// - Throws: `ImportError.tooLarge` when scoring the readings of the dates after their heads would pass the budget
-    ///   of `work`, and `CancellationError` once the task is cancelled.
+    /// - Throws: `LimitReached` with its steps when scoring the readings of the dates after their heads would pass the
+    ///   budget of `work`, and `CancellationError` once the task is cancelled.
     static func reading(
         _ lines: [EntryReader.Line], anchors: [Int], kind: EntryReader.Kind, usuallyDatesFirst: Bool, work: inout AnalysisWork
     ) throws -> EntryLayout {

@@ -16,6 +16,31 @@ Test targets and test-support targets are described below each package. The chec
 
 ---
 
+## Package `DiagnosticLogging` — Diagnostic logging
+
+| Target | Layer | Platforms | May import |
+|---|---|---|---|
+| `DiagnosticLogging` | port, value types and decorators | iOS, macOS, Linux ✓, Android ✓ | Foundation |
+| `DiagnosticLoggingOSLog` | outbound adapter | iOS, macOS | `DiagnosticLogging`, `os` |
+
+A leaf package that depends on no other package ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)). `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI` may depend on its `DiagnosticLogging` target, and only on that one: the one exception to the forbidden edges between the three packages.
+
+**`DiagnosticLogging`**
+- **The port, `DiagnosticLogger`:** one synchronous `log(_:)` that never throws, with the shorthands `debug`, `info`, `notice`, `error` and `fault`.
+- **The entry, `LogEntry`:** a level, a `LogCategory` each module declares once, an event that is a `StaticString`, and fields of a closed set of kinds: `count`, `duration`, `flag`, `token` (a `StaticString`), `identifier` (a UUID) and `error`, which is written as its type and the `logCode` of a `LoggableError`, never as its description. So no value of a CV can reach a line. `line` writes the event and its `key=value` pairs.
+- **The decorators:** `FanOutLogger`, `MinimumLevelLogger` and `SilentLogger`, for previews.
+- **`Stopwatch`:** the time a step took, on an injected `Clock`.
+- No platform condition, no Apple-only import, no bundle (R11, R18).
+
+**`DiagnosticLoggingOSLog`** writes each entry to the unified log: one `os.Logger` per category of the subsystem, the levels mapped one to one, and the line as public text. Only the composition root makes one (R4). Every file is wrapped in `#if canImport(os)`.
+
+**Test support and tests.**
+- `DiagnosticLoggingTestSupport` may import `DiagnosticLogging`, Foundation, Synchronization. It holds `RecordingLogger`, which records the entries under a `Mutex`, and `TickingClock`, a `Clock` that moves on by one step at every reading.
+- **`DiagnosticLoggingTests`** may import `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, Testing, Foundation. They test the lines, the decorators and the stopwatch, on Linux too.
+- **`DiagnosticLoggingOSLogTests`** (Apple hosts) may import `DiagnosticLoggingOSLog`, `DiagnosticLogging`, Testing and `os`.
+
+---
+
 ## Package `PrestoCVCore` — CV Authoring and CV Import
 
 | Target | Layer | Platforms | May import |
@@ -23,8 +48,8 @@ Test targets and test-support targets are described below each package. The chec
 | `PrestoCVDomain` | domain | iOS, macOS, Linux ✓, Android ✓ | Foundation |
 | `PrestoCVApplication` | application | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVDomain`, Foundation |
 | `PrestoCVPersistence` | outbound adapter | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Glibc, Darwin, Android |
-| `PrestoCVImporting` | domain + application (CV Import) | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVDomain`, Foundation |
-| `PrestoCVImportingPDFKit` | outbound adapter | iOS, macOS | `PrestoCVImporting`, PDFKit, UIKit, AppKit, CoreGraphics, Foundation |
+| `PrestoCVImporting` | domain + application (CV Import) | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVDomain`, `DiagnosticLogging`, Foundation |
+| `PrestoCVImportingPDFKit` | outbound adapter | iOS, macOS | `PrestoCVImporting`, `DiagnosticLogging`, PDFKit, UIKit, AppKit, CoreGraphics, Foundation |
 
 **`PrestoCVDomain`**
 - **`CV`**, the aggregate:
@@ -81,13 +106,14 @@ Test targets and test-support targets are described below each package. The chec
   - the readers of names, contacts, dates and periods, entries, skills, languages and levels, certifications and interests.
 - **The draft, `ImportedCV`:** every value is `Sourced`, with the spans it quotes and the rule that read it, if any. Values the rules are unsure of carry a check reason, and the review list collects them. Text that fits no field is kept as text not imported; noise is left out with its reason. A final gate checks every value against its spans.
 - **The use case, `ImportCV`:** pasted text, or a PDF through the port **`PDFTextExtracting`**; both are untyped `throws` and cancellable, and both are read within one budget of work. Typed `ImportError`: empty, too large, too many pages, encrypted, unreadable, no text (a scan).
+- **What it logs** through the `DiagnosticLogger` its initialiser takes ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)), under the category `import`: the kind of input, its pages and characters, the sections by kind and the time taken; the headings not recognised and the lines left unplaced, as counts; a failure by kind, and the limit of the bounded reading it reached; a cancellation.
 - No platform condition, no Apple-only import, no bundle (R11, R18). It is built for Android with the rest of `PrestoCVCore`.
 
-**`PrestoCVImportingPDFKit`** implements `PDFTextExtracting` with PDFKit: each page's words with their box, font size and weight, in PDFKit's order, and nothing decided about the reading order, which the core decides. It checks the size, the page count and the encryption before it reads any text, refuses a page whose text is longer than the characters left before it reads the page's glyphs, counts the words as it reads them, and stops in the middle of a page once its task is cancelled. A word whose font PDFKit cannot name comes back without its weight, so the adapter draws the page with CoreGraphics and marks a word bold when its strokes are clearly heavier than the page's ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)). `characterBounds(at:)` has no box for the line breaks of `PDFPage.string`, so the adapter walks the two together. Every file is wrapped in `#if canImport(PDFKit)`.
+**`PrestoCVImportingPDFKit`** implements `PDFTextExtracting` with PDFKit: each page's words with their box, font size and weight, in PDFKit's order, and nothing decided about the reading order, which the core decides. It checks the size, the page count and the encryption before it reads any text, refuses a page whose text is longer than the characters left before it reads the page's glyphs, counts the words as it reads them, and stops in the middle of a page once its task is cancelled. A word whose font PDFKit cannot name comes back without its weight, so the adapter draws the page with CoreGraphics and marks a word bold when its strokes are clearly heavier than the page's ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)). `characterBounds(at:)` has no box for the line breaks of `PDFPage.string`, so the adapter walks the two together. Through the logger its initialiser takes, it logs the pages and the words it read, and the limit that stopped it, which it throws as a `LimitReached` for the use case to word and log. Every file is wrapped in `#if canImport(PDFKit)`.
 
 **Test support and tests.**
-- **`PrestoCVImportingTests`** may import `PrestoCVImporting`, `PrestoCVDomain`, Testing, Foundation. It holds the unit tests of every rule and the **contract table**: the synthetic corpus under `PrestoCVCore/Tests/ImportFixtures/` (texts, recorded page layouts and their PDFs, each with the fields it states), measured per language and form, and checked line by line: every line of every fixture is covered by a value, a text not imported or a left-out piece. No real CV is ever committed.
-- **`PrestoCVImportingPDFKitTests`** (Apple hosts) may import `PrestoCVImportingPDFKit`, `PrestoCVImporting`, Testing, Foundation, PDFKit, CoreGraphics, and CoreText, with which it draws hostile pages when it runs. Its contract test reads the fixture PDFs with PDFKit and compares the words with the recorded layouts that the Linux tests use.
+- **`PrestoCVImportingTests`** may import `PrestoCVImporting`, `PrestoCVDomain`, `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, Testing, Foundation. It holds the unit tests of every rule and the **contract table**: the synthetic corpus under `PrestoCVCore/Tests/ImportFixtures/` (texts, recorded page layouts and their PDFs, each with the fields it states), measured per language and form, and checked line by line: every line of every fixture is covered by a value, a text not imported or a left-out piece. No real CV is ever committed.
+- **`PrestoCVImportingPDFKitTests`** (Apple hosts) may import `PrestoCVImportingPDFKit`, `PrestoCVImporting`, `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, Testing, Foundation, PDFKit, CoreGraphics, and CoreText, with which it draws hostile pages when it runs. Its contract test reads the fixture PDFs with PDFKit and compares the words with the recorded layouts that the Linux tests use.
 - `PrestoCVCoreTestSupport` may import `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Synchronization. It holds:
   - `InMemoryCVRepository`, `SteppingClock`, `SequentialIDGenerator`;
   - `ManualClock`, a `Clock` that moves only when a test moves it, for the timing of `Autosave`;
@@ -209,6 +235,8 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 **Test support.** `CVDraftingTestSupport` holds a fake generator and fixtures.
 
+**The legacy target `CVGeneratorAI`**, which version 1 ships ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), depends on `DiagnosticLogging` on Apple hosts: its use case takes a `DiagnosticLogger` and a `Clock` in its initialiser, and logs under the category `draft` the availability of the model and why not, the language of the description and the state of its data, a generation started, finished, cancelled or refused by the guardrails, with its time, the claims checked and withdrawn, as counts, and the check that rejected a request or a draft ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)). Its tests may also import `DiagnosticLoggingTestSupport`.
+
 ---
 
 ## Package `PrestoCVApp` — App integration and presentation
@@ -268,7 +296,8 @@ A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-
 | `Platform/` | the platform shims: iOS-only modifiers wrapped for `Features/`, HTML and PDF previews, sharing, pasteboard, file import and export | SwiftUI, UIKit, AppKit, WebKit, PDFKit, QuickLook, UniformTypeIdentifiers, `CVRenderingWebKitSupport`, `PrestoCVPresentation` |
 | `Resources/` | `Localizable.xcstrings`, sample CV JSON, assets | — |
 
-**The legacy target `PrestoCV`**, which version 1 ships ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), imports the legacy `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI`, and also `PrestoCVDomain` and `PrestoCVApplication`, whose rules its view models call ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)), and `PrestoCVImporting` with its PDFKit reader, for the import of version 1 ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)):
+**The legacy target `PrestoCV`**, which version 1 ships ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), imports the legacy `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI`, and also `PrestoCVDomain` and `PrestoCVApplication`, whose rules its view models call ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)), and `PrestoCVImporting` with its PDFKit reader, for the import of version 1 ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)), and `DiagnosticLogging` with `DiagnosticLoggingOSLog` ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)):
+- its entry point makes the one `OSLogDiagnosticLogger`, with the subsystem `com.PigLardLord.prestocv`, and its factory passes it to the import and to the AI draft; the construction moves into `PrestoCVComposition` with the app;
 - it imports each declaration of the two by name (`import struct PrestoCVDomain.ExportPolicy`), since the legacy `PrestoCVCore` declares types with the same names;
 - its adapters from the legacy `CVModel` to the plain values the rules read are in `PrestoCV/Shared/CoreRules/`;
 - its mapper from an `ImportedCV` to an unsaved `CVModel` is in `PrestoCV/Features/Import/`, as the AI draft's is in `PrestoCV/Features/AIGeneration/`; the PDFs it opens from the share sheet are declared in `PrestoCV/Info.plist`, which Xcode merges with the generated one;
@@ -301,8 +330,10 @@ PrestoCV (app) ─▶ PrestoCVPresentation ─▶ PrestoCVWorkflowPorts ─▶ P
                                 CVRenderingWebKitSupport, CVRenderingIOS | CVRenderingMacOS,
                                 CVRenderingPDFKitInspector, CVDraftingFoundationModels
 PrestoCVImportingPDFKit ─▶ PrestoCVImporting
+PrestoCVImporting, PrestoCVImportingPDFKit, CVGeneratorAI (legacy), PrestoCV (app) ─▶ DiagnosticLogging
+PrestoCV (app) ─▶ DiagnosticLoggingOSLog ─▶ DiagnosticLogging
 
-Forbidden: any edge between PrestoCVCore, CVPDFExporter and CVGeneratorAI.
+Forbidden: any edge between PrestoCVCore, CVPDFExporter and CVGeneratorAI, except to DiagnosticLogging (ADR 0030).
 Forbidden: any edge from a domain, application or port target to an adapter target.
 Forbidden: PrestoCVPresentation → PrestoCVIntegration.
 ```

@@ -42,10 +42,11 @@ func cpuSeconds(of work: () -> Void) -> Double {
     return now() - start
 }
 
-/// How much more a call costs for `size` than for a quarter of it, the call being `cost(size)` seconds of CPU time. A
-/// pass over the text costs four times as much for four times the text, and a pass over the text for each of its parts
-/// sixteen times as much: the same on a fast machine and on a slow one. Each cost is the least of two runs, which leaves
-/// out what the first run spends on tables built when they are first used.
+/// How much more a call costs for `size` than for a quarter of it, the call being `cost(size)` seconds of CPU time, or
+/// the steps of a probe that counts them. A pass over the text costs four times as much for four times the text, and a
+/// pass over the text for each of its parts sixteen times as much: the same on a fast machine and on a slow one, for
+/// steps; seconds of a short run are only as steady as the machine. Each cost is the least of two runs, which leaves out
+/// what the first run spends on tables built when they are first used.
 func growth(whole size: Int, cost: (Int) -> Double) -> (ratio: Double, seconds: Double) {
     let quarter = min(cost(size / 4), cost(size / 4))
     let whole = min(cost(size), cost(size))

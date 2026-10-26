@@ -1,3 +1,5 @@
+import DiagnosticLogging
+import DiagnosticLoggingTestSupport
 import Foundation
 import Testing
 @testable import PrestoCVImporting
@@ -161,16 +163,39 @@ struct ReadingWorkTests {
 
     @Test("A check of growth tells a pass over a text from a pass over it for each of its parts")
     func theCheckOfGrowthTellsTheTwoApart() {
+        // The probes report the steps they take, not the CPU time the steps take. On a busy machine, or one that has not
+        // brought a core up to speed for a short run, a step costs more in the quarter-size run than in the whole (6.59
+        // came out for the quadratic probe, 16 being the ratio of its steps): a bound halfway between 4 and 16 holds for
+        // the steps of a probe on any machine and for the time of one only on a quiet one.
         func pass(_ size: Int) -> Double {
-            cpuSeconds { var sum = 0; for index in 0..<size * 4_000 { sum &+= index ^ (sum >> 3) }; #expect(sum != 1) }
+            var steps = 0, sum = 0
+            for index in 0..<size { sum &+= index ^ (sum >> 3); steps += 1 }
+            #expect(sum != 1)
+            return Double(steps)
         }
         func passForEachPart(_ size: Int) -> Double {
-            cpuSeconds { var sum = 0; for part in 0..<size { for index in 0..<size { sum &+= index ^ part } }; #expect(sum != 1) }
+            var steps = 0, sum = 0
+            for part in 0..<size { for index in 0..<size { sum &+= index ^ part; steps += 1 } }
+            #expect(sum != 1)
+            return Double(steps)
         }
-        let linear = growth(whole: 4_000, cost: pass)
-        let quadratic = growth(whole: 4_000, cost: passForEachPart)
-        #expect(linear.ratio < linearGrowthBound, "\(linear)")
-        #expect(quadratic.ratio > linearGrowthBound, "\(quadratic)")
+        let linear = growth(whole: 400, cost: pass)
+        let quadratic = growth(whole: 400, cost: passForEachPart)
+        #expect(linear.ratio == 4, "\(linear)")
+        #expect(quadratic.ratio == 16, "\(quadratic)")
+        #expect(linear.ratio < linearGrowthBound && linearGrowthBound < quadratic.ratio)
+    }
+
+    @Test("The CPU time of a call is the time it computes, not the time it lasts")
+    func theCPUTimeOfACallIsTheTimeItComputes() {
+        var sum = 0
+        let computing = cpuSeconds { for index in 0..<2_000_000 { sum &+= index ^ (sum >> 3) } }
+        #expect(sum != 1)
+        #expect(computing > 0)
+
+        // A call that waits for a tenth of a second computes for a few microseconds, on a busy machine for some more
+        let waiting = cpuSeconds { Thread.sleep(forTimeInterval: 0.1) }
+        #expect(waiting < 0.05, "\(waiting) s of CPU for a wait of 0.1 s")
     }
 
     // MARK: A PDF shares its budget with the reading of its text
@@ -190,7 +215,7 @@ struct ReadingWorkTests {
     }
 
     @Test("A PDF's reading counts against the budget of its analysis")
-    func theReadingOfAPDFSharesTheBudget() throws {
+    func theReadingOfAPDFSharesTheBudget() async throws {
         let pages = pages(lines: 800)
         var probe = AnalysisWork(budget: .max / 2)
         let analysis = try LayoutAnalyzer.analyze(pages, limits: limits(steps: .max / 2), work: &probe)
@@ -199,9 +224,15 @@ struct ReadingWorkTests {
         // The analysis alone fits its budget, and the 640 thousand readings of the dates do not fit what is left
         let analysed = probe.steps
         let layout = ExtractedLayout.pages(pages)
-        let tight = ImportCV(pdfReader: ScriptedPDFReader(layout: layout), limits: limits(steps: analysed + 300_000))
-        #expect(failure(of: { try tight.read(layout) }) as? ImportError == .tooLarge)
+        let logger = RecordingLogger()
+        let tight = ImportCV(
+            pdfReader: ScriptedPDFReader(layout: layout), limits: limits(steps: analysed + 300_000), logger: logger, clock: ContinuousClock()
+        )
+        var failure: (any Error)?
+        do { _ = try await tight.importPDF(Data([1])) } catch { failure = error }
+        #expect(failure as? ImportError == .tooLarge)
+        #expect(logger.entry("import.failed")?.fields.contains(.token("limit", "steps")) == true)
         let roomy = ImportCV(pdfReader: ScriptedPDFReader(layout: layout), limits: limits(steps: analysed + 3_000_000))
-        #expect(try roomy.read(layout).cv.experience.count == 2)
+        #expect(try await roomy.importPDF(Data([1])).cv.experience.count == 2)
     }
 }

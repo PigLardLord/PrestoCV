@@ -21,6 +21,8 @@ struct ReleaseHygieneTests {
         "PrestoCVApplication": "PrestoCVCore/Sources/PrestoCVApplication",
         "PrestoCVImporting": "PrestoCVCore/Sources/PrestoCVImporting",
         "PrestoCVImportingPDFKit": "PrestoCVCore/Sources/PrestoCVImportingPDFKit",
+        "DiagnosticLogging": "DiagnosticLogging/Sources/DiagnosticLogging",
+        "DiagnosticLoggingOSLog": "DiagnosticLogging/Sources/DiagnosticLoggingOSLog",
     ]
 
     /// The sources whose code ships with the app.
