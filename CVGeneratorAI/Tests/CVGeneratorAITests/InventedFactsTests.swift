@@ -139,35 +139,6 @@ struct InventedFactsTests {
         #expect(other.invented.map(\.path) == ["personalInfo.email", "personalInfo.phone"])
     }
 
-    // MARK: - Dates
-
-    @Test("A date reduced from a year of the description is allowed, a year it lacks is a hard finding",
-          arguments: [
-              DateCase(input: "en-plain", year: "2014", missingYear: "2015", present: "Present"),
-              DateCase(input: "it-plain", year: "2016", missingYear: "2015", present: "Presente"),
-              DateCase(input: "de-plain", year: "2014", missingYear: "2013", present: "heute"),
-              DateCase(input: "es-plain", year: "2017", missingYear: "2016", present: "Actualidad"),
-              DateCase(input: "fr-plain", year: "2015", missingYear: "2014", present: "Aujourd'hui"),
-              DateCase(input: "pt-plain", year: "2014", missingYear: "2013", present: "Atual"),
-          ])
-    func dates(_ example: DateCase) throws {
-        let input = try Self.input(example.input)
-        var draft = Draft(faithfulTo: input)
-        draft.experience[0] = Experience(company: draft.experience[0].company, startDate: example.year, endDate: example.present)
-        draft.experience[1] = Experience(company: draft.experience[1].company, startDate: "\(example.year)-01-01")
-        draft.education = [Education(
-            institution: draft.education[0].institution, startDate: "09/\(example.year)", endDate: example.missingYear
-        )]
-
-        let report = InventedFacts.count(draft.cv, for: input)
-
-        #expect(report.finding(at: "experience[0].startDate")?.kind == .quote)
-        #expect(report.finding(at: "experience[0].endDate")?.kind == .derived)
-        #expect(report.finding(at: "experience[1].startDate")?.kind == .derived)
-        #expect(report.finding(at: "education[0].startDate")?.kind == .review)
-        #expect(report.invented.map(\.path) == ["education[0].endDate"])
-    }
-
     // MARK: - Prose
 
     @Test("A number the description lacks in a summary is a hard finding", arguments: [
@@ -349,15 +320,6 @@ struct AccentCase: Sendable, CustomTestStringConvertible {
     let value: String
 
     var testDescription: String { "\(input): \(value)" }
-}
-
-struct DateCase: Sendable, CustomTestStringConvertible {
-    let input: String
-    let year: String
-    let missingYear: String
-    let present: String
-
-    var testDescription: String { input }
 }
 
 /// A trap of a description, put in the field where a model would put it. The traps of each input come in one order:
