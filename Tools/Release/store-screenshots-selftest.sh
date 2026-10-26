@@ -10,7 +10,9 @@
 #   - leave no capture of an earlier run to be composed: a capture run starts by removing the captures it will replace,
 #     so a run that fails at any step (the arguments' runtime, the build, the simulator, the test, the export) leaves none
 #     of its languages, and --compose-only composes only a complete set; the captures of a language are put in place
-#     whole, by a rename, so that a copy that fails leaves no file of that language,
+#     whole, by a rename, so that a copy that fails leaves no file of that language; and a run that is killed (no chance to
+#     clean up) leaves the captures of the languages it had finished, and none of the language it was in or of those after
+#     it, so that a --compose-only accepts only a language that is whole,
 #   - run its tests where Xcode enforces their time allowance: the plan turns test timeouts on.
 #
 #   Tools/Release/store-screenshots-selftest.sh
@@ -81,6 +83,8 @@ case " $* " in
         [ "${FAKE_SIGNAL:-}" != term ] || { trap 'trap - TERM' TERM; kill -TERM "$PPID"; sleep 5; sleep 5; }
         # A test that is still running when the script is killed
         [ "${FAKE_HANG:-}" != 1 ] || { echo started > "$FAKE_READY"; read -t 60 <> "$FAKE_BLOCK"; }
+        # The same, in the test of one language (FAKE_HANG_ON=de): the tests of the languages before it have ended
+        [ -z "${FAKE_HANG_ON:-}" ] || [ "$FAKE_HANG_ON" != "$language" ] || { echo started > "$FAKE_READY"; read -t 60 <> "$FAKE_BLOCK"; }
         [ "${FAKE_FAIL_ON:-}" != test ] || exit 1 ;;
 esac
 exit 0
@@ -136,6 +140,8 @@ put_captures() {
     mkdir -p "$dir"
     for number in $(seq 1 "$3"); do echo "old capture" > "$dir/$(printf '%02d' "$number").png"; done
 }
+# No capture of an earlier run (put_captures) is left, in any language
+no_old_capture() { ! grep -rqF "old capture" "$OUT_DIR/captures" 2>/dev/null; }
 # The process of a test that was left running is gone
 gone() { ! kill -0 "$(cat "$1" 2>/dev/null)" 2>/dev/null; }
 
@@ -322,6 +328,46 @@ rm -rf "$OUT_DIR"; put_captures iphone en 6
 run -- --compose-only
 expect "a --compose-only run" "exit $RC" [ "$RC" = 0 ]
 expect "  keeps the captures" "the captures are: $(captures iphone en)" [ "$(captures iphone en)" = "$six" ]
+
+# 13. A run that is killed (no chance to clean up) while it captures leaves the captures of the languages it had finished,
+#     and none of the language it was in, or of those after it, however old: the captures of the earlier run were removed
+#     when the run began, and a language is put in place whole, by a rename. A --compose-only after it accepts the
+#     languages that are whole, and refuses the others.
+killed_in() {
+    local name="$1" language="$2"
+    rm -rf "$LOCK" "$OUT_DIR" "$T/child.pid"; write_devices
+    put_captures iphone en 6; put_captures iphone de 6
+    exec 7<>"$T/ready"
+    FAKE_HANG_ON="$language" FAKE_READY="$T/ready" FAKE_CHILD_PID="$T/child.pid" \
+        "$SCRIPT" --output "$OUT_DIR" --devices iphone --languages en,de > /dev/null 2>&1 < /dev/null &
+    killed=$!
+    read -t 60 -u 7 started   # the test of the language has started
+    kill -9 "$killed"; { wait "$killed"; } 2>/dev/null
+    kill "$(cat "$T/child.pid" 2>/dev/null)" 2>/dev/null
+    exec 7>&-
+    rm -rf "$LOCK"
+    OUT="the run was killed while it captured $language"
+    expect "$name: no capture of the earlier run is left" "the captures are: en $(captures iphone en), de $(captures iphone de)" \
+        no_old_capture
+    expect "  leaves no half-made set" "a .partial is left" no_partial
+}
+killed_in "a run killed during its first language" en
+expect "  leaves no capture of that language" "the captures are: $(captures iphone en)" [ -z "$(captures iphone en)" ]
+expect "  leaves none of the language after it" "the captures are: $(captures iphone de)" [ -z "$(captures iphone de)" ]
+run -- --compose-only --languages en,de
+expect "  and a --compose-only after it" "exit $RC, want a failure" [ "$RC" != 0 ]
+expect "    does not compose" "the composer ran" not_composed
+killed_in "a run killed during its second language" de
+expect "  keeps the first language, as that run took it" "the captures are: $(captures iphone en)" [ "$(captures iphone en)" = "$six" ]
+expect "  they are not those of the earlier run" "$(cat "$OUT_DIR/captures/iphone/en/01.png")" grep -q "png of en-01.png" "$OUT_DIR/captures/iphone/en/01.png"
+expect "  leaves no capture of the language it was in" "the captures are: $(captures iphone de)" [ -z "$(captures iphone de)" ]
+run -- --compose-only --languages en,de
+expect "  a --compose-only for both languages after it" "exit $RC, want a failure" [ "$RC" != 0 ]
+expect "    names a missing capture of the second" "no mention of iphone/de/01.png" says "iphone/de/01.png"
+expect "    does not compose" "the composer ran" not_composed
+run -- --compose-only --languages en
+expect "  a --compose-only for the language that is whole" "exit $RC" [ "$RC" = 0 ]
+expect "    composes it" "the composer did not run" composed
 
 # The test sets a time allowance for each language, and Xcode enforces it only where the plan turns test timeouts on
 PLAN="$HERE/../../TestPlans/StoreScreenshots.xctestplan"
