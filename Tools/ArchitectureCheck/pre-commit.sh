@@ -23,6 +23,15 @@ if [ ! -x "$TMP/tree/Tools/ArchitectureCheck/check.sh" ]; then
   echo "The staged tree has no Tools/ArchitectureCheck/check.sh: the architecture check cannot run." >&2
   exit 1
 fi
+# git exports to its hooks GIT_DIR, GIT_INDEX_FILE and the other variables that tell git which repository to work on, as
+# absolute paths in a linked worktree. SwiftPM runs git in its dependency checkouts with `git -C`, which those variables
+# override, so its fetches and checkouts would go to this repository instead. The hook's own git calls are done, so
+# check.sh runs without them. The list is git's own, so a variable that a later git adds is cleared too. It holds the
+# configuration given to the commit with `git -c` or GIT_CONFIG_COUNT, which is cleared as well: SwiftPM's checkouts
+# would run under it, `-c core.hooksPath=…` running this repository's post-checkout hook in a dependency.
+REPOSITORY_VARIABLES="$(git rev-parse --local-env-vars)"
+# Split on purpose: git prints one variable name per line.
+unset $REPOSITORY_VARIABLES
 if ! ARCHITECTURE_CHECK_ROOT="$TMP/tree" ARCHITECTURE_CHECK_SCRATCH="$REPO/Tools/ArchitectureCheck/.build" \
      "$TMP/tree/Tools/ArchitectureCheck/check.sh"; then
   echo "Architecture check failed on the staged changes (see docs/architecture/rules.md)." >&2

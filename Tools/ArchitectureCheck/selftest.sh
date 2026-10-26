@@ -628,6 +628,47 @@ if [[ "$(uname)" == Darwin ]]; then
 else
   expect "packages: an Apple-only manifest branch is invisible on Linux, so CI also checks packages on macOS" 0 "" --packages .
 fi
+# --- the pre-commit hook
+# git exports GIT_DIR and GIT_INDEX_FILE to its hooks, as absolute paths in a linked worktree. SwiftPM runs git in its
+# dependency checkouts with `git -C`, which those variables override, so the first commit in a fresh worktree checked
+# out swift-syntax's revision in the project's repository and failed. Here check.sh is a stub that makes the same call,
+# and records what it sees of the configuration given to the commit with `git -c` and GIT_CONFIG_COUNT: nothing.
+HOOK_ROOT="$(mktemp -d)"; ROOTS+=("$HOOK_ROOT")
+LABEL="hook: from a linked worktree, check.sh's git works on its own repository without the commit's configuration, and the commit keeps the staged file"
+# Not the condition of an `if`, where bash ignores set -e and only the last command would count.
+(
+  set -e; cd "$HOOK_ROOT"
+  # Neither the developer's git configuration (identity, signing, hooks) nor the repository of a caller that runs this
+  # from a git hook plays any part: its GIT_DIR would point every git call here at that repository.
+  unset $(git rev-parse --local-env-vars)
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+  export GIT_AUTHOR_NAME=selftest GIT_AUTHOR_EMAIL=selftest@example.invalid
+  export GIT_COMMITTER_NAME=selftest GIT_COMMITTER_EMAIL=selftest@example.invalid
+  git init -q -b main dep; git -C dep commit -q --allow-empty -m first; git -C dep commit -q --allow-empty -m second
+  FIRST="$(git -C dep rev-parse HEAD~1)"
+  git init -q -b main repo; mkdir -p repo/Tools/ArchitectureCheck hooks
+  {
+    echo '#!/usr/bin/env bash'
+    echo 'set -e'
+    echo "git -C '$HOOK_ROOT/dep' checkout -q -f $FIRST"
+    echo "git -C '$HOOK_ROOT/dep' config --get selftest.param >> '$HOOK_ROOT/kept' || :"
+    echo "git -C '$HOOK_ROOT/dep' config --get selftest.count >> '$HOOK_ROOT/kept' || :"
+  } > repo/Tools/ArchitectureCheck/check.sh
+  chmod +x repo/Tools/ArchitectureCheck/check.sh
+  git -C repo add -A; git -C repo commit -q -m stub
+  ln -s "$HERE/pre-commit.sh" hooks/pre-commit; git -C repo config core.hooksPath "$HOOK_ROOT/hooks"
+  git -C repo worktree add -q ../wt -b feature
+  echo 'let x = 1' > wt/A.swift; git -C wt add A.swift
+  GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=selftest.count GIT_CONFIG_VALUE_0=count \
+    git -C wt -c selftest.param=param commit -q -m change
+  # The stub checked out its own repository, and git, which reads the index again after the hook, committed ours.
+  [ "$(git -C dep rev-parse HEAD)" = "$FIRST" ] || { echo "check.sh did not check out its own repository"; exit 1; }
+  git -C wt cat-file -e HEAD:A.swift || { echo "the commit lost the staged A.swift"; exit 1; }
+  KEPT="$(tr '\n' ' ' < kept)"
+  [ -z "$KEPT" ] || { echo "check.sh got configuration given to the commit: '$KEPT'"; exit 1; }
+) > "$HOOK_ROOT/out.txt" 2>&1
+if [[ $? -eq 0 ]]; then pass=$((pass+1)); echo "ok   $LABEL"
+else fail=$((fail+1)); echo "FAIL $LABEL"; sed 's/^/     /' "$HOOK_ROOT/out.txt"; fi
 
 echo "selftest: $pass passed, $fail failed"
 [[ $fail -eq 0 ]]
