@@ -16,6 +16,13 @@ import SwiftSyntax
 // 4. Exceptions are permanent, justified by an existing ADR; baseline entries are temporary.
 // 5. --modules: rules.json and modules.md must agree in both directions; rules may be stricter.
 // 6. --packages: each package's declared target dependencies must be allowed imports.
+// 7. Test plans: every test target an .xctestplan runs has the rule with the sourceTreePath detector (R16), because
+//    the machines that run a plan have only the built products. Legacy targets are checked for the rules listed for them.
+// 8. Views and default arguments: a view holds no service and makes no view model, a view model imports no UI framework
+//    (R5), and a default argument makes no dependency and reads no ambient state (R17). The views of a target are
+//    collected from all its files first, so that an extension of a view in another file is part of the view.
+// 9. Warnings: a detector listed in warningDetectors reports without failing, and never enters the baseline (R18: an API
+//    that needs the full Foundation).
 
 struct Config: Decodable {
     struct Target: Decodable {
@@ -32,8 +39,13 @@ struct Config: Decodable {
     let targets: [Target]
     let rules: [String: [String]]         // rule → detectors
     let infrastructureTypes: [String]
+    /// The suffixes of what a view may not hold (R5) and a default argument may not make (R17), without `Protocol`.
+    let serviceSuffixes: [String]?
+    let dependencySuffixes: [String]?
     let exceptions: [Exception]?
     let notYetImplemented: [String]?
+    /// Detectors whose findings are printed as warnings: they do not fail the check and never enter the baseline.
+    let warningDetectors: [String]?
 }
 
 struct Finding { let key: String; let message: String }
@@ -55,6 +67,7 @@ catch { fail("cannot read rules: \(error)") }
 func loadBaseline(_ path: String) -> [String]? { try? JSONDecoder().decode([String].self, from: Data(contentsOf: URL(fileURLWithPath: path))) }
 var problems: [String] = []
 var findings: [Finding] = []
+var warnings: [String] = []
 
 // MARK: 1. Inventory
 
@@ -65,14 +78,21 @@ for t in config.targets where !FileManager.default.fileExists(atPath: root.appen
     problems.append("target \(t.name): path \(t.path) does not exist")
 }
 var files: [String] = []
-if let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isSymbolicLinkKey]) {
+var testPlans: [String] = []
+if let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isSymbolicLinkKey, .isDirectoryKey]) {
     for case let url as URL in e {
         let rel = url.standardizedFileURL.path.replacingOccurrences(of: root.path + "/", with: "")
-        if rel.hasPrefix(".git") || rel.contains("/.build") || rel.hasPrefix(".build") { e.skipDescendants(); continue }
+        if rel.hasPrefix(".git") || rel.contains("/.build") || rel.hasPrefix(".build") {
+            // Only a directory's descendants are skipped: on Darwin, skipDescendants() after a file, such as .gitignore,
+            // skips the next directory instead, and that directory's files would go unchecked.
+            if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true { e.skipDescendants() }
+            continue
+        }
         if (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
             problems.append("symbolic link in the source tree: \(rel)"); continue
         }
         if url.pathExtension == "swift" { files.append(rel) }
+        if url.pathExtension == "xctestplan" { testPlans.append(rel) }
     }
 }
 var assignment: [(file: String, target: Config.Target)] = []
@@ -131,20 +151,34 @@ func isLegacyDeclaration(_ name: String, inManifest manifest: String) -> Bool {
     legacyTargets.contains { $0.name == name && owningManifest(of: $0.path) == manifest }
 }
 
-for (file, target) in assignment where target.kind != "legacy" {
+// A legacy target is exempt (ADR 0012) except from the rules listed for it: R16 for the legacy test targets a test plan runs,
+// R5 and R17 for the legacy app and PrestoCVCore (ADR 0025).
+var parsed: [(file: String, target: Config.Target, source: String, tree: SourceFileSyntax)] = []
+for (file, target) in assignment where target.kind != "legacy" || !target.rules.isEmpty {
     guard let source = try? String(contentsOf: root.appendingPathComponent(file), encoding: .utf8) else { problems.append("cannot read \(file)"); continue }
-    let tree = Parser.parse(source: source)
-    let scanner = Scanner(tree: tree, file: file, infrastructureTypes: Set(config.infrastructureTypes))
+    parsed.append((file, target, source, Parser.parse(source: source)))
+}
+var viewTypes: [String: Set<String>] = [:]
+var memberTypes: [String: [String: TypeMembers]] = [:]
+for entry in parsed {
+    viewTypes[entry.target.name, default: []].formUnion(Scanner.viewTypeNames(in: entry.tree))
+    for (type, members) in MemberIndex.members(in: entry.tree) { memberTypes[entry.target.name, default: [:]][type, default: TypeMembers()].merge(members) }
+}
+for (file, target, source, tree) in parsed {
+    let scanner = Scanner(tree: tree, file: file, infrastructureTypes: Set(config.infrastructureTypes), viewTypes: viewTypes[target.name] ?? [],
+                          memberTypes: memberTypes[target.name] ?? [:],
+                          serviceSuffixes: config.serviceSuffixes ?? [], dependencySuffixes: config.dependencySuffixes ?? [])
     scanner.walk(tree)
     var ordinals: [String: Int] = [:]
     func record(rule: String, detector: String, detail: String, node: String, line: Int) {
         if exceptionsValid.contains(where: { file.hasPrefix($0.path) && $0.detector == detector }) { return }
+        if config.warningDetectors?.contains(detector) == true { warnings.append("\(file):\(line): \(rule) \(detector): \(detail)"); return }
         let base = "\(file)|\(rule)|\(detector)|\(fingerprint(node))"
         let n = ordinals[base, default: 0]; ordinals[base] = n + 1
         findings.append(Finding(key: "\(base)#\(n)", message: "\(file):\(line): \(rule) \(detector): \(detail)"))
     }
     let allowed = Set(target.allowedImports + ["Swift"])
-    for imp in scanner.imports where !allowed.contains(imp.module) {
+    for imp in scanner.imports where target.kind != "legacy" && !allowed.contains(imp.module) {
         record(rule: "R1", detector: "import", detail: imp.node, node: imp.node, line: imp.line)
     }
     for imp in scanner.imports where target.requiredImportAccess?[imp.module] == "internal" {
@@ -156,8 +190,10 @@ for (file, target) in assignment where target.kind != "legacy" {
     let rulesFor = detectorToRules(target)
     for hit in scanner.hits {
         // Inside a manifest, the declaration of a legacy target is exempt like its sources (ADR 0012); anything
-        // else in the manifest, including package-level settings and new targets, is checked.
-        if target.kind == "manifest", let owner = hit.packageTarget, isLegacyDeclaration(owner, inManifest: file) { continue }
+        // else in the manifest, including package-level settings and new targets, is checked. A legacy target's resource
+        // layout is checked too, because its bundle is signed in the same build as the new targets' (R15).
+        if target.kind == "manifest", hit.detector != "bundleLayout", let owner = hit.packageTarget,
+           isLegacyDeclaration(owner, inManifest: file) { continue }
         for rule in rulesFor[hit.detector] ?? [] { record(rule: rule, detector: hit.detector, detail: hit.detail, node: hit.node, line: hit.line) }
     }
     // A tools version below 6 builds every target without an explicit mode in Swift 5 mode. Only a manifest
@@ -177,7 +213,7 @@ for (file, target) in assignment where target.kind != "legacy" {
 
 // MARK: 5. modules.md, both directions
 
-let frameworks: Set<String> = ["Glibc", "Darwin", "Dispatch", "Foundation", "Observation", "WebKit", "UIKit", "AppKit", "FoundationModels", "Testing", "SwiftUI", "PDFKit", "QuickLook", "UniformTypeIdentifiers", "Synchronization"]
+let frameworks: Set<String> = ["Glibc", "Darwin", "Android", "Dispatch", "Foundation", "Observation", "WebKit", "UIKit", "AppKit", "FoundationModels", "Testing", "SwiftUI", "PDFKit", "QuickLook", "UniformTypeIdentifiers", "Synchronization", "CoreGraphics", "CoreText"]
 if let modulesPath = value(after: "--modules") {
     var documented: [String: Set<String>?] = [:]
     let modulesText = (try? String(contentsOfFile: modulesPath, encoding: .utf8)) ?? ""
@@ -246,6 +282,26 @@ if let packages = value(after: "--packages") {
     }
 }
 
+// MARK: 7. Test plans
+
+// A plan's test targets run on machines that have only the built products, so each one needs the rule that keeps its
+// tests from reading the source tree. The plans of an excluded path are not the repository's.
+let excludedPaths = config.targets.filter { $0.kind == "excluded" }.map { key($0.path) }
+let sourceTreeRules = config.rules.filter { $0.value.contains("sourceTreePath") }.keys.sorted()
+let targetsByName = Dictionary(config.targets.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+for plan in testPlans.sorted() where !excludedPaths.contains(where: plan.hasPrefix) {
+    guard let data = FileManager.default.contents(atPath: root.appendingPathComponent(plan).path),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let entries = json["testTargets"] as? [[String: Any]] else { problems.append("cannot read the test plan \(plan)"); continue }
+    for entry in entries {
+        guard let name = (entry["target"] as? [String: Any])?["name"] as? String else { problems.append("\(plan) has a test target without a name"); continue }
+        guard let target = targetsByName[name] else { problems.append("test plan \(plan) runs \(name), which rules.json does not know"); continue }
+        if Set(target.rules).isDisjoint(with: sourceTreeRules) {
+            problems.append("test plan \(plan) runs \(name) without the repository, so its rules must include \(sourceTreeRules.isEmpty ? "a rule with the sourceTreePath detector" : sourceTreeRules.joined(separator: " or "))")
+        }
+    }
+}
+
 // MARK: Report
 
 let current = Set(findings.map(\.key))
@@ -263,9 +319,10 @@ if let againstPath = value(after: "--against") {
     guard let base = loadBaseline(againstPath) else { fail("cannot read base baseline \(againstPath)") }
     added = baselined.subtracting(Set(base)).sorted()
 }
+for w in warnings { print("warning: \(w)") }
 for p in problems { print("error: \(p)") }
 for f in new { print("error: new violation \(f.message)") }
 for s in stale { print("error: baseline entry no longer occurs, remove it: \(s)") }
 for a in added { print("error: baseline grew compared with the base branch: \(a)") }
-print("checked \(assignment.count) files in \(config.targets.count) targets: \(findings.count) findings, \(baseline.count) baselined, \(new.count) new, \(stale.count) stale, \(added.count) added")
+print("checked \(assignment.count) files in \(config.targets.count) targets: \(findings.count) findings, \(baseline.count) baselined, \(new.count) new, \(stale.count) stale, \(added.count) added, \(warnings.count) warnings")
 exit(problems.isEmpty && new.isEmpty && stale.isEmpty && added.isEmpty ? 0 : 1)

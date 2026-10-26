@@ -48,6 +48,10 @@ public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
         return try await cvRepository.saveCV(newCV)
     }
     
+    public func storeNewCV(_ cv: CVModel) async throws -> CVModel {
+        return try await cvRepository.saveCV(cv)
+    }
+    
     public func updateCV(_ cv: CVModel) async throws -> CVModel {
         return try await cvRepository.saveCV(cv)
     }
@@ -56,36 +60,17 @@ public final class CVManagementUseCase: CVManagementUseCaseProtocol, Sendable {
         try await cvRepository.deleteCV(id: id)
     }
     
-    public func duplicateCV(id: UUID) async throws -> CVModel {
+    public func duplicateCV(id: UUID, named name: String) async throws -> CVModel {
         guard let existingCV = try await cvRepository.getCV(by: id) else {
             throw AppError.notFound("error.subject.cv".localized)
         }
         
-        // Create a copy with a new ID and modified name
-        let duplicatedCV = existingCV.copy(nameModifier: createCopyNameModifier)
+        let duplicatedCV = existingCV.copy(nameModifier: { _ in name })
         
         return try await cvRepository.saveCV(duplicatedCV)
     }
     
     public func getCV(by id: UUID) async throws -> CVModel? {
         return try await cvRepository.getCV(by: id)
-    }
-}
-
-// MARK: - Private Helper Methods
-
-extension CVManagementUseCase {
-    
-    // MARK: Name Generation
-    
-    /// Names a duplicate after the CV it copies, followed by the localized copy suffix, as "<name> (Copy)".
-    /// A CV without a name is called by the name the list shows for it, "Untitled CV", so the copy is "Untitled CV (Copy)".
-    /// - Parameter name: The original name to modify
-    /// - Returns: The name of the duplicate
-    private func createCopyNameModifier(_ name: String) -> String {
-        let hasName = !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let originalName = hasName ? name : "cv.untitled".localized
-        let copySuffix = "action.copy_suffix".localized
-        return "\(originalName) \(copySuffix)"
     }
 }

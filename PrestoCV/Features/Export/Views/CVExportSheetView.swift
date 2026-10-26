@@ -5,20 +5,21 @@ import PrestoCVCore
 import CVPDFExporter
 
 struct CVExportSheetView: View {
-    let cv: CVModel
-    @StateObject private var viewModel = CVExportSheetViewModel()
+    @StateObject private var viewModel: CVExportSheetViewModel
     @StateObject private var previewCoordinator = HTMLPreviewCoordinator()
+    /// The PDF in the share sheet, while the share sheet is open
+    @State private var sharingPDF: ExportedPDF?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var loadingTemplates = true
     /// The room for the designs, fonts and colours grows with the text, so that their names are not cut, until the
     /// preview above them would be left with too little.
     @ScaledMetric(relativeTo: .footnote) private var optionsHeight: CGFloat = 300
     private let largestOptionsHeight: CGFloat = 420
 
-    init(cv: CVModel) {
-        self.cv = cv
+    /// The view model is built once, when the sheet first appears, and survives every re-render of the screen under it.
+    init(viewModel: @autoclosure @escaping () -> CVExportSheetViewModel) {
+        self._viewModel = StateObject(wrappedValue: viewModel())
     }
 
     var body: some View {
@@ -32,7 +33,18 @@ struct CVExportSheetView: View {
                         previewSection
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        pageCountLabel
+                        previewFooter
+                    }
+
+                    if let warning = viewModel.shareWarning {
+                        Label(warning, systemImage: "exclamationmark.circle")
+                            .typography(.footnote)
+                            .foregroundColor(DesignTokens.Colors.secondary)
+                            .multilineTextAlignment(.center)
+                            // The sentence is shown whole, as the one below; the PDF is made all the same
+                            .fixedSize(horizontal: false, vertical: true)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+                            .padding(.horizontal, DesignTokens.Spacing.lg)
                     }
 
                     if let blocker = viewModel.shareBlocker {
@@ -46,6 +58,8 @@ struct CVExportSheetView: View {
                             .dynamicTypeSize(...DynamicTypeSize.accessibility2)
                             .padding(.horizontal, DesignTokens.Spacing.lg)
                     }
+
+                    sendSection
 
                     // Fixed height section for options with native TabView
                     TabView {
@@ -72,18 +86,14 @@ struct CVExportSheetView: View {
             .screenTitle(String(localized: "export.sheet.title"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    BarButton(title: String(localized: "common.cancel"), systemImage: "xmark", screenTextSize: dynamicTypeSize) {
+                    BarButton(title: viewModel.closeButtonTitle, systemImage: "xmark", screenTextSize: dynamicTypeSize) {
                         dismiss()
                     }
                         .foregroundColor(DesignTokens.Colors.accent)
                 }
-
-                ToolbarItem(placement: .primaryAction) {
-                    shareButton
-                }
             }
             .overlay {
-                if loadingTemplates {
+                if viewModel.isLoadingTemplates {
                     LoadingView.fullscreen()
                 }
             }
@@ -96,17 +106,20 @@ struct CVExportSheetView: View {
                 Text(viewModel.errorMessage ?? "")
             })
             .task {
-                // Loading the templates sets the selection, which starts the first preview
-                await viewModel.loadTemplates()
-                loadingTemplates = false
+                await viewModel.start()
             }
-            .onChange(of: viewModel.selection) {
-                viewModel.requestPreview(for: cv)
+            .onChange(of: viewModel.shareConfirmationText) { _, confirmation in
+                if let confirmation {
+                    AccessibilityNotification.Announcement(confirmation).post()
+                }
             }
             .onDisappear {
                 viewModel.stop()
             }
         }
+        // Where the sheet does not fill the screen, as on iPad, it is as tall as a page: the preview keeps its room
+        // above the language and the button
+        .presentationSizing(.page)
     }
 
     @ViewBuilder
@@ -140,7 +153,7 @@ struct CVExportSheetView: View {
                             viewModel.reportPreviewLoadFailure(error)
                         }
                     }
-            } else if viewModel.isPreviewLoading || loadingTemplates {
+            } else if viewModel.isPreviewLoading || viewModel.isLoadingTemplates {
                 ProgressView()
                     .aspectRatio(viewModel.aspectRatio, contentMode: .fit)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -159,6 +172,54 @@ struct CVExportSheetView: View {
         .animation(DesignTokens.Animations.fastEaseInOut, value: viewModel.previewHTML)
     }
 
+    /// Under the preview: how many pages the PDF has, and the language of its headings with a way to change it. Side by
+    /// side where they fit, one above the other where they do not.
+    private var previewFooter: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: DesignTokens.Spacing.md) {
+                pageCountLabel
+                documentLanguageMenu
+            }
+
+            VStack(spacing: DesignTokens.Spacing.xxs) {
+                pageCountLabel
+                documentLanguageMenu
+            }
+        }
+        // The line stops short of the largest text sizes, so that the preview keeps its room
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+        .padding(.horizontal, DesignTokens.Spacing.lg)
+    }
+
+    /// The language of the PDF's headings, "Headings in English", which opens the choice of the language
+    private var documentLanguageMenu: some View {
+        Menu {
+            Picker(selection: $viewModel.documentLanguageChoice) {
+                Text(viewModel.automaticDocumentLanguageTitle).tag(DocumentLanguage?.none)
+                ForEach(DocumentLanguage.allCases) { language in
+                    Text(language.nativeName).tag(Optional(language))
+                }
+            } label: {
+                Text("field.document_language".localized)
+            }
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: DesignTokens.Spacing.xxs) {
+                Image(systemName: "globe")
+                    .accessibilityHidden(true)
+                Text(viewModel.documentLanguageText)
+                    .multilineTextAlignment(.center)
+                Image(systemName: "chevron.up.chevron.down")
+                    .imageScale(.small)
+                    .accessibilityHidden(true)
+            }
+            .font(DesignTokens.Typography.footnote.font)
+            .frame(minHeight: DesignTokens.InputSize.minimumTapTarget)
+        }
+        .buttonStyle(AccentTextButtonStyle())
+        .accessibilityHint(Text("export.language.hint".localized))
+    }
+
     /// How many pages the PDF has, under the preview and not over a page of it. The line is there while the PDF is
     /// still rendering, so that the preview does not move when the count appears.
     private var pageCountLabel: some View {
@@ -173,7 +234,7 @@ struct CVExportSheetView: View {
     private var templateCarousel: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: DesignTokens.Spacing.md) {
-                if loadingTemplates {
+                if viewModel.isLoadingTemplates {
                     OptionCarouselItem(isSelected: false, isInteractive: false, action: {}) {
                         ProgressView()
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -310,40 +371,40 @@ struct CVExportSheetView: View {
         }
     }
 
-    /// The PDF is rendered once the preview has settled, so sharing it is one tap; until then the button waits.
-    @ViewBuilder
-    private var shareButton: some View {
-        if let pdf = viewModel.sharePDF {
-            shareLink(for: pdf)
-                .foregroundColor(DesignTokens.Colors.accent)
-        } else if viewModel.isPreviewLoading || viewModel.isPreparingPDF {
-            ProgressView()
-                .accessibilityLabel(Text("export.loading".localized))
-        } else {
-            Button {} label: {
-                shareLabel
+    /// The main action of the sheet, under the preview: the PDF goes wherever the share sheet sends or saves it. The
+    /// PDF is rendered once the preview has settled, so that this is one tap; until then the button waits, and says
+    /// so. After a share that went through, a line says where the PDF went.
+    private var sendSection: some View {
+        let isPreparing = viewModel.isPreviewLoading || viewModel.isPreparingPDF
+        return VStack(spacing: DesignTokens.Spacing.xs) {
+            PrimaryButton.large(
+                title: "export.share".localized,
+                icon: "square.and.arrow.up",
+                isLoading: isPreparing,
+                isDisabled: viewModel.sharePDF == nil
+            ) {
+                sharingPDF = viewModel.sharePDF
             }
-            .disabled(true)
-        }
-    }
+            .accessibilityValue(isPreparing ? "export.loading".localized : "")
+            .shareSheet(for: $sharingPDF) { activityType, completed in
+                viewModel.shareEnded(activityType: activityType, completed: completed)
+            }
 
-    /// The share sheet shows the first page next to the file name, where it would otherwise show a generic icon
-    @ViewBuilder
-    private func shareLink(for pdf: ExportedPDF) -> some View {
-        if let thumbnail = pdf.thumbnail.flatMap(UIImage.init(data:)) {
-            ShareLink(item: pdf.url, preview: SharePreview(pdf.fileName, image: Image(uiImage: thumbnail))) {
-                shareLabel
-            }
-        } else {
-            ShareLink(item: pdf.url, preview: SharePreview(pdf.fileName)) {
-                shareLabel
+            if let confirmation = viewModel.shareConfirmationText {
+                Label {
+                    Text(confirmation)
+                        .foregroundColor(DesignTokens.Colors.primary)
+                } icon: {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(DesignTokens.Colors.accent)
+                }
+                .font(DesignTokens.Typography.footnote.font)
             }
         }
-    }
-
-    private var shareLabel: some View {
-        Label("export.share".localized, systemImage: "square.and.arrow.up")
-            .labelStyle(.titleAndIcon)
+        // The button keeps a readable size at the largest text sizes instead of taking the room of the preview
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .frame(maxWidth: DesignTokens.Layout.readableContentWidth)
+        .padding(.horizontal, DesignTokens.Spacing.lg)
     }
 
     private var fallbackTemplatePreview: some View {
@@ -475,36 +536,16 @@ private extension FontScheme {
     }
 }
 
-private extension Color {
-    static func fromHex(_ hex: String) -> Color {
-        var sanitized = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        if sanitized.count == 3 {
-            sanitized = sanitized.reduce(into: "") { result, character in
-                result.append(String(repeating: character, count: 2))
-            }
-        }
-
-        guard sanitized.count == 6,
-              let value = UInt64(sanitized, radix: 16) else {
-            return DesignTokens.Colors.backgroundSecondary
-        }
-
-        let red = Double((value & 0xFF0000) >> 16) / 255
-        let green = Double((value & 0x00FF00) >> 8) / 255
-        let blue = Double(value & 0x0000FF) / 255
-
-        return Color(red: red, green: green, blue: blue)
-    }
-}
 
 
-
+#if DEBUG
 #Preview("CV Export Sheet") {
     // Use the comprehensive sample CV from CVPDFExporter
     let adapter = CVDocumentAdapter()
     let mockCV = adapter.convertToCVModel(from: SampleCVData.complete)
 
-    return CVExportSheetView(cv: mockCV)
+    return CVExportSheetView(viewModel: PreviewDependencies.exportSheet(for: mockCV, sink: { _ in }))
 }
+#endif
 
 

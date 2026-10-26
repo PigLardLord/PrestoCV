@@ -13,10 +13,7 @@ struct LastSavedDescription {
 
     /// - Parameter locale: The language of the words of the time. It is the language of the app, which is what the
     ///   rest of the texts are in, and not the region of the device, which can differ from it.
-    init(
-        locale: Locale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en"),
-        calendar: Calendar = .autoupdatingCurrent
-    ) {
+    init(locale: Locale, calendar: Calendar) {
         self.locale = locale
         self.calendar = calendar
     }

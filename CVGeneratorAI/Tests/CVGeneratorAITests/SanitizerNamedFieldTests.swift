@@ -7,17 +7,17 @@ import Foundation
 struct SanitizerNamedFieldTests {
     private let sanitizer = CVDataSanitizer()
 
-    private func sanitized(_ cvData: CVData, from description: String) -> CVData {
-        sanitizer.sanitize(cvData, against: description)
+    private func sanitized(_ cvData: CVData, from description: String) throws -> CVData {
+        try sanitizer.sanitize(cvData, against: description)
     }
 
     // MARK: - The person's name
 
     @Test("A name is a contiguous phrase of the description, whatever its case or accents")
-    func nameInTheDescription() {
+    func nameInTheDescription() throws {
         let info = PersonalInfo(name: "José Núñez")
 
-        #expect(sanitized(CVData(personalInfo: info), from: "i am JOSE NUNEZ, a chef").personalInfo.name == "José Núñez")
+        #expect(try sanitized(CVData(personalInfo: info), from: "i am JOSE NUNEZ, a chef").personalInfo.name == "José Núñez")
     }
 
     @Test("A name made of words that are only nearby in the description is dropped",
@@ -27,52 +27,52 @@ struct SanitizerNamedFieldTests {
             "I am John, and Smith is my manager",
             "Smith hired John",
           ])
-    func nameBuiltFromSeparateWords(description: String) {
-        let result = sanitized(CVData(personalInfo: PersonalInfo(name: "John Smith")), from: description)
+    func nameBuiltFromSeparateWords(description: String) throws {
+        let result = try sanitized(CVData(personalInfo: PersonalInfo(name: "John Smith")), from: description)
 
         #expect(result.personalInfo.name == nil)
     }
 
     @Test("A name is a whole word, not the end of another")
-    func nameInsideAnotherWord() {
-        let result = sanitized(CVData(personalInfo: PersonalInfo(name: "Anna")), from: "My daughter Joanna is a nurse")
+    func nameInsideAnotherWord() throws {
+        let result = try sanitized(CVData(personalInfo: PersonalInfo(name: "Anna")), from: "My daughter Joanna is a nurse")
 
         #expect(result.personalInfo.name == nil)
     }
 
     @Test("A name with a hyphen or an apostrophe matches however the apostrophe is typed")
-    func nameWithPunctuation() {
+    func nameWithPunctuation() throws {
         let info = PersonalInfo(name: "Jean-Luc D'Angelo")
 
-        #expect(sanitized(CVData(personalInfo: info), from: "My name is Jean-Luc D\u{2019}Angelo.").personalInfo.name == "Jean-Luc D'Angelo")
+        #expect(try sanitized(CVData(personalInfo: info), from: "My name is Jean-Luc D\u{2019}Angelo.").personalInfo.name == "Jean-Luc D'Angelo")
     }
 
     @Test("A name that is only a title is dropped: \"I'm a nurse\" is not a person called Nurse")
-    func nameThatIsATitle() {
+    func nameThatIsATitle() throws {
         let sparse = CVData(
             personalInfo: PersonalInfo(name: "Nurse", title: "Nurse"),
             experience: [Experience(title: "Nurse", company: "Hospital", startDate: "2020")]
         )
 
-        let result = sanitized(sparse, from: "I'm a nurse.")
+        let result = try sanitized(sparse, from: "I'm a nurse.")
 
         #expect(result.personalInfo.name == nil)
         #expect(result.personalInfo.title == "Nurse")
-        #expect(sanitized(CVData(personalInfo: PersonalInfo(name: "Cook", title: "nurse")), from: "I'm a nurse and a cook.").personalInfo.name == "Cook", "Only the person's own title is refused")
+        #expect(try sanitized(CVData(personalInfo: PersonalInfo(name: "Cook", title: "nurse")), from: "I'm a nurse and a cook.").personalInfo.name == "Cook", "Only the person's own title is refused")
     }
 
     @Test("A name the model gives as a job title is dropped")
-    func nameThatIsAJobTitle() {
+    func nameThatIsAJobTitle() throws {
         let draft = CVData(
             personalInfo: PersonalInfo(name: "Head Nurse"),
             experience: [Experience(title: "head nurse", company: "San Raffaele")]
         )
 
-        #expect(sanitized(draft, from: "I was head nurse at San Raffaele").personalInfo.name == nil)
+        #expect(try sanitized(draft, from: "I was head nurse at San Raffaele").personalInfo.name == nil)
     }
 
     @Test("The word \"null\", which the model writes for an empty field, is empty, even if the description has the word")
-    func nullWord() {
+    func nullWord() throws {
         let description = "The word null appears here, with null@example.com and null.example.com"
         let draft = CVData(
             personalInfo: PersonalInfo(name: "null", email: "NULL", phone: "null", location: "Null", title: "null"),
@@ -81,12 +81,12 @@ struct SanitizerNamedFieldTests {
             interests: ["null"]
         )
 
-        #expect(sanitized(draft, from: description) == CVData())
+        #expect(try sanitized(draft, from: description) == CVData())
     }
 
     @Test("A name the description never mentions is dropped")
-    func inventedName() {
-        let result = sanitized(CVData(personalInfo: PersonalInfo(name: "Mario Rossi")), from: "I'm a nurse in Turin")
+    func inventedName() throws {
+        let result = try sanitized(CVData(personalInfo: PersonalInfo(name: "Mario Rossi")), from: "I'm a nurse in Turin")
 
         #expect(result.personalInfo.name == nil)
     }
@@ -94,20 +94,20 @@ struct SanitizerNamedFieldTests {
     // MARK: - Titles and places
 
     @Test("The person's title and place are kept only if the description says them")
-    func personalTitleAndLocation() {
+    func personalTitleAndLocation() throws {
         let info = PersonalInfo(location: "Bologna", title: "primary school teacher")
         let invented = PersonalInfo(location: "Milan", title: "head teacher")
         let description = "I'm a primary school teacher from Bologna"
 
-        #expect(sanitized(CVData(personalInfo: info), from: description).personalInfo.title == "primary school teacher")
-        #expect(sanitized(CVData(personalInfo: info), from: description).personalInfo.location == "Bologna")
-        #expect(sanitized(CVData(personalInfo: invented), from: description).personalInfo.title == nil)
-        #expect(sanitized(CVData(personalInfo: invented), from: description).personalInfo.location == nil)
+        #expect(try sanitized(CVData(personalInfo: info), from: description).personalInfo.title == "primary school teacher")
+        #expect(try sanitized(CVData(personalInfo: info), from: description).personalInfo.location == "Bologna")
+        #expect(try sanitized(CVData(personalInfo: invented), from: description).personalInfo.title == nil)
+        #expect(try sanitized(CVData(personalInfo: invented), from: description).personalInfo.location == nil)
     }
 
     @Test("A place wider than the one the description gives is dropped")
-    func widerPlace() {
-        let result = sanitized(CVData(personalInfo: PersonalInfo(location: "Bologna, Italy")), from: "I live in Bologna")
+    func widerPlace() throws {
+        let result = try sanitized(CVData(personalInfo: PersonalInfo(location: "Bologna, Italy")), from: "I live in Bologna")
 
         #expect(result.personalInfo.location == nil)
     }
@@ -115,12 +115,12 @@ struct SanitizerNamedFieldTests {
     // MARK: - Jobs
 
     @Test("A job keeps the title, employer and place the description gives, and loses the ones it does not")
-    func jobFields() {
+    func jobFields() throws {
         let description = "I worked as a cook at Trattoria Da Mario in Rome"
         let job = Experience(title: "cook", company: "Trattoria Da Mario", location: "Rome")
         let partlyInvented = Experience(title: "chef", company: "Trattoria Da Mario", location: "Milan")
 
-        let result = sanitized(CVData(experience: [job, partlyInvented]), from: description).experience
+        let result = try sanitized(CVData(experience: [job, partlyInvented]), from: description).experience
 
         #expect(result.map(\.title) == ["cook", ""])
         #expect(result.map(\.company) == ["Trattoria Da Mario", "Trattoria Da Mario"])
@@ -128,7 +128,7 @@ struct SanitizerNamedFieldTests {
     }
 
     @Test("A job needs its employer, or its title together with a date")
-    func jobNeedsAnEmployerOrADatedTitle() {
+    func jobNeedsAnEmployerOrADatedTitle() throws {
         let description = "I'm a cook. I cooked at Trattoria Da Mario. From 2016 to 2018 I was a baker. In 2019 I became a florist."
         let entries = [
             Experience(title: "cook", description: "Prepared meals.", achievements: ["Won an award"]),
@@ -138,7 +138,7 @@ struct SanitizerNamedFieldTests {
             Experience(title: "baker", description: "Baked bread."),
         ]
 
-        let result = sanitized(CVData(experience: entries), from: description).experience
+        let result = try sanitized(CVData(experience: entries), from: description).experience
 
         #expect(result.count == 3, "A title alone, with whatever the model made up around it, is not a job")
         #expect(result.map(\.company) == ["Trattoria Da Mario", "", ""])
@@ -147,17 +147,17 @@ struct SanitizerNamedFieldTests {
     }
 
     @Test("A job with no title or employer from the description is dropped, even if its place is right")
-    func jobWithNothingIdentifying() {
+    func jobWithNothingIdentifying() throws {
         let invented = Experience(title: "head chef", company: "Ristorante Bellavista", location: "Rome", description: "Ran the kitchen.")
 
-        let result = sanitized(CVData(experience: [invented]), from: "I worked as a cook at Trattoria Da Mario in Rome")
+        let result = try sanitized(CVData(experience: [invented]), from: "I worked as a cook at Trattoria Da Mario in Rome")
 
         #expect(result.experience.isEmpty)
     }
 
     @Test("A title is a whole phrase: \"teacher\" is not found in \"teachers\"")
-    func titleInsideAnotherWord() {
-        let result = sanitized(CVData(experience: [Experience(title: "teacher", company: "Don Milani")]), from: "I trained teachers at Don Milani")
+    func titleInsideAnotherWord() throws {
+        let result = try sanitized(CVData(experience: [Experience(title: "teacher", company: "Don Milani")]), from: "I trained teachers at Don Milani")
 
         #expect(result.experience.map(\.title) == [""])
         #expect(result.experience.map(\.company) == ["Don Milani"])
@@ -166,7 +166,7 @@ struct SanitizerNamedFieldTests {
     // MARK: - Studies
 
     @Test("A degree and a school are kept only if the description names them; with neither left, the entry goes")
-    func education() {
+    func education() throws {
         let description = "I studied Education Sciences at the University of Bologna"
         let entries = [
             Education(degree: "Education Sciences", institution: "University of Bologna"),
@@ -174,7 +174,7 @@ struct SanitizerNamedFieldTests {
             Education(degree: "Master in Pedagogy", institution: "University of Padua"),
         ]
 
-        let result = sanitized(CVData(education: entries), from: description).education
+        let result = try sanitized(CVData(education: entries), from: description).education
 
         #expect(result.map(\.degree) == ["Education Sciences"], "A degree with a school the description lacks is found by its clause, which names the other school")
         #expect(result.map(\.institution) == ["University of Bologna"])
@@ -183,7 +183,7 @@ struct SanitizerNamedFieldTests {
     // MARK: - Certifications
 
     @Test("A certification needs its name in the description, and keeps its issuer only if that is there too")
-    func certifications() {
+    func certifications() throws {
         let description = "I hold the BLS from the American Heart Association"
         let entries = [
             Certification(name: "BLS", issuer: "American Heart Association"),
@@ -191,7 +191,7 @@ struct SanitizerNamedFieldTests {
             Certification(name: "ACLS", issuer: "American Heart Association"),
         ]
 
-        let result = sanitized(CVData(certifications: entries), from: description).certifications
+        let result = try sanitized(CVData(certifications: entries), from: description).certifications
 
         #expect(result.map(\.name) == ["BLS"], "The ACLS entry is gone, and the BLS entry whose issuer was invented is the same certificate")
         #expect(result.map(\.issuer) == ["American Heart Association"])
@@ -200,14 +200,14 @@ struct SanitizerNamedFieldTests {
     // MARK: - Skills and interests
 
     @Test("Skills and interests the description does not mention are dropped")
-    func skillsAndInterests() {
+    func skillsAndInterests() throws {
         let description = "I know Swift and Python. In my free time I like chess and hiking."
         let cvData = CVData(
             skills: [Skill(name: "Swift"), Skill(name: "Java"), Skill(name: "python")],
             interests: ["chess", "Hiking", "Painting"]
         )
 
-        let result = sanitized(cvData, from: description)
+        let result = try sanitized(cvData, from: description)
 
         #expect(result.skills.map(\.name) == ["Swift", "python"])
         #expect(result.interests == ["chess", "Hiking"])

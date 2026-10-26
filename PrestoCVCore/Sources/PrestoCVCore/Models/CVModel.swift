@@ -13,7 +13,8 @@ public struct CVModel: Codable, Identifiable, Sendable, Equatable {
     public var certifications: [Certification]
     public var interests: [String]
     public var social: [Social]
-    /// BCP 47 language of the exported document. Nil follows the language of the app.
+    /// BCP 47 language of the exported document. Nil is automatic: the language the CV is written in, or the app's
+    /// when that cannot be told (`DocumentLanguageDetector`).
     public var documentLanguage: String?
     
     // Custom CodingKeys to handle JSON field naming
@@ -95,5 +96,14 @@ public struct CVModel: Codable, Identifiable, Sendable, Equatable {
         self.interests = try container.decodeIfPresent([String].self, forKey: .interests) ?? []
         self.social = try container.decodeIfPresent([Social].self, forKey: .social) ?? []
         self.documentLanguage = try container.decodeIfPresent(String.self, forKey: .documentLanguage)
+    }
+}
+
+// MARK: - Document Language
+
+extension CVModel {
+    /// The language chosen for the CV's PDF; nil is automatic. A language the PDF has no headings for is no choice.
+    public var chosenDocumentLanguage: DocumentLanguage? {
+        documentLanguage.flatMap(DocumentLanguage.init(languageTag:))
     }
 }

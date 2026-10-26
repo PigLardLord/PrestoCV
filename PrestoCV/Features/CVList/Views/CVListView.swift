@@ -14,10 +14,17 @@ struct CVListView<EmptyState: View>: View {
     @State private var deleteAnchor: CGRect?
     @State private var renameTarget: CVModel?
     @State private var renameText = ""
+    private let makeExportSheet: @MainActor (CVModel) -> CVExportSheetViewModel
     private let emptyState: EmptyState
 
-    init(viewModel: CVListViewModel, @ViewBuilder emptyState: () -> EmptyState) {
+    /// - Parameter makeExportSheet: Gives the export sheet of a CV of the list.
+    init(
+        viewModel: CVListViewModel,
+        makeExportSheet: @escaping @MainActor (CVModel) -> CVExportSheetViewModel,
+        @ViewBuilder emptyState: () -> EmptyState
+    ) {
         self.viewModel = viewModel
+        self.makeExportSheet = makeExportSheet
         self.emptyState = emptyState()
     }
     
@@ -64,15 +71,13 @@ struct CVListView<EmptyState: View>: View {
             await viewModel.keepPresentationDateCurrent()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                viewModel.refreshPresentationDate()
-            }
+            viewModel.sceneDidChange(isActive: phase == .active)
         }
         .refreshable {
             await viewModel.loadCVs()
         }
         .sheet(item: $exportTarget) { cv in
-            CVExportSheetView(cv: cv)
+            CVExportSheetView(viewModel: makeExportSheet(cv))
         }
         .anchoredConfirmationDialog(
             String(localized: "cv.delete.confirmation.title"),
@@ -92,7 +97,7 @@ struct CVListView<EmptyState: View>: View {
                 deleteTarget = nil
             }
         } message: { target in
-            Text("cv.delete.confirmation.message_named".localizedWithArgs(target.listTitle))
+            Text("cv.delete.confirmation.message_named".localizedWithArgs(viewModel.title(of: target)))
         }
         .alert(
             "cv.rename.title".localized,
@@ -120,17 +125,17 @@ struct CVListView<EmptyState: View>: View {
     private var cvListView: some View {
         DeletableList(items: viewModel.cvs) { cv in
             CVRowView(
-                cv: cv,
-                subtitle: viewModel.personLine(of: cv),
+                title: viewModel.title(of: cv),
+                subtitle: viewModel.subtitle(of: cv),
                 caption: viewModel.lastSavedLine(of: cv),
                 onTap: {
-                    router.navigate(to: .cvEditor(cvId: cv.id.uuidString))
+                    router.openEditor(.stored(cvId: cv.id.uuidString))
                 },
                 onDuplicate: {
                     Task { await viewModel.duplicateCV(withId: cv.id) }
                 },
                 onRename: {
-                    renameText = cv.name
+                    renameText = viewModel.title(of: cv)
                     renameTarget = cv
                 },
                 onExport: {
@@ -151,7 +156,7 @@ struct CVListView<EmptyState: View>: View {
 // MARK: - CV Row View
 
 private struct CVRowView: View {
-    let cv: CVModel
+    let title: String
     let subtitle: String?
     let caption: String?
     let onTap: () -> Void
@@ -162,7 +167,7 @@ private struct CVRowView: View {
 
     var body: some View {
         NavigationRow(
-            title: cv.listTitle,
+            title: title,
             subtitle: subtitle,
             caption: caption,
             action: onTap
@@ -203,23 +208,26 @@ private struct CVRowView: View {
 
 // MARK: - Previews
 
+#if DEBUG
 struct CVListView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            CVListView(viewModel: createMockViewModel()) {
+            CVListView(viewModel: makeViewModel(), makeExportSheet: makeExportSheet) {
                 Text("navigation.my_cvs".localized)
             }
         }
         .environmentObject(AppRouter())
     }
     
-    private static func createMockViewModel() -> CVListViewModel {
-        let container = DependencyContainer()
-        do {
-            let cvManagementUseCase = try container.makeCVManagementUseCase()
-            return CVListViewModel(cvManagementUseCase: cvManagementUseCase)
-        } catch {
-            fatalError("Failed to create mock view model: \(error)")
-        }
+    private static func makeExportSheet(_ cv: CVModel) -> CVExportSheetViewModel {
+        PreviewDependencies.exportSheet(for: cv, sink: { _ in })
+    }
+    
+    private static func makeViewModel() -> CVListViewModel {
+        PreviewDependencies.list(of: [
+            CVModel(name: "Backend Engineer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Software Engineer")),
+            CVModel(name: "Product Designer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Designer")),
+        ])
     }
 }
+#endif

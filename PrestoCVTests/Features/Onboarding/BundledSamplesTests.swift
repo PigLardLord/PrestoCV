@@ -47,7 +47,7 @@ struct BundledSamplesTests {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("bundled_samples_\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: directory) }
         let repository = try DependencyContainer(storageDirectory: { directory }).makeSampleCVRepository()
-        let viewModel = OnboardingViewModel(onboardingUseCase: MockOnboardingUseCase(), sampleRepository: repository)
+        let viewModel = NewCVChoicesViewModel(aiAvailability: { .available }, sampleRepository: repository)
         
         await viewModel.loadSamples()
         let samples = viewModel.samples

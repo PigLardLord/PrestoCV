@@ -56,7 +56,7 @@ The validation prototype in `Prototypes/ADRValidation/` (Swift 6.3.3, Linux).
 - Every design-package attack in #9, in the adversarial reviews and in the security review is rejected. See [ADR 0011](0011-typed-html-builder.md#validation).
 
 **Found**
-- All three bundled designs are rejected as they stand, and must be rewritten against [contract 1](../markup-contract.md).
+- All three bundled designs are rejected as they stand, and must be rewritten against [contract 1](../../../CVPDFExporter/Docs/markup-contract.md).
 - A server renderer matches the Apple output only if the fonts match. Designs use a closed set of system font families, and embedding fonts needs its own ADR.
 
 ## Alternatives considered

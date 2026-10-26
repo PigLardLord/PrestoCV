@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Synchronization
 @testable import PrestoCV
 @testable import PrestoCVCore
 
@@ -80,6 +81,37 @@ private final class ContainerSupplier {
 
 private let storageFailure = DependencyError.serviceCreationFailed("StorageService", AppError.unknown("disk full"))
 
+/// The order in which the launch did its work.
+private final class LaunchLog: Sendable {
+    private let entries = Mutex<[String]>([])
+
+    func record(_ entry: String) {
+        entries.withLock { $0.append(entry) }
+    }
+
+    var all: [String] {
+        entries.withLock { $0 }
+    }
+}
+
+/// An import of leftover edits that writes in the log when it runs, and that can be cancelled.
+private struct LeftoverEditsSpy: LeftoverEditsImportProtocol {
+    var log = LaunchLog()
+    var isCancelled = false
+
+    func importLeftovers() async throws(CancellationError) -> LeftoverEditsImportReport {
+        log.record("import")
+        if isCancelled { throw CancellationError() }
+        return LeftoverEditsImportReport(imported: 1)
+    }
+}
+
+/// Nothing left by earlier versions.
+@MainActor
+private func noLeftovers(_ cvs: CVManagementUseCaseProtocol) -> LeftoverEditsImportProtocol {
+    LeftoverEditsSpy()
+}
+
 /// Waits for the first element of the stream; false when the timeout passes first.
 private func receives(_ stream: AsyncStream<Void>, within timeout: Duration) async -> Bool {
     await withTaskGroup(of: Bool.self) { group in
@@ -109,7 +141,7 @@ struct AppLaunchViewModelTests {
     func containerThatBuildsGivesDependencies() {
         let supplier = ContainerSupplier(failures: [nil])
 
-        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, bootstrapTemplates: {})
+        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeLeftoverEdits: noLeftovers, environment: .fixed(), bootstrapTemplates: {})
 
         guard case .ready = viewModel.phase else {
             Issue.record("Expected the ready phase")
@@ -121,7 +153,7 @@ struct AppLaunchViewModelTests {
     func containerThatFailsGivesTheReason() {
         let supplier = ContainerSupplier(failures: [storageFailure])
 
-        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, bootstrapTemplates: {})
+        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeLeftoverEdits: noLeftovers, environment: .fixed(), bootstrapTemplates: {})
 
         guard case .failed(let message) = viewModel.phase else {
             Issue.record("Expected the failed phase")
@@ -135,7 +167,7 @@ struct AppLaunchViewModelTests {
     @Test("Retry asks for a new container and recovers when it builds")
     func retryAsksForNewContainerAndRecovers() {
         let supplier = ContainerSupplier(failures: [storageFailure, nil])
-        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, bootstrapTemplates: {})
+        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeLeftoverEdits: noLeftovers, environment: .fixed(), bootstrapTemplates: {})
 
         viewModel.retry()
 
@@ -149,7 +181,7 @@ struct AppLaunchViewModelTests {
     @Test("Retry keeps showing the failure while the container still cannot be built")
     func retryKeepsFailureWhileStillFailing() {
         let supplier = ContainerSupplier(failures: [storageFailure, storageFailure])
-        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, bootstrapTemplates: {})
+        let viewModel = AppLaunchViewModel(makeDependencyContainer: supplier.next, makeLeftoverEdits: noLeftovers, environment: .fixed(), bootstrapTemplates: {})
 
         viewModel.retry()
 
@@ -166,6 +198,8 @@ struct AppLaunchViewModelTests {
         let onboardingUseCase = StubOnboardingUseCase(onCheck: { checkStarted.continuation.yield() })
         let viewModel = AppLaunchViewModel(
             makeDependencyContainer: { StubDependencyContainer(onboardingUseCase: onboardingUseCase) },
+            makeLeftoverEdits: noLeftovers,
+            environment: .fixed(),
             bootstrapTemplates: {
                 for await _ in templatesReleased.stream {
                     return
@@ -174,7 +208,7 @@ struct AppLaunchViewModelTests {
         )
 
         let starting = Task { await viewModel.start() }
-        let checkedWhileTemplatesWereBlocked = await receives(checkStarted.stream, within: .seconds(5))
+        let checkedWhileTemplatesWereBlocked = await receives(checkStarted.stream, within: patience)
         templatesReleased.continuation.yield()
         await starting.value
 
@@ -187,6 +221,8 @@ struct AppLaunchViewModelTests {
         let supplier = ContainerSupplier(failures: [nil])
         let viewModel = AppLaunchViewModel(
             makeDependencyContainer: supplier.next,
+            makeLeftoverEdits: noLeftovers,
+            environment: .fixed(),
             bootstrapTemplates: { await installs.increment() }
         )
 
@@ -200,12 +236,65 @@ struct AppLaunchViewModelTests {
         #expect(dependencies.onboardingViewModel.onboardingState == .firstTime)
     }
 
+    @Test("Leftover edits whose folder cannot be reached do not stop the launch: the CVs and the editor work without them")
+    func launchGoesOnWithoutLeftoverEdits() async {
+        struct NoFolder: Error {}
+        let viewModel = AppLaunchViewModel(
+            makeDependencyContainer: { StubDependencyContainer() },
+            makeLeftoverEdits: { _ in throw NoFolder() },
+            environment: .fixed(),
+            bootstrapTemplates: {}
+        )
+
+        guard case .ready(let dependencies) = viewModel.phase else {
+            Issue.record("The app must open when only the leftover edits cannot be reached")
+            return
+        }
+        #expect(dependencies.leftoverEdits == nil)
+        await viewModel.start()
+        #expect(dependencies.onboardingViewModel.onboardingState == .firstTime)
+    }
+
+    @Test("start stores the leftover edits of earlier versions once, before the CVs are checked")
+    func startImportsLeftoversFirst() async {
+        let log = LaunchLog()
+        let onboardingUseCase = StubOnboardingUseCase(onCheck: { log.record("check") })
+        let viewModel = AppLaunchViewModel(
+            makeDependencyContainer: { StubDependencyContainer(onboardingUseCase: onboardingUseCase) },
+            makeLeftoverEdits: { _ in LeftoverEditsSpy(log: log) },
+            environment: .fixed(),
+            bootstrapTemplates: {}
+        )
+
+        await viewModel.start()
+
+        #expect(log.all == ["import", "check"], "A CV left by an earlier version is in the list the first screen shows")
+    }
+
+    @Test("start ends when the import of the leftovers is cancelled, and the leftovers stay for the next launch")
+    func startEndsWhenTheImportIsCancelled() async {
+        let log = LaunchLog()
+        let onboardingUseCase = StubOnboardingUseCase(onCheck: { log.record("check") })
+        let viewModel = AppLaunchViewModel(
+            makeDependencyContainer: { StubDependencyContainer(onboardingUseCase: onboardingUseCase) },
+            makeLeftoverEdits: { _ in LeftoverEditsSpy(log: log, isCancelled: true) },
+            environment: .fixed(),
+            bootstrapTemplates: {}
+        )
+
+        await viewModel.start()
+
+        #expect(log.all == ["import"], "A cancelled launch checks nothing more")
+    }
+
     @Test("start does nothing when the dependencies could not be built")
     func startDoesNothingWhenCompositionFailed() async {
         let installs = CallCounter()
         let supplier = ContainerSupplier(failures: [storageFailure])
         let viewModel = AppLaunchViewModel(
             makeDependencyContainer: supplier.next,
+            makeLeftoverEdits: noLeftovers,
+            environment: .fixed(),
             bootstrapTemplates: { await installs.increment() }
         )
 

@@ -288,47 +288,6 @@
         }
       }
     },
-    "accessibility.unsaved_changes_hint" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieses Formular enthält ungespeicherte Änderungen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "There are unsaved changes in this form"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este formulario tiene cambios sin guardar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce formulaire contient des modifications non enregistrées"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Questo modulo contiene modifiche non salvate"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este formulário tem alterações não salvas"
-          }
-        }
-      }
-    },
     "action.add_certification" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -739,43 +698,207 @@
         }
       }
     },
-    "ai.draft.cv_name" : {
+    "ai.entry.line.model_not_ready" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lebenslauf von %@"
+            "value" : "Modell wird geladen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV of %@"
+            "value" : "Downloading the model"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV de %@"
+            "value" : "Descargando el modelo"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV de %@"
+            "value" : "Téléchargement du modèle"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV di %@"
+            "value" : "Download del modello in corso"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Currículo de %@"
+            "value" : "Baixando o modelo"
+          }
+        }
+      }
+    },
+    "ai.entry.line.not_enabled" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence einschalten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on Apple Intelligence"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa Apple Intelligence"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activez Apple Intelligence"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attiva Apple Intelligence"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ative o Apple Intelligence"
+          }
+        }
+      }
+    },
+    "ai.entry.line.not_on_this_device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erfordert Apple Intelligence"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Needs Apple Intelligence"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requiere Apple Intelligence"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nécessite Apple Intelligence"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Richiede Apple Intelligence"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requer o Apple Intelligence"
+          }
+        }
+      }
+    },
+    "ai.entry.line.unknown" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Derzeit nicht verfügbar"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available right now"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No disponible en este momento"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indisponible pour le moment"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non disponibile al momento"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indisponível no momento"
+          }
+        }
+      }
+    },
+    "ai.entry.unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht verfügbar"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unavailable"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No disponible"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indisponible"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non disponibile"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indisponível"
           }
         }
       }
@@ -786,37 +909,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence ist gerade beschäftigt. Bitte versuchen Sie es gleich noch einmal."
+            "value" : "Apple Intelligence ist gerade beschäftigt. Bitte versuchen Sie es erneut."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence is busy right now. Please try again in a moment."
+            "value" : "Apple Intelligence is busy right now. Please try again."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence está ocupado ahora mismo. Inténtalo de nuevo en un momento."
+            "value" : "Apple Intelligence está ocupado ahora mismo. Inténtalo de nuevo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence est occupé pour le moment. Réessayez dans un instant."
+            "value" : "Apple Intelligence est occupé pour le moment. Réessayez."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence è occupato in questo momento. Riprova tra un attimo."
+            "value" : "Apple Intelligence è occupato in questo momento. Riprova."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Apple Intelligence está ocupado agora. Tente novamente em instantes."
+            "value" : "O Apple Intelligence está ocupado agora. Tente novamente."
           }
         }
       }
@@ -1237,37 +1360,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beschreiben Sie Ihren Werdegang mit eigenen Worten. Die KI erstellt Ihren Lebenslauf auf diesem Gerät, und Sie prüfen alles, bevor Sie speichern."
+            "value" : "Beschreiben Sie Ihren Werdegang mit eigenen Worten. Die KI erstellt Ihren Lebenslauf auf diesem Gerät, und Sie prüfen alles, bevor Sie ihn versenden."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Describe your background in your own words. AI drafts your CV on this device, and you check everything before saving."
+            "value" : "Describe your background in your own words. AI drafts your CV on this device, and you check everything before you send it."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Describe tu trayectoria con tus propias palabras. La IA redacta tu CV en este dispositivo y tú lo revisas todo antes de guardar."
+            "value" : "Describe tu trayectoria con tus propias palabras. La IA redacta tu CV en este dispositivo y tú lo revisas todo antes de enviarlo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Décrivez votre parcours avec vos propres mots. L'IA rédige votre CV sur cet appareil et vous vérifiez tout avant d'enregistrer."
+            "value" : "Décrivez votre parcours avec vos propres mots. L'IA rédige votre CV sur cet appareil et vous vérifiez tout avant de l'envoyer."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Descrivi il tuo percorso con parole tue. L'IA scrive il tuo CV su questo dispositivo e tu controlli tutto prima di salvare."
+            "value" : "Descrivi il tuo percorso con parole tue. L'IA scrive il tuo CV su questo dispositivo e tu controlli tutto prima di inviarlo."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Descreva sua trajetória com suas próprias palavras. A IA escreve seu currículo neste dispositivo e você confere tudo antes de salvar."
+            "value" : "Descreva sua trajetória com suas próprias palavras. A IA escreve seu currículo neste dispositivo e você confere tudo antes de enviá-lo."
           }
         }
       }
@@ -1309,6 +1432,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Geração de currículo com IA"
+          }
+        }
+      }
+    },
+    "ai.generation.language_data_message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Sprachdaten für Ihre Beschreibung werden geladen …"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Getting the language data your description needs..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obteniendo los datos de idioma que necesita tu descripción..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récupération des données linguistiques dont votre description a besoin..."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recupero dei dati linguistici di cui ha bisogno la tua descrizione..."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obtendo os dados de idioma de que sua descrição precisa..."
           }
         }
       }
@@ -1518,43 +1682,43 @@
         }
       }
     },
-    "ai.unavailable.device_not_eligible" : {
+    "ai.unavailable.language_data_not_ready" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dieses Gerät unterstützt Apple Intelligence nicht."
+            "value" : "Dieses Gerät kann die Sprachdaten nicht laden, die Entwürfe auf Englisch oder Deutsch benötigen. Schreiben Sie Ihren Lebenslauf von Hand, importieren Sie ihn oder beschreiben Sie sich auf Italienisch, Spanisch, Französisch oder Portugiesisch."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This device doesn't support Apple Intelligence."
+            "value" : "This device cannot get the language data that drafts in English or German need. Write your CV by hand, import it, or describe yourself in Italian, Spanish, French or Portuguese."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este dispositivo no es compatible con Apple Intelligence."
+            "value" : "Este dispositivo no puede obtener los datos de idioma que necesitan los borradores en inglés o alemán. Escribe tu CV a mano, impórtalo o descríbete en italiano, español, francés o portugués."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cet appareil n'est pas compatible avec Apple Intelligence."
+            "value" : "Cet appareil ne peut pas obtenir les données linguistiques nécessaires aux brouillons en anglais ou en allemand. Rédigez votre CV vous-même, importez-le ou décrivez-vous en italien, espagnol, français ou portugais."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questo dispositivo non supporta Apple Intelligence."
+            "value" : "Questo dispositivo non riesce a ottenere i dati linguistici che servono alle bozze in inglese o tedesco. Scrivi il tuo CV a mano, importalo o descriviti in italiano, spagnolo, francese o portoghese."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este dispositivo não é compatível com o Apple Intelligence."
+            "value" : "Este dispositivo não consegue obter os dados de idioma de que os rascunhos em inglês ou alemão precisam. Escreva seu currículo manualmente, importe-o ou descreva-se em italiano, espanhol, francês ou português."
           }
         }
       }
@@ -1565,37 +1729,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das Apple-Intelligence-Modell wird noch geladen. Versuchen Sie es später noch einmal."
+            "value" : "Das Apple-Intelligence-Modell wird geladen. Der KI-Entwurf ist von selbst verfügbar, sobald der Download abgeschlossen ist."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The Apple Intelligence model is still downloading. Try again later."
+            "value" : "Apple Intelligence is downloading its model. The AI draft becomes available by itself when the download is complete."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El modelo de Apple Intelligence aún se está descargando. Inténtalo de nuevo más tarde."
+            "value" : "Apple Intelligence está descargando su modelo. El borrador con IA estará disponible automáticamente cuando termine la descarga."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le modèle d'Apple Intelligence est encore en cours de téléchargement. Réessayez plus tard."
+            "value" : "Apple Intelligence télécharge son modèle. Le brouillon rédigé par l'IA sera disponible automatiquement une fois le téléchargement terminé."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il modello di Apple Intelligence è ancora in download. Riprova più tardi."
+            "value" : "Apple Intelligence sta scaricando il suo modello. La bozza con l'IA sarà disponibile automaticamente al termine del download."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O modelo do Apple Intelligence ainda está sendo baixado. Tente novamente mais tarde."
+            "value" : "O Apple Intelligence está baixando o modelo. O rascunho com IA ficará disponível automaticamente quando o download terminar."
           }
         }
       }
@@ -1641,6 +1805,88 @@
         }
       }
     },
+    "ai.unavailable.not_enabled.mac" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence ist ausgeschaltet. Öffnen Sie dafür die Systemeinstellungen, klicken Sie auf „Apple Intelligence & Siri“ und schalten Sie Apple Intelligence ein."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence is turned off. To use this, open System Settings, click Apple Intelligence & Siri, and turn on Apple Intelligence."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence está desactivado. Para usarlo, abre Ajustes del Sistema, haz clic en Apple Intelligence y Siri y activa Apple Intelligence."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence est désactivé. Pour l'utiliser, ouvrez Réglages Système, cliquez sur Apple Intelligence et Siri, puis activez Apple Intelligence."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence è disattivato. Per usarlo, apri Impostazioni di Sistema, fai clic su Apple Intelligence e Siri e attiva Apple Intelligence."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Apple Intelligence está desativado. Para usá-lo, abra Ajustes do Sistema, clique em Apple Intelligence e Siri e ative o Apple Intelligence."
+          }
+        }
+      }
+    },
+    "ai.unavailable.not_on_this_device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Gerät unterstützt keine KI-Entwürfe. Sie können Ihren Lebenslauf selbst erstellen oder mit einem Beispiel beginnen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device doesn't support AI drafts. You can create your CV by hand or start from an example."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este dispositivo no es compatible con los borradores con IA. Puedes crear tu CV a mano o empezar con un ejemplo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n'est pas compatible avec les brouillons rédigés par l'IA. Vous pouvez créer votre CV vous-même ou commencer avec un exemple."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo dispositivo non supporta le bozze con l'IA. Puoi creare il tuo CV a mano o partire da un esempio."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este dispositivo não é compatível com os rascunhos com IA. Você pode criar seu currículo manualmente ou começar com um exemplo."
+          }
+        }
+      }
+    },
     "ai.unavailable.unknown" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1678,6 +1924,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "A criação com IA não está disponível no momento."
+          }
+        }
+      }
+    },
+    "common.back" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zurück"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atrás"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retour"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indietro"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voltar"
           }
         }
       }
@@ -1760,47 +2047,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Excluir"
-          }
-        }
-      }
-    },
-    "common.discard" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verwerfen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Discard"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descartar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ignorer"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scarta"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descartar"
           }
         }
       }
@@ -2092,47 +2338,6 @@
         }
       }
     },
-    "common.save" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speichern"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Save"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Guardar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enregistrer"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Salva"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Salvar"
-          }
-        }
-      }
-    },
     "cv.action.duplicate" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2368,7 +2573,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modificato adesso"
+            "value" : "Modificato ora"
           }
         },
         "pt" : {
@@ -2656,6 +2861,47 @@
         }
       }
     },
+    "cv.title.numbered" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$lld)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$lld)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$lld)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$lld)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$lld)"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$lld)"
+          }
+        }
+      }
+    },
     "cv.untitled" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2693,170 +2939,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Currículo sem título"
-          }
-        }
-      }
-    },
-    "dialog.discard_changes.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alle ungespeicherten Änderungen gehen verloren."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "All unsaved changes will be lost."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se perderán todos los cambios sin guardar."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toutes les modifications non enregistrées seront perdues."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tutte le modifiche non salvate andranno perse."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Todas as alterações não salvas serão perdidas."
-          }
-        }
-      }
-    },
-    "dialog.discard_changes.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Änderungen verwerfen?"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Discard Changes?"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¿Descartar los cambios?"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ignorer les modifications ?"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scartare le modifiche?"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descartar as alterações?"
-          }
-        }
-      }
-    },
-    "dialog.save_success.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ihr Lebenslauf ist auf diesem Gerät gespeichert."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your CV is saved on this device."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu CV está guardado en este dispositivo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Votre CV est enregistré sur cet appareil."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il tuo CV è salvato su questo dispositivo."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seu currículo está salvo neste dispositivo."
-          }
-        }
-      }
-    },
-    "editor.continue_editing" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Weiter bearbeiten"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continue Editing"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seguir editando"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuer la modification"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continua a modificare"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuar editando"
           }
         }
       }
@@ -2902,84 +2984,289 @@
         }
       }
     },
-    "editor.delete_row.title" : {
+    "editor.delete_row.title.certification" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diesen Eintrag löschen?"
+            "value" : "Dieses Zertifikat löschen?"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delete this item?"
+            "value" : "Delete this certification?"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "¿Eliminar este elemento?"
+            "value" : "¿Eliminar esta certificación?"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Supprimer cet élément ?"
+            "value" : "Supprimer cette certification ?"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminare questo elemento?"
+            "value" : "Eliminare questa certificazione?"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Excluir este item?"
+            "value" : "Excluir esta certificação?"
           }
         }
       }
     },
-    "editor.keep_editing" : {
+    "editor.delete_row.title.education" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Weiter bearbeiten"
+            "value" : "Diese Ausbildung löschen?"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keep Editing"
+            "value" : "Delete this education entry?"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seguir editando"
+            "value" : "¿Eliminar esta formación?"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Continuer la modification"
+            "value" : "Supprimer cette formation ?"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Continua a modificare"
+            "value" : "Eliminare questa formazione?"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Continuar editando"
+            "value" : "Excluir esta formação?"
+          }
+        }
+      }
+    },
+    "editor.delete_row.title.experience" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Berufserfahrung löschen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this experience?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar esta experiencia?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer cette expérience ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminare questa esperienza?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir esta experiência?"
+          }
+        }
+      }
+    },
+    "editor.delete_row.title.interest" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Interesse löschen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this interest?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar este interés?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer ce centre d’intérêt ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminare questo interesse?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir este interesse?"
+          }
+        }
+      }
+    },
+    "editor.delete_row.title.language" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Sprache löschen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this language?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar este idioma?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer cette langue ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminare questa lingua?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir este idioma?"
+          }
+        }
+      }
+    },
+    "editor.delete_row.title.skill" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Fähigkeit löschen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this skill?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar esta competencia?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer cette compétence ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminare questa competenza?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir esta competência?"
+          }
+        }
+      }
+    },
+    "editor.delete_row.title.social_link" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Profil löschen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this social link?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar este perfil?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer ce profil ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminare questo profilo?"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir este perfil?"
           }
         }
       }
@@ -2990,7 +3277,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neuer Lebenslauf"
+            "value" : "Lebenslauf"
           }
         },
         "en" : {
@@ -3031,78 +3318,242 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Entwurf, von der KI aus Ihrer Beschreibung erstellt. Prüfen Sie jedes Feld und speichern Sie dann. Was Sie nicht erwähnt haben, bleibt leer."
+            "value" : "Entwurf, von der KI aus Ihrer Beschreibung erstellt. Prüfen Sie jedes Feld, bevor Sie den Lebenslauf versenden. Was Sie nicht erwähnt haben, bleibt leer."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Draft written by AI from your description. Check every field, then save. Anything you didn't mention is left blank."
+            "value" : "Draft written by AI from your description. Check every field before you send the CV. Anything you didn't mention is left blank."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Borrador escrito por la IA a partir de tu descripción. Revisa cada campo y luego guarda. Lo que no mencionaste queda en blanco."
+            "value" : "Borrador escrito por la IA a partir de tu descripción. Revisa cada campo antes de enviar el CV. Lo que no mencionaste queda en blanco."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Brouillon rédigé par l'IA à partir de votre description. Vérifiez chaque champ, puis enregistrez. Ce que vous n'avez pas mentionné reste vide."
+            "value" : "Brouillon rédigé par l'IA à partir de votre description. Vérifiez chaque champ avant d'envoyer le CV. Ce que vous n'avez pas mentionné reste vide."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bozza scritta dall'IA a partire dalla tua descrizione. Controlla ogni campo, poi salva. Ciò che non hai indicato resta vuoto."
+            "value" : "Bozza scritta dall'IA a partire dalla tua descrizione. Controlla ogni campo prima di inviare il CV. Ciò che non hai indicato resta vuoto."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rascunho escrito pela IA a partir da sua descrição. Confira cada campo e depois salve. O que você não mencionou fica em branco."
+            "value" : "Rascunho escrito pela IA a partir da sua descrição. Confira cada campo antes de enviar o currículo. O que você não mencionou fica em branco."
           }
         }
       }
     },
-    "editor.save_success" : {
+    "editor.notice.ai_draft.unchecked" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gespeichert"
+            "value" : "Ihre Fähigkeiten, Sprachen, Interessen, Berufsbezeichnung und Ihren Ort konnten wir nicht prüfen, daher bleiben sie leer. Ergänzen Sie sie selbst."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Saved"
+            "value" : "We could not check your skills, languages, interests, job title and place, so they are left blank. Add them yourself."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guardado"
+            "value" : "No pudimos comprobar tus competencias, idiomas, intereses, título profesional y ubicación, así que quedan en blanco. Añádelos tú."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enregistré"
+            "value" : "Nous n'avons pas pu vérifier vos compétences, langues, centres d'intérêt, titre professionnel et lieu, ils restent donc vides. Ajoutez-les vous-même."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Salvato"
+            "value" : "Non abbiamo potuto controllare le tue competenze, lingue, interessi, qualifica professionale e città, quindi restano vuoti. Aggiungili tu."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Salvo"
+            "value" : "Não conseguimos verificar suas competências, idiomas, interesses, título profissional e localização, por isso ficam em branco. Adicione-os você mesmo."
+          }
+        }
+      }
+    },
+    "editor.notice.imported" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus Ihrem Text importiert. Prüfen Sie jedes Feld, bevor Sie den Lebenslauf versenden. Text, der in kein Feld passt, wurde nicht übernommen; Sie können ihn kopieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imported from your text. Check every field before you send the CV. Text that fits no field wasn't added; you can copy it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importado de tu texto. Revisa cada campo antes de enviar el CV. El texto que no encaja en ningún campo no se añadió: puedes copiarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importé depuis votre texte. Vérifiez chaque champ avant d'envoyer le CV. Le texte qui ne correspond à aucun champ n'a pas été ajouté : vous pouvez le copier."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importato dal tuo testo. Controlla ogni campo prima di inviare il CV. Il testo che non entra in nessun campo non è stato aggiunto: puoi copiarlo."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importado do seu texto. Confira cada campo antes de enviar o currículo. O texto que não cabe em nenhum campo não foi adicionado: você pode copiá-lo."
+          }
+        }
+      }
+    },
+    "editor.notice.imported.review" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Was zu prüfen ist"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What to check"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qué revisar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À vérifier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cosa controllare"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que conferir"
+          }
+        }
+      }
+    },
+    "editor.save_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ihre letzte Änderung konnte nicht gespeichert werden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save your last change"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo guardar tu último cambio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’enregistrer votre dernière modification"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile salvare l’ultima modifica"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível salvar sua última alteração"
+          }
+        }
+      }
+    },
+    "editor.saved" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf diesem Gerät gespeichert"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved on this device"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardado en este dispositivo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistré sur cet appareil"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvato su questo dispositivo"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvo neste dispositivo"
           }
         }
       }
@@ -3144,47 +3595,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Editor de currículo"
-          }
-        }
-      }
-    },
-    "editor.unsaved_changes" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ungespeicherte Änderungen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unsaved Changes"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cambios sin guardar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modifications non enregistrées"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modifiche non salvate"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alterações não salvas"
           }
         }
       }
@@ -4911,6 +5321,88 @@
         }
       }
     },
+    "export.confirmation.saved" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF gespeichert"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF saved"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF guardado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF enregistré"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF salvato"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF salvo"
+          }
+        }
+      }
+    },
+    "export.confirmation.sent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF gesendet"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF sent"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF enviado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF envoyé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF inviato"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF enviado"
+          }
+        }
+      }
+    },
     "export.error.failed" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4948,47 +5440,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Não foi possível criar o PDF. Tente novamente."
-          }
-        }
-      }
-    },
-    "export.error.missing_name_email" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fügen Sie Ihrem Lebenslauf Ihren Namen und Ihre E-Mail-Adresse hinzu, bevor Sie ihn exportieren."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add your name and email to the CV before exporting it."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agrega tu nombre y tu correo electrónico al CV antes de exportarlo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajoutez votre nom et votre adresse e-mail au CV avant de l'exporter."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiungi il tuo nome e la tua e-mail al CV prima di esportarlo."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicione seu nome e seu e-mail ao currículo antes de exportá-lo."
           }
         }
       }
@@ -5444,6 +5895,88 @@
         }
       }
     },
+    "export.language.headings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Überschriften auf %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Headings in %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encabezados en %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titres en %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titoli in %@"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Títulos em %@"
+          }
+        }
+      }
+    },
+    "export.language.hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wählen Sie die Sprache der Überschriften im PDF"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose the language of the PDF's headings"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige el idioma de los encabezados del PDF"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez la langue des titres du PDF"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli la lingua dei titoli del PDF"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha o idioma dos títulos do PDF"
+          }
+        }
+      }
+    },
     "export.loading" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5526,43 +6059,207 @@
         }
       }
     },
+    "export.readiness.name_required" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügen Sie Ihrem Lebenslauf Ihren Namen hinzu, bevor Sie ihn exportieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add your name to the CV before exporting it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrega tu nombre al CV antes de exportarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez votre nom au CV avant de l'exporter."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi il tuo nome al CV prima di esportarlo."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione seu nome ao currículo antes de exportá-lo."
+          }
+        }
+      }
+    },
+    "export.readiness.no_email" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügen Sie eine E-Mail-Adresse hinzu, damit Personalverantwortliche Ihnen antworten können."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add an email address so that recruiters can reply to you."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrega un correo electrónico para que los reclutadores puedan responderte."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez une adresse e-mail pour que les recruteurs puissent vous répondre."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi un indirizzo e-mail perché i selezionatori possano risponderti."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione um e-mail para que os recrutadores possam responder a você."
+          }
+        }
+      }
+    },
+    "export.readiness.no_email_phone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügen Sie eine E-Mail-Adresse oder eine Telefonnummer hinzu, damit Personalverantwortliche Sie erreichen können."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add an email address or a phone number so that recruiters can contact you."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrega un correo electrónico o un número de teléfono para que los reclutadores puedan contactarte."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez une adresse e-mail ou un numéro de téléphone pour que les recruteurs puissent vous contacter."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi un indirizzo e-mail o un numero di telefono perché i selezionatori possano contattarti."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione um e-mail ou um número de telefone para que os recrutadores possam entrar em contato com você."
+          }
+        }
+      }
+    },
+    "export.readiness.no_phone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügen Sie eine Telefonnummer hinzu, damit Personalverantwortliche Sie anrufen können."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a phone number so that recruiters can call you."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrega un número de teléfono para que los reclutadores puedan llamarte."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez un numéro de téléphone pour que les recruteurs puissent vous appeler."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi un numero di telefono perché i selezionatori possano chiamarti."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione um número de telefone para que os recrutadores possam ligar para você."
+          }
+        }
+      }
+    },
     "export.share" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "PDF teilen"
+            "value" : "PDF senden oder speichern"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share PDF"
+            "value" : "Send or save PDF"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compartir PDF"
+            "value" : "Enviar o guardar PDF"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Partager le PDF"
+            "value" : "Envoyer ou enregistrer le PDF"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Condividi PDF"
+            "value" : "Invia o salva il PDF"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compartilhar PDF"
+            "value" : "Enviar ou salvar PDF"
           }
         }
       }
@@ -6018,47 +6715,6 @@
         }
       }
     },
-    "field.email.help" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wird in Ihrem Lebenslauf für die berufliche Kontaktaufnahme angezeigt"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shown on your CV for professional contact"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se muestra en tu CV para el contacto profesional"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Affiché dans votre CV pour les contacts professionnels"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mostrata nel tuo CV per i contatti professionali"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aparece no seu currículo para contato profissional"
-          }
-        }
-      }
-    },
     "field.email.placeholder" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6417,7 +7073,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Luogo"
+            "value" : "Città"
           }
         },
         "pt" : {
@@ -6547,6 +7203,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Inclua o código do país para contatos internacionais"
+          }
+        }
+      }
+    },
+    "field.phone.no_digits" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das sieht nicht nach einer Telefonnummer aus: Es fehlen die Ziffern."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This doesn’t look like a phone number: it has no digits."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No parece un número de teléfono: no tiene dígitos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ceci ne ressemble pas à un numéro de téléphone : il ne contient aucun chiffre."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non sembra un numero di telefono: non contiene cifre."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Isso não parece um número de telefone: não tem dígitos."
           }
         }
       }
@@ -7043,43 +7740,1601 @@
         }
       }
     },
+    "import.error.empty" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es gibt keinen Text zum Einlesen. Fügen Sie den Text Ihres Lebenslaufs ein oder wählen Sie ein PDF, das Text enthält."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There's no text to read. Paste the text of your CV, or choose a PDF that contains text."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay texto que leer. Pega el texto de tu CV o elige un PDF que contenga texto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il n'y a pas de texte à lire. Collez le texte de votre CV ou choisissez un PDF qui contient du texte."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non c'è testo da leggere. Incolla il testo del tuo CV oppure scegli un PDF che contiene testo."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não há texto para ler. Cole o texto do seu currículo ou escolha um PDF que contenha texto."
+          }
+        }
+      }
+    },
+    "import.error.encrypted" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses PDF ist mit einem Passwort geschützt. Öffnen Sie es, speichern Sie es ohne Passwort und wählen Sie es hier aus."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This PDF is protected by a password. Open it, save it again without a password, and choose it here."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este PDF está protegido con contraseña. Ábrelo, guárdalo de nuevo sin contraseña y elígelo aquí."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce PDF est protégé par un mot de passe. Ouvrez-le, enregistrez-le de nouveau sans mot de passe et choisissez-le ici."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo PDF è protetto da password. Aprilo, salvalo di nuovo senza password e sceglilo qui."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este PDF está protegido por senha. Abra-o, salve-o novamente sem senha e escolha-o aqui."
+          }
+        }
+      }
+    },
+    "import.error.file" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Datei konnte nicht gelesen werden. Wählen Sie sie noch einmal aus."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file couldn't be read. Try choosing it again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo leer el archivo. Prueba a elegirlo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le fichier n'a pas pu être lu. Essayez de le choisir à nouveau."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stato possibile leggere il file. Prova a sceglierlo di nuovo."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível ler o arquivo. Tente escolhê-lo de novo."
+          }
+        }
+      }
+    },
+    "import.error.scan" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses PDF ist ein Scan: Es enthält keinen Text zum Einlesen. Fügen Sie stattdessen hier den Text Ihres Lebenslaufs ein."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This PDF is a scan: it has no text to read. Paste the text of your CV here instead."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este PDF es un escaneo: no tiene texto que leer. Pega aquí el texto de tu CV en su lugar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce PDF est un scan : il ne contient pas de texte à lire. Collez plutôt ici le texte de votre CV."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo PDF è una scansione: non contiene testo da leggere. Incolla invece qui il testo del tuo CV."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este PDF é uma digitalização: não tem texto para ler. Cole aqui o texto do seu currículo em vez disso."
+          }
+        }
+      }
+    },
+    "import.error.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nichts zu importieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing to import"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada que importar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien à importer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niente da importare"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada para importar"
+          }
+        }
+      }
+    },
+    "import.error.too_large" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das ist länger als ein Lebenslauf. Fügen Sie nur den Lebenslauf ein oder wählen Sie ein kleineres PDF."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is longer than a CV. Paste only the CV, or choose a smaller PDF."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es más largo que un CV. Pega solo el CV o elige un PDF más pequeño."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C'est plus long qu'un CV. Collez seulement le CV ou choisissez un PDF plus petit."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "È più lungo di un CV. Incolla solo il CV oppure scegli un PDF più piccolo."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "É mais longo do que um currículo. Cole só o currículo ou escolha um PDF menor."
+          }
+        }
+      }
+    },
+    "import.error.too_many_pages" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses PDF hat mehr Seiten als ein Lebenslauf. Wählen Sie das PDF, das nur Ihren Lebenslauf enthält."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This PDF has more pages than a CV. Choose the PDF of your CV alone."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este PDF tiene más páginas que un CV. Elige el PDF que contiene solo tu CV."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce PDF a plus de pages qu'un CV. Choisissez le PDF qui contient seulement votre CV."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo PDF ha più pagine di un CV. Scegli il PDF del solo CV."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este PDF tem mais páginas do que um currículo. Escolha o PDF só com o seu currículo."
+          }
+        }
+      }
+    },
+    "import.error.unreadable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Datei lässt sich nicht als PDF lesen. Fügen Sie stattdessen den Text Ihres Lebenslaufs ein."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This file can't be read as a PDF. Paste the text of your CV instead."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este archivo no se puede leer como PDF. Pega en su lugar el texto de tu CV."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce fichier ne peut pas être lu comme un PDF. Collez plutôt le texte de votre CV."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo file non si può leggere come PDF. Incolla invece il testo del tuo CV."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este arquivo não pode ser lido como PDF. Cole o texto do seu currículo em vez disso."
+          }
+        }
+      }
+    },
+    "import.header_subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügen Sie den Text eines Lebenslaufs ein, mit einem KI-Chat geschrieben oder aus einem Dokument, einer E-Mail oder LinkedIn kopiert, oder wählen Sie ein PDF. PrestoCV ordnet jeden Teil auf diesem Gerät ein, und Sie prüfen alles, bevor Sie den Lebenslauf versenden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste the text of a CV, written with an AI chat or copied from a document, an email or LinkedIn, or choose a PDF. PrestoCV puts each part in its place on this device, and you check everything before you send the CV."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pega el texto de un CV, escrito con un chat de IA o copiado de un documento, un correo o LinkedIn, o elige un PDF. PrestoCV pone cada parte en su sitio en este dispositivo y tú lo revisas todo antes de enviar el CV."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collez le texte d'un CV, écrit avec un chat d'IA ou copié d'un document, d'un e-mail ou de LinkedIn, ou choisissez un PDF. PrestoCV range chaque partie à sa place sur cet appareil, et vous vérifiez tout avant d'envoyer le CV."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incolla il testo di un CV, scritto con una chat di IA o copiato da un documento, da un'e-mail o da LinkedIn, oppure scegli un PDF. PrestoCV mette ogni parte al suo posto su questo dispositivo e tu controlli tutto prima di inviare il CV."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cole o texto de um currículo, escrito com um chat de IA ou copiado de um documento, de um e-mail ou do LinkedIn, ou escolha um PDF. O PrestoCV coloca cada parte no lugar neste dispositivo e você confere tudo antes de enviar o currículo."
+          }
+        }
+      }
+    },
+    "import.header_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bringen Sie Ihren Lebenslauf mit"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bring the CV you already have"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trae el CV que ya tienes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apportez le CV que vous avez déjà"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Porta il CV che hai già"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traga o currículo que você já tem"
+          }
+        }
+      }
+    },
+    "import.pdf.button" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF auswählen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a PDF"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir un PDF"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir un PDF"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli un PDF"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher um PDF"
+          }
+        }
+      }
+    },
+    "import.pdf.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein PDF, das Text enthält, etwa aus einem Textprogramm oder aus LinkedIn gespeichert. Ein Scan enthält keinen Text zum Einlesen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A PDF that contains text, such as one saved from a word processor or from LinkedIn. A scan has no text to read."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un PDF que contenga texto, como uno guardado desde un procesador de textos o desde LinkedIn. Un escaneo no tiene texto que leer."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un PDF qui contient du texte, par exemple enregistré depuis un traitement de texte ou depuis LinkedIn. Un scan n'a pas de texte à lire."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un PDF che contiene testo, come quelli salvati da un programma di videoscrittura o da LinkedIn. Una scansione non ha testo da leggere."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um PDF que contenha texto, como um salvo de um editor de texto ou do LinkedIn. Uma digitalização não tem texto para ler."
+          }
+        }
+      }
+    },
+    "import.pdf.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oder ein PDF"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Or a PDF"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O un PDF"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ou un PDF"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oppure un PDF"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ou um PDF"
+          }
+        }
+      }
+    },
+    "import.privacy_note" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alles geschieht auf diesem Gerät. Text und Datei werden weder gesendet noch aufbewahrt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Everything happens on this device. The text and the file aren't sent anywhere or kept."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todo ocurre en este dispositivo. El texto y el archivo no se envían a ningún sitio ni se guardan."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout se passe sur cet appareil. Le texte et le fichier ne sont ni envoyés nulle part ni conservés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutto avviene su questo dispositivo. Il testo e il file non vengono inviati da nessuna parte né conservati."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tudo acontece neste dispositivo. O texto e o arquivo não são enviados para lugar nenhum nem guardados."
+          }
+        }
+      }
+    },
+    "import.reading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF wird gelesen …"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading the PDF…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leyendo el PDF…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture du PDF…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lettura del PDF…"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lendo o PDF…"
+          }
+        }
+      }
+    },
+    "import.review.check_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zu prüfende Angaben"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Values to check"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Datos que revisar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valeurs à vérifier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valori da controllare"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dados para conferir"
+          }
+        }
+      }
+    },
+    "import.review.copied" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopiert"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copied"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copié"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiato"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiado"
+          }
+        }
+      }
+    },
+    "import.review.copy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alles kopieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy all"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar todo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout copier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia tutto"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar tudo"
+          }
+        }
+      }
+    },
+    "import.review.field.education" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausbildung %lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Education %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formación %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formation %lld"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formazione %lld"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formação %lld"
+          }
+        }
+      }
+    },
+    "import.review.field.experience" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Berufserfahrung %lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Experience %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Experiencia %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expérience %lld"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperienza %lld"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Experiência %lld"
+          }
+        }
+      }
+    },
+    "import.review.field.language" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprache"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Idioma"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Langue"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lingua"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Idioma"
+          }
+        }
+      }
+    },
+    "import.review.field.location" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ort"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ubicación"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lieu"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Località"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Localização"
+          }
+        }
+      }
+    },
+    "import.review.field.name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vollständiger Name"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome"
+          }
+        }
+      }
+    },
+    "import.review.field.summary" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kurzprofil"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Summary"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resumen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résumé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profilo"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resumo"
+          }
+        }
+      }
+    },
+    "import.review.field.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Berufsbezeichnung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Professional title"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Título profesional"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titre professionnel"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titolo professionale"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Título profissional"
+          }
+        }
+      }
+    },
+    "import.review.not_imported_footer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Text passt in kein Feld des Lebenslaufs. Kopieren Sie, was Sie brauchen, in den Editor."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This text fits no field of the CV. Copy what you need into the editor."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este texto no encaja en ningún campo del CV. Copia en el editor lo que necesites."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce texte ne correspond à aucun champ du CV. Copiez dans l'éditeur ce dont vous avez besoin."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo testo non entra in nessun campo del CV. Copia nell'editor ciò che ti serve."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este texto não cabe em nenhum campo do currículo. Copie para o editor o que precisar."
+          }
+        }
+      }
+    },
+    "import.review.not_imported_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht übernommen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not imported"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No importado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non importé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non importato"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não importado"
+          }
+        }
+      }
+    },
+    "import.review.reason.bounds" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Zeilen neben diesen Daten gehören vielleicht zum vorherigen oder nächsten Eintrag: Prüfen Sie sie."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The lines next to these dates may belong to the entry before or after: check them."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las líneas junto a estas fechas pueden ser de la entrada anterior o de la siguiente: revísalas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les lignes autour de ces dates appartiennent peut-être à l'entrée précédente ou suivante : vérifiez-les."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le righe vicino a queste date potrebbero appartenere alla voce precedente o successiva: controllale."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As linhas junto a estas datas podem pertencer à entrada anterior ou seguinte: verifique-as."
+          }
+        }
+      }
+    },
+    "import.review.reason.language" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es ist kein GER-Niveau angegeben, daher wurde die Sprache nicht übernommen. Fügen Sie sie mit ihrem Niveau hinzu."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No CEFR level is stated, so the language wasn't added. Add it with its level."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se indica un nivel del MCER, así que el idioma no se añadió. Añádelo con su nivel."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun niveau CECRL n'est indiqué, la langue n'a donc pas été ajoutée. Ajoutez-la avec son niveau."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è indicato un livello QCER, quindi la lingua non è stata aggiunta. Aggiungila con il suo livello."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não há nível QECR indicado, por isso o idioma não foi adicionado. Adicione-o com o seu nível."
+          }
+        }
+      }
+    },
+    "import.review.reason.levels" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es sind mehrere Niveaus angegeben, daher wurde die Sprache nicht übernommen. Fügen Sie sie mit dem Niveau Ihrer Wahl hinzu."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Several levels are stated, so the language wasn't added. Add it with the level you choose."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se indican varios niveles, así que el idioma no se añadió. Añádelo con el nivel que elijas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plusieurs niveaux sont indiqués, la langue n'a donc pas été ajoutée. Ajoutez-la avec le niveau de votre choix."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sono indicati più livelli, quindi la lingua non è stata aggiunta. Aggiungila con il livello che scegli."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Há vários níveis indicados, por isso o idioma não foi adicionado. Adicione-o com o nível que escolher."
+          }
+        }
+      }
+    },
+    "import.review.reason.order" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position und Arbeitgeber wurden nach ihrer Reihenfolge unterschieden: Tauschen Sie sie bei Bedarf."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Role and employer were told apart by their order: swap them if needed."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El puesto y la empresa se distinguieron por su orden: intercámbialos si hace falta."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le poste et l'employeur ont été distingués par leur ordre : inversez-les si besoin."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruolo e datore di lavoro sono stati distinti dal loro ordine: scambiali se serve."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O cargo e o empregador foram distinguidos pela ordem: troque-os se for preciso."
+          }
+        }
+      }
+    },
+    "import.review.reason.period" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Daten ließen sich nicht als Zeitraum lesen: Prüfen Sie sie."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The dates couldn't be read as a period: check them."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las fechas no se pudieron leer como periodo: revísalas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les dates n'ont pas pu être lues comme une période : vérifiez-les."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le date non sono state lette come periodo: controllale."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As datas não puderam ser lidas como período: confira-as."
+          }
+        }
+      }
+    },
+    "import.review.reason.position" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus seiner Stelle im Text übernommen: Prüfen Sie, ob es stimmt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taken from where it stands in the text: check that it's right."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tomado de su posición en el texto: comprueba que sea correcto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repris d'après sa place dans le texte : vérifiez qu'il est juste."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preso dalla sua posizione nel testo: controlla che sia giusto."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tirado da posição no texto: confira se está certo."
+          }
+        }
+      }
+    },
+    "import.review.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import prüfen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check the import"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revisar la importación"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifier l'import"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controlla l'importazione"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conferir a importação"
+          }
+        }
+      }
+    },
+    "import.screen_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lebenslauf importieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import a CV"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar un CV"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importer un CV"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importa un CV"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar um currículo"
+          }
+        }
+      }
+    },
+    "import.text.button" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diesen Text importieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import this text"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar este texto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importer ce texte"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importa questo testo"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar este texto"
+          }
+        }
+      }
+    },
+    "import.text.placeholder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügen Sie Ihren Lebenslauf hier ein oder schreiben Sie ihn"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste or type your CV here"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pega o escribe aquí tu CV"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collez ou saisissez votre CV ici"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incolla o scrivi qui il tuo CV"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cole ou digite seu currículo aqui"
+          }
+        }
+      }
+    },
+    "import.text.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ihr Lebenslauf als Text"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your CV as text"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu CV como texto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre CV en texte"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il tuo CV come testo"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu currículo em texto"
+          }
+        }
+      }
+    },
     "language.automatic" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatisch"
+            "value" : "Automatisch (%@)"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatic"
+            "value" : "Automatic (%@)"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automático"
+            "value" : "Automático (%@)"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatique"
+            "value" : "Automatique (%@)"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatica"
+            "value" : "Automatica (%@)"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automático"
+            "value" : "Automático (%@)"
           }
         }
       }
@@ -7377,7 +9632,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lebenslauf mit KI erstellen"
+            "value" : "Lebenslauf mit KI"
           }
         },
         "en" : {
@@ -7389,25 +9644,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Generación de CV con IA"
+            "value" : "CV con IA"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Génération de CV par IA"
+            "value" : "CV avec l'IA"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Generazione CV con IA"
+            "value" : "CV con l'IA"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geração de CV com IA"
+            "value" : "Currículo com IA"
           }
         }
       }
@@ -7453,6 +9708,47 @@
         }
       }
     },
+    "onboarding.ai.button" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meinen Lebenslauf mit KI entwerfen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Draft My CV with AI"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redactar mi CV con IA"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rédiger mon CV avec l'IA"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scrivi il mio CV con l'IA"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escrever meu currículo com IA"
+          }
+        }
+      }
+    },
     "onboarding.create.button" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7489,7 +9785,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Criar meu primeiro CV"
+            "value" : "Criar meu primeiro currículo"
           }
         }
       }
@@ -7531,6 +9827,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "O nome e os dados de contato ficam em branco para você preencher."
+          }
+        }
+      }
+    },
+    "onboarding.import.button" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lebenslauf einfügen oder importieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste or import a CV"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pega o importa un CV"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coller ou importer un CV"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incolla o importa un CV"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colar ou importar um currículo"
           }
         }
       }
@@ -8156,37 +10493,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beginnen Sie mit einer leeren Seite, um Ihren Lebenslauf von Grund auf zu erstellen."
+            "value" : "Wählen Sie, wie Sie beginnen möchten. Sie können später alles ändern."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Start with a blank canvas to create your CV from scratch."
+            "value" : "Choose how to start. You can change everything later."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Comienza con un lienzo en blanco para crear tu CV desde cero."
+            "value" : "Elige cómo empezar. Podrás cambiarlo todo más adelante."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Commencez avec une toile vierge pour créer votre CV à partir de zéro."
+            "value" : "Choisissez comment commencer. Vous pourrez tout modifier ensuite."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inizia con una tela bianca per creare il tuo CV da zero."
+            "value" : "Scegli come iniziare. Potrai modificare tutto in seguito."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Comece com uma tela em branco para criar seu CV do zero."
+            "value" : "Escolha como começar. Você pode alterar tudo depois."
           }
         }
       }
@@ -8273,6 +10610,170 @@
         }
       }
     },
+    "template.example.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passen Sie einen Beispiel-Lebenslauf an Ihre Erfahrung an"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adapt a sample CV to your own experience"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adapta un CV de ejemplo a tu experiencia"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adaptez un exemple de CV à votre parcours"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adatta un CV di esempio alla tua esperienza"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adapte um currículo de exemplo à sua experiência"
+          }
+        }
+      }
+    },
+    "template.example.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beispiel-Lebenslauf"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Example CV"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV de ejemplo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exemple de CV"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV di esempio"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Currículo de exemplo"
+          }
+        }
+      }
+    },
+    "template.import.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit Ihrem vorhandenen Lebenslauf beginnen, als Text oder als PDF"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start from the CV you already have, as text or as a PDF"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empieza con el CV que ya tienes, como texto o como PDF"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partez du CV que vous avez déjà, en texte ou en PDF"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parti dal CV che hai già, come testo o come PDF"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comece pelo currículo que você já tem, em texto ou em PDF"
+          }
+        }
+      }
+    },
+    "template.import.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lebenslauf einfügen oder importieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste or import a CV"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pega o importa un CV"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coller ou importer un CV"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incolla o importa un CV"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colar ou importar um currículo"
+          }
+        }
+      }
+    },
     "template.present" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8310,6 +10811,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atual"
+          }
+        }
+      }
+    },
+    "unsaved_edits.recovered_suffix" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(wiederhergestellt)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(recovered)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(recuperado)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(récupéré)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(recuperato)"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(recuperado)"
           }
         }
       }
@@ -8355,6 +10897,47 @@
         }
       }
     },
+    "welcome.description.ai" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beschreiben Sie sich in ein paar Sätzen, und die KI entwirft Ihren Lebenslauf auf diesem Gerät. Oder beginnen Sie mit einer leeren Seite oder mit einem Beispiel."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Describe yourself in a few sentences and AI drafts your CV on this device. Or start from a blank page or from an example."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descríbete en unas pocas frases y la IA redacta tu CV en este dispositivo. O empieza con una página en blanco o con un ejemplo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décrivez-vous en quelques phrases et l'IA rédige votre CV sur cet appareil. Ou commencez avec une page blanche ou avec un exemple."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descriviti in poche frasi e l'IA scrive una bozza del tuo CV su questo dispositivo. Oppure parti da una pagina bianca o da un esempio."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descreva-se em poucas frases e a IA escreve seu currículo neste dispositivo. Ou comece com uma página em branco ou com um exemplo."
+          }
+        }
+      }
+    },
     "welcome.subtitle" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8367,7 +10950,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create Your Perfect Resume"
+            "value" : "Create Your Perfect CV"
           }
         },
         "es" : {
@@ -8391,7 +10974,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crie seu CV perfeito"
+            "value" : "Crie seu currículo perfeito"
           }
         }
       }
@@ -8414,25 +10997,25 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bienvenido a PrestoCV"
+            "value" : "Te damos la bienvenida a PrestoCV"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bienvenue sur PrestoCV"
+            "value" : "Bienvenue dans PrestoCV"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Benvenuto su PrestoCV"
+            "value" : "Ti diamo il benvenuto in PrestoCV"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bem-vindo ao PrestoCV"
+            "value" : "Boas-vindas ao PrestoCV"
           }
         }
       }

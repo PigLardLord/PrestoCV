@@ -2,6 +2,17 @@ import Foundation
 import PrestoCVCore
 import CVGeneratorAI
 
+/// A CV drafted by AI, not stored yet, and whether its personal items were left blank because the claim check gave no answer
+/// (ADR 0028). The editor opens it with the notice that matches.
+struct AIDraft: Equatable, Sendable {
+    let cv: CVModel
+    let personalItemsUnchecked: Bool
+
+    var notice: EditorNotice {
+        personalItemsUnchecked ? .aiDraftUnchecked : .aiDraft
+    }
+}
+
 /// Turns what the on-device model produced into a CV the editor can open.
 ///
 /// Pure: the same CV data and labels always give the same CV (apart from fresh ids). It lives in
@@ -12,6 +23,14 @@ struct AIDraftMapper {
     /// The BCP 47 tag of the language a text is written in, or nil when it cannot tell
     let languageOfText: (String) -> String?
 
+    /// The draft of a generation, with whether its personal items went unchecked.
+    /// - Parameters:
+    ///   - draft: What the generation gave from the description.
+    ///   - description: The person's own text.
+    func map(_ draft: GeneratedDraft, writtenIn description: String) -> AIDraft {
+        AIDraft(cv: map(draft.cvData, writtenIn: description), personalItemsUnchecked: draft.personalItemsUnchecked)
+    }
+
     /// - Parameters:
     ///   - cvData: What the model produced from the description.
     ///   - description: The person's own text. The CV is printed in its language when the templates
@@ -19,8 +38,8 @@ struct AIDraftMapper {
     func map(_ cvData: CVGeneratorAI.CVData, writtenIn description: String) -> CVModel {
         let info = cvData.personalInfo
 
+        // No name of its own: the list calls the draft by its person, otherwise by its role (CVTitle), until it is renamed
         return CVModel(
-            name: labels.cvName(for: info.name),
             personalInfo: PrestoCVCore.PersonalInfo(
                 name: info.name ?? "",
                 title: info.title ?? "",
@@ -119,14 +138,14 @@ struct AIDraftMapper {
         }
     }
 
-    /// The editor rates skills from 0 to 5 stars; no level is no stars.
+    /// The editor rates skills with up to `Skill.maxLevel` stars; no level is no stars, and an expert gets them all.
     private func skillLevel(_ level: CVGeneratorAI.SkillLevel?) -> Int {
         switch level {
         case nil: return 0
         case .beginner?: return 1
         case .intermediate?: return 3
         case .advanced?: return 4
-        case .expert?: return 5
+        case .expert?: return PrestoCVCore.Skill.maxLevel
         }
     }
 

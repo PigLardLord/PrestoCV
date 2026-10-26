@@ -18,15 +18,15 @@ public final class SampleCVRepository: SampleCVRepositoryProtocol, Sendable {
     
     // MARK: - Initialization
     
-    /// - Parameter languages: The languages to read the samples in, the most wanted first. The default is the
-    ///   language the app is shown in. A sample with no version in any of them is read in English.
+    /// - Parameter languages: The languages to read the samples in, the most wanted first: the language the app is
+    ///   shown in. A sample with no version in any of them is read in English.
     public init(
         storageService: StorageServiceProtocol,
         categoryService: TemplateCategoryServiceProtocol,
         bundleResourceService: BundleResourceServiceProtocol,
         templateLoader: JSONTemplateLoaderProtocol,
         parallelSearchService: ParallelSearchServiceProtocol,
-        languages: [String] = Bundle.main.preferredLocalizations
+        languages: [String]
     ) {
         self.storageService = storageService
         self.categoryService = categoryService

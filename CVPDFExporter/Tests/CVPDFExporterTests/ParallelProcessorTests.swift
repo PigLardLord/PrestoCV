@@ -129,11 +129,12 @@ struct ParallelProcessorTests {
     @Test("Parallel processor tracks performance")
     func parallelProcessorTracksPerformance() async throws {
         // Given
-        let processor = ParallelProcessor(trackPerformance: true)
+        let clock = ManualClock()
+        let processor = ParallelProcessor(trackPerformance: true, now: clock.now)
         let document = createSampleDocument()
         let templates: [RenderableTemplate] = [
-            createBasicTemplate(),
-            createModernTemplate()
+            TimedTemplate(template: createBasicTemplate(), clock: clock, seconds: 0.25),
+            TimedTemplate(template: createModernTemplate(), clock: clock, seconds: 0.25)
         ]
 
         // When
@@ -147,16 +148,17 @@ struct ParallelProcessorTests {
         #expect(results.count == 2)
         let metrics = await processor.getPerformanceMetrics()
         #expect(metrics != nil)
-        #expect(metrics?.totalTime ?? 0 > 0)
-        #expect(metrics?.averageTime ?? 0 > 0)
+        #expect(metrics?.totalTime == 0.5)
+        #expect(metrics?.averageTime == 0.25)
     }
 
-    @Test("Parallel processor cancels operations")
+    @Test("Parallel processor cancels operations", .timeLimit(.minutes(1)))
     func parallelProcessorCancelsOperations() async {
         // Given
         let processor = ParallelProcessor()
         let document = createSampleDocument()
-        let templates: [RenderableTemplate] = (0..<10).map { _ in SlowTemplate() }
+        let (starts, started) = AsyncStream<Void>.makeStream()
+        let templates: [RenderableTemplate] = (0..<10).map { _ in HeldTemplate(started: started) }
 
         // When - Start rendering and cancel
         let task = Task {
@@ -167,8 +169,9 @@ struct ParallelProcessorTests {
             )
         }
 
-        // Give it time to start
-        try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
+        // A render has started, and none can end before the cancellation
+        var renders = starts.makeAsyncIterator()
+        await renders.next()
         task.cancel()
 
         // Then
@@ -275,9 +278,31 @@ private struct FailingTemplate: RenderableTemplate {
     }
 }
 
-private struct SlowTemplate: RenderableTemplate {
+/// A template whose render takes `seconds` on `clock`.
+private struct TimedTemplate: RenderableTemplate {
+    let template: Template
+    let clock: ManualClock
+    let seconds: TimeInterval
+
     func render(document: CVDocument, options: ExportOptions) async throws -> String {
-        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
-        return "<html><body>Slow</body></html>"
+        clock.advance(by: seconds)
+        return try await template.render(document: document, options: options)
+    }
+}
+
+/// A render that reports it started, then lasts until its task is cancelled.
+private struct HeldTemplate: RenderableTemplate {
+    let started: AsyncStream<Void>.Continuation
+    /// Nothing is ever sent on it, and its continuation keeps it open: iterating it ends only with a cancellation.
+    private let never = AsyncStream<Void>.makeStream()
+
+    init(started: AsyncStream<Void>.Continuation) {
+        self.started = started
+    }
+
+    func render(document: CVDocument, options: ExportOptions) async throws -> String {
+        started.yield()
+        for await _ in never.stream {}
+        throw CancellationError()
     }
 }

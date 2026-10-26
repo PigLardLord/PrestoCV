@@ -24,7 +24,6 @@ enum ListChange: CaseIterable {
 struct CVListViewModelTests {
     
     private let copySuffix = "action.copy_suffix".localized
-    private let untitled = "cv.untitled".localized
     
     private func makeViewModel(repository: InMemoryCVRepository) -> CVListViewModel {
         let useCase = CVManagementUseCase(cvRepository: repository, sampleRepository: UnusedSampleCVRepository())
@@ -309,16 +308,34 @@ struct CVListViewModelTests {
         #expect(viewModel.actionError == nil)
     }
     
-    @Test("The duplicate of an unnamed CV is called Untitled CV with the copy suffix")
-    func duplicateOfUnnamedCVIsUntitledCopy() async {
-        let original = CVModel(name: "")
+    @Test("The duplicate of an unnamed CV is named after the title the list shows it with",
+          arguments: [(PersonalInfo(name: "Lena Hartmann", title: "Pflegefachkraft"), "Lena Hartmann"),
+                      (PersonalInfo(title: "Pflegefachkraft"), "Pflegefachkraft"), (PersonalInfo(email: "lena@example.com"), "cv.untitled".localized)])
+    func duplicateOfUnnamedCVIsNamedAfterItsTitle(person: PersonalInfo, shownTitle: String) async {
+        let original = CVModel(name: "", personalInfo: person)
         let repository = InMemoryCVRepository(cvs: [original])
         let viewModel = makeViewModel(repository: repository)
         await viewModel.loadCVs()
-        
+        #expect(viewModel.title(of: original) == shownTitle)
+
         await viewModel.duplicateCV(withId: original.id)
-        
-        #expect(viewModel.cvs.map(\.name).sorted() == ["", "\(untitled) \(copySuffix)"])
+
+        #expect(viewModel.cvs.map(\.name).sorted() == ["", "\(shownTitle) \(copySuffix)"])
+    }
+
+    @Test("Two copies of one CV are numbered in the list, as any titles that read alike")
+    func copiesOfOneCVAreNumbered() async throws {
+        let original = CVModel(name: "", personalInfo: PersonalInfo(name: "Lena Hartmann"))
+        let repository = InMemoryCVRepository(cvs: [original])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+
+        await viewModel.duplicateCV(withId: original.id)
+        await viewModel.duplicateCV(withId: original.id)
+
+        let titles = viewModel.cvs.map(viewModel.title(of:)).sorted()
+        let copy = "Lena Hartmann \(copySuffix)"
+        #expect(titles == ["Lena Hartmann", copy, "cv.title.numbered".localizedWithArgs(copy, 2)].sorted())
     }
     
     // MARK: - Rename
@@ -381,6 +398,78 @@ struct CVListViewModelTests {
         #expect(viewModel.errorMessage.isEmpty)
     }
     
+    // MARK: - Document language
+
+    @Test("The language chosen in the export sheet of a CV of the list is saved, and nothing else changes",
+          arguments: [DocumentLanguage?.some(.english), nil])
+    func documentLanguageIsSaved(language: DocumentLanguage?) async throws {
+        let cv = CVModel(name: "Luca – Sales", personalInfo: PersonalInfo(name: "Luca"), documentLanguage: "it")
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+
+        await viewModel.setDocumentLanguage(language, ofCVWithId: cv.id)
+
+        let stored = try #require(await repository.getCV(by: cv.id))
+        #expect(stored.documentLanguage == language?.rawValue)
+        #expect(stored.name == cv.name && stored.personalInfo == cv.personalInfo, "Only the language changes")
+        #expect(viewModel.cvs.first?.documentLanguage == language?.rawValue)
+        #expect(viewModel.actionError == nil)
+    }
+
+    @Test("A language chosen while the one before is still being saved is stored last, whatever order the saves end in")
+    func latestLanguageIsStoredLast() async throws {
+        let cv = CVModel(name: "Luca – Sales", documentLanguage: "it")
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+        await repository.holdNextSaves(1)
+
+        // English is being written, slowly, when German is chosen
+        let english = Task { await viewModel.setDocumentLanguage(.english, ofCVWithId: cv.id) }
+        await repository.waitUntilSavesAreHeld(1)
+        let german = Task { await viewModel.setDocumentLanguage(.german, ofCVWithId: cv.id) }
+        await german.value
+        await repository.releaseOldestSave()
+        await english.value
+
+        #expect(try #require(await repository.getCV(by: cv.id)).documentLanguage == "de")
+        #expect(viewModel.cvs.first?.documentLanguage == "de", "The list shows the language the sheet shows")
+    }
+
+    @Test("Languages chosen while one is being saved are not all saved: only the latest follows it")
+    func supersededLanguagesAreNotSaved() async throws {
+        let cv = CVModel(name: "Luca – Sales")
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+        await repository.holdNextSaves(1)
+
+        let english = Task { await viewModel.setDocumentLanguage(.english, ofCVWithId: cv.id) }
+        await repository.waitUntilSavesAreHeld(1)
+        await viewModel.setDocumentLanguage(.german, ofCVWithId: cv.id)
+        await viewModel.setDocumentLanguage(nil, ofCVWithId: cv.id)
+        await repository.releaseOldestSave()
+        await english.value
+
+        #expect(try #require(await repository.getCV(by: cv.id)).documentLanguage == nil, "Automatic was chosen last")
+        #expect(await repository.saveCount == 2, "English, then automatic: German was replaced before it was saved")
+    }
+
+    @Test("A language that cannot be saved reports an error and keeps the CV as it was")
+    func failedDocumentLanguageReportsAnError() async throws {
+        let cv = CVModel(name: "Luca – Sales", documentLanguage: "it")
+        let repository = InMemoryCVRepository(cvs: [cv])
+        let viewModel = makeViewModel(repository: repository)
+        await viewModel.loadCVs()
+        await repository.fail(.save, with: AppError.unknown("disk"))
+
+        await viewModel.setDocumentLanguage(.english, ofCVWithId: cv.id)
+
+        #expect(viewModel.actionError?.contains("disk") == true)
+        #expect(try #require(await repository.getCV(by: cv.id)).documentLanguage == "it")
+    }
+
     // MARK: - Delete
     
     @Test("Deleting removes the CV from the list and from storage")

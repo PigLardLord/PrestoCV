@@ -29,7 +29,7 @@ struct DescriptionText {
         language = languageOfText(description).map(Self.primaryLanguage)
         vocabularyLanguage = (language ?? LanguageGuess.tag(of: description)).flatMap(Vocabulary.Language.init(tag:))
         text = Self.normalized(description)
-        sentences = SentenceSplitter.sentences(in: description).map(Sentence.init)
+        sentences = SentenceSplitter.sentencesByLine(in: description).map { Sentence($0.text, startsALine: $0.startsALine) }
         (emails, links, phones) = Self.addresses(in: description)
     }
 
@@ -41,7 +41,7 @@ struct DescriptionText {
         language = source.language
         vocabularyLanguage = source.vocabularyLanguage
         text = Self.normalized(raw.joined(separator: " "))
-        sentences = raw.map(Sentence.init)
+        sentences = raw.map { Sentence($0) }
         (emails, links, phones) = Self.addresses(in: raw.joined(separator: " "))
     }
 
@@ -65,11 +65,14 @@ struct DescriptionText {
         let raw: String
         let folded: String
         let accented: String
+        /// Whether the sentence starts a line of the description: not known of the sentences of a text made of kept clauses.
+        let startsALine: Bool
 
-        init(_ text: String) {
+        init(_ text: String, startsALine: Bool = false) {
             raw = text
             folded = DescriptionText.normalized(text)
             accented = DescriptionText.normalized(text, foldingAccents: false)
+            self.startsALine = startsALine
         }
     }
 
@@ -179,7 +182,8 @@ struct DescriptionText {
                       nearest.gap < (Self.nearest(to: statement.span, in: otherSpans)?.gap ?? Int.max),
                       !Self.isSeparatedByConjunction(statement.span, nearest.span, in: sentence),
                       Self.isInTheClauseOfTheItem(statement.span, item: nearest.span, clauses: clauses, in: sentence.folded),
-                      !Self.hedgesOrNegates(Self.clauseText(containing: statement.span, ranges: clauses, in: sentence.folded)) else { continue }
+                      !Self.hedgesOrNegates(Self.clauseText(containing: statement.span, ranges: clauses, in: sentence.folded),
+                                           language: vocabularyLanguage) else { continue }
 
                 if statement.isCode {
                     fromCodes.formUnion(statement.levels)
@@ -298,8 +302,10 @@ struct DescriptionText {
         return normalized(String(decoding: units[range.lowerBound..<end], as: UTF16.self))
     }
 
-    static func hedgesOrNegates(_ sentence: String) -> Bool {
-        sentence.contains("n't") || containsAny(StatementWords.hedges, in: sentence)
+    /// Whether the sentence holds a negation or a hedge (`StatementWords.hedges`). A hedge of another language that the description's
+    /// language has as a word of its own is none (`Vocabulary.isOwnWord`): German "Mai" is a month, Portuguese "no" is "in the".
+    static func hedgesOrNegates(_ sentence: String, language: Vocabulary.Language? = nil) -> Bool {
+        sentence.contains("n't") || containsAny(StatementWords.hedges.filter { !Vocabulary.isOwnWord($0, in: language) }, in: sentence)
     }
 
     static func containsAny(_ phrases: [String], in sentence: String) -> Bool {

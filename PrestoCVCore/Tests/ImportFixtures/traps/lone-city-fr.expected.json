@@ -1,0 +1,11 @@
+{
+ "id": "traps/lone-city-fr", "language": "fr", "form": "trap",
+ "person": {"name": "Camille Roux", "title": "Cheffe de projet, MBA", "email": "camille.roux@example.com", "phone": "06 00 00 00 00",
+            "location": "Reims", "links": [], "summary": null},
+ "experience": [
+  {"role": "Cheffe de projet", "employer": "Exemple Conseil SA", "location": "Reims", "start": [2021, 3], "end": "current", "details": 0},
+  {"role": "Chargée de mission", "employer": "Exemple Conseil SA", "location": "Paris", "start": [2018, 6], "end": [2021, 2], "details": 0}
+ ],
+ "education": [{"degree": "Master Gestion de projet", "school": "Université de Reims", "start": [2013, null], "end": [2018, null]}],
+ "skills": [], "languages": [], "certifications": [], "interests": []
+}

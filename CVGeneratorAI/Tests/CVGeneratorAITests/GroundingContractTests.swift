@@ -21,18 +21,20 @@ import Foundation
 @Suite("Grounding contract: ADR 0023")
 struct GroundingContractTests {
     @Test("A row of the contract holds", arguments: GroundingRows.all)
-    func rowHolds(_ row: GroundingRow) {
-        func check() {
-            let differences = Verdict.differences(of: row)
+    func rowHolds(_ row: GroundingRow) throws {
+        func check() throws {
+            let differences = try Verdict.differences(of: row)
             #expect(differences.isEmpty, "\(row.id): \(row.reason)\n\(differences.joined(separator: "\n"))")
         }
 
         if GroundingRows.notImplementedYet.contains(row.id) {
-            withKnownIssue("ADR 0023 not implemented yet") { check() }
+            withKnownIssue("ADR 0023 not implemented yet; the claim check closes it (measured on macOS 27.0.1 only; iOS 26 device check pending)") {
+                try check()
+            }
         } else if GroundingRows.residualRisks.contains(row.id) {
-            withKnownIssue("ADR 0023, Consequences: a residual risk the owner accepts") { check() }
+            withKnownIssue("ADR 0023, Consequences: a residual risk the owner accepts") { try check() }
         } else {
-            check()
+            try check()
         }
     }
 
@@ -294,8 +296,8 @@ private enum Sheet {
 
 private enum Verdict {
     /// What the sanitiser leaves of the draft of a row that the contract does not allow; empty when the row holds.
-    static func differences(of row: GroundingRow) -> [String] {
-        let result = CVDataSanitizer().sanitize(row.draft, against: row.description)
+    static func differences(of row: GroundingRow) throws -> [String] {
+        let result = try CVDataSanitizer().sanitize(row.draft, against: row.description)
         let actual = Sheet.fields(of: result)
 
         switch row.expected {
@@ -416,11 +418,28 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 1389
+    static let rowsWhenWritten = 2076
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
-    /// fails and the id leaves this list.
-    static let notImplementedYet: Set<String> = []
+    /// fails and the id leaves this list. All of them are residual risks of the rules (ADR 0023) that the claim check of
+    /// ADR 0028 closes on the product path: `ClaimCheckEvaluation` (a), composed, fails on any item of theirs that both keep. That
+    /// is measured on macOS 27.0.1 only; the iOS 26 device check is pending.
+    static let notImplementedYet: Set<String> = [
+        // Text typed without accents.
+        "a-konjunktiv-typed-without-its-umlaut-claims-nothing-de",
+        // Whose words and whose title and place a claim gives.
+        "speech-on-the-line-of-the-colon-claims-nothing",
+        "the-title-of-a-person-the-claim-names-is-not-the-persons-en", "the-title-of-a-person-the-claim-names-is-not-the-persons-it",
+        "the-title-of-a-person-the-claim-names-is-not-the-persons-de", "the-title-of-a-person-the-claim-names-is-not-the-persons-es",
+        "the-title-of-a-person-the-claim-names-is-not-the-persons-fr", "the-title-of-a-person-the-claim-names-is-not-the-persons-pt",
+        // Whose verb follows a relative of the person, and the relatives of place.
+        "a-noun-before-a-relative-of-the-person-is-another-subject-en", "a-noun-before-a-relative-of-the-person-is-another-subject-it",
+        "a-noun-before-a-relative-of-the-person-is-another-subject-de", "a-noun-before-a-relative-of-the-person-is-another-subject-es",
+        "a-noun-before-a-relative-of-the-person-is-another-subject-fr", "a-noun-before-a-relative-of-the-person-is-another-subject-pt",
+        "a-relative-of-place-brings-in-another-subject-en", "a-relative-of-place-brings-in-another-subject-it",
+        "a-relative-of-place-brings-in-another-subject-es", "a-relative-of-place-brings-in-another-subject-fr",
+        "a-relative-of-place-brings-in-another-subject-pt",
+    ]
 
     /// Rows whose desired output the sanitiser does not give, and whose leak the owner accepts as a residual risk (ADR 0023,
     /// Consequences). Each runs in `withKnownIssue`: once a rule closes the leak the wrapper fails, and the id leaves this list.
@@ -446,7 +465,10 @@ enum GroundingRows {
         rows += summariesOfAnotherCV()
         rows += clausesBetweenTwoEntries()
         rows += quotesThatHoldAnEmployerPreposition()
+        rows += employerPrepositionsOfTheDescriptionsLanguage()
+        rows += wordsOfAnotherLanguageStateNothing()
         rows += titlesInANeutralClause()
+        rows += aWordOfStudyingInTheClauseOfATitle()
         rows += negationInProse()
         rows += orderInProse()
         rows += oneClauseOfProse()
@@ -475,12 +497,34 @@ enum GroundingRows {
         rows += referencesAndTheReachablePerson()
         rows += bareNamesBeforeAVerblessContact()
         rows += namesInAFragmentBeforeAContact()
+        rows += hobbiesAreNoSkills()
+        rows += skillsTheDescriptionClaims()
+        rows += hobbiesOfThePersonAlone()
+        rows += factsTheDescriptionWithdraws()
+        rows += wishesInAPhrase()
+        rows += wishesAfterTheItem()
+        rows += personalFieldsOfAClaim()
+        rows += acceptedReadingsOfAClaim()
+        rows += negationsOfTheAbility()
+        rows += deniedLowLevels()
+        rows += textWithoutAccents()
+        rows += moodsOfSupposition()
+        rows += questionsClaimNothing()
+        rows += quotedSpeechClaimsNothing()
+        rows += speechAfterALineOfAnotherPerson()
+        rows += relativeClausesOfAnotherSubject()
+        rows += titlesOfAnotherPersonInAClaim()
+        rows += subjectsAroundARelative()
+        rows += intentionWordsAsNouns()
+        rows += intentionsInAPhrase()
         rows += everyFactIsThePersons()
         rows += datesOfJobs()
         rows += omittedEmployers()
         rows += omittedEmployersInManyWords()
         rows += titlesOfOthers()
         rows += schoolsAndCertifications()
+        rows += entryNamesWithoutAnArticle()
+        rows += degreesThatNameNoDegree()
         rows += faithfulExamples()
         rows += theAppExampleKeepsEveryFact()
         rows += realModelProbes()
@@ -1370,6 +1414,63 @@ enum GroundingRows {
         }
     }
 
+    /// A word is read in the language of the description (#202): an employer preposition of another language that the description's
+    /// language uses for something else is that word, so French "j'ai" holds no Italian "ai", English "per shift" no Italian "per",
+    /// and Portuguese "da" (of the) no Italian "da". A preposition of another language that is no word of the description's language
+    /// still introduces an employer: "chez Gamma" in English, "at Gamma" in Italian.
+    private static func employerPrepositionsOfTheDescriptionsLanguage() -> [GroundingRow] {
+        typealias Variant = (id: String, language: String, description: String, employer: String, achievement: String, keeps: Bool)
+        var variants: [Variant] = []
+        variants.append(("j-ai-is-no-italian-ai-fr", "fr",
+                         "Depuis 2016, j'enseigne à l'école Don Milani, où j'ai formé 3 nouveaux enseignants.", "école Don Milani",
+                         "j'ai formé 3 nouveaux enseignants", true))
+        variants.append(("per-shift-is-no-italian-per-en", "en",
+                         "Since 2016 I have worked at the Molinette hospital, where I managed up to 12 patients per shift.", "Molinette hospital",
+                         "managed up to 12 patients per shift", true))
+        variants.append(("all-is-no-italian-all-en", "en",
+                         "Since 2016 I have worked at Acme, where I trained all new nurses.", "Acme", "trained all new nurses", true))
+        variants.append(("da-is-no-italian-da-pt", "pt",
+                         "Desde 2016 trabalho na Acme, onde formei 3 enfermeiros da equipe.", "Acme", "formei 3 enfermeiros da equipe", true))
+        variants.append(("chez-still-introduces-an-employer-en", "en",
+                         "Since 2016 I have worked at Acme, where I trained 3 cooks chez Gamma.", "Acme", "trained 3 cooks chez Gamma", false))
+        variants.append(("at-still-introduces-an-employer-it", "it",
+                         "Dal 2016 lavoro presso Acme, dove ho formato 3 cuochi at Gamma.", "Acme", "ho formato 3 cuochi at Gamma", false))
+
+        return variants.map { v in
+            let current = { (achievements: [String]) in job("", v.employer, from: "2016", current: true, achievements: achievements) }
+            return row("employer-preposition-of-the-description-\(v.id)",
+                       v.keeps
+                           ? "the quote holds a preposition of another language that is another word in the description's: the achievement stays"
+                           : "the quote holds a preposition of another language that is no word of the description's: it explains nothing",
+                       v.description, CVData(experience: [current([v.achievement])]),
+                       v.keeps ? .unchanged : .exactly(CVData(experience: [current([])])), language: v.language)
+        }
+    }
+
+    /// A word of negation, doubt or condition of one language that is another word in the description's language (#202) states
+    /// nothing there: German and French "Mai" is a month and no Italian "mai" (never), Portuguese "no" is "in the" and no English or
+    /// Spanish "no", English "fast" is quick and no German "fast" (almost).
+    private static func wordsOfAnotherLanguageStateNothing() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        rows.append(row("a-month-is-no-italian-never-de", "Mai is the month of the start, not the Italian mai: the job goes on",
+                        "Seit Mai 2016 arbeite ich bei Acme.", CVData(experience: [job("", "Acme", from: "Mai 2016", current: true)]),
+                        .unchanged, language: "de"))
+        rows.append(row("a-month-is-no-italian-never-fr", "mai is the month of the start, not the Italian mai: the job goes on",
+                        "Je travaille chez Acme depuis mai 2016.", CVData(experience: [job("", "Acme", from: "mai 2016", current: true)]),
+                        .unchanged, language: "fr"))
+        rows.append(row("in-the-is-no-denial-of-a-job-pt", "no is in the, not the English or Spanish no: the job goes on",
+                        "Desde 2016 trabalho no Hospital Santa Maria.",
+                        CVData(experience: [job("", "Hospital Santa Maria", from: "2016", current: true)]), .unchanged, language: "pt"))
+        rows.append(row("in-the-is-no-denial-of-a-level-pt", "no is in the, not the English or Spanish no: the level stays",
+                        "Falo inglês (B2) no trabalho.", CVData(languages: [Language(name: "inglês", proficiency: .b2)]),
+                        .unchanged, language: "pt"))
+        rows.append(row("fast-is-no-german-almost-en",
+                        "fast is quick, not the German fast: Acme is mentioned as a fact, though the clause backs no year, as fast and team are unexplained",
+                        "Since 2016 I have worked at Acme in a fast team.", CVData(experience: [job("", "Acme", from: "2016", current: true)]),
+                        .exactly(CVData(experience: [job("", "Acme")]))))
+        return rows
+    }
+
     // MARK: A title quoted in a clause that names no entry (b)
 
     /// A clause that names no entry and whose words the vocabulary, the entry's quotes or the person's quotes explain backs no
@@ -1398,6 +1499,17 @@ enum GroundingRows {
                             .exactly(CVData(experience: [current("")])), language: v.language))
         }
         return rows
+    }
+
+    /// "Ensino fundamental" (primary school) is a word of studying (#202): the clause of the person's title holds only explained
+    /// words, so the job's shorter title, quoted there, stays.
+    private static func aWordOfStudyingInTheClauseOfATitle() -> [GroundingRow] {
+        [row("a-word-of-studying-in-the-clause-of-a-title-pt",
+             "fundamental, of ensino fundamental, is a word of studying: the clause of the title is explained, and professora stays",
+             "Sou Maria Rossi, professora do ensino fundamental em Bolonha. Desde 2016 leciono na escola Don Milani.",
+             CVData(personalInfo: person(name: "Maria Rossi", location: "Bolonha"),
+                    experience: [job("professora", "escola Don Milani", from: "2016", current: true)]),
+             .unchanged, language: "pt")]
     }
 
     // MARK: Prose is explained clause by clause (d)
@@ -3159,6 +3271,1147 @@ enum GroundingRows {
         return rows
     }
 
+    // MARK: A hobby is no skill (#202)
+
+    /// The model lists the hobbies of the app's example (chess, hiking) as skills too: a skill claims an ability that the person
+    /// never claimed, so a skill whose name is an interest of the same draft, whatever its case or accents, goes when the description
+    /// mentions it only as leisure ("In my free time I like chess and hiking"). The interest stays, and so does a skill that only holds
+    /// an interest's name.
+    private static func hobbiesAreNoSkills() -> [GroundingRow] {
+        typealias Variant = (language: String, interests: [String], skills: [String])
+        var variants: [Variant] = []
+        variants.append(("en", ["chess", "hiking"], ["Chess", "hiking"]))
+        variants.append(("it", ["scacchi", "escursioni"], ["scacchi", "Escursioni"]))
+        variants.append(("de", ["Schach", "Wandern"], ["schach", "Wandern"]))
+        variants.append(("es", ["ajedrez", "senderismo"], ["Ajedrez", "senderismo"]))
+        variants.append(("fr", ["échecs", "randonnée"], ["Echecs", "randonnee"]))
+        variants.append(("pt", ["xadrez", "caminhadas"], ["xadrez", "Caminhadas"]))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-hobby-is-no-skill-\(v.language)",
+                            "the skills are the interests of the same draft, in another case or without accents: they go, the interests stay",
+                            AppExample.text(in: v.language),
+                            CVData(skills: v.skills.map { Skill(name: $0, level: .beginner) }, interests: v.interests),
+                            .exactly(CVData(interests: v.interests)), language: v.language))
+        }
+        rows.append(row("a-skill-that-holds-a-hobby-stays",
+                        "chess coaching is a skill the person claims, though it holds the interest chess: it stays",
+                        "My skills include chess coaching and first aid. In my free time I like chess.",
+                        CVData(skills: [Skill(name: "chess coaching"), Skill(name: "first aid")], interests: ["chess"]), .unchanged))
+        return rows
+    }
+
+    /// A skill that is also an interest of the draft stays when the description mentions it anywhere but in a clause of leisure: as an
+    /// ability ("proficient in Python"), in a job's clause ("where I do portrait photography") or in a list of skills. An interest that
+    /// the description never states as one removes no skill.
+    private static func skillsTheDescriptionClaims() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        rows.append(row("a-skill-the-person-claims-stays-though-it-is-an-interest",
+                        "Python is an ability the person claims (proficient, its level) before it is a pastime: the skill and its level stay",
+                        "I am proficient in Python and enjoy Python programming.",
+                        CVData(skills: [Skill(name: "Python", level: .advanced)], interests: ["Python"]), .unchanged))
+        rows.append(row("a-skill-of-the-job-stays-though-it-is-a-hobby-en",
+                        "photography is the person's work at Studio Luce as well as a hobby: the skill stays",
+                        "I work as a photographer at Studio Luce, where I do portrait photography. In my free time I like photography and hiking.",
+                        CVData(experience: [job("photographer", "Studio Luce")], skills: [Skill(name: "photography")],
+                               interests: ["photography", "hiking"]), .unchanged))
+        rows.append(row("a-skill-of-the-job-stays-though-it-is-a-hobby-it",
+                        "fotografia is the person's work at Studio Luce as well as a hobby: the skill stays",
+                        "Sono fotografa presso lo Studio Luce, dove faccio fotografia di ritratto. Nel tempo libero mi piacciono la fotografia e le escursioni.",
+                        CVData(skills: [Skill(name: "fotografia")], interests: ["fotografia", "escursioni"]), .unchanged, language: "it"))
+        rows.append(row("a-skill-of-the-job-stays-though-it-is-a-hobby-fr",
+                        "photographie is the person's work at Studio Luce as well as a hobby: the skill stays",
+                        "Je suis photographe au Studio Luce, où je fais de la photographie de portrait. Pendant mon temps libre, j'aime la photographie et la randonnée.",
+                        CVData(skills: [Skill(name: "photographie")], interests: ["photographie", "randonnée"]), .unchanged, language: "fr"))
+        rows.append(row("a-skill-in-a-list-of-skills-stays-though-it-is-a-hobby",
+                        "chess stands in the list of skills as well as among the pastimes: the skill stays",
+                        "My skills include chess and first aid. In my free time I like chess and hiking.",
+                        CVData(skills: [Skill(name: "chess"), Skill(name: "first aid")], interests: ["chess", "hiking"]), .unchanged))
+        rows.append(row("an-interest-the-description-does-not-state-removes-no-skill",
+                        "the model makes ECG monitoring an interest too, though the description states no interest: the skill stays",
+                        "I am good at ECG monitoring.",
+                        CVData(skills: [Skill(name: "ECG monitoring")], interests: ["ECG monitoring"]), .unchanged))
+        return rows
+    }
+
+    // MARK: A clause that denies, wishes or supposes claims no skill, interest or language (c)
+
+    /// A skill, an interest or a language counts only in a clause of the person that claims it (#202): one that denies ("I have never
+    /// used Python"), wishes ("I would like to learn Spanish") or supposes ("If I had time, I would play chess") claims nothing, and
+    /// nor does a clause that follows a condition in its sentence. Ability and part still claim: "I can speak French", "I partly use
+    /// Swift", "I mostly use Swift". The same item in a plain clause of the person stays.
+    private static func factsTheDescriptionWithdraws() -> [GroundingRow] {
+        typealias Variant = (
+            language: String, denied: String, wished: String, supposed: String, skill: String, spoken: String, interest: String,
+            affirmed: String
+        )
+        var variants: [Variant] = []
+        variants.append(("en", "I have never used Python.", "I would like to learn Spanish.", "If I had time, I would play chess.",
+                         "Python", "Spanish", "chess",
+                         "I use Python. I have never used Python for games. I speak Spanish. I would like to speak Spanish better. "
+                            + "I play chess. If I had time, I would play chess more."))
+        variants.append(("it", "Non ho mai usato Python.", "Vorrei imparare lo spagnolo.", "Se avessi tempo, giocherei a scacchi.",
+                         "Python", "spagnolo", "scacchi",
+                         "Uso Python. Non ho mai usato Python per i videogiochi. Parlo spagnolo. Vorrei parlare meglio lo spagnolo. "
+                            + "Gioco a scacchi. Se avessi tempo, giocherei di più a scacchi."))
+        variants.append(("de", "Ich habe nie Python benutzt.", "Ich möchte Spanisch lernen.", "Wenn ich Zeit hätte, würde ich Schach spielen.",
+                         "Python", "Spanisch", "Schach",
+                         "Ich benutze Python. Ich habe nie Python für Spiele benutzt. Ich spreche Spanisch. Ich möchte besser Spanisch "
+                            + "sprechen. Ich spiele Schach. Wenn ich Zeit hätte, würde ich mehr Schach spielen."))
+        variants.append(("es", "Nunca he usado Python.", "Quiero aprender español.", "Si tuviera tiempo, jugaría al ajedrez.",
+                         "Python", "español", "ajedrez",
+                         "Uso Python. Nunca he usado Python para juegos. Hablo español. Quiero hablar mejor español. Juego al ajedrez. "
+                            + "Si tuviera tiempo, jugaría más al ajedrez."))
+        variants.append(("fr", "Je n'ai jamais utilisé Python.", "Je souhaite apprendre l'espagnol.",
+                         "Si j'avais le temps, je jouerais aux échecs.", "Python", "espagnol", "échecs",
+                         "J'utilise Python. Je n'ai jamais utilisé Python pour des jeux. Je parle espagnol. Je souhaite mieux parler "
+                            + "espagnol. Je joue aux échecs. Si j'avais le temps, je jouerais plus aux échecs."))
+        variants.append(("pt", "Nunca usei Python.", "Quero aprender espanhol.", "Se eu tivesse tempo, jogaria xadrez.",
+                         "Python", "espanhol", "xadrez",
+                         "Uso Python. Nunca usei Python para jogos. Falo espanhol. Quero falar melhor espanhol. Jogo xadrez. "
+                            + "Se eu tivesse tempo, jogaria mais xadrez."))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-denied-skill-is-not-the-persons-\(v.language)", "the only clause that names the skill denies it: no skill",
+                            v.denied, CVData(skills: [Skill(name: v.skill)]), .exactly(CVData()), language: v.language))
+            rows.append(row("a-wished-language-is-not-the-persons-\(v.language)", "the only clause that names the language wishes it: no language",
+                            v.wished, CVData(languages: [Language(name: v.spoken)]), .exactly(CVData()), language: v.language))
+            rows.append(row("a-supposed-interest-is-not-the-persons-\(v.language)",
+                            "the only clause that names the interest follows a condition: no interest",
+                            v.supposed, CVData(interests: [v.interest]), .exactly(CVData()), language: v.language))
+            rows.append(row("an-affirmed-skill-language-and-interest-stay-\(v.language)",
+                            "each item also stands in a plain clause of the person, beside one that denies, wishes or supposes it: all stay",
+                            v.affirmed,
+                            CVData(skills: [Skill(name: v.skill)], languages: [Language(name: v.spoken)], interests: [v.interest]),
+                            .unchanged, language: v.language))
+        }
+
+        rows.append(row("a-wished-language-is-not-the-persons-in-the-conditional-fr",
+                        "j'aimerais only wishes the language: no language",
+                        "J'aimerais apprendre l'espagnol.", CVData(languages: [Language(name: "espagnol")]), .exactly(CVData()),
+                        language: "fr"))
+
+        typealias Ability = (language: String, description: String, name: String)
+        var abilities: [Ability] = []
+        abilities.append(("en", "I can speak French.", "French"))
+        abilities.append(("it", "Posso parlare francese.", "francese"))
+        abilities.append(("de", "Ich kann Französisch sprechen.", "Französisch"))
+        abilities.append(("es", "Puedo hablar francés.", "francés"))
+        abilities.append(("fr", "Je peux parler espagnol.", "espagnol"))
+        abilities.append(("pt", "Posso falar francês.", "francês"))
+        for v in abilities {
+            rows.append(row("an-ability-is-a-claim-\(v.language)", "can is an ability the person claims: the language stays",
+                            v.description, CVData(languages: [Language(name: v.name)]), .unchanged, language: v.language))
+        }
+
+        typealias Part = (language: String, description: String)
+        var parts: [Part] = []
+        parts.append(("en", "I partly use Swift."))
+        parts.append(("it", "Uso parzialmente Swift."))
+        parts.append(("de", "Ich nutze teilweise Swift."))
+        parts.append(("es", "Uso parcialmente Swift."))
+        parts.append(("fr", "J'utilise partiellement Swift."))
+        parts.append(("pt", "Uso parcialmente Swift."))
+        for v in parts {
+            rows.append(row("a-part-is-a-claim-\(v.language)", "partly qualifies the claim but does not withdraw it: the skill stays",
+                            v.description, CVData(skills: [Skill(name: "Swift")]), .unchanged, language: v.language))
+        }
+        rows.append(row("most-is-a-claim", "mostly qualifies the claim but does not withdraw it: the skill stays",
+                        "I mostly use Swift.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
+        return rows
+    }
+
+    /// Wishes said with a phrase, not one word (#202): English "'d like", "'d love", "'d prefer", "'d rather"; German "würde gern",
+    /// "würde gerne", "würde lieber"; the verbs of dream with their complement ("sogno di", "sueño con", "rêve de", "sonho em",
+    /// "träume davon"). The words alone keep their meaning: "I'd used Swift" and "Ich wurde in Python geschult" claim.
+    private static func wishesInAPhrase() -> [GroundingRow] {
+        typealias Wish = (id: String, language: String, description: String, name: String)
+        var wishes: [Wish] = []
+        wishes.append(("d-like-en", "en", "I'd like to learn Spanish.", "Spanish"))
+        wishes.append(("d-love-en", "en", "I'd love to speak Spanish.", "Spanish"))
+        wishes.append(("d-prefer-en", "en", "I'd prefer to speak French.", "French"))
+        wishes.append(("d-rather-en", "en", "I'd rather learn German.", "German"))
+        wishes.append(("wurde-gern-de", "de", "Ich würde gern Spanisch lernen.", "Spanisch"))
+        wishes.append(("wurde-gerne-de", "de", "Ich würde gerne Italienisch lernen.", "Italienisch"))
+        wishes.append(("wurde-lieber-de", "de", "Ich würde lieber Französisch sprechen.", "Französisch"))
+        wishes.append(("traume-davon-de", "de", "Ich träume davon, Spanisch zu lernen.", "Spanisch"))
+        wishes.append(("sogno-di-it", "it", "Sogno di imparare lo spagnolo.", "spagnolo"))
+        wishes.append(("sueno-con-es", "es", "Sueño con hablar francés.", "francés"))
+        wishes.append(("reve-d-fr", "fr", "Je rêve d'apprendre l'espagnol.", "espagnol"))
+        wishes.append(("reve-de-fr", "fr", "Je rêve de parler italien.", "italien"))
+        wishes.append(("sonho-em-pt", "pt", "Sonho em falar francês.", "francês"))
+        wishes.append(("sonho-com-pt", "pt", "Sonho com aprender italiano.", "italiano"))
+
+        var rows: [GroundingRow] = []
+        for v in wishes {
+            rows.append(row("a-wish-in-a-phrase-claims-no-language-\(v.id)", "the phrase only wishes the language: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        typealias Fronted = (word: String, description: String, name: String, person: String, title: String, place: String)
+        var fronted: [Fronted] = []
+        fronted.append(("gerne", "Gerne würde ich Spanisch lernen.", "Spanisch",
+                        "Ich bin Maria Rossi. Gerne würde ich als Lehrerin in Berlin arbeiten.", "Lehrerin", "Berlin"))
+        fronted.append(("gern", "Gern würde ich Italienisch lernen.", "Italienisch",
+                        "Ich bin Maria Rossi. Gern würde ich als Krankenschwester in Turin arbeiten.", "Krankenschwester", "Turin"))
+        fronted.append(("lieber", "Lieber würde ich Französisch sprechen.", "Französisch",
+                        "Ich bin Maria Rossi. Lieber würde ich als Lehrer in Berlin arbeiten.", "Lehrer", "Berlin"))
+        for v in fronted {
+            rows.append(row("a-fronted-wish-claims-no-language-\(v.word)-de", "\(v.word) comes before würde, and it still only wishes: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: "de"))
+            rows.append(row("a-fronted-wish-gives-no-title-or-place-\(v.word)-de",
+                            "\(v.word) comes before würde, and it still only wishes: the name stays, the title and the place go",
+                            v.person, CVData(personalInfo: person(name: "Maria Rossi", location: v.place, title: v.title)),
+                            .exactly(CVData(personalInfo: person(name: "Maria Rossi"))), language: "de"))
+        }
+        rows.append(row("a-fronted-dream-claims-no-language-de", "von comes before träume, and it still only dreams: no language",
+                        "Von fließendem Spanisch träume ich.", CVData(languages: [Language(name: "Spanisch")]), .exactly(CVData()),
+                        language: "de"))
+        rows.append(row("a-fronted-gerne-before-a-past-is-an-accepted-loss-de",
+                        "gerne before wurde reads as a wish, though here it is a past: the skill goes, an accepted loss",
+                        "Gerne wurde ich in Python geschult.", CVData(skills: [Skill(name: "Python")]), .exactly(CVData()), language: "de"))
+        rows.append(row("a-past-participle-after-d-is-a-claim", "I'd used is I had used: the skill stays",
+                        "I'd used Swift for years.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
+        rows.append(row("wurde-without-gern-is-a-claim", "ich wurde geschult is a fact: the skill stays",
+                        "Ich wurde in Python geschult.", CVData(skills: [Skill(name: "Python")]), .unchanged, language: "de"))
+        return rows
+    }
+
+    /// Text typed without accents (#202, #249): the moods of supposition lose the mark that tells them from a fact. Spanish "seria"
+    /// still withdraws through the Portuguese "seria" (would be), which also takes Spanish "seria" (serious): an accepted loss.
+    /// "wurde" for "würde" reads as a past and keeps its item (`notImplementedYet`): the claim check of ADR 0028 withdraws it.
+    private static func textWithoutAccents() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        rows.append(row("a-conditional-typed-without-its-accent-claims-nothing-es",
+                        "seria for sería still supposes: no language",
+                        "Yo seria feliz aprendiendo aleman.", CVData(languages: [Language(name: "alemán")]), .exactly(CVData()), language: "es"))
+        rows.append(row("a-konjunktiv-typed-without-its-umlaut-claims-nothing-de",
+                        "wurde for würde still wishes: no language",
+                        "Am liebsten wurde ich Spanisch lernen.", CVData(languages: [Language(name: "Spanisch")]), .exactly(CVData()),
+                        language: "de"))
+        rows.append(row("serious-in-spanish-is-an-accepted-loss",
+                        "seria (serious) reads as the Portuguese would be: the clause and the one that shares it claim nothing, an accepted loss",
+                        "Soy una persona seria y hablo alemán.", CVData(languages: [Language(name: "alemán")]), .exactly(CVData()),
+                        language: "es"))
+        return rows
+    }
+
+    /// A denied level keeps its item only when the level is high (#202): denying "expert" or "fluent" implies some knowledge, while
+    /// denying a basic level, or knowledge itself, denies the item. "I'm not a beginner" denies a low level too, and loses its item:
+    /// an accepted loss.
+    private static func deniedLowLevels() -> [GroundingRow] {
+        typealias Denial = (id: String, language: String, description: String, name: String)
+        var denials: [Denial] = []
+        denials.append(("no-basic-knowledge-en", "en", "I have no basic knowledge of German.", "German"))
+        denials.append(("no-basic-en", "en", "I have no basic German.", "German"))
+        denials.append(("no-knowledge-en", "en", "I have no knowledge of German.", "German"))
+        denials.append(("not-even-basic-en", "en", "I have not even basic knowledge of German.", "German"))
+        denials.append(("keine-grundkenntnisse-de", "de", "Ich habe keine Grundkenntnisse in Deutsch.", "Deutsch"))
+        denials.append(("nicht-einmal-grundkenntnisse-de", "de", "Ich habe nicht einmal Grundkenntnisse in Deutsch.", "Deutsch"))
+        denials.append(("keine-kenntnisse-de", "de", "Ich habe keine Kenntnisse in Deutsch.", "Deutsch"))
+        denials.append(("nessuna-base-it", "it", "Non ho nessuna base di tedesco.", "tedesco"))
+        denials.append(("nessuna-conoscenza-di-base-it", "it", "Non ho nessuna conoscenza di base del tedesco.", "tedesco"))
+        denials.append(("ningun-conocimiento-basico-es", "es", "No tengo ningún conocimiento básico de alemán.", "alemán"))
+        denials.append(("no-es-basico-es", "es", "Mi alemán no es básico.", "alemán"))
+        denials.append(("aucune-notion-de-base-fr", "fr", "Je n'ai aucune notion de base en allemand.", "allemand"))
+        denials.append(("pas-de-notions-fr", "fr", "Je n'ai pas de notions d'allemand.", "allemand"))
+        denials.append(("nenhum-conhecimento-basico-pt", "pt", "Não tenho nenhum conhecimento básico de alemão.", "alemão"))
+        denials.append(("nao-e-basico-pt", "pt", "O meu alemão não é básico.", "alemão"))
+
+        var rows: [GroundingRow] = []
+        for v in denials {
+            rows.append(row("a-denied-low-level-gives-no-language-\(v.id)", "the negation denies a basic level or knowledge itself: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("a-denied-beginner-level-is-an-accepted-loss",
+                        "not a beginner denies a low level, which reads as no knowledge: the skill goes, an accepted loss",
+                        "I'm not a beginner in Python.", CVData(skills: [Skill(name: "Python")]), .exactly(CVData())))
+        return rows
+    }
+
+    /// A mood that only supposes or wishes is never a fact (#202): German Konjunktiv II ("würde", "hätte", "wäre", "müsste",
+    /// "dürfte"), read with its umlaut, so the past "wurde", "hatte", "musste" and "durfte" stay facts; English "'d" before a verb's
+    /// base form; the conditional of "to be", "to have", "to do" and of the verbs of liking in the other languages.
+    private static func moodsOfSupposition() -> [GroundingRow] {
+        typealias Supposed = (id: String, language: String, description: String, draft: CVData)
+        var supposed: [Supposed] = []
+        let maria = { (title: String, place: String) in CVData(personalInfo: person(name: "Maria Rossi", location: place, title: title)) }
+        supposed.append(("am-liebsten-wurde-language-de", "de", "Am liebsten würde ich Spanisch lernen.",
+                         CVData(languages: [Language(name: "Spanisch")])))
+        supposed.append(("am-liebsten-wurde-title-and-place-de", "de", "Ich bin Maria Rossi. Am liebsten würde ich als Lehrer in Berlin arbeiten.",
+                         maria("Lehrer", "Berlin")))
+        supposed.append(("wurde-alone-de", "de", "Ich bin Maria Rossi. Ich würde als Lehrerin in Berlin arbeiten.", maria("Lehrerin", "Berlin")))
+        supposed.append(("am-liebsten-hatte-de", "de", "Ich bin Maria Rossi. Am liebsten hätte ich eine Stelle als Lehrerin in Berlin.",
+                         maria("Lehrerin", "Berlin")))
+        supposed.append(("hatte-gern-de", "de", "Ich hätte gern Spanisch gelernt.", CVData(languages: [Language(name: "Spanisch")])))
+        supposed.append(("ware-gern-de", "de", "Ich bin Maria Rossi. Ich wäre gern Lehrerin in Berlin.", maria("Lehrerin", "Berlin")))
+        supposed.append(("d-work-en", "en", "I'm Maria Rossi. I'd work as a teacher in Berlin.", maria("teacher", "Berlin")))
+        supposed.append(("d-be-en", "en", "I'd be happy to learn Spanish.", CVData(languages: [Language(name: "Spanish")])))
+        supposed.append(("sarei-it", "it", "Sono Maria Rossi. Sarei felice di lavorare come infermiera a Torino.", maria("infermiera", "Torino")))
+        supposed.append(("farei-it", "it", "Sono Maria Rossi. Farei l'infermiera a Torino.", maria("infermiera", "Torino")))
+        supposed.append(("avrei-it", "it", "Avrei voluto imparare lo spagnolo.", CVData(languages: [Language(name: "spagnolo")])))
+        supposed.append(("seria-es", "es", "Soy Maria Rossi. Sería feliz trabajando como enfermera en Turín.", maria("enfermera", "Turín")))
+        supposed.append(("encantaria-es", "es", "Me encantaría aprender alemán.", CVData(languages: [Language(name: "alemán")])))
+        supposed.append(("serais-fr", "fr", "Je suis Maria Rossi. Je serais heureuse de travailler comme infirmière à Turin.",
+                         maria("infirmière", "Turin")))
+        supposed.append(("adorerais-fr", "fr", "J'adorerais apprendre l'espagnol.", CVData(languages: [Language(name: "espagnol")])))
+        supposed.append(("seria-pt", "pt", "Sou Maria Rossi. Seria feliz trabalhando como enfermeira em Turim.", maria("enfermeira", "Turim")))
+        supposed.append(("adoraria-pt", "pt", "Adoraria aprender alemão.", CVData(languages: [Language(name: "alemão")])))
+        supposed.append(("quereria-pt", "pt", "Quereria aprender espanhol.", CVData(languages: [Language(name: "espanhol")])))
+
+        var rows: [GroundingRow] = []
+        for v in supposed {
+            let kept = v.draft.personalInfo.name.map { CVData(personalInfo: person(name: $0)) } ?? CVData()
+            rows.append(row("a-mood-of-supposition-claims-nothing-\(v.id)", "the mood only supposes or wishes: nothing of the clause stays",
+                            v.description, v.draft, .exactly(kept), language: v.language))
+        }
+        rows.append(row("hatte-in-the-past-is-a-fact-de", "hatte without an umlaut is the past: the language stays",
+                        "Ich hatte Spanisch in der Schule.", CVData(languages: [Language(name: "Spanisch")]), .unchanged, language: "de"))
+        rows.append(row("a-past-after-d-keeps-the-title-and-place-en", "I'd worked is I had worked: the title and the place stay",
+                        "I'm Maria Rossi. I'd worked as a teacher in Berlin.", maria("teacher", "Berlin"), .unchanged))
+        return rows
+    }
+
+    /// A question claims nothing (#202): a sentence that ends with a question mark, every clause of it. The sentence after it claims
+    /// as usual, and a question the person answers loses its item: an accepted loss.
+    private static func questionsClaimNothing() -> [GroundingRow] {
+        typealias Question = (language: String, question: String, name: String, answered: String)
+        var questions: [Question] = []
+        questions.append(("en", "Do I speak French?", "French", "Do you need a translator? I speak French."))
+        questions.append(("it", "Parlo francese?", "francese", "Cercate un traduttore? Parlo francese."))
+        questions.append(("de", "Spreche ich Französisch?", "Französisch", "Suchen Sie einen Übersetzer? Ich spreche Französisch."))
+        questions.append(("es", "¿Hablo francés?", "francés", "¿Busca un traductor? Hablo francés."))
+        questions.append(("fr", "Est-ce que je parle français ?", "français", "Vous cherchez un traducteur ? Je parle français."))
+        questions.append(("pt", "Falo francês?", "francês", "Procura um tradutor? Falo francês."))
+
+        var rows: [GroundingRow] = []
+        for v in questions {
+            let draft = CVData(languages: [Language(name: v.name)])
+            rows.append(row("a-question-claims-no-language-\(v.language)", "the person only asks: no language",
+                            v.question, draft, .exactly(CVData()), language: v.language))
+            rows.append(row("a-fact-after-a-question-keeps-its-language-\(v.language)",
+                            "the question is the reader's; the sentence after it is a fact: the language stays",
+                            v.answered, draft, .unchanged, language: v.language))
+        }
+        rows.append(row("a-sentence-that-ends-in-a-question-claims-nothing",
+                        "the sentence ends with a question mark: neither language stays, not even the one before the comma",
+                        "Parlo francese e tedesco, giusto?",
+                        CVData(languages: [Language(name: "francese"), Language(name: "tedesco")]), .exactly(CVData()), language: "it"))
+        rows.append(row("a-question-the-person-answers-is-an-accepted-loss",
+                        "the item stands only in the question, and the answer does not name it: French goes, an accepted loss",
+                        "Do I speak French? Yes, fluently.", CVData(languages: [Language(name: "French")]), .exactly(CVData())))
+        return rows
+    }
+
+    /// What stands inside quotation marks claims nothing (#202): another person's words, or words the person only quotes. Every
+    /// mark of the six languages counts, straight or typographic, and a quote may run over two sentences. An apostrophe inside a word
+    /// is no mark, and a mark that nothing closes quotes nothing. A skill the person puts between quotation marks goes: an accepted
+    /// loss.
+    private static func quotedSpeechClaimsNothing() -> [GroundingRow] {
+        typealias Message = (language: String, description: String, name: String)
+        var messages: [Message] = []
+        messages.append(("en", "A message from my colleague:\n“I speak French.”", "French"))
+        messages.append(("it", "Messaggio del mio collega:\n«Parlo francese.»", "francese"))
+        messages.append(("de", "Eine Nachricht meines Kollegen:\n„Ich spreche Französisch.“", "Französisch"))
+        messages.append(("es", "Un mensaje de mi colega:\n«Hablo francés.»", "francés"))
+        messages.append(("fr", "Un message de mon collègue :\n« Je parle français. »", "français"))
+        messages.append(("pt", "Uma mensagem do meu colega:\n“Falo francês.”", "francês"))
+
+        var rows: [GroundingRow] = []
+        for v in messages {
+            rows.append(row("a-quoted-message-claims-no-language-\(v.language)", "the language stands only inside quotation marks: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        let marks: [(id: String, open: String, close: String)] = [
+            ("straight-double", "\"", "\""), ("straight-single", "'", "'"), ("curly-double", "“", "”"), ("curly-single", "‘", "’"),
+            ("guillemets", "«", "»"), ("low-and-high", "„", "“"), ("low-and-curly", "„", "”"), ("reversed-guillemets", "»", "«"),
+            ("single-guillemets", "‹", "›"),
+        ]
+        for mark in marks {
+            rows.append(row("speech-in-\(mark.id)-marks-claims-nothing", "the whole description is a quote: no language",
+                            "\(mark.open)I speak French.\(mark.close)", CVData(languages: [Language(name: "French")]), .exactly(CVData())))
+        }
+        rows.append(row("a-quote-of-two-sentences-claims-nothing",
+                        "the quote runs over two sentences: neither language stays",
+                        "Feedback from a client: “I speak French. I also speak German.”",
+                        CVData(languages: [Language(name: "French"), Language(name: "German")]), .exactly(CVData())))
+        rows.append(row("words-after-a-quote-still-claim",
+                        "only the quoted words claim nothing: Swift stands after the closing mark, and stays",
+                        "I use “clean code” principles with Swift every day.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
+        rows.append(row("typographic-apostrophes-are-no-quotation-marks-en",
+                        "the apostrophes of I’m and I’ve are inside words: French and Swift stay",
+                        "I’m fluent in French and I’ve used Swift.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]), .unchanged))
+        rows.append(row("typographic-apostrophes-are-no-quotation-marks-fr",
+                        "the apostrophes of j’ai and l’anglais are inside words: Swift and English stay",
+                        "J’ai utilisé Swift et je parle l’anglais.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "anglais")]), .unchanged, language: "fr"))
+        rows.append(row("typographic-apostrophes-are-no-quotation-marks-it",
+                        "the apostrophe of l’inglese is inside the word: English stays",
+                        "Ho usato Swift e parlo l’inglese.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "inglese")]), .unchanged, language: "it"))
+        rows.append(row("a-mark-nothing-closes-quotes-nothing",
+                        "the opening mark has no closing one: it quotes nothing, and both languages stay",
+                        "I speak “French and German.",
+                        CVData(languages: [Language(name: "French"), Language(name: "German")]), .unchanged))
+        rows.append(row("a-skill-in-quotation-marks-is-an-accepted-loss",
+                        "the skill stands only inside quotation marks: Swift goes, an accepted loss",
+                        "I work with “Swift” every day.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData())))
+        rows += singleMarksAfterAWord()
+        rows += marksAtTheEndOfALine()
+        rows += quotesInsideQuotes()
+        return rows
+    }
+
+    /// A mark at the end of a line opens a quote that goes on with the next lines (#202), when a mark may close it there: a speech
+    /// introduced without a colon, its words on the next line ("Mon collègue a écrit '", then "Je parle français.'"), claims nothing.
+    /// With nothing to close it, the mark opens nothing, and the next line claims as usual. A mark alone on its line closes the quote,
+    /// unless a later mark closes it for sure and no opening mark after the lone one pairs with that later mark: the lone mark is then
+    /// a symbol the quote holds, such as a ditto mark, and the quote runs to the later mark.
+    private static func marksAtTheEndOfALine() -> [GroundingRow] {
+        typealias Speech = (language: String, description: String, name: String)
+        var speeches: [Speech] = []
+        speeches.append(("en", "My colleague wrote \"\nI speak French.\"", "French"))
+        speeches.append(("it", "Il mio collega ha scritto “\nParlo francese.”", "francese"))
+        speeches.append(("de", "Mein Kollege schrieb „\nIch spreche Französisch.“", "Französisch"))
+        speeches.append(("es", "Mi colega escribió \"\nHablo francés.\"", "francés"))
+        speeches.append(("fr", "Mon collègue a écrit '\nJe parle français.'", "français"))
+        speeches.append(("pt", "O meu colega escreveu ‘\nFalo francês.’", "francês"))
+
+        var rows: [GroundingRow] = []
+        for v in speeches {
+            rows.append(row("a-mark-at-the-end-of-a-line-opens-a-quote-\(v.language)",
+                            "the mark ends the colleague's line and the next line closes it: the quote is the colleague's, and no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("a-mark-at-the-end-of-a-line-opens-a-quote-that-only-a-word-may-close",
+                        "the mark ends the colleague's line and only the possessive may close it: the next line is quoted to its end, and no language",
+                        "My colleague wrote '\nI manage patients' records. I speak French.", CVData(languages: [Language(name: "French")]),
+                        .exactly(CVData())))
+        rows.append(row("a-mark-at-the-end-of-a-line-that-nothing-closes-opens-nothing",
+                        "no mark closes the one that ends the first line: it opens nothing, and both languages stay",
+                        "I speak French “\nI speak German.", CVData(languages: [Language(name: "French"), Language(name: "German")]), .unchanged))
+        rows.append(row("a-possessive-at-the-end-of-a-line-opens-nothing",
+                        "the mark after James is a possessive, no opening mark: French stays",
+                        "I studied at St. James'\nI speak French.", CVData(languages: [Language(name: "French")]), .unchanged))
+        rows.append(row("a-mark-alone-on-its-line-closes-the-quote",
+                        "the mark alone on the third line closes the colleague's quote: Swift goes, and French, on the next line, stays",
+                        "My colleague wrote \"\nI use Swift.\n\"\nI speak French.\nI use \"clean code\".",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]),
+                        .exactly(CVData(languages: [Language(name: "French")]))))
+        rows.append(row("a-mark-alone-on-its-line-closes-the-quote-before-a-possessive",
+                        "only a possessive follows the mark alone on the third line, and it closes nothing for sure: the lone mark closes the quote, Swift goes and French stays",
+                        "My colleague wrote '\nI use Swift.\n'\nI speak French.\nI keep my patients' records.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]),
+                        .exactly(CVData(languages: [Language(name: "French")]))))
+        rows.append(row("a-mark-alone-on-its-line-inside-a-quote-closes-nothing",
+                        "the mark alone on the third line is the colleague's ditto symbol, and the quote runs to the last line: no language",
+                        "My colleague wrote \"\nIn my table, the ditto symbol is:\n\"\nI speak French.\nEnd of my message.\"",
+                        CVData(languages: [Language(name: "French")]), .exactly(CVData())))
+        var dittoMarks: [Speech] = []
+        dittoMarks.append(("it", "Il mio collega ha scritto “\nNella mia tabella, il simbolo di ripetizione è:\n”\nParlo francese.\nFine del messaggio.”", "francese"))
+        dittoMarks.append(("de", "Mein Kollege schrieb „\nIn meiner Tabelle ist das Wiederholungszeichen:\n“\nIch spreche Französisch.\nEnde meiner Nachricht.“", "Französisch"))
+        dittoMarks.append(("es", "Mi colega escribió \"\nEn mi tabla, el símbolo de repetición es:\n\"\nHablo francés.\nFin de mi mensaje.\"", "francés"))
+        dittoMarks.append(("fr", "Mon collègue a écrit '\nDans mon tableau, le symbole de répétition est :\n'\nJe parle français.\nFin de mon message.'", "français"))
+        dittoMarks.append(("pt", "O meu colega escreveu ‘\nNa minha tabela, o símbolo de repetição é:\n’\nFalo francês.\nFim da mensagem.’", "francês"))
+        for v in dittoMarks {
+            rows.append(row("a-mark-alone-on-its-line-inside-a-quote-closes-nothing-\(v.language)",
+                            "the mark alone on the third line is the colleague's ditto symbol, and the quote runs to the last line: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        // The opening marks after a lone mark count whatever pair they belong to: a quote of another pair does not end the first one
+        rows.append(row("a-mark-alone-on-its-line-closes-the-quote-before-a-quote-of-another-pair-de",
+                        "the lone mark on the third line closes the colleague's quote; the ” that ends the motto closes the motto, not the colleague's quote: Swift goes, Python stays",
+                        "Mein Kollege schrieb „\nIch benutze Swift.\n“\nIch benutze Python.\nMein Motto ist “Sauberer Code”.",
+                        CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")]),
+                        .exactly(CVData(skills: [Skill(name: "Python")])), language: "de"))
+        rows.append(row("a-mark-alone-on-its-line-inside-a-quote-that-holds-a-quote-of-another-pair-de",
+                        "the lone mark on the third line is the colleague's ditto symbol, a quote of another pair closes inside the message, and the message runs to its last line: no language",
+                        "Mein Kollege schrieb „\nIn meiner Tabelle ist das Wiederholungszeichen:\n“\nIch spreche “schnell” Französisch.\nEnde meiner Nachricht.“",
+                        CVData(languages: [Language(name: "Französisch")]), .exactly(CVData()), language: "de"))
+        rows.append(row("a-mark-alone-on-its-line-inside-a-quote-that-a-closing-mark-of-another-pair-ends-de",
+                        "a ” closes the colleague's quote for sure after the lone mark and no opening mark pairs with it: the lone mark is a symbol the message holds, so Swift and Python go and Deutsch stays",
+                        "Mein Kollege schrieb „\nIch benutze Swift.\n“\nIch benutze Python.”\nIch spreche Deutsch.",
+                        CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")], languages: [Language(name: "Deutsch")]),
+                        .exactly(CVData(languages: [Language(name: "Deutsch")])), language: "de"))
+        return rows
+    }
+
+    /// A quote may hold a quote of another pair (#249): the quote of a German „…“ holds a “…” or a ‚…‘, a “…” holds a „…“. A closing
+    /// mark closes the latest open quote that it pairs with, whichever pair that is, and only a mark that closes none of them ends the
+    /// quote that holds them. So the words after the inner quote, up to the mark that ends the outer one, are still quoted, and the
+    /// line after it claims as usual. Every pair of the six languages is the outer one once for each other pair it holds, in a quote
+    /// that a closing mark ends, and in a quote with a mark alone on its line, which is a symbol it holds when a later mark ends it.
+    /// The inner quote starts with a letter and ends with a closing bracket: a mark right before a punctuation mark closes a quote, so
+    /// an inner « before a bracket would close the outer one, and a single mark after a letter may be an apostrophe.
+    ///
+    /// A mark that an inner quote took never ends the quote that holds it, so two more rows exist for every pair of quotes that share a
+    /// closing mark (“…” inside a „…“, a „…” inside a “…”, a ‚…’ inside a ‘…’): an outer quote that only the inner quote's mark could
+    /// close, and an outer quote that closes with the mark of an inner quote that nothing closes. Each runs to the end of the line of
+    /// that mark, as no other mark ends it (the unit table in `QuotedSpeechNestingTests` holds every cell).
+    private static func quotesInsideQuotes() -> [GroundingRow] {
+        typealias Marks = (id: String, open: String, close: String)
+        let pairs: [Marks] = [
+            ("straight-double", "\"", "\""), ("straight-single", "'", "'"), ("curly-double", "“", "”"), ("curly-single", "‘", "’"),
+            ("guillemets", "«", "»"), ("reversed-guillemets", "»", "«"), ("single-guillemets", "‹", "›"),
+            ("reversed-single-guillemets", "›", "‹"), ("low-and-high", "„", "“"), ("low-and-curly", "„", "”"),
+            ("single-low-and-high", "‚", "‘"), ("single-low-and-curly", "‚", "’"),
+        ]
+
+        let closersOfOpen = Dictionary(grouping: pairs, by: \.open).mapValues { Set($0.map(\.close)) }
+        var texts: Set<String> = []
+
+        var rows: [GroundingRow] = []
+        rows.append(row("a-quote-of-another-pair-inside-a-quote-does-not-end-it-de",
+                        "the “ that closes the motto is no end of the colleague's quote, which a lone ” on its own line only seems to close: Swift goes, and Deutsch, on the last line, stays",
+                        "Mein Kollege schrieb “\nIn meiner Tabelle ist das Wiederholungszeichen:\n”\nMein Motto ist „Sauberer Code“. Ich benutze Swift.\nEnde meiner Nachricht.”\nIch spreche Deutsch.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "Deutsch")]),
+                        .exactly(CVData(languages: [Language(name: "Deutsch")])), language: "de"))
+        for outer in pairs {
+            for inner in pairs where inner.open != outer.open {
+                let nesting = "\(inner.id)-inside-a-quote-of-\(outer.id)"
+                let within = "\(inner.open)\(inner.close) inside \(outer.open)\(outer.close)"
+                rows.append(row("the-sentence-after-a-quote-of-\(nesting)-is-quoted",
+                                "\(within): the inner quote closes with its own mark before the full stop, and the next sentence is still the colleague's: Swift and Python go, and French, on the next line, stays",
+                                "\(outer.open)My colleague wrote:\(inner.open)Swift (ok)\(inner.close). I use Python.\(outer.close)\nI speak French.",
+                                CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")], languages: [Language(name: "French")]),
+                                .exactly(CVData(languages: [Language(name: "French")]))))
+                rows.append(row("a-mark-alone-on-its-line-before-a-quote-of-\(nesting)-closes-nothing",
+                                "\(within): the mark alone on the third line is the colleague's symbol, the inner quote closes with its own mark before the full stop, and the message runs to its end: Swift and Python go, and French, on the last line, stays",
+                                "My colleague wrote \(outer.open)\nIn my table, the ditto symbol is:\n\(outer.close)\nI say:\(inner.open)Swift (ok)\(inner.close). I use Python.\nEnd of my message.\(outer.close)\nI speak French.",
+                                CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")], languages: [Language(name: "French")]),
+                                .exactly(CVData(languages: [Language(name: "French")]))))
+
+                let unclosedOuter = "\(outer.open)My colleague wrote:\(inner.open)Swift (ok)\(inner.close). I use Python.\nI speak French."
+                if closersOfOpen[outer.open, default: []].contains(inner.close), texts.insert(unclosedOuter).inserted {
+                    rows.append(row("a-quote-only-the-mark-of-\(nesting)-could-close-runs-to-the-end-of-its-line",
+                                    "\(within): the mark of the inner quote closes the outer pair too, but an inner quote took it, so nothing ends the outer quote and it runs to the end of that line: Swift and Python go, and French, on the next line, stays",
+                                    unclosedOuter,
+                                    CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")], languages: [Language(name: "French")]),
+                                    .exactly(CVData(languages: [Language(name: "French")]))))
+                }
+
+                let unclosedInner = "\(outer.open)My colleague wrote:\(inner.open)Swift (ok). I use Python.\(outer.close) I speak German.\nI speak French."
+                if closersOfOpen[inner.open, default: []].contains(outer.close), texts.insert(unclosedInner).inserted {
+                    rows.append(row("a-quote-of-\(nesting)-whose-inner-quote-nothing-closes-runs-to-the-end-of-its-line",
+                                    "\(within): the mark that closes the outer quote closes the inner pair too, but nothing else closes either, so the outer quote runs to the end of that line: Swift, Python and German go, and French, on the next line, stays",
+                                    unclosedInner,
+                                    CVData(skills: [Skill(name: "Swift"), Skill(name: "Python")],
+                                           languages: [Language(name: "German"), Language(name: "French")]),
+                                    .exactly(CVData(languages: [Language(name: "French")]))))
+                }
+            }
+        }
+        return rows
+    }
+
+    /// A single mark right after a letter or a digit may end a word rather than a quote (#202): a possessive ("patients' records",
+    /// "Hans’ Team"), an elision ("un po'", "all' università", "jusqu' à") or a prime ("a 5' de la oficina"), whatever follows it. It
+    /// closes no quote: the quote runs to a mark that closes it for sure, after a punctuation mark, or, with none, to the end of the
+    /// line of the last mark that may. An apostrophe outside a quote still claims as usual ("I'm", "l'inglese", "dell'università",
+    /// "clients' apps"). A quote that such a mark closes takes the rest of its line with it, and so does an apostrophe that starts a
+    /// word when a later one may close it ("the '90s"), and every line up to the last mark that may close a quote, though that mark
+    /// closes another quote: accepted losses.
+    private static func singleMarksAfterAWord() -> [GroundingRow] {
+        typealias Passage = (id: String, language: String, description: String, name: String)
+        var passages: [Passage] = []
+        passages.append(("straight-possessive-en", "en", "My colleague said 'I manage patients' records. I speak French.'", "French"))
+        passages.append(("curly-possessive-en", "en", "My colleague said ‘I manage patients’ records. I speak French.’", "French"))
+        passages.append(("possessive-of-a-name-de", "de", "Mein Kollege sagte: ‚Ich leite Hans’ Team. Ich spreche Französisch.‘", "Französisch"))
+        passages.append(("low-mark-as-an-apostrophe-de", "de", "Mein Kollege sagte: ‚Ich leite Hans‘ Team. Ich spreche Französisch.‘",
+                         "Französisch"))
+        passages.append(("straight-possessive-of-a-name-de", "de", "Mein Kollege sagte: 'Ich leite Hans' Team. Ich spreche Französisch.'",
+                         "Französisch"))
+        passages.append(("elision-before-a-word-it", "it", "Il mio collega ha detto: 'Parlo un po' di tedesco. Parlo francese.'", "francese"))
+        passages.append(("elision-before-a-full-stop-it", "it", "Il mio collega ha detto: 'Parlo tedesco solo un po'. Parlo francese.'",
+                         "francese"))
+        passages.append(("elision-before-a-space-it", "it", "Il mio collega ha scritto: 'Ho studiato all' università. Parlo francese.'",
+                         "francese"))
+        passages.append(("elision-before-a-space-fr", "fr", "Mon collègue a écrit : 'Je travaille jusqu' à huit heures. Je parle français.'",
+                         "français"))
+        passages.append(("prime-es", "es", "Mi colega dijo: 'Vivo a 5' de la oficina. Hablo francés.'", "francés"))
+        passages.append(("prime-pt", "pt", "O meu colega disse: 'Moro a 5' do escritório. Falo francês.'", "francês"))
+
+        var rows: [GroundingRow] = []
+        for v in passages {
+            rows.append(row("a-quote-runs-past-a-\(v.id)",
+                            "the mark after the word may end the word, not the quote: the quote runs to the mark after the full stop, and no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+
+        let unclosed: [Passage] = [
+            ("straight-possessive-en", "en", "My colleague said 'I manage patients' records. I speak French.", "French"),
+            ("curly-possessive-en", "en", "My colleague said ‘I manage patients’ records. I speak French.", "French"),
+            ("possessive-of-a-name-de", "de", "Mein Kollege sagte: ‚Ich leite Hans’ Team. Ich spreche Französisch.", "Französisch"),
+            ("elision-it", "it", "Il mio collega ha detto: 'Parlo un po' di tedesco. Parlo francese.", "francese"),
+        ]
+        for v in unclosed {
+            rows.append(row("a-quote-only-a-word-could-close-runs-to-the-end-of-its-line-\(v.id)",
+                            "nothing closes the quote for sure: it runs to the end of its line, and no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("a-quote-only-a-word-could-close-stops-at-the-end-of-its-line",
+                        "the quote runs to the end of its line; the next line is the person's: German stays",
+                        "My colleague said 'I manage patients' records. I speak French.\nI speak German.",
+                        CVData(languages: [Language(name: "French"), Language(name: "German")]),
+                        .exactly(CVData(languages: [Language(name: "German")]))))
+
+        // No quote: the apostrophes and the possessives claim as usual.
+        rows.append(row("straight-apostrophes-are-no-quotation-marks-en",
+                        "the apostrophes of I'm and I've are inside words: French and Swift stay",
+                        "I'm fluent in French and I've used Swift.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]), .unchanged))
+        rows.append(row("straight-apostrophes-are-no-quotation-marks-fr",
+                        "the apostrophes of J'ai and l'anglais are inside words: Swift and English stay",
+                        "J'ai utilisé Swift et je parle l'anglais.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "anglais")]), .unchanged, language: "fr"))
+        rows.append(row("straight-apostrophes-are-no-quotation-marks-it",
+                        "the apostrophes of dell'università and l'inglese are inside words: English stays",
+                        "Ho una laurea dell'università di Bologna e parlo l'inglese.",
+                        CVData(languages: [Language(name: "inglese")]), .unchanged, language: "it"))
+        rows.append(row("a-possessive-outside-quotation-marks-claims-en",
+                        "no mark opens a quote: the possessive is only a possessive, and Swift stays",
+                        "I built my clients' apps with Swift.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
+        rows.append(row("a-possessive-outside-quotation-marks-claims-de",
+                        "no mark opens a quote: the possessive is only a possessive, and Swift stays",
+                        "Ich habe in Hans' Team mit Swift gearbeitet.", CVData(skills: [Skill(name: "Swift")]), .unchanged, language: "de"))
+        rows.append(row("a-possessive-after-a-closed-quote-claims",
+                        "the quote closed before the possessive: Swift stays",
+                        "My motto is “clean code”. I built my clients' apps with Swift.", CVData(skills: [Skill(name: "Swift")]), .unchanged))
+
+        // Accepted losses: a single mark that closes a quote right after a word may be an apostrophe, so the rest of its line goes.
+        rows.append(row("words-after-a-single-mark-after-a-word-are-an-accepted-loss",
+                        "the mark after code may be an apostrophe: the quote runs to the end of the line, and Swift goes, an accepted loss",
+                        "I use 'clean code' principles with Swift every day.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData())))
+        rows.append(row("a-sentence-after-a-single-mark-after-a-word-is-an-accepted-loss",
+                        "the mark after French may be an apostrophe: the quote runs to the end of the line, and German goes too, an accepted loss",
+                        "My colleague said 'I speak French'. I speak German.",
+                        CVData(languages: [Language(name: "French"), Language(name: "German")]), .exactly(CVData())))
+        rows.append(row("an-apostrophe-that-starts-a-word-before-a-possessive-is-an-accepted-loss",
+                        "the apostrophe of '90s may open a quote that the possessive may close: both lines go, Swift with them, an accepted loss; French stays",
+                        "I grew up in the '90s.\nI built my clients' apps with Swift.\nI speak French.",
+                        CVData(skills: [Skill(name: "Swift")], languages: [Language(name: "French")]),
+                        .exactly(CVData(languages: [Language(name: "French")]))))
+        rows.append(row("a-line-between-two-quotes-that-a-word-may-close-is-an-accepted-loss",
+                        "the first quote runs to the last mark that may close it, on the third line: the line between goes, French with it, an accepted loss",
+                        "I use 'clean code'.\nI speak French.\nI use 'unit tests'.", CVData(languages: [Language(name: "French")]),
+                        .exactly(CVData())))
+        return rows
+    }
+
+    /// A line that ends with a colon and does not speak for the person introduces someone else's words: the line after it claims
+    /// nothing, all its sentences (#202). The line after that claims as usual, and so does the line after a colon line that the
+    /// person speaks ("My languages:", "Skills:", "I worked with my team on:"). Words without marks after the colon on its own line
+    /// are read by their own clauses, and a sentence after the colon's keeps its item (`notImplementedYet`): the claim check of
+    /// ADR 0028 withdraws it.
+    private static func speechAfterALineOfAnotherPerson() -> [GroundingRow] {
+        typealias Speech = (language: String, description: String, name: String)
+        var speeches: [Speech] = []
+        speeches.append(("en", "My colleague wrote:\nI speak French.", "French"))
+        speeches.append(("it", "Il mio collega ha scritto:\nParlo francese.", "francese"))
+        speeches.append(("de", "Mein Kollege schrieb:\nIch spreche Französisch.", "Französisch"))
+        speeches.append(("es", "Mi colega escribió:\nHablo francés.", "francés"))
+        speeches.append(("fr", "Mon collègue a écrit :\nJe parle français.", "français"))
+        speeches.append(("pt", "O meu colega escreveu:\nFalo francês.", "francês"))
+
+        var rows: [GroundingRow] = []
+        for v in speeches {
+            rows.append(row("the-line-after-another-persons-colon-claims-nothing-\(v.language)",
+                            "the colleague's line introduces the colleague's words: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("every-sentence-of-the-introduced-line-claims-nothing",
+                        "both sentences of the line after the colon are the colleague's; the next line is the person's: Italian stays",
+                        "My colleague wrote:\nI speak French. I speak German.\nI speak Italian.",
+                        CVData(languages: [Language(name: "French"), Language(name: "German"), Language(name: "Italian")]),
+                        .exactly(CVData(languages: [Language(name: "Italian")]))))
+        rows.append(row("speech-on-the-line-of-the-colon-claims-nothing",
+                        "the colleague's words follow the colon on its own line: neither language stays",
+                        "My colleague wrote: I speak French. I speak German.",
+                        CVData(languages: [Language(name: "French"), Language(name: "German")]), .exactly(CVData())))
+        rows.append(row("the-line-after-the-persons-own-colon-claims-en", "my languages are the person's: both languages stay",
+                        "My languages:\nItalian and English.",
+                        CVData(languages: [Language(name: "Italian"), Language(name: "English")]), .unchanged))
+        rows.append(row("the-line-after-the-persons-own-colon-claims-it", "le mie lingue are the person's: both languages stay",
+                        "Le mie lingue:\nitaliano e inglese.",
+                        CVData(languages: [Language(name: "italiano"), Language(name: "inglese")]), .unchanged, language: "it"))
+        rows.append(row("the-line-after-a-label-claims", "a label speaks for no one else: both skills stay",
+                        "Skills:\nPython, Swift.", CVData(skills: [Skill(name: "Python"), Skill(name: "Swift")]), .unchanged))
+        rows.append(row("the-line-after-the-persons-own-statement-claims", "the person speaks the colon line: both skills stay",
+                        "I worked with my team on:\nSwift and Kotlin apps.",
+                        CVData(skills: [Skill(name: "Swift"), Skill(name: "Kotlin")]), .unchanged))
+        return rows
+    }
+
+    /// A relative pronoun or a subordinator that brings in another subject withdraws what follows it in its clause (#202): "I work with
+    /// a colleague who speaks French" claims no French, nor "Ich leite ein Team, das Kotlin und Swift nutzt" Kotlin. When the person
+    /// stays the subject ("which I use", "che uso", "das ich nutze", "que je parle"), or the item stands before the pronoun, the item
+    /// stays. When the person is the subject that the pronoun brings in ("I am a developer who knows Swift"), the item goes: an
+    /// accepted loss.
+    private static func relativeClausesOfAnotherSubject() -> [GroundingRow] {
+        typealias Variant = (
+            language: String, colleague: String, spoken: String, team: String, before: String, person: String, languages: [String]
+        )
+        var variants: [Variant] = []
+        variants.append(("en", "I work with a colleague who speaks French.", "French", "I manage a team that uses Kotlin and Swift.",
+                         "I speak French, which I use every day.", "The languages that I speak are French and German.", ["French", "German"]))
+        variants.append(("it", "Io lavoro con un collega che parla francese.", "francese", "Gestisco un team che usa Kotlin e Swift.",
+                         "Parlo francese, che uso ogni giorno.", "Le lingue che parlo sono il francese e il tedesco.", ["francese", "tedesco"]))
+        variants.append(("de", "Ich arbeite mit einem Kollegen, der Französisch spricht.", "Französisch",
+                         "Ich leite ein Team, das Kotlin und Swift nutzt.", "Ich spreche Französisch, das ich täglich nutze.",
+                         "Die Sprachen, die ich spreche, sind Französisch und Deutsch.", ["Französisch", "Deutsch"]))
+        variants.append(("es", "Trabajo con un colega que habla francés.", "francés", "Dirijo un equipo que usa Kotlin y Swift.",
+                         "Hablo francés, que uso cada día.", "Los idiomas que hablo son el francés y el alemán.", ["francés", "alemán"]))
+        variants.append(("fr", "Je travaille avec un collègue qui parle français.", "français", "Je dirige une équipe qui utilise Kotlin et Swift.",
+                         "Je parle français, que j'utilise tous les jours.", "Les langues que je parle sont le français et l'allemand.",
+                         ["français", "allemand"]))
+        variants.append(("pt", "Trabalho com um colega que fala francês.", "francês", "Coordeno uma equipe que usa Kotlin e Swift.",
+                         "Falo francês, que uso todos os dias.", "As línguas que falo são o francês e o alemão.", ["francês", "alemão"]))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-colleagues-language-after-a-relative-is-not-the-persons-\(v.language)",
+                            "the colleague speaks the language: no language", v.colleague, CVData(languages: [Language(name: v.spoken)]),
+                            .exactly(CVData()), language: v.language))
+            rows.append(row("a-teams-skills-after-a-relative-are-not-the-persons-\(v.language)",
+                            "the team uses both skills, the one after the conjunction too: no skill", v.team,
+                            CVData(skills: [Skill(name: "Kotlin"), Skill(name: "Swift")]), .exactly(CVData()), language: v.language))
+            rows.append(row("an-item-before-a-relative-stays-\(v.language)",
+                            "the person speaks the language before the pronoun, and uses it after: the language stays", v.before,
+                            CVData(languages: [Language(name: v.spoken)]), .unchanged, language: v.language))
+            rows.append(row("the-person-after-a-relative-keeps-the-items-\(v.language)",
+                            "the person is the subject after the pronoun: both languages stay", v.person,
+                            CVData(languages: v.languages.map { Language(name: $0) }), .unchanged, language: v.language))
+        }
+        rows.append(row("a-clause-of-the-person-after-a-relative-claims",
+                        "the colleague speaks French; the person speaks German in a clause of their own: German stays",
+                        "I work with a colleague who speaks French, and I speak German.",
+                        CVData(languages: [Language(name: "French"), Language(name: "German")]),
+                        .exactly(CVData(languages: [Language(name: "German")]))))
+        rows.append(row("a-relative-after-the-item-keeps-it",
+                        "Python stands before which, and the person knows it: the skill stays",
+                        "I work with Python, which I know well.", CVData(skills: [Skill(name: "Python")]), .unchanged))
+        rows.append(row("a-friends-skill-in-a-relative-is-no-skill-of-the-person",
+                        "the friend teaches chess; the person only likes it in her free time: the skill goes, the interest stays",
+                        "In my free time I like chess. I have a friend who teaches chess.",
+                        CVData(skills: [Skill(name: "chess")], interests: ["chess"]), .exactly(CVData(interests: ["chess"]))))
+        rows.append(row("a-demonstrative-that-is-no-relative",
+                        "that before a noun points at the role: Python stays", "In that role I used Python.",
+                        CVData(skills: [Skill(name: "Python")]), .unchanged))
+        rows.append(row("a-demonstrative-that-after-a-preposition-is-no-relative",
+                        "that after on points at the project: Swift stays", "I worked on that project with Swift.",
+                        CVData(skills: [Skill(name: "Swift")]), .unchanged))
+        rows.append(row("que-before-an-infinitive-brings-in-no-subject",
+                        "tengo que hablar has no other subject: English stays", "Tengo que hablar inglés en el trabajo.",
+                        CVData(languages: [Language(name: "inglés")]), .unchanged, language: "es"))
+        rows.append(row("the-person-as-the-subject-of-who-is-an-accepted-loss",
+                        "the developer who knows Swift is the person, but who reads as another subject: Swift goes, an accepted loss",
+                        "I am a developer who knows Swift.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData())))
+        rows.append(row("the-person-as-the-subject-of-che-is-an-accepted-loss",
+                        "the person who loves photography is the person, but che reads as another subject: the interest goes, an accepted loss",
+                        "Sono una persona che ama la fotografia.", CVData(interests: ["fotografia"]), .exactly(CVData()), language: "it"))
+        rows.append(row("a-thing-that-uses-a-skill-is-an-accepted-loss-en",
+                        "the apps use Swift and the person builds them, but that reads as another subject: Swift goes, an accepted loss",
+                        "I build apps that use Swift.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData())))
+        rows.append(row("a-thing-that-uses-a-skill-is-an-accepted-loss-it",
+                        "the apps use Swift and the person builds them, but che reads as another subject: Swift goes, an accepted loss",
+                        "Sviluppo app che usano Swift.", CVData(skills: [Skill(name: "Swift")]), .exactly(CVData()), language: "it"))
+        rows.append(row("lo-que-before-the-item-is-an-accepted-loss",
+                        "what I like most is the person's, but que reads as bringing in another subject: the interest goes, an accepted loss",
+                        "Lo que más me gusta es el ajedrez.", CVData(interests: ["ajedrez"]), .exactly(CVData()), language: "es"))
+        rows += infinitivesAfterARelative()
+        return rows
+    }
+
+    /// A word after a relative that ends the way an infinitive does keeps no person by its ending (#202): it is often a finite form of
+    /// the subject the relative brings in ("qui prépare", "qui offre", "che appare", "que requer", "quem souber"). The person stays
+    /// the subject of an infinitive after "que" only in the periphrasis of obligation, after a form of Spanish "tener" or Portuguese
+    /// "ter" that the person can say ("tengo que hablar", "he tenido que", "tenho que falar"). Any other infinitive after a relative
+    /// claims nothing: "hay que hablar inglés" says what a job needs, and "un team con cui parlare inglese" loses English, accepted
+    /// losses.
+    private static func infinitivesAfterARelative() -> [GroundingRow] {
+        typealias Variant = (id: String, language: String, description: String, skill: String)
+        var finite: [Variant] = []
+        finite.append(("prepare-fr", "fr", "Je travaille avec une collègue qui prépare des cours de Python.", "Python"))
+        finite.append(("assure-fr", "fr", "Je travaille avec une collègue qui assure les cours de Python.", "Python"))
+        finite.append(("offre-fr", "fr", "Je travaille avec un collègue qui offre des formations en Python.", "Python"))
+        finite.append(("decouvre-fr", "fr", "Je travaille avec un collègue qui découvre Kotlin.", "Kotlin"))
+        finite.append(("appare-it", "it", "Lavoro con un collega che appare spesso nei video su Python.", "Python"))
+        finite.append(("compare-it", "it", "Lavoro con un collega che compare in tutti i video di Python.", "Python"))
+        finite.append(("requer-pt", "pt", "Trabalho com uma equipe que requer Python.", "Python"))
+        finite.append(("souber-pt", "pt", "Trabalho com quem souber Kotlin.", "Kotlin"))
+
+        var rows: [GroundingRow] = []
+        for v in finite {
+            rows.append(row("a-finite-form-that-ends-like-an-infinitive-after-a-relative-is-another-subjects-\(v.id)",
+                            "the verb after the relative is a finite form of another subject, though it ends like an infinitive: the skill goes",
+                            v.description, CVData(skills: [Skill(name: v.skill)]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("an-infinitive-after-a-relative-outside-an-obligation-claims-nothing-es",
+                        "que follows a quantity, not a form of tener: the infinitive says what is left to learn, and Python goes",
+                        "Tengo mucho que aprender de Python.", CVData(skills: [Skill(name: "Python")]), .exactly(CVData()), language: "es"))
+        rows.append(row("an-impersonal-obligation-is-an-accepted-loss-es",
+                        "hay que says what the job needs, not what the person speaks: English goes, an accepted loss",
+                        "En mi trabajo hay que hablar inglés.", CVData(languages: [Language(name: "inglés")]), .exactly(CVData()), language: "es"))
+        rows.append(row("an-infinitive-after-a-relative-is-an-accepted-loss-it",
+                        "the person speaks English with the team, but cui reads as bringing in another subject: English goes, an accepted loss",
+                        "Ho trovato un team con cui parlare inglese ogni giorno.", CVData(languages: [Language(name: "inglese")]), .exactly(CVData()),
+                        language: "it"))
+
+        // The periphrasis of obligation with a form of tener or ter that the person can say: the infinitive is the person's.
+        let obligations: [(id: String, language: String, description: String, name: String)] = [
+            ("tuve-es", "es", "Tuve que hablar inglés en el trabajo.", "inglés"),
+            ("tenia-es", "es", "Tenía que hablar inglés en el trabajo.", "inglés"),
+            ("he-tenido-es", "es", "He tenido que hablar inglés en el trabajo.", "inglés"),
+            ("tenho-pt", "pt", "Tenho que falar inglês no trabalho.", "inglês"),
+            ("tive-pt", "pt", "Tive que falar inglês no trabalho.", "inglês"),
+            ("tinha-pt", "pt", "Tinha que falar inglês no trabalho.", "inglês"),
+        ]
+        for v in obligations {
+            rows.append(row("que-in-an-obligation-of-the-person-brings-in-no-subject-\(v.id)",
+                            "que after the person's form of tener or ter brings in no subject: the language stays",
+                            v.description, CVData(languages: [Language(name: v.name)]), .unchanged, language: v.language))
+        }
+        return rows
+    }
+
+    /// The person's title and place come from a clause that claims them, but nothing tells whose they are inside it (ADR 0023,
+    /// Consequences): "Io lavoro con un infermiere a Torino" gives the person the nurse's title (`notImplementedYet`): the claim
+    /// check of ADR 0028 withdraws it.
+    private static func titlesOfAnotherPersonInAClaim() -> [GroundingRow] {
+        typealias Variant = (language: String, description: String, title: String)
+        var variants: [Variant] = []
+        variants.append(("it", "Io lavoro con un infermiere a Torino.", "infermiere"))
+        variants.append(("en", "I work with a nurse in Turin.", "nurse"))
+        variants.append(("de", "Ich arbeite mit einem Krankenpfleger in Turin.", "Krankenpfleger"))
+        variants.append(("es", "Trabajo con un enfermero en Turín.", "enfermero"))
+        variants.append(("fr", "Je travaille avec un infirmier à Turin.", "infirmier"))
+        variants.append(("pt", "Trabalho com um enfermeiro em Turim.", "enfermeiro"))
+
+        return variants.map { v in
+            row("the-title-of-a-person-the-claim-names-is-not-the-persons-\(v.language)",
+                "the person works with a nurse: the title is the nurse's, and goes", v.description,
+                CVData(personalInfo: person(title: v.title)), .exactly(CVData()), language: v.language)
+        }
+    }
+
+    /// Two readings of a relative that the word rules do not build (ADR 0023, Consequences), residual risks that the claim check
+    /// of ADR 0028 closes (`notImplementedYet`): a noun subject before a relative that keeps the person ("The team that I lead
+    /// uses Kotlin") gives the person the noun's verb after it, and the relatives of place ("where", "dove", "où", "donde",
+    /// "onde") are not in the relative list ("Trabajo en una empresa donde todo el mundo habla inglés"). German writes a comma
+    /// before "wo", and the clause it splits off has a subject of its own: its row holds.
+    private static func subjectsAroundARelative() -> [GroundingRow] {
+        typealias Variant = (language: String, description: String, item: String)
+        var teams: [Variant] = []
+        teams.append(("en", "The team that I lead uses Kotlin.", "Kotlin"))
+        teams.append(("it", "Il team che dirigo usa Kotlin.", "Kotlin"))
+        teams.append(("de", "Das Team, das ich leite, nutzt Kotlin.", "Kotlin"))
+        teams.append(("es", "El equipo que dirijo usa Kotlin.", "Kotlin"))
+        teams.append(("fr", "L'équipe que je dirige utilise Kotlin.", "Kotlin"))
+        teams.append(("pt", "A equipe que eu coordeno usa Kotlin.", "Kotlin"))
+        var places: [Variant] = []
+        places.append(("en", "I work in a company where everyone speaks French.", "French"))
+        places.append(("it", "Lavoro in un'azienda dove tutti parlano francese.", "francese"))
+        places.append(("de", "Ich arbeite in einer Firma, wo alle Französisch sprechen.", "Französisch"))
+        places.append(("es", "Trabajo en una empresa donde todo el mundo habla inglés.", "inglés"))
+        places.append(("fr", "Je travaille dans une entreprise où tout le monde parle anglais.", "anglais"))
+        places.append(("pt", "Trabalho numa empresa onde todos falam francês.", "francês"))
+
+        var rows: [GroundingRow] = []
+        for v in teams {
+            rows.append(row("a-noun-before-a-relative-of-the-person-is-another-subject-\(v.language)",
+                            "the person leads the team, and the team uses Kotlin: the skill is the team's, and goes",
+                            v.description, CVData(skills: [Skill(name: v.item)]), .exactly(CVData()), language: v.language))
+        }
+        for v in places {
+            rows.append(row("a-relative-of-place-brings-in-another-subject-\(v.language)",
+                            "everyone at the company speaks the language, not the person: no language",
+                            v.description, CVData(languages: [Language(name: v.item)]), .exactly(CVData()), language: v.language))
+        }
+        return rows
+    }
+
+    /// "plan", "plans" and "planning" say an intention only as verbs (#202): with "to", "on", an article or a possessive after them, or a
+    /// subject, a form of "to be", an auxiliary or a possessive before them ("I am planning to learn Rust", "I'm also planning a move",
+    /// "My plan is to"). After a content word, an article or a preposition they name an activity, and withdraw nothing: "route
+    /// planning", "care plans", "responsible for planning". The other languages name the activity with a noun of its own
+    /// ("pianificazione", "Routenplanung", "planificación", "planification", "planejamento"). A mention still needs a factual verb and
+    /// an explained lead-in (rule (c)): "Since 2018 I have done route planning at Acme" gives no entry.
+    private static func intentionWordsAsNouns() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        rows.append(row("care-plans-name-an-activity", "care plans names what the person wrote: the clause after it claims Python",
+                        "I wrote care plans for 12 patients and I know Python.", CVData(skills: [Skill(name: "Python")]), .unchanged))
+        rows.append(row("route-planning-in-a-job-clause-gives-the-entry",
+                        "route planning names an activity: the clause mentions Acme as a fact, and the entry stays",
+                        "Since 2018 I have worked in route planning at Acme.", CVData(experience: [job("", "Acme")]), .unchanged))
+        rows.append(row("route-planning-before-the-name-after-done-is-an-accepted-loss",
+                        "done is no verb of a CV and route planning stands unexplained before the name: no factual mention, an accepted loss",
+                        "Since 2018 I have done route planning at Acme.", CVData(experience: [job("", "Acme")]), .exactly(CVData())))
+        rows.append(row("planning-to-learn-claims-nothing", "planning to is an intention: no skill",
+                        "I am planning to learn Rust.", CVData(skills: [Skill(name: "Rust")]), .exactly(CVData())))
+        rows.append(row("route-planning-is-a-skill-the-person-claims",
+                        "route planning is a skill, and team leadership shares its clause: the three skills stay",
+                        "I am good at SAP, route planning and team leadership.",
+                        CVData(skills: [Skill(name: "SAP"), Skill(name: "route planning"), Skill(name: "team leadership")]), .unchanged))
+        rows.append(row("planning-after-a-preposition-names-the-work", "responsible for planning names the work: budgeting stays",
+                        "I was responsible for planning and budgeting.", CVData(skills: [Skill(name: "budgeting")]), .unchanged))
+        rows.append(row("planning-in-a-list-of-skills-is-a-skill", "a list of skills names planning: the three skills stay",
+                        "Skills: planning, budgeting and Excel.",
+                        CVData(skills: [Skill(name: "planning"), Skill(name: "budgeting"), Skill(name: "Excel")]), .unchanged))
+        rows.append(row("my-plan-is-an-intention", "a possessive before plan makes it the person's intention: no language",
+                        "My plan is to learn Spanish.", CVData(languages: [Language(name: "Spanish")]), .exactly(CVData())))
+        rows.append(row("planning-a-move-is-an-intention", "planning before an article plans a move: the place goes, the name stays",
+                        "I'm Maria Rossi. I'm also planning a move to Berlin.",
+                        CVData(personalInfo: person(name: "Maria Rossi", location: "Berlin")),
+                        .exactly(CVData(personalInfo: person(name: "Maria Rossi")))))
+        rows.append(row("planning-on-is-an-intention", "planning on is an intention: no skill",
+                        "I'm planning on a Rust course.", CVData(skills: [Skill(name: "Rust")]), .exactly(CVData())))
+
+        typealias Planning = (language: String, activity: String, intention: String)
+        var others: [Planning] = []
+        others.append(("it", "Mi occupo della pianificazione dei percorsi e conosco Python.", "Intendo imparare Rust."))
+        others.append(("de", "Ich bin für die Routenplanung zuständig und kenne Python.", "Ich beabsichtige, Rust zu lernen."))
+        others.append(("es", "Me encargo de la planificación de rutas y conozco Python.", "Planeo aprender Rust."))
+        others.append(("fr", "Je m'occupe de la planification des itinéraires et je connais Python.", "Je prévois d'apprendre Rust."))
+        others.append(("pt", "Cuido do planejamento de rotas e conheço Python.", "Planeio aprender Rust."))
+        for v in others {
+            rows.append(row("a-noun-of-planning-withdraws-nothing-\(v.language)", "the noun names the work: Python stays",
+                            v.activity, CVData(skills: [Skill(name: "Python")]), .unchanged, language: v.language))
+            rows.append(row("a-verb-of-planning-claims-nothing-\(v.language)", "the person only plans to learn it: no skill",
+                            v.intention, CVData(skills: [Skill(name: "Rust")]), .exactly(CVData()), language: v.language))
+        }
+        return rows
+    }
+
+    /// An intention said by a phrase claims nothing (#202), like a wish: "Ho intenzione di", "Tengo la intención de", "J'ai l'intention
+    /// d'", "Tenho a intenção de", "I have the intention of"; German "Ich plane" and "vorhaben", whose "vor" ends its clause ("Ich habe
+    /// vor, Rust zu lernen", "das habe ich vor"). A "vor" before a time is none ("vor 5 Jahren"), and "Plan", "Pläne" after a content
+    /// word or an article are nouns.
+    private static func intentionsInAPhrase() -> [GroundingRow] {
+        typealias Intention = (id: String, language: String, description: String)
+        var intentions: [Intention] = []
+        intentions.append(("intenzione-di-it", "it", "Ho intenzione di imparare Rust."))
+        intentions.append(("intencion-de-es", "es", "Tengo la intención de aprender Rust."))
+        intentions.append(("intention-d-fr", "fr", "J'ai l'intention d'apprendre Rust."))
+        intentions.append(("intention-de-fr", "fr", "J'ai l'intention de suivre un cours de Rust."))
+        intentions.append(("intencao-de-pt", "pt", "Tenho a intenção de aprender Rust."))
+        intentions.append(("intention-of-en", "en", "I have the intention of learning Rust."))
+        intentions.append(("ich-plane-de", "de", "Ich plane, Rust zu lernen."))
+        intentions.append(("plane-ich-de", "de", "Nächstes Jahr plane ich, Rust zu lernen."))
+        intentions.append(("habe-vor-de", "de", "Ich habe vor, Rust zu lernen."))
+        intentions.append(("das-habe-ich-vor-de", "de", "Rust zu lernen, das habe ich vor."))
+
+        var rows: [GroundingRow] = []
+        for v in intentions {
+            rows.append(row("an-intention-in-a-phrase-claims-nothing-\(v.id)", "the person only intends to learn it: no skill",
+                            v.description, CVData(skills: [Skill(name: "Rust")]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("an-intended-place-is-not-the-persons-fr", "the person only intends to work there: the name stays, the place goes",
+                        "Je suis Maria Rossi. J'ai l'intention de travailler à Berlin.",
+                        CVData(personalInfo: person(name: "Maria Rossi", location: "Berlin")),
+                        .exactly(CVData(personalInfo: person(name: "Maria Rossi"))), language: "fr"))
+        rows.append(row("vor-before-a-time-keeps-the-entry-de", "vor 5 Jahren is a time, no intention: the entry stays",
+                        "Ich habe vor 5 Jahren bei Acme gearbeitet.", CVData(experience: [job("", "Acme")]), .unchanged, language: "de"))
+        rows.append(row("a-plan-after-an-article-is-a-noun-de", "einen Plan names what the person made: Python stays",
+                        "Ich habe einen Plan erstellt und kenne Python.", CVData(skills: [Skill(name: "Python")]), .unchanged, language: "de"))
+        rows.append(row("plans-after-a-verb-are-a-noun-de", "Pläne names what the person made: Python stays",
+                        "Ich habe Pläne für 30 Baustellen erstellt und kenne Python.", CVData(skills: [Skill(name: "Python")]), .unchanged,
+                        language: "de"))
+        rows.append(row("my-plan-is-an-intention-de", "a possessive before Plan makes it the person's intention: no skill",
+                        "Mein Plan ist, Rust zu lernen.", CVData(skills: [Skill(name: "Rust")]), .exactly(CVData()), language: "de"))
+        rows.append(row("an-intention-without-its-preposition-is-no-intention-it",
+                        "intenzione without di names the client's: Python stays",
+                        "Ho capito l'intenzione del cliente e uso Python.", CVData(skills: [Skill(name: "Python")]), .unchanged, language: "it"))
+        return rows
+    }
+
+    /// A negation keeps its item only when it governs the word of level (#202): "not an expert", "never been fluent". A negation of
+    /// the ability itself withdraws the claim, though a word of level stands later in the clause: "I cannot speak German even at a
+    /// basic level", "I have never used Python at any level".
+    private static func negationsOfTheAbility() -> [GroundingRow] {
+        typealias Variant = (language: String, cannotSpeak: String, spoken: String, neverUsed: String)
+        var variants: [Variant] = []
+        variants.append(("en", "I cannot speak German even at a basic level.", "German", "I have never used Python at any level."))
+        variants.append(("it", "Non so parlare tedesco nemmeno a livello base.", "tedesco", "Non ho mai usato Python a nessun livello."))
+        variants.append(("de", "Ich kann nicht einmal auf einfachem Niveau Deutsch sprechen.", "Deutsch",
+                         "Ich habe Python nie auf irgendeinem Niveau benutzt."))
+        variants.append(("es", "No puedo hablar alemán ni siquiera a nivel básico.", "alemán", "Nunca he usado Python a ningún nivel."))
+        variants.append(("fr", "Je ne sais pas parler allemand même à un niveau de base.", "allemand",
+                         "Je n'ai jamais utilisé Python à aucun niveau."))
+        variants.append(("pt", "Não consigo falar alemão nem em nível básico.", "alemão", "Nunca usei Python em nenhum nível."))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-denied-ability-beside-a-level-gives-no-language-\(v.language)",
+                            "the negation denies speaking, not a level: no language",
+                            v.cannotSpeak, CVData(languages: [Language(name: v.spoken)]), .exactly(CVData()), language: v.language))
+            rows.append(row("a-denied-use-beside-a-level-gives-no-skill-\(v.language)",
+                            "the negation denies the use, not a level: no skill",
+                            v.neverUsed, CVData(skills: [Skill(name: "Python")]), .exactly(CVData()), language: v.language))
+        }
+        return rows
+    }
+
+    /// The readings of the claim rule that ADR 0023 accepts as they are (Consequences): a negation that governs a word of level denies
+    /// the level only, a condition at the start of a clause makes the rest of its sentence a supposition, and "could" withdraws a claim.
+    private static func acceptedReadingsOfAClaim() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        rows.append(row("a-negation-beside-a-level-keeps-the-language",
+                        "never fluent denies the level only: German stays, without a level",
+                        "I have never been fluent in German.", CVData(languages: [Language(name: "German")]), .unchanged))
+        rows.append(row("a-condition-makes-a-habit-a-supposition",
+                        "the condition opens the sentence: playing chess is supposed, and no interest stays",
+                        "If I have time, I play chess.", CVData(interests: ["chess"]), .exactly(CVData())))
+        rows.append(row("could-withdraws-a-claim",
+                        "could withdraws the claim: an accepted loss, and no language stays",
+                        "I could already read Latin at school.", CVData(languages: [Language(name: "Latin")]), .exactly(CVData())))
+        return rows
+    }
+
+    /// A clause that states nothing as a fact (no verb, or none factual: "Spanisch zu lernen") and is not a fragment of a factual
+    /// clause shares the withdrawal of the clause after it in its sentence (#202): "Spanisch zu lernen, davon träume ich" gives no
+    /// Spanish. A factual clause before a later wish keeps its item.
+    private static func wishesAfterTheItem() -> [GroundingRow] {
+        typealias Wish = (id: String, language: String, description: String, name: String)
+        var wishes: [Wish] = []
+        wishes.append(("de", "de", "Spanisch zu lernen, davon träume ich.", "Spanisch"))
+        wishes.append(("en", "en", "Learning Spanish, that's what I'd like.", "Spanish"))
+        wishes.append(("verbless-en", "en", "Spanish, that's what I'd like to learn.", "Spanish"))
+        wishes.append(("it", "it", "Imparare lo spagnolo, è quello che vorrei.", "spagnolo"))
+        wishes.append(("lo-sogno-it", "it", "Imparare lo spagnolo: lo sogno da sempre.", "spagnolo"))
+        wishes.append(("es", "es", "Aprender alemán, eso es lo que quiero.", "alemán"))
+        wishes.append(("lo-sueno-es", "es", "Hablar francés, lo sueño desde niña.", "francés"))
+        wishes.append(("fr", "fr", "Apprendre l'espagnol, voilà ce que je voudrais.", "espagnol"))
+        wishes.append(("en-reve-fr", "fr", "Parler italien, j'en rêve.", "italien"))
+        wishes.append(("pt", "pt", "Aprender espanhol, é o que eu quero.", "espanhol"))
+
+        var rows: [GroundingRow] = []
+        for v in wishes {
+            rows.append(row("a-wish-after-the-item-claims-no-language-\(v.id)",
+                            "the clause of the language states nothing as a fact, and the clause after it only wishes: no language",
+                            v.description, CVData(languages: [Language(name: v.name)]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("a-fact-before-a-later-wish-keeps-its-language-de",
+                        "ich spreche Spanisch is a fact: the dream that follows takes nothing from it",
+                        "Ich spreche Spanisch, und davon träume ich nicht mehr.", CVData(languages: [Language(name: "Spanisch")]),
+                        .unchanged, language: "de"))
+        rows.append(row("a-fact-before-a-later-wish-keeps-its-language-en",
+                        "I speak Spanish is a fact; French stands only in the wish: Spanish stays, French goes",
+                        "I speak Spanish, and I'd like to learn French.",
+                        CVData(languages: [Language(name: "Spanish"), Language(name: "French")]),
+                        .exactly(CVData(languages: [Language(name: "Spanish")]))))
+        rows.append(row("the-fragments-of-a-fact-keep-their-languages-before-a-wish",
+                        "English and French belong to I speak: the wish to improve them takes nothing away",
+                        "I speak Italian, English and French, which I'd like to improve.",
+                        CVData(languages: [Language(name: "Italian"), Language(name: "English"), Language(name: "French")]), .unchanged))
+        rows.append(row("a-coordinated-item-before-a-wish-claims-no-language",
+                        "learning German states nothing as a fact, and Spanish is what the person would like: neither language stays",
+                        "Learning German and Spanish is what I'd like.",
+                        CVData(languages: [Language(name: "German"), Language(name: "Spanish")]), .exactly(CVData())))
+        rows.append(row("a-verbless-line-before-a-wish-is-an-accepted-loss-en",
+                        "fluent in English has no verb, and the wish after it withdraws it: English goes too, an accepted loss",
+                        "Fluent in English, and I'd love to learn German.",
+                        CVData(languages: [Language(name: "English"), Language(name: "German")]), .exactly(CVData())))
+        rows.append(row("a-verbless-list-of-skills-before-a-wish-is-an-accepted-loss",
+                        "the list of skills has no verb, and the wish after it withdraws it: Python and SQL go too, an accepted loss",
+                        "Skills: Python and SQL, but I would like to learn Rust.",
+                        CVData(skills: [Skill(name: "Python"), Skill(name: "SQL"), Skill(name: "Rust")]), .exactly(CVData())))
+        rows.append(row("a-verbless-title-before-a-wish-is-an-accepted-loss",
+                        "the line of the title has no verb, and the wish after it withdraws it: the title goes with the place, an accepted loss",
+                        "Teacher at Acme since 2016, and I would like to move to Berlin.",
+                        CVData(personalInfo: person(location: "Berlin", title: "Teacher")), .exactly(CVData())))
+        rows.append(row("a-verbless-list-before-a-wish-is-an-accepted-loss",
+                        "a list with no verb states nothing as a fact, and the wish after it withdraws it: the languages go, an accepted loss",
+                        "Languages: Italian, English and French, which I'd like to improve.",
+                        CVData(languages: [Language(name: "Italian"), Language(name: "English"), Language(name: "French")]),
+                        .exactly(CVData())))
+        return rows
+    }
+
+    /// The person's headline title and place count only in a clause that claims them (#202), like a skill: "I would like to work as a
+    /// nurse in Turin" gives neither nurse nor Turin. The name stays wherever the person gives it.
+    private static func personalFieldsOfAClaim() -> [GroundingRow] {
+        typealias Variant = (language: String, wished: String, claimed: String, title: String, wishedTitle: String, place: String)
+        var variants: [Variant] = []
+        variants.append(("en", "I'm Maria Rossi, a teacher. I would like to work as a nurse in Turin.",
+                         "I'm Maria Rossi. I work as a nurse in Turin.", "teacher", "nurse", "Turin"))
+        variants.append(("it", "Sono Maria Rossi, insegnante. Vorrei lavorare come infermiera a Torino.",
+                         "Sono Maria Rossi. Lavoro come infermiera a Torino.", "insegnante", "infermiera", "Torino"))
+        variants.append(("de", "Ich bin Maria Rossi, Lehrerin. Ich möchte als Krankenschwester in Turin arbeiten.",
+                         "Ich bin Maria Rossi. Ich arbeite als Krankenschwester in Turin.", "Lehrerin", "Krankenschwester", "Turin"))
+        variants.append(("es", "Soy Maria Rossi, maestra. Quiero trabajar como enfermera en Turín.",
+                         "Soy Maria Rossi. Trabajo como enfermera en Turín.", "maestra", "enfermera", "Turín"))
+        variants.append(("fr", "Je suis Maria Rossi, enseignante. Je voudrais travailler comme infirmière à Turin.",
+                         "Je suis Maria Rossi. Je travaille comme infirmière à Turin.", "enseignante", "infirmière", "Turin"))
+        variants.append(("pt", "Sou Maria Rossi, professora. Quero trabalhar como enfermeira em Turim.",
+                         "Sou Maria Rossi. Trabalho como enfermeira em Turim.", "professora", "enfermeira", "Turim"))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-wished-place-is-not-the-persons-\(v.language)",
+                            "the title is the person's; the place stands only in a wish: the name and the title stay, the place goes",
+                            v.wished, CVData(personalInfo: person(name: "Maria Rossi", location: v.place, title: v.title)),
+                            .exactly(CVData(personalInfo: person(name: "Maria Rossi", title: v.title))), language: v.language))
+            rows.append(row("a-wished-title-is-not-the-persons-\(v.language)",
+                            "the title and the place stand only in a wish: the name stays, the title and the place go",
+                            v.wished, CVData(personalInfo: person(name: "Maria Rossi", location: v.place, title: v.wishedTitle)),
+                            .exactly(CVData(personalInfo: person(name: "Maria Rossi"))), language: v.language))
+            rows.append(row("a-claimed-title-and-place-stay-\(v.language)",
+                            "the person works as a nurse in the place: the name, the title and the place stay",
+                            v.claimed, CVData(personalInfo: person(name: "Maria Rossi", location: v.place, title: v.wishedTitle)),
+                            .unchanged, language: v.language))
+        }
+        return rows
+    }
+
+    /// Only the person's own clauses tell a hobby from a skill, as the grounding attributes them: another person's clause neither
+    /// keeps the skill nor drops it. A clause of the person that denies, doubts or only wishes claims no ability, so it keeps no
+    /// skill either.
+    private static func hobbiesOfThePersonAlone() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        let chess = CVData(skills: [Skill(name: "chess")], interests: ["chess"])
+        rows.append(row("a-hobby-is-no-skill-though-another-person-has-it-en",
+                        "the sister teaches chess; the person only likes it in her free time: the skill goes, the interest stays",
+                        "In my free time I like chess. My sister teaches chess.", chess, .exactly(CVData(interests: ["chess"]))))
+        rows.append(row("a-hobby-is-no-skill-though-another-person-has-it-it",
+                        "the sister teaches chess; the person only likes it in her free time: the skill goes, the interest stays",
+                        "Nel tempo libero mi piacciono gli scacchi. Mia sorella insegna scacchi.",
+                        CVData(skills: [Skill(name: "scacchi")], interests: ["scacchi"]), .exactly(CVData(interests: ["scacchi"])),
+                        language: "it"))
+        rows.append(row("a-hobby-is-no-skill-though-a-shared-subject-has-it",
+                        "teaches chess shares the sister as its subject: it is hers, and the person's skill goes",
+                        "In my free time I like chess. My sister is a coach and teaches chess.", chess,
+                        .exactly(CVData(interests: ["chess"]))))
+        rows.append(row("a-skill-of-the-job-stays-though-another-person-has-it-too",
+                        "the person's own job clause claims photography; the sister's clause neither keeps nor drops it: the skill stays",
+                        "I work as a photographer at Studio Luce, where I do portrait photography. My sister loves photography. "
+                            + "In my free time I like photography.",
+                        CVData(skills: [Skill(name: "photography")], interests: ["photography"]), .unchanged))
+        rows.append(row("a-skill-the-person-claims-stays-though-another-person-likes-it",
+                        "the sister's clause of leisure is not the person's; the person coaches chess: the skill stays",
+                        "My sister loves chess. I coach chess at the Acme club.", chess, .unchanged))
+        rows.append(row("a-denied-mention-claims-no-skill",
+                        "I don't play chess claims no ability: the skill goes",
+                        "In my free time I don't play chess.", chess, .safe(never: [], absent: ["skills[0].name"])))
+        rows.append(row("a-hedged-mention-claims-no-skill",
+                        "I almost never play chess claims no ability: the skill goes",
+                        "In my free time I like chess, but I almost never play chess.", chess,
+                        .safe(never: [], absent: ["skills[0].name"])))
+        rows.append(row("a-skill-the-person-can-teach-stays-though-it-is-a-hobby",
+                        "I can teach chess claims the ability, can and all: the skill stays",
+                        "I can teach chess. In my free time I like chess.", chess, .unchanged))
+        rows.append(row("a-skill-the-person-partly-teaches-stays-though-it-is-a-hobby-de",
+                        "ich unterrichte teilweise Schach claims the ability, though partly: the skill stays",
+                        "Ich unterrichte teilweise Schach. In meiner Freizeit mag ich Schach.",
+                        CVData(skills: [Skill(name: "Schach")], interests: ["Schach"]), .unchanged, language: "de"))
+        rows.append(row("a-wish-claims-no-skill",
+                        "I would like to learn Python claims no ability: the skill goes",
+                        "I would like to learn Python.", CVData(skills: [Skill(name: "Python")], interests: ["Python"]),
+                        .safe(never: [], absent: ["skills[0].name"])))
+        return rows
+    }
+
     // MARK: Every fact is the person's (c)
 
     /// Languages and their levels, skills, interests, certifications and the person's own fields need a clause that speaks for
@@ -3589,6 +4842,81 @@ enum GroundingRows {
         return rows
     }
 
+    // MARK: An employer or a school keeps no leading indefinite article (#202)
+
+    /// The model copies the article of "in a nursery" into the employer: a CV names the place, so a leading indefinite article goes,
+    /// in each language, and what is left is the same quote without it. An article written with a capital is part of a name ("UNA
+    /// Hotels", "A Plus Consulting"), and a name that is no quote stays no quote.
+    private static func entryNamesWithoutAnArticle() -> [GroundingRow] {
+        typealias Variant = (id: String, language: String, description: String, written: String, kept: String)
+        var variants: [Variant] = []
+        variants.append(("a-en", "en", "I worked as an assistant in a nursery.", "a nursery", "nursery"))
+        variants.append(("an-en", "en", "I worked at an orphanage.", "an orphanage", "orphanage"))
+        variants.append(("un-it", "it", "Ho lavorato come assistente in un asilo nido.", "un asilo nido", "asilo nido"))
+        variants.append(("una-it", "it", "Ho lavorato in una scuola.", "una scuola", "scuola"))
+        variants.append(("uno-it", "it", "Ho lavorato in uno studio legale.", "uno studio legale", "studio legale"))
+        variants.append(("un-elided-it", "it", "Ho lavorato in un'azienda agricola.", "un'azienda agricola", "azienda agricola"))
+        variants.append(("einer-de", "de", "Ich habe in einer Kinderkrippe gearbeitet.", "einer Kinderkrippe", "Kinderkrippe"))
+        variants.append(("einem-de", "de", "Ich habe in einem Krankenhaus gearbeitet.", "einem Krankenhaus", "Krankenhaus"))
+        variants.append(("ein-de", "de", "Ich habe für ein Pflegeheim gearbeitet.", "ein Pflegeheim", "Pflegeheim"))
+        variants.append(("una-es", "es", "Trabajé como auxiliar en una guardería.", "una guardería", "guardería"))
+        variants.append(("un-es", "es", "Trabajé en un hospital.", "un hospital", "hospital"))
+        variants.append(("une-fr", "fr", "J'ai travaillé comme assistante dans une crèche.", "une crèche", "crèche"))
+        variants.append(("un-fr", "fr", "J'ai travaillé dans un hôpital.", "un hôpital", "hôpital"))
+        variants.append(("uma-pt", "pt", "Trabalhei como auxiliar em uma creche.", "uma creche", "creche"))
+        variants.append(("um-pt", "pt", "Trabalhei em um hospital.", "um hospital", "hospital"))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("an-employer-keeps-no-leading-article-\(v.id)", "the article of the employer goes; the rest is the same quote",
+                            v.description, CVData(experience: [job("", v.written)]), .exactly(CVData(experience: [job("", v.kept)])),
+                            language: v.language))
+        }
+        rows.append(row("a-school-keeps-no-leading-article-en", "the article of the school goes; the degree and the rest of the school stay",
+                        "I studied Nursing at a community college.", CVData(education: [study("Nursing", at: "a community college")]),
+                        .exactly(CVData(education: [study("Nursing", at: "community college")]))))
+        rows.append(row("a-school-keeps-no-leading-article-it", "the article of the school goes; the degree and the rest of the school stay",
+                        "Ho studiato Ragioneria in un istituto tecnico.", CVData(education: [study("Ragioneria", at: "un istituto tecnico")]),
+                        .exactly(CVData(education: [study("Ragioneria", at: "istituto tecnico")])), language: "it"))
+        rows.append(row("a-capitalised-article-is-part-of-a-name-it", "UNA Hotels is a name: its article stays",
+                        "Dal 2016 lavoro presso UNA Hotels.", CVData(experience: [job("", "UNA Hotels", from: "2016", current: true)]),
+                        .unchanged, language: "it"))
+        rows.append(row("a-capitalised-article-is-part-of-a-name-en", "A Plus Consulting is a name: its article stays",
+                        "Since 2016 I have worked at A Plus Consulting.",
+                        CVData(experience: [job("", "A Plus Consulting", from: "2016", current: true)]), .unchanged))
+        rows.append(row("an-employer-that-is-no-quote-stays-no-quote", "the description says the nursery: a nursery is no quote, and nursery is not made one",
+                        "I worked at the nursery.", CVData(experience: [job("", "a nursery")]), .exactly(CVData())))
+        return rows
+    }
+
+    // MARK: A degree that only says graduating names no degree (#202)
+
+    /// "diplôme", "Abschluss", "laurea" or "my degree" alone say that the person graduated, not in what: the degree goes, and the
+    /// school stays. A degree with its field of study stays.
+    private static func degreesThatNameNoDegree() -> [GroundingRow] {
+        typealias Variant = (language: String, description: String, degree: String, school: String)
+        var variants: [Variant] = []
+        variants.append(("en", "I got my degree at the University of Bologna.", "degree", "University of Bologna"))
+        variants.append(("it", "Ho una laurea all'Università di Bologna.", "laurea", "Università di Bologna"))
+        variants.append(("de", AppExample.de, "Abschluss", "Universität Bologna"))
+        variants.append(("es", "Obtuve mi título en la Universidad de Bolonia.", "título", "Universidad de Bolonia"))
+        variants.append(("fr", AppExample.fr, "diplôme", "université de Bologne"))
+        variants.append(("pt", "Recebi o meu diploma na Universidade de Bolonha.", "diploma", "Universidade de Bolonha"))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-word-for-graduating-names-no-degree-\(v.language)", "the degree only says graduating: it goes, and the school stays",
+                            v.description, CVData(education: [study(v.degree, at: v.school)]),
+                            .exactly(CVData(education: [study(at: v.school)])), language: v.language))
+        }
+        rows.append(row("a-degree-with-its-field-stays-it", "laurea in Scienze della Formazione names its field: it stays",
+                        "Ho una laurea in Scienze della Formazione all'Università di Bologna.",
+                        CVData(education: [study("laurea in Scienze della Formazione", at: "Università di Bologna")]), .unchanged, language: "it"))
+        rows.append(row("a-word-for-graduating-without-a-school-leaves-nothing-it", "the degree only says graduating, and there is no school: the study goes",
+                        "Ho la laurea.", CVData(education: [study("laurea")]), .exactly(CVData()), language: "it"))
+        return rows
+    }
+
     // MARK: Schools and certifications follow the clauses of their own name
 
     /// ADR 0023 words its clause rule for jobs. The sanitiser applies it to schools and certifications as well, and a
@@ -3934,6 +5262,7 @@ enum GroundingRows {
         rows.append(probeContactsEN())
         rows.append(probeSparseEN())
         rows.append(probeSparseIT())
+        rows += firstRunOnTheRealModel()
         return rows
     }
 
@@ -4337,5 +5666,296 @@ enum GroundingRows {
         drops.append(Drop("interests[0]", "Infermieristica is not a word of the description"))
         return row("probe-sparse-it", "kept: only the title the person gave; a sparse description gives a sparse draft",
                    "Sono infermiera.", draft, .keeping(drops), kind: .probe, language: "it")
+    }
+
+    // MARK: The first run on the real on-device model (#202)
+
+    // The raw answers of the on-device model on 2026-10-18 (macOS 27.0.1, Apple Intelligence on), run 1 of each description: the
+    // app's six examples and a nurse in Turin. The three runs of each description gave the same draft. Each row expects the whole
+    // grounded draft, in the model's order of the jobs: the use case then puts the current job first (see `JobOrder`).
+
+    private static let nurseInTurin = """
+        My name is Giulia Bianchi and I am a registered nurse living in Turin. \
+        My email is giulia.bianchi@example.com and my phone number is +39 333 123 4567. \
+        Since March 2019 I have worked as a ward nurse in the cardiology department of the Molinette hospital in Turin, where I look \
+        after up to 12 patients per shift and train new colleagues. \
+        From 2016 to 2019 I worked as a home care nurse for the Il Sorriso cooperative in Moncalieri. \
+        I graduated in Nursing from the University of Turin in 2016. \
+        I speak Italian (native), English (B2) and French (A2). \
+        I am good at ECG monitoring, wound care and patient education. \
+        In my free time I sing in a choir and go cycling.
+        """
+
+    private static func firstRunOnTheRealModel() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        rows.append(firstRunEN())
+        rows.append(firstRunIT())
+        rows.append(firstRunDE())
+        rows.append(firstRunES())
+        rows.append(firstRunFR())
+        rows.append(firstRunPT())
+        rows.append(firstRunNurseEN())
+        return rows
+    }
+
+    private static func firstRunEN() -> GroundingRow {
+        let draft = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologna"),
+            summary: "I am a primary school teacher from Bologna. Since 2016 I have taught at Don Milani school and trained 3 new teachers. "
+                + "Before that, from 2012 to 2016, I worked as an assistant in a nursery.",
+            experience: [
+                Experience(title: "assistant", company: "a nursery", location: "Bologna", startDate: "2012", endDate: "2016",
+                           description: "I worked as an assistant in a nursery"),
+                Experience(title: "primary school teacher", company: "Don Milani school", location: "Bologna", startDate: "2016", endDate: null,
+                           current: true, description: "I taught at Don Milani school and trained 3 new teachers",
+                           achievements: ["trained 3 new teachers"]),
+            ],
+            education: [
+                Education(degree: "Education Sciences", institution: "University of Bologna", startDate: "2012", endDate: "2012",
+                          description: "I studied Education Sciences at the University of Bologna and graduated in 2012"),
+            ],
+            skills: [Skill(name: "chess", level: .beginner)],
+            languages: [Language(name: "Italian", proficiency: .native), Language(name: "English", proficiency: .b2)],
+            interests: ["chess", "hiking"])
+        let expected = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologna"),
+            experience: [
+                Experience(title: "assistant", company: "nursery", startDate: "2012", endDate: "2016",
+                           description: "I worked as an assistant in a nursery"),
+                Experience(title: "primary school teacher", company: "Don Milani school", startDate: "2016", current: true,
+                           achievements: ["trained 3 new teachers"]),
+            ],
+            education: [
+                Education(degree: "Education Sciences", institution: "University of Bologna", endDate: "2012",
+                          description: "I studied Education Sciences at the University of Bologna and graduated in 2012"),
+            ],
+            languages: [Language(name: "Italian", proficiency: .native), Language(name: "English", proficiency: .b2)],
+            interests: ["chess", "hiking"])
+        return row("first-run-on-the-real-model-example-en",
+                   "kept: name, place, both jobs with titles and years, the 3 new teachers, the degree and its year, languages, interests; "
+                       + "chess is a hobby and no skill, and a nursery loses its article",
+                   AppExample.en, draft, .exactly(expected), kind: .probe, language: "en")
+    }
+
+    private static func firstRunIT() -> GroundingRow {
+        let draft = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologna"),
+            summary: "Sono insegnante di scuola primaria a Bologna. Dal 2016 insegno alla scuola Don Milani, dove ho formato 3 nuovi insegnanti. "
+                + "Prima, dal 2012 al 2016, ho lavorato come assistente in un asilo nido.",
+            experience: [
+                Experience(title: "insegnante", company: "scuola Don Milani", location: "Bologna", current: true,
+                           description: "insegno alla scuola Don Milani", achievements: ["ho formato 3 nuovi insegnanti"]),
+                Experience(title: "assistente", company: "asilo nido", location: "Bologna",
+                           description: "ho lavorato come assistente in un asilo nido"),
+            ],
+            education: [
+                Education(degree: "Scienze della Formazione", institution: "Università di Bologna", startDate: "2012", endDate: "2012",
+                          description: "mi sono laureata nel 2012"),
+            ],
+            skills: [Skill(name: "scacchi", level: .beginner), Skill(name: "escursioni", level: .beginner)],
+            languages: [Language(name: "italiano", proficiency: .native), Language(name: "inglese", proficiency: .b2)],
+            interests: ["scacchi", "escursioni"])
+        let expected = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologna"),
+            experience: [
+                Experience(title: "insegnante", company: "scuola Don Milani", current: true, achievements: ["ho formato 3 nuovi insegnanti"]),
+                Experience(title: "assistente", company: "asilo nido", description: "ho lavorato come assistente in un asilo nido"),
+            ],
+            education: [
+                Education(degree: "Scienze della Formazione", institution: "Università di Bologna", endDate: "2012",
+                          description: "mi sono laureata nel 2012"),
+            ],
+            languages: [Language(name: "italiano", proficiency: .native), Language(name: "inglese", proficiency: .b2)],
+            interests: ["scacchi", "escursioni"])
+        return row("first-run-on-the-real-model-example-it",
+                   "kept: name, place, both jobs with their titles, the 3 new teachers, the degree and its year, languages, interests; "
+                       + "chess and hiking are hobbies and no skills",
+                   AppExample.it, draft, .exactly(expected), kind: .probe, language: "it")
+    }
+
+    private static func firstRunDE() -> GroundingRow {
+        let draft = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologna", title: "Grundschullehrerin"),
+            summary: "Ich bin Grundschullehrerin aus Bologna. Seit 2016 unterrichte ich an der Schule Don Milani, wo ich 3 neue Lehrkräfte "
+                + "eingearbeitet habe. Davor habe ich von 2012 bis 2016 als Betreuerin in einer Kinderkrippe gearbeitet.",
+            experience: [
+                Experience(title: "Betreuerin", company: "Kinderkrippe", location: "Bologna",
+                           description: "von 2012 bis 2016 als Betreuerin in einer Kinderkrippe gearbeitet"),
+                Experience(title: "Grundschullehrerin", company: "Schule Don Milani", location: "Bologna", current: true,
+                           description: "3 neue Lehrkräfte eingearbeitet", achievements: ["3 neue Lehrkräfte eingearbeitet"]),
+            ],
+            education: [
+                Education(degree: "Erziehungswissenschaften", institution: "Universität Bologna", startDate: "2012", endDate: "2012",
+                          description: "2012 meinen Abschluss gemacht"),
+            ],
+            languages: [Language(name: "Italienisch", proficiency: .native), Language(name: "Englisch", proficiency: .b2)],
+            interests: ["Schach", "Wandern"])
+        let expected = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologna", title: "Grundschullehrerin"),
+            experience: [
+                Experience(title: "Betreuerin", company: "Kinderkrippe"),
+                Experience(title: "Grundschullehrerin", company: "Schule Don Milani", current: true),
+            ],
+            education: [
+                Education(degree: "Erziehungswissenschaften", institution: "Universität Bologna", endDate: "2012",
+                          description: "2012 meinen Abschluss gemacht"),
+            ],
+            languages: [Language(name: "Italienisch", proficiency: .native), Language(name: "Englisch", proficiency: .b2)],
+            interests: ["Schach", "Wandern"])
+        return row("first-run-on-the-real-model-example-de",
+                   "kept: name, place, title, both jobs with their titles, the degree and its year, languages, interests; the achievement "
+                       + "begins with a number, not with a CV verb, and goes",
+                   AppExample.de, draft, .exactly(expected), kind: .probe, language: "de")
+    }
+
+    private static func firstRunES() -> GroundingRow {
+        let draft = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bolonia"),
+            summary: "Soy maestra de primaria en Bolonia. Desde 2016 enseño en la escuela Don Milani, donde formé a 3 nuevos maestros. "
+                + "Antes, de 2012 a 2016, trabajé como auxiliar en una guardería.",
+            experience: [
+                Experience(title: "maestra de primaria", company: "escuela Don Milani", location: "Bolonia", current: true,
+                           description: "enseño en la escuela Don Milani", achievements: ["formé a 3 nuevos maestros"]),
+                Experience(title: "auxiliar", company: "una guardería", location: "Bolonia", description: "trabajé como auxiliar en una guardería"),
+            ],
+            education: [
+                Education(degree: "Ciencias de la Educación", institution: "Universidad de Bolonia", startDate: "2012", endDate: "2012",
+                          description: "estudié Ciencias de la Educación en la Universidad de Bolonia y me gradué en 2012"),
+            ],
+            skills: [Skill(name: "ajedrez", level: .beginner), Skill(name: "senderismo", level: .beginner)],
+            languages: [Language(name: "italiano", proficiency: .native), Language(name: "inglés", proficiency: .b2)],
+            interests: ["ajedrez", "senderismo"])
+        let expected = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bolonia"),
+            experience: [
+                Experience(title: "maestra de primaria", company: "escuela Don Milani", current: true, achievements: ["formé a 3 nuevos maestros"]),
+                Experience(title: "auxiliar", company: "guardería", description: "trabajé como auxiliar en una guardería"),
+            ],
+            education: [
+                Education(degree: "Ciencias de la Educación", institution: "Universidad de Bolonia", endDate: "2012",
+                          description: "estudié Ciencias de la Educación en la Universidad de Bolonia y me gradué en 2012"),
+            ],
+            languages: [Language(name: "italiano", proficiency: .native), Language(name: "inglés", proficiency: .b2)],
+            interests: ["ajedrez", "senderismo"])
+        return row("first-run-on-the-real-model-example-es",
+                   "kept: name, place, both jobs with their titles, the 3 new teachers, the degree and its year, languages, interests; "
+                       + "chess and hiking are hobbies and no skills, and una guardería loses its article",
+                   AppExample.es, draft, .exactly(expected), kind: .probe, language: "es")
+    }
+
+    private static func firstRunFR() -> GroundingRow {
+        let draft = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologne"),
+            summary: "Je suis Maria Rossi, institutrice dans une école primaire de Bologne. Depuis 2016, j'enseigne à l'école Don Milani, "
+                + "où j'ai formé 3 nouveaux enseignants. Avant, de 2012 à 2016, j'ai travaillé comme assistante dans une crèche.",
+            experience: [
+                Experience(title: "assistante", company: "crèche", location: "Bologne",
+                           achievements: ["j'ai travaillé comme assistante dans une crèche"]),
+                Experience(title: "institutrice", company: "école Don Milani", location: "Bologne", current: true,
+                           achievements: ["j'ai formé 3 nouveaux enseignants"]),
+            ],
+            education: [Education(degree: "diplôme", institution: "université de Bologne", startDate: "2012")],
+            languages: [Language(name: "italien", proficiency: .native), Language(name: "anglais", proficiency: .b2)],
+            interests: ["échecs", "randonnée"])
+        let expected = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologne"),
+            summary: "Je suis Maria Rossi, institutrice dans une école primaire de Bologne.",
+            experience: [
+                Experience(title: "assistante", company: "crèche", achievements: ["j'ai travaillé comme assistante dans une crèche"]),
+                Experience(title: "institutrice", company: "école Don Milani", current: true, achievements: ["j'ai formé 3 nouveaux enseignants"]),
+            ],
+            education: [Education(institution: "université de Bologne")],
+            languages: [Language(name: "italien", proficiency: .native), Language(name: "anglais", proficiency: .b2)],
+            interests: ["échecs", "randonnée"])
+        return row("first-run-on-the-real-model-example-fr",
+                   "kept: name, place, the first sentence of the summary, both jobs with their titles, the 3 new teachers (j'ai holds no "
+                       + "Italian ai), the university, languages, interests; diplôme alone names no degree",
+                   AppExample.fr, draft, .exactly(expected), kind: .probe, language: "fr")
+    }
+
+    private static func firstRunPT() -> GroundingRow {
+        let draft = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bolonha"),
+            summary: "Sou professora do ensino fundamental em Bolonha. Desde 2016 leciono na escola Don Milani, onde formei 3 novos professores. "
+                + "Antes, de 2012 a 2016, trabalhei como auxiliar em uma creche.",
+            experience: [
+                Experience(title: "auxiliar", company: "creche", location: "Bolonha", startDate: "2012", endDate: "2016"),
+                Experience(title: "professora", company: "escola Don Milani", location: "Bolonha", startDate: "2016", endDate: null, current: true,
+                           achievements: ["formei 3 novos professores"]),
+            ],
+            education: [
+                Education(degree: "Ciências da Educação", institution: "Universidade de Bolonha", startDate: "2012", endDate: "2012",
+                          description: "me formei em 2012"),
+            ],
+            skills: [Skill(name: "xadrez", level: .beginner), Skill(name: "caminhadas", level: .beginner)],
+            languages: [Language(name: "italiano", proficiency: .native), Language(name: "inglês", proficiency: .b2)],
+            interests: ["xadrez", "caminhadas"])
+        let expected = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bolonha"),
+            experience: [
+                Experience(title: "auxiliar", company: "creche", startDate: "2012", endDate: "2016"),
+                Experience(title: "professora", company: "escola Don Milani", startDate: "2016", current: true,
+                           achievements: ["formei 3 novos professores"]),
+            ],
+            education: [
+                Education(degree: "Ciências da Educação", institution: "Universidade de Bolonha", endDate: "2012", description: "me formei em 2012"),
+            ],
+            languages: [Language(name: "italiano", proficiency: .native), Language(name: "inglês", proficiency: .b2)],
+            interests: ["xadrez", "caminhadas"])
+        return row("first-run-on-the-real-model-example-pt",
+                   "kept: name, place, both jobs with titles and years, the school job's title professora (fundamental is a word of "
+                       + "studying), the 3 new teachers, the degree and its year, languages, interests; chess and hiking are no skills",
+                   AppExample.pt, draft, .exactly(expected), kind: .probe, language: "pt")
+    }
+
+    /// The years, the place and the achievements of the current job stand in a clause with words that nothing explains (cardiology,
+    /// department): it backs nothing, so they go, and so does its current flag (ADR 0023, Consequences: thinner drafts).
+    private static func firstRunNurseEN() -> GroundingRow {
+        let draft = CVData(
+            personalInfo: PersonalInfo(name: "Giulia Bianchi", email: "giulia.bianchi@example.com", phone: "+39 333 123 4567", location: "Turin"),
+            summary: "I am a registered nurse living in Turin. Since March 2019 I have worked as a ward nurse in the cardiology department of "
+                + "the Molinette hospital in Turin, where I look after up to 12 patients per shift and train new colleagues. From 2016 to 2019 "
+                + "I worked as a home care nurse for the Il Sorriso cooperative in Moncalieri. I graduated in Nursing from the University of "
+                + "Turin in 2016.",
+            experience: [
+                Experience(title: "ward nurse", company: "Molinette hospital", location: "Turin", startDate: "March 2019", endDate: null,
+                           current: true, description: "I look after up to 12 patients per shift and train new colleagues",
+                           achievements: ["look after up to 12 patients per shift", "train new colleagues"]),
+                Experience(title: "home care nurse", company: "Il Sorriso cooperative", location: "Moncalieri", startDate: "2016", endDate: "2019",
+                           description: "I worked as a home care nurse", achievements: [null]),
+            ],
+            education: [
+                Education(degree: "Nursing", institution: "University of Turin", startDate: "2016", endDate: "2016",
+                          description: "I graduated in Nursing from the University of Turin in 2016"),
+            ],
+            skills: [
+                Skill(name: "ECG monitoring", level: .beginner), Skill(name: "wound care", level: .beginner),
+                Skill(name: "patient education", level: .beginner),
+            ],
+            languages: [
+                Language(name: "Italian", proficiency: .native), Language(name: "English", proficiency: .b2),
+                Language(name: "French", proficiency: .a2),
+            ],
+            interests: ["singing in a choir", "going cycling"])
+        let expected = CVData(
+            personalInfo: PersonalInfo(name: "Giulia Bianchi", email: "giulia.bianchi@example.com", phone: "+39 333 123 4567", location: "Turin"),
+            summary: "I am a registered nurse living in Turin.",
+            experience: [
+                Experience(title: "ward nurse", company: "Molinette hospital"),
+                Experience(title: "home care nurse", company: "Il Sorriso cooperative", location: "Moncalieri", startDate: "2016", endDate: "2019"),
+            ],
+            education: [
+                Education(degree: "Nursing", institution: "University of Turin", endDate: "2016",
+                          description: "I graduated in Nursing from the University of Turin in 2016"),
+            ],
+            skills: [Skill(name: "ECG monitoring"), Skill(name: "wound care"), Skill(name: "patient education")],
+            languages: [
+                Language(name: "Italian", proficiency: .native), Language(name: "English", proficiency: .b2),
+                Language(name: "French", proficiency: .a2),
+            ])
+        return row("first-run-on-the-real-model-nurse-in-turin-en",
+                   "kept: name, contacts, place, the first sentence of the summary, both employers and titles, the years and place of the "
+                       + "older job, the degree and its year, skills without levels, languages; the paraphrased hobbies go",
+                   nurseInTurin, draft, .exactly(expected), kind: .probe, language: "en")
     }
 }

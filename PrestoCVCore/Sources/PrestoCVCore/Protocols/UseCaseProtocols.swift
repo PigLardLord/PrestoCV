@@ -38,6 +38,13 @@ public protocol CVManagementUseCaseProtocol: Sendable {
     /// - Throws: AppError if CV creation or saving fails
     func createCV(from template: CVModel) async throws -> CVModel
     
+    /// Stores a CV that the editor started, under the id it got when its editing began. Storing it again updates
+    /// it, so a first save that is repeated, after the app was ended in the middle of it, never makes a second CV.
+    /// - Parameter cv: The CV with its own id
+    /// - Returns: The CV as stored
+    /// - Throws: AppError if saving fails
+    func storeNewCV(_ cv: CVModel) async throws -> CVModel
+    
     /// Updates an existing CV with new data
     /// - Parameter cv: The CVModel with updated information
     /// - Returns: The updated CVModel as saved in storage
@@ -49,11 +56,13 @@ public protocol CVManagementUseCaseProtocol: Sendable {
     /// - Throws: AppError if deletion fails
     func deleteCV(id: UUID) async throws
     
-    /// Creates a duplicate copy of an existing CV
-    /// - Parameter id: The UUID of the CV to duplicate
-    /// - Returns: The new duplicated CVModel with a unique ID and modified name
+    /// Stores a copy of an existing CV, under a new identity
+    /// - Parameters:
+    ///   - id: The UUID of the CV to duplicate
+    ///   - name: The name of the copy, which the caller gives it by the rule of PrestoCVDomain (`CVTitle.copyName`)
+    /// - Returns: The copy, as stored
     /// - Throws: AppError if source CV doesn't exist or duplication fails
-    func duplicateCV(id: UUID) async throws -> CVModel
+    func duplicateCV(id: UUID, named name: String) async throws -> CVModel
     
     /// Retrieves a specific CV by its unique identifier
     /// - Parameter id: The UUID of the CV to retrieve

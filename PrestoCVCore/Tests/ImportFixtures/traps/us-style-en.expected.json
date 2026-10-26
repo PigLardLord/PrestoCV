@@ -1,0 +1,12 @@
+{
+ "id": "traps/us-style-en", "language": "en", "form": "trap",
+ "person": {"name": "MICHAEL TORRES", "title": null, "email": "michael.torres@example.com", "phone": "(555) 010-0199",
+            "location": "New York, NY", "links": ["https://github.com/mtorres-example"], "summary": null},
+ "experience": [
+  {"role": "Senior Software Engineer", "employer": "Acme Corp", "location": "New York, NY", "start": [2020, 1], "end": "current", "details": 2},
+  {"role": "Software Engineer", "employer": "Example Labs Inc.", "location": "Boston, MA", "start": [2016, 7], "end": [2019, 12], "details": 1}
+ ],
+ "education": [{"degree": "B.S. in Computer Science", "school": "Example State University", "start": [2016, 5], "end": null}],
+ "skills": ["Go", "Python", "TypeScript", "Kubernetes", "PostgreSQL", "Terraform"],
+ "languages": [], "certifications": [], "interests": []
+}

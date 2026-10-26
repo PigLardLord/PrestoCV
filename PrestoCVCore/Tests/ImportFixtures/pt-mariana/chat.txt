@@ -1,0 +1,41 @@
+Com certeza! Aqui está o teu CV num formato profissional:
+
+# Mariana Costa
+**Desenvolvedora de software**
+📍 Lisboa, Portugal | 📞 +351 912 000 101 | ✉️ mariana.costa@example.com | 🔗 linkedin.com/in/mariana-costa-example
+
+---
+
+## Perfil profissional
+Desenvolvedora com seis anos de experiência em aplicações móveis, apaixonada por acessibilidade e por equipas pequenas.
+
+## Experiência profissional
+### Desenvolvedora iOS — Exemplo Tecnologia Lda., Lisboa
+*Março de 2020 – presente*
+- Desenvolvimento da aplicação de pagamentos
+- Mentoria de duas estagiárias
+
+### Desenvolvedora web — Agência Exemplo, Porto
+*Julho de 2017 – fevereiro de 2020*
+- Sites e lojas online para clientes locais
+
+## Formação académica
+### Licenciatura em Engenharia Informática
+Universidade de Lisboa, Lisboa | 2013 – 2017
+
+## Competências
+- Swift, SwiftUI, JavaScript
+
+## Línguas
+- **Português:** nativo
+- **Inglês:** C1
+
+## Certificações
+- Certificação Scrum – Exemplo Academy (2021)
+
+## Interesses
+Surf, Leitura
+
+---
+
+Se quiseres, posso adaptá-lo a uma oferta de emprego específica.

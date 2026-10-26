@@ -1,0 +1,34 @@
+Mariana Costa
+Desenvolvedora de software
+ +351 912 000 101    mariana.costa@example.com    linkedin.com/in/mariana-costa-example
+ Lisboa, Portugal
+
+Sobre mim
+Desenvolvedora com seis anos de experiência em aplicações
+móveis, apaixonada por acessibilidade e por equipas
+pequenas.
+
+Experiência
+2020–Presente   Desenvolvedora iOS, Exemplo Tecnologia Lda., Lisboa
+• Desenvolvimento da aplicação de pagamentos
+• Mentoria de duas estagiárias
+2017–2020   Desenvolvedora web, Agência Exemplo, Porto
+• Sites e lojas online para clientes locais
+
+Educação
+2013–2017   Licenciatura em Engenharia Informática, Universidade de Lisboa
+
+Conhecimentos
+Conhecimentos   Swift, SwiftUI, JavaScript
+
+Línguas
+Português   nativo
+Inglês   C1
+
+Certificados
+2021   Certificação Scrum, Exemplo Academy
+
+Lazer
+Surf, Leitura
+
+1

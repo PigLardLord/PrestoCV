@@ -25,5 +25,11 @@ Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected*
 | [0022](0022-ship-legacy-app-as-v1.md) | Ship the legacy app, fixed, as version 1 | Accepted |
 | [0023](0023-ground-the-ai-draft-in-the-description.md) | Ground the AI draft by quoting the description and explaining every word | Accepted |
 | [0024](0024-run-apple-ci-and-releases-on-xcode-cloud.md) | Run the Apple CI and the releases on Xcode Cloud | Accepted |
+| [0025](0025-hold-the-legacy-app-to-the-separation-rules.md) | Hold the legacy app to the separation of views, view models and rules | Accepted |
+| [0026](0026-keep-the-core-portable-to-android.md) | Keep the core portable to Android | Accepted |
+| [0027](0027-import-a-cv-from-its-text-with-rules.md) | Import a CV from its text with rules, in a portable core, every value traced to its source | Accepted |
+| [0028](0028-check-each-personal-claim-of-the-ai-draft-again.md) | Check each personal claim of the AI draft again with the on-device model | Accepted |
+| [0029](0029-check-pull-requests-on-the-mac-mini.md) | Check pull requests on the Mac mini | Accepted |
+| [0030](0030-log-through-one-interface-that-carries-no-cv-content.md) | Log through one interface that carries no CV content | Accepted |
 
 New ADRs copy [template.md](template.md).

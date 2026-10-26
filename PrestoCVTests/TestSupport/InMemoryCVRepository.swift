@@ -5,7 +5,8 @@ import Foundation
 ///
 /// A test can make an operation fail, and can hold listings until it releases them one by one, in the order they
 /// were started. A held listing sees the store as it was when it started, whatever happens before it is released,
-/// and the test chooses at its release whether it returns that or fails.
+/// and the test chooses at its release whether it returns that or fails. A held save, like a slow write, stores its
+/// CV only when it is released.
 actor InMemoryCVRepository: CVRepositoryProtocol {
     enum Operation: Hashable {
         case listing
@@ -23,6 +24,9 @@ actor InMemoryCVRepository: CVRepositoryProtocol {
     private var listingsToHold = 0
     private var heldListings: [CheckedContinuation<Error?, Never>] = []
     private var heldListingWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var savesToHold = 0
+    private var heldSaves: [CheckedContinuation<Void, Never>] = []
+    private var heldSaveWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
     
     init(cvs: [CVModel] = []) {
         for cv in cvs {
@@ -67,6 +71,22 @@ actor InMemoryCVRepository: CVRepositoryProtocol {
         heldListings.removeLast().resume(returning: error)
     }
     
+    /// The next `count` saves wait until `releaseOldestSave` lets them go.
+    func holdNextSaves(_ count: Int = 1) {
+        savesToHold = count
+    }
+
+    func waitUntilSavesAreHeld(_ count: Int) async {
+        guard heldSaves.count < count else { return }
+        await withCheckedContinuation { heldSaveWaiters.append((count, $0)) }
+    }
+
+    /// Lets the save that started first go on and store its CV.
+    func releaseOldestSave() {
+        guard !heldSaves.isEmpty else { return }
+        heldSaves.removeFirst().resume()
+    }
+
     var storedNames: [String] {
         sorted(Array(storedCVs.values)).map(\.name)
     }
@@ -92,6 +112,15 @@ actor InMemoryCVRepository: CVRepositoryProtocol {
     
     func saveCV(_ cv: CVModel) async throws -> CVModel {
         try failIfNeeded(.save)
+        if savesToHold > 0 {
+            savesToHold -= 1
+            await withCheckedContinuation { continuation in
+                heldSaves.append(continuation)
+                let ready = heldSaveWaiters.filter { $0.count <= heldSaves.count }
+                heldSaveWaiters.removeAll { $0.count <= heldSaves.count }
+                ready.forEach { $0.continuation.resume() }
+            }
+        }
         saveCount += 1
         storedCVs[cv.id] = cv
         return cv

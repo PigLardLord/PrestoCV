@@ -1,11 +1,17 @@
-import SwiftUI
+import Combine
+import Foundation
 import PrestoCVCore
+import struct PrestoCVApplication.ChangeStoredCV
+import enum PrestoCVDomain.CVTitle
+import enum PrestoCVApplication.StoredCVChangeError
 
 @MainActor
 final class CVListViewModel: ObservableObject {
     
     // MARK: - Published Properties
-    @Published var viewState: ViewState<[CVModel]> = .idle
+    @Published var viewState: ViewState<[CVModel]> = .idle {
+        didSet { rowLabels = Self.rowLabels(of: cvs) }
+    }
     @Published private(set) var unreadableCount = 0
     /// When each CV of the list was last saved, for the CVs that are known to have a time.
     @Published private(set) var lastSavedAt: [UUID: Date] = [:]
@@ -23,15 +29,26 @@ final class CVListViewModel: ObservableObject {
     
     // MARK: - Private Properties
     private let cvManagementUseCase: CVManagementUseCaseProtocol
+    private let storedCVChanges: ChangeStoredCV<CVModel>
+    private let locale: Locale
     private let now: () -> Date
     private let waitBetweenTicks: (Duration) async throws -> Void
     private let calendar: () -> Calendar
+    /// Returns once the editors that were left have stored what they showed.
+    private let awaitLeftEditors: @MainActor () async -> Void
     /// Counts the reads that were started and the changes that went through. A read publishes what it found only if
     /// nothing was counted since it started: a newer read, and the rows that a change was applied to, win over a
     /// read that began earlier and was overtaken, whenever that one finishes.
     private var readSequence = 0
     /// A change went through and no read of the list has confirmed it yet.
     private var hasUnconfirmedChange = false
+    /// The CVs whose document language is being saved.
+    private var documentLanguageSaves: Set<UUID> = []
+    /// The language last chosen for a CV and not yet being saved; nil is automatic.
+    private var pendingDocumentLanguages: [UUID: DocumentLanguage?] = [:]
+    /// The label of each row, by identity, made once each time the list changes rather than each time a row is drawn.
+    /// The words in it change only with the app's language, and iOS starts the app again for that.
+    private var rowLabels: [String: String] = [:]
     
     // MARK: - Computed Properties
     var cvs: [CVModel] {
@@ -59,17 +76,27 @@ final class CVListViewModel: ObservableObject {
     
     // MARK: - Initialization
     /// - Parameters:
+    ///   - storedCVChanges: Renames a stored CV, or sets the language of its PDF.
+    ///   - locale: The language of the words that say when a CV was saved: the language of the app.
     ///   - now: The clock of the app.
     ///   - calendar: What counts as a day when a save is told in days. It is asked for each time a text is made, so
     ///     that a change of the time zone of the device moves the days with it.
     ///   - sleep: How the clock of the list waits between two ticks.
+    ///   - awaitLeftEditors: Returns once the editors that were left have stored what they showed. The store is read only
+    ///     after it, so that a CV just edited is listed as the editor left it.
     init(
         cvManagementUseCase: CVManagementUseCaseProtocol,
-        now: @escaping () -> Date = { Date() },
-        calendar: @escaping () -> Calendar = { .autoupdatingCurrent },
-        sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+        storedCVChanges: ChangeStoredCV<CVModel>,
+        locale: Locale,
+        now: @escaping () -> Date,
+        calendar: @escaping () -> Calendar,
+        sleep: @escaping (Duration) async throws -> Void,
+        awaitLeftEditors: @escaping @MainActor () async -> Void
     ) {
+        self.awaitLeftEditors = awaitLeftEditors
         self.cvManagementUseCase = cvManagementUseCase
+        self.storedCVChanges = storedCVChanges
+        self.locale = locale
         self.now = now
         self.waitBetweenTicks = sleep
         self.presentationDate = now()
@@ -78,24 +105,44 @@ final class CVListViewModel: ObservableObject {
     
     // MARK: - Row Text
     
-    /// The person a CV is about, for the line under its name: the name of the person and the job title, or the one
-    /// of them that is there. It tells apart CVs that have no name of their own. Nil when the CV has neither.
-    func personLine(of cv: CVModel) -> String? {
-        let parts = [cv.personalInfo.name, cv.personalInfo.title]
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    /// What the list calls a CV, by the title rule of PrestoCVDomain: its name, otherwise the name of its person,
+    /// otherwise the role it is for, and "Untitled CV" only without any of them. A CV whose title reads like another's
+    /// in the list is numbered, with a number that gives a label no other row shows.
+    func title(of cv: CVModel) -> String {
+        rowLabels[cv.id.uuidString] ?? cv.cvTitle.text
+    }
+
+    private static func rowLabels(of cvs: [CVModel]) -> [String: String] {
+        CVTitle.labels(
+            for: cvs.map { (id: $0.id.uuidString, title: $0.cvTitle) },
+            untitled: "cv.untitled".localized,
+            numbered: { "cv.title.numbered".localizedWithArgs($0, $1) }
+        )
+    }
+    
+    /// The line under the title of a CV's row, by the rule of PrestoCVDomain: who the CV is about, without what its
+    /// title already says. Nil when nothing is left to say.
+    func subtitle(of cv: CVModel) -> String? {
+        cv.rowSubtitle
     }
     
     /// When a CV was last saved, in words, for its row. Nil while that is not known.
     func lastSavedLine(of cv: CVModel) -> String? {
-        lastSavedAt[cv.id].map { LastSavedDescription(calendar: calendar()).text(for: $0, relativeTo: presentationDate) }
+        lastSavedAt[cv.id].map { LastSavedDescription(locale: locale, calendar: calendar()).text(for: $0, relativeTo: presentationDate) }
     }
     
     /// Moves the clock of the list to now, so that the times of the rows are told again. The list calls it when the
     /// app comes back to the foreground, which can be days after the rows were last drawn.
     func refreshPresentationDate() {
         presentationDate = now()
+    }
+    
+    /// The app came to the foreground or left it. Back in the foreground, which can be days after the rows were last
+    /// drawn, the times of the rows are told again.
+    func sceneDidChange(isActive: Bool) {
+        if isActive {
+            refreshPresentationDate()
+        }
     }
     
     /// Keeps the clock of the list current, one tick a minute, until the task that runs it is cancelled.
@@ -119,6 +166,8 @@ final class CVListViewModel: ObservableObject {
     /// error, or, once a change has gone through that no read has confirmed yet, by the notice that the list is
     /// stale. A successful read makes the list up to date.
     func loadCVs() async {
+        // The editor just left may still be storing its CV: a list read before that would miss it, or show it as it was
+        await awaitLeftEditors()
         readSequence += 1
         let thisRead = readSequence
         if viewState.data == nil {
@@ -151,24 +200,36 @@ final class CVListViewModel: ObservableObject {
         }
     }
     
+    /// Stores a copy of a listed CV, named after the title the list shows it with, as "Lena Hartmann (Copy)"
     func duplicateCV(withId id: UUID) async {
+        guard let name = cvs.first(where: { $0.id == id })?.copyName else { return }
         await perform {
-            .added(try await self.cvManagementUseCase.duplicateCV(id: id))
+            .added(try await self.cvManagementUseCase.duplicateCV(id: id, named: name))
         }
     }
     
-    /// Gives a CV a new name. The name is trimmed and an empty one is refused. The CV is read again before it is
-    /// saved, so that nothing but its name changes.
+    /// Gives a CV a new name, as `ChangeStoredCV` does: trimmed, never blank, and nothing but the name changes.
     func renameCV(id: UUID, to newName: String) async {
-        let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        
         await perform {
-            guard var cv = try await self.cvManagementUseCase.getCV(by: id) else {
-                throw AppError.notFound("error.subject.cv".localized)
+            try await self.storedCVChanges.rename(id, to: newName).map(CommittedChange.replaced)
+        }
+    }
+
+    /// Sets the language of a CV's PDF, as chosen in its export sheet; nil is automatic. `ChangeStoredCV` reads the CV
+    /// again before it is saved, so that nothing but its language changes.
+    ///
+    /// The saves of one CV run one after the other. A choice made while one is being saved waits, and replaces any
+    /// choice still waiting, so that the latest choice is always the one stored last: the language the sheet shows.
+    func setDocumentLanguage(_ language: DocumentLanguage?, ofCVWithId id: UUID) async {
+        pendingDocumentLanguages.updateValue(language, forKey: id)
+        // A save is under way: it saves this choice when it is done
+        guard documentLanguageSaves.insert(id).inserted else { return }
+        defer { documentLanguageSaves.remove(id) }
+
+        while let wanted = pendingDocumentLanguages.removeValue(forKey: id) {
+            await perform {
+                .replaced(try await self.storedCVChanges.setDocumentLanguage(wanted?.rawValue, of: id))
             }
-            cv.name = name
-            return .replaced(try await self.cvManagementUseCase.updateCV(cv))
         }
     }
     
@@ -178,25 +239,34 @@ final class CVListViewModel: ObservableObject {
     private enum CommittedChange {
         /// A copy of a CV. The store lists the CV saved last first, so it goes to the top.
         case added(CVModel)
-        /// A CV saved under a new name, which makes it the one saved last.
+        /// A CV saved with a change, such as a new name, which makes it the one saved last.
         case replaced(CVModel)
         case removed(UUID)
         case unreadableCVsAcknowledged
     }
     
     /// Runs a change of the stored CVs. A change that fails is reported as an action error and leaves the list
-    /// alone. One that goes through is shown in the list at once, from what it returned, and the list is then read
-    /// again, so that the user sees what happened even when that read fails.
-    private func perform(_ change: () async throws -> CommittedChange) async {
+    /// alone, and so does one that changed nothing (nil). One that goes through is shown in the list at once, from what
+    /// it returned, and the list is then read again, so that the user sees what happened even when that read fails.
+    private func perform(_ change: () async throws -> CommittedChange?) async {
         let committed: CommittedChange
         do {
-            committed = try await change()
+            guard let change = try await change() else { return }
+            committed = change
         } catch {
-            actionError = error.localizedAppErrorDescription
+            actionError = Self.message(for: error)
             return
         }
         apply(committed)
         await loadCVs()
+    }
+    
+    /// Why a change failed, in words. A CV deleted meanwhile is not found, as the store says of one it has not got.
+    private static func message(for error: Error) -> String {
+        guard error as? StoredCVChangeError == .notFound else {
+            return error.localizedAppErrorDescription
+        }
+        return AppError.notFound("error.subject.cv".localized).localizedDescription
     }
     
     private func apply(_ change: CommittedChange) {

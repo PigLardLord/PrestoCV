@@ -1,0 +1,41 @@
+Bien sûr ! Voici ton CV dans une mise en forme professionnelle :
+
+# Thomas Moreau
+**Comptable**
+📍 Lille, France | 📞 +33 1 99 00 02 02 | ✉️ thomas.moreau@example.org | 🔗 linkedin.com/in/thomas-moreau-example
+
+---
+
+## Profil professionnel
+Comptable expérimenté dans les PME, rigoureux et à l'écoute, habitué aux clôtures mensuelles et annuelles.
+
+## Expérience professionnelle
+**Comptable** | Cabinet Exemple | Lille | Janvier 2019 – aujourd'hui
+- Tenue de la comptabilité de trente clients
+- Préparation des bilans annuels
+
+**Assistant comptable** | Exemple Distribution SARL | Roubaix | Septembre 2015 – décembre 2018
+- Saisie des factures et rapprochements bancaires
+
+## Formation
+### DCG
+Lycée Exemple, Lille | 2012 – 2015
+
+## Compétences
+- Sage, Excel, Fiscalité
+
+## Langues
+| Language | Level |
+|---|---|
+| Français | langue maternelle |
+| Anglais | B1 |
+
+## Certifications
+- Certificat Voltaire – Projet Voltaire (2019)
+
+## Centres d'intérêt
+Randonnée, Jardinage
+
+---
+
+Dis-moi si tu veux une version plus courte ou adaptée à une offre précise.

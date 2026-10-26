@@ -1,14 +1,12 @@
 import SwiftUI
-import PrestoCVCore
 
 /// Shows the app once its dependencies are built, or the reason they could not be, with a retry.
 struct AppLaunchView: View {
     @StateObject private var viewModel: AppLaunchViewModel
 
-    init(makeDependencyContainer: @escaping @MainActor () -> DependencyContainerProtocol) {
-        self._viewModel = StateObject(
-            wrappedValue: AppLaunchViewModel(makeDependencyContainer: makeDependencyContainer)
-        )
+    /// - Parameter viewModel: Made once for each window, by the app's entry point.
+    init(viewModel: @autoclosure @escaping () -> AppLaunchViewModel) {
+        self._viewModel = StateObject(wrappedValue: viewModel())
     }
 
     var body: some View {

@@ -21,12 +21,8 @@ protocol ExportPreferencesStore {
 struct FileExportPreferencesStore: ExportPreferencesStore {
     private let fileURL: URL
 
-    init(fileURL: URL = FileExportPreferencesStore.defaultFileURL) {
+    init(fileURL: URL) {
         self.fileURL = fileURL
-    }
-
-    static var defaultFileURL: URL {
-        URL.applicationSupportDirectory.appendingPathComponent("PrestoCV/export-preferences.json")
     }
 
     func load() -> ExportPreferences {

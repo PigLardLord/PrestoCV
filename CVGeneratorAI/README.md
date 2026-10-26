@@ -41,21 +41,72 @@ are its planned replacement and are still empty.
   - A job stays current only if a clause naming its employer says it goes on now (or "since" with a year, when the sentence
     holds exactly one).
   - Repeated entries are dropped.
+  - Words are read in the description's language. A word that is an employer preposition, a negation or a hedge in another
+    of the six languages, and another word in the description's, is that other word: French "j'ai" holds no Italian "ai",
+    English "per shift" no Italian "per", German "seit Mai" no Italian "mai" (never). A word of another language that the
+    description's language does not have keeps its meaning.
+  - Skills, interests, languages and the person's headline title and place count only in a clause of the person that claims
+    them. A clause that denies, doubts, wishes or supposes ("I have never used Python", "I would like to work as a nurse in
+    Turin", "I'd like to", "I'd work", "Ich würde", "Ich hätte gern", "Sarei", "Me encantaría", "Sogno di", "If I had time,
+    I would play chess") claims nothing, and so does a clause that depends on it, or that states nothing as a fact before it
+    ("Spanisch zu lernen, davon träume ich"); "can", "mostly" and "partly" still claim ("I can speak French"), and a
+    negation that governs a high level denies only the level ("I am not an expert in Swift" keeps Swift), while one of a
+    low level or of the ability denies the item ("I have no basic knowledge of German", "I cannot speak German even at a
+    basic level"). A question claims nothing ("Do I speak French?"), nor do the words inside quotation marks (a mark at the
+    end of a line opens a quote on the next one; a single mark after a letter or a digit may be an apostrophe, "patients'
+    records", "un po'", and closes none: a quote that only such a mark may close, or only a mark that a quote inside it took,
+    runs to the end of its line), nor the line
+    after a colon line that another person speaks ("My colleague wrote:"), nor what follows a relative that brings in
+    another subject ("I work with a colleague who speaks French"); "which I use", "che uso", "tengo que hablar" and an item
+    before the relative still claim, and a word that only ends like an infinitive keeps no person ("qui prépare", "che
+    appare"). "plan", "plans" and "planning" withdraw only as verbs ("I am planning to learn Rust"), not as nouns ("route
+    planning", "care plans", "einen Plan erstellt"); an intention said by a phrase withdraws like a wish ("Ho intenzione
+    di", "J'ai l'intention d'", "Ich plane", "Ich habe vor, …").
+  - A skill that is also one of the draft's interests, and that the person mentions only as leisure ("In my free time I like
+    chess and hiking"), is a hobby, and is dropped; the interest stays. A skill the person claims anywhere else ("proficient
+    in Python", a job's clause, a list of skills) stays. Another person's clause ("My sister teaches chess") counts for
+    neither.
+  - An employer or a school loses a leading indefinite article written in lower case ("a nursery" is "nursery"); an article
+    with a capital is part of a name ("UNA Hotels").
+  - A degree that only says graduating ("diplôme", "Abschluss", "laurea" or "my degree" alone) is dropped; the school stays.
+- **A second check of the personal items (ADR 0028).** After the rules, the on-device model reads the description again
+  and judges each skill, language, interest, the headline title and the place that the grounded draft still keeps: whose it
+  is (the writer's, someone else's, or not mentioned) and how the description states it (as true, wished, conditional or
+  denied). An item stays only when it is the writer's and stated as true, so the check can only withdraw; a language's
+  level goes with its language. It asks the model (`FoundationModelsClaimChecker`) in batches of at most 8 items, one
+  after the other, with a fixed instruction, greedy sampling and structured output, and it reads the answer with
+  `ClaimAnswer`: the items must be numbered 1 to n, each once, and an item is a fact only when the model quotes words of
+  the description that contain it, otherwise it is withdrawn. Employers, schools, dates and prose stay with the rules.
+  When the check gives no answer (a failed call, a refusal of the model's guardrail, an answer that does not number its
+  items 1 to n, or no end within its 60 seconds, `ClaimCheckLimits`), the draft keeps its jobs, schools, dates and
+  prose, every item of the five kinds is withdrawn, and `GeneratedDraft.personalItemsUnchecked` is true, so that the app
+  can ask the person to add them; there is no retry and no fallback to the rules alone. Such a draft may be empty, and
+  is still a draft. Cancellation passes through.
+- **The order of a CV.** The use case lists the jobs that go on now first, then the others by their latest year (the end,
+  else the start), the newest first, as the grounded draft gives the years. A job with no year keeps its place among the
+  others, and so do jobs of the same year.
 - **On device.** The request, the description and the answer never leave the device.
 - **Typed outcomes.** Failures are `CVGenerationError` cases that the app explains in the person's language;
   cancellation is `CancellationError`, never an error case. Availability is an `AIAvailability` value with the reason
   when the model cannot run (device not eligible, Apple Intelligence off, model not ready).
+- **Language data.** The verbs of English and German are read from the device's lexical class (`LexicalTagger`, the
+  device's `DeviceLexicalTagger` in the app), which the device has once it has downloaded the language's data. Without
+  it, `generateCV` throws `languageDataUnavailable` with the language, before the model runs, and the sanitiser throws it
+  too: such a description is never grounded another way. The app asks the system for the data and waits for it for 60
+  seconds at most, with the screen saying so; when the data comes it generates once more, and when it does not it tells
+  the person the other ways to write the CV.
 
 ## Layout
 
 ```
 CVGeneratorAI/
-├── Models/        # CVData and its parts, CVGenerationRequest, CVGenerationError, AIAvailability, limits
+├── ClaimCheck/    # ClaimChecking, the candidates of a draft, the withdrawal, FoundationModelsClaimChecker
+├── Models/        # CVData and its parts, GeneratedDraft, CVGenerationRequest, CVGenerationError, AIAvailability, limits
 ├── Prompt/        # CVPrompt: the fixed instructions and the prompt built from a request
 ├── Protocols/     # CVGenerationService
 ├── Services/      # FoundationModelsService, the only implementation
 ├── Validation/    # CVValidator (request and answer rules) and CVDataSanitizer
-└── UseCases/      # CVGeneratorUseCase: check, generate, sanitize, check
+└── UseCases/      # CVGeneratorUseCase: check, generate, sanitize, check the claims again, order the jobs (JobOrder), check
 ```
 
 ## Usage
@@ -63,7 +114,7 @@ CVGeneratorAI/
 ```swift
 import CVGeneratorAI
 
-let useCase = CVGeneratorUseCase(service: FoundationModelsService())
+let useCase = CVGeneratorUseCase(service: FoundationModelsService(), claimChecker: FoundationModelsClaimChecker())
 
 guard case .available = useCase.availability() else { return }
 
@@ -71,7 +122,8 @@ let request = CVGenerationRequest(
     userPrompt: "I'm Maria Rossi, a primary school teacher from Bologna. Since 2016 I teach at Scuola Don Milani.",
     fallbackLanguageCode: "it"
 )
-let cvData = try await useCase.generateCV(from: request)
+let draft = try await useCase.generateCV(from: request)
+// draft.cvData is the grounded and checked CV; draft.personalItemsUnchecked says that the second check gave no answer.
 ```
 
 `fallbackLanguageCode` is the app's language: the CV is written in the language of the description, and in this one
@@ -83,12 +135,27 @@ only when that language is unclear.
 swift test
 ```
 
-The package builds only on Apple platforms. Tests use `FakeCVGenerationService`; the mapping of the framework's
-availability and errors (`FoundationModelsServiceTests`) needs macOS 26 with the FoundationModels framework.
+The package builds only on Apple platforms. Tests use `FakeCVGenerationService` and `FakeClaimChecker`; the mapping of
+the framework's availability and errors (`FoundationModelsServiceTests`) needs macOS 26 with the FoundationModels
+framework.
+
+`ClaimCheckEvaluation` runs the second check on the real model, only when asked, on a Mac with Apple Intelligence on. It
+measures the contract (a), the adversarial set (b), the held-out set of the spike (c), the held-out set written after
+the instruction was frozen (d) and drafts of 22, 32 and 42 personal items (e), three times each. It fails on verdicts
+that differ between runs, and on any item that the draft keeps although the description does not claim it (a false
+keep):
+
+```bash
+PRESTOCV_CLAIM_EVAL=abcde PRESTOCV_CLAIM_EVAL_OUT=/tmp/claim-eval swift test --filter ClaimCheckEvaluation
+```
+
+By default it runs the path of the product: the rules, then the check of what they keep. `PRESTOCV_CLAIM_EVAL_MODE=alone`
+judges every listed item without the rules, as when the instruction is tuned; then a false keep of the contract is only
+measured, since the rules drop those items before the check.
 
 ## Requirements
 
-- iOS 26 / macOS 26 with Apple Intelligence for generation
+- iOS 26.5 / macOS 26 with Apple Intelligence for generation
 - Swift 6 language mode
 
 ## License

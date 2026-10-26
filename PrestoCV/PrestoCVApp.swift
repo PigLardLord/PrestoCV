@@ -8,14 +8,50 @@
 import SwiftUI
 import PrestoCVCore
 import CVPDFExporter
+import DiagnosticLoggingOSLog
+import os
 
+private let launchLogger = Logger(subsystem: "com.PigLardLord.prestocv", category: "launch")
+
+/// The entry point, and the composition root of the app: the only place that reads the device and makes the real
+/// services, which the view model factory then hands out.
 @main
 struct PrestoCVApp: App {
-    private let storageDirectory = LaunchEnvironment.storageDirectory()
+    private static let environment = AppEnvironment.device(
+        diagnostics: OSLogDiagnosticLogger(subsystem: "com.PigLardLord.prestocv")
+    )
+    private static let storage = LaunchEnvironment.storage(arguments: environment.arguments)
 
     var body: some Scene {
         WindowGroup {
-            AppLaunchView(makeDependencyContainer: { [storageDirectory] in DependencyContainer(storageDirectory: storageDirectory) })
+            if LaunchEnvironment.hostsUnitTests(arguments: Self.environment.arguments) {
+                EmptyView()
+            } else {
+                AppLaunchView(
+                    viewModel: AppLaunchViewModel(
+                        makeDependencyContainer: { DependencyContainer(storageDirectory: Self.storage.cvs) },
+                        makeLeftoverEdits: { cvs in
+                            try DependencyContainer.makeLeftoverEditsImport(
+                                in: Self.storage.unsavedEdits(),
+                                cvs: cvs,
+                                recoveredName: { $0.recoveredCopyName }
+                            )
+                        },
+                        environment: Self.environment,
+                        bootstrapTemplates: { await Self.installBundledTemplates() }
+                    )
+                )
+            }
+        }
+    }
+
+    /// Installs the templates that ship with the app. A failure is logged and does not block the launch.
+    nonisolated private static func installBundledTemplates() async {
+        do {
+            let bootstrapService = try TemplateBootstrapService()
+            try await bootstrapService.syncBundledTemplates()
+        } catch {
+            launchLogger.error("Bundled templates were not installed: \(error.localizedDescription, privacy: .public)")
         }
     }
 }

@@ -33,12 +33,10 @@ struct LanguagesSubsection: View {
             emptyStateSubtitle: "empty.languages_subtitle".localized,
             addButtonTitle: "action.add_language".localized,
             items: $viewModel.cv.languages,
-            rowContent: { language, onDelete in
-                LanguageRowView(
-                    language: language,
-                    onDelete: onDelete
-                )
+            rowContent: { language in
+                LanguageRowView(language: language)
             },
+            deleteLabel: { $0.deleteActionLabel },
             onAdd: viewModel.addLanguage,
             onRemove: { viewModel.requestRemoval(of: .languages, at: $0) }
         )
@@ -56,12 +54,10 @@ struct CertificationsSubsection: View {
             emptyStateSubtitle: "empty.certifications_subtitle".localized,
             addButtonTitle: "action.add_certification".localized,
             items: $viewModel.cv.certifications,
-            rowContent: { certification, onDelete in
-                CertificationRowView(
-                    certification: certification,
-                    onDelete: onDelete
-                )
+            rowContent: { certification in
+                CertificationRowView(certification: certification)
             },
+            deleteLabel: { $0.deleteActionLabel },
             onAdd: viewModel.addCertification,
             onRemove: { viewModel.requestRemoval(of: .certifications, at: $0) }
         )
@@ -79,12 +75,10 @@ struct SocialLinksSubsection: View {
             emptyStateSubtitle: "empty.social_links_subtitle".localized,
             addButtonTitle: "action.add_social_link".localized,
             items: $viewModel.cv.social,
-            rowContent: { social, onDelete in
-                SocialLinkRowView(
-                    social: social,
-                    onDelete: onDelete
-                )
+            rowContent: { social in
+                SocialLinkRowView(social: social)
             },
+            deleteLabel: { $0.deleteActionLabel },
             onAdd: viewModel.addSocial,
             onRemove: { viewModel.requestRemoval(of: .social, at: $0) }
         )
@@ -102,22 +96,18 @@ struct InterestsSubsection: View {
             emptyStateSubtitle: "empty.interests_subtitle".localized,
             addButtonTitle: "action.add_interest".localized,
             items: $viewModel.cv.interests,
-            rowContent: { interest, onDelete in
-                InterestRowView(
-                    interest: interest,
-                    onDelete: onDelete
-                )
+            rowContent: { interest in
+                InterestRowView(interest: interest)
             },
+            deleteLabel: { InterestEntry(text: $0).deleteActionLabel },
             onAdd: viewModel.addInterest,
             onRemove: { viewModel.requestRemoval(of: .interests, at: $0) }
         )
     }
 }
 
+#if DEBUG
 #Preview {
-    let container = DependencyContainer()
-    let cvManagementUseCase = try! container.makeCVManagementUseCase()
-    let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: cvManagementUseCase)
-    
-    return DetailsSection(viewModel: viewModel)
+    DetailsSection(viewModel: PreviewDependencies.editor())
 }
+#endif

@@ -6,14 +6,23 @@ import Foundation
 /// are cut, which is harmless to the checks that read sentences one by one.
 enum SentenceSplitter {
     static func sentences(in text: String) -> [String] {
-        let characters = Array(text)
-        var sentences: [String] = []
-        var current = ""
+        sentencesByLine(in: text).map(\.text)
+    }
 
-        func closeSentence() {
+    /// The sentences of `text` as `sentences(in:)` cuts them, each with whether it starts a line: the first one does, and so does each
+    /// one that a line break comes before.
+    static func sentencesByLine(in text: String) -> [(text: String, startsALine: Bool)] {
+        let characters = Array(text)
+        var sentences: [(text: String, startsALine: Bool)] = []
+        var current = ""
+        var startsALine = true
+
+        func closeSentence(atALineBreak: Bool) {
             if let sentence = current.trimmedNonEmpty {
-                sentences.append(sentence)
+                sentences.append((sentence, startsALine))
+                startsALine = false
             }
+            if atALineBreak { startsALine = true }
             current = ""
         }
 
@@ -25,10 +34,10 @@ enum SentenceSplitter {
             let followedByGap = index + 1 == characters.count || characters[index + 1].isWhitespace
 
             if isLineBreak || (isTerminator && followedByGap) {
-                closeSentence()
+                closeSentence(atALineBreak: isLineBreak)
             }
         }
-        closeSentence()
+        closeSentence(atALineBreak: false)
 
         return sentences
     }

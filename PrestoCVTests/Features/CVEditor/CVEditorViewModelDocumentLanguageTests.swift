@@ -50,22 +50,55 @@ struct CVEditorViewModelDocumentLanguageTests {
         #expect(viewModel.cv.documentLanguage == nil)
     }
 
-    @Test("Changing the language of a saved CV is an unsaved change, and undoing it is not")
-    func languageChangeIsTrackedAsUnsavedChange() async {
+    @Test("Automatic names the language it stands for as the CV is typed: the app's, then the one the CV is written in")
+    func automaticNamesTheLanguageItStandsFor() {
+        let viewModel = CVEditorViewModel(
+            cvId: nil,
+            initialCV: CVModel(personalInfo: PersonalInfo(name: "Luca Ferrari", title: "Sales Manager")),
+            cvManagementUseCase: MockCVManagementUseCase(),
+            documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: ["it-IT"], read: NaturalLanguageReader.read)
+        )
+        let automatic = { (name: String) in String(format: String(localized: "language.automatic"), name) }
+        #expect(viewModel.automaticDocumentLanguageTitle == automatic("Italiano"), "Too few words to tell: the app's language")
+
+        viewModel.cv.personalInfo.profile = "Sales and operations manager with over 20 years of experience in industrial "
+            + "distribution. Built and led teams of up to 15 people and managed key accounts."
+
+        #expect(viewModel.automaticDocumentLanguageTitle == automatic("English"))
+        #expect(viewModel.documentLanguageSelection == nil, "Naming the language does not choose it")
+    }
+
+    @Test("The row shows the language chosen, or what automatic stands for")
+    func rowShowsTheChosenOrTheAutomaticLanguage() {
+        let viewModel = CVEditorViewModel(
+            cvId: nil,
+            initialCV: CVModel(),
+            cvManagementUseCase: MockCVManagementUseCase(),
+            documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: ["it-IT"], read: NaturalLanguageReader.read)
+        )
+        #expect(viewModel.documentLanguageTitle == viewModel.automaticDocumentLanguageTitle)
+
+        viewModel.documentLanguageSelection = .german
+
+        #expect(viewModel.documentLanguageTitle == "Deutsch")
+    }
+
+    @Test("Changing the language of a saved CV and undoing it before the save stores nothing")
+    func languageChangeUndoneStoresNothing() async {
         // Given
         let saved = CVModel(name: "Backend", personalInfo: PersonalInfo(name: "Ada", email: "ada@example.com"))
         let useCase = MockCVManagementUseCase()
         await useCase.setGetCVResult(.success(saved))
         let viewModel = CVEditorViewModel(cvId: saved.id.uuidString, cvManagementUseCase: useCase)
         await viewModel.loadCV()
-        #expect(!viewModel.hasUnsavedChanges)
 
-        // When / Then
+        // When
         viewModel.documentLanguageSelection = .german
-        #expect(viewModel.hasUnsavedChanges)
-
         viewModel.documentLanguageSelection = nil
-        #expect(!viewModel.hasUnsavedChanges)
+        await viewModel.saveNow()
+
+        // Then
+        #expect(await !useCase.updateCVCalled)
     }
 
     @Test("Saving a CV keeps the language that was chosen")
@@ -79,10 +112,9 @@ struct CVEditorViewModelDocumentLanguageTests {
         viewModel.documentLanguageSelection = .spanish
 
         // When
-        let didSave = await viewModel.saveCV()
+        await viewModel.saveNow()
 
         // Then
-        #expect(didSave)
         #expect(await useCase.updatedCVs.last?.documentLanguage == "es")
     }
 }

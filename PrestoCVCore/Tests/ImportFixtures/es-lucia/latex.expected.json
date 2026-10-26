@@ -1,0 +1,87 @@
+{
+ "id": "es-lucia/latex",
+ "language": "es",
+ "form": "latex",
+ "person": {
+  "name": "Lucía Fernández",
+  "title": "Enfermera",
+  "email": "lucia.fernandez@example.com",
+  "phone": "+34 600 000 101",
+  "location": "Valencia, España",
+  "links": [
+   "https://linkedin.com/in/lucia-fernandez-example"
+  ],
+  "summary": "Enfermera con seis años de experiencia en urgencias y pediatría, organizada y cercana con los pacientes."
+ },
+ "experience": [
+  {
+   "role": "Enfermera",
+   "employer": "Hospital Ejemplo",
+   "location": "Valencia",
+   "details": 2,
+   "start": [
+    2020,
+    null
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Enfermera",
+   "employer": "Clínica Ejemplo",
+   "location": "Alicante",
+   "details": 1,
+   "start": [
+    2018,
+    null
+   ],
+   "end": [
+    2019,
+    null
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "Grado en Enfermería",
+   "school": "Universidad de Valencia",
+   "start": [
+    2014,
+    null
+   ],
+   "end": [
+    2018,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "Urgencias",
+  "Pediatría",
+  "Triaje"
+ ],
+ "languages": [
+  {
+   "name": "Español",
+   "level": "native"
+  },
+  {
+   "name": "Inglés",
+   "level": "b2"
+  },
+  {
+   "name": "Valenciano",
+   "level": "c1"
+  }
+ ],
+ "certifications": [
+  {
+   "name": "Soporte vital avanzado",
+   "issuer": "Cruz Roja Ejemplo",
+   "year": 2022
+  }
+ ],
+ "interests": [
+  "Natación",
+  "Lectura"
+ ]
+}

@@ -131,10 +131,12 @@ struct BundledTemplateRenderTests {
         return try JSONDecoder().decode(TemplatePackage.self, from: Data(contentsOf: url))
     }
 
+    /// The page of `cv` in `language`. The fixtures have no document language, so the adapter is given `language` as
+    /// the person's: the level names are then in the language of the headings, whatever the language of the machine.
     private static func render(_ id: String, language: String = "en", cv: CVModel = fullCV()) async throws -> String {
         let package = try loadPackage(id)
         let template = Template(id: id, name: package.manifest.name, htmlContent: package.composedHTML)
-        let converted = PrestoCVCoreAdapter().convertToCV(from: cv)
+        let converted = PrestoCVCoreAdapter(preferredLanguages: [language]).convertToCV(from: cv)
         let document = CVDocument(personalInfo: converted.personalInfo, sections: converted.sections, metadata: DocumentMetadata(language: language))
         return try await MustacheTemplateEngine().render(template: template, data: document, customization: CustomizationOptions())
     }
@@ -261,7 +263,8 @@ struct BundledTemplateRenderTests {
         }
 
         let classAttributes = try NSRegularExpression(pattern: "class=\"([^\"]*)\"")
-        var present = Set<String>()
+        // The renderer sets these classes on the root element when it prints a CV tightened onto one page
+        var present = OnePageFit.classNames
         for match in classAttributes.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
             present.formUnion(String(html[Range(match.range(at: 1), in: html)!]).split(separator: " ").map(String.init))
         }

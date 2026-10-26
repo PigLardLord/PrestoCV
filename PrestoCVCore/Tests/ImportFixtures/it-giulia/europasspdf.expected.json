@@ -1,0 +1,76 @@
+{
+ "id": "it-giulia/europasspdf",
+ "language": "it",
+ "form": "europasspdf",
+ "person": {
+  "name": "Bianchi Giulia",
+  "title": null,
+  "email": "giulia.bianchi@example.com",
+  "phone": "+39 333 000 0101",
+  "location": "Via Roma 1, 10121 Torino",
+  "links": [],
+  "summary": null
+ },
+ "experience": [
+  {
+   "role": "Infermiera",
+   "employer": "Ospedale Esempio",
+   "location": "Via Esempio 1, Torino",
+   "details": 1,
+   "start": [
+    2019,
+    3
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Infermiera",
+   "employer": "Clinica Esempio",
+   "location": "Via Esempio 1, Milano",
+   "details": 1,
+   "start": [
+    2016,
+    9
+   ],
+   "end": [
+    2019,
+    2
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "Laurea in Infermieristica",
+   "school": "Università degli Studi di Torino",
+   "start": [
+    2013,
+    null
+   ],
+   "end": [
+    2016,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "Terapia intensiva",
+  "Gestione dei turni",
+  "Cartella clinica elettronica"
+ ],
+ "languages": [
+  {
+   "name": "Italiano",
+   "level": "native"
+  },
+  {
+   "name": "Inglese",
+   "level": null
+  },
+  {
+   "name": "Francese",
+   "level": null
+  }
+ ],
+ "certifications": [],
+ "interests": []
+}

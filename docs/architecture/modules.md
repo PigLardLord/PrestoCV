@@ -10,26 +10,53 @@ A new target, or a new edge between targets, changes this file in the same pull 
 
 Notation:
 - **May import** lists every module the target may `import`. Swift and Foundation are always allowed; in domain targets only as value types (R2).
-- The platform column reads iOS / macOS / Linux. **Linux ✓** means the target must build and pass its tests on Linux in CI.
+- The platform column reads iOS / macOS / Linux / Android. **Linux ✓** means the target must build and pass its tests on Linux in CI. **Android ✓** means it must also build for Android (arm64, API level 28) in CI; its tests do not run there yet ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md)).
 
 Test targets and test-support targets are described below each package. The checker applies only its import allow-lists to them.
 
 ---
 
-## Package `PrestoCVCore` — CV Authoring
+## Package `DiagnosticLogging` — Diagnostic logging
 
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
-| `PrestoCVDomain` | domain | iOS, macOS, Linux ✓ | Foundation |
-| `PrestoCVApplication` | application | iOS, macOS, Linux ✓ | `PrestoCVDomain`, Foundation |
-| `PrestoCVPersistence` | outbound adapter | iOS, macOS, Linux ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Glibc, Darwin |
+| `DiagnosticLogging` | port, value types and decorators | iOS, macOS, Linux ✓, Android ✓ | Foundation |
+| `DiagnosticLoggingOSLog` | outbound adapter | iOS, macOS | `DiagnosticLogging`, `os` |
+
+A leaf package that depends on no other package ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)). `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI` may depend on its `DiagnosticLogging` target, and only on that one: the one exception to the forbidden edges between the three packages.
+
+**`DiagnosticLogging`**
+- **The port, `DiagnosticLogger`:** one synchronous `log(_:)` that never throws, with the shorthands `debug`, `info`, `notice`, `error` and `fault`.
+- **The entry, `LogEntry`:** a level, a `LogCategory` each module declares once, an event that is a `StaticString`, and fields of a closed set of kinds: `count`, `duration`, `flag`, `token` (a `StaticString`), `identifier` (a UUID) and `error`, which is written as its type and the `logCode` of a `LoggableError`, never as its description. So no value of a CV can reach a line. `line` writes the event and its `key=value` pairs.
+- **The decorators:** `FanOutLogger`, `MinimumLevelLogger` and `SilentLogger`, for previews.
+- **`Stopwatch`:** the time a step took, on an injected `Clock`.
+- No platform condition, no Apple-only import, no bundle (R11, R18).
+
+**`DiagnosticLoggingOSLog`** writes each entry to the unified log: one `os.Logger` per category of the subsystem, the levels mapped one to one, and the line as public text. Only the composition root makes one (R4). Every file is wrapped in `#if canImport(os)`.
+
+**Test support and tests.**
+- `DiagnosticLoggingTestSupport` may import `DiagnosticLogging`, Foundation, Synchronization. It holds `RecordingLogger`, which records the entries under a `Mutex`, and `TickingClock`, a `Clock` that moves on by one step at every reading.
+- **`DiagnosticLoggingTests`** may import `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, Testing, Foundation. They test the lines, the decorators and the stopwatch, on Linux too.
+- **`DiagnosticLoggingOSLogTests`** (Apple hosts) may import `DiagnosticLoggingOSLog`, `DiagnosticLogging`, Testing and `os`.
+
+---
+
+## Package `PrestoCVCore` — CV Authoring and CV Import
+
+| Target | Layer | Platforms | May import |
+|---|---|---|---|
+| `PrestoCVDomain` | domain | iOS, macOS, Linux ✓, Android ✓ | Foundation |
+| `PrestoCVApplication` | application | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVDomain`, Foundation |
+| `PrestoCVPersistence` | outbound adapter | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Glibc, Darwin, Android |
+| `PrestoCVImporting` | domain + application (CV Import) | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVDomain`, `DiagnosticLogging`, Foundation |
+| `PrestoCVImportingPDFKit` | outbound adapter | iOS, macOS | `PrestoCVImporting`, `DiagnosticLogging`, PDFKit, UIKit, AppKit, CoreGraphics, Foundation |
 
 **`PrestoCVDomain`**
 - **`CV`**, the aggregate:
   - a typed identity (`CVID`);
   - `revision`, `createdAt` and `updatedAt`, settable only inside the package;
   - a private title, `PersonalDetails`, and ordered sections of entries;
-  - the "has enough content to be saved" rule;
+  - the "has enough content to be saved" rule, `SaveRule`: a detail of the person is written, or a section has an entry. It reads plain values, so the legacy app's editor is judged by it too ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md));
   - duplication with a title composed by the caller.
 - **Value objects:**
   - `PartialDate` (year or month precision, partial order);
@@ -38,6 +65,14 @@ Test targets and test-support targets are described below each package. The chec
   - `LanguageProficiency` (CEFR + native);
   - `EmailAddress`, `PhoneNumber`, `WebLink`, `DocumentLanguage`, `DesignChoice`.
 - **`Period.make(start:end:current:)`** is the single rule that turns loose data into a period, or into a typed `PeriodError`.
+- **`FieldCheck`**: whether the text of an e-mail, phone or web-address field reads as one. E-mail addresses and web addresses are judged by `EmailAddress` and `WebLink`; a phone number needs a digit, and is otherwise written as the person likes. The legacy app's editor checks a field when the person leaves it.
+- **`CVTitle`**: what a CV is called wherever it is named: its name, otherwise the name of its person, otherwise the role it is for; "Untitled CV", which the app words, only for a CV with none of the three; the name of a copy, that title followed by the app's word for a copy; and the labels of a list's rows, in which a CV whose title reads like another's takes the first number that gives a label no other row shows, so that no two rows read the same. A CV with none of the three, as a new one the editor stored before it was named, is numbered as the platform numbers an untitled document: "Untitled CV", "Untitled CV 2". The legacy app passes the name of a copy to the legacy duplicate operation.
+- **`CVSubtitle`**: the line under the title of a CV in a row of the list, which never repeats the title: the name of the person and the role under a CV titled by its own name, only the role under one titled by its person, only the person under one titled by its role; an empty part leaves no separator.
+- **`ExampleDraft`**: the fields (`CVField`) a draft started from an example leaves blank, who its person is and how to reach them.
+- **`PDFFileName`**: the title of an exported PDF and the name of its file, from the person's name or the CV's, cleaned for every file system and cut to its bytes, around the pattern of the PDF's language, which the app gives from its catalog.
+- **`ExportReadiness`**: whether a CV can be exported, and which field to fix: only the person's name is required; a missing e-mail address or phone number only warns.
+- **`ExportPolicy`**: the page of version 1's export, A4 with a 43-point margin and 10 pages at most.
+- The legacy app reads both while it exports through the legacy exporter; at migration step 5 the policy of `CVRendering` replaces them ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)).
 - Planned: projects (#54), photo (#53).
 
 **`PrestoCVApplication`**
@@ -47,21 +82,41 @@ Test targets and test-support targets are described below each package. The chec
   - `SampleCVSource`, `IDGenerator`, `TimeSource`. `TimeSource` is so named to avoid shadowing `Swift.Clock`.
 - **Use cases:**
   - `NewCV`, `SaveCV` (create or conditional update, errors translated to `AuthoringError`, including `tooLarge`), `LoadCV`;
-  - list (by last change), rename, duplicate, delete, start from a sample, determine onboarding.
+  - list (by last change), rename, duplicate, delete, start from a sample, determine onboarding;
+  - `ChangeStoredCV`: renames a stored CV (trimmed, never blank) or sets the language of its PDF, reading it again just before it is stored, so nothing else changes. It works through the `StoredCVs` port, generic over the store's own CV, which the legacy app implements over its stored CVs until the migration replaces them ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)).
 - **Listing** returns the healthy CVs plus `StoreIssue`s: `corrupt`, `upgradeRequired`, `unreadable`, `tooLarge`, `quarantineFailed`.
+- **`Autosave`**: when an editor writes what it shows. A second after the last change, at once on a flush (the app leaving the foreground, the editor being left); never when the content equals what is stored, so its edit time stays; a CV the store does not hold yet only once it is worth storing. After each write the content is compared with the store again: a change made while it ran, or one that undid it, is written next, and a flush goes on until the store holds what the form shows. A failed write leaves the content in memory and a `failed` status until a write succeeds or the content returns to what the store holds, and a write that runs meanwhile says `retrying`, not `writing`, so that it hides no failure (`hasUnresolvedFailure`); its cause goes to a diagnostic boundary the caller gives, apart from the status. The store is known to hold the content (`storeHoldsTheContent`) only when no write runs and nothing differs: the end of a write that runs can leave something else there. A write the store cancels is no failure: the content stays to be written, and the flush passes the cancellation on. The write is told whether the store holds the CV, so that it needs nothing of the editor; it and the clock are given by the caller.
 
 **`PrestoCVPersistence`**
 - `FileCVRepository`:
   - one `CVFileV1` file per CV, named from its id;
   - atomic writes with `complete` protection, and a read-back check before every write;
-  - every mutation under an exclusive `flock` on the store;
+  - every mutation under an exclusive `flock` on the store, from the C library of the platform: `Glibc`, `Darwin` or `Android` ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md));
   - reads classified as described in R12;
   - `Quarantine/` with validated restore, erase and purge.
 - `DirectorySampleCVSource`: sample CVs from an injected directory, in the same v1 format and through the store's own reader. They are kept in `PrestoCV/Resources/Samples/`, and the app ships them from the switch to the new stack on (version 1 ships the legacy samples).
 
+**`PrestoCVImporting`** turns a CV someone already has into a draft, with rules only ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)). It is the CV Import context, packaged with Authoring because it reads Authoring's value objects and period rule instead of copying them: the only edge between two contexts inside this package, and it goes one way.
+- **What a reader saw, `ExtractedLayout`:** the lines of a pasted text, or the words of each page of a PDF with their box and style. Untrusted input (R8), bounded by `ImportLimits`.
+- **The document in reading order, `SourceDocument`:** blocks (a line, a heading, a list item, a row of cells) with page, box, column and style when there are any, over one canonical text. `SourceSpan`s count Unicode scalars.
+- **The rules:**
+  - `PlainTextReader` for pasted text, and `LayoutAnalyzer` for pages: lines, cells, a sidebar told from a table, the reading order, repeated headers and footers, page numbers;
+  - normalisation: chat Markdown and chatter, ligatures, line-end hyphenation, icon glyphs;
+  - `SectionVocabulary` and the segmentation by headings in six languages, Europass and Lebenslauf labels included;
+  - the readers of names, contacts, dates and periods, entries, skills, languages and levels, certifications and interests.
+- **The draft, `ImportedCV`:** every value is `Sourced`, with the spans it quotes and the rule that read it, if any. Values the rules are unsure of carry a check reason, and the review list collects them. Text that fits no field is kept as text not imported; noise is left out with its reason. A final gate checks every value against its spans.
+- **The use case, `ImportCV`:** pasted text, or a PDF through the port **`PDFTextExtracting`**; both are untyped `throws` and cancellable, and both are read within one budget of work. Typed `ImportError`: empty, too large, too many pages, encrypted, unreadable, no text (a scan).
+- **What it logs** through the `DiagnosticLogger` its initialiser takes ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)), under the category `import`: the kind of input, its pages and characters, the sections by kind and the time taken; the headings not recognised and the lines left unplaced, as counts; a failure by kind, and the limit of the bounded reading it reached; a cancellation.
+- No platform condition, no Apple-only import, no bundle (R11, R18). It is built for Android with the rest of `PrestoCVCore`.
+
+**`PrestoCVImportingPDFKit`** implements `PDFTextExtracting` with PDFKit: each page's words with their box, font size and weight, in PDFKit's order, and nothing decided about the reading order, which the core decides. It checks the size, the page count and the encryption before it reads any text, refuses a page whose text is longer than the characters left before it reads the page's glyphs, counts the words as it reads them, and stops in the middle of a page once its task is cancelled. A word whose font PDFKit cannot name comes back without its weight, so the adapter draws the page with CoreGraphics and marks a word bold when its strokes are clearly heavier than the page's ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)). `characterBounds(at:)` has no box for the line breaks of `PDFPage.string`, so the adapter walks the two together. Through the logger its initialiser takes, it logs the pages and the words it read, and the limit that stopped it, which it throws as a `LimitReached` for the use case to word and log. Every file is wrapped in `#if canImport(PDFKit)`.
+
 **Test support and tests.**
+- **`PrestoCVImportingTests`** may import `PrestoCVImporting`, `PrestoCVDomain`, `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, Testing, Foundation. It holds the unit tests of every rule and the **contract table**: the synthetic corpus under `PrestoCVCore/Tests/ImportFixtures/` (texts, recorded page layouts and their PDFs, each with the fields it states), measured per language and form, and checked line by line: every line of every fixture is covered by a value, a text not imported or a left-out piece. No real CV is ever committed.
+- **`PrestoCVImportingPDFKitTests`** (Apple hosts) may import `PrestoCVImportingPDFKit`, `PrestoCVImporting`, `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, Testing, Foundation, PDFKit, CoreGraphics, and CoreText, with which it draws hostile pages when it runs. Its contract test reads the fixture PDFs with PDFKit and compares the words with the recorded layouts that the Linux tests use.
 - `PrestoCVCoreTestSupport` may import `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Synchronization. It holds:
   - `InMemoryCVRepository`, `SteppingClock`, `SequentialIDGenerator`;
+  - `ManualClock`, a `Clock` that moves only when a test moves it, for the timing of `Autosave`;
   - the **`CVRepository` contract suite**: round trip with timestamps, create twice, update bumps the revision, stale update and stale delete, 50 concurrent updates from one revision leave exactly one success, update after delete, listing order.
 - File-store behaviour that an in-memory store cannot have is tested in the Core tests, not in the contract: mixed directory, unreadable, oversized and hostile files, restore, erase, purge, and two instances racing.
 
@@ -73,11 +128,12 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
-| `CVDocumentModel` | published language | iOS, macOS, Linux ✓ | Foundation |
-| `CVDesignCatalog` | domain + application | iOS, macOS, Linux ✓ | Foundation |
-| `CVDesignCatalogFileStore` | outbound adapter | iOS, macOS, Linux ✓ | `CVDesignCatalog`, Foundation, Glibc, Darwin |
-| `CVBundledDesigns` | outbound adapter + resources | iOS, macOS, Linux ✓ | `CVDesignCatalog`, Foundation |
-| `CVRendering` | application | iOS, macOS, Linux ✓ | `CVDocumentModel`, `CVDesignCatalog`, Foundation |
+| `CVDocumentModel` | published language | iOS, macOS, Linux ✓, Android ✓ | Foundation |
+| `CVDesignCatalog` | domain + application | iOS, macOS, Linux ✓, Android ✓ | Foundation |
+| `CVDesignCatalogFileStore` | outbound adapter | iOS, macOS, Linux ✓, Android ✓ | `CVDesignCatalog`, Foundation, Glibc, Darwin, Android |
+| `CVBundledDesigns` | outbound adapter + resources | iOS, macOS, Linux ✓, Android ✓ | `CVDesignCatalog`, Foundation |
+| `CVRendering` | application | iOS, macOS, Linux ✓, Android ✓ | `CVDocumentModel`, `CVDesignCatalog`, Foundation |
+| `CVBundledHeadings` | outbound adapter + resources | iOS, macOS, Linux ✓, Android ✓ | `CVRendering`, Foundation |
 | `CVRenderingWebKitSupport` | adapter support | iOS, macOS | `CVRendering`, WebKit, Foundation |
 | `CVRenderingIOS` | outbound adapter | iOS | `CVRenderingWebKitSupport`, `CVRendering`, WebKit, UIKit, Foundation |
 | `CVRenderingMacOS` | outbound adapter | macOS | `CVRenderingWebKitSupport`, `CVRendering`, WebKit, AppKit, Foundation |
@@ -98,7 +154,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - Pending: a committed JSON Schema.
 
 **`CVDesignCatalog`**
-- **`MarkupContract`**, version 1: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](markup-contract.md).
+- **`MarkupContract`**, version 1: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](../../CVPDFExporter/Docs/markup-contract.md).
 - **The CSS policy:** a tokenizer, an allow-list of properties and values, and canonical re-serialisation into `ValidatedStylesheet`, whose initialiser is internal.
 - **`DesignPackageValidator`** takes raw bytes and returns a `ValidatedDesign`: manifest, stylesheet and PNG preview.
 - **Customisation values:** `HexColor`, `Palette` (exists only with readable contrast) and `FontScheme` (a closed set).
@@ -107,7 +163,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - **`InstallDesign`**: validate the raw bytes, then `DesignRenderingGate.verify`, then `DesignStore.save`. Nothing is stored unless both checks pass.
 - **Ports:** `DesignStore`, `BundledDesignSource` (raw bytes), and **`DesignRenderingGate`**. The catalog owns the gate; `CVRendering` implements it, along the allowed Rendering → Catalog edge.
 
-**`CVDesignCatalogFileStore`** holds `FileDesignStore`: the directory is injected, the index is written atomically under a lock (`flock`), and one instance serves the process. Every read validates the file again, so only validated designs leave the store.
+**`CVDesignCatalogFileStore`** holds `FileDesignStore`: the directory is injected, the index is written atomically under a lock (`flock`, from `Glibc`, `Darwin` or `Android`), and one instance serves the process. Every read validates the file again, so only validated designs leave the store.
 
 **`CVBundledDesigns`** holds the bundled `.mcvt` files as resources, served as raw bytes through `Bundle.module`.
 
@@ -117,13 +173,15 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - validates the language tag;
   - keeps only `WebLink`s, and prints each link's destination as its text;
   - formats dates in the document language.
-- **`HeadingsCatalog`:** JSON heading tables per language plus an index, matched by BCP 47. An unsupported language is a typed error.
+- **`HeadingsCatalog`:** JSON heading tables per language plus an index, matched by BCP 47. An unsupported language is a typed error. It reads the tables as raw bytes through **`HeadingTableSource`**, its outbound port, and decodes them itself; only a tag that reads as BCP 47 reaches the source ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md)).
 - **`PDFRendering`**, the outbound port: `render(html:page:) async throws -> RenderedPDF`, with `data`, `pageCount` and `requiredPages`. `truncated` is derived from those.
 - **`PDFInspecting`**, the outbound port that reads the page count and text of a PDF.
 - **`RenderedDocument`:** the builder's output, meaning the HTML plus the exact text nodes it contains.
 - **`DocumentCompleteness`:** every text node needs its own span of the PDF text, which no other node uses, ignoring case and spacing.
 - **`FixtureRenderingGate`:** implements the catalog's `DesignRenderingGate`. It renders a fixture that uses every section with the candidate design, and requires a complete, untruncated PDF.
 - **Policy:** the required fields and page limit, shared by preview and export.
+
+**`CVBundledHeadings`** holds the heading tables as resources, served as raw bytes through `Bundle.module` by `BundleHeadingTableSource`. An Android app ships no SwiftPM bundle: its edge reads the same files from the app's assets and passes them through the same port ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md)).
 
 **`CVRenderingWebKitSupport`**
 - `SecureWebViewConfiguration.compileRules()` is called once by the composition root: a block rule per network scheme, plus a block on every subresource type. `make(rules:)` then builds each configuration: JavaScript off for content, non-persistent store, media only on user action.
@@ -143,7 +201,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - `PDFInspecting` on PDFKit, used by the export workflow and by the native contract tests. Every file is wrapped in `#if canImport(PDFKit)`.
 
 **Test support and tests.**
-- **`CVRenderingTestSupport`** may import `CVRendering`, `CVDocumentModel`, `CVDesignCatalog`, Foundation. It holds `InMemoryDesignStore`, the **`DesignStore` contract suite** that it and `FileDesignStore` pass, and:
+- **`CVRenderingTestSupport`** may import `CVRendering`, `CVDocumentModel`, `CVDesignCatalog`, `CVBundledHeadings` (the contract fixture prints the shipped Italian headings), Foundation. It holds `InMemoryDesignStore`, the **`DesignStore` contract suite** that it and `FileDesignStore` pass, and:
   - the **`PDFRendering` contract suite**:
     - the fixture must fit and contain every field;
     - page count per the inspector;
@@ -162,7 +220,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
-| `CVDrafting` | domain + application | iOS, macOS, Linux ✓ | Foundation |
+| `CVDrafting` | domain + application | iOS, macOS, Linux ✓, Android ✓ | Foundation |
 | `CVDraftingFoundationModels` | outbound adapter | iOS 26, macOS 26 | `CVDrafting`, FoundationModels, Foundation |
 
 **`CVDrafting`**
@@ -177,6 +235,8 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 **Test support.** `CVDraftingTestSupport` holds a fake generator and fixtures.
 
+**The legacy target `CVGeneratorAI`**, which version 1 ships ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), depends on `DiagnosticLogging` on Apple hosts: its use case takes a `DiagnosticLogger` and a `Clock` in its initialiser, and logs under the category `draft` the availability of the model and why not, the language of the description and the state of its data, a generation started, finished, cancelled or refused by the guardrails, with its time, the claims checked and withdrawn, as counts, and the check that rejected a request or a draft ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)). Its tests may also import `DiagnosticLoggingTestSupport`.
+
 ---
 
 ## Package `PrestoCVApp` — App integration and presentation
@@ -185,10 +245,10 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 
 | Target | Layer | Platforms | May import |
 |---|---|---|---|
-| `PrestoCVWorkflowPorts` | app ports | iOS, macOS, Linux ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation |
-| `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, Foundation |
-| `PrestoCVPresentation` | inbound adapter | iOS, macOS, Linux ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain` (both `internal import`), Observation, Foundation |
-| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels` |
+| `PrestoCVWorkflowPorts` | app ports | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation |
+| `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `PrestoCVImporting`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, Foundation |
+| `PrestoCVPresentation` | inbound adapter | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain` (both `internal import`), Observation, Foundation |
+| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `PrestoCVImportingPDFKit`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVBundledHeadings`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels` |
 
 **`PrestoCVWorkflowPorts`**
 - The ports that view models consume: `CVEditing` (new, save, load) and `CVExporting` (untyped `throws`, so cancellation passes through).
@@ -199,8 +259,9 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - `EditCVWorkflow`;
   - `ExportCVWorkflow`: from the editor snapshot, with the document language, through the renderer, then the completeness check on the actual PDF;
   - `BrowseDesigns`;
-  - `DraftCVWithAI`: availability, then draft, then an unsaved CV plus its gaps.
-- **Mappers:** `CV → CVDocument` and `CVDraft → CV`. They are exhaustive and deterministic, with typed dates. The draft mapper uses `Period.make` and reports every gap.
+  - `DraftCVWithAI`: availability, then draft, then an unsaved CV plus its gaps;
+  - `ImportCVWorkflow` (planned, [ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)): the import, then an unsaved CV plus its review list and the text not imported.
+- **Mappers:** `CV → CVDocument`, `CVDraft → CV` and, when the import is wired in, `ImportedCV → CV`. They are exhaustive and deterministic, with typed dates. The draft mapper uses `Period.make` and reports every gap.
 
 **`PrestoCVPresentation`**
 - `@Observable @MainActor` view models whose public API holds presentation types only: status enums, and no domain types.
@@ -215,7 +276,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - one `FileCVRepository` and one `FileDesignStore`;
   - the web-view rule list, compiled once;
   - the platform renderer and the PDFKit inspector;
-  - the AI adapter, `TimeSource`, `IDGenerator` and logger;
+  - the AI adapter, the PDFKit reader of the import, `TimeSource`, `IDGenerator` and logger;
   - the `ScreenFactory`.
 - **UI tests and previews** use the production `FileCVRepository` on a temporary directory seeded from fixture JSON. A launch argument selects it. No production target depends on a test-support target.
 
@@ -223,7 +284,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 
 ---
 
-## Xcode app target `PrestoCV` (iOS 26, macOS 26)
+## Xcode app target `PrestoCV` (iOS 26.5, macOS 26)
 
 A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-app.md)). The checker maps each folder as its own target.
 
@@ -235,21 +296,44 @@ A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-
 | `Platform/` | the platform shims: iOS-only modifiers wrapped for `Features/`, HTML and PDF previews, sharing, pasteboard, file import and export | SwiftUI, UIKit, AppKit, WebKit, PDFKit, QuickLook, UniformTypeIdentifiers, `CVRenderingWebKitSupport`, `PrestoCVPresentation` |
 | `Resources/` | `Localizable.xcstrings`, sample CV JSON, assets | — |
 
+**The legacy target `PrestoCV`**, which version 1 ships ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), imports the legacy `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI`, and also `PrestoCVDomain` and `PrestoCVApplication`, whose rules its view models call ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)), and `PrestoCVImporting` with its PDFKit reader, for the import of version 1 ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)), and `DiagnosticLogging` with `DiagnosticLoggingOSLog` ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)):
+- its entry point makes the one `OSLogDiagnosticLogger`, with the subsystem `com.PigLardLord.prestocv`, and its factory passes it to the import and to the AI draft; the construction moves into `PrestoCVComposition` with the app;
+- it imports each declaration of the two by name (`import struct PrestoCVDomain.ExportPolicy`), since the legacy `PrestoCVCore` declares types with the same names;
+- its adapters from the legacy `CVModel` to the plain values the rules read are in `PrestoCV/Shared/CoreRules/`;
+- its mapper from an `ImportedCV` to an unsaved `CVModel` is in `PrestoCV/Features/Import/`, as the AI draft's is in `PrestoCV/Features/AIGeneration/`; the PDFs it opens from the share sheet are declared in `PrestoCV/Info.plist`, which Xcode merges with the generated one;
+- the checker holds it to R5 and R17, and its test target to R16.
+
+---
+
+## Tools
+
+Packages under `Tools/` that check the repository. They are `tool` targets in `rules.json`, so the checker applies only their import allow-lists, and nothing in the app depends on them.
+
+- **`Tools/ArchitectureCheck`**: the architecture checker ([ADR 0006](adr/0006-enforce-architecture-mechanically.md)). Its `ArchitectureCheck` executable may import SwiftSyntax, SwiftParser and Foundation.
+- **`Tools/SourceChecks`**: the checks of source text, which read the repository and so cannot run in a test plan: the machines that run one have only the built products.
+  - **What it checks:** the string catalog in its six languages and the keys the code uses; the rules the app's views follow (accent colours, button presses, the list's delete button); how the tests render views off screen (with Core Graphics, never through the GPU image of an `ImageRenderer`); release hygiene (console output, the privacy manifest, the linked products).
+  - **Its target:** one test target, `SourceChecksTests`, which may import Testing and Foundation. It depends on no package, so it builds in seconds on Linux.
+  - **Where it runs:** `swift test` runs it on the Linux CI job and, through `ci_scripts/ci_post_xcodebuild.sh`, on the Mac mini (the pull request check) and on the Xcode Cloud build host (the Release workflow).
+
 ---
 
 ## Dependency graph (summary)
 
 ```
 PrestoCV (app) ─▶ PrestoCVPresentation ─▶ PrestoCVWorkflowPorts ─▶ PrestoCVApplication ─▶ PrestoCVDomain
-     │                                     ▲
-     │                     PrestoCVIntegration ┴─▶ CVRendering ─┬─▶ CVDocumentModel
-     │                                    │                └─▶ CVDesignCatalog
-     │                                    └─▶ CVDrafting
-     └────▶ PrestoCVComposition ─▶ (all of the above) + PrestoCVPersistence, CVDesignCatalogFileStore, CVBundledDesigns,
+     │                                     ▲                                                  ▲
+     │                     PrestoCVIntegration ┴─▶ CVRendering ─┬─▶ CVDocumentModel             │
+     │                                    │                └─▶ CVDesignCatalog              │
+     │                                    ├─▶ CVDrafting                                     │
+     │                                    └─▶ PrestoCVImporting ─────────────────────────────┘
+     └────▶ PrestoCVComposition ─▶ (all of the above) + PrestoCVPersistence, PrestoCVImportingPDFKit, CVDesignCatalogFileStore, CVBundledDesigns, CVBundledHeadings,
                                 CVRenderingWebKitSupport, CVRenderingIOS | CVRenderingMacOS,
                                 CVRenderingPDFKitInspector, CVDraftingFoundationModels
+PrestoCVImportingPDFKit ─▶ PrestoCVImporting
+PrestoCVImporting, PrestoCVImportingPDFKit, CVGeneratorAI (legacy), PrestoCV (app) ─▶ DiagnosticLogging
+PrestoCV (app) ─▶ DiagnosticLoggingOSLog ─▶ DiagnosticLogging
 
-Forbidden: any edge between PrestoCVCore, CVPDFExporter and CVGeneratorAI.
+Forbidden: any edge between PrestoCVCore, CVPDFExporter and CVGeneratorAI, except to DiagnosticLogging (ADR 0030).
 Forbidden: any edge from a domain, application or port target to an adapter target.
 Forbidden: PrestoCVPresentation → PrestoCVIntegration.
 ```

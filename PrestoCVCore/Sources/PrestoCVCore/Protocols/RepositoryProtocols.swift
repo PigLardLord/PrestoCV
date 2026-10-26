@@ -50,6 +50,32 @@ public protocol CVRepositoryProtocol: Sendable {
     func getCVsCount() async throws -> Int
 }
 
+/// The edits that earlier versions of the app kept of editor work nobody saved, one set per editing.
+public protocol UnsavedEditsRepositoryProtocol: Sendable {
+    /// Everything that is kept, in no particular order, and how many files of the folder could not be read as edits.
+    /// A file that cannot be read is never deleted: it stays where it is, to be read again next time, or is set aside
+    /// until `acknowledgeUnreadable()`.
+    /// - Throws: AppError if the kept edits cannot be listed
+    func allKept() async throws -> StorageLoadReport<UnsavedEdits>
+
+    /// Marks the files that were set aside as seen, so that `allKept()` stops counting them. They are kept, not deleted.
+    /// - Throws: AppError if the files cannot be moved
+    func acknowledgeUnreadable() async throws
+    
+    /// Removes the edits kept for an editing. Removing edits that are not kept is not an error.
+    /// - Throws: AppError if they cannot be removed
+    func discard(editing id: UUID) async throws
+
+    /// Marks the edits of an editing as stored: the CVs hold them now. It is done before they are removed, so that edits
+    /// whose removal fails are never stored again, whatever the person did with the CVs since. The mark stays when the
+    /// edits go: no version keeps edits any more, so no other edits come under that editing.
+    /// - Throws: AppError if the mark cannot be written
+    func markStored(editing id: UUID) async throws
+
+    /// Whether the edits of an editing were marked as stored.
+    func isMarkedStored(editing id: UUID) async -> Bool
+}
+
 /// Protocol for managing user onboarding state
 public protocol OnboardingRepositoryProtocol: Sendable {
     /// Checks if the user has any existing CVs, including CVs that could not be opened

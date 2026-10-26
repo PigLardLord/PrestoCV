@@ -1,0 +1,14 @@
+Jonas Beispiel
+Mobile-Entwickler
+Leipzig · jonas.beispiel@example.com · +49 170 0000505
+
+BERUFSERFAHRUNG
+03/2021 – heute	Mobile-Entwickler, App Beispiel GmbH, Leipzig
+06/2018 – 02/2021	Junior-Entwickler, Software Beispiel GmbH, Dresden
+
+AUSBILDUNG
+2015 – 2018	Bachelor Informatik, Universität Leipzig
+
+TECHNISCHE KENNTNISSE
+Swift, SwiftUI, Combine
+Kotlin, Docker

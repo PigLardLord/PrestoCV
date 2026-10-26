@@ -3,17 +3,16 @@ import PrestoCVCore
 import CVPDFExporter
 
 struct AppRootView: View {
-    @StateObject private var router = AppRouter()
+    @StateObject private var router: AppRouter
     @ObservedObject private var onboardingViewModel: OnboardingViewModel
     @ObservedObject private var cvListViewModel: CVListViewModel
-    private let cvManagementUseCase: CVManagementUseCaseProtocol
     private let viewModelFactory: ViewModelFactory
     
     init(dependencies: RootDependencies) {
         self.onboardingViewModel = dependencies.onboardingViewModel
         self.cvListViewModel = dependencies.cvListViewModel
-        self.cvManagementUseCase = dependencies.cvManagementUseCase
         self.viewModelFactory = dependencies.viewModelFactory
+        self._router = StateObject(wrappedValue: dependencies.viewModelFactory.makeAppRouter())
     }
     
     var body: some View {
@@ -34,13 +33,21 @@ struct AppRootView: View {
             .navigationDestination(for: Route.self) { route in
                 destinationView(for: router.destination(for: route))
             }
+            // A PDF opened in the app from the share sheet or Files goes to the import, once the editor on screen, if
+            // any, is saved
+            .onOpenURL { url in
+                Task { await router.openImport(of: url) }
+            }
         }
         .environmentObject(router)
     }
     
     private var listView: some View {
-        CVListView(viewModel: cvListViewModel) {
-            FirstRunView(viewModel: onboardingViewModel)
+        CVListView(
+            viewModel: cvListViewModel,
+            makeExportSheet: { viewModelFactory.makeExportSheetViewModel(exporting: $0, from: cvListViewModel) }
+        ) {
+            FirstRunView(viewModel: viewModelFactory.makeNewCVChoicesViewModel())
         }
     }
     
@@ -50,17 +57,15 @@ struct AppRootView: View {
         case .list:
             listView
         case .templateSelection:
-            TemplateSelectionView(viewModel: viewModelFactory.makeTemplateSelectionViewModel())
+            TemplateSelectionView(viewModel: viewModelFactory.makeNewCVChoicesViewModel())
         case .aiGeneration:
             AIGenerationView(viewModel: viewModelFactory.makeAIGenerationViewModel())
-        case .cvEditor(let cvId):
+        case .importCV:
+            ImportView(viewModel: viewModelFactory.makeImportViewModel())
+        case .cvEditor(let request):
             CVEditorView(
-                viewModel: CVEditorViewModel(
-                    cvId: cvId,
-                    initialCV: router.initialCVForEditor,
-                    cvManagementUseCase: cvManagementUseCase
-                ),
-                notice: router.editorNotice
+                viewModel: viewModelFactory.makeCVEditorViewModel(for: request),
+                makeExportSheet: viewModelFactory.makeExportSheetViewModel(editing:)
             )
         }
     }

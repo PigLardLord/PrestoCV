@@ -40,31 +40,28 @@ final class EditorLayoutUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(phone.frame.width, 250, "The phone field should not be squeezed into half a row")
     }
 
-    /// At the largest text size the export button used to take a fifth of the screen.
-    func testTheExportButtonDoesNotTakeTheScreenAtTheLargestTextSize() throws {
+    /// At the largest text size the export button below the form used to take a fifth of the screen.
+    func testTheExportControlIsInTheNavigationBarAtTheLargestTextSize() throws {
         launch(contentSize: "UICTContentSizeCategoryAccessibilityXXXL")
-        let export = app.buttons["Preview & export"]
-        XCTAssertTrue(export.waitForExistence(timeout: 10), "The editor should offer to preview and export")
-        XCTAssertLessThanOrEqual(export.frame.height, app.frame.height * 0.12, "The export button should keep a readable, bounded size")
+        assertOneExportControlInTheNavigationBar(context: "at the largest text size")
     }
 
-    /// In landscape the tab bar and the export button below the form used to leave it about one row: on an iPhone
-    /// the export button goes up into the navigation bar.
-    func testTheExportButtonMovesIntoTheNavigationBarInLandscape() throws {
+    /// A bar below the form took its height on every device: the export control sits in the navigation bar, in
+    /// portrait and in landscape, on an iPhone and on an iPad. The outer screen of the iPhone Duo stays upright for
+    /// every app, Safari too: there, only portrait is checked.
+    func testTheExportControlIsInTheNavigationBarInBothOrientations() throws {
         launch()
-        let export = app.buttons["Preview & export"]
-        XCTAssertTrue(export.waitForExistence(timeout: 10), "The editor should offer to preview and export")
-        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
+        assertOneExportControlInTheNavigationBar(context: "in portrait")
 
-        XCUIDevice.shared.orientation = .landscapeLeft
-        let barExport = app.navigationBars.buttons["Preview & export"]
-        XCTAssertTrue(barExport.waitForExistence(timeout: 10), "In landscape the navigation bar should offer to export")
-        let exportButtons = app.buttons.matching(NSPredicate(format: "label == 'Preview & export'"))
-        XCTAssertEqual(exportButtons.count, 1, "The export button should not stay below the form as well")
+        if !app.turn(to: .landscapeLeft) {
+            try XCTSkipUnless(safariTurns(), "This screen stays upright for every app, as the outer screen of the iPhone Duo; portrait passed")
+            XCTFail("The screen should turn to landscape")
+            return
+        }
+        assertOneExportControlInTheNavigationBar(context: "in landscape")
 
-        XCUIDevice.shared.orientation = .portrait
-        XCTAssertTrue(waitUntil(barExport, exists: false), "In portrait the export button should leave the navigation bar")
-        XCTAssertTrue(export.waitForExistence(timeout: 10), "In portrait the export button should be back below the form")
+        XCTAssertTrue(app.turn(to: .portrait), "The screen should turn back to portrait")
+        assertOneExportControlInTheNavigationBar(context: "back in portrait")
     }
 
     /// At the largest text size an address needs several lines, and a field that keeps to one would cut it off.
@@ -76,10 +73,11 @@ final class EditorLayoutUITests: XCTestCase {
         email.tap()
         email.typeText("ada.lovelace@analytical-engine.example")
 
-        let deadline = Date().addingTimeInterval(10)
-        while email.frame.height <= heightBefore && Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.5)
-        }
+        let grown = XCTNSPredicateExpectation(
+            predicate: NSPredicate { element, _ in ((element as? XCUIElement)?.frame.height ?? 0) > heightBefore },
+            object: email
+        )
+        XCTWaiter().wait(for: [grown], timeout: 60)
         XCTAssertGreaterThan(email.frame.height, heightBefore, "The email field should grow to show the whole address")
     }
 
@@ -96,19 +94,43 @@ final class EditorLayoutUITests: XCTestCase {
         assertTheDocumentLanguageIsFollowedByThePersonalDetails(within: 130)
     }
 
-    /// Between the label of the document language and the heading of the personal details there is no more than the
-    /// end of a row and the space between two sections.
+    /// Besides the menu, the row of the document language holds no more than its label and its margins, and the
+    /// heading of the personal details follows it. The label is not in the tree, because the menu says it to
+    /// VoiceOver and the row is a single element: what the row holds is measured around the menu as it is drawn.
     private func assertTheDocumentLanguageIsFollowedByThePersonalDetails(within points: CGFloat) {
-        let language = app.staticTexts["Document language"]
+        let row = app.buttons["Document language"]
         let personal = app.staticTexts["Personal Information"]
-        XCTAssertTrue(language.waitForExistence(timeout: 10), "The editor should ask for the document language")
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "The editor should ask for the document language")
         XCTAssertTrue(personal.waitForExistence(timeout: 10), "The personal details should follow the CV details")
-        let gap = personal.frame.minY - language.frame.maxY
-        XCTAssertLessThanOrEqual(gap, points, "The document language row should take only the room of its text")
+        let menu = row.buttons.firstMatch
+        XCTAssertTrue(menu.exists, "The document language row should show its menu")
+        let besidesTheMenu = row.frame.height - menu.frame.height
+        XCTAssertLessThanOrEqual(besidesTheMenu, points, "The document language row should take only the room of its text")
+        let gap = personal.frame.minY - row.frame.maxY
+        XCTAssertLessThanOrEqual(gap, points, "The personal details should follow the document language row")
     }
 
-    private func waitUntil(_ element: XCUIElement, exists: Bool, timeout: TimeInterval = 10) -> Bool {
-        let condition = expectation(for: NSPredicate(format: "exists == %@", NSNumber(value: exists)), evaluatedWith: element)
-        return XCTWaiter().wait(for: [condition], timeout: timeout) == .completed
+    /// The editor offers to preview and export once, in its bar (the navigation bar, or the vertical bar of the iPhone
+    /// Duo), and leaves no bar below the form: the form reaches the bottom of the screen, save the strip of the home
+    /// indicator, which is narrower than any button.
+    private func assertOneExportControlInTheNavigationBar(context: String) {
+        let barExport = app.barButton("Preview & export")
+        XCTAssertTrue(barExport.waitForExistence(timeout: 10), "The bar should offer to preview and export \(context)")
+        let exportControls = app.buttons.matching(NSPredicate(format: "label == 'Preview & export'"))
+        XCTAssertEqual(exportControls.count, 1, "The editor should offer to preview and export only once \(context)")
+
+        let form = app.otherElements["CV Editor"]
+        XCTAssertTrue(form.exists, "The editor should show its form \(context)")
+        let window = app.windows.firstMatch
+        XCTAssertGreaterThan(form.frame.maxY, window.frame.maxY - 44, "Nothing should sit below the form \(context)")
+    }
+
+    /// Whether Safari's screen turns to landscape with the device already turned, as on every screen that turns: a
+    /// screen where Safari stays upright too has no landscape, and one where only the app stays upright is a defect.
+    private func safariTurns() -> Bool {
+        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
+        safari.launch()
+        defer { safari.terminate() }
+        return safari.turn(to: .landscapeLeft)
     }
 }
