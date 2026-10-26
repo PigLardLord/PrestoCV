@@ -56,17 +56,26 @@ struct InventedFactsTrapTests {
 
     @Test("A word that the description also says outside the trap is not a part of a trap")
     func partSaidElsewhere() throws {
+        // A skill that is a piece of the employer or of the title is a doubt for that reason, never a trap.
         let praxis = try InventedFactsTests.input("de-traps")
         var draft = Draft(faithfulTo: praxis)
         draft.skills.append(Skill(name: "Praxis"))
         let skill = InventedFacts.count(draft.cv, for: praxis).finding(at: "skills[\(draft.skills.count - 1)].name")
-        #expect(skill?.kind == .quote, "\(String(describing: skill))")
+        #expect(skill?.kind == .review, "\(String(describing: skill))")
+        #expect(skill?.reason.contains("trap") == false, "\(String(describing: skill))")
 
         let nurse = try InventedFactsTests.input("en-traps")
         var other = Draft(faithfulTo: nurse)
         other.skills.append(Skill(name: "nurse"))
         let word = InventedFacts.count(other.cv, for: nurse).finding(at: "skills[\(other.skills.count - 1)].name")
-        #expect(word?.kind == .quote, "\(String(describing: word))")
+        #expect(word?.kind == .review, "\(String(describing: word))")
+        #expect(word?.reason.contains("trap") == false, "\(String(describing: word))")
+
+        // A word that is nothing else is a quote.
+        var ward = Draft(faithfulTo: nurse)
+        ward.skills.append(Skill(name: "ward"))
+        let plain = InventedFacts.count(ward.cv, for: nurse).finding(at: "skills[\(ward.skills.count - 1)].name")
+        #expect(plain?.kind == .quote, "\(String(describing: plain))")
     }
 
     @Test("A faithful draft of a description with traps holds none of them", arguments: DraftingInputs.written.filter { $0.kind == .traps })

@@ -64,8 +64,9 @@ enum InventedFacts {
     static func count(_ cv: CVData, description: String, facts: [ExpectedFact] = [], traps: [String] = []) -> Report {
         let source = Source(description, cv: cv)
         let trapWords = traps.map { (trap: $0, words: words(of: $0)) }.filter { !$0.words.isEmpty }
+        let names = Names(cv: cv, facts: facts)
         let leaves = Sheet.leaves(of: cv)
-        let findings = leaves.map { classify($0, of: cv, against: source, traps: trapWords) }
+        let findings = leaves.map { classify($0, of: cv, against: source, traps: trapWords, names: names) }
         let kept = facts.filter { !keptPaths(of: $0, in: leaves, findings: findings, source: source).isEmpty }
         let titleAt = Set(facts.filter { $0.kind == .title }.flatMap { keptPaths(of: $0, in: leaves, findings: findings, source: source) })
         return Report(
@@ -105,18 +106,39 @@ enum InventedFacts {
     }
 
     private static func tokens(of text: String) -> [String] {
-        var tokens: [String] = []
+        tokensWithStarts(of: text).map(\.token)
+    }
+
+    /// The runs of letters and digits of a text, each with whether it starts a sentence: the first of the text, or the first
+    /// after `. ! ? ; …` followed by a space or the end (as `sentences(of:)` ends one), or after a new line. A capital letter at
+    /// the start of a sentence says nothing about a proper name.
+    private static func tokensWithStarts(of text: String) -> [(token: String, initial: Bool)] {
+        var found: [(token: String, initial: Bool)] = []
         var token = ""
-        for character in text {
+        var tokenStartsSentence = false
+        var startsSentence = true
+        let characters = Array(text)
+        for (index, character) in characters.enumerated() {
             if character.isLetter || character.isNumber {
+                if token.isEmpty {
+                    tokenStartsSentence = startsSentence
+                    startsSentence = false
+                }
                 token.append(character)
-            } else if !token.isEmpty {
-                tokens.append(token)
+                continue
+            }
+            if !token.isEmpty {
+                found.append((token, tokenStartsSentence))
                 token = ""
             }
+            if character.isNewline {
+                startsSentence = true
+            } else if ".!?;…".contains(character), index + 1 == characters.count || characters[index + 1].isWhitespace {
+                startsSentence = true
+            }
         }
-        if !token.isEmpty { tokens.append(token) }
-        return tokens
+        if !token.isEmpty { found.append((token, tokenStartsSentence)) }
+        return found
     }
 
     private static func fold(_ word: String) -> String {
@@ -248,6 +270,30 @@ enum InventedFacts {
                 }
             }
             return masked
+        }
+    }
+
+    /// What a skill, a language or an interest could be mistaken for: the languages, skills, employers, schools, titles and
+    /// name that the input expects or the draft holds.
+    private struct Names {
+        private let named: [(kind: ExpectedFact.Kind, words: [String])]
+
+        init(cv: CVData, facts: [ExpectedFact]) {
+            var named = facts.flatMap { fact in fact.forms.map { (kind: fact.kind, words: InventedFacts.words(of: $0)) } }
+            named.append((.name, InventedFacts.words(of: cv.personalInfo.name ?? "")))
+            named.append((.title, InventedFacts.words(of: cv.personalInfo.title ?? "")))
+            named += cv.experience.flatMap { [(kind: ExpectedFact.Kind.employer, words: InventedFacts.words(of: $0.company)),
+                                              (.title, InventedFacts.words(of: $0.title))] }
+            named += cv.education.map { (.school, InventedFacts.words(of: $0.institution ?? "")) }
+            named += cv.languages.map { (.language, InventedFacts.words(of: $0.name)) }
+            named += cv.skills.map { (.skill, InventedFacts.words(of: $0.name)) }
+            self.named = named.filter { !$0.words.isEmpty }
+        }
+
+        /// The first other kind of thing that is, or holds, or is a piece of, the value: a skill that is the name of a
+        /// language, a language that is the name of a skill.
+        func mistaken(_ words: [String], for own: ExpectedFact.Kind?) -> ExpectedFact.Kind? {
+            named.first { $0.kind != own && (InventedFacts.holds($0.words, run: words) || InventedFacts.holds(words, run: $0.words)) }?.kind
         }
     }
 
@@ -388,7 +434,8 @@ enum InventedFacts {
     // MARK: - Classes
 
     private enum Field {
-        case nameLike, headline, jobTitle, jobLocation, email, phone, link, date, level, current, prose
+        case nameLike, headline, jobTitle, jobLocation, degree, skill, language, interest, email, phone, link, date, level
+        case current, prose
     }
 
     private static func field(of leaf: Sheet.Leaf) -> Field {
@@ -399,6 +446,10 @@ enum InventedFacts {
         case ("personalInfo", "title"): .headline
         case ("experience", "title"): .jobTitle
         case ("experience", "location"): .jobLocation
+        case ("education", "degree"): .degree
+        case ("skills", "name"): .skill
+        case ("languages", "name"): .language
+        case ("interests", _): .interest
         case (_, "startDate"), (_, "endDate"), ("certifications", "date"): .date
         case ("skills", "level"), ("languages", "proficiency"): .level
         case ("experience", "current"): .current
@@ -408,7 +459,7 @@ enum InventedFacts {
     }
 
     private static func classify(
-        _ leaf: Sheet.Leaf, of cv: CVData, against source: Source, traps: [(trap: String, words: [String])]
+        _ leaf: Sheet.Leaf, of cv: CVData, against source: Source, traps: [(trap: String, words: [String])], names: Names
     ) -> Finding {
         let field = field(of: leaf)
         let value = leaf.value
@@ -443,6 +494,32 @@ enum InventedFacts {
             guard !words.isEmpty else { return finding(.review, "no word") }
             return entryBound(words, entry: source.entry(of: leaf), source: source, finding)
 
+        case .degree:
+            // The sentence of a school holds the degree, and as much else: the counter cannot tell which phrase is the degree.
+            guard !words.isEmpty else { return finding(.review, "no word") }
+            let bound = entryBound(words, entry: source.entry(of: leaf), source: source, finding)
+            guard bound.kind == .quote else { return bound }
+            return finding(.review, "in the sentence of the school; the counter cannot tell a degree from another phrase", context: bound.context)
+
+        case .skill, .language:
+            guard !words.isEmpty else { return finding(.review, "no word") }
+            guard holds(source.words, run: words) else { return finding(.invented, "not a phrase of the description") }
+            if let other = names.mistaken(words, for: field == .skill ? .skill : .language) {
+                return finding(.review, "the words of another kind of value (\(other.rawValue)), in this field")
+            }
+            return finding(.quote, "a phrase of the description")
+
+        case .interest:
+            // A hobby is a word or two of the description; a phrase of several words may be a clause with a verb in it.
+            guard !words.isEmpty else { return finding(.review, "no word") }
+            guard holds(source.words, run: words) else { return finding(.invented, "not a phrase of the description") }
+            if let other = names.mistaken(words, for: nil) {
+                return finding(.review, "the words of another kind of value (\(other.rawValue)), in this field")
+            }
+            return words.count == 1
+                ? finding(.quote, "a word of the description")
+                : finding(.review, "several words of the description; the counter cannot tell a hobby from a clause")
+
         case .email:
             let address = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             return source.emails.contains(address)
@@ -468,18 +545,27 @@ enum InventedFacts {
             return finding(.review, "a current job", context: owner(of: leaf, in: cv))
 
         case .prose:
-            let originals = tokens(of: value)
-            let absent = zip(originals, words).filter { !source.vocabulary.contains($0.1) }
-            let numbers = absent.filter { $0.1.contains(where: \.isNumber) }.map(\.0)
-            let capitals = absent.filter { !$0.1.contains(where: \.isNumber) && ($0.0.first?.isUppercase ?? false) }.map(\.0)
-            guard numbers.isEmpty, capitals.isEmpty else {
+            let tokens = tokensWithStarts(of: value)
+            let absent = zip(tokens, words).filter { !source.vocabulary.contains($0.1) }
+            let numbers = absent.filter { $0.1.contains(where: \.isNumber) }.map(\.0.token)
+            let capitals = absent.filter { !$0.1.contains(where: \.isNumber) && ($0.0.token.first?.isUppercase ?? false) }
+            let inside = capitals.filter { !$0.0.initial }.map(\.0.token)
+            let atStart = capitals.filter { $0.0.initial }.map(\.0.token)
+            let context = owner(of: leaf, in: cv)
+            guard numbers.isEmpty, inside.isEmpty else {
                 let reasons = [
                     numbers.isEmpty ? nil : "numbers the description lacks: \(numbers.joined(separator: ", "))",
-                    capitals.isEmpty ? nil : "capitalised words the description lacks: \(capitals.joined(separator: ", "))",
+                    inside.isEmpty ? nil : "capitalised words the description lacks: \(inside.joined(separator: ", "))",
                 ]
-                return finding(.invented, reasons.compactMap { $0 }.joined(separator: "; "))
+                return finding(.invented, reasons.compactMap { $0 }.joined(separator: "; "), context: context)
             }
-            return finding(.review, holds(source.words, run: words) ? "prose, a phrase of the description" : "prose")
+            if !atStart.isEmpty {
+                return finding(
+                    .review, "a capitalised word the description lacks at the start of a sentence: \(atStart.joined(separator: ", "))",
+                    context: context
+                )
+            }
+            return finding(.review, holds(source.words, run: words) ? "prose, a phrase of the description" : "prose", context: context)
         }
     }
 
@@ -596,7 +682,8 @@ enum InventedFacts {
             } else if own.isEmpty {
                 review.append("the sentence that names this entry names another entry too")
             } else {
-                for year in years.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } } {
+                let distinct = years.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+                for year in distinct {
                     let holders = source.holders(of: [year])
                     if holders.contains(where: { own.contains($0) }) { continue }
                     if holders.contains(where: { entry.owners.contains($0) }) {
@@ -729,6 +816,12 @@ enum InventedFacts {
         case "experience" where cv.experience.indices.contains(index):
             let job = cv.experience[index]
             return job.title.isEmpty ? job.company : "\(job.title) at \(job.company)"
+        case "education" where cv.education.indices.contains(index):
+            let study = cv.education[index]
+            let degree = study.degree ?? ""
+            let institution = study.institution ?? ""
+            if degree.isEmpty || institution.isEmpty { return degree.isEmpty ? (institution.isEmpty ? nil : institution) : degree }
+            return "\(degree) at \(institution)"
         default: return nil
         }
     }
