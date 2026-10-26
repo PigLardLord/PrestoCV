@@ -20,7 +20,7 @@ struct PrestoCVApp: App {
     private static let environment = AppEnvironment.device(
         diagnostics: OSLogDiagnosticLogger(subsystem: "com.PigLardLord.prestocv")
     )
-    private static let storage = LaunchEnvironment.storage(arguments: environment.arguments)
+    private static let storage = LaunchEnvironment.storage(arguments: environment.arguments, diagnostics: environment.diagnostics)
 
     var body: some Scene {
         WindowGroup {

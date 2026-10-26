@@ -1,6 +1,6 @@
 # The diagnostic log
 
-The import and the AI draft write what they did to one interface, `DiagnosticLogger`, which carries no CV content ([ADR 0030](architecture/adr/0030-log-through-one-interface-that-carries-no-cv-content.md)). In the app, the entry point sends every entry to the unified log of the device, under the subsystem `com.PigLardLord.prestocv`. This page says how to read that log, what it holds, and how to add a line to it.
+The import, the AI draft and the Debug launch of a UI test write what they did to one interface, `DiagnosticLogger`, which carries no CV content ([ADR 0030](architecture/adr/0030-log-through-one-interface-that-carries-no-cv-content.md)). In the app, the entry point sends every entry to the unified log of the device, under the subsystem `com.PigLardLord.prestocv`. This page says how to read that log, what it holds, and how to add a line to it.
 
 ## Reading the log
 
@@ -101,6 +101,12 @@ A draft ends with one of `draft.finished`, `draft.cancelled`, `draft.refused`, `
 | `draft.refused` | notice | `elapsed` | The model's guardrails refused the description. |
 | `draft.cancelled` | info | `stage`, `elapsed` | The person left, or asked again, while the draft was written. |
 | `draft.failed` | error | `stage` (`model`, `grounding`, `claimCheck` or `result`), `error`, `elapsed` | A step failed. |
+
+### The launch of a UI test (category `launch`, Debug builds only)
+
+| Event | Level | Fields | When |
+|---|---|---|---|
+| `launch.seedFailed` | error | `files` (the CV files the test handed over), `error` | The CV files a UI test hands over could not be written into the new storage folder, so the test starts without them. |
 
 ## Adding a line
 

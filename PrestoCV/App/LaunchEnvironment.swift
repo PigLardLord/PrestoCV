@@ -1,8 +1,6 @@
+import DiagnosticLogging
 import Foundation
 import PrestoCVCore
-#if DEBUG
-import os
-#endif
 
 /// What the app takes from the way it was launched.
 enum LaunchEnvironment {
@@ -14,15 +12,17 @@ enum LaunchEnvironment {
 
     /// Where the app keeps its data. The debug build keeps it in a folder of its own when a UI test asks for one, so
     /// that the test does not depend on what the simulator already holds: a new, empty folder for each launch, or a
-    /// named one that the launches of one test share, as a relaunch needs. The folder starts with the CV files the
-    /// test hands over (`seedFiles(arguments:)`). Release builds ignore the request.
-    static func storage(arguments: [String]) -> Storage {
+    /// named one that the launches of one test share, as a relaunch needs. A new folder starts with the CV files the
+    /// test hands over (`seedFiles(arguments:)`); a named folder that a launch has already made keeps what the app saved
+    /// in it, so a test that wants to start over names a new one. Release builds ignore the request.
+    /// - Parameter diagnostics: Where a seed that could not be written is logged.
+    static func storage(arguments: [String], diagnostics: any DiagnosticLogger) -> Storage {
         #if DEBUG
         if let folder = uiTestFolder(arguments: arguments) {
             let directory = FileManager.default.temporaryDirectory
                 .appendingPathComponent("PrestoCVUITests-\(folder)", isDirectory: true)
             let cvs = directory.appendingPathComponent("CVs", isDirectory: true)
-            write(seedFiles(arguments: arguments), into: cvs)
+            seed(seedFiles(arguments: arguments), into: cvs, diagnostics: diagnostics)
             return Storage(
                 cvs: { cvs },
                 unsavedEdits: { directory.appendingPathComponent("UnsavedEdits", isDirectory: true) }
@@ -183,19 +183,31 @@ enum LaunchEnvironment {
         }
     }
 
-    /// Writes the files into the folder before the app reads it. A file that cannot be written leaves the test
-    /// without it, and the log says why.
-    private static func write(_ files: [String: String], into directory: URL) {
-        guard !files.isEmpty else { return }
+    /// Writes the files into a new folder before the app reads it. A folder that exists already holds what an earlier
+    /// launch of the test saved, and the seed would overwrite it, so it is left as it is. A file that cannot be written
+    /// leaves the test without it, and the log says why.
+    private static func seed(_ files: [String: String], into directory: URL, diagnostics: any DiagnosticLogger) {
+        guard !files.isEmpty, !isFolder(directory) else { return }
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             for (name, content) in files {
                 try Data(content.utf8).write(to: directory.appendingPathComponent(name), options: .atomic)
             }
         } catch {
-            Logger(subsystem: "com.PigLardLord.prestocv", category: "launch")
-                .error("The UI test's CV files were not written: \(error.localizedDescription, privacy: .public)")
+            diagnostics.error(.launch, "launch.seedFailed", .count("files", files.count), .error(error))
         }
+    }
+
+    private static func isFolder(_ url: URL) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
     }
     #endif
 }
+
+#if DEBUG
+extension LogCategory {
+    /// The launch of a UI test: the seed that could not be written
+    fileprivate static let launch = LogCategory("launch")
+}
+#endif

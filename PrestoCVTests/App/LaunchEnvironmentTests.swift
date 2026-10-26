@@ -1,3 +1,4 @@
+import DiagnosticLogging
 import Testing
 import Foundation
 @testable import PrestoCV
@@ -95,7 +96,7 @@ extension LaunchEnvironmentTests {
     @Test("The CV files a UI test hands over are in its folder before the app reads it")
     func seedFilesAreWrittenIntoTheTestFolder() throws {
         let files = seed(#"{"cv_1.json":"{\"name\":\"Atelier Numérique de l'Erdre\"}","cv_2.json":"{}"}"#)
-        let storage = LaunchEnvironment.storage(arguments: folderArguments(seed: files))
+        let storage = LaunchEnvironment.storage(arguments: folderArguments(seed: files), diagnostics: SilentLogger())
         let cvs = try storage.cvs()
         defer { try? FileManager.default.removeItem(at: cvs.deletingLastPathComponent()) }
 
@@ -109,7 +110,7 @@ extension LaunchEnvironmentTests {
         let files = seed(#"{"../out.json":"{}","inner/cv.json":"{}","notes.txt":"x",".json":"{}","cv_1.json":"{}"}"#)
         #expect(LaunchEnvironment.seedFiles(arguments: ["PrestoCV", "-PrestoCVUITestsSeed", files]) == ["cv_1.json": "{}"])
 
-        let storage = LaunchEnvironment.storage(arguments: folderArguments(seed: files))
+        let storage = LaunchEnvironment.storage(arguments: folderArguments(seed: files), diagnostics: SilentLogger())
         let cvs = try storage.cvs()
         defer { try? FileManager.default.removeItem(at: cvs.deletingLastPathComponent()) }
 
@@ -133,7 +134,7 @@ extension LaunchEnvironmentTests {
             #expect(LaunchEnvironment.seedFiles(arguments: argument).isEmpty, "\(argument)")
         }
 
-        let storage = LaunchEnvironment.storage(arguments: folderArguments(seed: notBase64))
+        let storage = LaunchEnvironment.storage(arguments: folderArguments(seed: notBase64), diagnostics: SilentLogger())
         let cvs = try storage.cvs()
         defer { try? FileManager.default.removeItem(at: cvs.deletingLastPathComponent()) }
         #expect(!FileManager.default.fileExists(atPath: cvs.path), "A seed that cannot be read makes no folder and no file")
@@ -142,11 +143,63 @@ extension LaunchEnvironmentTests {
     @Test("A seed is read only for the folder of a UI test: without one, the CVs stay where the app keeps them")
     func seedWithoutATestFolderIsNotWritten() throws {
         let files = seed(#"{"cv_1.json":"{}"}"#)
-        let storage = LaunchEnvironment.storage(arguments: ["PrestoCV", "-PrestoCVUITestsSeed", files])
+        let storage = LaunchEnvironment.storage(arguments: ["PrestoCV", "-PrestoCVUITestsSeed", files], diagnostics: SilentLogger())
         let cvs = try storage.cvs()
 
         #expect(cvs.path.hasSuffix("/PrestoCV/CVs"))
         #expect(!FileManager.default.fileExists(atPath: cvs.appendingPathComponent("cv_1.json").path))
+    }
+
+    @Test("A relaunch on the same folder keeps what the app saved there: the seed is written only into a folder that is new")
+    func aRelaunchKeepsWhatTheAppSaved() throws {
+        let files = seed(#"{"cv_1.json":"{\"name\":\"as handed over\"}","cv_2.json":"{}"}"#)
+        let arguments = folderArguments(seed: files)
+        let cvs = try LaunchEnvironment.storage(arguments: arguments, diagnostics: SilentLogger()).cvs()
+        defer { try? FileManager.default.removeItem(at: cvs.deletingLastPathComponent()) }
+        // What the app does between the two launches: it saves a CV over a seeded file, deletes one and adds one
+        try Data(#"{"name":"saved by the app"}"#.utf8).write(to: cvs.appendingPathComponent("cv_1.json"))
+        try FileManager.default.removeItem(at: cvs.appendingPathComponent("cv_2.json"))
+        try Data("{}".utf8).write(to: cvs.appendingPathComponent("cv_3.json"))
+
+        let relaunched = try LaunchEnvironment.storage(arguments: arguments, diagnostics: SilentLogger()).cvs()
+
+        #expect(relaunched == cvs)
+        #expect(try String(contentsOf: cvs.appendingPathComponent("cv_1.json"), encoding: .utf8) == #"{"name":"saved by the app"}"#,
+                "The CV the app saved is not written over with the seed")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: cvs.path).sorted() == ["cv_1.json", "cv_3.json"],
+                "The CV the app deleted does not come back, and the one it added stays")
+    }
+
+    @Test("A seed that cannot be written is logged as an error with the kind of failure and no text of it")
+    func aSeedThatCannotBeWrittenIsLogged() throws {
+        // A file name over the 255 bytes of a name on the device's volume: the folder is made, and the file is not
+        let name = String(repeating: "a", count: 300) + ".json"
+        let log = LogSpy()
+        let storage = LaunchEnvironment.storage(arguments: folderArguments(seed: seed("{\"\(name)\":\"{}\"}")), diagnostics: log)
+        defer { try? FileManager.default.removeItem(at: storage.cvs().deletingLastPathComponent()) }
+
+        let entry = try #require(log.entries.first, "A seed that is not written should reach the log")
+        #expect(log.entries.count == 1)
+        #expect(entry.level == .error)
+        #expect(entry.category == LogCategory("launch"))
+        #expect(entry.event.description == "launch.seedFailed")
+        #expect(entry.fields.first == LogField.count("files", 1))
+        let failure = try #require(entry.fields.last)
+        #expect(failure.key == "error")
+        guard case .error = failure.value else {
+            Issue.record("The last field should be the error, and it is \(failure)")
+            return
+        }
+        #expect(!entry.line.contains("aaaa"), "The line should not hold the name of the file: \(entry.line)")
+    }
+
+    @Test("A seed that is written logs nothing")
+    func aSeedThatIsWrittenLogsNothing() throws {
+        let log = LogSpy()
+        let storage = LaunchEnvironment.storage(arguments: folderArguments(seed: seed(#"{"cv_1.json":"{}"}"#)), diagnostics: log)
+        defer { try? FileManager.default.removeItem(at: storage.cvs().deletingLastPathComponent()) }
+
+        #expect(log.entries.isEmpty)
     }
 
     @Test("The CVs a UI test hands over are listed, and the scripted writes then apply to them")
@@ -162,7 +215,7 @@ extension LaunchEnvironmentTests {
         #expect(files.count == 1, "The store keeps a CV in one file")
 
         let seeded = try JSONEncoder().encode(files).base64EncodedString()
-        let storage = LaunchEnvironment.storage(arguments: folderArguments(seed: seeded))
+        let storage = LaunchEnvironment.storage(arguments: folderArguments(seed: seeded), diagnostics: SilentLogger())
         defer { try? FileManager.default.removeItem(at: storage.cvs().deletingLastPathComponent()) }
         let cvs = LaunchEnvironment.cvs(
             try DependencyContainer(storageDirectory: storage.cvs).makeCVManagementUseCase(),
