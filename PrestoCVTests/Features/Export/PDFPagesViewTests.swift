@@ -122,4 +122,30 @@ struct PDFPagesViewTests {
         #expect(view.minScaleFactor == view.scaleFactorForSizeToFit)
         #expect(view.maxScaleFactor == view.scaleFactorForSizeToFit * PDFPagesView.zoomLimit)
     }
+
+    /// `zoomedBy` is how many times the old fit the pages were enlarged to before the width changed (1 is at the fit);
+    /// `endsAt` is how many times the new fit they are expected to end at
+    @Test(
+        "The range of the zoom follows a width that changes by more than the zoom limit",
+        arguments: [
+            (from: 200.0, to: 1000.0, zoomedBy: 1.0, endsAt: 1.0),
+            (from: 1000.0, to: 200.0, zoomedBy: 1.0, endsAt: 1.0),
+            (from: 200.0, to: 1000.0, zoomedBy: 2.0, endsAt: 1.0),
+            (from: 1000.0, to: 200.0, zoomedBy: 3.0, endsAt: 4.0)
+        ]
+    )
+    func zoomRangeFollowsAWidthThatChangesALot(from: Double, to: Double, zoomedBy: Double, endsAt: Double) throws {
+        let view = try makeView(width: from)
+        let oldFit = view.scaleFactorForSizeToFit
+        view.scaleFactor = oldFit * zoomedBy
+
+        view.frame = CGRect(x: 0, y: 0, width: to, height: 700)
+        view.layoutIfNeeded()
+
+        let fit = view.scaleFactorForSizeToFit
+        #expect(max(fit / oldFit, oldFit / fit) > PDFPagesView.zoomLimit, "the width changed by more than the zoom limit")
+        #expect(view.minScaleFactor == fit, "the smallest page is the new fit")
+        #expect(view.maxScaleFactor == fit * PDFPagesView.zoomLimit, "the largest is the zoom limit times the new fit")
+        #expect(abs(view.scaleFactor - fit * endsAt) < 0.001, "the pages end within the new range, as close to their size as it lets them")
+    }
 }
