@@ -91,7 +91,7 @@ A draft ends with one of `draft.finished`, `draft.cancelled`, `draft.refused`, `
 
 | Event | Level | Fields | When |
 |---|---|---|---|
-| `draft.availability` | info, notice when not available | `available`, `reason` (when not available) | Whether the model can run, each time that changes. |
+| `draft.availability` | info, notice when not available | `available`, `reason` (when not available) | Whether the model can run: the first availability each AI draft use case reads, and each change after that. The app builds two use cases (the one that decides whether the AI draft is offered, and the AI screen's), so a launch can log the same availability twice, once from each. |
 | `draft.unavailable` | notice | `reason` | A draft was asked for while the model cannot run. |
 | `draft.rejected` | notice | `check` (`request`, `language` or `result`), `error`, `elapsed` (a result only) | The description broke a rule of the request, the device lacks the language data that grounding it needs (`draft.language` shows which), or the draft left after the checks broke a rule of the validation. |
 | `draft.language` | info, notice when the data is missing | `supported`, `language` (when supported), `data` (`notNeeded`, `present` or `missing`) | The language of the description, and the device's language data that grounding it needs. |
