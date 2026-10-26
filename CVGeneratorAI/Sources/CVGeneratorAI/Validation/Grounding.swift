@@ -24,6 +24,8 @@ struct Grounding {
     /// The clauses that back each entry, each as far as it gives facts: up to a purpose or a detail after the statement.
     private let backingFacts: [[Place: Clause]]
     private let backing: [Set<Place>]
+    /// The names of the employers and schools of the draft.
+    private let holders: [[String]]
 
     /// - Parameter person: The quotes of the person's own name, place and title.
     init(clauses: DescriptionClauses, explainer: Explainer, subjects: [Subject], person: [[String]]) {
@@ -36,6 +38,7 @@ struct Grounding {
         mentioning = subjects.map { Self.namingPlaces(of: $0.mentions, among: reading.ofEntries, in: clauses) }
         backingFacts = zip(subjects, naming).map { Self.backingClauses(of: $0, naming: $1, reading: reading, explainer: explainer) }
         backing = backingFacts.map { Set($0.keys) }
+        holders = subjects.compactMap(\.holder)
     }
 
     /// How the clauses of the description read for the entries of a draft: through the quotes of the draft, which name something and
@@ -306,7 +309,8 @@ struct Grounding {
             statesCurrent: statesCurrent(index, joining: joining),
             quotable: ProseQuotes(sources: (dated + graduation).map { ProseQuotes.Source($0) }, language: explainer.language),
             quotableByAchievements: ProseQuotes(sources: joined.map { ProseQuotes.Source(clauses.clause(at: $0)) }, language: explainer.language),
-            verbAchievements: Set(subject.achievements.indices.filter { isQuoteOfAVerb(subject.achievements[$0], of: subject) })
+            verbAchievements: Set(subject.achievements.indices.filter { isQuoteOfAVerb(subject.achievements[$0], of: subject) }),
+            holders: holders
         )
     }
 
@@ -348,14 +352,15 @@ struct Grounding {
     /// Whether the description gives `title` (a title, or a degree) for the entry at `index`: in a clause that speaks for the person
     /// and names the entry, or in one that names no other entry and holds nothing but explained words, the person's own quotes among
     /// them. A title that the description gives only in the clause of another entry ("head nurse at Beta"), or in one about someone
-    /// else ("my sister is a nurse at Acme"), is not this entry's.
+    /// else ("my sister is a nurse at Acme"), is not this entry's, nor is a word of the name of an employer or a school
+    /// ("contabile" in "Studio Contabile Merlini"): it stands as the title only outside those names.
     func supportsTitle(_ title: [String], of index: Int, person: [[String]]) -> Bool {
         let subject = subjects[index]
 
         return clauses.places.contains { place in
             guard reading.speaks(at: place) else { return false }
             let clause = facts(at: place, naming: subject.names, by: subject)
-            guard clause.contains(title) else { return false }
+            guard !clause.standaloneSpans(of: title, amongQuotes: holders).isEmpty else { return false }
             if !subject.isFoundByItsTitle && naming[index].contains(place) { return true }
             guard !namesAnotherEntry(at: place, than: subject) else { return false }
             if subject.isFoundByItsTitle { return true }

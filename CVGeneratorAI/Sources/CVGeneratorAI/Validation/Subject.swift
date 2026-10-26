@@ -13,19 +13,23 @@ struct Subject {
     let quotes: [[String]]
     /// The achievements of a job, each as the words it is made of.
     let achievements: [[String]]
+    /// The name of the employer or the school of the entry, when it has one: a statement about the entry names it, and says
+    /// nothing else with its words (ADR 0023, rule (b)).
+    let holder: [String]?
     /// Whether the entry is found by its title alone: it is, only if the description names the title once.
     let isFoundByItsTitle: Bool
     /// Whether the entry is a study: a graduation phrase next to its clause joins it, and gives its end date.
     let isEducation: Bool
 
     init(
-        names: [[String]], mentions: [[String]]? = nil, quotes: [[String]], achievements: [[String]] = [], isFoundByItsTitle: Bool = false,
-        isEducation: Bool = false
+        names: [[String]], mentions: [[String]]? = nil, quotes: [[String]], achievements: [[String]] = [], holder: [String]? = nil,
+        isFoundByItsTitle: Bool = false, isEducation: Bool = false
     ) {
         self.names = names
         self.mentions = mentions ?? names
         self.quotes = quotes
         self.achievements = achievements
+        self.holder = holder
         self.isFoundByItsTitle = isFoundByItsTitle
         self.isEducation = isEducation
     }
