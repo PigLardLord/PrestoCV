@@ -29,5 +29,6 @@ Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected*
 | [0026](0026-keep-the-core-portable-to-android.md) | Keep the core portable to Android | Accepted |
 | [0027](0027-import-a-cv-from-its-text-with-rules.md) | Import a CV from its text with rules, in a portable core, every value traced to its source | Accepted |
 | [0028](0028-check-each-personal-claim-of-the-ai-draft-again.md) | Check each personal claim of the AI draft again with the on-device model | Accepted |
+| [0030](0030-log-through-one-interface-that-carries-no-cv-content.md) | Log through one interface that carries no CV content | Accepted |
 
 New ADRs copy [template.md](template.md).
