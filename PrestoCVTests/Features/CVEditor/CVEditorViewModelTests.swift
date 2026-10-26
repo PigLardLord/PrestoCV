@@ -626,6 +626,46 @@ struct CVEditorViewModelTests {
         #expect(viewModel.cv.id == existing.id)
     }
 
+    @Test("A stored CV is read only after the changes made to it outside the editor have been stored")
+    func storedCVIsReadAfterTheChangesOnTheirWay() async {
+        let existing = storedCV()
+        let mockUseCase = MockCVManagementUseCase()
+        await mockUseCase.storeCV(existing)
+        let gate = Gate()
+        let asked = ChangesAskedAfter()
+        let viewModel = CVEditorViewModel(
+            cvId: existing.id.uuidString,
+            cvManagementUseCase: mockUseCase,
+            awaitStoredChanges: { id in
+                asked.ids.append(id)
+                await gate.wait()
+            }
+        )
+
+        let loading = Task { await viewModel.loadCV() }
+        await gate.waitUntilSomeoneWaits()
+        #expect(await !mockUseCase.getCVCalled, "The CV is not read while a look chosen in the list is being stored")
+        #expect(asked.ids == [existing.id], "The editor waits for the changes to its own CV")
+
+        gate.open()
+        await loading.value
+
+        #expect(await mockUseCase.getCVCalled)
+        #expect(viewModel.cv.id == existing.id)
+    }
+
+    @Test("A new CV waits for no change: nothing is stored under its identity yet")
+    func newCVWaitsForNoStoredChange() async {
+        let asked = ChangesAskedAfter()
+        let viewModel = CVEditorViewModel(
+            cvId: nil, cvManagementUseCase: MockCVManagementUseCase(), awaitStoredChanges: { asked.ids.append($0) }
+        )
+
+        await viewModel.loadCV()
+
+        #expect(asked.ids.isEmpty)
+    }
+
     // MARK: - When the editor can be left at once
 
     @Test("The edge swipe may leave at once only when the store holds what the form shows")
@@ -755,6 +795,12 @@ final class SaveFailureLog {
     func record(_ cause: any Error) {
         causes.append(cause as? AppError ?? .unknown("\(cause)"))
     }
+}
+
+/// The CVs an editor asked the changes made to them outside the editor for
+@MainActor
+final class ChangesAskedAfter {
+    var ids: [UUID] = []
 }
 
 /// A wait that ends when a test opens it.

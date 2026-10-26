@@ -185,7 +185,7 @@ struct CVExportSheetViewModelTests {
         store: InMemoryExportPreferencesStore = InMemoryExportPreferencesStore()
     ) -> CVExportSheetViewModel {
         let viewModel = CVExportSheetViewModel(
-            cv: cv, exportService: service, preferencesStore: store, documentLanguageSink: { _ in }, exportPolicy: .standard,
+            cv: cv, exportService: service, preferencesStore: store, documentLanguageSink: { _ in }, lookSink: { _ in }, exportPolicy: .standard,
             documentLanguageDetector: englishDocumentLanguageDetector, appLocale: Locale(identifier: "en"), previewDebounce: debounce
         )
         viewModel.selectedTemplateId = template

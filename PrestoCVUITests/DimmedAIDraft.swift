@@ -55,7 +55,7 @@ extension XCUIApplication {
 
         XCTAssertTrue(explanation.waitForExistence(timeout: 10), "A tap should show the full explanation", file: file, line: line)
         XCTAssertTrue(text(draft.line).exists, "The explanation should open with the line shown in place", file: file, line: line)
-        navigationBars.buttons["Done"].tap()
+        barButton("Done").tap()
         let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: explanation)
         XCTAssertEqual(XCTWaiter().wait(for: [closed], timeout: 10), .completed, "Done should close the explanation", file: file, line: line)
     }

@@ -1,6 +1,8 @@
+import DiagnosticLogging
 import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
+import struct PrestoCVApplication.LookChange
 
 // The view models take every dependency through their initialisers, and the app's entry point gives them the device's.
 // These tests give fixed ones unless they vary them: English, a fixed day in UTC, and waits that end only when their task
@@ -18,12 +20,15 @@ func waitUntilCancelled(_ duration: Duration) async throws {
 let englishDocumentLanguageDetector = DocumentLanguageDetector(preferredLanguages: ["en"], read: { NaturalLanguageReader.read($0) })
 
 extension AppEnvironment {
-    /// A device in English, on a fixed day in UTC, whose waits end only when cancelled, and whose clock moves only when
-    /// a test moves it. `arguments` are the launch arguments, none by default.
+    /// A device in English, on a fixed day in UTC, whose waits end only when cancelled (or as `sleep` says), and whose clock
+    /// moves only when a test moves it. `arguments` are the launch arguments, none by default; `diagnostics` is where the
+    /// import and the AI draft log, nowhere by default.
     static func fixed(
         clock: any Clock<Duration> = ManualClock(),
         container: URL = FileManager.default.temporaryDirectory.appendingPathComponent("Container-\(UUID().uuidString)"),
-        arguments: [String] = []
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await waitUntilCancelled($0) },
+        arguments: [String] = [],
+        diagnostics: any DiagnosticLogger = SilentLogger()
     ) -> AppEnvironment {
         AppEnvironment(
             now: { testDay },
@@ -31,7 +36,7 @@ extension AppEnvironment {
             timeZone: .gmt,
             appLanguage: "en",
             preferredLanguages: { ["en"] },
-            sleep: { try await waitUntilCancelled($0) },
+            sleep: sleep,
             clock: clock,
             temporaryDirectory: FileManager.default.temporaryDirectory,
             exportPreferencesFile: FileManager.default.temporaryDirectory.appendingPathComponent("export-preferences-\(UUID().uuidString).json"),
@@ -39,7 +44,8 @@ extension AppEnvironment {
             removeFile: { try FileManager.default.removeItem(at: $0) },
             arguments: arguments,
             bundle: Bundle(for: AppRouter.self),
-            platform: .iPhoneOrIPad
+            platform: .iPhoneOrIPad,
+            diagnostics: diagnostics
         )
     }
 }
@@ -64,6 +70,7 @@ extension CVEditorViewModel {
         documentLanguageDetector: DocumentLanguageDetector = englishDocumentLanguageDetector,
         clock: any Clock<Duration> = ManualClock(),
         awaitLeftEditors: @escaping @MainActor () async -> Void = {},
+        awaitStoredChanges: @escaping @MainActor (UUID) async -> Void = { _ in },
         reportSaveFailure: @escaping @MainActor @Sendable (any Error) -> Void = { _ in }
     ) {
         let request: EditorRequest
@@ -78,6 +85,7 @@ extension CVEditorViewModel {
             documentLanguageDetector: documentLanguageDetector,
             clock: clock,
             awaitLeftEditors: awaitLeftEditors,
+            awaitStoredChanges: awaitStoredChanges,
             reportSaveFailure: reportSaveFailure
         )
     }
@@ -90,17 +98,36 @@ extension CVListViewModel {
         now: @escaping () -> Date = { testDay },
         calendar: @escaping () -> Calendar = { gregorianUTC },
         sleep: @escaping (Duration) async throws -> Void = waitUntilCancelled,
+        clock: any Clock<Duration> = ManualClock(),
+        changeQueue: StoredCVChangeQueue = StoredCVChangeQueue(),
         awaitLeftEditors: @escaping @MainActor () async -> Void = {}
     ) {
         self.init(
             cvManagementUseCase: cvManagementUseCase,
             storedCVChanges: .init(cvs: ManagedStoredCVs(cvs: cvManagementUseCase)),
+            changeQueue: changeQueue,
             locale: Locale(identifier: "en"),
             now: now,
             calendar: calendar,
             sleep: sleep,
+            clock: clock,
             awaitLeftEditors: awaitLeftEditors
         )
+    }
+
+    /// Chooses a language the way a sheet does, and returns once it is stored: the pause before it is stored is not waited for
+    func setDocumentLanguage(_ language: DocumentLanguage?, ofCVWithId id: UUID) async {
+        let save = chooseDocumentLanguage(language, ofCVWithId: id)
+        storeChoicesNow()
+        await save?.value
+    }
+
+    /// Chooses a look the way a sheet does, and returns once it is stored, or once the save under way that will store it
+    /// has begun: the pause before it is stored is not waited for
+    func setLook(_ change: LookChange, ofCVWithId id: UUID) async {
+        let save = chooseLook(change, ofCVWithId: id)
+        storeChoicesNow()
+        await save?.value
     }
 }
 

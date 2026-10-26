@@ -33,6 +33,8 @@ final class CVEditorViewModel: ObservableObject {
     private let clock: any Clock<Duration>
     /// Returns once the editors that were left have stored what they showed, so that a CV is read as they left it.
     private let awaitLeftEditors: @MainActor () async -> Void
+    /// Returns once the changes to a stored CV that are on their way have been stored, so that a CV is read as they left it.
+    private let awaitStoredChanges: @MainActor (UUID) async -> Void
     /// Told why a write failed, which the banner does not say.
     private let reportSaveFailure: @MainActor @Sendable (any Error) -> Void
     /// Writes the form to the store; nil until the form shows a CV.
@@ -99,6 +101,9 @@ final class CVEditorViewModel: ObservableObject {
     ///   - clock: The clock the pause before a write is measured on.
     ///   - awaitLeftEditors: Returns once the editors that were left have stored what they showed. A stored CV is read
     ///     only after it, so that it is read as the editor before left it.
+    ///   - awaitStoredChanges: Returns once the changes made to a stored CV outside its editor, a language or a look chosen
+    ///     in the list, a rename, have been stored. The CV is read only after them, so that the editor's first save does not
+    ///     undo them.
     ///   - reportSaveFailure: Told the cause of each write that fails.
     init(
         request: EditorRequest,
@@ -106,6 +111,7 @@ final class CVEditorViewModel: ObservableObject {
         documentLanguageDetector: DocumentLanguageDetector,
         clock: any Clock<Duration>,
         awaitLeftEditors: @escaping @MainActor () async -> Void,
+        awaitStoredChanges: @escaping @MainActor (UUID) async -> Void,
         reportSaveFailure: @escaping @MainActor @Sendable (any Error) -> Void
     ) {
         self.request = request
@@ -113,6 +119,7 @@ final class CVEditorViewModel: ObservableObject {
         self.documentLanguageDetector = documentLanguageDetector
         self.clock = clock
         self.awaitLeftEditors = awaitLeftEditors
+        self.awaitStoredChanges = awaitStoredChanges
         self.reportSaveFailure = reportSaveFailure
 
         switch request {
@@ -120,9 +127,10 @@ final class CVEditorViewModel: ObservableObject {
             self.notice = nil
         case .new(let template, let notice):
             self.notice = notice
-            // A new CV gets an id of its own. An AI draft or an imported CV is stored as it is, without waiting for a
-            // change; a blank CV or an example once it is changed, so one left untouched leaves nothing behind
-            let cv = template.copy()
+            // A new CV gets an id of its own, and the standard look: never the look of the CV it started from. An AI
+            // draft or an imported CV is stored as it is, without waiting for a change; a blank CV or an example once it
+            // is changed, so one left untouched leaves nothing behind
+            let cv = template.startingAsNewCV()
             begin(showing: cv, unchangedFrom: request.storesAsItIs ? nil : cv, isStored: false)
         }
     }
@@ -139,8 +147,10 @@ final class CVEditorViewModel: ObservableObject {
         }
 
         viewState = .loading
-        // An editor that was just left may still be storing this CV: read it once it has
+        // An editor that was just left may still be storing this CV, and so may a change made in the list: read it once
+        // they have
         await awaitLeftEditors()
+        await awaitStoredChanges(uuid)
         do {
             guard let loadedCV = try await cvManagementUseCase.getCV(by: uuid) else {
                 throw AppError.notFound("error.subject.cv".localized)

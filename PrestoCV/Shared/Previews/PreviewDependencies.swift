@@ -26,13 +26,18 @@ enum PreviewDependencies {
             documentLanguageDetector: documentLanguageDetector,
             clock: ContinuousClock(),
             awaitLeftEditors: {},
+            awaitStoredChanges: { _ in },
             reportSaveFailure: { _ in }
         )
     }
 
-    /// The export sheet of `cv`, which hands the language chosen to `sink`
+    /// The export sheet of `cv`, which hands the language chosen to `sink` and the design, palette and font to `lookSink`
     @MainActor
-    static func exportSheet(for cv: CVModel, sink: @escaping DocumentLanguageSink) -> CVExportSheetViewModel {
+    static func exportSheet(
+        for cv: CVModel,
+        sink: @escaping DocumentLanguageSink,
+        lookSink: @escaping LookSink = { _ in }
+    ) -> CVExportSheetViewModel {
         CVExportSheetViewModel(
             cv: cv,
             exportService: CVExportService(
@@ -42,6 +47,7 @@ enum PreviewDependencies {
             ),
             preferencesStore: PreviewExportPreferencesStore(),
             documentLanguageSink: sink,
+            lookSink: lookSink,
             exportPolicy: .standard,
             documentLanguageDetector: documentLanguageDetector,
             appLocale: Locale(identifier: "en")
@@ -55,10 +61,12 @@ enum PreviewDependencies {
         return CVListViewModel(
             cvManagementUseCase: management,
             storedCVChanges: .init(cvs: ManagedStoredCVs(cvs: management)),
+            changeQueue: StoredCVChangeQueue(),
             locale: Locale(identifier: "en"),
             now: { Date(timeIntervalSinceReferenceDate: 800_000_000) },
             calendar: { Calendar(identifier: .gregorian) },
             sleep: { _ in },
+            clock: ContinuousClock(),
             awaitLeftEditors: {}
         )
     }
@@ -130,16 +138,10 @@ private struct PreviewSampleCVRepository: SampleCVRepositoryProtocol {
     }
 }
 
-/// The last export choice, kept in memory.
-final class PreviewExportPreferencesStore: ExportPreferencesStore {
-    private var preferences = ExportPreferences()
-
+/// No choice of an earlier version: a preview reads nothing from the device.
+struct PreviewExportPreferencesStore: ExportPreferencesStore {
     func load() -> ExportPreferences {
-        preferences
-    }
-
-    func save(_ preferences: ExportPreferences) {
-        self.preferences = preferences
+        ExportPreferences()
     }
 }
 #endif

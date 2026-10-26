@@ -1,4 +1,5 @@
 import Testing
+import DiagnosticLogging
 import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
@@ -6,31 +7,19 @@ import Foundation
 
 // MARK: - Test Doubles
 
-/// Keeps the choice in memory, so view model tests never touch the real file in Application Support.
-final class InMemoryExportPreferencesStore: ExportPreferencesStore {
-    var stored: ExportPreferences
-    var saveError: Error?
-    private(set) var saveCount = 0
-
-    init(stored: ExportPreferences = ExportPreferences()) {
-        self.stored = stored
-    }
+/// Holds the choice of an earlier version in memory, so view model tests never touch the real file in Application Support.
+struct InMemoryExportPreferencesStore: ExportPreferencesStore {
+    var stored = ExportPreferences()
 
     func load() -> ExportPreferences {
         stored
-    }
-
-    func save(_ preferences: ExportPreferences) throws {
-        saveCount += 1
-        if let saveError {
-            throw saveError
-        }
-        stored = preferences
     }
 }
 
 // MARK: - FileExportPreferencesStore Tests
 
+/// The file that earlier versions wrote the one choice of the whole app in: it is only read now, for a CV that has no
+/// look of its own.
 @Suite("FileExportPreferencesStore Tests")
 struct FileExportPreferencesStoreTests {
 
@@ -44,180 +33,64 @@ struct FileExportPreferencesStoreTests {
         try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
     }
 
+    private func write(_ json: String, to fileURL: URL) throws {
+        try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(json.utf8).write(to: fileURL)
+    }
+
     @Test("load returns an empty choice when nothing is stored")
     func loadReturnsEmptyChoiceWithoutFile() {
         let fileURL = makeTemporaryFileURL()
-        let store = FileExportPreferencesStore(fileURL: fileURL)
 
-        #expect(store.load() == ExportPreferences())
+        #expect(FileExportPreferencesStore(fileURL: fileURL).load() == ExportPreferences())
     }
 
-    @Test("save then load returns the same choice and creates the folder")
-    func saveThenLoadRoundTrip() throws {
+    @Test("load returns the choice that an earlier version wrote")
+    func loadReturnsTheChoiceOfAnEarlierVersion() throws {
         let fileURL = makeTemporaryFileURL()
         defer { removeDirectory(of: fileURL) }
-        let store = FileExportPreferencesStore(fileURL: fileURL)
-        let choice = ExportPreferences(templateId: "minimal", colorPalette: .creative, fontScheme: .serif)
+        try write(#"{"templateId":"minimal","colorPalette":"creative","fontScheme":"serif"}"#, to: fileURL)
 
-        try store.save(choice)
-
-        #expect(FileManager.default.fileExists(atPath: fileURL.path))
-        #expect(FileExportPreferencesStore(fileURL: fileURL).load() == choice)
+        #expect(FileExportPreferencesStore(fileURL: fileURL).load()
+                == ExportPreferences(templateId: "minimal", colorPalette: .creative, fontScheme: .serif))
     }
 
-    @Test("a second save replaces the first choice")
-    func saveReplacesPreviousChoice() throws {
+    @Test("load returns the parts of an earlier choice that were made")
+    func loadReturnsAPartialChoice() throws {
         let fileURL = makeTemporaryFileURL()
         defer { removeDirectory(of: fileURL) }
-        let store = FileExportPreferencesStore(fileURL: fileURL)
+        try write(#"{"colorPalette":"minimal"}"#, to: fileURL)
 
-        try store.save(ExportPreferences(templateId: "modern", colorPalette: .modern, fontScheme: .modern))
-        try store.save(ExportPreferences(templateId: "minimal", colorPalette: .minimal, fontScheme: .classic))
-
-        #expect(store.load() == ExportPreferences(templateId: "minimal", colorPalette: .minimal, fontScheme: .classic))
+        #expect(FileExportPreferencesStore(fileURL: fileURL).load()
+                == ExportPreferences(templateId: nil, colorPalette: .minimal, fontScheme: nil))
     }
 
     @Test("load returns an empty choice when the file is damaged")
     func loadReturnsEmptyChoiceForDamagedFile() throws {
         let fileURL = makeTemporaryFileURL()
         defer { removeDirectory(of: fileURL) }
-        try FileManager.default.createDirectory(
-            at: fileURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try Data("not json".utf8).write(to: fileURL)
+        try write("not json", to: fileURL)
 
         #expect(FileExportPreferencesStore(fileURL: fileURL).load() == ExportPreferences())
     }
 
+    @Test("reading the file leaves it as it is")
+    func loadDoesNotChangeTheFile() throws {
+        let fileURL = makeTemporaryFileURL()
+        defer { removeDirectory(of: fileURL) }
+        let json = #"{"templateId":"modern","colorPalette":"modern","fontScheme":"modern"}"#
+        try write(json, to: fileURL)
+
+        _ = FileExportPreferencesStore(fileURL: fileURL).load()
+
+        #expect(try Data(contentsOf: fileURL) == Data(json.utf8))
+    }
+
     @Test("the default file lives in Application Support, outside UserDefaults")
     func defaultFileIsInApplicationSupport() {
-        let path = AppEnvironment.device().exportPreferencesFile.path
+        let path = AppEnvironment.device(diagnostics: SilentLogger()).exportPreferencesFile.path
 
         #expect(path.contains("Application Support"))
         #expect(path.hasSuffix("export-preferences.json"))
-    }
-}
-
-// MARK: - CVExportSheetViewModel remembers the last choice
-
-@MainActor
-@Suite("CVExportSheetViewModel Preferences Tests")
-struct CVExportSheetViewModelPreferencesTests {
-
-    private static func template(_ id: String) -> Template {
-        Template(id: id, name: id.capitalized, htmlContent: "<html></html>")
-    }
-
-    private func makeViewModel(
-        templates: [Template],
-        stored: ExportPreferences = ExportPreferences()
-    ) async -> (CVExportSheetViewModel, InMemoryExportPreferencesStore, MockCVExportService) {
-        let service = MockCVExportService()
-        await service.setAvailableTemplatesResult(.success(templates))
-        let store = InMemoryExportPreferencesStore(stored: stored)
-        let viewModel = CVExportSheetViewModel(
-            cv: .exportable, exportService: service, preferencesStore: store, documentLanguageSink: { _ in }, exportPolicy: .standard,
-            documentLanguageDetector: englishDocumentLanguageDetector, appLocale: Locale(identifier: "en"), previewDebounce: .zero
-        )
-        return (viewModel, store, service)
-    }
-
-    @Test("loadTemplates preselects the template chosen last time")
-    func loadTemplatesPreselectsStoredTemplate() async {
-        let (viewModel, _, _) = await makeViewModel(
-            templates: [Self.template("professional"), Self.template("modern"), Self.template("minimal")],
-            stored: ExportPreferences(templateId: "minimal", colorPalette: .creative, fontScheme: .serif)
-        )
-
-        await viewModel.loadTemplates()
-
-        #expect(viewModel.selectedTemplateId == "minimal")
-        #expect(viewModel.selectedColorPalette == .creative)
-        #expect(viewModel.selectedFontScheme == .serif)
-    }
-
-    @Test("loadTemplates falls back to the first template when the stored one is gone")
-    func loadTemplatesFallsBackToFirstTemplate() async {
-        let (viewModel, _, _) = await makeViewModel(
-            templates: [Self.template("professional"), Self.template("modern")],
-            stored: ExportPreferences(templateId: "retired", colorPalette: .minimal, fontScheme: nil)
-        )
-
-        await viewModel.loadTemplates()
-
-        #expect(viewModel.selectedTemplateId == "professional")
-        #expect(viewModel.selectedColorPalette == .minimal)
-        #expect(viewModel.selectedFontScheme == .classic)
-    }
-
-    @Test("loadTemplates keeps the defaults when nothing was chosen before")
-    func loadTemplatesKeepsDefaultsWithoutStoredChoice() async {
-        let (viewModel, _, _) = await makeViewModel(
-            templates: [Self.template("professional"), Self.template("modern")]
-        )
-
-        await viewModel.loadTemplates()
-
-        #expect(viewModel.selectedTemplateId == "professional")
-        #expect(viewModel.selectedColorPalette == .professional)
-        #expect(viewModel.selectedFontScheme == .classic)
-    }
-
-    @Test("loadTemplates does not overwrite a template picked in this session")
-    func loadTemplatesKeepsCurrentSelection() async {
-        let (viewModel, _, _) = await makeViewModel(
-            templates: [Self.template("professional"), Self.template("modern")],
-            stored: ExportPreferences(templateId: "professional", colorPalette: nil, fontScheme: nil)
-        )
-        viewModel.selectedTemplateId = "modern"
-
-        await viewModel.loadTemplates()
-
-        #expect(viewModel.selectedTemplateId == "modern")
-    }
-
-    @Test("a rendered PDF stores the template, palette and font")
-    func renderedPDFStoresTheChoice() async {
-        let (viewModel, store, _) = await makeViewModel(templates: [Self.template("modern")])
-        viewModel.selectedTemplateId = "modern"
-        viewModel.selectedColorPalette = .creative
-        viewModel.selectedFontScheme = .serif
-
-        await viewModel.requestPreview().value
-
-        #expect(store.stored == ExportPreferences(templateId: "modern", colorPalette: .creative, fontScheme: .serif))
-    }
-
-    @Test("a failed PDF does not store the choice")
-    func failedPDFStoresNothing() async {
-        let (viewModel, store, service) = await makeViewModel(templates: [Self.template("modern")])
-        await service.setExportResult(.failure(AppError.unknown("Export error")))
-        viewModel.selectedTemplateId = "modern"
-
-        await viewModel.requestPreview().value
-
-        #expect(store.saveCount == 0)
-    }
-
-    @Test("without a template nothing is stored")
-    func noTemplateStoresNothing() async {
-        let (viewModel, store, _) = await makeViewModel(templates: [])
-
-        await viewModel.requestPreview().value
-
-        #expect(store.saveCount == 0)
-    }
-
-    @Test("the PDF is still offered when the choice cannot be stored")
-    func pdfIsOfferedWhenStoringFails() async {
-        let (viewModel, store, _) = await makeViewModel(templates: [Self.template("modern")])
-        store.saveError = CocoaError(.fileWriteOutOfSpace)
-        viewModel.selectedTemplateId = "modern"
-
-        await viewModel.requestPreview().value
-
-        #expect(viewModel.sharePDF != nil)
-        #expect(viewModel.errorMessage == nil)
     }
 }

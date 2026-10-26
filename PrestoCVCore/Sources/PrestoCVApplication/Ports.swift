@@ -40,11 +40,37 @@ public enum StoreIssue: Sendable, Equatable {
 
 public enum StoreFailure: Sendable, Equatable { case notADirectory, cannotList, cannotLock }
 
+/// The error under a failed call, as codes only: its domain and its code, never a path or a message (R7).
+public struct FailureCause: Sendable, Equatable, CustomStringConvertible {
+    public enum Domain: Sendable, Equatable {
+        /// `NSCocoaErrorDomain`: Foundation's own file errors, such as a write without permission.
+        case cocoa
+        /// `NSPOSIXErrorDomain`: the code is the `errno` value.
+        case posix
+        /// Any other domain, or a Swift error that has none.
+        case other
+    }
+
+    public let domain: Domain, code: Int
+    /// The `errno` under the error, when Foundation reports one. A Cocoa code covers several of them: `cocoa 513` is
+    /// both a folder that cannot be written to (`posix 13`) and a file the device has locked, so only the pair tells
+    /// them apart. Foundation on Apple platforms reports it; swift-corelibs-foundation on Linux does not.
+    public let underlyingPOSIX: Int?
+    public init(domain: Domain, code: Int, underlyingPOSIX: Int? = nil) {
+        self.domain = domain; self.code = code; self.underlyingPOSIX = underlyingPOSIX
+    }
+
+    /// `posix 13`, or `cocoa 513 (posix 13)`: the form a failed test and a printed error show.
+    public var description: String {
+        underlyingPOSIX.map { "\(domain) \(code) (posix \($0))" } ?? "\(domain) \(code)"
+    }
+}
+
 /// No paths or free-form strings: file names only, and coded failures (R7).
 public enum RepositoryError: Error, Equatable, Sendable {
     case notFound(CVID), alreadyExists(CVID), conflict(CVID, storedRevision: Int)
     case corrupt(file: String), unreadable(file: String), upgradeRequired(file: String, version: Int), tooLarge(file: String)
-    case invalidName(String), storeUnavailable(StoreFailure), writeFailed(file: String)
+    case invalidName(String), storeUnavailable(StoreFailure), writeFailed(file: String, cause: FailureCause)
     /// Refused before writing: the file would exceed the size cap, or would not read back (the previous version is kept).
     case wouldNotReadBack(file: String)
 }

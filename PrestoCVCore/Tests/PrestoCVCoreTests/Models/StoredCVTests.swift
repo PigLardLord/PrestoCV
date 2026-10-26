@@ -140,4 +140,50 @@ struct StoredCVTests {
         #expect(!StoredCV.isListedBefore(sameHigh, sameLow))
         #expect(!StoredCV.isListedBefore(sameLow, sameLow))
     }
+
+    // MARK: - Look Tests
+
+    /// A file as the released build writes it: flat, with the times, and without a look.
+    private static let releasedFile = #"""
+    {"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","name":"Backend – Apple","personalInfo":{"name":"Ada Lovelace","title":"Engineer","location":"London","email":"ada@example.com","phone":"","portfolio":"","profile":""},"relevant_experience":[],"education":[],"skills":[],"languages":[],"certifications":[],"interests":["Chess"],"social":[],"documentLanguage":"it","createdAt":"2024-03-01T10:00:00Z","updatedAt":"2024-03-02T11:30:00Z"}
+    """#
+
+    private func object(of data: Data) throws -> NSDictionary {
+        try #require(try JSONSerialization.jsonObject(with: data) as? NSDictionary)
+    }
+
+    @Test("A file of the released build, which has no look, is read with no look and nothing else lost")
+    func releasedFileHasNoLook() throws {
+        let stored = try decode(Self.releasedFile)
+
+        #expect(stored.cv.look == nil)
+        #expect(stored.cv.name == "Backend – Apple")
+        #expect(stored.cv.personalInfo.name == "Ada Lovelace")
+        #expect(stored.cv.interests == ["Chess"])
+        #expect(stored.cv.documentLanguage == "it")
+        #expect(stored.createdAt == Date(timeIntervalSince1970: 1_709_287_200))
+        #expect(stored.updatedAt == Date(timeIntervalSince1970: 1_709_379_000))
+    }
+
+    @Test("A file of the released build is written again as it was, with the look still absent")
+    func releasedFileIsWrittenBackWithoutALook() throws {
+        let stored = try decode(Self.releasedFile)
+
+        let written = try encoder().encode(stored)
+
+        #expect(try object(of: written) == object(of: Data(Self.releasedFile.utf8)))
+        #expect(try object(of: written)["look"] == nil)
+    }
+
+    @Test("A stored look is written flat next to the CV's own keys and read back")
+    func storedLookRoundTrips() throws {
+        let look = CVLook(design: "minimal", palette: "creative", fonts: "serif")
+        let stored = StoredCV(cv: CVModel(name: "Backend", look: look), updatedAt: Date(timeIntervalSince1970: 1_700_000_090))
+
+        let data = try encoder().encode(stored)
+        let written = try object(of: data)
+
+        #expect(written["look"] as? [String: String] == ["design": "minimal", "palette": "creative", "fonts": "serif"])
+        #expect(try decoder().decode(StoredCV.self, from: data) == stored)
+    }
 }

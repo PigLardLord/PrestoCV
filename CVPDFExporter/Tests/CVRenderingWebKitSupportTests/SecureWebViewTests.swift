@@ -55,7 +55,8 @@ final class ConnectionCounter: Sendable {
 
 /// Every kind of load a page can start, pointing at the test listener, and whether a web view without the rules makes
 /// it offscreen. Recorded on iOS 26.5, iOS 27.0, macOS 26 and macOS 27: the table holds on every release the app
-/// supports; iOS 26.2, below the minimum, lets the object and embed loads through the rules. The kinds marked false are
+/// supports; iOS 26.2, below the minimum, lets the object and embed loads through the rules (`DeploymentTargetTests` in
+/// `Tools/SourceChecks` fails if the project or a manifest sets an iOS release below 26.5). The kinds marked false are
 /// not loaded even without the rules (a favicon, a prefetch hint, ftp:, which WebKit no longer supports, and media: on
 /// iOS an offscreen web view does not fetch it even when a script starts muted, inline playback). None of these can
 /// enter the document: the builder's closed tag set has no media, link or icon elements, and a link must be http(s)

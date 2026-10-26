@@ -16,6 +16,8 @@ actor InMemoryCVRepository: CVRepositoryProtocol {
     }
     
     private(set) var saveCount = 0
+    /// How many times the listing, the CVs with their times, was asked for.
+    private(set) var listingCount = 0
     
     private var storedCVs: [UUID: CVModel] = [:]
     private var lastSavedAt: [UUID: Date] = [:]
@@ -98,7 +100,8 @@ actor InMemoryCVRepository: CVRepositoryProtocol {
     }
     
     func getCVListing() async throws -> CVListing {
-        try await listing()
+        listingCount += 1
+        return try await listing()
     }
     
     func acknowledgeUnreadableCVs() async throws {

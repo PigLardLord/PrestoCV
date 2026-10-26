@@ -1,23 +1,25 @@
 import Foundation
 import CVPDFExporter
 
-/// The design the user chose the last time a PDF was exported: template, color palette and font scheme.
-/// It is kept for the whole app, not per CV.
+/// The design the user chose the last time a PDF was exported by a version that kept one choice for the whole app:
+/// template, color palette and font scheme.
+///
+/// Since CVs keep their own look (`CVLook`), nothing writes this any more. The choice stays on the device of whoever
+/// has it, read once as the look of a CV that has none (`ExportLookResolver`). Delete it, with its file, once no
+/// installed version has CVs without a look.
 struct ExportPreferences: Codable, Equatable {
     var templateId: String?
     var colorPalette: ColorPalette?
     var fontScheme: FontScheme?
 }
 
-/// Where the last export choice is kept between launches.
+/// Where the last choice of an earlier version is read from. It is read-only.
 protocol ExportPreferencesStore {
     /// The stored choice, or an empty one when nothing usable is stored.
     func load() -> ExportPreferences
-    func save(_ preferences: ExportPreferences) throws
 }
 
-/// Keeps the choice in a small JSON file in Application Support.
-/// It is a file and not `UserDefaults`, which would require a privacy manifest entry for its required-reason API.
+/// Reads the choice from the small JSON file that earlier versions wrote in Application Support.
 struct FileExportPreferencesStore: ExportPreferencesStore {
     private let fileURL: URL
 
@@ -26,19 +28,11 @@ struct FileExportPreferencesStore: ExportPreferencesStore {
     }
 
     func load() -> ExportPreferences {
-        // A missing or damaged file only means the user has not chosen yet; the next export writes a fresh one.
+        // A missing or damaged file only means no choice was made before CVs kept their own look.
         guard let data = try? Data(contentsOf: fileURL),
               let preferences = try? JSONDecoder().decode(ExportPreferences.self, from: data) else {
             return ExportPreferences()
         }
         return preferences
-    }
-
-    func save(_ preferences: ExportPreferences) throws {
-        try FileManager.default.createDirectory(
-            at: fileURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try JSONEncoder().encode(preferences).write(to: fileURL, options: .atomic)
     }
 }
