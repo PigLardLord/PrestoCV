@@ -5,6 +5,9 @@ import Foundation
 
 /// The PDF full screen: the preview of the export sheet opens the PDF that is shared, with all its pages, and closing it
 /// leaves the sheet as it was.
+///
+/// The sheet is covered when the cover is up, not when it is asked for: `fullPDFDidAppear()` is the cover appearing and
+/// `fullPDFDidDismiss()` the cover having gone, as the sheet's view tells them.
 @MainActor
 @Suite("CVExportSheetViewModel Tests - the full PDF")
 struct CVExportSheetFullPDFTests {
@@ -120,9 +123,11 @@ struct CVExportSheetFullPDFTests {
         let renders = await service.exportCallCount
 
         viewModel.showFullPDF()
+        viewModel.fullPDFDidAppear()
         await viewModel.sheetDisappeared().value
         viewModel.closeFullPDF()
         await viewModel.start()
+        viewModel.fullPDFDidDismiss()
 
         #expect(viewModel.sharePDF == shared)
         #expect(await service.exportCallCount == renders, "the PDF is not made again")
@@ -168,6 +173,7 @@ struct CVExportSheetFullPDFTests {
         let viewModel = makeViewModel(service)
         await viewModel.requestPreview().value
         viewModel.showFullPDF()
+        viewModel.fullPDFDidAppear()
 
         await viewModel.sheetDisappeared().value
 
@@ -184,12 +190,14 @@ struct CVExportSheetFullPDFTests {
         await viewModel.requestPreview().value
         let shared = viewModel.sharePDF
         viewModel.showFullPDF()
+        viewModel.fullPDFDidAppear()
 
         // Done while the viewer is still being presented: the sheet goes off screen after the PDF is closed
         viewModel.closeFullPDF()
         await viewModel.sheetDisappeared().value
         // and the sheet is back, where its task starts again
         await viewModel.start()
+        viewModel.fullPDFDidDismiss()
 
         #expect(shared != nil)
         #expect(viewModel.sharePDF == shared, "the sheet is still there, with the PDF to share")
@@ -207,6 +215,7 @@ struct CVExportSheetFullPDFTests {
         await viewModel.requestPreview().value
         let shared = viewModel.sharePDF
         viewModel.showFullPDF()
+        viewModel.fullPDFDidAppear()
         viewModel.closeFullPDF()
 
         await viewModel.start()
@@ -225,6 +234,7 @@ struct CVExportSheetFullPDFTests {
         var viewModel: CVExportSheetViewModel? = makeViewModel(service)
         await viewModel?.requestPreview().value
         viewModel?.showFullPDF()
+        viewModel?.fullPDFDidAppear()
         await viewModel?.sheetDisappeared().value
 
         viewModel = nil
@@ -240,6 +250,7 @@ struct CVExportSheetFullPDFTests {
         await viewModel.start()
         await viewModel.requestPreview().value
         viewModel.showFullPDF()
+        viewModel.fullPDFDidAppear()
         await viewModel.sheetDisappeared().value
         viewModel.closeFullPDF()
         await viewModel.start()
@@ -253,18 +264,55 @@ struct CVExportSheetFullPDFTests {
         #expect(!viewModel.isPreviewLoading, "the sheet is gone: a choice makes no preview")
     }
 
-    @Test("The sheet stopped while the cover is up is not covered any more")
-    func stopEndsTheCovering() async {
+    @Test("A cover that was asked for and never appeared covers nothing: the sheet closing stops the sheet")
+    func askedForCoverDoesNotCoverTheSheet() async {
         let service = MockCVExportService()
         let viewModel = makeViewModel(service)
+        await viewModel.start()
         await viewModel.requestPreview().value
         viewModel.showFullPDF()
-        await viewModel.stop().value
-        await viewModel.requestPreview().value
 
         await viewModel.sheetDisappeared().value
 
-        #expect(viewModel.sharePDF == nil, "a sheet that is closing removes its PDF")
+        #expect(viewModel.sharePDF == nil, "the cover is not up, so the sheet is closing")
+        #expect(await service.cleanedUpURLs == [URL(fileURLWithPath: "/tmp/test.pdf")])
+    }
+
+    @Test("A request for the cover withdrawn before the cover appears leaves the sheet stopped when it closes")
+    func withdrawnRequestDoesNotCoverTheSheet() async {
+        let service = MockCVExportService()
+        let viewModel = makeViewModel(service)
+        await viewModel.start()
+        await viewModel.requestPreview().value
+        viewModel.showFullPDF()
+        // A new choice makes a new PDF, which takes the one the cover was asked for away: the cover never appears
+        viewModel.selectedColorPalette = .minimal
+        #expect(viewModel.fullPDF == nil)
+
+        await viewModel.sheetDisappeared().value
+
+        // The sheet is stopped: a choice made now makes no preview, and the sheet does not stay active after it closed
+        viewModel.selectedColorPalette = .creative
+        #expect(!viewModel.isPreviewLoading, "a sheet that has closed makes no preview")
+        #expect(!viewModel.isPreparingPDF)
+        #expect(viewModel.sharePDF == nil)
+    }
+
+    @Test("A cover that was up and has gone covers nothing: the next disappearance of the sheet stops it")
+    func goneCoverDoesNotCoverTheSheet() async {
+        let service = MockCVExportService()
+        let viewModel = makeViewModel(service)
+        await viewModel.start()
+        await viewModel.requestPreview().value
+        viewModel.showFullPDF()
+        viewModel.fullPDFDidAppear()
+        viewModel.closeFullPDF()
+        viewModel.fullPDFDidDismiss()
+
+        await viewModel.sheetDisappeared().value
+
+        #expect(viewModel.sharePDF == nil, "the cover has gone, so the sheet is closing")
+        #expect(await service.cleanedUpURLs == [URL(fileURLWithPath: "/tmp/test.pdf")])
     }
 
     @Test("A sheet that goes away without the full PDF removes its PDF")

@@ -7,8 +7,8 @@ import CVPDFExporter
 struct CVExportSheetView: View {
     @StateObject private var viewModel: CVExportSheetViewModel
     @StateObject private var previewCoordinator = HTMLPreviewCoordinator()
-    /// The PDF in the share sheet, while the share sheet is open
-    @State private var sharingPDF: ExportedPDF?
+    /// The share that holds the PDF for the share sheet, from the tap on the button until the share sheet has closed
+    @State private var sharing: PDFShare?
     /// VoiceOver's focus on the button that shows the full PDF, which is put back there when the full PDF is closed
     @AccessibilityFocusState private var fullPDFButtonHasFocus: Bool
 
@@ -128,6 +128,8 @@ struct CVExportSheetView: View {
             fullPDFButtonHasFocus = true
         }) { pdf in
             FullPDFView(pdf: pdf) { viewModel.closeFullPDF() }
+                // The cover is up: the sheet going off screen under it is not closing
+                .onAppear { viewModel.fullPDFDidAppear() }
         }
         // Where the sheet does not fill the screen, as on iPad, it is as tall as a page: the preview keeps its room
         // above the language and the button
@@ -436,10 +438,10 @@ struct CVExportSheetView: View {
                 isLoading: isPreparing,
                 isDisabled: viewModel.sharePDF == nil
             ) {
-                sharingPDF = viewModel.sharePDF
+                sharing = viewModel.beginShare()
             }
             .accessibilityValue(isPreparing ? "export.loading".localized : "")
-            .shareSheet(for: $sharingPDF) { activityType, completed in
+            .shareSheet(for: $sharing) { activityType, completed in
                 viewModel.shareEnded(activityType: activityType, completed: completed)
             }
 
