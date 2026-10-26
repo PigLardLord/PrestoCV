@@ -102,7 +102,7 @@ The tables list every event the code writes; the source checks fail when the cod
 
 ## Adding a line
 
-1. **Declare the category once in the module**, if it has none: `extension LogCategory { static let export = LogCategory("export") }`.
+1. **Declare the category once**, in the module that owns the flow, if it has none: `extension LogCategory { static let export = LogCategory("export") }`. A module that is a step of the same flow, as the PDF reader is of the import, logs under the category of the module it serves (`public` there) and declares none; a source check fails when two files declare one name.
 2. **Take the logger in the initialiser**, as `any DiagnosticLogger`, with no default value (R17). The composition root passes the one it made (R4); a test passes a `RecordingLogger`, and a preview a `SilentLogger`.
 3. **Write the event with a shorthand**, and fields of the kinds above: a case name becomes a `token` through a `switch` that spells it out, and an error conforms to `LoggableError`.
 4. **Test it** with `RecordingLogger` and `TickingClock`, from `DiagnosticLoggingTestSupport`: the event, its level and its fields; and, once per module, that a word put in the CV appears in no line.

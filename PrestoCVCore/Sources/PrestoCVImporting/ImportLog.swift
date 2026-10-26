@@ -3,27 +3,28 @@ import DiagnosticLogging
 // MARK: - What the import logs (ADR 0030)
 
 extension LogCategory {
-    /// The import of a CV, from a PDF or a pasted text.
-    static let importing = LogCategory("import")
+    /// The import of a CV, from a PDF or a pasted text. The modules that read it share this one name: the PDF reader logs
+    /// under it too.
+    public static let importing = LogCategory("import")
 }
 
 /// A bound of `ImportLimits` that the reading reached. The reading stops there; the use case logs which bound it was,
-/// then throws the `ImportError` that the app words.
-struct LimitReached: Error, Equatable {
-    enum Limit: Equatable {
+/// then throws the `ImportError` that the app words. A reader of PDFs names the bound it reached the same way.
+public struct LimitReached: Error, Equatable, Sendable {
+    public enum Limit: Equatable, Sendable {
         case bytes, pages, characters, words, lines, cells, steps
     }
 
-    let limit: Limit
+    public let limit: Limit
 
-    init(_ limit: Limit) {
+    public init(_ limit: Limit) {
         self.limit = limit
     }
 
     /// The failure the person is told about: too many pages, or too large for any other bound.
-    var importError: ImportError { limit == .pages ? .tooManyPages : .tooLarge }
+    public var importError: ImportError { limit == .pages ? .tooManyPages : .tooLarge }
 
-    var logName: StaticString {
+    public var logName: StaticString {
         switch limit {
         case .bytes: "bytes"
         case .pages: "pages"

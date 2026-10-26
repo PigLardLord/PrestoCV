@@ -12,7 +12,7 @@ struct LoggingGuideTests {
     private static let guide = "docs/logging.md"
 
     /// The sources that may log through the interface: the packages and the app.
-    private static let sourceFolders = [
+    static let sourceFolders = [
         "DiagnosticLogging/Sources", "PrestoCVCore/Sources", "CVPDFExporter/Sources", "CVGeneratorAI/Sources", "PrestoCV",
     ]
 
