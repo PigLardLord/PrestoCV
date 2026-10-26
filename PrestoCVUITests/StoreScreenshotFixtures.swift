@@ -7,7 +7,6 @@ struct StoreScreenshotFixture {
     let language: String
     let locale: String
     let name: String
-    let email: String
     /// The name of the complete CV in the list
     let completeName: String
     /// The CV the export screens show, complete and on one page
@@ -56,7 +55,6 @@ extension StoreScreenshotFixture {
         language: "en",
         locale: "en_US",
         name: "Emily Parker",
-        email: "emily.parker@example.com",
         completeName: "Project Manager – Ridgeline Freight",
         complete: CV(
             title: "Project Manager",
@@ -121,7 +119,6 @@ extension StoreScreenshotFixture {
         language: "de",
         locale: "de_DE",
         name: "Lena Hoffmann",
-        email: "lena.hoffmann@example.com",
         completeName: "Intensivpflege – Klinikum Elbufer",
         complete: CV(
             title: "Pflegefachfrau",
@@ -185,7 +182,6 @@ extension StoreScreenshotFixture {
         language: "it",
         locale: "it_IT",
         name: "Giulia Conti",
-        email: "giulia.conti@example.com",
         completeName: "Farmacista – Farmacia Aurora Nuova",
         complete: CV(
             title: "Farmacista",
@@ -248,7 +244,6 @@ extension StoreScreenshotFixture {
         language: "es",
         locale: "es_ES",
         name: "Lucía Martínez",
-        email: "lucia.martinez@example.com",
         completeName: "Diseño gráfico – Estudio Alfarero",
         complete: CV(
             title: "Diseñadora gráfica",
@@ -310,7 +305,6 @@ extension StoreScreenshotFixture {
         language: "fr",
         locale: "fr_FR",
         name: "Camille Laurent",
-        email: "camille.laurent@example.com",
         completeName: "Développeuse web – Atelier Numérique",
         complete: CV(
             title: "Développeuse web",
@@ -374,7 +368,6 @@ extension StoreScreenshotFixture {
         language: "pt",
         locale: "pt_BR",
         name: "Ana Ferreira",
-        email: "ana.ferreira@example.com",
         completeName: "Engenheira de obras – Vale Verde",
         complete: CV(
             title: "Engenheira civil",
