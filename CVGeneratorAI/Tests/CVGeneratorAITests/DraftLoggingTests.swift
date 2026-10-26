@@ -98,7 +98,7 @@ struct DraftLoggingTests {
         #expect(lines.allSatisfy { $0.level == .info })
     }
 
-    @Test("Language data the device has not got is logged as a notice, before the model is asked")
+    @Test("Language data the device has not got is logged as a notice, then the draft as rejected by the language check, before the model is asked")
     func missingLanguageData() async {
         let logger = RecordingLogger()
         let missing = CVDataSanitizer(lexicalClasses: ForcedLexicalTagger([.german: .noAssets]))
@@ -107,9 +107,11 @@ struct DraftLoggingTests {
             try await generator(sanitizer: missing, logger: logger).generateCV(from: CVGenerationRequest(userPrompt: faithfulExamples[2].description))
         }
 
-        #expect(logger.events == ["draft.language"])
+        #expect(logger.events == ["draft.language", "draft.rejected"])
         #expect(logger.entry("draft.language")?.line == "draft.language supported=true language=de data=missing")
         #expect(logger.entry("draft.language")?.level == .notice)
+        #expect(logger.entry("draft.rejected")?.line == "draft.rejected check=language error=CVGenerationError.languageDataUnavailable")
+        #expect(logger.entry("draft.rejected")?.level == .notice)
     }
 
     // MARK: Generation

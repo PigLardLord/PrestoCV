@@ -33,6 +33,21 @@ struct DraftLog {
         }
     }
 
+    /// The check that rejected a description before the model was asked.
+    enum Check {
+        /// The rules of the request: its length and what it may hold.
+        case request
+        /// The language data of the device that grounding the description needs.
+        case language
+
+        var logName: StaticString {
+            switch self {
+            case .request: "request"
+            case .language: "language"
+            }
+        }
+    }
+
     let logger: any DiagnosticLogger
 
     /// Whether the model can run, and why not when it cannot: then a notice, since the person sees the draft is not offered.
@@ -50,9 +65,10 @@ struct DraftLog {
         logger.notice(.draft, "draft.unavailable", .token("reason", reason.logName))
     }
 
-    /// A description the rules of the request reject, before the model is asked.
-    func rejectedRequest(_ error: any Error) {
-        logger.notice(.draft, "draft.rejected", .token("check", "request"), .error(error))
+    /// A description rejected before the model is asked, by the rules of the request or because the device lacks the language data
+    /// that grounding it needs: the last line of a draft that goes no further.
+    func rejected(check: Check, by error: any Error) {
+        logger.notice(.draft, "draft.rejected", .token("check", check.logName), .error(error))
     }
 
     /// The language of the description, and whether grounding it needs the device's language data and finds it; a notice when

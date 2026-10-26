@@ -62,12 +62,17 @@ public final class CVGeneratorUseCase {
         do {
             try validator.validateRequest(request)
         } catch {
-            log.rejectedRequest(error)
+            log.rejected(check: .request, by: error)
             throw error
         }
         let language = sanitizer.languageCheck(of: request.userPrompt)
         log.language(language)
-        try language.require()
+        do {
+            try language.require()
+        } catch {
+            log.rejected(check: .language, by: error)
+            throw error
+        }
 
         log.started(characters: request.userPrompt.count)
         let stopwatch = Stopwatch(started: self.clock)

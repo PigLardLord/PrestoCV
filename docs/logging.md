@@ -87,11 +87,13 @@ The tables list every event the code writes; the source checks fail when the cod
 
 ### The AI draft (category `draft`)
 
+A draft ends with one of `draft.finished`, `draft.cancelled`, `draft.refused`, `draft.rejected` or `draft.failed`; one asked for while the model cannot run ends with `draft.unavailable`.
+
 | Event | Level | Fields | When |
 |---|---|---|---|
 | `draft.availability` | info, notice when not available | `available`, `reason` (when not available) | Whether the model can run, each time that changes. |
 | `draft.unavailable` | notice | `reason` | A draft was asked for while the model cannot run. |
-| `draft.rejected` | notice | `check` (`request` or `result`), `error`, `elapsed` (a result only) | The description, or the draft left after the checks, broke a rule of the validation. |
+| `draft.rejected` | notice | `check` (`request`, `language` or `result`), `error`, `elapsed` (a result only) | The description broke a rule of the request, the device lacks the language data that grounding it needs (`draft.language` shows which), or the draft left after the checks broke a rule of the validation. |
 | `draft.language` | info, notice when the data is missing | `supported`, `language` (when supported), `data` (`notNeeded`, `present` or `missing`) | The language of the description, and the device's language data that grounding it needs. |
 | `draft.started` | info | `characters` | The model was asked. |
 | `draft.claims` | info, notice when one was withdrawn | `checked` (the personal items put to the check), `withdrawn`, `unchecked` (the check gave no answer, so every item is withdrawn and left blank) | The claim check judged the personal items ([ADR 0028](architecture/adr/0028-check-each-personal-claim-of-the-ai-draft-again.md)). |
