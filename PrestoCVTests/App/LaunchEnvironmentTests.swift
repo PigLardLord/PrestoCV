@@ -169,8 +169,7 @@ extension LaunchEnvironmentTests {
             arguments: ["PrestoCV", LaunchEnvironment.writeStepsArgument, "fail,ok"],
             sleep: { _ in }
         )
-        var edited = cv
-        edited.name = "Backend, edited"
+        let edited = CVModel(id: cv.id, name: "Backend, edited", personalInfo: cv.personalInfo)
 
         #expect(try await cvs.getAllCVs() == [cv], "The CV handed over is the one the app lists")
         await #expect(throws: CocoaError.self) { _ = try await cvs.updateCV(edited) }
