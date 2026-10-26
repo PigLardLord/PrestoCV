@@ -294,7 +294,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 2123
+    static let rowsWhenWritten = 2158
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list. All of them are residual risks of the rules (ADR 0023) that the claim check of
@@ -403,6 +403,7 @@ enum GroundingRows {
         rows += entryNamesWithoutAnArticle()
         rows += degreesThatNameNoDegree()
         rows += aVerbIsNoDegree()
+        rows += aPastJobTakesNoTitleOfTheHeadline()
         rows += faithfulExamples()
         rows += theAppExampleKeepsEveryFact()
         rows += realModelProbes()
@@ -4923,6 +4924,89 @@ enum GroundingRows {
         rows.append(row("a-noun-the-vocabulary-lists-as-a-verb-is-a-degree-de", "Lehre is a qualification, though the vocabulary lists it as a form of a verb: the degree stays",
                         "Ich habe eine Lehre bei der Berufsschule Kassel gemacht.",
                         CVData(education: [study("Lehre", at: "Berufsschule Kassel")]), .unchanged, language: "de"))
+        return rows
+    }
+
+    // MARK: A past job takes no title from the headline (#202)
+
+    /// The headline of the description ("I am a nurse in Leeds") says what the person is now. A job the description says has
+    /// ended ("Before that, from 2014 to 2018, I worked at Beta": two years, or a word of ending) gets no title from it: the
+    /// clause that names the job does not state the role, so the title the model copies there is not a fact the person gave for
+    /// that job, whether or not the draft also copies it into its own headline field (ADR 0023, rules (c) and (f)). The title of
+    /// a job that goes on, a title the clause of the job states, and the degree of a study stay.
+    private static func aPastJobTakesNoTitleOfTheHeadline() -> [GroundingRow] {
+        typealias Variant = (
+            language: String, name: String, place: String, title: String, headline: String, current: String, former: String,
+            formerWithRole: String, until: String?, unended: String, study: String, school: String
+        )
+        var variants: [Variant] = []
+        variants.append(("en", "Emma Clarke", "Leeds", "nurse", "I am Emma Clarke, a nurse in Leeds.",
+                         "Since 2018 I have worked at Acme.", "Before that, from 2014 to 2018, I worked at Beta.",
+                         "Before that, from 2014 to 2018, I worked as a nurse at Beta.", "Until 2018 I worked at Beta.",
+                         "Since 2018 I have worked at Beta.", "From 2014 to 2018 I studied at Beta College.", "Beta College"))
+        variants.append(("it", "Chiara Benedetti", "Verona", "infermiera", "Mi chiamo Chiara Benedetti e sono infermiera a Verona.",
+                         "Dal 2018 lavoro presso Acme.", "Prima, dal 2014 al 2018, ho lavorato presso Beta.",
+                         "Prima, dal 2014 al 2018, ho lavorato come infermiera presso Beta.", "Fino al 2018 ho lavorato presso Beta.",
+                         "Dal 2018 lavoro presso Beta.", "Dal 2014 al 2018 ho studiato presso la Scuola Beta.", "Scuola Beta"))
+        variants.append(("de", "Anna Weber", "Kassel", "Krankenschwester", "Ich heiße Anna Weber und bin Krankenschwester in Kassel.",
+                         "Seit 2018 arbeite ich bei Acme.", "Davor habe ich von 2014 bis 2018 bei Beta gearbeitet.",
+                         "Davor habe ich von 2014 bis 2018 als Krankenschwester bei Beta gearbeitet.", "Bis 2018 habe ich bei Beta gearbeitet.",
+                         "Seit 2018 arbeite ich bei Beta.", "Von 2014 bis 2018 habe ich an der Schule Beta studiert.", "Schule Beta"))
+        variants.append(("es", "Lucía Romero", "Valencia", "enfermera", "Me llamo Lucía Romero y soy enfermera en Valencia.",
+                         "Desde 2018 trabajo en Acme.", "Antes, de 2014 a 2018, trabajé en Beta.",
+                         "Antes, de 2014 a 2018, trabajé como enfermera en Beta.", "Hasta 2018 trabajé en Beta.",
+                         "Desde 2018 trabajo en Beta.", "De 2014 a 2018 estudié en la Escuela Beta.", "Escuela Beta"))
+        variants.append(("fr", "Claire Martin", "Lyon", "infirmière", "Je m'appelle Claire Martin et je suis infirmière à Lyon.",
+                         "Depuis 2018, je travaille chez Acme.", "Avant, de 2014 à 2018, j'ai travaillé chez Beta.",
+                         "Avant, de 2014 à 2018, j'ai travaillé comme infirmière chez Beta.", "Jusqu'en 2018, j'ai travaillé chez Beta.",
+                         "Depuis 2018, je travaille chez Beta.", "De 2014 à 2018, j'ai étudié à l'École Beta.", "École Beta"))
+        // Portuguese has no word of ending among the statement words ("até" is also "even", and "até hoje" is the present).
+        variants.append(("pt", "Inês Duarte", "Coimbra", "enfermeira", "Chamo-me Inês Duarte e sou enfermeira em Coimbra.",
+                         "Desde 2018 trabalho na Acme.", "Antes, de 2014 a 2018, trabalhei na Beta.",
+                         "Antes, de 2014 a 2018, trabalhei como enfermeira na Beta.", nil,
+                         "Desde 2018 trabalho na Beta.", "De 2014 a 2018 estudei na Escola Beta.", "Escola Beta"))
+
+        let copied = "the title of the headline, copied onto a job that has ended: the clause that names the job does not state the role"
+        var rows: [GroundingRow] = []
+        for v in variants {
+            let headline = person(name: v.name, location: v.place, title: v.title)
+            let noHeadline = person(name: v.name, location: v.place)
+            rows.append(row("a-past-job-copies-the-headline-\(v.language)",
+                            "two years say the job has ended; the headline names the person's role now: its title goes, the current job keeps it",
+                            "\(v.headline) \(v.current) \(v.former)",
+                            CVData(personalInfo: headline, experience: [job(v.title, "Acme", from: "2018", current: true),
+                                                                      job(v.title, "Beta", from: "2014", to: "2018")]),
+                            .keeping([Drop("experience[1].title", copied)]), language: v.language))
+            rows.append(row("a-past-job-copies-the-headline-undated-\(v.language)",
+                            "the draft has no dates and no headline field: the description alone says the job has ended, and the title goes",
+                            "\(v.headline) \(v.current) \(v.former)",
+                            CVData(personalInfo: noHeadline, experience: [job(v.title, "Acme", from: "2018", current: true),
+                                                                         job(v.title, "Beta")]),
+                            .keeping([Drop("experience[1].title", copied)]), language: v.language))
+            if let until = v.until {
+                rows.append(row("a-past-job-until-copies-the-headline-\(v.language)",
+                                "a word of ending, with a single year, says the job has ended: the title of the headline goes",
+                                "\(v.headline) \(until)",
+                                CVData(personalInfo: noHeadline, experience: [job(v.title, "Beta", to: "2018")]),
+                                .keeping([Drop("experience[0].title", copied)]), language: v.language))
+            }
+            rows.append(row("a-past-job-states-its-role-\(v.language)",
+                            "the clause that names the job gives its role: the title stays, though the job has ended",
+                            "\(v.headline) \(v.current) \(v.formerWithRole)",
+                            CVData(personalInfo: headline, experience: [job(v.title, "Acme", from: "2018", current: true),
+                                                                      job(v.title, "Beta", from: "2014", to: "2018")]),
+                            .unchanged, language: v.language))
+            rows.append(row("a-job-with-no-end-keeps-the-headline-\(v.language)",
+                            "the description gives a start and no end: the job has not ended, so the title of the headline stays",
+                            "\(v.headline) \(v.unended)",
+                            CVData(personalInfo: headline, experience: [job(v.title, "Beta", from: "2018")]),
+                            .unchanged, language: v.language))
+            rows.append(row("the-headline-is-the-degree-of-a-study-\(v.language)",
+                            "a degree persists: the title of the headline stays as the degree of a study that ended",
+                            "\(v.headline) \(v.study)",
+                            CVData(personalInfo: headline, education: [study(v.title, at: v.school, from: "2014", to: "2018")]),
+                            .unchanged, language: v.language))
+        }
         return rows
     }
 

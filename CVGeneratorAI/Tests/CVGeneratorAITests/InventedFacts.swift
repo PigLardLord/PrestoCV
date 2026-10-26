@@ -491,7 +491,7 @@ enum InventedFacts {
 
         case .jobTitle, .jobLocation:
             guard !words.isEmpty else { return finding(.review, "no word") }
-            return entryBound(words, entry: source.entry(of: leaf), source: source, finding)
+            return entryBound(words, entry: source.entry(of: leaf), source: source, isJobTitle: field == .jobTitle, finding)
 
         case .degree:
             // The sentence of a school holds the degree, and as much else: the counter cannot tell which phrase is the degree.
@@ -587,9 +587,10 @@ enum InventedFacts {
     // MARK: - Titles and places
 
     /// A job title or a place of a job: the employer's own sentence says it (a quote); every other source is a doubt or
-    /// another entry's.
+    /// another entry's. The one exception is the title of a job that has ended (`isOver`), said only in a sentence that names no
+    /// employer or school, such as the headline: the person said it of what they are now, so it is invented for that job.
     private static func entryBound(
-        _ words: [String], entry: Entry?, source: Source, _ finding: (Class, String, String?) -> Finding
+        _ words: [String], entry: Entry?, source: Source, isJobTitle: Bool = false, _ finding: (Class, String, String?) -> Finding
     ) -> Finding {
         let holders = source.holders(of: words)
         if holders.isEmpty { return notOneSentence(words, source: source, finding) }
@@ -607,9 +608,23 @@ enum InventedFacts {
             return finding(.review, "taken from the name of the employer or the school", entry.label)
         }
         if holders.contains(where: { !source.owned.contains($0) }) {
+            if isJobTitle, isOver(entry, in: source) {
+                return finding(.invented, "said in a sentence that names no employer or school, for a job that has ended", entry.label)
+            }
             return finding(.review, "said in a sentence that names no employer or school", entry.label)
         }
         return finding(.invented, "a phrase of the sentence of another entry", entry.label)
+    }
+
+    /// Whether the sentences of the entry itself say that it is over: they give two different years and no word of the present.
+    /// The counter reads words only, with a rule of its own (the grounding reads the clauses, and also the words of ending), so a
+    /// title it flags is one that the grounding has to drop for its own reasons.
+    private static func isOver(_ entry: Entry, in source: Source) -> Bool {
+        let own = source.ownSentences(of: entry)
+        guard Set(own.flatMap { yearTokens(in: source.sentences[$0]) }).count >= 2 else { return false }
+        return !own.contains { sentence in
+            presentWords.contains { holds(source.sentences[sentence], run: $0.split(separator: " ").map(String.init)) }
+        }
     }
 
     // MARK: - Dates

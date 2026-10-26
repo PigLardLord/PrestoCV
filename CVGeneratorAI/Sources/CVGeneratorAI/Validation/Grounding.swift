@@ -353,7 +353,9 @@ struct Grounding {
     /// and names the entry, or in one that names no other entry and holds nothing but explained words, the person's own quotes among
     /// them. A title that the description gives only in the clause of another entry ("head nurse at Beta"), or in one about someone
     /// else ("my sister is a nurse at Acme"), is not this entry's, nor is a word of the name of an employer or a school
-    /// ("contabile" in "Studio Contabile Merlini"): it stands as the title only outside those names.
+    /// ("contabile" in "Studio Contabile Merlini"): it stands as the title only outside those names. A clause of no entry says
+    /// what the person is now ("I am a nurse in Leeds"): for a job that the description says is over it states no title, so the
+    /// title stands there only if the clause of the job gives it. A degree persists.
     func supportsTitle(_ title: [String], of index: Int, person: [[String]]) -> Bool {
         let subject = subjects[index]
 
@@ -368,7 +370,8 @@ struct Grounding {
             if subject.isFoundByItsTitle { return true }
 
             let covered = clause.positions(inside: subject.quotes + person)
-            return clause.words.indices.allSatisfy { covered.contains($0) || explainer.explains(clause.words[$0]) }
+            guard clause.words.indices.allSatisfy({ covered.contains($0) || explainer.explains(clause.words[$0]) }) else { return false }
+            return subject.isEducation || !hasEnded(index)
         }
     }
 
@@ -476,12 +479,29 @@ struct Grounding {
     private func statesCurrent(_ index: Int, joining: [Place]) -> Bool {
         let counted = backing.reduce(into: Set(joining)) { $0.formUnion($1) }
 
-        return backing[index].contains { place in
+        return periods(of: index, joining: joining).contains { period in
+            let years = Set(clauses.places.filter { $0.sentence == period.place.sentence && counted.contains($0) }
+                .flatMap { stated($0).words }.filter { $0.isNumber && $0.folded.count == 4 }.map(\.folded))
+            return PresentStatement.holds(in: period.text, sentenceYears: years.count, language: explainer.language)
+        }
+    }
+
+    /// Whether the description says that the job at `index` is over: no clause of it says the job goes on, and some clause that
+    /// backs it, with the clauses of nothing but time next to it, writes two years or an end and no word for the present
+    /// (`PresentStatement.ended`). A job with no clause that backs it, one without dates in the past tense, and one that ends
+    /// "até 2018" (the word is also "even") are not found over, and keep what they keep.
+    private func hasEnded(_ index: Int) -> Bool {
+        let joining = joiningPlaces(of: index)
+        return !statesCurrent(index, joining: joining) && periods(of: index, joining: joining).contains { PresentStatement.ended(in: $0.text) }
+    }
+
+    /// The time each clause that backs the entry gives: the clause as it states the entry, with the clauses of nothing but time that
+    /// join the entry next to it.
+    private func periods(of index: Int, joining: [Place]) -> [(place: Place, text: String)] {
+        backing[index].sorted(by: Self.isBefore).map { place in
             let neighbours = clauses.neighbours(of: place).filter { joining.contains($0) && clauses.clause(at: $0).words.allSatisfy(explainer.isTimePhrase) }
             let texts = (neighbours + [place]).sorted(by: Self.isBefore).map { stated($0).text }
-            let years = Set(clauses.places.filter { $0.sentence == place.sentence && counted.contains($0) }
-                .flatMap { stated($0).words }.filter { $0.isNumber && $0.folded.count == 4 }.map(\.folded))
-            return PresentStatement.holds(in: texts.joined(separator: " "), sentenceYears: years.count, language: explainer.language)
+            return (place, texts.joined(separator: " "))
         }
     }
 

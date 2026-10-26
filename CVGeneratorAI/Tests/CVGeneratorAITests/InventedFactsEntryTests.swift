@@ -258,6 +258,65 @@ struct InventedFactsEntryTests {
         #expect(finding.context?.contains(draft.experience[0].company) == true, "\(finding)")
     }
 
+    /// The written inputs whose sentence for the job that ended does not hold the headline's word. The description of "it-plain"
+    /// calls that job "aiuto cuoco", so its sentence holds "cuoco", the headline: that title is a phrase of the job's own sentence
+    /// (`headlineWordInTheTitleOfAPastJob`).
+    static let pastJobWithoutTheHeadline = DraftingInputs.written.filter { $0.id != "it-plain" }
+
+    @Test("The title of the headline on a job that has ended is invented; on a job that goes on, a doubt",
+          arguments: pastJobWithoutTheHeadline)
+    func headlineTitleOnAPastJob(_ input: DraftingInput) throws {
+        let title = try #require(input.facts.first { $0.kind == .title }).forms[0]
+        var draft = Draft(faithfulTo: input)
+        draft.experience[1] = Experience(title: title, company: draft.experience[1].company)
+
+        let report = InventedFacts.count(draft.cv, for: input)
+
+        let finding = try #require(report.finding(at: "experience[1].title"))
+        #expect(finding.kind == .invented, "\(input.id): \(finding)")
+        #expect(finding.reason.contains("has ended"), "\(input.id): \(finding)")
+        #expect(finding.context?.contains(draft.experience[1].company) == true, "\(input.id): \(finding)")
+        #expect(report.finding(at: "experience[0].title")?.kind != .invented, "\(input.id): the job that goes on is no mistake")
+    }
+
+    @Test("The headline's word inside the title that the sentence of a job that ended gives is a quote, not a copy")
+    func headlineWordInTheTitleOfAPastJob() throws {
+        let input = try InventedFactsTests.input("it-plain")
+        var draft = Draft(faithfulTo: input)
+        draft.experience[1] = Experience(title: "cuoco", company: draft.experience[1].company)
+
+        let report = InventedFacts.count(draft.cv, for: input)
+
+        #expect(report.finding(at: "experience[1].title")?.kind == .quote, "\(report.findings)")
+    }
+
+    @Test("The title of the headline is a doubt when the sentences of the job give one year, or a year and the present")
+    func headlineTitleOnAJobThatGoesOn() {
+        func finding(_ description: String, title: String = "nurse", at company: String) -> InventedFacts.Finding? {
+            InventedFacts.count(
+                CVData(experience: [Experience(title: title, company: company)]), description: description
+            ).finding(at: "experience[0].title")
+        }
+        let headline = "I am Emma Clarke, a nurse in Leeds."
+
+        #expect(finding("\(headline) Since 2018 I have worked at Beta.", at: "Beta")?.kind == .review)
+        #expect(finding("\(headline) From 2014 to 2018 and again from 2020 to today I work at Beta.", at: "Beta")?.kind == .review,
+                "two years and a word for the present: the job goes on")
+        #expect(finding("\(headline) From 2014 to 2018 I worked at Beta.", at: "Beta")?.kind == .invented)
+        #expect(finding("\(headline) From 2014 to 2018 I worked as a nurse at Beta.", at: "Beta")?.kind == .quote,
+                "a job that has ended keeps the title its own sentence states")
+    }
+
+    @Test("The degree of a study that ended is no title of a job: the headline title as a degree stays a doubt")
+    func headlineTitleAsADegree() {
+        let description = "I am Emma Clarke, a nurse in Leeds. From 2014 to 2018 I studied at Beta College."
+        let report = InventedFacts.count(
+            CVData(education: [Education(degree: "nurse", institution: "Beta College")]), description: description
+        )
+
+        #expect(report.invented.isEmpty, "\(report.invented)")
+    }
+
     @Test("A place of the sentence of another job is invented; one taken from the employer's name is a doubt")
     func placeOfAJob() {
         let description = "Since 2019 I have worked at Northfield Logistics in Leeds. From 2014 to 2019 I was a driver at Kestrel Foods in York."

@@ -3,7 +3,8 @@ import Foundation
 /// Whether a clause of the description says that a thing goes on now.
 ///
 /// A word for the present (now, currently, today, attualmente, derzeit...) says it, and so does "since" when the whole sentence
-/// holds exactly one year. Two years in the clause, a negation or a hedge, or an end ("until", "formerly") deny it.
+/// holds exactly one year. Two years in the clause, a negation or a hedge, or an end ("until", "formerly") deny it. A clause with
+/// two years or an end, and no word for the present, says that the thing is over (`ended`).
 enum PresentStatement {
     /// - Parameters:
     ///   - text: The clause, with the clauses of nothing but time next to it, as `DescriptionText.normalized` writes it.
@@ -18,6 +19,16 @@ enum PresentStatement {
             return true
         }
         return DescriptionText.containsAny(StatementWords.since, in: text) && sentenceYears == 1
+    }
+
+    /// Whether a clause says that a thing is over: it writes two different years ("from 2014 to 2018") or an end ("until",
+    /// "formerly"), and no word for the present. A hedge does not make the thing go on here: what asks this keeps less when it is
+    /// true, and losing a fact beats inventing one.
+    ///
+    /// - Parameter text: The clause, with the clauses of nothing but time next to it, as `DescriptionText.normalized` writes it.
+    static func ended(in text: String) -> Bool {
+        guard !DescriptionText.containsAny(StatementWords.presents, in: text) else { return false }
+        return distinctYears(in: text) >= 2 || DescriptionText.containsAny(StatementWords.ends, in: text)
     }
 
     private static func distinctYears(in text: String) -> Int {
