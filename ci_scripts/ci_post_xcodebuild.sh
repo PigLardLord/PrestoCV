@@ -49,6 +49,9 @@ case "$ACTION" in
     step "$ROOT/Tools/ArchitectureCheck/selftest.sh"
     # The archive check itself runs on the archive, after the merge; its self-test runs here, on every pull request.
     step "$ROOT/Tools/Release/check-archive-selftest.sh"
+    # The screenshot tool erases simulators: its guards (reserved name, one run at a time, put back on every way out) are
+    # tested here on fake tools.
+    step "$ROOT/Tools/Release/store-screenshots-selftest.sh"
     # PrestoCVApp has no tests until step 5 (#88); building it checks its targets and cross-package dependencies.
     step swift build --package-path "$ROOT/PrestoCVApp"
     # The exporter's demos, apart from the library (R14); they use the legacy exporter, Apple hosts only.

@@ -92,6 +92,9 @@ final class StoreScreenshotsUITests: XCTestCase {
 
     /// 3. A CV with only the facts of that description: what it does not mention is blank
     ///
+    /// On both devices the fields of the first section hold the facts of the description (name, title, location),
+    /// are blank where it says nothing (e-mail, phone, portfolio, and the summary with its hint), and are all in view.
+    ///
     /// On iPhone the section bar floats over the lower part of the form, and the form is taller than the room between
     /// the bars. The form goes up until the heading of the first section, with the facts, sits just under the
     /// navigation bar (the one with the name of the CV and "Saved on this device"). Every fact and every blank field
@@ -108,16 +111,21 @@ final class StoreScreenshotsUITests: XCTestCase {
         XCTAssertTrue(location.waitForExistence(timeout: 10), "The editor should open on the CV")
         waitUntilStill(location)
         let form = app.collectionViews.firstMatch
+        let heading = form.staticTexts.matching(labeled(text("section.personal_info"))).firstMatch
+        XCTAssertTrue(heading.exists, "The editor should show the section with the facts")
+        // On iPhone the section bar is at the bottom of the screen, over the form; on iPad it is not
         let sectionBar = app.tabBars.firstMatch
-        if sectionBar.exists && sectionBar.frame.minY > app.frame.height / 2 {
-            let heading = form.staticTexts.matching(labeled(text("section.personal_info"))).firstMatch
-            XCTAssertTrue(heading.exists, "The editor should show the section with the facts")
+        let bottomBar = sectionBar.exists && sectionBar.frame.minY > app.frame.height / 2 ? sectionBar : nil
+        if let bottomBar {
             // A point behind the edge of the bar: the heading has room above its text, and the hint of the summary
             // stays a few points over the section bar
             scroll(app, until: heading, isBelowTheNavigationBarBy: -1)
-            assertNoText(of: form, under: sectionBar)
+            assertNoText(of: form, under: bottomBar)
         }
         assertNoTextCut(of: form, byTheEdgeOf: app.navigationBars.firstMatch)
+        let inView = CGRect(x: app.frame.minX, y: app.navigationBars.firstMatch.frame.maxY, width: app.frame.width,
+                            height: (bottomBar?.frame.minY ?? app.frame.maxY) - app.navigationBars.firstMatch.frame.maxY)
+        assertTheFacts(of: form, areInView: inView)
         attachScreenshot(3, showing: location)
     }
 
@@ -249,6 +257,33 @@ final class StoreScreenshotsUITests: XCTestCase {
         XCTAssertTrue(covered.isEmpty, "The section bar should cover no text, and it covers \(covered)")
     }
 
+    /// Fails unless the first section of the editor holds the facts of the description, is blank where the description
+    /// says nothing, and shows all of it inside `area`. An empty field shows its hint as its value, and the empty
+    /// summary shows its hint as a text of its own.
+    private func assertTheFacts(of form: XCUIElement, areInView area: CGRect) {
+        let facts = [("field.full_name", fixture.name), ("field.professional_title", fixture.draft.title),
+                     ("field.location", fixture.draft.location)]
+        for (key, expected) in facts {
+            let field = form.textFields.matching(labeled(text(key))).firstMatch
+            XCTAssertTrue(field.exists, "The editor should show \(key)")
+            XCTAssertTrue((field.value as? String ?? "").isSameText(as: expected),
+                          "\(key) should hold \"\(expected)\", and it holds \"\(field.value as? String ?? "nothing")\"")
+            XCTAssertTrue(area.contains(field.frame), "\(key) should be in view: it is at \(field.frame), the room is \(area)")
+        }
+        for key in ["field.email", "field.phone", "field.portfolio_url"] {
+            let field = form.textFields.matching(labeled(text(key))).firstMatch
+            XCTAssertTrue(field.exists, "The editor should show \(key)")
+            XCTAssertEqual(field.value as? String, field.placeholderValue,
+                           "\(key) should be blank, and it holds \"\(field.value as? String ?? "nothing")\"")
+            XCTAssertFalse(field.placeholderValue?.isEmpty ?? true, "\(key) should have a hint to show while it is blank")
+            XCTAssertTrue(area.contains(field.frame), "\(key) should be in view: it is at \(field.frame), the room is \(area)")
+        }
+        let summaryHint = form.staticTexts.matching(labeled(text("field.professional_summary_placeholder"))).firstMatch
+        XCTAssertTrue(summaryHint.exists, "The summary should be blank, with its hint")
+        XCTAssertTrue(area.contains(summaryHint.frame),
+                      "The hint of the summary should be in view: it is at \(summaryHint.frame), the room is \(area)")
+    }
+
     private func closeTheKeyboard(in app: XCUIApplication) {
         guard app.keyboards.firstMatch.exists else { return }
         app.toolbars.buttons.matching(labeled(text("common.done"))).firstMatch.tap()
@@ -292,5 +327,10 @@ private extension String {
     /// Whether `part` is in the text, in either of its Unicode forms (see `labeled(_:containing:)`).
     func mentions(_ part: String) -> Bool {
         precomposedStringWithCanonicalMapping.contains(part.precomposedStringWithCanonicalMapping)
+    }
+
+    /// Whether the two texts are the same, whichever of its Unicode forms each is in.
+    func isSameText(as other: String) -> Bool {
+        precomposedStringWithCanonicalMapping == other.precomposedStringWithCanonicalMapping
     }
 }

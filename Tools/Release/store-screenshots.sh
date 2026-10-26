@@ -11,13 +11,15 @@
 #   ipad        iPad 13-inch, on an iPad Pro 13-inch (M5): 2064 x 2752
 #
 # For each device it uses the simulator "<prefix> <device>" (default prefix "PrestoCV store"), made on the first run
-# with the newest iOS runtime or the one --ios names. It builds the StoreScreenshots test plan, which holds only
-# StoreScreenshotsUITests, once. Then, for each language, it erases the simulator, so that no choice of the last language
-# is left, and boots it in that language and region, so that the system's own screens (the share sheet) and the clock
-# speak it too: the status bar at 9:41 (09:41 where the region writes it so), full battery and full signal, the light
-# appearance, and a keyboard without autocorrection, spell check or predictions, which would change or underline the
-# description the test types. It runs the language's test, handing it the app's texts in that language from the string
-# catalog (the test does not read the source tree), and exports the screenshots the test attached.
+# with the newest iOS runtime or the one --ios names. The tool erases the simulators it uses, so the prefix must start
+# with "PrestoCV store": that name is reserved to it, and no other simulator may carry it. It builds the
+# StoreScreenshots test plan, which holds only StoreScreenshotsUITests, once. Then, for each language, it erases the
+# simulator, so that no choice of the last language is left, and boots it in that language and region, so that the
+# system's own screens (the share sheet) and the clock speak it too: the status bar at 9:41 (09:41 where the region
+# writes it so), full battery and full signal, the light appearance, and a keyboard without autocorrection, spell check
+# or predictions, which would change or underline the description the test types. It runs the language's test, handing
+# it the app's texts in that language from the string catalog (the test does not read the source tree), and exports the
+# screenshots the test attached.
 #
 # Output in <dir>:
 #   captures/<device>/<language>/NN.png   the screenshots as the simulator took them
@@ -25,6 +27,10 @@
 #   contact-sheet-<device>.png            every locale of a device at a glance
 # --compose-only skips the capture and composes the captures already in <dir>. --listing takes the captions from another
 # copy of docs/release/store-listing.md, such as a change to them that is still under review.
+#
+# One run at a time: the runs share the simulators and the work folder, so a second one exits with 75 while the first
+# lives. Whatever way a run ends (the end, a failure, Ctrl-C or a signal), it clears the status bar of the simulator it
+# was using, shuts it down and releases the lock. Tools/Release/store-screenshots-selftest.sh tests this on fake tools.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -39,12 +45,50 @@ while [ $# -gt 0 ]; do
         --simulator-prefix) PREFIX="$2"; shift 2 ;;
         --compose-only) COMPOSE_ONLY=1; shift ;;
         --listing) LISTING="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"; shift 2 ;;
-        *) sed -n '2,27p' "$0" >&2; exit 2 ;;
+        *) sed -n '2,33p' "$0" >&2; exit 2 ;;
     esac
 done
-[ -n "$OUTPUT" ] || { sed -n '2,27p' "$0" >&2; exit 2; }
+[ -n "$OUTPUT" ] || { sed -n '2,33p' "$0" >&2; exit 2; }
+# The simulators are erased by name: only a name reserved to this tool may be erased
+RESERVED="PrestoCV store"
+case "$PREFIX" in
+    "$RESERVED"|"$RESERVED "*) ;;
+    *) echo "store-screenshots: --simulator-prefix must start with \"$RESERVED\": the tool erases the simulators it uses, so that name is reserved to it" >&2; exit 2 ;;
+esac
 mkdir -p "$OUTPUT"; OUTPUT="$(cd "$OUTPUT" && pwd)"
 WORK="${TMPDIR:-/tmp}/prestocv-store-screenshots"; mkdir -p "$WORK"
+
+# One run at a time. The lock is a folder, which only one process can make, holding the pid of its run. The lock of a run
+# that ended without a chance to clean up (a kill) is taken over; the lock of a run that is alive is respected.
+LOCK="$WORK/lock"
+holder=""
+if ! mkdir "$LOCK" 2>/dev/null; then
+    holder="$(cat "$LOCK/pid" 2>/dev/null || true)"
+    if [ -z "$holder" ] || kill -0 "$holder" 2>/dev/null; then
+        echo "store-screenshots: another run (${holder:-pid not written yet}) is using the simulators and $WORK; wait for it, or remove $LOCK if that run has ended" >&2
+        exit 75
+    fi
+    echo "store-screenshots: taking over the lock of the run $holder, which has ended" >&2
+    rm -rf "$LOCK"
+    mkdir "$LOCK" 2>/dev/null || { echo "store-screenshots: another run took the lock first" >&2; exit 75; }
+fi
+echo $$ > "$LOCK/pid"
+
+# The simulator the run is using, put back on every way out: the status bar cleared, shut down
+SIMULATOR=""
+finish() {
+    local status=$?
+    trap - EXIT
+    if [ -n "$SIMULATOR" ]; then
+        xcrun simctl status_bar "$SIMULATOR" clear >/dev/null 2>&1 || true
+        xcrun simctl shutdown "$SIMULATOR" >/dev/null 2>&1 || true
+    fi
+    rm -rf "$LOCK"
+    exit "$status"
+}
+trap finish EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 device_type() {
     case "$1" in
@@ -160,6 +204,7 @@ capture() {
     local build=(-project "$ROOT/PrestoCV.xcodeproj" -scheme PrestoCV -testPlan StoreScreenshots
         -derivedDataPath "$WORK/DerivedData" -skipMacroValidation -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO)
     udid=$(simulator "$device")
+    SIMULATOR="$udid"
     echo "== $device: building for $(device_type "$device"); log in $WORK/$device-build.log"
     xcodebuild build-for-testing "${build[@]}" -destination "id=$udid" </dev/null >"$WORK/$device-build.log" 2>&1 \
         || { grep -E "error:" "$WORK/$device-build.log" | head -20; return 1; }
@@ -177,6 +222,7 @@ capture() {
     done
     xcrun simctl status_bar "$udid" clear || true
     xcrun simctl shutdown "$udid" || true
+    SIMULATOR=""
     return "$status"
 }
 
