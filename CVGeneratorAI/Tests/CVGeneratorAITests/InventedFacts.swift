@@ -645,7 +645,7 @@ enum InventedFacts {
         let ownYears = Set(own.flatMap { yearTokens(in: source.sentences[$0]) })
 
         if presentWords.contains(words.joined(separator: " ")) {
-            if holds(source.words, run: words) { return (.quote, "a phrase of the description") }
+            if let said = presentSaid(words, by: entry, own: own, against: source) { return said }
             if leaf.steps.first?.name == "experience", role == "endDate", ownYears.count == 1 {
                 return (.derived, "the present, for a job whose sentence gives one year")
             }
@@ -732,6 +732,29 @@ enum InventedFacts {
         if backing.contains(where: { holds(source.sentences[$0], run: words) }) { return (.quote, "a phrase of the sentence of the entry") }
         if iso != nil || words.allSatisfy(isYear) { return (.derived, "reduced from a year of the sentence of the entry") }
         return (.review, "a date in another shape")
+    }
+
+    /// What the description says of the word of the present in a date, or nil when it does not say it at all. The present is the
+    /// entry's own only when the sentence that names its employer or school says it: said of another entry it is provably wrong,
+    /// said in a sentence that several entries share, or that names none, it is a doubt. A date no entry owns (a
+    /// certification) takes the phrase from anywhere in the description.
+    private static func presentSaid(
+        _ words: [String], by entry: Entry?, own: [Int], against source: Source
+    ) -> (Class, String)? {
+        guard let entry else {
+            return holds(source.words, run: words) ? (.quote, "a phrase of the description") : nil
+        }
+        let holders = source.holders(of: words)
+        if holders.contains(where: { own.contains($0) }) { return (.quote, "a phrase of the sentence of the entry") }
+        if holders.isEmpty { return nil }
+        if entry.owners.isEmpty { return (.review, "no sentence of the description names this employer or school") }
+        if holders.contains(where: { entry.owners.contains($0) }) {
+            return (.review, "the present is said only in a sentence that names several entries")
+        }
+        if holders.contains(where: { !source.owned.contains($0) }) {
+            return (.review, "the present is said in a sentence that names no employer or school")
+        }
+        return (.invented, "the present is said only of another entry")
     }
 
     /// Whether the sentences give the month, and the day, of a year: a month name (in full, in the six languages) within

@@ -166,6 +166,15 @@ struct InventedFactsEntryTests {
         #expect(report.finding(at: "education[0].endDate")?.kind == .review)
     }
 
+    @Test("The present is a quote for the entry whose sentence says it, and not for another entry", arguments: PresentCase.all)
+    func presentOfTheEntry(_ item: PresentCase) {
+        let report = InventedFacts.count(item.cv, description: item.description)
+
+        let finding = report.finding(at: item.path)
+        #expect(finding?.kind == item.kind, "\(item): \(report.findings)")
+        #expect(finding?.reason.contains(item.reason) == true, "\(item): \(finding?.reason ?? "no finding")")
+    }
+
     @Test("The later year of a job as its start, or the earlier as its end, is a doubt", arguments: EntryYears.all)
     func yearInTheWrongRole(_ years: EntryYears) throws {
         var draft = try years.draft()
@@ -345,5 +354,48 @@ struct EntryYears: Sendable, CustomTestStringConvertible {
         EntryYears(input: "es-plain", since: "2021", from: "2017", until: "2021", graduated: "2017", missing: "2016", present: "Actualidad"),
         EntryYears(input: "fr-plain", since: "2019", from: "2015", until: "2019", graduated: "2015", missing: "2014", present: "Aujourd'hui"),
         EntryYears(input: "pt-plain", since: "2018", from: "2014", until: "2018", graduated: "2014", missing: "2013", present: "Atual"),
+    ]
+}
+
+/// The word of the present, put in a field of an entry, in a description that says it of one entry, of two, or of none.
+struct PresentCase: Sendable, CustomTestStringConvertible {
+    let label: String
+    let description: String
+    /// The field that holds the present: `experience[0].endDate`, `experience[1].endDate` or `education[0].endDate`.
+    let path: String
+    let present: String
+    let kind: InventedFacts.Class
+    let reason: String
+
+    var testDescription: String { label }
+
+    var cv: CVData {
+        func end(_ target: String) -> String? { path == target ? present : nil }
+        return CVData(
+            experience: [
+                Experience(company: "Alpha Corp", endDate: end("experience[0].endDate")),
+                Experience(company: "Beta Ltd", endDate: end("experience[1].endDate")),
+            ],
+            education: [Education(institution: "Gamma University", endDate: end("education[0].endDate"))]
+        )
+    }
+
+    private static let split = "I worked at Alpha Corp until 2020. Since 2021 I work at Beta Ltd, up to the present. I studied at Gamma University and graduated in 2015."
+    private static let shared = "I worked at Alpha Corp until 2020 and at Beta Ltd up to the present. I studied at Gamma University and graduated in 2015."
+    private static let nobody = "I worked at Alpha Corp until 2020. I worked at Beta Ltd from 2021. I am present at every conference. I studied at Gamma University and graduated in 2015."
+    private static let italian = "Ho lavorato in Alpha Corp fino al 2020. Dal 2021 lavoro in Beta Ltd, ad oggi. Mi sono laureato alla Gamma University nel 2015."
+    private static let german = "Ich arbeitete bei Alpha Corp bis 2020. Seit 2021 arbeite ich bei Beta Ltd, bis heute. Ich studierte an der Gamma University bis 2015."
+
+    static let all: [PresentCase] = [
+        PresentCase(label: "the job that ended takes the present of the other job", description: split, path: "experience[0].endDate", present: "Present", kind: .invented, reason: "another entry"),
+        PresentCase(label: "the job whose sentence says it", description: split, path: "experience[1].endDate", present: "Present", kind: .quote, reason: "sentence of the entry"),
+        PresentCase(label: "the school takes the present of a job", description: split, path: "education[0].endDate", present: "Present", kind: .invented, reason: "another entry"),
+        PresentCase(label: "a present said of two jobs in one sentence, the first job", description: shared, path: "experience[0].endDate", present: "Present", kind: .review, reason: "several entries"),
+        PresentCase(label: "a present said of two jobs in one sentence, the second job", description: shared, path: "experience[1].endDate", present: "Present", kind: .review, reason: "several entries"),
+        PresentCase(label: "a present in a sentence of no employer or school", description: nobody, path: "experience[0].endDate", present: "Present", kind: .review, reason: "names no employer or school"),
+        PresentCase(label: "Italian: the job that ended", description: italian, path: "experience[0].endDate", present: "Ad oggi", kind: .invented, reason: "another entry"),
+        PresentCase(label: "Italian: the job whose sentence says it", description: italian, path: "experience[1].endDate", present: "Ad oggi", kind: .quote, reason: "sentence of the entry"),
+        PresentCase(label: "German: the job that ended", description: german, path: "experience[0].endDate", present: "Bis heute", kind: .invented, reason: "another entry"),
+        PresentCase(label: "German: the job whose sentence says it", description: german, path: "experience[1].endDate", present: "Bis heute", kind: .quote, reason: "sentence of the entry"),
     ]
 }
