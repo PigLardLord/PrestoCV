@@ -29,7 +29,11 @@
 # language asked for (it prints when they were taken). --listing takes the captions from another copy of
 # docs/release/store-listing.md, such as a change to them that is still under review.
 #
-# The arguments are checked before anything is taken or erased. A language whose test fails (or attaches fewer than six
+# The arguments are checked before anything is taken or erased. A capture run then starts by removing the captures of every
+# device and language it was asked for, before the first step that can fail (finding the simulators, the build, the
+# preparation of a simulator), so that a run that fails at any step leaves none of them for a later --compose-only to
+# accept. The captures of a language are made aside, in <language>.partial, and put in place by a rename once all six
+# are copied: a copy that fails leaves no file of the language. A language whose test fails (or attaches fewer than six
 # screenshots) keeps none of its captures, the other languages of the device are still run, and then the run ends: the
 # second device and the composer are skipped, so that a set with a hole is never composed.
 #
@@ -271,12 +275,15 @@ PY
 }
 
 # Copies the screenshots of a result bundle, which the test names <language>-NN, to the captures of the language, if it
-# attached all of them. A language with fewer keeps none of them: a set with a hole is not one to compose.
+# attached all of them. A language with fewer keeps none of them: a set with a hole is not one to compose. The copy is made
+# in <language>.partial and renamed once it is whole, so that a copy that fails (or is cut short) leaves no file that a
+# --compose-only would take for a capture. (It is called in a list with ||, where set -e does not apply: every step is checked.)
 export_captures() {
     local bundle="$1" device="$2" language="$3" attachments="$WORK/attachments"
-    rm -rf "$attachments"
-    xcrun xcresulttool export attachments --path "$bundle" --output-path "$attachments" >/dev/null
-    python3 - "$attachments" "$OUTPUT/captures/$device/$language" "$language" "$SCREENSHOTS" <<'PY'
+    local target="$OUTPUT/captures/$device/$language"
+    rm -rf "$attachments" "$target.partial"
+    xcrun xcresulttool export attachments --path "$bundle" --output-path "$attachments" >/dev/null || return 1
+    python3 - "$attachments" "$target.partial" "$language" "$SCREENSHOTS" <<'PY' || { rm -rf "$target.partial"; return 1; }
 import json, re, shutil, sys
 from pathlib import Path
 source, target, language, expected = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3], int(sys.argv[4])
@@ -294,6 +301,8 @@ target.mkdir(parents=True, exist_ok=True)
 for number, file in found.items():
     shutil.copyfile(file, target / f"{number:02d}.png")
 PY
+    rm -rf "$target"
+    mv "$target.partial" "$target" || { rm -rf "$target.partial"; return 1; }
 }
 
 capture() {
@@ -308,8 +317,9 @@ capture() {
     for language in ${LANGUAGES//,/ }; do
         prepare "$udid" "$language"
         bundle="$WORK/$device-$language.xcresult"; log="$WORK/$device-$language.log"
-        # Nothing of an earlier run is left to be composed if this one fails
-        rm -rf "$bundle" "$OUTPUT/captures/$device/$language"
+        # The result bundle of an earlier run: xcodebuild does not write over one. (The captures of the language were
+        # removed when the run began.)
+        rm -rf "$bundle"
         strings=$(app_strings "$language")
         if TEST_RUNNER_STORE_SCREENSHOT_STRINGS="$strings" run_child "$log" \
             xcodebuild test-without-building "${build[@]}" -destination "id=$udid" -resultBundlePath "$bundle" \
@@ -354,7 +364,20 @@ print(f"== composing the captures taken {stamp(min(times))}" + (f" to {stamp(max
 PY
 }
 
+# The captures a capture run will replace, removed before the first step that can fail: a run that fails on its way (a Mac
+# that cannot make a simulator, a build that fails, a simulator that cannot be prepared) must not leave the captures of an
+# earlier run for a later --compose-only to take for its own. Only the devices and languages asked for are touched.
+clear_captures() {
+    local device language
+    for device in ${DEVICES//,/ }; do
+        for language in ${LANGUAGES//,/ }; do
+            rm -rf "$OUTPUT/captures/$device/$language" "$OUTPUT/captures/$device/$language.partial"
+        done
+    done
+}
+
 if [ "$COMPOSE_ONLY" -eq 0 ]; then
+    clear_captures
     # Every simulator is found or made before the first one is erased: a Mac that cannot make the last one finds out now
     for device in ${DEVICES//,/ }; do simulator "$device" >/dev/null || exit $?; done
     for device in ${DEVICES//,/ }; do capture "$device"; done

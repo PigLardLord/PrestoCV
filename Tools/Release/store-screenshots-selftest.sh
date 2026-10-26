@@ -7,8 +7,10 @@
 #     unless the capture of that run is still going,
 #   - put the simulator back (status bar cleared, shut down) and release the lock on every way out: the end, a failure
 #     and a signal, which stops the capture at once,
-#   - leave no capture of an earlier run to be composed: a language whose test failed has none, and --compose-only
-#     composes only a complete set,
+#   - leave no capture of an earlier run to be composed: a capture run starts by removing the captures it will replace,
+#     so a run that fails at any step (the arguments' runtime, the build, the simulator, the test, the export) leaves none
+#     of its languages, and --compose-only composes only a complete set; the captures of a language are put in place
+#     whole, by a rename, so that a copy that fails leaves no file of that language,
 #   - run its tests where Xcode enforces their time allowance: the plan turns test timeouts on.
 #
 #   Tools/Release/store-screenshots-selftest.sh
@@ -52,6 +54,8 @@ case "$1 $2" in
             file="$(printf '%s-%02d.png' "$language" "$number")"; echo "png of $file" > "$out/$file"
             entries="$entries${entries:+,}{\"suggestedHumanReadableName\":\"$(printf '%s-%02d' "$language" "$number")_0_ABC.png\",\"exportedFileName\":\"$file\"}"
         done
+        # FAKE_LOSE_FILE=N: the manifest names the Nth screenshot but its file is not there, so the copy fails half way
+        [ -z "${FAKE_LOSE_FILE:-}" ] || rm -f "$out/$(printf '%s-%02d.png' "$language" "$FAKE_LOSE_FILE")"
         echo "[{\"attachments\":[$entries]}]" > "$out/manifest.json" ;;
 esac
 exit 0
@@ -59,6 +63,7 @@ FAKE
 cat > "$BIN/xcodebuild" <<'FAKE'
 #!/usr/bin/env bash
 case " $* " in
+    *" build-for-testing "*) [ "${FAKE_FAIL_ON:-}" != build ] || { echo "error: the build failed" >&2; exit 1; } ;;
     *" test-without-building "*)
         # The test needs the app's texts in its environment
         [ -n "${TEST_RUNNER_STORE_SCREENSHOT_STRINGS:-}" ] || { echo "no TEST_RUNNER_STORE_SCREENSHOT_STRINGS" >&2; exit 3; }
@@ -123,6 +128,8 @@ says() { grep -qF -- "$1" <<< "$OUT"; }
 # The captures of a language on a device, as the composer reads them
 captures() { ls "$OUT_DIR/captures/$1/$2" 2>/dev/null | tr '\n' ' '; }
 six="01.png 02.png 03.png 04.png 05.png 06.png "
+# No half-made set of captures is left next to the sets: the copy of a language is made aside and renamed
+no_partial() { [ -z "$(find "$OUT_DIR/captures" -name '*.partial' 2>/dev/null)" ]; }
 # put_captures <device> <language> <count>: the captures of an earlier run
 put_captures() {
     local dir="$OUT_DIR/captures/$1/$2" number
@@ -140,6 +147,7 @@ expect "  erases its own simulator" "no erase of OWN-UDID" called "simctl erase 
 expect "  puts it back" "the last calls are not the clearing of the status bar and the shutdown" put_back OWN-UDID
 expect "  leaves no lock" "$LOCK is left" no_lock
 expect "  exports the six screenshots" "the captures are: $(captures iphone en)" [ "$(captures iphone en)" = "$six" ]
+expect "  leaves no half-made set" "a .partial is left" no_partial
 expect "  composes them" "the composer did not run" composed
 
 # 2. The name of the simulators is reserved to the tool: another name is refused before anything is erased
@@ -227,7 +235,16 @@ run FAKE_ATTACHMENTS=5 -- --simulator-prefix "PrestoCV store"
 expect "a test that attached five screenshots" "exit $RC, want a failure" [ "$RC" != 0 ]
 expect "  says how many" "no mention of 5 of the 6" says "5 of the 6"
 expect "  keeps none" "the captures are: $(captures iphone en)" [ -z "$(captures iphone en)" ]
+expect "  leaves no half-made set" "a .partial is left" no_partial
 expect "  does not compose" "the composer ran" not_composed
+# The sixth screenshot is named by the result bundle but cannot be copied: the five before it are not kept
+rm -rf "$OUT_DIR"; put_captures iphone en 6
+run FAKE_LOSE_FILE=6 -- --simulator-prefix "PrestoCV store"
+expect "a screenshot that cannot be copied" "exit $RC, want a failure" [ "$RC" != 0 ]
+expect "  keeps none of the language's captures" "the captures are: $(captures iphone en)" [ -z "$(captures iphone en)" ]
+expect "  leaves no half-made set" "a .partial is left" no_partial
+expect "  does not compose" "the composer ran" not_composed
+expect "  puts the simulator back" "the last calls are not the clearing of the status bar and the shutdown" put_back OWN-UDID
 
 # 10. --compose-only composes a complete set of captures, and only that
 rm -rf "$OUT_DIR"; put_captures iphone en 5
@@ -280,6 +297,31 @@ run -- --simulator-prefix "PrestoCV store"
 expect "a lock that another run is taking over" "exit $RC, want 75" [ "$RC" = 75 ]
 expect "  touches no simulator" "xcrun was called" no_calls
 rm -rf "$LOCK" "$LOCK.takeover"
+
+# 12. A run that fails before its test has run (no runtime for --ios, the build, the preparation of the simulator) must not
+#     leave the captures of an earlier run either: the run removes the captures it will replace before the first step that
+#     can fail, and a --compose-only after it refuses. The captures of a language the run was not asked for are not its own.
+failed_early() {
+    local name="$1"; shift
+    rm -rf "$OUT_DIR"; put_captures iphone en 6; put_captures iphone de 6
+    run "$@"
+    expect "$name" "exit $RC, want a failure" [ "$RC" != 0 ]
+    expect "  leaves no capture of that language" "the captures are: $(captures iphone en)" [ -z "$(captures iphone en)" ]
+    expect "  leaves the captures of another language" "the captures are: $(captures iphone de)" [ "$(captures iphone de)" = "$six" ]
+    expect "  leaves no half-made set" "a .partial is left" no_partial
+    expect "  leaves no lock" "$LOCK is left" no_lock
+    run -- --compose-only
+    expect "  and a --compose-only after it" "exit $RC, want a failure" [ "$RC" != 0 ]
+    expect "    does not compose" "the composer ran" not_composed
+}
+failed_early "a Mac with no runtime of the iOS asked for" -- --ios 26
+failed_early "a build that fails" FAKE_FAIL_ON=build --
+failed_early "a simulator that cannot be prepared" FAKE_FAIL_ON=erase --
+# A run that only composes removes nothing
+rm -rf "$OUT_DIR"; put_captures iphone en 6
+run -- --compose-only
+expect "a --compose-only run" "exit $RC" [ "$RC" = 0 ]
+expect "  keeps the captures" "the captures are: $(captures iphone en)" [ "$(captures iphone en)" = "$six" ]
 
 # The test sets a time allowance for each language, and Xcode enforces it only where the plan turns test timeouts on
 PLAN="$HERE/../../TestPlans/StoreScreenshots.xctestplan"
