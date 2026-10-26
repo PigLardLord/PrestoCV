@@ -47,6 +47,7 @@ actor MockCVExportService: CVExportServiceProtocol {
 
     private var heldCalls: [Call: [CheckedContinuation<Void, Never>]] = [:]
     private var waiters: [(call: Call, count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var cleanupWaiters = CountWaiters()
 
     private(set) var availableTemplatesCalled = false
     private(set) var generatePreviewHTMLCallCount = 0
@@ -160,6 +161,23 @@ actor MockCVExportService: CVExportServiceProtocol {
 
     func cleanupTempFile(at url: URL) async {
         cleanedUpURLs.append(url)
+        cleanupWaiters.reach(cleanedUpURLs.count)
+    }
+
+    /// Returns once `count` files have been removed, or when the task that waits is cancelled
+    func waitUntilCleanedUp(_ count: Int = 1) async {
+        let id = UUID()
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                cleanupWaiters.add(id, waitingFor: count, continuation, reached: cleanedUpURLs.count)
+            }
+        } onCancel: {
+            Task { await self.stopWaitingForCleanup(id) }
+        }
+    }
+
+    private func stopWaitingForCleanup(_ id: UUID) {
+        cleanupWaiters.cancel(id)
     }
 }
 

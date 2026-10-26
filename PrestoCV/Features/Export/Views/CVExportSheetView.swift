@@ -7,8 +7,10 @@ import CVPDFExporter
 struct CVExportSheetView: View {
     @StateObject private var viewModel: CVExportSheetViewModel
     @StateObject private var previewCoordinator = HTMLPreviewCoordinator()
-    /// The PDF in the share sheet, while the share sheet is open
-    @State private var sharingPDF: ExportedPDF?
+    /// The share that holds the PDF for the share sheet, from the tap on the button until the share sheet has closed
+    @State private var sharing: PDFShare?
+    /// VoiceOver's focus on the button that shows the full PDF, which is put back there when the full PDF is closed
+    @AccessibilityFocusState private var fullPDFButtonHasFocus: Bool
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -114,8 +116,20 @@ struct CVExportSheetView: View {
                 }
             }
             .onDisappear {
-                viewModel.stop()
+                viewModel.sheetDisappeared()
             }
+        }
+        // The PDF full screen covers the sheet without closing it: the PDF it shows is the one the button shares
+        .fullScreenCover(item: Binding(
+            get: { viewModel.fullPDF },
+            set: { if $0 == nil { viewModel.closeFullPDF() } }
+        ), onDismiss: {
+            viewModel.fullPDFDidDismiss()
+            fullPDFButtonHasFocus = true
+        }) { pdf in
+            FullPDFView(pdf: pdf) { viewModel.closeFullPDF() }
+                // The cover is up: the sheet going off screen under it is not closing
+                .onAppear { viewModel.fullPDFDidAppear() }
         }
         // Where the sheet does not fill the screen, as on iPad, it is as tall as a page: the preview keeps its room
         // above the language and the button
@@ -132,7 +146,7 @@ struct CVExportSheetView: View {
                     .overlay {
                         // Once the PDF is rendered, its pages replace the first page of the preview
                         if let pdf = viewModel.sharePDF {
-                            PDFPreviewView(url: pdf.url)
+                            pdfPreview(of: pdf)
                         }
                     }
                     .padding(8) // Add padding around WebView for the white border
@@ -170,6 +184,47 @@ struct CVExportSheetView: View {
         }
         .padding(.horizontal, DesignTokens.Spacing.lg)
         .animation(DesignTokens.Animations.fastEaseInOut, value: viewModel.previewHTML)
+    }
+
+    /// The pages of the rendered PDF in the preview, to scroll through. A tap on them shows the PDF full screen, and so
+    /// does the button over their corner, which is how VoiceOver, a keyboard, a pointer, Switch Control and Voice Control
+    /// get there: the pages themselves are for the eye and the finger.
+    private func pdfPreview(of pdf: ExportedPDF) -> some View {
+        PDFPreviewView(url: pdf.url, isForTheEyeOnly: true)
+            .accessibilityHidden(true)
+            .onTapGesture {
+                viewModel.showFullPDF()
+            }
+            .overlay(alignment: .bottomTrailing) {
+                showFullPDFButton
+            }
+    }
+
+    /// Shows the PDF full screen; for VoiceOver it says how many pages the PDF has
+    private var showFullPDFButton: some View {
+        Button {
+            viewModel.showFullPDF()
+        } label: {
+            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                .font(DesignTokens.Typography.footnote.font)
+                .foregroundColor(DesignTokens.Colors.primary)
+                .padding(DesignTokens.Spacing.xs)
+                .background(.regularMaterial, in: Circle())
+                // The room around the sign is part of the button, up to what a finger can hit
+                .frame(
+                    minWidth: DesignTokens.InputSize.minimumTapTarget,
+                    minHeight: DesignTokens.InputSize.minimumTapTarget
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .hoverEffect(.highlight)
+        .accessibilityLabel(viewModel.fullPDFAccessibilityLabel ?? "")
+        .accessibilityFocused($fullPDFButtonHasFocus)
+        // The sign stays small at the largest text sizes, where it would cover the page
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        // It lies on a page, which is on paper in a dark interface too: the sign and its material are light on it
+        .environment(\.colorScheme, .light)
     }
 
     /// Under the preview: how many pages the PDF has, and the language of its headings with a way to change it. Side by
@@ -383,10 +438,10 @@ struct CVExportSheetView: View {
                 isLoading: isPreparing,
                 isDisabled: viewModel.sharePDF == nil
             ) {
-                sharingPDF = viewModel.sharePDF
+                sharing = viewModel.beginShare()
             }
             .accessibilityValue(isPreparing ? "export.loading".localized : "")
-            .shareSheet(for: $sharingPDF) { activityType, completed in
+            .shareSheet(for: $sharing) { activityType, completed in
                 viewModel.shareEnded(activityType: activityType, completed: completed)
             }
 
