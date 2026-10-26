@@ -115,7 +115,7 @@ struct LocalizedSamplesTests {
         let repository = SampleCVRepository(
             storageService: try FileStorageService(baseDirectory: directory),
             categoryService: TemplateCategoryService(),
-            bundleResourceService: BundleResourceService(),
+            bundleResourceService: BundleResourceService(bundle: Bundle(for: AppRouter.self)),
             templateLoader: JSONTemplateLoader(),
             parallelSearchService: ParallelSearchService(),
             languages: languages

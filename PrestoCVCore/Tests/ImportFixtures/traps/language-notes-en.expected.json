@@ -1,0 +1,12 @@
+{
+ "id": "traps/language-notes-en", "language": "en", "form": "trap",
+ "person": {"name": "Daniel Reyes", "title": "Data Analyst", "email": "daniel.reyes@example.com", "phone": null,
+            "location": null, "links": [], "summary": null},
+ "experience": [
+  {"role": "Data Analyst", "employer": "Example Analytics Ltd", "location": null, "start": [2019, 1], "end": "current", "details": 1}
+ ],
+ "education": [{"degree": "BSc Statistics", "school": "University of Example", "start": [2013, null], "end": [2016, null]}],
+ "skills": [],
+ "languages": [{"name": "English", "level": "native"}, {"name": "Spanish", "level": "b2"}, {"name": "German", "level": "a2"}, {"name": "French", "level": null}],
+ "certifications": [], "interests": []
+}

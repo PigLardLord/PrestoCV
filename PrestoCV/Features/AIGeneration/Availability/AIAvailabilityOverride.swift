@@ -22,7 +22,7 @@ enum AIAvailabilityOverride {
 
     /// The override given on this launch, if any. It reads the launch arguments themselves: `UserDefaults` would
     /// need a privacy manifest entry for its required-reason API.
-    static func current(arguments: [String] = ProcessInfo.processInfo.arguments) -> AIAvailability? {
+    static func current(arguments: [String]) -> AIAvailability? {
         guard let flag = arguments.firstIndex(of: "-" + launchArgument), flag + 1 < arguments.endIndex else {
             return nil
         }

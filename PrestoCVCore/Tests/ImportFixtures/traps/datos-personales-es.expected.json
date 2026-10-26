@@ -1,0 +1,13 @@
+{
+ "id": "traps/datos-personales-es", "language": "es", "form": "trap",
+ "person": {"name": "Carmen Ruiz Ortega", "title": null, "email": "carmen.ruiz@example.org", "phone": "600 000 404",
+            "location": "Calle Ejemplo 3, 28001 Madrid", "links": [], "summary": null},
+ "experience": [
+  {"role": "Dependienta", "employer": "Tienda Ejemplo S.L.", "location": "Madrid", "start": [2021, 10], "end": "current", "details": 1},
+  {"role": "Camarera", "employer": "Bar Ejemplo", "location": "Toledo", "start": [2018, 6], "end": [2021, 9], "details": 0}
+ ],
+ "education": [{"degree": "Bachillerato de Ciencias Sociales", "school": "IES Ejemplo", "start": [2011, null], "end": [2013, null]}],
+ "skills": [],
+ "languages": [{"name": "Inglés", "level": null}, {"name": "Francés", "level": "a2"}],
+ "certifications": [], "interests": []
+}

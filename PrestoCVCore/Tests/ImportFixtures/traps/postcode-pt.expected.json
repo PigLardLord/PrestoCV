@@ -1,0 +1,10 @@
+{
+ "id": "traps/postcode-pt", "language": "pt", "form": "trap",
+ "person": {"name": "Ana Souza", "title": "Analista de sistemas", "email": "ana.souza@example.com", "phone": "(11) 91234-5678",
+            "location": "Rua das Flores, 45, São Paulo - SP, 01010-000", "links": [], "summary": null},
+ "experience": [
+  {"role": "Analista de sistemas", "employer": "Exemplo Ltda", "location": null, "start": [2019, 3], "end": "current", "details": 1}
+ ],
+ "education": [{"degree": "Licenciatura em Informática", "school": "Universidade Exemplo", "start": [2013, null], "end": [2017, null]}],
+ "skills": [], "languages": [], "certifications": [], "interests": []
+}

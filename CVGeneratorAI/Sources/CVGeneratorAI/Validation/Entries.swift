@@ -31,8 +31,10 @@ struct Entries {
     let studies: [Study]
     let certifications: [Certificate]
     private let subjects: [Subject]
+    private let clauses: DescriptionClauses
     private let grounding: Grounding
     private let person: [[String]]
+    private let language: Vocabulary.Language?
 
     init(_ cvData: CVData, personalInfo: PersonalInfo, _ source: DescriptionText) {
         let companies = cvData.experience.map { (company: source.named($0.company), title: source.named($0.title)) }
@@ -65,14 +67,12 @@ struct Entries {
 
         person = [personalInfo.name, personalInfo.location, personalInfo.title].compactMap { $0 }.map(Self.words(of:))
         self.subjects = subjects
-        grounding = Grounding(
-            clauses: DescriptionClauses(
-                sentences: source.sentences.map(\.raw), protecting: subjects.flatMap(\.quotes) + person, language: source.explainer.language
-            ),
-            explainer: source.explainer,
-            subjects: subjects,
-            person: person
+        language = source.explainer.language
+        clauses = DescriptionClauses(
+            sentences: source.sentences.map(\.raw), protecting: subjects.flatMap(\.quotes) + person, language: language,
+            lineStarts: Set(source.sentences.indices.filter { source.sentences[$0].startsALine })
         )
+        grounding = Grounding(clauses: clauses, explainer: source.explainer, subjects: subjects, person: person)
     }
 
     /// What a summary may quote.
@@ -83,6 +83,12 @@ struct Entries {
     /// The description as the person speaks it: `source` without the clauses that speak for someone else.
     func spoken(in source: DescriptionText) -> DescriptionText {
         DescriptionText(sentences: grounding.spokenSentences, of: source)
+    }
+
+    /// The description as the person claims skills, interests and languages in it: `source` without the clauses that speak for
+    /// someone else, or that deny, wish or suppose ("I have never used Python", "I would like to learn Spanish").
+    func claimed(in source: DescriptionText) -> DescriptionText {
+        DescriptionText(sentences: grounding.claimedSentences, of: source)
     }
 
     /// The description as it gives the person's contacts: `source` without the clauses that speak for someone else or name another
@@ -99,6 +105,16 @@ struct Entries {
     /// intention, future or condition. Without one the entry is not kept.
     func hasFactualMention(of subject: Int) -> Bool {
         grounding.hasFactualMention(subject)
+    }
+
+    /// Whether the person mentions `name` only as leisure, among the draft's `interests` that the description gives (see
+    /// `LeisureMentions`): "In my free time I like chess" does, "I am proficient in Python" does not, and a clause that claims
+    /// nothing for the person (another person's, or one that denies, wishes or supposes) counts for neither.
+    func mentionsOnlyAsLeisure(_ name: String, interests: [String]) -> Bool {
+        let leisure = LeisureMentions(
+            clauses: clauses, language: language, interests: interests.map(Self.words(of:)), claimed: grounding.claimedWords(at:)
+        )
+        return leisure.mentionsOnlyAsLeisure(Self.words(of: name))
     }
 
     /// The title of a job, or the degree of a study, when the description gives it for that entry: in a clause that names the

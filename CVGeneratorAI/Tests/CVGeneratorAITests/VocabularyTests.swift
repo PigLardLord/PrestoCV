@@ -142,6 +142,166 @@ struct VocabularyTests {
         #expect(Vocabulary.modality(in: Word.words(in: "Trabalho no hospital"), language: .portuguese).isEmpty, "no is in the, in Portuguese")
     }
 
+    @Test("A word of negation, doubt or condition of one language is another word in the description's language, and states nothing there",
+          arguments: [
+            ("I worked at Acme in a fast team", Vocabulary.Language.english, "fast"), ("I worked at the Sioux Falls clinic", .english, "falls"),
+            ("Diseñé un plan de formación", .spanish, "plan"), ("J'ai écrit un plan de soins", .french, "plan"),
+            ("J'ai écrit des plans de soins", .french, "plans"), ("Ho gestito casi complessi", .italian, "casi"),
+            ("Lavoro la sera presso Acme", .italian, "sera"), ("Se me asignó la formación", .spanish, "se"),
+            ("Une équipe qui se forme", .french, "se"), ("Mi si è affidato un reparto", .italian, "si"), ("Trabalho para si", .portuguese, "si"),
+          ])
+    func modalityOfAnotherLanguage(text: String, language: Vocabulary.Language, word: String) {
+        #expect(!Vocabulary.modality(in: Word.words(in: text), language: language).contains(word), "\(word) in \(language)")
+        #expect(Vocabulary.modality(in: Word.words(in: text)).contains(word), "\(word), in a description of no known language")
+    }
+
+    @Test("The same word still states negation, doubt or condition in its own language", arguments: [
+        ("Ich habe fast 3 Jahre gearbeitet", Vocabulary.Language.german, "fast"), ("Falls Acme mich einstellt", .german, "falls"),
+        ("I plan to work at Acme", .english, "plan"), ("Casi tres años", .spanish, "casi"), ("Je sera", .french, "sera"),
+        ("Si Acme me contrata", .spanish, "si"), ("Si Acme m'embauche", .french, "si"), ("Se Acme mi assume", .italian, "se"),
+        ("Se a Acme me contratar", .portuguese, "se"),
+    ])
+    func modalityOfItsLanguage(text: String, language: Vocabulary.Language, word: String) {
+        #expect(Vocabulary.modality(in: Word.words(in: text), language: language).contains(word), "\(word) in \(language)")
+    }
+
+    @Test("The qualifiers of a claim and the words of condition are words of the modality list of their language",
+          arguments: Vocabulary.Language.allCases)
+    func claimWordsAreModality(language: Vocabulary.Language) {
+        let modality = language.words.modality
+        #expect(Vocabulary.claimQualifiers(of: language).subtracting(modality).isEmpty, "\(language)")
+        #expect(Vocabulary.conditions(of: language).subtracting(modality).isEmpty, "\(language)")
+        #expect(!Vocabulary.claimQualifiers(of: language).isEmpty && !Vocabulary.conditions(of: language).isEmpty, "\(language)")
+    }
+
+    @Test("A relative is no conjunction, so its clause does not end before it, and no pronoun of the first person",
+          arguments: Vocabulary.Language.allCases)
+    func relativesStandInTheirClause(language: Vocabulary.Language) {
+        let relatives = Vocabulary.relatives(of: language)
+        #expect(!relatives.isEmpty, "\(language)")
+        #expect(relatives.allSatisfy { !StatementWords.isConjunction($0, in: language) }, "\(language)")
+        #expect(relatives.isDisjoint(with: Voice.words[language]?.firstPerson ?? []), "\(language)")
+    }
+
+    @Test("plan, plans and planning are words of intention as verbs, and none as nouns")
+    func planningNouns() {
+        func modality(_ text: String) -> Set<String> { Vocabulary.modality(in: Word.words(in: text), language: .english) }
+
+        #expect(modality("I am planning to learn Rust") == ["planning"])
+        #expect(modality("I'm also planning a move") == ["planning"])
+        #expect(modality("My plan is to learn Spanish") == ["plan"])
+        #expect(modality("I plan routes") == ["plan"])
+        #expect(modality("I do route planning").isEmpty)
+        #expect(modality("I wrote care plans for patients").isEmpty)
+        #expect(modality("I was responsible for planning").isEmpty)
+        #expect(modality("planning, budgeting").isEmpty)
+    }
+
+    @Test("Ability and part qualify a claim; denial, wish and condition withdraw it")
+    func claimsAndWithdrawals() {
+        #expect(Vocabulary.withdrawals(in: Word.words(in: "I can teach chess"), language: .english).isEmpty)
+        #expect(Vocabulary.withdrawals(in: Word.words(in: "I mostly use Swift"), language: .english).isEmpty)
+        #expect(Vocabulary.withdrawals(in: Word.words(in: "Ich unterrichte teilweise Schach"), language: .german).isEmpty)
+        #expect(Vocabulary.withdrawals(in: Word.words(in: "Posso parlare francese"), language: .italian).isEmpty)
+        #expect(!Vocabulary.withdrawals(in: Word.words(in: "I can't teach chess"), language: .english).isEmpty)
+        #expect(!Vocabulary.withdrawals(in: Word.words(in: "I have never used Python"), language: .english).isEmpty)
+        #expect(!Vocabulary.withdrawals(in: Word.words(in: "I would like to learn Spanish"), language: .english).isEmpty)
+        #expect(!Vocabulary.withdrawals(in: Word.words(in: "Vorrei imparare lo spagnolo"), language: .italian).isEmpty)
+        #expect(!Vocabulary.withdrawals(in: Word.words(in: "Si tuviera tiempo"), language: .spanish).isEmpty)
+        #expect(Vocabulary.isCondition("si", in: .french) && Vocabulary.isCondition("wenn", in: .german))
+        #expect(!Vocabulary.isCondition("se", in: .spanish), "Spanish se is oneself")
+    }
+
+    @Test("A wish that only a phrase says withdraws a claim, and the words of the phrase alone do not")
+    func wishesInAPhrase() {
+        func withdraws(_ text: String, _ language: Vocabulary.Language) -> Bool {
+            !Vocabulary.withdrawals(in: Word.words(in: text), language: language).isEmpty
+        }
+        #expect(withdraws("I'd like to learn Spanish", .english) && withdraws("I'd really like to learn Spanish", .english))
+        #expect(withdraws("I'd rather learn German", .english))
+        #expect(!withdraws("I'd used Swift for years", .english), "I had used")
+        #expect(withdraws("Ich würde gern Spanisch lernen", .german) && withdraws("Ich würde sehr gerne Spanisch lernen", .german))
+        #expect(!withdraws("Ich wurde befördert", .german) && !withdraws("Ich wurde Ingenieur", .german))
+        #expect(withdraws("Gerne würde ich Spanisch lernen", .german) && withdraws("Lieber würde ich arbeiten", .german))
+        #expect(withdraws("Davon träume ich", .german) && withdraws("Von Spanien träume ich", .german))
+        #expect(withdraws("Ich träume davon", .german) && !withdraws("Mein Traum war Spanisch", .german))
+        #expect(withdraws("Sogno di imparare lo spagnolo", .italian) && !withdraws("Era un sogno", .italian))
+        #expect(withdraws("Sueño con hablar francés", .spanish) && withdraws("Je rêve d'apprendre l'espagnol", .french))
+        #expect(withdraws("Sonho em falar francês", .portuguese) && withdraws("Sonho com aprender italiano", .portuguese))
+        #expect(withdraws("Ho intenzione di imparare Rust", .italian) && !withdraws("Ho capito l'intenzione del cliente", .italian))
+        #expect(withdraws("Tengo la intención de aprender Rust", .spanish) && withdraws("J'ai l'intention d'apprendre Rust", .french))
+        #expect(withdraws("Tenho a intenção de aprender Rust", .portuguese) && withdraws("I have the intention of learning Rust", .english))
+        #expect(withdraws("Ich plane, Rust zu lernen", .german) && withdraws("Nächstes Jahr plane ich", .german))
+        #expect(!withdraws("Ich habe einen Plan erstellt", .german) && !withdraws("Ich habe Pläne erstellt", .german))
+        #expect(withdraws("Mein Plan ist, Rust zu lernen", .german))
+    }
+
+    @Test("German vor ends a clause of haben as the intention vorhaben, and no vor before a time is one")
+    func vorhaben() {
+        func modality(_ text: String) -> Set<String> { Vocabulary.modality(in: Word.words(in: text), language: .german) }
+
+        #expect(modality("Ich habe vor, Rust zu lernen") == ["vor"])
+        #expect(modality("das habe ich vor") == ["vor"])
+        #expect(modality("Ich habe vor 5 Jahren bei Acme gearbeitet").isEmpty)
+        #expect(modality("Ich stelle mich kurz vor").isEmpty, "no form of haben")
+    }
+
+    @Test("A phrase of the modality lists is two words joined by an underscore, or by a tilde in either order",
+          arguments: Vocabulary.Language.allCases)
+    func modalityPhrasesHaveTwoWords(language: Vocabulary.Language) {
+        for phrase in language.words.modality where phrase.contains("_") || phrase.contains("~") {
+            let parts = phrase.split(omittingEmptySubsequences: false, whereSeparator: { $0 == "_" || $0 == "~" })
+            #expect(parts.count == 2 && parts.allSatisfy { !$0.isEmpty && DescriptionText.normalized(String($0)) == String($0) }, "\(phrase)")
+        }
+    }
+
+    @Test("Every phrase of the level vocabularies has one height, and a low level is a beginner's or an A1 or A2")
+    func levelHeights() {
+        let skills = LevelVocabulary<SkillLevel>.skills.phrases, languages = LevelVocabulary<LanguageProficiency>.languages.phrases
+        for phrase in Set(skills.map(\.phrase)).intersection(languages.map(\.phrase)) {
+            let lowSkill = skills.contains { $0.phrase == phrase && $0.levels == [.beginner] }
+            let lowLanguage = languages.contains { $0.phrase == phrase && $0.levels.isSubset(of: [.a1, .a2]) }
+            #expect(lowSkill == lowLanguage, "\(phrase): the skills and the languages give it two heights")
+        }
+        #expect(LevelHeight.phrases.filter(LevelHeight.isLow).allSatisfy(LevelHeight.phrases.contains))
+        func height(_ text: String) -> LevelHeight? { LevelHeight.ofPhrase(at: 0, in: Word.words(in: text).map(\.folded)) }
+        for high in ["expert", "fluent", "advanced", "intermediate", "upper intermediate", "mother tongue", "experte", "fliessend", "b1", "c2"] {
+            #expect(height(high) == .high, "\(high)")
+        }
+        for low in ["basic", "beginner", "elementary", "grundkenntnisse", "notions", "a1", "a2", "basico"] {
+            #expect(height(low) == .low, "\(low)")
+        }
+        #expect(height("knowledge") == nil && height("level") == nil)
+    }
+
+    @Test("A mood of supposition withdraws a claim, read with its accents, and the past it folds to does not")
+    func moodsOfSupposition() {
+        func withdraws(_ text: String, _ language: Vocabulary.Language) -> Bool {
+            !Vocabulary.withdrawals(in: Word.words(in: text), language: language).isEmpty
+        }
+        #expect(withdraws("Ich würde arbeiten", .german) && !withdraws("Ich wurde befördert", .german))
+        #expect(withdraws("Ich hätte eine Stelle", .german) && !withdraws("Ich hatte eine Stelle", .german))
+        #expect(withdraws("Ich müsste lernen", .german) && !withdraws("Ich musste lernen", .german))
+        #expect(withdraws("Ich wäre Lehrerin", .german) && withdraws("Am liebsten würde ich Spanisch lernen", .german))
+        #expect(withdraws("I'd work as a teacher", .english) && withdraws("I'd be happy", .english) && withdraws("I'd teach", .english))
+        #expect(!withdraws("I'd worked as a teacher", .english) && !withdraws("I'd used Swift", .english))
+        #expect(!withdraws("I'd taught", .english) && !withdraws("I'd led a team", .english) && !withdraws("I'd been a nurse", .english))
+        #expect(withdraws("Sería feliz", .spanish) && withdraws("Seria feliz", .spanish), "Spanish typed without its accent too")
+        #expect(withdraws("Seria feliz", .portuguese) && withdraws("Sarei felice", .italian) && withdraws("Je serais heureuse", .french))
+    }
+
+    @Test("A hedge of one language is another word in the description's language: a month, or in the")
+    func hedgesOfAnotherLanguage() {
+        #expect(!DescriptionText.hedgesOrNegates("seit mai 2016 arbeite ich bei acme", language: .german))
+        #expect(!DescriptionText.hedgesOrNegates("je travaille chez acme depuis mai 2016", language: .french))
+        #expect(!DescriptionText.hedgesOrNegates("desde 2016 trabalho no hospital", language: .portuguese))
+        #expect(!DescriptionText.hedgesOrNegates("ho gestito casi complessi", language: .italian))
+        #expect(DescriptionText.hedgesOrNegates("seit mai 2016 arbeite ich bei acme"), "with no language, mai is the Italian never")
+        #expect(DescriptionText.hedgesOrNegates("non ho mai lavorato presso acme", language: .italian))
+        #expect(DescriptionText.hedgesOrNegates("no he trabajado en acme", language: .spanish))
+        #expect(DescriptionText.hedgesOrNegates("casi tres anos", language: .spanish))
+    }
+
     @Test("A verb of a CV is known in its inflected forms, by the language of the verb", arguments: [
         "trained", "teach", "taught", "formato", "lavoro", "gearbeitet", "unterrichte", "forme", "travaille", "trabalhei",
     ])
@@ -269,8 +429,27 @@ struct VocabularyTests {
         #expect(!Vocabulary.employerPrepositions.contains(word), "\(word)")
     }
 
+    @Test("An employer preposition of another language is another word in the description's language, and introduces no employer there",
+          arguments: [
+            ("ai", Vocabulary.Language.french), ("per", .english), ("all", .english), ("am", .english), ("alle", .german), ("da", .german),
+            ("da", .spanish), ("da", .portuguese), ("nos", .spanish), ("nos", .french),
+          ])
+    func employerPrepositionsThatAreAnotherWord(word: String, language: Vocabulary.Language) {
+        #expect(!Vocabulary.isEmployerPreposition(word, in: language), "\(word) in \(language)")
+        #expect(Vocabulary.isEmployerPreposition(word, in: nil), "\(word), in a description of no known language")
+    }
+
+    @Test("An employer preposition introduces an employer in its own language, and in one that has no such word",
+          arguments: [
+            ("ai", Vocabulary.Language.italian), ("per", .italian), ("da", .italian), ("am", .german), ("nos", .portuguese),
+            ("chez", .english), ("at", .italian), ("presso", .french),
+          ])
+    func employerPrepositionsOfTheDescription(word: String, language: Vocabulary.Language) {
+        #expect(Vocabulary.isEmployerPreposition(word, in: language), "\(word) in \(language)")
+    }
+
     @Test("A verb of a CV, a word of level, of studying and of time are explained, so that they may stand in a clause that backs an entry",
-          arguments: ["worked", "taught", "managed", "native", "fluent", "school", "degree", "students", "lavorato", "laurea", "gearbeitet", "abschluss", "trabajado", "diplome", "formei", "years", "now", "march", "anni", "jahre", "anos", "today", "currently"])
+          arguments: ["worked", "taught", "managed", "native", "fluent", "school", "degree", "students", "lavorato", "laurea", "gearbeitet", "abschluss", "trabajado", "diplome", "formei", "fundamental", "years", "now", "march", "anni", "jahre", "anos", "today", "currently"])
     func explainedWords(word: String) {
         #expect(Vocabulary.explains(word), "\(word)")
     }

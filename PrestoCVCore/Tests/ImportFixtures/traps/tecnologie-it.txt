@@ -1,0 +1,18 @@
+Elena Gallo
+Sviluppatrice mobile
+Bologna · elena.gallo@example.net · +39 333 000 0505
+
+ESPERIENZA LAVORATIVA
+Sviluppatrice mobile – App Esempio S.r.l., Bologna
+Marzo 2021 – Presente
+Sviluppo dell'app di prenotazione in Swift.
+
+Sviluppatrice junior – Software Esempio S.r.l., Modena
+Giugno 2018 – Febbraio 2021
+
+ISTRUZIONE
+Laurea in Informatica – Università di Bologna (2015 – 2018)
+
+TECNOLOGIE
+Swift, SwiftUI, Combine
+Kotlin, Docker

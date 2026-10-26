@@ -70,6 +70,6 @@ struct GroundingOnEveryDeviceTests {
     func otherDescriptionsNeedNoData(description: String) throws {
         let withoutData = ForcedLexicalTagger(Dictionary(uniqueKeysWithValues: Vocabulary.Language.allCases.map { ($0, .noAssets) }))
 
-        try CVDataSanitizer(lexicalClasses: withoutData).requireLanguageData(for: description)
+        try CVDataSanitizer(lexicalClasses: withoutData).languageCheck(of: description).require()
     }
 }

@@ -53,7 +53,7 @@ targets.append(.target(name: "PrestoCVComposition", dependencies: [
 
 let package = Package(
     name: "PrestoCVApp",
-    platforms: [.iOS("26.0"), .macOS("26.0")],
+    platforms: [.iOS("26.5"), .macOS("26.0")],
     products: products,
     dependencies: [
         .package(path: "../PrestoCVCore"),

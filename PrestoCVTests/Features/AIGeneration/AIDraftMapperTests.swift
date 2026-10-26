@@ -7,7 +7,7 @@ import CVGeneratorAI
 @Suite("AIDraftMapper Tests")
 struct AIDraftMapperTests {
     /// Words that appear nowhere in the mapper, so a test fails if it falls back to English.
-    private let labels = AIDraftLabels(present: "Oggi", untitled: "Nuovo CV", cvNameFormat: "CV di %@")
+    private let labels = AIDraftLabels(present: "Oggi")
 
     private func map(_ cvData: CVData, writtenIn description: String = "A description.", language: String? = nil) -> CVModel {
         AIDraftMapper(labels: labels, languageOfText: { _ in language }).map(cvData, writtenIn: description)
@@ -15,19 +15,25 @@ struct AIDraftMapperTests {
 
     // MARK: - CV name and personal info
 
-    @Test("The CV is named after the person with the injected format")
-    func cvNameUsesTheFormat() {
-        let cv = map(CVData(personalInfo: CVGeneratorAI.PersonalInfo(name: "Maria Rossi")))
+    @Test("A draft has no name of its own, whatever the model found", arguments: [
+        ("Maria Rossi", "Infermiera"), (nil, "Infermiera"), (nil, nil), ("   ", nil),
+    ] as [(String?, String?)])
+    func draftHasNoName(person: String?, role: String?) {
+        let cv = map(CVData(personalInfo: CVGeneratorAI.PersonalInfo(name: person, title: role)))
 
-        #expect(cv.name == "CV di Maria Rossi")
-        #expect(cv.personalInfo.name == "Maria Rossi")
+        #expect(cv.name.isEmpty)
     }
 
-    @Test("Without a name the CV gets the untitled label", arguments: [nil, "", "   "] as [String?])
-    func cvNameFallsBackToUntitled(name: String?) {
-        let cv = map(CVData(personalInfo: CVGeneratorAI.PersonalInfo(name: name)))
+    @MainActor
+    @Test("The list calls a draft by its person, and a draft with only a role by its role", arguments: [
+        ("Maria Rossi", "Infermiera", "Maria Rossi"), (nil, "Infermiera", "Infermiera"),
+    ] as [(String?, String, String)])
+    func draftIsListedByTheTitleRule(person: String?, role: String, listed: String) {
+        let draft = map(CVData(personalInfo: CVGeneratorAI.PersonalInfo(name: person, title: role)))
+        let list = CVListViewModel(cvManagementUseCase: MockCVManagementUseCase())
 
-        #expect(cv.name == "Nuovo CV")
+        #expect(list.title(of: draft) == listed)
+        #expect(draft.personalInfo.name == (person ?? ""))
     }
 
     @Test("Personal fields are copied and the summary becomes the profile")
@@ -200,6 +206,13 @@ struct AIDraftMapperTests {
         #expect(cv.skills.first?.level == stars)
     }
 
+    @Test("An expert skill gets every star the editor shows")
+    func expertSkillGetsEveryStar() {
+        let cv = map(CVData(skills: [CVGeneratorAI.Skill(name: "Chess", level: .expert)]))
+
+        #expect(cv.skills.first?.level == PrestoCVCore.Skill.maxLevel)
+    }
+
     @Test("Every language level maps to its own level", arguments: [
         (LanguageProficiency.a1, LanguageProficiencyLevel.a1),
         (.a2, .a2),
@@ -322,6 +335,32 @@ struct AIDraftMapperTests {
         _ = mapper.map(CVData(summary: "Generated summary."), writtenIn: "Sono infermiera.")
 
         #expect(received == ["Sono infermiera."])
+    }
+
+    // MARK: - Generated draft (ADR 0028)
+
+    @Test("A generated draft keeps whether its personal items went unchecked, and opens with the notice that matches",
+          arguments: [(false, EditorNotice.aiDraft), (true, EditorNotice.aiDraftUnchecked)])
+    func generatedDraftCarriesTheCheck(unchecked: Bool, notice: EditorNotice) {
+        let generated = GeneratedDraft(cvData: CVData(personalInfo: CVGeneratorAI.PersonalInfo(name: "Maria Rossi")),
+                                       personalItemsUnchecked: unchecked)
+
+        let draft = AIDraftMapper(labels: labels, languageOfText: { _ in "it" }).map(generated, writtenIn: "Sono infermiera.")
+
+        #expect(draft.personalItemsUnchecked == unchecked)
+        #expect(draft.notice == notice)
+        #expect(draft.cv.personalInfo.name == "Maria Rossi", "The CV is mapped as any other draft")
+        #expect(draft.cv.documentLanguage == "it")
+    }
+
+    @Test("A generated draft with nothing in it but the notice that the check gave no answer is still a draft to open")
+    func emptyUncheckedDraftOpens() {
+        let draft = AIDraftMapper(labels: labels, languageOfText: { _ in "it" })
+            .map(GeneratedDraft(cvData: CVData(), personalItemsUnchecked: true), writtenIn: "Sono infermiera.")
+
+        #expect(draft.notice == .aiDraftUnchecked)
+        #expect(draft.cv.skills.isEmpty && draft.cv.languages.isEmpty && draft.cv.interests.isEmpty)
+        #expect(draft.cv.personalInfo.title.isEmpty && draft.cv.personalInfo.location.isEmpty)
     }
 
     // MARK: - Identity

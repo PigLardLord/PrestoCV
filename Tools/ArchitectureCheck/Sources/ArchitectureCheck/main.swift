@@ -18,6 +18,11 @@ import SwiftSyntax
 // 6. --packages: each package's declared target dependencies must be allowed imports.
 // 7. Test plans: every test target an .xctestplan runs has the rule with the sourceTreePath detector (R16), because
 //    the machines that run a plan have only the built products. Legacy targets are checked for the rules listed for them.
+// 8. Views and default arguments: a view holds no service and makes no view model, a view model imports no UI framework
+//    (R5), and a default argument makes no dependency and reads no ambient state (R17). The views of a target are
+//    collected from all its files first, so that an extension of a view in another file is part of the view.
+// 9. Warnings: a detector listed in warningDetectors reports without failing, and never enters the baseline (R18: an API
+//    that needs the full Foundation).
 
 struct Config: Decodable {
     struct Target: Decodable {
@@ -34,8 +39,13 @@ struct Config: Decodable {
     let targets: [Target]
     let rules: [String: [String]]         // rule → detectors
     let infrastructureTypes: [String]
+    /// The suffixes of what a view may not hold (R5) and a default argument may not make (R17), without `Protocol`.
+    let serviceSuffixes: [String]?
+    let dependencySuffixes: [String]?
     let exceptions: [Exception]?
     let notYetImplemented: [String]?
+    /// Detectors whose findings are printed as warnings: they do not fail the check and never enter the baseline.
+    let warningDetectors: [String]?
 }
 
 struct Finding { let key: String; let message: String }
@@ -57,6 +67,7 @@ catch { fail("cannot read rules: \(error)") }
 func loadBaseline(_ path: String) -> [String]? { try? JSONDecoder().decode([String].self, from: Data(contentsOf: URL(fileURLWithPath: path))) }
 var problems: [String] = []
 var findings: [Finding] = []
+var warnings: [String] = []
 
 // MARK: 1. Inventory
 
@@ -140,15 +151,28 @@ func isLegacyDeclaration(_ name: String, inManifest manifest: String) -> Bool {
     legacyTargets.contains { $0.name == name && owningManifest(of: $0.path) == manifest }
 }
 
-// A legacy target is exempt (ADR 0012) except from the rules listed for it: R16 for the legacy test targets a test plan runs.
+// A legacy target is exempt (ADR 0012) except from the rules listed for it: R16 for the legacy test targets a test plan runs,
+// R5 and R17 for the legacy app and PrestoCVCore (ADR 0025).
+var parsed: [(file: String, target: Config.Target, source: String, tree: SourceFileSyntax)] = []
 for (file, target) in assignment where target.kind != "legacy" || !target.rules.isEmpty {
     guard let source = try? String(contentsOf: root.appendingPathComponent(file), encoding: .utf8) else { problems.append("cannot read \(file)"); continue }
-    let tree = Parser.parse(source: source)
-    let scanner = Scanner(tree: tree, file: file, infrastructureTypes: Set(config.infrastructureTypes))
+    parsed.append((file, target, source, Parser.parse(source: source)))
+}
+var viewTypes: [String: Set<String>] = [:]
+var memberTypes: [String: [String: TypeMembers]] = [:]
+for entry in parsed {
+    viewTypes[entry.target.name, default: []].formUnion(Scanner.viewTypeNames(in: entry.tree))
+    for (type, members) in MemberIndex.members(in: entry.tree) { memberTypes[entry.target.name, default: [:]][type, default: TypeMembers()].merge(members) }
+}
+for (file, target, source, tree) in parsed {
+    let scanner = Scanner(tree: tree, file: file, infrastructureTypes: Set(config.infrastructureTypes), viewTypes: viewTypes[target.name] ?? [],
+                          memberTypes: memberTypes[target.name] ?? [:],
+                          serviceSuffixes: config.serviceSuffixes ?? [], dependencySuffixes: config.dependencySuffixes ?? [])
     scanner.walk(tree)
     var ordinals: [String: Int] = [:]
     func record(rule: String, detector: String, detail: String, node: String, line: Int) {
         if exceptionsValid.contains(where: { file.hasPrefix($0.path) && $0.detector == detector }) { return }
+        if config.warningDetectors?.contains(detector) == true { warnings.append("\(file):\(line): \(rule) \(detector): \(detail)"); return }
         let base = "\(file)|\(rule)|\(detector)|\(fingerprint(node))"
         let n = ordinals[base, default: 0]; ordinals[base] = n + 1
         findings.append(Finding(key: "\(base)#\(n)", message: "\(file):\(line): \(rule) \(detector): \(detail)"))
@@ -189,7 +213,7 @@ for (file, target) in assignment where target.kind != "legacy" || !target.rules.
 
 // MARK: 5. modules.md, both directions
 
-let frameworks: Set<String> = ["Glibc", "Darwin", "Dispatch", "Foundation", "Observation", "WebKit", "UIKit", "AppKit", "FoundationModels", "Testing", "SwiftUI", "PDFKit", "QuickLook", "UniformTypeIdentifiers", "Synchronization"]
+let frameworks: Set<String> = ["Glibc", "Darwin", "Android", "Dispatch", "Foundation", "Observation", "WebKit", "UIKit", "AppKit", "FoundationModels", "Testing", "SwiftUI", "PDFKit", "QuickLook", "UniformTypeIdentifiers", "Synchronization", "CoreGraphics", "CoreText"]
 if let modulesPath = value(after: "--modules") {
     var documented: [String: Set<String>?] = [:]
     let modulesText = (try? String(contentsOfFile: modulesPath, encoding: .utf8)) ?? ""
@@ -295,9 +319,10 @@ if let againstPath = value(after: "--against") {
     guard let base = loadBaseline(againstPath) else { fail("cannot read base baseline \(againstPath)") }
     added = baselined.subtracting(Set(base)).sorted()
 }
+for w in warnings { print("warning: \(w)") }
 for p in problems { print("error: \(p)") }
 for f in new { print("error: new violation \(f.message)") }
 for s in stale { print("error: baseline entry no longer occurs, remove it: \(s)") }
 for a in added { print("error: baseline grew compared with the base branch: \(a)") }
-print("checked \(assignment.count) files in \(config.targets.count) targets: \(findings.count) findings, \(baseline.count) baselined, \(new.count) new, \(stale.count) stale, \(added.count) added")
+print("checked \(assignment.count) files in \(config.targets.count) targets: \(findings.count) findings, \(baseline.count) baselined, \(new.count) new, \(stale.count) stale, \(added.count) added, \(warnings.count) warnings")
 exit(problems.isEmpty && new.isEmpty && stale.isEmpty && added.isEmpty ? 0 : 1)

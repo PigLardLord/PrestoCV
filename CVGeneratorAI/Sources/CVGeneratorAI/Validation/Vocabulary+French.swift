@@ -154,10 +154,14 @@ extension Vocabulary {
         """,
         /// Words of negation, doubt or degree, wish or intention, future and condition: in no other list.
         modality: """
+        serais serait serions seriez seraient aurais aurait aurions auriez auraient ferais ferait ferions feriez feraient
+        adorerais adorerait adorerions adoreriez adoreraient
+        reve_de reve_d en_reve intention_de intention_d
         accompagnera accompagnerai accompagneraient accompagnerais accompagnerait accompagneras accompagnerez
         accompagneriez accompagnerions accompagnerons accompagneront administrera administrerai administreraient
         administrerais administrerait administreras administrerez administreriez administrerions administrerons
         administreront aidera aiderai aideraient aiderais aiderait aideras aiderez aideriez aiderions aiderons
+        aimeraient aimerais aimerait aimeriez aimerions souhaiteraient souhaiterais souhaiterait souhaiteriez souhaiterions
         aideront ameliorera ameliorerai amelioreraient ameliorerais ameliorerait amelioreras ameliorerez amelioreriez
         ameliorerions ameliorerons amelioreront animera animerai animeraient animerais animerait animeras animerez
         animeriez animerions animerons animeront assurera assurerai assureraient assurerais assurerait assureras

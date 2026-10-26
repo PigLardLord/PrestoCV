@@ -25,14 +25,14 @@ struct ExportErrorMessageTests {
         #expect(message.contains("10"))
     }
 
-    @Test("a document without name or email asks the user to add them")
-    func invalidContentAsksForNameAndEmail() {
+    @Test("a document without a name asks the user to add it")
+    func invalidContentAsksForTheName() {
         let message = ExportErrorMessage.message(
-            for: PDFExportError.invalidContent("Document must have an email"),
+            for: PDFExportError.invalidContent("Document must have a name"),
             during: .exporting
         )
 
-        #expect(message == String(localized: "export.error.missing_name_email"))
+        #expect(message == String(localized: "export.readiness.name_required"))
     }
 
     @Test("a template that cannot be used says so, whatever the activity",

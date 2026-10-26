@@ -17,11 +17,15 @@ import Foundation
 ///   or of the clauses that back its entry (see `ProseQuotes`); a summary holds no number;
 /// - a skill level or language level stays only if the description states it, in a sentence with no negation or hedge, and a
 ///   language with a level that the description does not state goes whole; a language without a level may stay without one;
+/// - a skill that is also an interest of the draft, and that the person mentions only as leisure, is a hobby, and goes;
+/// - an employer or a school keeps no leading indefinite article, and a degree that only says graduating ("diplôme") goes;
 /// - every fact is the person's: a language, a skill, an interest and the person's own name, contacts, place and title are kept only
 ///   as the clauses that speak for the person (or a list with no verb) give them, so a sister's French or a manager's email goes; a
 ///   contact, only as a label ("Email: ..."), the person's possession of the field ("My email is ..."), a verb of contacting whose
 ///   object is the person ("You can reach me at ...") or the person as reachable ("I can be reached at ...") gives it, with no other
 ///   person named ("I can put you in touch with the recruiter at ..." gives none), and never from the references on;
+/// - a language, a skill, an interest and the person's headline title and place are kept only as a clause that claims them gives
+///   them: one that denies, wishes or supposes ("I have never used Python", "I would like to work as a nurse in Turin") gives none;
 /// - prose in another language than the description's is dropped, when a language detector is given;
 /// - a description in English or German is grounded only with the device's lexical class of its language (`LexicalClasses`): without
 ///   it, nothing is grounded and `CVGenerationError.languageDataUnavailable` says which language data the device needs.
@@ -55,18 +59,21 @@ public struct CVDataSanitizer: Sendable {
         return LexicalClasses.$tagger.withValue(lexicalClasses) { grounded(cvData, in: source) }
     }
 
-    /// Whether the device has the language data that grounding `description` needs, asked before the model writes a draft.
-    ///
-    /// - Throws: `CVGenerationError.languageDataUnavailable` when the description is in English or German and the device does not
-    ///   tag its language.
-    public func requireLanguageData(for description: String) throws(CVGenerationError) {
-        try requireLanguageData(of: DescriptionText(description, languageOfText: languageOfText))
+    /// The language of `description`, when it is one of the six, and whether grounding it needs the device's language data and
+    /// finds it, asked before the model writes a draft: the use case logs it, then has it `require()` the data.
+    func languageCheck(of description: String) -> LanguageCheck {
+        languageCheck(of: DescriptionText(description, languageOfText: languageOfText))
     }
 
     private func requireLanguageData(of source: DescriptionText) throws(CVGenerationError) {
-        guard let language = source.explainer.language, VerbForms.readsVerbsByTags(in: language),
-              !lexicalClasses.tagsLexicalClass(inLanguage: language.rawValue) else { return }
-        throw .languageDataUnavailable(languageCode: language.rawValue)
+        try languageCheck(of: source).require()
+    }
+
+    private func languageCheck(of source: DescriptionText) -> LanguageCheck {
+        guard let language = source.explainer.language, VerbForms.readsVerbsByTags(in: language) else {
+            return LanguageCheck(language: source.explainer.language, data: .notNeeded)
+        }
+        return LanguageCheck(language: language, data: lexicalClasses.tagsLexicalClass(inLanguage: language.rawValue) ? .present : .missing)
     }
 
     private func grounded(_ cvData: CVData, in source: DescriptionText) -> CVData {
@@ -75,16 +82,18 @@ public struct CVDataSanitizer: Sendable {
         // the clauses that speak for the person then tell which of them stand in the description for the person.
         let entries = Entries(cvData, personalInfo: sanitize(cvData.personalInfo, jobTitles: jobTitles, source), source)
         let spoken = entries.spoken(in: source)
+        let claimed = entries.claimed(in: source)
+        let interests = unique(cvData.interests.compactMap(claimed.named)) { $0 }
 
         return CVData(
-            personalInfo: sanitize(cvData.personalInfo, jobTitles: jobTitles, spoken, contacts: entries.contacts(in: source)),
+            personalInfo: sanitize(cvData.personalInfo, jobTitles: jobTitles, spoken, claimed: claimed, contacts: entries.contacts(in: source)),
             summary: source.grounded(cvData.summary, quoting: entries.summaryQuotes, allowsNumbers: false),
             experience: sanitize(entries.jobs, source, entries),
             education: sanitize(entries.studies, source, entries),
-            skills: sanitize(cvData.skills, spoken),
-            languages: sanitize(cvData.languages, spoken),
+            skills: sanitize(cvData.skills, claimed, interests: interests, entries),
+            languages: sanitize(cvData.languages, claimed),
             certifications: sanitize(entries.certifications, entries),
-            interests: unique(cvData.interests.compactMap(spoken.named)) { $0 }
+            interests: interests
         )
     }
 
@@ -93,8 +102,14 @@ public struct CVDataSanitizer: Sendable {
     /// The name must not be a title: for "I'm a nurse" the model writes "Nurse" as the name, and the description does
     /// contain the word.
     ///
-    /// - Parameter contacts: What the email, the phone and the links are looked up in, when it is not `source`.
-    private func sanitize(_ info: PersonalInfo, jobTitles: [String], _ source: DescriptionText, contacts: DescriptionText? = nil) -> PersonalInfo {
+    /// - Parameters:
+    ///   - claimed: What the headline title and the place are looked up in, when it is not `source`: the clauses that claim them,
+    ///     so "I would like to work as a nurse in Turin" gives neither.
+    ///   - contacts: What the email, the phone and the links are looked up in, when it is not `source`.
+    private func sanitize(
+        _ info: PersonalInfo, jobTitles: [String], _ source: DescriptionText, claimed: DescriptionText? = nil, contacts: DescriptionText? = nil
+    ) -> PersonalInfo {
+        let claimed = claimed ?? source
         let contacts = contacts ?? source
         let titles = ([info.title] + jobTitles.map { Optional($0) }).compactMap { $0.presentValue }.map { DescriptionText.normalized($0) }
         let name = source.named(info.name).flatMap { titles.contains(DescriptionText.normalized($0)) ? nil : $0 }
@@ -103,11 +118,11 @@ public struct CVDataSanitizer: Sendable {
             name: name,
             email: contacts.supportedEmail(info.email),
             phone: contacts.supportedPhone(info.phone),
-            location: source.named(info.location),
+            location: claimed.named(info.location),
             website: contacts.supportedLink(info.website),
             linkedin: contacts.supportedLink(info.linkedin),
             github: contacts.supportedLink(info.github),
-            title: source.named(info.title)
+            title: claimed.named(info.title)
         )
     }
 
@@ -123,7 +138,7 @@ public struct CVDataSanitizer: Sendable {
 
             return Experience(
                 title: title ?? "",
-                company: job.company ?? "",
+                company: job.company.map { withoutArticle($0, source) } ?? "",
                 location: job.location.flatMap { evidence.backs($0) ? $0 : nil },
                 startDate: dates[0],
                 endDate: dates[1],
@@ -141,13 +156,15 @@ public struct CVDataSanitizer: Sendable {
         let cleaned = studies.compactMap { study -> Education? in
             guard entries.hasFactualMention(of: study.subject) else { return nil }
             let evidence = entries.evidence(of: study.subject)
-            let degree = entries.supportedTitle(of: study.subject, study.degree)
+            let degree = entries.supportedTitle(of: study.subject, study.degree).flatMap {
+                EntryWording.namesADegree($0, in: source.explainer.language) ? $0 : nil
+            }
             guard degree != nil || study.institution != nil else { return nil }
             let dates = evidence.supportedDates([study.entry.endDate, study.entry.startDate], graduationDate: 0)
 
             return Education(
                 degree: degree,
-                institution: study.institution,
+                institution: study.institution.map { withoutArticle($0, source) },
                 startDate: dates[1],
                 endDate: dates[0],
                 description: source.grounded(study.entry.description, quoting: evidence.quotable, allowsNumbers: true)
@@ -156,10 +173,17 @@ public struct CVDataSanitizer: Sendable {
         return unique(cleaned) { "\($0.degree ?? "")|\($0.institution ?? "")" }
     }
 
-    private func sanitize(_ skills: [Skill], _ source: DescriptionText) -> [Skill] {
+    /// A skill whose name is one of the interests that the description gives, and that the person mentions only as leisure ("In my
+    /// free time I like chess and hiking"), is a hobby: as a skill it would claim an ability the person never claimed, so it goes, and
+    /// the interest stays. A skill the person mentions anywhere else ("proficient in Python", a job's clause, a list of skills) stays;
+    /// another person's clause counts for neither (see `LeisureMentions`).
+    private func sanitize(_ skills: [Skill], _ source: DescriptionText, interests: [String], _ entries: Entries) -> [Skill] {
         let names = skills.compactMap { source.named($0.name) }
+        let hobbies = Set(interests.map { DescriptionText.normalized($0) })
         let cleaned = skills.compactMap { skill -> Skill? in
             guard let name = source.named(skill.name) else { return nil }
+            let isAHobby = hobbies.contains(DescriptionText.normalized(name)) && entries.mentionsOnlyAsLeisure(name, interests: interests)
+            guard !isAHobby else { return nil }
             let allowed = source.levels(of: name, among: names, vocabulary: .skills)
             return Skill(name: name, level: statedLevel(skill.level, allowed: allowed))
         }
@@ -198,6 +222,11 @@ public struct CVDataSanitizer: Sendable {
 
     // MARK: - Helpers
 
+    /// An employer or a school without its leading indefinite article ("a nursery"), when what is left is a quote too.
+    private func withoutArticle(_ name: String, _ source: DescriptionText) -> String {
+        source.named(EntryWording.withoutLeadingArticle(name, in: source.explainer.language)) ?? name
+    }
+
     /// The model's level, if the description allows it.
     private func statedLevel<Level: Hashable>(_ level: Level?, allowed: Set<Level>?) -> Level? {
         guard let level, allowed?.contains(level) == true else { return nil }
@@ -208,5 +237,28 @@ public struct CVDataSanitizer: Sendable {
     private func unique<T>(_ items: [T], by key: (T) -> String) -> [T] {
         var seen = Set<String>()
         return items.filter { seen.insert(DescriptionText.normalized(key($0))).inserted }
+    }
+}
+
+/// The language of a description and the state of the language data that grounding it needs (#270): English and German are read
+/// with the device's lexical class of the language, which the system downloads on request; the other four need none.
+struct LanguageCheck: Equatable, Sendable {
+    enum LanguageData: Equatable, Sendable {
+        /// The language is not one that is read with the device's language data, or is not one of the six.
+        case notNeeded
+        /// The device tags the language.
+        case present
+        /// The device has not got the data of the language yet.
+        case missing
+    }
+
+    /// The language of the description, when it is one of the six.
+    let language: Vocabulary.Language?
+    let data: LanguageData
+
+    /// - Throws: `CVGenerationError.languageDataUnavailable` when the device has not got the data the language needs.
+    func require() throws(CVGenerationError) {
+        guard data == .missing, let language else { return }
+        throw .languageDataUnavailable(languageCode: language.rawValue)
     }
 }

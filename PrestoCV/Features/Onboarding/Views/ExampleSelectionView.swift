@@ -3,7 +3,7 @@ import PrestoCVCore
 
 /// The sheet of example CVs the first run and the "New CV" screen offer. Picking one hands it to `onSelect`.
 struct ExampleSelectionView: View {
-    let samples: [CVModel]
+    let examples: [ExampleChoice]
     let onSelect: (CVModel) -> Void
     
     @Environment(\.dismiss) private var dismiss
@@ -13,11 +13,11 @@ struct ExampleSelectionView: View {
         NavigationStack {
             List {
                 Section {
-                    ForEach(samples) { sample in
+                    ForEach(examples) { example in
                         Button {
-                            onSelect(sample)
+                            onSelect(example.sample)
                         } label: {
-                            row(for: sample)
+                            row(for: example)
                         }
                     }
                 } footer: {
@@ -35,13 +35,13 @@ struct ExampleSelectionView: View {
         }
     }
     
-    private func row(for sample: CVModel) -> some View {
+    private func row(for example: ExampleChoice) -> some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
-            Text(sample.personalInfo.title.isEmpty ? "cv.untitled".localized : sample.personalInfo.title)
+            Text(example.title)
                 .typography(.headline)
                 .foregroundColor(DesignTokens.Colors.primary)
             
-            Text(sample.personalInfo.profile)
+            Text(example.summary)
                 .typography(.subheadline)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .lineLimit(2)
@@ -76,7 +76,7 @@ private struct ExampleSelectionSheet: ViewModifier {
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $isPresented, onDismiss: openPendingDraft) {
-                ExampleSelectionView(samples: viewModel.samples) { sample in
+                ExampleSelectionView(examples: viewModel.examples) { sample in
                     pendingDraft = viewModel.makeDraft(from: sample)
                     isPresented = false
                 }
@@ -95,9 +95,17 @@ private struct ExampleSelectionSheet: ViewModifier {
 #if DEBUG
 #Preview {
     ExampleSelectionView(
-        samples: [
-            CVModel(personalInfo: PersonalInfo(title: "Senior Software Engineer", profile: "Senior engineer with 8+ years of experience building scalable systems.")),
-            CVModel(personalInfo: PersonalInfo(title: "Senior UX/UI Designer", profile: "Designer with 7+ years of experience crafting intuitive digital products."))
+        examples: [
+            ExampleChoice(
+                sample: CVModel(),
+                title: "Senior Software Engineer",
+                summary: "Senior engineer with 8+ years of experience building scalable systems."
+            ),
+            ExampleChoice(
+                sample: CVModel(),
+                title: "Senior UX/UI Designer",
+                summary: "Designer with 7+ years of experience crafting intuitive digital products."
+            )
         ],
         onSelect: { _ in }
     )

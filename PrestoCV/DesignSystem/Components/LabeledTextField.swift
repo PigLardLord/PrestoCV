@@ -1,5 +1,16 @@
 import SwiftUI
 
+/// What a labeled field shows beside its text: whether the text is valid, whether the field must be filled in, and the
+/// line under it. Whoever owns the field decides it; the field only shows it.
+struct FieldState: Equatable {
+    var validation: FieldLabel.ValidationState = .none
+    var isRequired = false
+    /// Shown under the field while the text is invalid
+    var errorMessage: String? = nil
+    /// Shown under the field otherwise
+    var helpText: String? = nil
+}
+
 /// A reusable text field component with a label above it
 /// Follows the design system tokens for consistent styling
 struct LabeledTextField: View {
@@ -9,22 +20,19 @@ struct LabeledTextField: View {
     var keyboardType: UIKeyboardType = .default
     var textContentType: UITextContentType? = nil
     var isSecure: Bool = false
-    var isRequired: Bool = false
-    var validationState: ValidationState = .none
-    var errorMessage: String? = nil
-    var helpText: String? = nil
+    var state = FieldState()
     var onCommit: (() -> Void)? = nil
+    /// Called when the field loses the focus: the person has left it
+    var onLeave: (() -> Void)? = nil
     
     @FocusState private var isFocused: Bool
-    
-    typealias ValidationState = FieldLabel.ValidationState
     
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xxs) {
             FieldLabel.conditional(
                 text: label,
-                isRequired: isRequired,
-                validationState: validationState,
+                isRequired: state.isRequired,
+                validationState: state.validation,
                 isFocused: isFocused
             )
             
@@ -35,18 +43,23 @@ struct LabeledTextField: View {
                 isSecure: isSecure,
                 keyboardType: keyboardType,
                 textContentType: textContentType,
-                validationState: validationState,
+                validationState: state.validation,
                 isFocused: $isFocused,
                 onCommit: onCommit
             )
             
             FieldMessage.conditional(
-                validationState: validationState,
-                errorMessage: errorMessage,
-                helpText: helpText
+                validationState: state.validation,
+                errorMessage: state.errorMessage,
+                helpText: state.helpText
             )
         }
         .padding(.vertical, DesignTokens.Spacing.xs)
+        .onChange(of: isFocused) { _, focused in
+            if !focused {
+                onLeave?()
+            }
+        }
     }
 }
 
@@ -56,38 +69,29 @@ extension LabeledTextField {
         label: String = "field.email".localized,
         text: Binding<String>,
         placeholder: String = "field.email.placeholder".localized,
-        isRequired: Bool = false,
-        onCommit: (() -> Void)? = nil
+        state: FieldState,
+        onCommit: (() -> Void)? = nil,
+        onLeave: (() -> Void)? = nil
     ) -> LabeledTextField {
-        let validationState: ValidationState = {
-            let email = text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            if email.isEmpty { return .none }
-            return email.contains("@") && email.contains(".") ? .valid : .invalid
-        }()
-        
-        return LabeledTextField(
+        LabeledTextField(
             label: label,
             text: text,
             placeholder: placeholder,
             keyboardType: .emailAddress,
             textContentType: .emailAddress,
-            isRequired: isRequired,
-            validationState: validationState,
-            errorMessage: validationState == .invalid ? "field.email.error_invalid".localized : nil,
-            helpText: isRequired ? "field.help.required".localized : "field.email.help".localized,
-            onCommit: onCommit
+            state: state,
+            onCommit: onCommit,
+            onLeave: onLeave
         )
     }
     
-    /// - Parameter lacksDigits: The field holds text without a digit: it is marked with a warning, and its help
-    ///   says that this is not a phone number. The warning does not stop anything.
     static func phone(
         label: String = "field.phone".localized,
         text: Binding<String>,
         placeholder: String = "field.phone.placeholder".localized,
-        isRequired: Bool = false,
-        lacksDigits: Bool = false,
-        onCommit: (() -> Void)? = nil
+        state: FieldState,
+        onCommit: (() -> Void)? = nil,
+        onLeave: (() -> Void)? = nil
     ) -> LabeledTextField {
         LabeledTextField(
             label: label,
@@ -95,10 +99,9 @@ extension LabeledTextField {
             placeholder: placeholder,
             keyboardType: .phonePad,
             textContentType: .telephoneNumber,
-            isRequired: isRequired,
-            validationState: lacksDigits ? .warning : .none,
-            helpText: lacksDigits ? "field.phone.no_digits".localized : "field.phone.help".localized,
-            onCommit: onCommit
+            state: state,
+            onCommit: onCommit,
+            onLeave: onLeave
         )
     }
     
@@ -106,24 +109,19 @@ extension LabeledTextField {
         label: String = "field.url".localized,
         text: Binding<String>,
         placeholder: String = "https://example.com",
-        helpText: String? = "field.url.help".localized,
-        onCommit: (() -> Void)? = nil
+        state: FieldState,
+        onCommit: (() -> Void)? = nil,
+        onLeave: (() -> Void)? = nil
     ) -> LabeledTextField {
-        let validationState: ValidationState = {
-            let url = text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            if url.isEmpty { return .none }
-            return url.lowercased().hasPrefix("http") ? .valid : .warning
-        }()
-        
-        return LabeledTextField(
+        LabeledTextField(
             label: label,
             text: text,
             placeholder: placeholder,
             keyboardType: .URL,
             textContentType: .URL,
-            validationState: validationState,
-            helpText: helpText,
-            onCommit: onCommit
+            state: state,
+            onCommit: onCommit,
+            onLeave: onLeave
         )
     }
 }
@@ -138,13 +136,13 @@ struct LabeledTextField_Previews: PreviewProvider {
         VStack(spacing: DesignTokens.Spacing.lg) {
             LabeledTextField(label: "Label", text: $text, placeholder: "Enter text")
             
-            LabeledTextField.email(text: $email) {
+            LabeledTextField.email(text: $email, state: FieldState(isRequired: true, helpText: "field.help.required".localized), onLeave: {
                 print("Email submitted")
-            }
+            })
             
-            LabeledTextField.phone(text: $phone)
+            LabeledTextField.phone(text: $phone, state: FieldState(validation: .warning, helpText: "field.phone.no_digits".localized))
             
-            LabeledTextField.url(text: $url)
+            LabeledTextField.url(text: $url, state: FieldState(validation: .valid, helpText: "field.url.help".localized))
             
             // Without label
             LabeledTextField(label: "", text: $text, placeholder: "No label field")

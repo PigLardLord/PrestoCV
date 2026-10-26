@@ -18,7 +18,7 @@ struct ButtonPressTests {
     func addButtonIsReadable(isPressed: Bool) {
         let title = AccentTextButtonStyle.foregroundColor(isPressed: isPressed)
         for appearance in AccentColorTests.Appearance.allCases {
-            for background in AccentColorTests.textBackgrounds {
+            for background in AccentColorTests.TextBackground.allCases {
                 let pair = AccentColorTests.ContrastPair(name: "", foreground: title, background: background.color)
                 let ratio = appearance.contrast(of: pair)
 

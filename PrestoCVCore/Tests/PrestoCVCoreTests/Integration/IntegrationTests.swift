@@ -73,8 +73,8 @@ struct IntegrationTests {
             _ = try await cvManagementUseCase.updateCV(updatedCV)
             
             // 7. User creates a second CV by duplicating the first
-            let duplicatedCV = try await cvManagementUseCase.duplicateCV(id: firstCV.id)
-            #expect(duplicatedCV.name == "John Doe action.copy_suffix")
+            let duplicatedCV = try await cvManagementUseCase.duplicateCV(id: firstCV.id, named: "John Doe (Copy)")
+            #expect(duplicatedCV.name == "John Doe (Copy)")
             
             // 8. User now has 2 CVs
             let finalCVs = try await cvManagementUseCase.getAllCVs()
@@ -85,7 +85,7 @@ struct IntegrationTests {
             let copyCV = finalCVs.first { $0.id == duplicatedCV.id }
             
             #expect(originalCV?.name == "John Doe")
-            #expect(copyCV?.name == "John Doe action.copy_suffix")
+            #expect(copyCV?.name == "John Doe (Copy)")
             #expect(originalCV?.skills.count == 3)
             #expect(copyCV?.skills.count == 3)
             
@@ -124,7 +124,7 @@ struct IntegrationTests {
             #expect(allCVs.count == 2)
             
             // 5. User can duplicate and modify CVs
-            let duplicatedCV = try await cvManagementUseCase.duplicateCV(id: secondCV.id)
+            let duplicatedCV = try await cvManagementUseCase.duplicateCV(id: secondCV.id, named: "Copy")
             
             let modifiedCV = CVModel(
                 id: duplicatedCV.id,
@@ -290,7 +290,7 @@ struct IntegrationTests {
             let nonExistentId = UUID()
             
             await #expect(throws: AppError.self) {
-                _ = try await cvManagementUseCase.duplicateCV(id: nonExistentId)
+                _ = try await cvManagementUseCase.duplicateCV(id: nonExistentId, named: "Copy")
             }
             
             // 3. System should remain consistent after error
@@ -302,7 +302,7 @@ struct IntegrationTests {
             #expect(allCVs.first?.id == cv.id) // Original CV still exists
             
             // 4. Subsequent operations should work normally
-            let duplicatedCV = try await cvManagementUseCase.duplicateCV(id: cv.id)
+            let duplicatedCV = try await cvManagementUseCase.duplicateCV(id: cv.id, named: "Copy")
             #expect(duplicatedCV.id != cv.id)
             
             let finalCVs = try await cvManagementUseCase.getAllCVs()
@@ -340,9 +340,9 @@ struct IntegrationTests {
             
             // 5. Operations on specific CVs should still work
             let randomCV = createdCVs.randomElement()!
-            let duplicatedCV = try await cvManagementUseCase.duplicateCV(id: randomCV.id)
+            let duplicatedCV = try await cvManagementUseCase.duplicateCV(id: randomCV.id, named: "\(randomCV.name) (Copy)")
             
-            #expect(duplicatedCV.name.hasSuffix("action.copy_suffix"))
+            #expect(duplicatedCV.name.hasSuffix("(Copy)"))
             
             let finalCount = try await cvManagementUseCase.getAllCVs()
             #expect(finalCount.count == cvCount + 2) // +1 onboarding, +1 duplicate
@@ -380,14 +380,14 @@ struct IntegrationTests {
             // This tests the actor isolation is working properly
             let createResult1 = try await cvManagementUseCase.createCV(from: template2)
             let createResult2 = try await cvManagementUseCase.createCV(from: template3)
-            let duplicateResult = try await cvManagementUseCase.duplicateCV(id: initialCV.id)
+            let duplicateResult = try await cvManagementUseCase.duplicateCV(id: initialCV.id, named: "Initial CV (Copy)")
             let stateResult = await onboardingUseCase.checkOnboardingRequired()
             let getAllResult = try await cvManagementUseCase.getAllCVs()
             
             // 3. Verify all operations succeeded
             #expect(createResult1.name == "Concurrent CV 1")
             #expect(createResult2.name == "Concurrent CV 2")
-            #expect(duplicateResult.name == "Initial CV action.copy_suffix")
+            #expect(duplicateResult.name == "Initial CV (Copy)")
             #expect(stateResult == .returning)
             #expect(getAllResult.count >= 1) // At least the initial CV
             
@@ -429,7 +429,7 @@ struct IntegrationTests {
             #expect(retrievedCV?.social.count == complexTemplate.social.count)
             
             // 3. Duplicate complex CV
-            let duplicatedComplexCV = try await cvManagementUseCase.duplicateCV(id: complexCV.id)
+            let duplicatedComplexCV = try await cvManagementUseCase.duplicateCV(id: complexCV.id, named: "Copy")
             
             // 4. Verify all complex data was duplicated
             #expect(duplicatedComplexCV.skills.count == complexCV.skills.count)

@@ -12,14 +12,18 @@ Each rule says what is required, why, and what enforces it:
 - **test**: a required test fails.
 - **review**: nothing automatic can catch it. Kept to a minimum, and marked as such.
 
-The checker applies to **production targets**: domain, application, integration, presentation and adapter targets, and the composition root. Test, test-support and tool targets get the import allow-lists only, plus R16 where a test plan runs them. Legacy targets are exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)), except from R15 and R16.
+The checker applies to **production targets**: domain, application, integration, presentation and adapter targets, and the composition root. Test, test-support and tool targets get the import allow-lists only, plus R16 where a test plan runs them. Legacy targets are exempt until deleted ([ADR 0012](adr/0012-legacy-targets-during-migration.md)), except from R15 and R16, and, for the legacy app and `PrestoCVCore`, from R5 and R17 ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)).
 
 ---
 
 ## R1. Packages are isolated; contexts depend only along documented edges
 
-- **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI` never import one another. Translation between them happens only in `PrestoCVIntegration`.
-- **Inside a package, contexts depend only along the edges listed in [modules.md](modules.md).** There is exactly one such edge today: in `CVPDFExporter`, Document Rendering is downstream of Design Catalog (`CVRendering` imports `CVDesignCatalog`). The reverse is forbidden.
+- **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI` never import one another. Translation between them happens only in `PrestoCVIntegration`. Each may import `DiagnosticLogging`, a leaf package with no product types, and only its port target ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)).
+- **Inside a package, contexts depend only along the edges listed in [modules.md](modules.md).** There are two such edges today, and each goes one way:
+  - in `CVPDFExporter`, Document Rendering is downstream of Design Catalog (`CVRendering` imports `CVDesignCatalog`);
+  - in `PrestoCVCore`, CV Import is downstream of CV Authoring (`PrestoCVImporting` imports `PrestoCVDomain`), so that it reads the CV's value objects and period rule instead of copying them ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)).
+
+  The reverse of either is forbidden.
 - **Any other edge** between contexts needs an ADR and an update to [modules.md](modules.md).
 - **`@_exported import` is banned.** It would re-export a module to every importer.
 
@@ -34,7 +38,7 @@ The checker applies to **production targets**: domain, application, integration,
 
 Domain, application, integration, presentation and workflow-port targets must not use:
 
-- `Bundle` (except `Bundle.module`, a package's own resources), `FileManager`, `UserDefaults`, `ProcessInfo`, `NotificationCenter`;
+- `Bundle`, `FileManager`, `UserDefaults`, `ProcessInfo`, `NotificationCenter`. `Bundle.module`, a package's own resources, is no exception: [R18](#r18-pure-targets-stay-portable-to-android) refuses it, so that the core builds for Android;
 - `Locale.current`, `TimeZone.current`, `Calendar.current` and their `autoupdatingCurrent` forms;
 - `String(localized:)`, `NSLocalizedString`, `LocalizedStringResource`, `LocalizedStringKey`;
 - `Date()`, `Date.init()`, `Date.now`, `.now` or `UUID()` / `UUID.init()` to create values. Inject a `TimeSource` or an `IDGenerator` instead;
@@ -62,7 +66,7 @@ A protocol with one implementation exists only if it is a port or has a test dou
 Only `PrestoCVComposition` creates infrastructure: repositories, stores, renderers, the compiled web-view rule list, the AI adapter, file locations, time sources, identifier generators and loggers.
 
 - The `@main` App type creates the composition **once**, as a `static let`. That is the only process-wide instance.
-- Libraries do not provide `init()`s or default arguments that create infrastructure.
+- Libraries do not provide `init()`s or default arguments that create infrastructure. [R17](#r17-dependencies-come-in-through-the-initialiser) extends this to every default argument of production code.
 - Libraries contain no containers, service locators or `static let shared` singletons.
 - Each stateful resource (the design store, the CV store) exists once per process. Across processes, the file store serialises writers with a lock ([ADR 0009](adr/0009-persisted-schema-v1.md)).
 
@@ -72,19 +76,23 @@ Only `PrestoCVComposition` creates infrastructure: repositories, stores, rendere
 
 ## R5. Views render; view models present; neither decides
 
-- **Views** (Xcode app target) render presentation state and turn status enums into localised text. They forward user intents to the view model, and never construct view models or services.
+- **Views** (Xcode app target) render presentation state and turn status enums into localised text. They forward user intents to the view model, and never construct view models or hold services. A view is given its view model, made by the composition root; only a preview, in `#if DEBUG`, makes one, with fakes.
 - **View models** (`PrestoCVPresentation`) hold presentation state and call workflow ports. Rules:
   - They depend on `PrestoCVWorkflowPorts`, never on `PrestoCVIntegration`.
   - They import `PrestoCVDomain` and `PrestoCVApplication` with `internal import`, so no domain type can appear in their public API.
   - They import no UI framework.
 - **Business rules** live in the domain or application layer of their context.
 
-**Why.** Today the rule for "a CV can be saved" lives in `CVEditorViewModel`, the export-enabled rule in `CVExportSheetView`, the AI-to-CV mapping in `AIGenerationViewModel`, and `AppRootView` is the composition root.
+**Why.** The rule for "a CV can be saved" lived in `CVEditorViewModel`, the export-enabled rule in `CVExportSheetView`, the AI-to-CV mapping in `AIGenerationViewModel`, and `AppRootView` was the composition root (#251, #256).
 
 **Enforced by:**
 - **compiler:** `internal import`. A public property of type `CV` fails with "property cannot be declared public because its type uses an internal type", as verified.
 - **compiler:** target dependencies.
 - **checker:** import allow-lists, and the `importAccess` constraint. In `PrestoCVPresentation`, `PrestoCVDomain` and `PrestoCVApplication` must be imported `internal` or narrower. A plain `import` is public in Swift 6, so it fails as well.
+- **checker:** the `viewDependency` detector. A type that conforms to `View`, or an extension of one anywhere in its target, references no type whose name ends with one of `serviceSuffixes` in `rules.json` (use cases, repositories, services, containers; another view of the target is not one), and constructs no view model. A view model is constructed by the name of its type, qualified or not (`PrestoCVPresentation.ListViewModel(…)`), or by a contextual `.init(…)` where the syntax shows a view model is expected: the type of a binding, of the property an assignment sets (through `StateObject(wrappedValue:)` and the other property wrappers), of a parameter of a type of the target (overloads are told apart by the labels of the call and of the `.init(…)`), of a `viewModel:` argument, or of a return value, a closure's included. A local or a parameter shadows a property of the same name, unless `self.` names the property. Code in an `#if DEBUG` branch is exempt.
+  - **Known limits.** The detector reads syntax only. It does not see a type that inference carries across files beyond what the pre-pass indexes (the stored properties and initialisers of the target's own types), a view model made through a generic factory or an unconstrained `some`/`any` value, or code that a macro writes. When overloads cannot be told apart by labels, it assumes the view model. Review checks R5 in these cases; what a later check finds beyond these limits is recorded, not chased.
+- **checker:** the `viewModelImport` detector. A file that declares or extends a type named `…ViewModel` imports no SwiftUI, UIKit, AppKit or WatchKit, in any form.
+- The legacy app and `PrestoCVCore` have R5 too ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)).
 - **review:** whether a view contains a business rule.
 
 ## R6. The domain is rich and keeps its invariants
@@ -92,7 +100,7 @@ Only `PrestoCVComposition` creates infrastructure: repositories, stores, rendere
 - **Behaviour, not fields.** Aggregates and entities expose behaviour, not `public var` fields. State changes go through methods.
 - **Repository-owned state.** The revision and the timestamps are assigned only by repositories (`package` access).
 - **Value objects validate on creation.** `SkillLevel` is bounded. `PartialDate` has year or month precision, and only a partial order. `EmailAddress` and `WebLink` are parsed. Identifiers are typed.
-- **A rule exists once.** Periods are built only by `Period.make(start:end:current:)`, which both persistence and the AI mapper use. A second copy anywhere is a defect.
+- **A rule exists once.** Periods are built only by `Period.make(start:end:current:)`, which both persistence and the AI mapper use. "Has enough content to be saved" is `SaveRule`, which `CV.canBeSaved` and the legacy app's editor both read. A second copy anywhere is a defect.
 - **Two separate validity rules, by design.** "Can be saved" is Authoring's rule. "Can be rendered" is the rendering policy of the published `CVDocument`. A test asserts that every saveable CV maps to a renderable document.
 
 **Why.** Today there are four definitions of "valid CV", three skill scales, three language-level parsers and four period formats.
@@ -102,6 +110,7 @@ Only `PrestoCVComposition` creates infrastructure: repositories, stores, rendere
 ## R7. Errors are typed per context and translated at the boundary
 
 - **Each context has its own error type.** Errors carry codes and file names, never paths or free-form strings.
+- **A failed write keeps its cause,** as a domain and a code (`FailureCause`), so that a failed test and a direct caller of the repository can name it. It applies to the failures a repository maps to `writeFailed`; the other classified outcomes (a read, a lock, a listing, a quarantine) are codes and keep none. The use cases translate it to `AuthoringError.unavailable` and the cause stops there, until a diagnostic boundary records it. The text the user sees does not depend on it.
 - **`CancellationError` is always passed through unchanged.**
 - **Errors are translated once, where they cross a boundary.** For example, `SaveCV` turns repository errors into `AuthoringError`. Presentation never matches the shape of a port's errors.
 - **Nothing swallows an error.** There is no `try?` and no empty `catch` in production code. A tolerated failure is mapped explicitly to a typed outcome with `do`/`catch`.
@@ -113,7 +122,7 @@ Only `PrestoCVComposition` creates infrastructure: repositories, stores, rendere
 
 ## R8. Untrusted input enters through one validating boundary
 
-Untrusted input is: design packages, AI output, persisted files, and on a backend every request. Each kind enters through one anti-corruption layer that validates it into domain types or rejects it.
+Untrusted input is: design packages, AI output, persisted files, imported documents (pasted text, PDFs) and the text read from them, and on a backend every request. Each kind enters through one anti-corruption layer that validates it into domain types or rejects it.
 
 - **Design packages** ([ADR 0011](adr/0011-typed-html-builder.md)):
   - validated on the raw bytes: size cap first, then strict decoding (unknown keys and any `htmlContent` key are rejected), identifier `[a-z0-9-]{1,64}`, the supported markup contract version, and a PNG preview within size;
@@ -130,6 +139,7 @@ Untrusted input is: design packages, AI output, persisted files, and on a backen
 - **Completeness.** Every export is checked against its own document. Every text node the builder produced (fields, headings, dates, levels) needs **its own span of the PDF text**, ignoring case and spacing, that no other node uses; longer nodes are placed first. So removing one of two identical entries is detected, so is removing a value that also appears inside another one (a skill named in the summary), and so is a value that only appears across the boundary of two others ("Greg" + "Officer" contains "go"). Link destinations are printed as text ([markup contract](../../CVPDFExporter/Docs/markup-contract.md)), so losing one is detected too, even when the clickable annotation is not part of the PDF. A shortfall fails the export.
 - **Installing a design.** A design is stored only after it has been validated and has rendered a fixture document completely. The fixture exercises every section; a truncated render is a failure. The catalog owns the rendering-gate port, and `CVRendering` implements it. The renderer contract runs the same check.
 - **Native evidence.** The native renderers must also pass a geometric check: each field inside the page, and legible. It is pending until they exist ([ADR 0003](adr/0003-one-pdf-renderer-per-platform.md)).
+- **Imported documents** ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)) enter through `ImportCV`. A PDF's bytes and pages are bounded before any text is read, the characters of a pasted or extracted text before it is analysed, and an empty, encrypted or unreadable document, or one without text, is a typed error. The values it yields are quotes of the text, checked against their spans, and e-mail addresses, phone numbers and links are kept only as the domain's value objects.
 - **Documents** arriving as JSON (backend) pass `CVDocumentValidator`: supported version, required name, bounded text and counts, valid dates and ratings.
 - **Persisted files**: see R12.
 
@@ -206,7 +216,7 @@ A platform-only target wraps **every file** entirely in its platform condition. 
   - the views of the app target (UI strings);
   - rendering, for document headings in the **document's** language.
 - **Every other target returns codes, values, typed errors and status enums.** For example, `SaveStatus.conflict`. A duplicated CV's title is composed by presentation, which knows the language. This also keeps those targets building on Linux, where `String(localized:)` does not exist.
-- **Packages that render text own their translations.** They are JSON resource files, one per language, plus an index, loaded through `Bundle.module`. A test fails if any language lacks a key or has an empty value.
+- **Packages that render text own their translations.** They are JSON files, one per language, plus an index. An adapter target of the package ships them as resources and reads them through `Bundle.module` (`CVBundledHeadings`); the rendering receives them through a port, as bytes, and reads no bundle itself ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md)). A test fails if any language lacks a key or has an empty value.
 - **Language lookup uses BCP 47:** the full tag, then the full primary language subtag. An unsupported language is a typed error, never a silent fallback to English.
 - **The app catalog** marks an entry translated only when it is.
 
@@ -247,7 +257,7 @@ A test target that a test plan runs, on a simulator or a device, reads files onl
 - **Resources the app ships**, such as the example CVs, are read from the app bundle the tests run in.
 - **A package's test resources** are declared in its manifest and read through `Bundle.module`. The markup contract page is one: `CVDesignCatalogTests` copies it.
 - **A document that an app test compares with the app**, such as `docs/design/app-icon.md`, is copied into the test bundle by the project.
-- **Checks of source text** are tests of the `Tools/SourceChecks` package ([modules.md](modules.md#tools)). `swift test` runs them where the repository is: on the Linux CI job and on the Xcode Cloud build host. They cover the string catalog, the rules the app's views follow and release hygiene. A check that also needs the app's types or UIKit stays an app test, fed from a bundle.
+- **Checks of source text** are tests of the `Tools/SourceChecks` package ([modules.md](modules.md#tools)). `swift test` runs them where the repository is: on the Linux CI job, on the Mac mini's pull request check and on the Xcode Cloud build host. They cover the string catalog, the rules the app's views follow, how the tests render views off screen, release hygiene and the deployment targets. A check that also needs the app's types or UIKit stays an app test, fed from a bundle.
 - `#filePath` and `#file` may still be the default value of a `StaticString` parameter, while the function only forwards it, unchanged, as the `file:` argument of a call. That is how XCTest reports where an assertion failed. Any other use of the parameter is refused: `String(describing:)`, an interpolation, `.description`, `withUTF8Buffer` or a copy into a variable can turn it into a path of the checkout.
 - A test that writes into the checkout on purpose, behind an environment variable that only a developer sets, is an exception in `rules.json`. Two exist: the golden file's update ([ADR 0011](adr/0011-typed-html-builder.md)) and the thumbnails of version 1's bundled designs ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)).
 
@@ -258,4 +268,32 @@ Legacy test targets follow this rule too, since the same test plan runs them.
 **Enforced by:**
 - **checker:** the `sourceTreePath` detector, in every target whose rules list R16, legacy targets included.
 - **checker:** every `.xctestplan` in the repository is read. A target that a plan runs must be in `rules.json` and must have R16.
-- **CI:** Xcode Cloud's Test action, which runs the tests without the repository.
+- **CI:** the Test action of Xcode Cloud's Release workflow, which runs the tests without the repository.
+
+## R17. Dependencies come in through the initialiser
+
+Every dependency of a type is a parameter of its initialiser, or of the function that needs it, and its caller passes it: a service, a repository, a store, a clock, a wait, the calendar, the time zone, the locale and the languages, a bundle, a folder, the launch arguments, a function that does work. Only the composition root makes the real ones: the app's entry point, which reads the device once, and the factories and containers it hands them to.
+
+- **No default argument makes a dependency or reads ambient state** in production code. It may not construct or name a type whose name ends with one of `dependencySuffixes` in `rules.json` or is an infrastructure type, be the default of a parameter of such a type, be a closure or a function that does work, or read the clock, the locale, the time zone, the calendar, the preferred languages, a bundle other than `Bundle.module`, the file system, user defaults, the process or localised text.
+- **Values may have defaults:** a margin, a page size, the length of a debounce, an empty list, `nil`, a closure that does nothing or answers a constant (`{ _ in true }`), and an entity's new identity (`id: UUID = UUID()`).
+- **Tests pass their own.** A test target may hold initialisers that give the fixed values its tests do not vary; production code may not.
+
+**Why.** Initialisers made their own services and read the clock, the locale, the main bundle and the launch arguments when the caller passed nothing. A test that forgot an argument used the device's, so it passed on one machine and failed on another (#247), and a view could make a whole export stack without anyone seeing it (#251, #256).
+
+**Enforced by:** checker (detector `defaultDependency`, in every production target, and in the legacy app and `PrestoCVCore`, [ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)) and review, for a dependency that the name of its type does not show.
+
+## R18. Pure targets stay portable to Android
+
+([ADR 0026](adr/0026-keep-the-core-portable-to-android.md))
+
+The pure targets, which R2 holds too (the domain, application, published-language, integration, presentation and workflow-port targets), build for Android, where the core will run under a Kotlin interface. In them:
+
+- **No module that only Apple platforms have** is imported, in any form: SwiftUI, UIKit, AppKit, WatchKit, Combine, CryptoKit, `os` and OSLog, NaturalLanguage, FoundationModels, PDFKit, WebKit, Vision, CoreGraphics, UniformTypeIdentifiers, Darwin and the other Apple frameworks. Code that needs one belongs in an adapter, behind a port.
+- **No bundle is read:** no `Bundle`, not even `Bundle.module`, and no `#bundle`. An Android app has no SwiftPM resource bundle, and the accessor SwiftPM generates there stops the process when the bundle is missing. The edge reads the resources and passes them in through a port, as `HeadingTableSource` does for the heading tables.
+- **An API that needs the full Foundation warns.** The full Foundation, with ICU, weighs tens of megabytes for each ABI of an Android app; `FoundationEssentials` does not have these: `NSRegularExpression`, `NSRange`, `.regularExpression`, `folding`, `replacingOccurrences`, `trimmingCharacters`, `JSONSerialization`, `NSString`, `String(format:)`, Foundation's formatters and the localised comparisons. Whether the core gives up the full Foundation is the owner's decision, after the measurements of the spike in #267. Until then each use is listed as a warning, which never fails and never enters the baseline. Where the standard library does the same, prefer it: Swift `Regex`, `Codable`.
+
+**Why.** The owner's direction for Android (2026-10-20, #267) keeps one core, in Swift. On that day the core cross-compiled for Android except the file stores, which imported the C library as `Glibc`, while the rendering read its headings from a bundle that an Android app does not have. Nothing kept the next Apple-only import or the next `Bundle.module` out of the core.
+
+**Enforced by:**
+- **checker:** the detectors `appleOnlyImport` and `bundleAccess`, and `fullFoundation` as a warning (`warningDetectors` in `rules.json`), in every target whose rules list R18. A module-qualified name, such as `Foundation.Bundle`, is checked like a bare one.
+- **CI:** the Android job on GitHub Actions builds every target that builds on Linux for `aarch64-unknown-linux-android28`, with the Swift SDK for Android. It catches what no detector sees, such as a C library imported under one platform's name: the file stores import `Glibc`, `Darwin` or `Android`.

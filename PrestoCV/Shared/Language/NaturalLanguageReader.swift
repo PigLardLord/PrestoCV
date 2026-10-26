@@ -27,10 +27,3 @@ enum NaturalLanguageReader {
         return DocumentLanguageDetector.Reading(dominantLanguage: open.dominantLanguage?.rawValue, likelihoods: likelihoods)
     }
 }
-
-extension DocumentLanguageDetector {
-    /// The detector of the app: the system's recognizer, and the languages the user reads the app in
-    static var onDevice: DocumentLanguageDetector {
-        DocumentLanguageDetector(preferredLanguages: Locale.preferredLanguages, read: NaturalLanguageReader.read)
-    }
-}

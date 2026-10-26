@@ -1,0 +1,74 @@
+/// Reads a whole source document: the noise first, then the sections, each with its reader. What no reader places
+/// stays visible as text not imported, and the final gate checks every value against its spans.
+enum CVReader {
+
+    /// What reading a document gave: the result, and the sections the document was split into, which the log counts.
+    struct Reading {
+        var result: ImportResult
+        var sections: [Section]
+    }
+
+    /// - Throws: `CancellationError` once the task is cancelled; `LimitReached` with its steps when the reading passes
+    ///   the budget of `work`.
+    static func read(_ document: SourceDocument, leftOut: [LeftOutText], work: AnalysisWork) throws -> Reading {
+        let (findings, sections) = try readSections(document, leftOut: leftOut, work: work)
+        let result = ImportResult(
+            document: document, cv: findings.cv, language: SectionSegmenter.language(of: sections, in: document),
+            unplaced: findings.unplaced.sorted { $0.span < $1.span }, leftOut: findings.leftOut
+        )
+        return Reading(result: Remainder.swept(ImportGrounding.enforced(result), sections: sections), sections: sections)
+    }
+
+    /// What the readers found in each section, before anything is checked.
+    static func readSections(
+        _ document: SourceDocument, leftOut: [LeftOutText], work: AnalysisWork
+    ) throws -> (findings: Findings, sections: [Section]) {
+        var findings = Findings(document: document, work: work)
+        findings.leftOut = leftOut
+        NoiseReader.read(into: &findings)
+        let sections = try SectionSegmenter.sections(of: document, work: &findings.work)
+
+        HeaderReader.read(
+            sections.filter { $0.kind == .header || $0.kind == .personal }, headingsThatCouldBeTheName: sections.filter(\.headingCouldBeTheName),
+            hasSummarySection: sections.contains { $0.kind == .summary }, into: &findings
+        )
+        for section in sections {
+            try Task.checkCancellation()
+            switch section.kind {
+            case .header, .personal:
+                break
+            case .summary:
+                readSummary(section, into: &findings)
+            case .experience:
+                try EntryReader.read(section, kind: .experience, into: &findings)
+            case .education:
+                try EntryReader.read(section, kind: .education, into: &findings)
+            case .skills:
+                ListReader.readSkills(section, into: &findings)
+            case .interests:
+                ListReader.readInterests(section, into: &findings)
+            case .languages:
+                LanguageReader.read(section, into: &findings)
+            case .certifications:
+                CertificationReader.read(section, into: &findings)
+            case .projects, .volunteering, .references, .drivingLicence, .additional, .unknown:
+                // The CV has no field for these: they stay visible, with their heading
+                for block in section.blocks where !findings.consumedBlocks.contains(block.index) {
+                    findings.unplace(block, in: section)
+                }
+            }
+        }
+        return (findings, sections)
+    }
+
+    /// The summary: the lines of its section, in order.
+    private static func readSummary(_ section: Section, into findings: inout Findings) {
+        let pieces = section.blocks.filter { !findings.consumedBlocks.contains($0.index) }.flatMap { section.cells(of: $0, in: findings.document) }
+        guard !pieces.isEmpty else { return }
+        if let existing = findings.cv.person.summary, existing.check == nil {
+            findings.cv.person.summary = Sourced(value: existing.value + "\n" + pieces.map(\.text).joined(separator: "\n"), spans: existing.spans + pieces.map(\.span))
+        } else {
+            findings.cv.person.summary = Sourced(value: pieces.map(\.text).joined(separator: "\n"), spans: pieces.map(\.span))
+        }
+    }
+}

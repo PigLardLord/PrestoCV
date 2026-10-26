@@ -9,7 +9,7 @@ final class KeyboardVisibility: ObservableObject {
     private let notificationCenter: NotificationCenter
     private var observers: [NSObjectProtocol] = []
 
-    init(notificationCenter: NotificationCenter = .default) {
+    init(notificationCenter: NotificationCenter) {
         self.notificationCenter = notificationCenter
         let show = notificationCenter.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.isVisible = true }
@@ -42,7 +42,19 @@ extension View {
             }
         }
     }
+
+    /// Leaves room at the end of a scrolling form for the Done button that floats above the keyboard. A field that
+    /// takes the focus is scrolled above the keyboard, and with this room above the Done button too, so that what is
+    /// typed goes into a field the person sees.
+    func keepsClearOfTheKeyboardDoneButton() -> some View {
+        safeAreaInset(edge: .bottom, spacing: 0) {
+            Color.clear.frame(height: keyboardDoneButtonClearance)
+        }
+    }
 }
+
+/// The height of the Done button over the keyboard, with the gap above it.
+private let keyboardDoneButtonClearance: CGFloat = 56
 
 extension UIApplication {
     /// Closes the keyboard, whichever field has it.

@@ -1,0 +1,13 @@
+{
+ "id": "traps/colon-dates-fr", "language": "fr", "form": "trap",
+ "person": {"name": "Sophie Martin", "title": "Chargée de communication", "email": "sophie.martin@example.org", "phone": "06 39 98 03 03",
+            "location": "Nantes", "links": [], "summary": null},
+ "experience": [
+  {"role": "Chargée de communication", "employer": "Exemple SA", "location": "Nantes", "start": [2020, null], "end": "current", "details": 1},
+  {"role": "Assistante de communication", "employer": "Mairie Exemple", "location": "Angers", "start": [2017, null], "end": [2020, null], "details": 0}
+ ],
+ "education": [{"degree": "Master Information et communication", "school": "Université de Nantes", "start": [2015, null], "end": [2017, null]}],
+ "skills": [],
+ "languages": [{"name": "anglais", "level": null}, {"name": "espagnol", "level": "b2"}],
+ "certifications": [], "interests": ["Lecture", "voile", "théâtre"]
+}

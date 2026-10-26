@@ -7,6 +7,14 @@
     }
   ],
   "defaultOptions" : {
+    "commandLineArgumentEntries" : [
+      {
+        "argument" : "-PrestoCVUnitTestHost"
+      },
+      {
+        "argument" : "YES"
+      }
+    ],
     "targetForVariableExpansion" : {
       "containerPath" : "container:PrestoCV.xcodeproj",
       "identifier" : "23E2E8A327562C01000F2E5D",

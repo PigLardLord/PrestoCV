@@ -18,7 +18,7 @@ struct DocumentLanguageDetectionTests {
     }
 
     private func detector(appLanguage: String) -> DocumentLanguageDetector {
-        DocumentLanguageDetector(preferredLanguages: [appLanguage], read: NaturalLanguageReader.read)
+        DocumentLanguageDetector(preferredLanguages: [appLanguage], read: { NaturalLanguageReader.read($0) })
     }
 
     /// A summary and two jobs, as Luca wrote them: in English, for a job abroad

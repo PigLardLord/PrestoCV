@@ -15,43 +15,6 @@ public protocol OnboardingUseCaseProtocol: Sendable {
     func createFirstCV(from template: CVModel) async throws -> CVModel
 }
 
-/// Keeps the edits that the editor has not saved yet on the device, so that they survive the app being ended, and
-/// finds them again. Each set of edits has one holder at a time, an editor or a window, which alone changes them.
-public protocol UnsavedEditsUseCaseProtocol: Sendable {
-    /// Takes the edits of a new editing, which has kept nothing yet, for its editor.
-    /// - Returns: The claim, or nil when the editing is held already
-    func claimEditing(_ editing: UUID) async -> UnsavedEditsClaim?
-    
-    /// Takes offered edits for one window, which then restores or discards them. Edits are held by one window or
-    /// editor at a time, and only while they are kept as they were offered: an offer another window holds, or one that
-    /// is no longer what is kept, is refused, and holds nothing.
-    /// - Returns: The claim, or nil when the edits cannot be taken
-    /// - Throws: AppError if the kept edits cannot be read
-    func claim(_ edits: UnsavedEdits) async throws -> UnsavedEditsClaim?
-    
-    /// Lets go of edits: they are offered again, unless they were removed. A claim that no longer holds them does nothing.
-    func release(_ claim: UnsavedEditsClaim) async
-    
-    /// Keeps the CV as the editor shows it, replacing what the editing kept before.
-    /// - Parameters:
-    ///   - cv: The CV as the editor shows it, with the id it is stored under or will be
-    ///   - base: The stored CV the edits were made on, or what a save that has started is storing; nil when nothing
-    ///     was stored yet
-    ///   - claim: The claim that holds the editing
-    /// - Throws: `UnsavedEditsError.notHeld` if the claim does not hold the editing; AppError if they cannot be kept
-    func keep(_ cv: CVModel, over base: CVModel?, as claim: UnsavedEditsClaim) async throws
-    
-    /// Removes what an editing kept, once its edits were saved or discarded.
-    /// - Throws: `UnsavedEditsError.notHeld` if the claim does not hold the editing; AppError if they cannot be removed
-    func discard(as claim: UnsavedEditsClaim) async throws
-    
-    /// The latest kept edits that nobody holds: left by an earlier run of the app, or by an editor that went away
-    /// without saving or discarding them.
-    /// - Returns: The edits to offer to restore, or nil when there are none
-    /// - Throws: AppError if the kept edits cannot be listed
-    func editsToRestore() async throws -> UnsavedEdits?
-}
-
 /// Protocol for comprehensive CV management operations
 public protocol CVManagementUseCaseProtocol: Sendable {
     /// Retrieves all user's CVs
@@ -93,11 +56,13 @@ public protocol CVManagementUseCaseProtocol: Sendable {
     /// - Throws: AppError if deletion fails
     func deleteCV(id: UUID) async throws
     
-    /// Creates a duplicate copy of an existing CV
-    /// - Parameter id: The UUID of the CV to duplicate
-    /// - Returns: The new duplicated CVModel with a unique ID and modified name
+    /// Stores a copy of an existing CV, under a new identity
+    /// - Parameters:
+    ///   - id: The UUID of the CV to duplicate
+    ///   - name: The name of the copy, which the caller gives it by the rule of PrestoCVDomain (`CVTitle.copyName`)
+    /// - Returns: The copy, as stored
     /// - Throws: AppError if source CV doesn't exist or duplication fails
-    func duplicateCV(id: UUID) async throws -> CVModel
+    func duplicateCV(id: UUID, named name: String) async throws -> CVModel
     
     /// Retrieves a specific CV by its unique identifier
     /// - Parameter id: The UUID of the CV to retrieve

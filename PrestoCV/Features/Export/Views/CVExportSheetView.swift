@@ -5,9 +5,6 @@ import PrestoCVCore
 import CVPDFExporter
 
 struct CVExportSheetView: View {
-    let cv: CVModel
-    /// Takes the language chosen for the PDF in the sheet, for the CV to keep; nil is automatic
-    let onDocumentLanguageChange: (DocumentLanguage?) -> Void
     @StateObject private var viewModel: CVExportSheetViewModel
     @StateObject private var previewCoordinator = HTMLPreviewCoordinator()
     /// The PDF in the share sheet, while the share sheet is open
@@ -15,16 +12,14 @@ struct CVExportSheetView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var loadingTemplates = true
     /// The room for the designs, fonts and colours grows with the text, so that their names are not cut, until the
     /// preview above them would be left with too little.
     @ScaledMetric(relativeTo: .footnote) private var optionsHeight: CGFloat = 300
     private let largestOptionsHeight: CGFloat = 420
 
-    init(cv: CVModel, onDocumentLanguageChange: @escaping (DocumentLanguage?) -> Void) {
-        self.cv = cv
-        self.onDocumentLanguageChange = onDocumentLanguageChange
-        self._viewModel = StateObject(wrappedValue: CVExportSheetViewModel(cv: cv))
+    /// The view model is built once, when the sheet first appears, and survives every re-render of the screen under it.
+    init(viewModel: @autoclosure @escaping () -> CVExportSheetViewModel) {
+        self._viewModel = StateObject(wrappedValue: viewModel())
     }
 
     var body: some View {
@@ -39,6 +34,17 @@ struct CVExportSheetView: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                         previewFooter
+                    }
+
+                    if let warning = viewModel.shareWarning {
+                        Label(warning, systemImage: "exclamationmark.circle")
+                            .typography(.footnote)
+                            .foregroundColor(DesignTokens.Colors.secondary)
+                            .multilineTextAlignment(.center)
+                            // The sentence is shown whole, as the one below; the PDF is made all the same
+                            .fixedSize(horizontal: false, vertical: true)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+                            .padding(.horizontal, DesignTokens.Spacing.lg)
                     }
 
                     if let blocker = viewModel.shareBlocker {
@@ -87,7 +93,7 @@ struct CVExportSheetView: View {
                 }
             }
             .overlay {
-                if loadingTemplates {
+                if viewModel.isLoadingTemplates {
                     LoadingView.fullscreen()
                 }
             }
@@ -100,15 +106,7 @@ struct CVExportSheetView: View {
                 Text(viewModel.errorMessage ?? "")
             })
             .task {
-                // Loading the templates sets the selection, which starts the first preview
-                await viewModel.loadTemplates()
-                loadingTemplates = false
-            }
-            .onChange(of: viewModel.selection) {
-                viewModel.requestPreview(for: cv)
-            }
-            .onChange(of: viewModel.documentLanguageChoice) { _, choice in
-                onDocumentLanguageChange(choice)
+                await viewModel.start()
             }
             .onChange(of: viewModel.shareConfirmationText) { _, confirmation in
                 if let confirmation {
@@ -155,7 +153,7 @@ struct CVExportSheetView: View {
                             viewModel.reportPreviewLoadFailure(error)
                         }
                     }
-            } else if viewModel.isPreviewLoading || loadingTemplates {
+            } else if viewModel.isPreviewLoading || viewModel.isLoadingTemplates {
                 ProgressView()
                     .aspectRatio(viewModel.aspectRatio, contentMode: .fit)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -236,7 +234,7 @@ struct CVExportSheetView: View {
     private var templateCarousel: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: DesignTokens.Spacing.md) {
-                if loadingTemplates {
+                if viewModel.isLoadingTemplates {
                     OptionCarouselItem(isSelected: false, isInteractive: false, action: {}) {
                         ProgressView()
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -538,36 +536,16 @@ private extension FontScheme {
     }
 }
 
-private extension Color {
-    static func fromHex(_ hex: String) -> Color {
-        var sanitized = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        if sanitized.count == 3 {
-            sanitized = sanitized.reduce(into: "") { result, character in
-                result.append(String(repeating: character, count: 2))
-            }
-        }
-
-        guard sanitized.count == 6,
-              let value = UInt64(sanitized, radix: 16) else {
-            return DesignTokens.Colors.backgroundSecondary
-        }
-
-        let red = Double((value & 0xFF0000) >> 16) / 255
-        let green = Double((value & 0x00FF00) >> 8) / 255
-        let blue = Double(value & 0x0000FF) / 255
-
-        return Color(red: red, green: green, blue: blue)
-    }
-}
 
 
-
+#if DEBUG
 #Preview("CV Export Sheet") {
     // Use the comprehensive sample CV from CVPDFExporter
     let adapter = CVDocumentAdapter()
     let mockCV = adapter.convertToCVModel(from: SampleCVData.complete)
 
-    return CVExportSheetView(cv: mockCV) { _ in }
+    return CVExportSheetView(viewModel: PreviewDependencies.exportSheet(for: mockCV, sink: { _ in }))
 }
+#endif
 
 

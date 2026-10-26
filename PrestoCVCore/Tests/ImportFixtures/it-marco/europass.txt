@@ -1,0 +1,43 @@
+FORMATO EUROPEO PER IL CURRICULUM VITAE
+
+INFORMAZIONI PERSONALI
+Nome	Esposito Marco
+Indirizzo	Via Esempio 12, 40121 Bologna
+Telefono	+39 347 000 0202
+E-mail	marco.esposito@example.org
+Nazionalità	Italiana
+Data di nascita	14/05/1992
+
+ESPERIENZA LAVORATIVA
+• Date (da – a)	Gennaio 2020 – ATTUALE
+• Nome e indirizzo del datore di lavoro	Esempio Software S.r.l., Via Esempio 1, Bologna
+• Tipo di azienda o settore	Informatica
+• Tipo di impiego	Senior Developer
+• Principali mansioni e responsabilità	Sviluppo di app iOS e Android per il settore bancario; Guida di un gruppo di quattro sviluppatori
+
+• Date (da – a)	Giugno 2016 – dicembre 2019
+• Nome e indirizzo del datore di lavoro	Agenzia Esempio, Via Esempio 1, Modena
+• Tipo di azienda o settore	Comunicazione
+• Tipo di impiego	Sviluppatore web
+• Principali mansioni e responsabilità	Siti e negozi online per clienti locali
+
+ISTRUZIONE E FORMAZIONE
+• Date (da – a)	2012 – 2016
+• Nome e tipo di istituto di istruzione o formazione	Università di Bologna
+• Principali materie / abilità professionali oggetto dello studio	Programmazione, basi di dati
+• Qualifica conseguita	Laurea in Informatica
+
+CAPACITÀ E COMPETENZE PERSONALI
+Acquisite nel corso della vita e della carriera ma non necessariamente riconosciute da certificati e diplomi ufficiali.
+MADRELINGUA	Italiano
+ALTRE LINGUE
+	Inglese
+• Capacità di lettura	buono
+• Capacità di scrittura	buono
+• Capacità di espressione orale	buono
+
+CAPACITÀ E COMPETENZE TECNICHE	Swift, Kotlin, TypeScript, Git
+
+PATENTE O PATENTI	B
+
+Autorizzo il trattamento dei miei dati personali ai sensi del D.Lgs. 196/2003 e del Regolamento UE 2016/679.

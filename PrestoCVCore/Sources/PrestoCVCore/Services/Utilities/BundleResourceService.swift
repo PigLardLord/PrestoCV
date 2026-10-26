@@ -4,7 +4,7 @@ actor BundleResourceService: BundleResourceServiceProtocol {
     
     private let bundle: Bundle
     
-    init(bundle: Bundle = .main) {
+    init(bundle: Bundle) {
         self.bundle = bundle
     }
     

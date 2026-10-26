@@ -4,7 +4,6 @@ import FoundationModels
 
 /// CV generation service using Apple's FoundationModels
 /// Requires iOS 26+ / macOS 26+ and Apple Intelligence-capable device
-@available(iOS 26, macOS 26, *)
 @MainActor
 public final class FoundationModelsService: CVGenerationService {
     /// Where the fixed instructions travel. `.promptPrefix` is the alternative should the
@@ -30,7 +29,7 @@ public final class FoundationModelsService: CVGenerationService {
                 to: prompt.text,
                 generating: CVData.self,
                 includeSchemaInPrompt: true,
-                options: GenerationOptions(sampling: .greedy)
+                options: GenerationOptions(samplingMode: .greedy)
             )
             return response.content
         } catch is CancellationError {

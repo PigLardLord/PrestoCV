@@ -1,6 +1,8 @@
 import Foundation
 import PDFKit
 import CoreGraphics
+import Synchronization
+import UIKit
 
 /// Where the text of a PDF is, page by page, as PDFKit reads it back: enough to judge how a design paginates
 struct PDFLayout {
@@ -27,15 +29,24 @@ struct PDFLayout {
     let pageSize: CGSize
     let margins: (top: CGFloat, left: CGFloat, bottom: CGFloat, right: CGFloat)
 
+    /// The sizes of the fonts the text is set in, in points to a tenth, as PDFKit reads them back. Reading them is by far the
+    /// dearest part of reading a PDF back: PDFKit looks up each font by name, fails, and logs a note for every run of text.
+    /// Few tests ask, so they are read on the first use and then kept.
+    var fontSizes: Set<Double> { fonts.sizes }
+
+    private let fonts: Fonts
+
     var pageCount: Int { pages.count }
     var blankPageNumbers: [Int] { pages.indices.filter { pages[$0].isBlank }.map { $0 + 1 } }
     var text: String { pages.map(\.text).joined(separator: "\n") }
 
     init?(pdf url: URL, margins: (top: CGFloat, left: CGFloat, bottom: CGFloat, right: CGFloat)) {
-        guard let document = PDFDocument(url: url), document.pageCount > 0 else { return nil }
+        guard let data = try? Data(contentsOf: url),
+              let document = PDFDocument(data: data), document.pageCount > 0 else { return nil }
         let first = document.page(at: 0)!.bounds(for: .mediaBox)
         self.pageSize = first.size
         self.margins = margins
+        self.fonts = Fonts(pdf: data)
         self.pages = (0..<document.pageCount).map { index in
             let page = document.page(at: index)!
             let selection = page.selection(for: page.bounds(for: .mediaBox))
@@ -49,6 +60,46 @@ struct PDFLayout {
         }
     }
 
+    /// The fonts of a PDF, read on first use. The layout keeps the bytes of the PDF, because the tests delete its file once it
+    /// is read back.
+    private final class Fonts: Sendable {
+        private let pdf: Data
+        private let memo = Mutex<Set<Double>?>(nil)
+
+        init(pdf: Data) { self.pdf = pdf }
+
+        var sizes: Set<Double> {
+            memo.withLock { memo in
+                if let memo { return memo }
+                var found = Set<Double>()
+                if let document = PDFDocument(data: pdf) { found = PDFLayout.fontSizes(of: document) }
+                memo = found
+                return found
+            }
+        }
+    }
+
+    private static func fontSizes(of document: PDFDocument) -> Set<Double> {
+        var sizes = Set<Double>()
+        for index in 0..<document.pageCount {
+            guard let text = document.page(at: index)?.attributedString else { continue }
+            text.enumerateAttribute(.font, in: NSRange(location: 0, length: text.length)) { value, _, _ in
+                if let font = value as? UIFont { sizes.insert((Double(font.pointSize) * 10).rounded() / 10) }
+            }
+        }
+        return sizes
+    }
+
+    /// Whether the text is set in the sizes of `other`, give or take what a reader of the PDF cannot tell apart from the
+    /// same size: a tenth of a point (the sizes are read back to a tenth) and half a percent. WebKit prints a design such as
+    /// Modern, whose page does not fit the printable width, scaled to fit, and the scale follows the height of the printable
+    /// area: with the same CSS and no step, the name of the CV is 28.8 pt with a foot margin of 20 pt, 29.0 pt with 43 pt and
+    /// 29.1 pt with 72 pt. A step that set a font size would move it by more than that.
+    func fontSizes(matching other: PDFLayout) -> Bool {
+        let mine = fontSizes.sorted(), theirs = other.fontSizes.sorted()
+        return mine.count == theirs.count && zip(mine, theirs).allSatisfy { abs($0 - $1) <= 0.1 + $1 * 0.005 + 1e-9 }
+    }
+
     /// How much of the height between the margins the text of a page uses, from 0 to 1
     func fill(ofPage number: Int) -> Double {
         guard let lowest = pages[number - 1].lowestTextEdge else { return 0 }
@@ -56,14 +107,15 @@ struct PDFLayout {
         return Double(((pageSize.height - margins.top) - lowest) / printableHeight)
     }
 
-    /// Whether all the text of a page is inside the margins, give or take a point
-    func isInsideMargins(page number: Int, tolerance: CGFloat = 2) -> Bool {
+    /// Whether all the text of a page is inside the margins, give or take a point. `bottomMargin` stands for the margin at
+    /// the foot of the page, when the page is allowed to go closer to it than the margins the layout was made with.
+    func isInsideMargins(page number: Int, tolerance: CGFloat = 2, bottomMargin: CGFloat? = nil) -> Bool {
         let page = pages[number - 1]
         guard let left = page.leftmostTextEdge, let right = page.rightmostTextEdge,
               let low = page.lowestTextEdge, let high = page.highestTextEdge else { return true }
         return left >= margins.left - tolerance
             && right <= pageSize.width - margins.right + tolerance
-            && low >= margins.bottom - tolerance
+            && low >= (bottomMargin ?? margins.bottom) - tolerance
             && high <= pageSize.height - margins.top + tolerance
     }
 
@@ -145,6 +197,23 @@ extension PDFLayout {
         return found
     }
 
+    /// The pairs of lines on a page that run into each other by more than `tolerance` points, side to side and top to
+    /// bottom: text set so close that one line is drawn over the next
+    func overlappingLines(tolerance: CGFloat = 3) -> [String] {
+        var found: [String] = []
+        for (index, page) in pages.enumerated() {
+            for (position, line) in page.lines.enumerated() {
+                for other in page.lines[(position + 1)...] {
+                    let overlap = line.bounds.intersection(other.bounds)
+                    if !overlap.isNull && overlap.width > tolerance && overlap.height > tolerance {
+                        found.append("page \(index + 1): \"\(line.text)\" and \"\(other.text)\"")
+                    }
+                }
+            }
+        }
+        return found
+    }
+
     /// The lines that start or end with `separator`: a mark between two items, left at the edge of a line by a wrap
     func linesWithSeparatorAtAnEdge(_ separator: Character = "\u{2022}") -> [String] {
         var found: [String] = []
@@ -182,6 +251,28 @@ extension PDFLayout {
     func missing(markers: [String]) -> [String] {
         let flat = text.filter { !$0.isWhitespace }
         return markers.filter { !flat.contains($0.filter { !$0.isWhitespace }) }
+    }
+
+    /// The runs in `runs` that the text of the PDF does not read whole, one after the other, in this order: a run is a title
+    /// with the items under it, and an item set among the items of another run, or a title in the middle of a list, breaks it.
+    /// Upper and lower case, white space and the marks between words (a dash, a colon, a comma) do not count.
+    /// The text is the lines of the pages from the top down, so a design that sets its lists in columns is not read by it.
+    func unreadRuns(_ runs: [String]) -> [String] {
+        let flat = Self.lettersAndDigits(text)
+        var position = flat.startIndex
+        var unread: [String] = []
+        for run in runs {
+            if let found = flat.range(of: Self.lettersAndDigits(run), range: position..<flat.endIndex) {
+                position = found.upperBound
+            } else {
+                unread.append(run)
+            }
+        }
+        return unread
+    }
+
+    private static func lettersAndDigits(_ text: String) -> String {
+        String(text.lowercased().filter { $0.isLetter || $0.isNumber })
     }
 
     private func isEntryTitle(_ line: Line, _ pattern: String) -> Bool {

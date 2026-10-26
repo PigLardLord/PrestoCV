@@ -1,0 +1,41 @@
+Certo! Ecco il tuo CV in un formato chiaro e professionale:
+
+# Marco Esposito
+**Sviluppatore software**
+📍 Bologna, Italia | 📞 +39 347 000 0202 | ✉️ marco.esposito@example.org | 🔗 linkedin.com/in/marco-esposito-example
+
+---
+
+## Profilo professionale
+Sviluppatore con otto anni di esperienza in applicazioni web e mobili, appassionato di accessibilità e di codice pulito.
+
+## Esperienza professionale
+**Senior Developer** | Esempio Software S.r.l. | Bologna | 01/2020 – oggi
+- Sviluppo di app iOS e Android per il settore bancario
+- Guida di un gruppo di quattro sviluppatori
+
+**Sviluppatore web** | Agenzia Esempio | Modena | 06/2016 – 12/2019
+- Siti e negozi online per clienti locali
+
+## Istruzione e formazione
+### Laurea in Informatica
+Università di Bologna, Bologna | 2012 – 2016
+
+## Competenze
+- Swift, Kotlin, TypeScript, Git
+
+## Lingue
+| Lingua | Livello |
+|---|---|
+| Italiano | madrelingua |
+| Inglese | C1 |
+
+## Certificazioni
+- Scrum Master – Scrum Alliance (2022)
+
+## Interessi
+Ciclismo, Musica jazz
+
+---
+
+Fammi sapere se vuoi una versione più breve o tradotta in inglese!

@@ -35,12 +35,27 @@ enum RepositorySources {
 
     /// The Swift files under a folder of the repository.
     static func swiftFiles(in folder: String) throws -> [File] {
-        guard let enumerator = FileManager.default.enumerator(at: root.appendingPathComponent(folder), includingPropertiesForKeys: nil) else {
+        try swiftFiles(under: root.appendingPathComponent(folder)) { _ in true }
+    }
+
+    /// The Swift files of the tests: those under a folder whose name ends in `Tests`, such as `PrestoCVTests` or the
+    /// `Tests` of a package, anywhere in the repository.
+    static func testFiles() throws -> [File] {
+        try swiftFiles(under: root) { path in path.split(separator: "/").dropLast().contains { $0.hasSuffix("Tests") } }
+    }
+
+    /// The Swift files under a folder whose path from the root is included. Hidden folders, such as the build folder
+    /// of a package, are skipped.
+    private static func swiftFiles(under folder: URL, where included: (String) -> Bool) throws -> [File] {
+        guard let enumerator = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) else {
             return []
         }
         var files: [File] = []
         for case let url as URL in enumerator where url.pathExtension == "swift" {
-            files.append(File(path: String(url.path.dropFirst(root.path.count + 1)), text: try String(contentsOf: url, encoding: .utf8)))
+            let path = String(url.path.dropFirst(root.path.count + 1))
+            if included(path) {
+                files.append(File(path: path, text: try String(contentsOf: url, encoding: .utf8)))
+            }
         }
         return files.sorted { $0.path < $1.path }
     }

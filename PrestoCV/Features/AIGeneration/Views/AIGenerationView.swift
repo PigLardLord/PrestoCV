@@ -29,7 +29,7 @@ struct AIGenerationView: View {
         .screenTitle("navigation.ai_generation".localized, large: true)
         .overlay {
             if viewModel.isGenerating {
-                GeneratingOverlay(onCancel: viewModel.cancel)
+                GeneratingOverlay(isWaitingForLanguageData: viewModel.isWaitingForLanguageData, onCancel: viewModel.cancel)
             }
         }
         .alert("common.error".localized, isPresented: .constant(!viewModel.errorMessage.isEmpty)) {
@@ -139,22 +139,32 @@ struct AIGenerationView: View {
 
 // MARK: - Generating Overlay
 
-/// Covers the screen while the model works, and lets the person stop it.
+/// Covers the screen while the model works, or while the system gets the language data it needs, and lets the person stop it.
 private struct GeneratingOverlay: View {
+    /// The screen waits for the language data and not for the model, which the screen says apart from the model's minute.
+    let isWaitingForLanguageData: Bool
     let onCancel: () -> Void
 
     var body: some View {
         VStack(spacing: DesignTokens.Spacing.md) {
-            LoadingView(message: "ai.generation.loading_message".asLoclizedKey)
+            // The label is what VoiceOver reads: while the app waits for the data it says so, instead of only "Processing..."
+            LoadingView(message: message, voiceOverLabel: isWaitingForLanguageData ? message : "common.processing".asLoclizedKey)
 
-            Text("ai.generation.time_note".localized)
-                .typography(.caption1)
-                .foregroundColor(DesignTokens.Colors.secondary)
+            // The model's minute does not hold while the app waits for the data: the system sets that pace, so there is no time here
+            if !isWaitingForLanguageData {
+                Text("ai.generation.time_note".localized)
+                    .typography(.caption1)
+                    .foregroundColor(DesignTokens.Colors.secondary)
+            }
 
             SecondaryButton(title: "common.cancel".localized, action: onCancel)
         }
         .padding(DesignTokens.Spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DesignTokens.Colors.background)
+    }
+
+    private var message: LocalizedStringKey {
+        isWaitingForLanguageData ? "ai.generation.language_data_message".asLoclizedKey : "ai.generation.loading_message".asLoclizedKey
     }
 }

@@ -20,11 +20,15 @@
     }, {
       "kind": "local",
       "path": "CVGeneratorAI",
+    }, {
+      "kind": "local",
+      "path": "DiagnosticLogging",
     },
   ],
   "files": [
     { "path": "CVGeneratorAI" },
     { "path": "CVPDFExporter" },
+    { "path": "DiagnosticLogging" },
     { "path": "<PROJECT>/PrestoCVCore" },
     {
       "kind": "folder",
@@ -36,6 +40,7 @@
         {
           "target": "PrestoCV",
           "exclusions": [
+            "Info.plist",
             "Resources/Samples/academic.cv.json",
             "Resources/Samples/business.cv.json",
             "Resources/Samples/creative.cv.json",
@@ -48,6 +53,8 @@
     { "kind": "folder", "path": "PrestoCVTests", "target-membership": [ "PrestoCVTests" ] },
     { "path": "docs/design/app-icon.md", "target-membership": [ "PrestoCVTests/resources" ] },
     { "kind": "folder", "path": "PrestoCVUITests", "target-membership": [ "PrestoCVUITests" ] },
+    { "path": "PrestoCVCore/Tests/ImportFixtures/de-jonas/chat.txt", "target-membership": [ "PrestoCVUITests/resources" ] },
+    { "path": "PrestoCVCore/Tests/ImportFixtures/en-emily/linkedin.pdf", "target-membership": [ "PrestoCVUITests/resources" ] },
     { "path": "<PRODUCTS>/PrestoCV.app", "id": "237D7D9E2E91379300212357", "type": "wrapper.application", "index": false },
     { "path": "<PRODUCTS>/PrestoCVTests.xctest", "id": "237D7D9F2E91379300212357", "type": "wrapper.cfbundle", "index": false },
     { "path": "<PRODUCTS>/PrestoCVUITests.xctest", "id": "237D7DA02E91379300212357", "type": "wrapper.cfbundle", "index": false },
@@ -71,7 +78,25 @@
           "product-name": "CVPDFExporter",
           "build-phase": { "build-phase": "frameworks" },
         }, {
+          "product-name": "DiagnosticLogging",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "product-name": "DiagnosticLoggingOSLog",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
           "product-name": "PrestoCVCore",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "product-name": "PrestoCVDomain",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "product-name": "PrestoCVApplication",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "product-name": "PrestoCVImporting",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "product-name": "PrestoCVImportingPDFKit",
           "build-phase": { "build-phase": "frameworks" },
         },
       ],
@@ -83,6 +108,7 @@
         "DEVELOPMENT_ASSET_PATHS": "\"PrestoCV/Preview Content\"",
         "ENABLE_PREVIEWS": "YES",
         "GENERATE_INFOPLIST_FILE": "YES",
+        "INFOPLIST_FILE": "PrestoCV/Info.plist",
         "INFOPLIST_KEY_CFBundleDisplayName": "PrestoCV",
         "INFOPLIST_KEY_UIApplicationSceneManifest_Generation": "YES",
         "INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents": "YES",
@@ -90,7 +116,7 @@
         "INFOPLIST_KEY_ITSAppUsesNonExemptEncryption": "NO",
         "INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad": "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight",
         "INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone": "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight",
-        "IPHONEOS_DEPLOYMENT_TARGET": "26.0",
+        "IPHONEOS_DEPLOYMENT_TARGET": "26.5",
         "LD_RUNPATH_SEARCH_PATHS": [
           "$(inherited)",
           "@executable_path/Frameworks",
@@ -122,7 +148,7 @@
         "CODE_SIGN_STYLE": "Automatic",
         "CURRENT_PROJECT_VERSION": "1",
         "GENERATE_INFOPLIST_FILE": "YES",
-        "IPHONEOS_DEPLOYMENT_TARGET": "26.0",
+        "IPHONEOS_DEPLOYMENT_TARGET": "26.5",
         "LD_RUNPATH_SEARCH_PATHS": [
           "$(inherited)",
           "@executable_path/Frameworks",
@@ -154,7 +180,7 @@
         "CODE_SIGN_STYLE": "Automatic",
         "CURRENT_PROJECT_VERSION": "1",
         "GENERATE_INFOPLIST_FILE": "YES",
-        "IPHONEOS_DEPLOYMENT_TARGET": "26.0",
+        "IPHONEOS_DEPLOYMENT_TARGET": "26.5",
         "LD_RUNPATH_SEARCH_PATHS": [
           "$(inherited)",
           "@executable_path/Frameworks",
@@ -224,7 +250,7 @@
     "GCC_WARN_UNINITIALIZED_AUTOS": "YES_AGGRESSIVE",
     "GCC_WARN_UNUSED_FUNCTION": "YES",
     "GCC_WARN_UNUSED_VARIABLE": "YES",
-    "IPHONEOS_DEPLOYMENT_TARGET": "26.0",
+    "IPHONEOS_DEPLOYMENT_TARGET": "26.5",
     "MTL_ENABLE_DEBUG_INFO[config=Debug]": "INCLUDE_SOURCE",
     "MTL_ENABLE_DEBUG_INFO[config=Release]": "NO",
     "MTL_FAST_MATH": "YES",

@@ -76,6 +76,120 @@ struct Grounding {
             speaks(at: Place(sentence: place.sentence, clause: place.clause - 1))
         }
 
+        /// The positions of the words of the clause at `place` that claim a skill, an interest, a language, or the person's title or
+        /// place (#202): none when the clause claims nothing (`claims(at:)`); otherwise every word before a relative that brings in
+        /// another subject ("I work with a colleague who speaks French", see `RelativeClauses`), but for the words inside quotation
+        /// marks (`QuotedSpeech`), which are someone else's, or only quoted.
+        func claimedWords(at place: Place) -> Set<Int> {
+            guard claims(at: place) else { return [] }
+            let clause = clauses.clause(at: place)
+            let end = RelativeClauses.start(in: clause, language: language) ?? clause.words.count
+            return Set(0..<end).subtracting(clauses.quotedWords(at: place))
+        }
+
+        /// Whether the clause at `place` claims a skill, an interest or a language for the person (#202): it speaks for the person,
+        /// holds no word that withdraws a claim (`Vocabulary.withdrawals`: "never", "would", "if", but not "can" or "partly"), asks
+        /// nothing (its sentence ends with a question mark), stands on no line that another person's line introduces ("My
+        /// colleague wrote:"), follows no clause of its sentence that opens with a word of condition ("If I had time, I would play
+        /// chess"), and, when it depends on the clause before it (a clause split off by a comma or a conjunction that has no verb,
+        /// starts with its verb, or says nothing as a fact, such as "Spanisch zu lernen"), that clause claims to its last word:
+        /// "I have never used Java or Swift" claims neither, "Ich träume davon, Spanisch zu lernen" no Spanish, and "a colleague who
+        /// speaks French and German" no German. A clause that states nothing as a fact shares the withdrawal of the clause after it:
+        /// "Spanisch zu lernen, davon träume ich" gives no Spanish either.
+        ///
+        /// A negation or a hedge that governs a word of level bears on the level alone: "I am not an expert in Swift" and "I have
+        /// never been fluent in German" claim Swift and German, and the level, which they deny, is not stated
+        /// (`DescriptionText.levels`). A negation of the verb withdraws the claim, though a word of level follows: "I cannot speak
+        /// German even at a basic level", "I don't speak French fluently".
+        private func claims(at place: Place) -> Bool {
+            let clause = clauses.clause(at: place)
+            guard speaks(at: place), !withdraws(clause), !asks(at: place), !isIntroduced(place.sentence) else { return false }
+            let supposed = (0..<place.clause).contains { index in
+                let opening = clauses.clause(at: Place(sentence: place.sentence, clause: index)).words.first
+                return opening.map { Vocabulary.isCondition($0.folded, in: language) } ?? false
+            }
+            guard !supposed, !(statesNothing(at: place) && isWithdrawnAhead(of: place)) else { return false }
+            if clause.isAnchored { return true }
+
+            let statement = Statement(clause: clause, quotes: all, language: language)
+            guard statement.startsWithItsVerb || !statement.hasVerbs || !statement.isFactual else { return true }
+            let previous = Place(sentence: place.sentence, clause: place.clause - 1)
+            return claimedWords(at: previous).contains(clauses.clause(at: previous).words.count - 1)
+        }
+
+        /// Whether the clause at `place` asks rather than claims: its sentence ends with a question mark ("Do I speak French?",
+        /// "Parlo francese e tedesco, giusto?"). A question mark inside a sentence ends no clause.
+        private func asks(at place: Place) -> Bool {
+            clauses.sentences[place.sentence].last?.endsAQuestion == true
+        }
+
+        /// Whether the sentence at `sentence` stands on the line right after a line that ends with a colon and that does not speak for
+        /// the person ("My colleague wrote:", "Il mio collega ha scritto:"): it gives another person's words, all its sentences. A line
+        /// the person speaks introduces the person's own ("My languages:", "Skills:", "I worked with my team on:").
+        private func isIntroduced(_ sentence: Int) -> Bool {
+            guard let line = clauses.lineStart(of: sentence), line > 0 else { return false }
+            let before = clauses.sentences[line - 1]
+            guard before.last?.endsWithAColon == true else { return false }
+            return before.indices.contains { !speaks(at: Place(sentence: line - 1, clause: $0)) }
+        }
+
+        /// Whether the clause at `place` states nothing as a fact, and takes no fact from a clause before it: it has no verb, or none
+        /// that is factual ("Spanisch zu lernen", "Spanish"), and it starts its sentence or a semicolon, or a comma or a conjunction
+        /// split it off from a clause that states nothing either. A fragment of a fact ("I speak Italian, English") states its fact.
+        private func statesNothing(at place: Place) -> Bool {
+            let clause = clauses.clause(at: place)
+            let statement = Statement(clause: clause, quotes: all, language: language)
+            guard !statement.hasVerbs || !statement.isFactual else { return false }
+            return clause.isAnchored || statesNothing(at: Place(sentence: place.sentence, clause: place.clause - 1))
+        }
+
+        /// Whether a clause after `place` in its sentence, split off by a comma or a conjunction, withdraws the claim, directly or through
+        /// clauses that state nothing as a fact: "Spanisch zu lernen, davon träume ich", "Python, Java and Swift, which I have never
+        /// used".
+        private func isWithdrawnAhead(of place: Place) -> Bool {
+            let next = Place(sentence: place.sentence, clause: place.clause + 1)
+            guard next.clause < clauses.sentences[place.sentence].count else { return false }
+            let clause = clauses.clause(at: next)
+            guard !clause.isAnchored else { return false }
+            return withdraws(clause) || (statesNothing(at: next) && isWithdrawnAhead(of: next))
+        }
+
+        /// Whether the clause withdraws its claim: some word of it does, and not only negations or hedges (`StatementWords.hedges`)
+        /// that each govern a word of level, which deny the level alone.
+        private func withdraws(_ clause: Clause) -> Bool {
+            let withdrawals = Vocabulary.withdrawals(in: clause.words, language: language)
+            guard !withdrawals.isEmpty else { return false }
+            guard withdrawals.allSatisfy({ $0 == "n't" || StatementWords.hedges.contains($0) }) else { return true }
+            let negations = clause.words.indices.filter { isANegation(at: $0, in: clause.words) }
+            return negations.isEmpty || !negations.allSatisfy { governsALevel(from: $0, in: clause.words) }
+        }
+
+        /// Whether the word at `index` is a negation or a hedge: one of `StatementWords.hedges`, or the "t" of "n't".
+        private func isANegation(at index: Int, in words: [Word]) -> Bool {
+            let word = words[index].folded
+            if word == "t" {
+                return index > 0 && Vocabulary.modality(in: Array(words[(index - 1)...index]), language: language).contains("n't")
+            }
+            return StatementWords.hedges.contains(word) && !Vocabulary.isOwnWord(word, in: language)
+        }
+
+        /// Whether the negation at `index` governs a high level (`LevelHeight`): only the forms of "to be", indefinite articles and
+        /// other negations stand between them ("not an expert", "never been fluent", "non sono esperto", "kein Experte", "ne suis pas
+        /// expert"). Denying a high level implies some knowledge; denying a low one ("no basic knowledge", "keine Grundkenntnisse")
+        /// implies none. A verb or an item between them makes it a negation of the ability: "cannot speak German even at a basic
+        /// level".
+        private func governsALevel(from index: Int, in words: [Word]) -> Bool {
+            let folded = words.map(\.folded)
+            for next in words.indices.dropFirst(index + 1) {
+                let word = words[next]
+                if let height = LevelHeight.ofPhrase(at: next, in: folded) { return height == .high }
+                let links = Vocabulary.isBeForm(word.accented, in: language) || EntryWording.isIndefiniteArticle(word.folded, in: language)
+                    || isANegation(at: next, in: words)
+                guard links else { return false }
+            }
+            return false
+        }
+
         /// Whether the clause at `place` gives the person's contacts (ADR 0023, rule (b)): it stands before the references, speaks for
         /// the person, names no other person, and has one of the three shapes of a contact.
         /// - A verbless clause, read as a label: its words name a contact or a field, or are function words, numbers or the person's own
@@ -207,6 +321,19 @@ struct Grounding {
         return ProseQuotes(sources: sources, language: explainer.language)
     }
 
+    /// The positions of the words of the clause at `place` that claim a skill, an interest or a language for the person: the words
+    /// that `claimedSentences` keeps.
+    func claimedWords(at place: DescriptionClauses.Place) -> Set<Int> {
+        reading.claimedWords(at: place)
+    }
+
+    /// The description as the person claims skills, interests and languages in it: its sentences, with every clause that does not
+    /// speak for the person, or that denies, wishes, supposes or asks, left out, and every word of another subject or inside
+    /// quotation marks.
+    var claimedSentences: [String] {
+        clauses.sentences(keepingWords: reading.claimedWords(at:))
+    }
+
     /// The description as the person speaks it: its sentences, with every clause that does not speak for the person left out.
     var spokenSentences: [String] {
         clauses.sentences(keeping: reading.speaks(at:))
@@ -314,10 +441,10 @@ struct Grounding {
     }
 
     /// An achievement explains a clause only if it begins with a verb of a CV ("trained", "ho formato", "formé") and holds no
-    /// preposition that introduces an employer: "Beta employed me" and "at Beta in 2019 I worked" explain nothing. A graduation phrase
-    /// explains nothing of a job.
+    /// preposition that introduces an employer, read in the language of the description: "Beta employed me" and "at Beta in 2019 I
+    /// worked" explain nothing, while "j'ai formé" holds no Italian "ai". A graduation phrase explains nothing of a job.
     private func isQuoteOfAVerb(_ words: [String], of subject: Subject) -> Bool {
-        guard !words.contains(where: Vocabulary.employerPrepositions.contains),
+        guard !words.contains(where: { Vocabulary.isEmployerPreposition($0, in: explainer.language) }),
               subject.isEducation || !explainer.isGraduationPhrase(folded: words),
               let first = words.first(where: { !Vocabulary.leading.contains($0) }) else { return false }
         return explainer.isVerb(first)
@@ -336,7 +463,7 @@ struct Grounding {
             let texts = (neighbours + [place]).sorted(by: Self.isBefore).map { stated($0).text }
             let years = Set(clauses.places.filter { $0.sentence == place.sentence && counted.contains($0) }
                 .flatMap { stated($0).words }.filter { $0.isNumber && $0.folded.count == 4 }.map(\.folded))
-            return PresentStatement.holds(in: texts.joined(separator: " "), sentenceYears: years.count)
+            return PresentStatement.holds(in: texts.joined(separator: " "), sentenceYears: years.count, language: explainer.language)
         }
     }
 

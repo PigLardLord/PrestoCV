@@ -1,7 +1,7 @@
 import XCTest
 
-/// The phone field accepted "abc" without a word. It still accepts it, and says beside the field that it is not a
-/// phone number.
+/// The phone field accepted "abc" without a word. It still accepts it, and once the person leaves the field it says
+/// beside it that it is not a phone number: a field is checked when it is left, not at every key.
 final class EditorPhoneHintUITests: XCTestCase {
 
     private var app: XCUIApplication!
@@ -26,10 +26,22 @@ final class EditorPhoneHintUITests: XCTestCase {
 
         phone.tap()
         phone.typeText("abc")
-        XCTAssertTrue(app.staticTexts[hint].waitForExistence(timeout: 5), "A phone without digits should get the hint")
+        XCTAssertFalse(app.staticTexts[hint].exists, "A phone that is still being typed should get no hint")
+        leave(phone)
+        XCTAssertTrue(app.staticTexts[hint].waitForExistence(timeout: 5), "A phone without digits should get the hint once it is left")
 
+        phone.tap()
         phone.typeText("1")
+        leave(phone)
         let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: app.staticTexts[hint])
         XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: 5), .completed, "A phone with a digit should lose the hint")
+    }
+
+    /// Leaves the field as the person does when they close the keyboard: with the Done button above it
+    private func leave(_ field: XCUIElement) {
+        let done = app.toolbars.buttons["Done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5), "The keyboard should offer a Done button")
+        done.tap()
+        app.scrollTo(field)
     }
 }

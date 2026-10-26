@@ -1,0 +1,42 @@
+Bien sûr ! Voici ton CV dans une mise en forme professionnelle :
+
+# Camille Laurent
+**Développeuse web**
+📍 Lyon, France | 📞 +33 6 39 98 01 01 | ✉️ camille.laurent@example.com | 🔗 linkedin.com/in/camille-laurent-example
+
+---
+
+## Profil professionnel
+Développeuse web depuis six ans, à l'aise sur le front comme sur le back, attachée à l'accessibilité des interfaces.
+
+## Expérience professionnelle
+### Développeuse full stack — Exemple SAS, Lyon
+*Sept. 2021 – aujourd'hui*
+- Refonte du site de réservation
+- Mise en place des tests automatisés
+
+### Développeuse front-end — Agence Exemple, Grenoble
+*Oct. 2018 – août 2021*
+- Sites pour des collectivités locales
+
+## Formation
+### Master en informatique
+Université Lyon 1, Lyon | 2016 – 2018
+
+## Compétences
+- JavaScript, React, PHP, Accessibilité
+
+## Langues
+- **Français:** langue maternelle
+- **Anglais:** C1
+- **Espagnol:** notions
+
+## Certifications
+- Opquast Qualité Web – Opquast (2020)
+
+## Centres d'intérêt
+Escalade, Cinéma
+
+---
+
+Dis-moi si tu veux une version plus courte ou adaptée à une offre précise.

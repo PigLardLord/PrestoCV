@@ -1,4 +1,5 @@
 import XCTest
+import Synchronization
 @testable import CVPDFExporter
 
 final class TemplatePreviewUseCaseTests: XCTestCase {
@@ -197,12 +198,16 @@ class MockTemplateEngine: TemplateEngine, @unchecked Sendable {
     var renderedHTML = "<html>Default</html>"
     var thumbnailData: Data?
     var shouldReturnDifferentHTML = false
-    private var renderCount = 0
+    /// Renders run concurrently, as in a batch: the count is shared between them.
+    private let renderCount = Mutex(0)
 
     func render(template: Template, data: CVDocument, customization: CustomizationOptions) async throws -> String {
         if shouldReturnDifferentHTML {
-            renderCount += 1
-            return "<html>Rendered \(renderCount)</html>"
+            let count = renderCount.withLock { count in
+                count += 1
+                return count
+            }
+            return "<html>Rendered \(count)</html>"
         }
         return renderedHTML
     }

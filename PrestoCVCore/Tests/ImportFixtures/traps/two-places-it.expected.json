@@ -1,0 +1,10 @@
+{
+ "id": "traps/two-places-it", "language": "it", "form": "trap",
+ "person": {"name": "Marta Esposito", "title": "Responsabile acquisti", "email": "marta.esposito@example.com", "phone": "+39 333 000 0202",
+            "location": null, "links": [], "summary": null},
+ "experience": [
+  {"role": "Responsabile acquisti", "employer": "Forniture Esempio", "location": "Verona, Italia", "start": [2018, 3], "end": [2022, 12], "details": 2}
+ ],
+ "education": [{"degree": "Laurea in economia aziendale", "school": "Università Esempio", "location": "Padova, Italia", "start": [2012, null], "end": [2015, null]}],
+ "skills": [], "languages": [], "certifications": [], "interests": []
+}

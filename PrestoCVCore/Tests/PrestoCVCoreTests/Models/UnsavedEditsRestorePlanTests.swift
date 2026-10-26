@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import PrestoCVCore
 
-/// How kept edits go back into the editor, given what is stored under their CV's id and under the id of their copy.
+/// How kept edits go into the CVs, given what is stored under their CV's id and under the id of their copy.
 @Suite("Unsaved edits restore plan Tests")
 struct UnsavedEditsRestorePlanTests {
 
@@ -41,7 +41,7 @@ struct UnsavedEditsRestorePlanTests {
         let sameEditsReadAgain = UnsavedEdits(id: kept.id, cv: kept.cv, base: kept.base, keptAt: kept.keptAt.addingTimeInterval(60))
         let otherEditing = edits(edited(stored), over: stored)
 
-        #expect(kept.copyID == sameEditsReadAgain.copyID, "Restoring the edits as a copy again targets the same CV")
+        #expect(kept.copyID == sameEditsReadAgain.copyID, "Storing the edits as a copy again targets the same CV")
         #expect(kept.copyID != kept.cv.id)
         #expect(kept.copyID != otherEditing.copyID)
         #expect(kept.copyID.uuidString.dropFirst(14).first == "5", "A name-based identifier, version 5")
@@ -56,7 +56,7 @@ struct UnsavedEditsRestorePlanTests {
         #expect(edits(edited(stored), over: nil).restorePlan(over: newer, copy: nil) == .copy, "Edits on no stored CV never replace one")
     }
 
-    @Test("Edits whose copy is stored were restored as it before: the copy opens as it is stored, whatever the CV is now")
+    @Test("Edits whose copy is stored were restored as it before: the copy stays as it is stored, whatever the CV is now")
     func editsWhoseCopyIsStoredOpenTheCopy() {
         let kept = edits(edited(stored), over: stored)
         var newer = stored
@@ -65,18 +65,9 @@ struct UnsavedEditsRestorePlanTests {
         copy.id = kept.copyID
         copy.personalInfo.title = "Charge nurse"
 
-        #expect(kept.restorePlan(over: newer, copy: copy) == .restoredAsCopy(copy))
-        #expect(kept.restorePlan(over: stored, copy: copy) == .restoredAsCopy(copy))
-        #expect(kept.restorePlan(over: nil, copy: copy) == .restoredAsCopy(copy), "The CV they were made on was deleted since")
-        #expect(kept.restorePlan(over: kept.cv, copy: copy) == .restoredAsCopy(copy))
-    }
-
-    @Test("Edits open as a CV of their own when they become a copy, or were restored as one before")
-    func whichPlansOpenACopy() {
-        #expect(UnsavedEdits.RestorePlan.copy.opensAsCopy)
-        #expect(UnsavedEdits.RestorePlan.restoredAsCopy(stored).opensAsCopy)
-        #expect(!UnsavedEdits.RestorePlan.update.opensAsCopy)
-        #expect(!UnsavedEdits.RestorePlan.create.opensAsCopy)
-        #expect(!UnsavedEdits.RestorePlan.alreadySaved.opensAsCopy)
+        #expect(kept.restorePlan(over: newer, copy: copy) == .restoredAsCopy)
+        #expect(kept.restorePlan(over: stored, copy: copy) == .restoredAsCopy)
+        #expect(kept.restorePlan(over: nil, copy: copy) == .restoredAsCopy, "The CV they were made on was deleted since")
+        #expect(kept.restorePlan(over: kept.cv, copy: copy) == .restoredAsCopy)
     }
 }
