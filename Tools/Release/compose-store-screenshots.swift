@@ -11,6 +11,10 @@
 // <output dir>/contact-sheet-<device>.png. In the iPad set the captions say "iPad" where they say "iPhone", as the
 // listing asks; apostrophes are typeset as ’, and "Apple Intelligence" is kept on one line. The images have no alpha
 // channel, which the App Store rejects. Tools/Release/store-screenshots.sh runs it.
+//
+// A locale needs exactly six captions, one for each capture, and each capture the size of the device's screen: the
+// composer fails otherwise, before it writes anything of that locale. It replaces the folder <locale>/<device> as a
+// whole, so that no image of an earlier run is left in it. Tools/Release/compose-store-screenshots-selftest.sh tests it.
 
 import CoreGraphics
 import CoreText
@@ -19,6 +23,10 @@ import ImageIO
 import UniformTypeIdentifiers
 
 // MARK: - Devices
+
+/// The screenshots of a locale. The nth caption goes on the nth capture, so a locale with another number of captions
+/// would put them over the wrong screens, and is refused.
+let screenshotCount = 6
 
 /// How one part of the captions is set: the titles, or the lines below them
 struct Style: Sendable {
@@ -362,6 +370,17 @@ func loadImage(_ url: URL) throws -> CGImage {
     return image
 }
 
+/// A screenshot the simulator took, which is the size of the device's screen: a capture of another size would be
+/// stretched or cut to the frame
+func loadCapture(_ url: URL, for device: Device) throws -> CGImage {
+    let image = try loadImage(url)
+    guard image.width == device.width, image.height == device.height else {
+        throw Failure("\(url.path) is \(image.width) x \(image.height), and the \(device.label) screen is "
+                      + "\(device.width) x \(device.height)")
+    }
+    return image
+}
+
 func writePNG(_ image: CGImage, to url: URL) throws {
     try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
     guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
@@ -492,6 +511,11 @@ func run(_ arguments: [String]) throws {
     let outputDirectory = URL(fileURLWithPath: arguments[3], isDirectory: true)
     let locales = captions(in: listing)
     guard !locales.isEmpty else { throw Failure("no screenshot captions in \(arguments[1])") }
+    // Every locale is checked, those not composed too, and before anything is written
+    for (locale, lines) in locales where lines.count != screenshotCount {
+        throw Failure("\(locale) has \(lines.count) screenshot captions and needs exactly \(screenshotCount), "
+                      + "one for each screenshot")
+    }
 
     for key in arguments[4].split(separator: ",").map(String.init) {
         guard let device = devices[key] else { throw Failure("unknown device \(key); known: \(devices.keys.sorted())") }
@@ -508,13 +532,20 @@ func run(_ arguments: [String]) throws {
         for (locale, captions) in set {
             let language = String(locale.prefix(2))
             if let languages, !languages.contains(language) { continue }
+            // All the images of the locale are composed before the first is written: a capture that is missing or
+            // wrong leaves nothing of the locale half written
             var images: [CGImage] = []
             for (index, caption) in captions.enumerated() {
                 let number = String(format: "%02d.png", index + 1)
-                let capture = capturesDirectory.appendingPathComponent("\(key)/\(language)/\(number)")
-                let image = try compose(caption: caption, capture: try loadImage(capture), device: device, layout: layout)
-                try writePNG(image, to: outputDirectory.appendingPathComponent("\(locale)/\(key)/\(number)"))
-                images.append(image)
+                let capture = try loadCapture(capturesDirectory.appendingPathComponent("\(key)/\(language)/\(number)"),
+                                              for: device)
+                images.append(try compose(caption: caption, capture: capture, device: device, layout: layout))
+            }
+            // The folder is replaced as a whole, so that an image of an earlier run is not left in it
+            let folder = outputDirectory.appendingPathComponent("\(locale)/\(key)", isDirectory: true)
+            try? FileManager.default.removeItem(at: folder)
+            for (index, image) in images.enumerated() {
+                try writePNG(image, to: folder.appendingPathComponent(String(format: "%02d.png", index + 1)))
             }
             rows.append((locale, images))
             print("\(locale) \(key): \(images.count) screenshots")
