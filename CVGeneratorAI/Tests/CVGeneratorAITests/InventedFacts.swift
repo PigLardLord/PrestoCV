@@ -15,8 +15,7 @@ enum InventedFacts {
     enum Class: String, Codable, Sendable {
         /// Found as a contiguous phrase of the description, with case, accents and punctuation folded.
         case quote
-        /// Allowed without being a quote: a date reduced from a year the description gives, "Present" and its
-        /// translations as the end of a job the sentence dates from a year, the literal "null".
+        /// Allowed without being a quote: a date reduced from a year the description gives, the literal "null".
         case derived
         /// States something the description does not: it fails the evaluation.
         case invented
@@ -645,14 +644,7 @@ enum InventedFacts {
         let ownYears = Set(own.flatMap { yearTokens(in: source.sentences[$0]) })
 
         if presentWords.contains(words.joined(separator: " ")) {
-            if let said = presentSaid(words, by: entry, own: own, against: source) { return said }
-            if leaf.steps.first?.name == "experience", role == "endDate", ownYears.count == 1, let entry {
-                if own.contains(where: { says(sinceYearIn: source.masked($0, of: entry)) }) {
-                    return (.derived, "the present, for a job whose sentence gives one year and a since before the year")
-                }
-                return (.review, "the present, for a job whose sentence gives one year but no since before it")
-            }
-            return (.review, "the present, other than the end of a job whose sentence gives one year")
+            return presentSaid(words, by: entry, own: own, against: source)
         }
 
         let years = yearTokens(in: words)
@@ -737,21 +729,21 @@ enum InventedFacts {
         return (.review, "a date in another shape")
     }
 
-    /// What the description says of the word of the present in a date, or nil when the date goes on to its own decision: the
-    /// description does not say the word, or says it only of another entry whose own sentence nevertheless dates the entry from a
-    /// year. The present is the entry's own only when a sentence of the entry itself holds the word, a quote, or dates the entry
-    /// from a year, a derivation. Nothing else proves it either way, so every other case is a doubt for a person and none is a
-    /// mistake: the counter reads words, not tenses, and a job in the present tense says that it goes on without a word to
-    /// find. A date no entry owns (a certification) has no sentence to say it, and goes on to be a doubt.
+    /// What the description says of the word of the present in a date. The present is the entry's own only when a sentence of the
+    /// entry itself holds the word, a quote. Nothing else proves it, and nothing proves it wrong either, so every other case is a
+    /// doubt for a person: never a derivation and never a mistake. The counter reads words, not tenses: "since 2019" dates the
+    /// start of a job, and "I had worked at Alpha Corp since 2019 before leaving" says that it ended, so a job that goes on says
+    /// so with a tense that no word shows. A date no entry owns (a certification) has no sentence to say it.
     private static func presentSaid(
         _ words: [String], by entry: Entry?, own: [Int], against source: Source
-    ) -> (Class, String)? {
-        guard let entry else { return nil }
+    ) -> (Class, String) {
+        let unsaid = (Class.review, "the present is not said by a sentence of the entry")
+        guard let entry else { return unsaid }
         let holders = source.holders(of: words)
         if own.contains(where: { holds(source.masked($0, of: entry), run: words) }) {
             return (.quote, "a phrase of the sentence of the entry")
         }
-        if holders.isEmpty { return nil }
+        if holders.isEmpty { return unsaid }
         if entry.owners.isEmpty { return (.review, "no sentence of the description names this employer or school") }
         if entry.owners.contains(where: { source.shared.contains($0) && holds(source.masked($0, of: entry), run: words) }) {
             return (.review, "the present is said only in a sentence that names several entries")
@@ -762,9 +754,7 @@ enum InventedFacts {
         if holders.contains(where: { !source.owned.contains($0) }) {
             return (.review, "the present is said in a sentence that names no employer or school")
         }
-        // Said only of another entry. A job that began "since 2019" is current whichever word of the present the draft chose, and
-        // the date then takes its own decision; for any other the word may be another entry's, or only another way to say it.
-        if own.contains(where: { says(sinceYearIn: source.masked($0, of: entry)) }) { return nil }
+        // Said only of another entry: the word may be another entry's, or only another way to say it.
         if own.isEmpty { return (.review, "the present is said of another entry, and no sentence of the description names this one alone") }
         return (.review, "the present is said only of another entry")
     }
@@ -830,20 +820,6 @@ enum InventedFacts {
 
     private static func isDigit(_ character: Character) -> Bool {
         ("0"..."9").contains(character)
-    }
-
-    /// Whether a sentence dates a job from a year: "since", "dal", "seit", "desde" or "depuis" and then the year, with nothing
-    /// between them but the words of a date (a month, a day, "de", "dem", "the"). Any other word between them ("dal mio ufficio
-    /// nel 2018", "since I like cooking") is another sense of the word, and the sentence then says nothing about the present.
-    private static func says(sinceYearIn sentence: [String]) -> Bool {
-        let since: Set<String> = ["since", "dal", "dall", "seit", "desde", "depuis"]
-        let small: Set<String> = ["de", "del", "of", "the", "el", "la", "le", "il", "dem", "den"]
-        return sentence.indices.contains { start in
-            guard since.contains(sentence[start]) else { return false }
-            let rest = sentence[(start + 1)...]
-            guard let year = rest.firstIndex(where: isYear) else { return false }
-            return sentence[(start + 1)..<year].allSatisfy { monthNames[$0] != nil || isSmallNumber($0) || small.contains($0) }
-        }
     }
 
     /// "Present" and its translations in the six languages of the app, folded.

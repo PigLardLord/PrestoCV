@@ -40,7 +40,7 @@ struct InventedFactsEntryTests {
 
     // MARK: - Dates
 
-    @Test("The dates of the entry's own sentence are quotes, and the present of a job that began is derived",
+    @Test("The dates of the entry's own sentence are quotes, and the present of a job that began is a doubt",
           arguments: EntryYears.all)
     func datesOfTheEntry(_ years: EntryYears) throws {
         var draft = try years.draft()
@@ -51,9 +51,9 @@ struct InventedFactsEntryTests {
         let report = InventedFacts.count(draft.cv, for: try InventedFactsTests.input(years.input))
 
         #expect(report.invented.isEmpty, "\(report.invented)")
-        #expect(report.toReview.isEmpty, "\(report.toReview)")
+        #expect(report.toReview.map(\.path) == ["experience[0].endDate"], "\(report.toReview)")
         #expect(report.finding(at: "experience[0].startDate")?.kind == .quote)
-        #expect(report.finding(at: "experience[0].endDate")?.kind == .derived)
+        #expect(report.finding(at: "experience[0].endDate")?.kind == .review)
         #expect(report.finding(at: "experience[1].startDate")?.kind == .quote)
         #expect(report.finding(at: "experience[1].endDate")?.kind == .quote)
         #expect(report.finding(at: "education[0].endDate")?.kind == .quote)
@@ -149,9 +149,9 @@ struct InventedFactsEntryTests {
         }
     }
 
-    @Test("The present is derived for a job whose sentence gives one year, and a doubt for any other entry",
+    @Test("The present is a doubt for every entry whose sentence does not say it: a since dates the start, not the end",
           arguments: EntryYears.all)
-    func presentNeedsOneYear(_ years: EntryYears) throws {
+    func presentIsADoubtWithoutAWord(_ years: EntryYears) throws {
         var draft = try years.draft()
         draft.experience[0] = Experience(company: draft.experience[0].company, endDate: years.present)
         draft.experience[1] = Experience(company: draft.experience[1].company, startDate: years.present, endDate: years.present)
@@ -160,7 +160,7 @@ struct InventedFactsEntryTests {
         let report = InventedFacts.count(draft.cv, for: try InventedFactsTests.input(years.input))
 
         #expect(report.invented.isEmpty, "\(report.invented)")
-        #expect(report.finding(at: "experience[0].endDate")?.kind == .derived)
+        #expect(report.finding(at: "experience[0].endDate")?.kind == .review)
         #expect(report.finding(at: "experience[1].startDate")?.kind == .review)
         #expect(report.finding(at: "experience[1].endDate")?.kind == .review)
         #expect(report.finding(at: "education[0].endDate")?.kind == .review)
@@ -185,7 +185,7 @@ struct InventedFactsEntryTests {
         let finding = InventedFacts.count(cv, description: description).finding(at: "certifications[0].date")
 
         #expect(finding?.kind == .review, "\(finding.map { "\($0.kind) \($0.reason)" } ?? "no finding")")
-        #expect(finding?.reason.contains("other than the end of a job") == true)
+        #expect(finding?.reason.contains("the present is not said by a sentence of the entry") == true)
     }
 
     @Test("The later year of a job as its start, or the earlier as its end, is a doubt", arguments: EntryYears.all)
@@ -414,27 +414,33 @@ struct PresentCase: Sendable, CustomTestStringConvertible {
         PresentCase(label: "Italian: the job whose sentence says it", description: italian, path: "experience[1].endDate", present: "Ad oggi", kind: .quote, reason: "sentence of the entry"),
         PresentCase(label: "German: the job that ended", description: german, path: "experience[0].endDate", present: "Bis heute", kind: .review, reason: "another entry"),
         PresentCase(label: "German: the job whose sentence says it", description: german, path: "experience[1].endDate", present: "Bis heute", kind: .quote, reason: "sentence of the entry"),
-        PresentCase(label: "one year and no word that says the job goes on", description: "I worked at Alpha Corp in 2019. I studied at Gamma University and graduated in 2015.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "no since before it"),
-        PresentCase(label: "one year that ends the job", description: "I worked at Alpha Corp until 2020. I studied at Gamma University and graduated in 2015.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "no since before it"),
-        PresentCase(label: "one year and a word of the present, but no since before the year: a doubt", description: "I currently work at Alpha Corp, where I started in 2019.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "no since before it"),
-        PresentCase(label: "one year and a since", description: "Since 2019 I work at Alpha Corp.", path: "experience[0].endDate", present: "Present", kind: .derived, reason: "a since before the year"),
-        PresentCase(label: "Italian: one year and a dal", description: "Lavoro in Alpha Corp dal 2019.", path: "experience[0].endDate", present: "Presente", kind: .derived, reason: "a since before the year"),
-        PresentCase(label: "German: one year and a seit", description: "Ich arbeite seit 2018 bei Alpha Corp.", path: "experience[0].endDate", present: "heute", kind: .derived, reason: "a since before the year"),
-        PresentCase(label: "a word of the present in the name of the employer is no word of the sentence", description: "I worked at Now Hiring Ltd in 2019.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "no since before it", company: "Now Hiring Ltd"),
+        // The counter reads words, not tenses: a since or a dal dates the start of a job, and says nothing of its end.
+        PresentCase(label: "one year and no word that says the job goes on", description: "I worked at Alpha Corp in 2019. I studied at Gamma University and graduated in 2015.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "one year that ends the job", description: "I worked at Alpha Corp until 2020. I studied at Gamma University and graduated in 2015.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "one year and a word of the present, but not the value: a doubt", description: "I currently work at Alpha Corp, where I started in 2019.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "a since before the year dates the start, not the end", description: "Since 2019 I work at Alpha Corp.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "Italian: a dal before the year", description: "Lavoro in Alpha Corp dal 2019.", path: "experience[0].endDate", present: "Presente", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "German: a seit before the year", description: "Ich arbeite seit 2018 bei Alpha Corp.", path: "experience[0].endDate", present: "heute", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "a word of the present in the name of the employer is no word of the sentence", description: "I worked at Now Hiring Ltd in 2019.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "the present is not said by a sentence of the entry", company: "Now Hiring Ltd"),
         PresentCase(label: "the name of the employer is no present for the job", description: "I worked at Today Magazine until 2020.", path: "experience[0].endDate", present: "Today", kind: .review, reason: "name of the employer", company: "Today Magazine"),
-        PresentCase(label: "a since and a month before the year", description: "Since March 2019 I work at Alpha Corp.", path: "experience[0].endDate", present: "Present", kind: .derived, reason: "a since before the year"),
-        PresentCase(label: "Spanish: a desde, a month and a de before the year", description: "Desde marzo de 2021 trabajo en Alpha Corp.", path: "experience[0].endDate", present: "Actualidad", kind: .derived, reason: "a since before the year"),
-        PresentCase(label: "Italian: a dal that means from a place, not since a year", description: "Ho lavorato in Alpha Corp dal mio ufficio nel 2018.", path: "experience[0].endDate", present: "Presente", kind: .review, reason: "no since before it"),
-        PresentCase(label: "Spanish: a desde that means from a place", description: "Trabajé en Alpha Corp desde casa en 2019.", path: "experience[0].endDate", present: "Actualidad", kind: .review, reason: "no since before it"),
-        PresentCase(label: "a since that is no since of the year", description: "Since I like cooking I worked at Alpha Corp in 2019.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "no since before it"),
-        PresentCase(label: "a word of the present in another clause of a job that ended", description: "I worked at Alpha Corp until 2020 and I now live in Berlin.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "no since before it"),
-        PresentCase(label: "the name of the employer between the since and the year is no month", description: "Since Alpha Corp 2019 the sky is blue.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "no since before it"),
-        PresentCase(label: "two jobs that go on: the first says it with a since, the second with a word of the present", description: both, path: "experience[0].endDate", present: "Currently", kind: .derived, reason: "a since before the year"),
-        PresentCase(label: "two jobs that go on: the other word of the present for the first job", description: both, path: "experience[0].endDate", present: "Present", kind: .derived, reason: "a since before the year"),
+        PresentCase(label: "a since and a month before the year", description: "Since March 2019 I work at Alpha Corp.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "Spanish: a desde, a month and a de before the year", description: "Desde marzo de 2021 trabajo en Alpha Corp.", path: "experience[0].endDate", present: "Actualidad", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "Italian: a dal that means from a place, not since a year", description: "Ho lavorato in Alpha Corp dal mio ufficio nel 2018.", path: "experience[0].endDate", present: "Presente", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "Spanish: a desde that means from a place", description: "Trabajé en Alpha Corp desde casa en 2019.", path: "experience[0].endDate", present: "Actualidad", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "a since that is no since of the year", description: "Since I like cooking I worked at Alpha Corp in 2019.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "a word of the present in another clause of a job that ended", description: "I worked at Alpha Corp until 2020 and I now live in Berlin.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "the name of the employer between the since and the year is no month", description: "Since Alpha Corp 2019 the sky is blue.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        // The job began in the year of the since and the sentence says that it ended (the third shape of the last review).
+        PresentCase(label: "a since before the year of a job that ended", description: "I had worked at Alpha Corp since 2019 before leaving last month.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "Italian: a dal before the year of a job that ended", description: "Ho lavorato in Alpha Corp dal 2019, poi me ne sono andato.", path: "experience[0].endDate", present: "Presente", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "German: a seit before the year of a job that ended", description: "Ich habe seit 2018 bei Alpha Corp gearbeitet und dann gekündigt.", path: "experience[0].endDate", present: "heute", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "Spanish: a desde before the year of a job that ended", description: "Trabajé en Alpha Corp desde 2019 hasta que me fui.", path: "experience[0].endDate", present: "Actualidad", kind: .review, reason: "the present is not said by a sentence of the entry"),
+        PresentCase(label: "two jobs that go on: the first says it with a since, the second with a word of the present", description: both, path: "experience[0].endDate", present: "Currently", kind: .review, reason: "said only of another entry"),
+        PresentCase(label: "two jobs that go on: the other word of the present for the first job", description: both, path: "experience[0].endDate", present: "Present", kind: .review, reason: "the present is not said by a sentence of the entry"),
         PresentCase(label: "two jobs that go on: the second job says it itself", description: both, path: "experience[1].endDate", present: "Currently", kind: .quote, reason: "sentence of the entry"),
-        PresentCase(label: "Italian: two jobs that go on, the first with a dal", description: italianBoth, path: "experience[0].endDate", present: "Ad oggi", kind: .derived, reason: "a since before the year"),
-        PresentCase(label: "two jobs, the first with two years: the word of the second is a doubt, not a mistake", description: "Since 2019 I work at Alpha Corp, after a degree in 2015. I currently work at Beta Ltd.", path: "experience[0].endDate", present: "Currently", kind: .review, reason: "other than the end of a job whose sentence gives one year"),
-        PresentCase(label: "a school that goes on, the word of a job: a doubt, not a mistake", description: "Since 2019 I study at Gamma University. I currently work at Beta Ltd.", path: "education[0].endDate", present: "Currently", kind: .review, reason: "other than the end of a job whose sentence gives one year"),
+        PresentCase(label: "Italian: two jobs that go on, the first with a dal", description: italianBoth, path: "experience[0].endDate", present: "Ad oggi", kind: .review, reason: "said only of another entry"),
+        PresentCase(label: "two jobs, the first with two years: the word of the second is a doubt, not a mistake", description: "Since 2019 I work at Alpha Corp, after a degree in 2015. I currently work at Beta Ltd.", path: "experience[0].endDate", present: "Currently", kind: .review, reason: "said only of another entry"),
+        PresentCase(label: "a school that goes on, the word of a job: a doubt, not a mistake", description: "Since 2019 I study at Gamma University. I currently work at Beta Ltd.", path: "education[0].endDate", present: "Currently", kind: .review, reason: "said only of another entry"),
         PresentCase(label: "an entry named only in a shared sentence, the word of another entry: a doubt", description: "I worked at Alpha Corp and Beta Ltd in 2019. I currently study at Gamma University.", path: "experience[0].endDate", present: "Currently", kind: .review, reason: "names this one alone"),
         PresentCase(label: "a shared sentence that says it goes on: a doubt, not a mistake", description: "Since 2019 I work at Alpha Corp and Beta Ltd. In 2017 I worked at Alpha Corp in Berlin. I currently study at Gamma University.", path: "experience[0].endDate", present: "Currently", kind: .review, reason: "said only of another entry"),
         PresentCase(label: "a job that ended and takes the word of the job that goes on: a doubt, a person decides", description: "I worked at Alpha Corp in 2019 and left. I currently work at Beta Ltd.", path: "experience[0].endDate", present: "Currently", kind: .review, reason: "another entry"),
