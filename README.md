@@ -55,15 +55,15 @@ On Linux, the packages contain only the new targets. They build today and stay e
 
 ## Releasing
 
-Xcode Cloud tests version 1 before a store build, archives it, signs it and uploads it to TestFlight ([ADR 0024](docs/architecture/adr/0024-run-apple-ci-and-releases-on-xcode-cloud.md)). It runs two workflows:
-- **Main:** a merge to `main` tests, archives and uploads a build to TestFlight for the internal testers.
+Xcode Cloud archives version 1, signs it and uploads it to TestFlight, and tests it again before a store build ([ADR 0024](docs/architecture/adr/0024-run-apple-ci-and-releases-on-xcode-cloud.md)). It runs two workflows:
+- **Main:** a merge to `main` archives a build and uploads it to TestFlight for the internal testers. It runs no tests: the pull request check tested that tree before the merge.
 - **Release:** a GitHub Release with a tag such as `v1.2.3`, or a push to a branch such as `release/1.2.3`, tests that commit, archives version 1.2.3 and uploads it to TestFlight.
 
 Nothing submits a build for App Review: the owner does it in App Store Connect, with Add for Review.
 
 Xcode Cloud checks no pull request. A pull request is checked on the Mac mini ([ADR 0029](docs/architecture/adr/0029-check-pull-requests-on-the-mac-mini.md)): the commit status `Mac mini · CI` on its head runs the `CI` test plan on an iPhone and an iPad simulator, and the Apple checks of `ci_scripts/ci_post_xcodebuild.sh`. A pull request merges when its branch contains the latest `main` and the checks are green on its head.
 
-The repository side is `ci_scripts/` (it sets an archive's version from its tag or branch, checks the archive with `Tools/Release/check-archive.sh` before the upload, and runs the architecture check, the package tests, the source checks and the package builds, in a Release build and in the pull request check), `TestPlans/`, and the `DEVELOPMENT_TEAM` of the project. Xcode Cloud signs the build itself, so the repository holds no key and no secret. `docs/release/xcode-cloud.md` has the exact settings of the three workflows, the one-time setup, and the steps to cut a release.
+The repository side is `ci_scripts/` (it sets an archive's version from its tag or branch, checks the archive with `Tools/Release/check-archive.sh` before the upload, and runs the architecture check, the package tests, the source checks and the package builds, in a Release build and in the pull request check), `TestPlans/`, and the `DEVELOPMENT_TEAM` of the project. Xcode Cloud signs the build itself, so the repository holds no key and no secret. `docs/release/xcode-cloud.md` has the exact settings of the two workflows, why the Pull Request workflow stays disabled, the one-time setup, and the steps to cut a release.
 
 ## Contributing
 
