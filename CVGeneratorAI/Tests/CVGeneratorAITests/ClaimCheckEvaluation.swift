@@ -78,6 +78,9 @@ struct ClaimCheckEvaluation {
         try write(summary, to: "\(name)-summary.json")
 
         #expect(summary.sameInEveryRun, "\(name): the verdicts differ between runs")
+        // The model's guardrail refuses a description now and then. Any other error means the check gave no answer, and the draft lost
+        // every personal item it judges: the answer did not have the shape the reading needs, or the call failed.
+        #expect(summary.errors == summary.refusals, "\(name): \(summary.errors - summary.refusals) draft(s) got no answer from the check")
         if falseKeepsFail {
             #expect(summary.falseKeeps.isEmpty, "\(name): false keeps \(summary.falseKeeps)")
         }
