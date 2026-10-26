@@ -837,26 +837,8 @@
    "rules": []
   },
   {
-   "name": "TestExport",
-   "path": "CVPDFExporterExamples/Demo/TestExport.swift",
-   "kind": "legacy",
-   "allowedImports": [
-    "CVPDFExporter"
-   ],
-   "rules": []
-  },
-  {
    "name": "CVExportDemoApp",
    "path": "CVPDFExporterExamples/Example",
-   "kind": "legacy",
-   "allowedImports": [
-    "CVPDFExporter"
-   ],
-   "rules": []
-  },
-  {
-   "name": "TemplateViewer",
-   "path": "CVPDFExporterExamples/TemplateViewer",
    "kind": "legacy",
    "allowedImports": [
     "CVPDFExporter"
