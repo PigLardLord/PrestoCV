@@ -1,4 +1,5 @@
 #if canImport(PDFKit)
+import DiagnosticLogging
 import Foundation
 import PDFKit
 import PrestoCVImporting
@@ -11,18 +12,36 @@ import AppKit
 /// Reads a PDF's words with PDFKit: each word with its box in page space (origin at the top left), its font size and
 /// whether it is bold, in PDFKit's order (ADR 0027). It decides nothing about the reading order: PDFKit does not
 /// promise one, and the core orders the words, tested on Linux. It opens no connection and keeps nothing.
+///
+/// It logs the pages and the words it read, and the limit that stopped it (ADR 0030): counts and names, never a word.
+/// It throws that limit as a `LimitReached`, as the port allows, and the import turns it into the failure the person is
+/// told about and logs every failure by its kind, the limit's name with it.
 public struct PDFKitTextExtractor: PDFTextExtracting {
+    private let logger: any DiagnosticLogger
 
-    public init() {}
+    public init(logger: any DiagnosticLogger) {
+        self.logger = logger
+    }
 
     public func layout(ofPDF data: Data, limits: ImportLimits) async throws -> ExtractedLayout {
+        do {
+            let pages = try read(data, limits: limits)
+            logger.info(.importing, "pdf.read", .count("pages", pages.count), .count("words", pages.reduce(0) { $0 + $1.words.count }))
+            return .pages(pages)
+        } catch let reached as LimitReached {
+            logger.notice(.importing, "pdf.limit", .token("limit", reached.logName))
+            throw reached
+        }
+    }
+
+    private func read(_ data: Data, limits: ImportLimits) throws -> [ExtractedPage] {
         try Task.checkCancellation()
-        guard data.count <= limits.maximumPDFBytes else { throw ImportError.tooLarge }
+        guard data.count <= limits.maximumPDFBytes else { throw LimitReached(.bytes) }
         guard let document = PDFDocument(data: data) else { throw ImportError.unreadable }
         // A PDF that opens with no password has `isLocked` false even when it is encrypted
         guard !document.isLocked else { throw ImportError.encrypted }
         guard document.pageCount > 0 else { throw ImportError.empty }
-        guard document.pageCount <= limits.maximumPages else { throw ImportError.tooManyPages }
+        guard document.pageCount <= limits.maximumPages else { throw LimitReached(.pages) }
         var pages: [ExtractedPage] = []
         var budget = Budget(characters: limits.maximumCharacters, words: limits.maximumWords)
         for index in 0..<document.pageCount {
@@ -30,7 +49,7 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
             guard let page = document.page(at: index) else { continue }
             pages.append(try Self.words(of: page, budget: &budget))
         }
-        return .pages(pages)
+        return pages
     }
 
     // MARK: Words
@@ -57,13 +76,13 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
     /// included, is counted as a pasted text is, in UTF-16 units, and a page over the characters left is refused before
     /// its style and its glyphs are read. Its words are counted as they are read, and the reading stops once its task
     /// is cancelled.
-    /// - Throws: `ImportError.tooLarge` over the characters or the words left; `CancellationError`.
+    /// - Throws: `LimitReached` over the characters or the words left; `CancellationError`.
     static func words(of page: PDFPage, budget: inout Budget) throws -> ExtractedPage {
         let bounds = page.bounds(for: .cropBox)
         let size = page.rotation % 180 == 0 ? bounds.size : CGSize(width: bounds.height, height: bounds.width)
         guard let string = page.string else { return ExtractedPage(width: size.width, height: size.height, words: []) }
         let text = string as NSString
-        guard text.length <= budget.characters else { throw ImportError.tooLarge }
+        guard text.length <= budget.characters else { throw LimitReached(.characters) }
         budget.characters -= text.length
         try Task.checkCancellation()
         let attributed = page.attributedString
@@ -81,7 +100,7 @@ public struct PDFKitTextExtractor: PDFTextExtracting {
         let wordsLeft = budget.words
         func close() throws {
             if !current.isEmpty, !ink.isNull {
-                guard words.count < wordsLeft else { throw ImportError.tooLarge }
+                guard words.count < wordsLeft else { throw LimitReached(.words) }
                 // Page space has its origin at the bottom left; the core's at the top left
                 let middle = bounds.maxY - ink.midY
                 let height = 0.925 * fontSize

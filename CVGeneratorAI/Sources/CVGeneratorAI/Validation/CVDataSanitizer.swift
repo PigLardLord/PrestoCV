@@ -59,18 +59,21 @@ public struct CVDataSanitizer: Sendable {
         return LexicalClasses.$tagger.withValue(lexicalClasses) { grounded(cvData, in: source) }
     }
 
-    /// Whether the device has the language data that grounding `description` needs, asked before the model writes a draft.
-    ///
-    /// - Throws: `CVGenerationError.languageDataUnavailable` when the description is in English or German and the device does not
-    ///   tag its language.
-    public func requireLanguageData(for description: String) throws(CVGenerationError) {
-        try requireLanguageData(of: DescriptionText(description, languageOfText: languageOfText))
+    /// The language of `description`, when it is one of the six, and whether grounding it needs the device's language data and
+    /// finds it, asked before the model writes a draft: the use case logs it, then has it `require()` the data.
+    func languageCheck(of description: String) -> LanguageCheck {
+        languageCheck(of: DescriptionText(description, languageOfText: languageOfText))
     }
 
     private func requireLanguageData(of source: DescriptionText) throws(CVGenerationError) {
-        guard let language = source.explainer.language, VerbForms.readsVerbsByTags(in: language),
-              !lexicalClasses.tagsLexicalClass(inLanguage: language.rawValue) else { return }
-        throw .languageDataUnavailable(languageCode: language.rawValue)
+        try languageCheck(of: source).require()
+    }
+
+    private func languageCheck(of source: DescriptionText) -> LanguageCheck {
+        guard let language = source.explainer.language, VerbForms.readsVerbsByTags(in: language) else {
+            return LanguageCheck(language: source.explainer.language, data: .notNeeded)
+        }
+        return LanguageCheck(language: language, data: lexicalClasses.tagsLexicalClass(inLanguage: language.rawValue) ? .present : .missing)
     }
 
     private func grounded(_ cvData: CVData, in source: DescriptionText) -> CVData {
@@ -234,5 +237,28 @@ public struct CVDataSanitizer: Sendable {
     private func unique<T>(_ items: [T], by key: (T) -> String) -> [T] {
         var seen = Set<String>()
         return items.filter { seen.insert(DescriptionText.normalized(key($0))).inserted }
+    }
+}
+
+/// The language of a description and the state of the language data that grounding it needs (#270): English and German are read
+/// with the device's lexical class of the language, which the system downloads on request; the other four need none.
+struct LanguageCheck: Equatable, Sendable {
+    enum LanguageData: Equatable, Sendable {
+        /// The language is not one that is read with the device's language data, or is not one of the six.
+        case notNeeded
+        /// The device tags the language.
+        case present
+        /// The device has not got the data of the language yet.
+        case missing
+    }
+
+    /// The language of the description, when it is one of the six.
+    let language: Vocabulary.Language?
+    let data: LanguageData
+
+    /// - Throws: `CVGenerationError.languageDataUnavailable` when the device has not got the data the language needs.
+    func require() throws(CVGenerationError) {
+        guard data == .missing, let language else { return }
+        throw .languageDataUnavailable(languageCode: language.rawValue)
     }
 }

@@ -111,10 +111,10 @@ struct ContractTableTests {
     ]
 
     @Test("Every fixture of the corpus imports with nothing invented, at or above its form's floor")
-    func table() throws {
+    func table() async throws {
         var rows: [(Corpus.Entry, Score)] = []
         for entry in try Corpus.entries() {
-            let result = try Corpus.importResult(of: entry)
+            let result = try await Corpus.importResult(of: entry)
             #expect(result.ungrounded.isEmpty, "\(entry.id): values the gate refused: \(result.ungrounded)")
             #expect(Coverage.lost(result).isEmpty, "\(entry.id): lines that no value, text not imported or left-out piece covers: \(Coverage.lost(result).map(\.text))")
             let score = Self.score(result, against: try Corpus.expected(of: entry))

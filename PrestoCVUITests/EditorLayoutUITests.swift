@@ -47,13 +47,16 @@ final class EditorLayoutUITests: XCTestCase {
     }
 
     /// A bar below the form took its height on every device: the export control sits in the navigation bar, in
-    /// portrait and in landscape, on an iPhone and on an iPad.
+    /// portrait and in landscape, on an iPhone and on an iPad. The outer screen of the iPhone Duo stays upright for
+    /// every app, Safari too: there, only portrait is checked.
     func testTheExportControlIsInTheNavigationBarInBothOrientations() throws {
         launch()
         assertOneExportControlInTheNavigationBar(context: "in portrait")
 
-        guard app.turn(to: .landscapeLeft) else {
-            throw XCTSkip("This screen does not turn to landscape, as the outer screen of the iPhone Duo; portrait passed")
+        if !app.turn(to: .landscapeLeft) {
+            try XCTSkipUnless(safariTurns(), "This screen stays upright for every app, as the outer screen of the iPhone Duo; portrait passed")
+            XCTFail("The screen should turn to landscape")
+            return
         }
         assertOneExportControlInTheNavigationBar(context: "in landscape")
 
@@ -120,5 +123,14 @@ final class EditorLayoutUITests: XCTestCase {
         XCTAssertTrue(form.exists, "The editor should show its form \(context)")
         let window = app.windows.firstMatch
         XCTAssertGreaterThan(form.frame.maxY, window.frame.maxY - 44, "Nothing should sit below the form \(context)")
+    }
+
+    /// Whether Safari's screen turns to landscape with the device already turned, as on every screen that turns: a
+    /// screen where Safari stays upright too has no landscape, and one where only the app stays upright is a defect.
+    private func safariTurns() -> Bool {
+        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
+        safari.launch()
+        defer { safari.terminate() }
+        return safari.turn(to: .landscapeLeft)
     }
 }

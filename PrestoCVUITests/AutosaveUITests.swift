@@ -134,10 +134,14 @@ final class AutosaveUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Create My First CV"].exists, "The list should not be shown")
     }
 
-    /// Swipes from the left edge to the right, as the system's Back gesture does.
+    /// Swipes from the left edge to the right, as the system's Back gesture does, halfway down the form between the bar
+    /// and the keyboard: a swipe that starts on the keyboard is the keyboard's, and on the outer screen of the iPhone
+    /// Duo the keyboard reaches above the middle of the screen.
     private func swipeBackFromTheLeftEdge() {
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.0, dy: 0.5))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
+        let y = (app.contentTop + (app.keyboardTop ?? app.frame.maxY)) / 2
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let start = origin.withOffset(CGVector(dx: 0, dy: y))
+        let end = origin.withOffset(CGVector(dx: app.frame.width * 0.8, dy: y))
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
