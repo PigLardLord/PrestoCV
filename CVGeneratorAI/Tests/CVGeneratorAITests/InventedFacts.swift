@@ -125,8 +125,33 @@ enum InventedFacts {
 
     /// Whether `run` occurs in `words` as a contiguous run.
     static func holds(_ words: [String], run: [String]) -> Bool {
-        guard !run.isEmpty, run.count <= words.count else { return false }
-        return (0...(words.count - run.count)).contains { start in words[start..<(start + run.count)].elementsEqual(run) }
+        !starts(of: run, in: words).isEmpty
+    }
+
+    /// The positions at which `run` occurs in `words`.
+    private static func starts(of run: [String], in words: [String]) -> [Int] {
+        guard !run.isEmpty, run.count <= words.count else { return [] }
+        return (0...(words.count - run.count)).filter { words[$0..<($0 + run.count)].elementsEqual(run) }
+    }
+
+    /// The trap that a value is a part of: the value occurs in the description, and every place it occurs overlaps an
+    /// occurrence of a trap, without the value holding that trap whole. A word of the colleague's employer, or the first
+    /// name in another person's email address, is a part of a trap; a word that the description also says elsewhere is not.
+    private static func trapHoldingAll(
+        occurrencesOf words: [String], in source: Source, traps: [(trap: String, words: [String])]
+    ) -> String? {
+        let places = starts(of: words, in: source.words)
+        guard !places.isEmpty else { return nil }
+        let spans = traps.flatMap { trap in
+            starts(of: trap.words, in: source.words).map { (trap: trap.trap, range: $0..<($0 + trap.words.count)) }
+        }
+        var first: String?
+        for place in places {
+            let range = place..<(place + words.count)
+            guard let span = spans.first(where: { $0.range.overlaps(range) }) else { return nil }
+            first = first ?? span.trap
+        }
+        return first
     }
 
     // MARK: - The description
@@ -263,8 +288,11 @@ enum InventedFacts {
             Finding(path: leaf.path, value: value, kind: kind, reason: reason, context: context)
         }
 
-        if field != .date, let trap = traps.first(where: { holds(words, run: $0.words) }) {
+        if let trap = traps.first(where: { holds(words, run: $0.words) }) {
             return finding(.invented, "trap: \(trap.trap)")
+        }
+        if let trap = trapHoldingAll(occurrencesOf: words, in: source, traps: traps) {
+            return finding(.invented, "part of a trap: \(trap)")
         }
         if words == ["null"] { return finding(.derived, "the literal null") }
 
