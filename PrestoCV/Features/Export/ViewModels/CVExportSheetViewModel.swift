@@ -56,6 +56,8 @@ final class CVExportSheetViewModel: ObservableObject {
     @Published private(set) var isPreviewLoading = false
     @Published private(set) var isPreparingPDF = false
     @Published private(set) var sharePDF: ExportedPDF?
+    /// The PDF shown full screen, while it is open: always the PDF that the share button shares
+    @Published private(set) var fullPDF: ExportedPDF?
     /// Why no PDF is made for this CV, in words the user can act on; nil when the CV can be exported
     @Published private(set) var shareBlocker: String?
     /// What the PDF lacks, though it is made, in words the user can act on; nil when it lacks nothing
@@ -94,6 +96,13 @@ final class CVExportSheetViewModel: ObservableObject {
     private var generation = 0
     /// The sheet is on screen, from `start()` to `stop()`: a change of the selection makes its preview
     private var isShown = false
+    /// The cover of the full PDF is up, from the moment it appears (`fullPDFDidAppear()`) until it has gone
+    /// (`fullPDFDidDismiss()`). It follows what SwiftUI did, not what was asked: `fullPDF` is cleared at once by Done,
+    /// while the cover is still on its way out and the sheet is still going on and off screen under it, and a request
+    /// for the cover that is withdrawn before it is presented leaves no cover to appear and none to dismiss.
+    private var isCovered = false
+    /// Removes the temp PDFs, and keeps the one a share sheet is reading until that share ends
+    private let files: ExportFileKeeper
     /// The selection is being set to the look the CV keeps, which is not a choice of the person
     private var isStartingFromTheCVsLook = false
 
@@ -156,6 +165,12 @@ final class CVExportSheetViewModel: ObservableObject {
         sharePDF.map { String(format: String(localized: "export.page_count"), $0.pageCount) }
     }
 
+    /// What the preview says to VoiceOver when it shows the pages of the PDF, which a tap opens full screen: "Show the
+    /// full PDF, 2 pages"; nil until the PDF is rendered
+    var fullPDFAccessibilityLabel: String? {
+        sharePDF.map { String(localized: "export.preview.open \($0.pageCount)") }
+    }
+
     var aspectRatio: CGFloat {
         let options = previewOptions ?? currentExportOptions()
         let pageSize = options.pageSize
@@ -200,6 +215,14 @@ final class CVExportSheetViewModel: ObservableObject {
             documentLanguage: cv.chosenDocumentLanguage
         )
         automaticDocumentLanguage = documentLanguageDetector.automaticLanguage(for: cv)
+        files = ExportFileKeeper(service: exportService)
+    }
+
+    /// The sheet was torn down without going off screen, as when it is closed from outside while the full PDF covers it:
+    /// the PDF it made is removed with it, as `stop()` does, once no share sheet reads it.
+    isolated deinit {
+        guard let staleFile = sharePDF?.url else { return }
+        files.letGo(of: staleFile)
     }
 
     /// The sheet shows: the templates are loaded, which selects the CV's own design and so makes the first preview.
@@ -235,7 +258,7 @@ final class CVExportSheetViewModel: ObservableObject {
         refreshTask?.cancel()
         generation += 1
         let requestGeneration = generation
-        let staleFile = takeSharePDF()
+        let removal = takeSharePDF().map { files.letGo(of: $0) }
 
         var printedCV = cv
         printedCV.documentLanguage = documentLanguage.rawValue
@@ -246,19 +269,17 @@ final class CVExportSheetViewModel: ObservableObject {
         isPreviewLoading = selectedTemplateId != nil
         isPreparingPDF = selectedTemplateId != nil && shareBlocker == nil
 
-        // The service, not the view model, removes the displaced file: the sheet may be gone before the task runs
-        let service = exportService
+        // The displaced file goes before the new one is made, unless a share sheet is still reading it
         let task = Task { [weak self] in
-            if let staleFile {
-                await service.cleanupTempFile(at: staleFile)
-            }
+            await removal?.value
             await self?.refresh(for: printedCV, generation: requestGeneration)
         }
         refreshTask = task
         return task
     }
 
-    /// Ends the work in progress and removes the PDF, because the sheet is going away
+    /// Ends the work in progress and removes the PDF, because the sheet is going away; a PDF that a share sheet is still
+    /// reading is removed when that share ends.
     /// - Returns: The task that removes the file, for a caller that wants to wait for it
     @discardableResult
     func stop() -> Task<Void, Never> {
@@ -268,15 +289,47 @@ final class CVExportSheetViewModel: ObservableObject {
         generation += 1
         isPreviewLoading = false
         isPreparingPDF = false
-        let staleFile = takeSharePDF()
+        guard let staleFile = takeSharePDF() else { return Task {} }
 
         // The sheet is going away and its view model with it, so the cleanup must not depend on the view model
-        let service = exportService
-        return Task {
-            if let staleFile {
-                await service.cleanupTempFile(at: staleFile)
-            }
-        }
+        return files.letGo(of: staleFile)
+    }
+
+    /// The sheet's content went off screen. While the full PDF covers the sheet it has not gone away, and its PDF stays
+    /// for the full PDF to show and the button to share; otherwise the sheet is closing, as in `stop()`.
+    ///
+    /// The cover decides, not the PDF it shows nor the request for it: a Done before the cover is fully up clears
+    /// `fullPDF` before the sheet goes off screen, and the sheet is back on screen right after. Only the cover going away
+    /// ends the covering. A request that was withdrawn before the cover appeared covers nothing, so the sheet closing
+    /// then stops.
+    /// - Returns: The task that removes the file, for a caller that wants to wait for it
+    @discardableResult
+    func sheetDisappeared() -> Task<Void, Never> {
+        guard !isCovered else { return Task {} }
+        return stop()
+    }
+
+    /// Asks for the PDF that the button shares full screen, over the sheet; nothing opens until the PDF is rendered. The
+    /// sheet is covered when the cover appears (`fullPDFDidAppear()`), not when it is asked for.
+    func showFullPDF() {
+        guard let pdf = sharePDF else { return }
+        fullPDF = pdf
+    }
+
+    /// Closes the full PDF, back to the sheet as it was: the PDF and the choices are kept. The cover is still on screen
+    /// until it tells that it has gone (`fullPDFDidDismiss()`).
+    func closeFullPDF() {
+        fullPDF = nil
+    }
+
+    /// The cover of the full PDF is up: the sheet is covered, and going off screen under it is not closing
+    func fullPDFDidAppear() {
+        isCovered = true
+    }
+
+    /// The cover of the full PDF has gone: the sheet is the one on screen again
+    func fullPDFDidDismiss() {
+        isCovered = false
     }
 
     /// The preview could not be shown by the web view; a cancelled load is not a failure
@@ -287,6 +340,13 @@ final class CVExportSheetViewModel: ObservableObject {
 
     func dismissError() {
         errorMessage = nil
+    }
+
+    /// The PDF is handed to a share sheet: it stays, whatever happens to the sheet, until that share ends
+    /// - Returns: The share, to end when the share sheet closes; nil until the PDF is rendered
+    func beginShare() -> PDFShare? {
+        guard let pdf = sharePDF else { return nil }
+        return PDFShare(pdf: pdf, keeper: files)
     }
 
     /// The share sheet closed: a share that went through is confirmed, one that was cancelled changes nothing
@@ -408,9 +468,11 @@ final class CVExportSheetViewModel: ObservableObject {
         errorMessage = ExportErrorMessage.message(for: error, during: activity)
     }
 
+    /// Lets the PDF go, which closes the full PDF with it: no viewer shows a file that is about to be removed
     private func takeSharePDF() -> URL? {
         let url = sharePDF?.url
         sharePDF = nil
+        fullPDF = nil
         return url
     }
 
