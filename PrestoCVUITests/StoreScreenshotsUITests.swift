@@ -180,8 +180,17 @@ final class StoreScreenshotsUITests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func text(_ key: String) -> String {
-        strings?[key] ?? key
+    /// The app's text for `key`, with `arguments` filled into its placeholders when there are any. A key the tool did not
+    /// hand over fails the test and names the key, and as `continueAfterFailure` is off, the test ends there: the key is
+    /// never searched for as if it were a label.
+    private func text(_ key: String, with arguments: [CVarArg]? = nil) -> String {
+        do {
+            let texts = try XCTUnwrap(strings, "The app's texts were not read")
+            return try arguments.map { try texts.format(key, with: $0) } ?? texts.text(key)
+        } catch {
+            XCTFail("\(error)")
+            return key
+        }
     }
 
     /// Matches a label in either of its Unicode forms: the labels of the app reach the test with their accents
@@ -208,7 +217,7 @@ final class StoreScreenshotsUITests: XCTestCase {
     }
 
     private func row(named name: String, in app: XCUIApplication) -> XCUIElement {
-        app.buttons.matching(labeled(strings?.format("accessibility.navigate_to", name) ?? name)).firstMatch
+        app.buttons.matching(labeled(text("accessibility.navigate_to", with: [name]))).firstMatch
     }
 
     /// Drags the content up by `distance` points, slowly and held at the end, so that it does not glide on.
