@@ -16,7 +16,7 @@ enum InventedFacts {
         /// Found as a contiguous phrase of the description, with case, accents and punctuation folded.
         case quote
         /// Allowed without being a quote: a date reduced from a year the description gives, "Present" and its
-        /// translations, the literal "null".
+        /// translations as the end of a job the sentence dates from a year, the literal "null".
         case derived
         /// States something the description does not: it fails the evaluation.
         case invented
@@ -738,17 +738,15 @@ enum InventedFacts {
     }
 
     /// What the description says of the word of the present in a date, or nil when the date goes on to its own decision: the
-    /// description does not say the word, or says it only of another entry whose sentences nevertheless say that it goes on. The
-    /// present is the entry's own only when the sentence that names its employer or school says it. Said of another entry it is
-    /// provably wrong when the entry has a sentence of its own and no sentence that names it says that it goes on; said in a
-    /// sentence that several entries share, in one that names none, or when no sentence names the entry alone, it is a doubt. A
-    /// date no entry owns (a certification) takes the phrase from anywhere in the description.
+    /// description does not say the word, or says it only of another entry whose own sentence nevertheless dates the entry from a
+    /// year. The present is the entry's own only when a sentence of the entry itself holds the word, a quote, or dates the entry
+    /// from a year, a derivation. Nothing else proves it either way, so every other case is a doubt for a person and none is a
+    /// mistake: the counter reads words, not tenses, and a job in the present tense says that it goes on without a word to
+    /// find. A date no entry owns (a certification) has no sentence to say it, and goes on to be a doubt.
     private static func presentSaid(
         _ words: [String], by entry: Entry?, own: [Int], against source: Source
     ) -> (Class, String)? {
-        guard let entry else {
-            return holds(source.words, run: words) ? (.quote, "a phrase of the description") : nil
-        }
+        guard let entry else { return nil }
         let holders = source.holders(of: words)
         if own.contains(where: { holds(source.masked($0, of: entry), run: words) }) {
             return (.quote, "a phrase of the sentence of the entry")
@@ -764,12 +762,11 @@ enum InventedFacts {
         if holders.contains(where: { !source.owned.contains($0) }) {
             return (.review, "the present is said in a sentence that names no employer or school")
         }
-        // Said only of another entry. A mistake only when the entry has a sentence of its own and no sentence that names it, its
-        // own or one it shares, says that it goes on: a job that began "since 2019" is current whichever word of the present the
-        // draft chose, and the date then takes its own decision.
+        // Said only of another entry. A job that began "since 2019" is current whichever word of the present the draft chose, and
+        // the date then takes its own decision; for any other the word may be another entry's, or only another way to say it.
+        if own.contains(where: { says(sinceYearIn: source.masked($0, of: entry)) }) { return nil }
         if own.isEmpty { return (.review, "the present is said of another entry, and no sentence of the description names this one alone") }
-        if entry.owners.contains(where: { says(goesOn: source.masked($0, of: entry)) }) { return nil }
-        return (.invented, "the present is said only of another entry")
+        return (.review, "the present is said only of another entry")
     }
 
     /// Whether the sentences give the month, and the day, of a year: a month name (in full, in the six languages) within
@@ -835,12 +832,6 @@ enum InventedFacts {
         ("0"..."9").contains(character)
     }
 
-    /// Whether a sentence says that a job goes on: a word of the present, or "since" (with one year in the sentence it says the
-    /// job goes on). A job that ended ("until 2020", "in 2019") has none of them. Folded words, in the six languages.
-    private static func says(goesOn sentence: [String]) -> Bool {
-        goesOn.contains { holds(sentence, run: $0) }
-    }
-
     /// Whether a sentence dates a job from a year: "since", "dal", "seit", "desde" or "depuis" and then the year, with nothing
     /// between them but the words of a date (a month, a day, "de", "dem", "the"). Any other word between them ("dal mio ufficio
     /// nel 2018", "since I like cooking") is another sense of the word, and the sentence then says nothing about the present.
@@ -853,14 +844,6 @@ enum InventedFacts {
             guard let year = rest.firstIndex(where: isYear) else { return false }
             return sentence[(start + 1)..<year].allSatisfy { monthNames[$0] != nil || isSmallNumber($0) || small.contains($0) }
         }
-    }
-
-    private static var goesOn: [[String]] {
-        let more: Set<String> = [
-            "still", "tuttora", "adesso", "momentan", "ahora", "agora", "maintenant", "actuellement",
-            "since", "dal", "dall", "seit", "desde", "depuis",
-        ]
-        return presentWords.union(more).map { $0.split(separator: " ").map(String.init) }
     }
 
     /// "Present" and its translations in the six languages of the app, folded.

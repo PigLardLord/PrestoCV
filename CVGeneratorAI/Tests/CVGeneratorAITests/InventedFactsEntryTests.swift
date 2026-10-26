@@ -175,6 +175,19 @@ struct InventedFactsEntryTests {
         #expect(finding?.reason.contains(item.reason) == true, "\(item): \(finding?.reason ?? "no finding")")
     }
 
+    @Test("The present as the date of a certification is a doubt: no sentence of an entry says it", arguments: [
+        "I passed the Safety Exam in 2021. I am present at every shift.",
+        "I passed the Safety Exam in 2021. I currently work at Alpha Corp.",
+    ])
+    func certificationPresent(_ description: String) {
+        let cv = CVData(certifications: [Certification(name: "Safety Exam", date: "Present")])
+
+        let finding = InventedFacts.count(cv, description: description).finding(at: "certifications[0].date")
+
+        #expect(finding?.kind == .review, "\(finding.map { "\($0.kind) \($0.reason)" } ?? "no finding")")
+        #expect(finding?.reason.contains("other than the end of a job") == true)
+    }
+
     @Test("The later year of a job as its start, or the earlier as its end, is a doubt", arguments: EntryYears.all)
     func yearInTheWrongRole(_ years: EntryYears) throws {
         var draft = try years.draft()
@@ -391,15 +404,15 @@ struct PresentCase: Sendable, CustomTestStringConvertible {
     private static let german = "Ich arbeitete bei Alpha Corp bis 2020. Seit 2021 arbeite ich bei Beta Ltd, bis heute. Ich studierte an der Gamma University bis 2015."
 
     static let all: [PresentCase] = [
-        PresentCase(label: "the job that ended takes the present of the other job", description: split, path: "experience[0].endDate", present: "Present", kind: .invented, reason: "another entry"),
+        PresentCase(label: "the job that ended takes the present of the other job: a doubt, a person decides", description: split, path: "experience[0].endDate", present: "Present", kind: .review, reason: "another entry"),
         PresentCase(label: "the job whose sentence says it", description: split, path: "experience[1].endDate", present: "Present", kind: .quote, reason: "sentence of the entry"),
-        PresentCase(label: "the school takes the present of a job", description: split, path: "education[0].endDate", present: "Present", kind: .invented, reason: "another entry"),
+        PresentCase(label: "the school takes the present of a job", description: split, path: "education[0].endDate", present: "Present", kind: .review, reason: "another entry"),
         PresentCase(label: "a present said of two jobs in one sentence, the first job", description: shared, path: "experience[0].endDate", present: "Present", kind: .review, reason: "several entries"),
         PresentCase(label: "a present said of two jobs in one sentence, the second job", description: shared, path: "experience[1].endDate", present: "Present", kind: .review, reason: "several entries"),
         PresentCase(label: "a present in a sentence of no employer or school", description: nobody, path: "experience[0].endDate", present: "Present", kind: .review, reason: "names no employer or school"),
-        PresentCase(label: "Italian: the job that ended", description: italian, path: "experience[0].endDate", present: "Ad oggi", kind: .invented, reason: "another entry"),
+        PresentCase(label: "Italian: the job that ended", description: italian, path: "experience[0].endDate", present: "Ad oggi", kind: .review, reason: "another entry"),
         PresentCase(label: "Italian: the job whose sentence says it", description: italian, path: "experience[1].endDate", present: "Ad oggi", kind: .quote, reason: "sentence of the entry"),
-        PresentCase(label: "German: the job that ended", description: german, path: "experience[0].endDate", present: "Bis heute", kind: .invented, reason: "another entry"),
+        PresentCase(label: "German: the job that ended", description: german, path: "experience[0].endDate", present: "Bis heute", kind: .review, reason: "another entry"),
         PresentCase(label: "German: the job whose sentence says it", description: german, path: "experience[1].endDate", present: "Bis heute", kind: .quote, reason: "sentence of the entry"),
         PresentCase(label: "one year and no word that says the job goes on", description: "I worked at Alpha Corp in 2019. I studied at Gamma University and graduated in 2015.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "no since before it"),
         PresentCase(label: "one year that ends the job", description: "I worked at Alpha Corp until 2020. I studied at Gamma University and graduated in 2015.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "no since before it"),
@@ -423,7 +436,7 @@ struct PresentCase: Sendable, CustomTestStringConvertible {
         PresentCase(label: "two jobs, the first with two years: the word of the second is a doubt, not a mistake", description: "Since 2019 I work at Alpha Corp, after a degree in 2015. I currently work at Beta Ltd.", path: "experience[0].endDate", present: "Currently", kind: .review, reason: "other than the end of a job whose sentence gives one year"),
         PresentCase(label: "a school that goes on, the word of a job: a doubt, not a mistake", description: "Since 2019 I study at Gamma University. I currently work at Beta Ltd.", path: "education[0].endDate", present: "Currently", kind: .review, reason: "other than the end of a job whose sentence gives one year"),
         PresentCase(label: "an entry named only in a shared sentence, the word of another entry: a doubt", description: "I worked at Alpha Corp and Beta Ltd in 2019. I currently study at Gamma University.", path: "experience[0].endDate", present: "Currently", kind: .review, reason: "names this one alone"),
-        PresentCase(label: "a shared sentence that says it goes on: a doubt, not a mistake", description: "Since 2019 I work at Alpha Corp and Beta Ltd. In 2017 I worked at Alpha Corp in Berlin. I currently study at Gamma University.", path: "experience[0].endDate", present: "Currently", kind: .review, reason: "no since before it"),
-        PresentCase(label: "a job that ended does not take the word of the job that goes on", description: "I worked at Alpha Corp in 2019 and left. I currently work at Beta Ltd.", path: "experience[0].endDate", present: "Currently", kind: .invented, reason: "another entry"),
+        PresentCase(label: "a shared sentence that says it goes on: a doubt, not a mistake", description: "Since 2019 I work at Alpha Corp and Beta Ltd. In 2017 I worked at Alpha Corp in Berlin. I currently study at Gamma University.", path: "experience[0].endDate", present: "Currently", kind: .review, reason: "said only of another entry"),
+        PresentCase(label: "a job that ended and takes the word of the job that goes on: a doubt, a person decides", description: "I worked at Alpha Corp in 2019 and left. I currently work at Beta Ltd.", path: "experience[0].endDate", present: "Currently", kind: .review, reason: "another entry"),
     ]
 }
