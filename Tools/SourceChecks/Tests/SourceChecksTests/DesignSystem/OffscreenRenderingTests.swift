@@ -39,7 +39,7 @@ struct OffscreenRenderingTests {
         let renderer = try NSRegularExpression(pattern: #"\bImageRenderer\b"#)
         let image = try NSRegularExpression(pattern: #"\.(?:cgImage|uiImage|nsImage)\b"#)
         guard source.contains("ImageRenderer") else { return [] }
-        let code = String(ButtonScan.blank(Array(source)))
+        let code = SwiftCode(source).skeleton.joined(separator: "\n")
         guard renderer.firstMatch(in: code, range: NSRange(code.startIndex..., in: code)) != nil else { return [] }
         return code.components(separatedBy: "\n").enumerated().compactMap { index, line in
             image.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) == nil ? nil : index + 1
