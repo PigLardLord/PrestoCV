@@ -13,8 +13,12 @@
 // channel, which the App Store rejects. Tools/Release/store-screenshots.sh runs it.
 //
 // A locale needs exactly six captions, one for each capture, and each capture the size of the device's screen: the
-// composer fails otherwise, before it writes anything of that locale. It replaces the folder <locale>/<device> as a
-// whole, so that no image of an earlier run is left in it. Tools/Release/compose-store-screenshots-selftest.sh tests it.
+// composer fails otherwise, before it writes anything of that locale. It makes the whole output aside, in
+// <output dir>/.compose-staging, and puts it in place only when all of it is made: each folder <locale>/<device> and each
+// contact sheet that it replaces is moved to <output dir>/.compose-previous first, and put back if a step fails. So a run
+// that fails leaves the output as it was, and no image of an earlier run is left in a folder it replaces. A run that is
+// killed while it puts the output in place leaves .compose-previous, and the next run refuses until it has been looked at.
+// Tools/Release/compose-store-screenshots-selftest.sh tests it.
 
 import CoreGraphics
 import CoreText
@@ -499,6 +503,61 @@ func contactSheet(_ rows: [(locale: String, images: [CGImage])], device: Device)
     return image
 }
 
+// MARK: - Output
+
+/// Where a run makes its output before it puts it in place, and where it moves what it replaces, both in the output
+/// directory, so that moving is renaming
+let stagingName = ".compose-staging"
+let previousName = ".compose-previous"
+
+/// Puts what a run made in staging (the paths below it are `items`) in the output directory, replacing what is there. An item
+/// that exists is moved to `.compose-previous` first. If a step fails, the items already moved are put back, so that the
+/// output is as it was, and the error is thrown; what could not be put back stays in `.compose-previous`, and is named.
+func promote(_ items: [String], from staging: URL, to output: URL) throws {
+    struct Step {
+        let item: String
+        var movedAside = false
+        var placed = false
+    }
+    let files = FileManager.default
+    let aside = output.appendingPathComponent(previousName, isDirectory: true)
+    var steps: [Step] = []
+    do {
+        for item in items {
+            let destination = output.appendingPathComponent(item)
+            steps.append(Step(item: item))
+            if files.fileExists(atPath: destination.path) {
+                let previous = aside.appendingPathComponent(item)
+                try files.createDirectory(at: previous.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try files.moveItem(at: destination, to: previous)
+                steps[steps.count - 1].movedAside = true
+            }
+            try files.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try files.moveItem(at: staging.appendingPathComponent(item), to: destination)
+            steps[steps.count - 1].placed = true
+        }
+    } catch {
+        let reason = error.localizedDescription
+        var notPutBack: [String] = []
+        for step in steps.reversed() {
+            let destination = output.appendingPathComponent(step.item)
+            do {
+                if step.placed { try files.removeItem(at: destination) }
+                if step.movedAside { try files.moveItem(at: aside.appendingPathComponent(step.item), to: destination) }
+            } catch {
+                notPutBack.append(step.item)
+            }
+        }
+        guard notPutBack.isEmpty else {
+            throw Failure("the screenshots could not be put in place (\(reason)), and these could not be put back; they are in "
+                          + "\(aside.path): \(notPutBack.joined(separator: ", "))")
+        }
+        try? files.removeItem(at: aside)
+        throw Failure("the screenshots could not be put in place (\(reason)); the output is as it was")
+    }
+    try? files.removeItem(at: aside)
+}
+
 // MARK: - Main
 
 func run(_ arguments: [String]) throws {
@@ -516,6 +575,19 @@ func run(_ arguments: [String]) throws {
         throw Failure("\(locale) has \(lines.count) screenshot captions and needs exactly \(screenshotCount), "
                       + "one for each screenshot")
     }
+
+    // The output is made in `.compose-staging` and put in place at the end (`promote`). What a run that failed to put its
+    // output in place could not put back is in `.compose-previous`, and is not to be written over by a new run.
+    let files = FileManager.default
+    let staging = outputDirectory.appendingPathComponent(stagingName, isDirectory: true)
+    let previous = outputDirectory.appendingPathComponent(previousName, isDirectory: true)
+    guard !files.fileExists(atPath: previous.path) else {
+        throw Failure("\(previous.path) holds what an earlier run could not put back; move it back or remove it, then run again")
+    }
+    try? files.removeItem(at: staging)
+    defer { try? files.removeItem(at: staging) }
+    var items: [String] = []
+    var report: [String] = []
 
     for key in arguments[4].split(separator: ",").map(String.init) {
         guard let device = devices[key] else { throw Failure("unknown device \(key); known: \(devices.keys.sorted())") }
@@ -541,18 +613,21 @@ func run(_ arguments: [String]) throws {
                                               for: device)
                 images.append(try compose(caption: caption, capture: capture, device: device, layout: layout))
             }
-            // The folder is replaced as a whole, so that an image of an earlier run is not left in it
-            let folder = outputDirectory.appendingPathComponent("\(locale)/\(key)", isDirectory: true)
-            try? FileManager.default.removeItem(at: folder)
+            // Written aside: the folder replaces the one of an earlier run, as a whole, once the run has made everything
+            let folder = staging.appendingPathComponent("\(locale)/\(key)", isDirectory: true)
             for (index, image) in images.enumerated() {
                 try writePNG(image, to: folder.appendingPathComponent(String(format: "%02d.png", index + 1)))
             }
+            items.append("\(locale)/\(key)")
             rows.append((locale, images))
-            print("\(locale) \(key): \(images.count) screenshots")
+            report.append("\(locale) \(key): \(images.count) screenshots")
         }
-        try writePNG(try contactSheet(rows, device: device),
-                     to: outputDirectory.appendingPathComponent("contact-sheet-\(key).png"))
+        let sheet = "contact-sheet-\(key).png"
+        try writePNG(try contactSheet(rows, device: device), to: staging.appendingPathComponent(sheet))
+        items.append(sheet)
     }
+    try promote(items, from: staging, to: outputDirectory)
+    for line in report { print(line) }
 }
 
 do {
