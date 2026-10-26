@@ -360,7 +360,9 @@ struct Grounding {
         return clauses.places.contains { place in
             guard reading.speaks(at: place) else { return false }
             let clause = facts(at: place, naming: subject.names, by: subject)
-            guard !clause.standaloneSpans(of: title, amongQuotes: holders).isEmpty else { return false }
+            let spans = clause.standaloneSpans(of: title, amongQuotes: holders)
+            guard !spans.isEmpty else { return false }
+            guard !subject.isEducation || spans.contains(where: { !isOnlyVerbs($0, in: clause) }) else { return false }
             if !subject.isFoundByItsTitle && naming[index].contains(place) { return true }
             guard !namesAnotherEntry(at: place, than: subject) else { return false }
             if subject.isFoundByItsTitle { return true }
@@ -368,6 +370,17 @@ struct Grounding {
             let covered = clause.positions(inside: subject.quotes + person)
             return clause.words.indices.allSatisfy { covered.contains($0) || explainer.explains(clause.words[$0]) }
         }
+    }
+
+    /// Whether the words of `span` in `clause`, the standalone occurrence of a degree, are nothing but finite verbs and function words
+    /// as the clause reads them ("terminé" in "estudié en la escuela y terminé en 2017"): what the person did names no qualification.
+    /// A verb beside a noun ("Titulado en Magisterio") and a word the vocabulary lists as a verb but the clause uses as a noun
+    /// ("o curso", "eine Lehre") are no such span. The other quotes of the draft are names, so no verbs; the span's own words are read.
+    private func isOnlyVerbs(_ span: Range<Int>, in clause: Clause) -> Bool {
+        let quoted = clause.positions(inside: reading.all).subtracting(span)
+        let verbs = Statement.finiteVerbs(in: clause.words, quoted: quoted, language: explainer.language)
+        return span.contains(where: verbs.contains)
+            && span.allSatisfy { verbs.contains($0) || Vocabulary.isNeutral(clause.words[$0].folded, in: explainer.language) }
     }
 
     private func namesAnotherEntry(at place: Place, than subject: Subject) -> Bool {

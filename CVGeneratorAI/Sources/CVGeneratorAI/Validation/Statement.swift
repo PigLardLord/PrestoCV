@@ -119,6 +119,19 @@ struct Statement {
         self.init(words: clause.words, name: name, quoted: clause.positions(inside: quotes), own: clause.positions(inside: own), language: language)
     }
 
+    /// The positions of the words of a clause that are finite verbs, as the statement of the clause reads them: a verb the vocabulary
+    /// lists in a form of a person or a tense, a form of "to be" or an auxiliary, or a word the device tags as one. An infinitive, a
+    /// gerund that nothing makes finite, a level word and the words at `quoted` are none, nor is a listed form after an article or a
+    /// preposition in the languages where the device tags no verb ("o curso", "il mio lavoro").
+    ///
+    /// - Parameters:
+    ///   - words: The words of the clause.
+    ///   - quoted: The positions of the words that are part of a quote of the draft: names, and no verbs.
+    ///   - language: The language of the description, when it is known.
+    static func finiteVerbs(in words: [Word], quoted: Set<Int>, language: Vocabulary.Language?) -> Set<Int> {
+        Set(VerbReader(words: words, quoted: quoted, language: language).verbs.filter(\.isFinite).map(\.index))
+    }
+
     /// Where a purpose that begins with the verb at `index` begins: at the word that introduces it ("to support", "per sostenere").
     private static func start(of index: Int, in words: [Word], language: Vocabulary.Language?) -> Int {
         index > 0 && VerbForms.isInfinitiveMarker(words[index - 1].folded, in: language) ? index - 1 : index

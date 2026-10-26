@@ -294,7 +294,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 2112
+    static let rowsWhenWritten = 2123
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list. All of them are residual risks of the rules (ADR 0023) that the claim check of
@@ -402,6 +402,7 @@ enum GroundingRows {
         rows += schoolsAndCertifications()
         rows += entryNamesWithoutAnArticle()
         rows += degreesThatNameNoDegree()
+        rows += aVerbIsNoDegree()
         rows += faithfulExamples()
         rows += theAppExampleKeepsEveryFact()
         rows += realModelProbes()
@@ -4882,6 +4883,46 @@ enum GroundingRows {
                         CVData(education: [study("laurea in Scienze della Formazione", at: "Università di Bologna")]), .unchanged, language: "it"))
         rows.append(row("a-word-for-graduating-without-a-school-leaves-nothing-it", "the degree only says graduating, and there is no school: the study goes",
                         "Ho la laurea.", CVData(education: [study("laurea")]), .exactly(CVData()), language: "it"))
+        return rows
+    }
+
+    // MARK: A verb names no degree (#202)
+
+    /// The model copies the verb of "I studied at the school and finished in 2017" into the degree: "terminé" says what the person
+    /// did, not what they hold. A degree that is nothing but finite verbs, as the clause that gives it reads them, goes, and the
+    /// school stays. A degree with a noun beside the verb ("Titulado en Magisterio"), and a noun the vocabulary also lists as a verb
+    /// ("Lehre"), name a qualification and stay.
+    private static func aVerbIsNoDegree() -> [GroundingRow] {
+        typealias Variant = (language: String, description: String, verb: String, school: String)
+        var variants: [Variant] = []
+        variants.append(("en", "I studied at the Nursing College of Leeds and finished in 2017.", "finished", "Nursing College of Leeds"))
+        variants.append(("it", "Studiai alla Scuola d'Arte Turia e terminai nel 2017.", "terminai", "Scuola d'Arte Turia"))
+        variants.append(("de", "Ich habe an der Kunstschule Kassel studiert und 2017 beendet.", "beendet", "Kunstschule Kassel"))
+        variants.append(("es", "Estudié en la Escuela de Arte Turia y terminé en 2017.", "terminé", "Escuela de Arte Turia"))
+        variants.append(("fr", "J'ai étudié à l'École d'Art Dumas et j'ai terminé en 2017.", "terminé", "École d'Art Dumas"))
+        variants.append(("pt", "Estudei na Escola de Arte Turia e terminei em 2017.", "terminei", "Escola de Arte Turia"))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-verb-names-no-degree-\(v.language)", "\(v.verb) is what the person did, not a qualification: the degree goes, and the school stays",
+                            v.description, CVData(education: [study(v.verb, at: v.school)]),
+                            .exactly(CVData(education: [study(at: v.school)])), language: v.language))
+        }
+        rows.append(row("a-verb-beside-a-noun-names-a-degree-es", "titulado is a verb of the vocabulary, but magisterio beside it is a qualification: the degree stays",
+                        "Titulado en Magisterio por la Escuela Normal de Turia.",
+                        CVData(education: [study("Titulado en Magisterio", at: "Escuela Normal de Turia")]), .unchanged, language: "es"))
+        rows.append(row("a-noun-after-a-verb-is-the-degree-es", "Magisterio is a qualification, and terminé beside it is not the degree: the degree stays",
+                        "Estudié Magisterio en la Escuela Normal de Turia y terminé en 2017.",
+                        CVData(education: [study("Magisterio", at: "Escuela Normal de Turia")]), .unchanged, language: "es"))
+        rows.append(row("a-noun-after-a-verb-is-the-degree-pt", "Enfermagem is a qualification, and terminei beside it is not the degree: the degree stays",
+                        "Estudei Enfermagem na Escola de Enfermagem do Mondego e terminei em 2017.",
+                        CVData(education: [study("Enfermagem", at: "Escola de Enfermagem do Mondego")]), .unchanged, language: "pt"))
+        rows.append(row("a-noun-after-a-verb-is-the-degree-en", "nurse is a qualification, and finished beside it is not the degree: the degree stays",
+                        "I trained as a nurse at the University of the West Country and finished in 2015.",
+                        CVData(education: [study("nurse", at: "University of the West Country")]), .unchanged))
+        rows.append(row("a-noun-the-vocabulary-lists-as-a-verb-is-a-degree-de", "Lehre is a qualification, though the vocabulary lists it as a form of a verb: the degree stays",
+                        "Ich habe eine Lehre bei der Berufsschule Kassel gemacht.",
+                        CVData(education: [study("Lehre", at: "Berufsschule Kassel")]), .unchanged, language: "de"))
         return rows
     }
 
