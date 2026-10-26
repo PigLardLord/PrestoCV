@@ -73,35 +73,44 @@ final class EditorRowDeletionUITests: XCTestCase {
         return (0..<fields.count).map { fields.element(boundBy: $0).value as? String ?? "" }
     }
 
-    /// Whether the fields of the kind come to hold exactly `names`, within `timeout`.
-    private func waitForNames(of kind: Kind, toBe names: [String], timeout: TimeInterval = 10) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while self.names(of: kind) != names && Date() < deadline {
-            _ = XCTWaiter().wait(for: [XCTestExpectation()], timeout: 0.3)
+    /// What the fields of all the rows of the kind hold, in the order of the form. The list is lazy: a row scrolled out of
+    /// sight is not in the tree, as the first rows are once a short screen has scrolled to the last, so the form is read
+    /// from its top to its end (`walkTheForm`). A name seen at two stops counts once: the rows of a test have names that differ.
+    private func allNames(of kind: Kind) -> [String] {
+        var all: [String] = []
+        app.walkTheForm {
+            for name in names(of: kind) where !all.contains(name) { all.append(name) }
         }
-        return self.names(of: kind) == names
+        return all
+    }
+
+    /// The fields of the kind that hold the keyboard's focus: the one being typed into, or none.
+    private func focusedFields(of kind: Kind) -> XCUIElementQuery {
+        fields(of: kind).matching(NSPredicate(format: "hasKeyboardFocus == true"))
     }
 
     /// Adds a row of the kind after the ones there, types `text` into its first field (nothing for a blank row) and
     /// ends the entry.
+    ///
+    /// The field of the new row is the one that takes the focus: the fields are not counted, because the list is lazy,
+    /// and with the keyboard up on a short screen the rows above the new one have left the tree, so the count does not
+    /// grow with the row. When the entry has ended the row is found by what was typed in it; a blank row has none, and is
+    /// the only one of its kind in the tests that add one.
     private func addRow(_ kind: Kind, typing text: String?) {
         app.buttons[kind.tab].firstMatch.tap()
         let add = app.buttons[kind.add]
         app.scrollTo(add)
-        let before = fields(of: kind).count
         add.tap()
 
-        // The new row is the last one, and it takes the focus
-        let fields = fields(of: kind)
+        let typing = focusedFields(of: kind).firstMatch
         XCTAssertTrue(
-            waitForCount(of: fields, toBe: before + 1),
-            "A new row should have a \(kind.field) to type into, after the \(before) there")
-        let field = fields.element(boundBy: before)
-        XCTAssertTrue(
-            field.waitForKeyboardFocus(true),
-            "The first field of a new row should take the focus. " + XCUIApplication.noSoftwareKeyboard)
+            typing.waitForExistence(timeout: 10),
+            "The first field of a new row should take the focus, to type into: a \(kind.field). The fields in the tree hold \(names(of: kind)); "
+                + "the button is at \(add.frame), the room from \(app.tapRoom.top) to \(app.tapRoom.bottom). "
+                + XCUIApplication.noSoftwareKeyboard + "\n\(app.debugDescription)")
         app.typeText((text ?? "") + "\n")
-        XCTAssertTrue(field.waitForKeyboardFocus(false), "Return should end the entry")
+        XCTAssertTrue(waitForCount(of: focusedFields(of: kind), toBe: 0), "Return should end the entry")
+        let field = text.map { fields(of: kind).matching(NSPredicate(format: "value == %@", $0)).firstMatch } ?? fields(of: kind).firstMatch
         app.scrollTo(field)
     }
 
@@ -120,18 +129,49 @@ final class EditorRowDeletionUITests: XCTestCase {
         app.cells.containing(NSPredicate(format: "value == %@", name)).firstMatch
     }
 
-    /// Swipes the row open from its upper part, clear of the fields' text.
-    private func swipeOpen(_ row: XCUIElement) {
-        let start = row.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.12))
-        let end = row.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.12))
-        start.press(forDuration: 0.05, thenDragTo: end)
+    /// Swipes the row open from its upper part, clear of the fields' text, inside what the row shows and where a touch
+    /// lands on the row (`TapRoom.swipeStart`). The row is scrolled into the room first: on a short screen the rows
+    /// added before it have carried it under the navigation bar, or out of the tree. Returns where the swipe started,
+    /// for a failure to tell.
+    @discardableResult
+    private func swipeOpen(_ row: XCUIElement) -> CGPoint {
+        app.scrollTo(row, upwards: true)
+        let frame = row.frame
+        let start = app.tapRoom.swipeStart(in: frame, contentRight: contentRight(of: row))
+        let end = CGPoint(x: frame.minX + frame.width * 0.2, y: start.y)
+        let origin = row.coordinate(withNormalizedOffset: .zero)
+        origin.withOffset(CGVector(dx: start.x - frame.minX, dy: start.y - frame.minY))
+            .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: end.x - frame.minX, dy: end.y - frame.minY)))
+        return start
+    }
+
+    /// How far right the row shows anything: the right edge of its fields, buttons and texts. Nil when the row cannot be read.
+    private func contentRight(of row: XCUIElement) -> CGFloat? {
+        guard let snapshot = try? row.snapshot() else { return nil }
+        let shown: Set<XCUIElement.ElementType> = [.textField, .textView, .button, .staticText]
+        var pending = snapshot.children
+        var right: CGFloat?
+        while let element = pending.popLast() {
+            pending.append(contentsOf: element.children)
+            let frame = element.frame
+            if shown.contains(element.elementType), !frame.isEmpty { right = max(right ?? frame.maxX, frame.maxX) }
+        }
+        return right
+    }
+
+    /// What a failed swipe or tap should say: where it went, in which row and room, and the screen as it was.
+    private func report(at point: CGPoint, in row: XCUIElement) -> String {
+        let room = app.tapRoom
+        return ". It started at \(point) in the row \(row.frame), the room being from \(room.top) to \(room.bottom) of \(app.frame)\n\(app.debugDescription)"
     }
 
     /// Opens the row and taps the delete button that the swipe reveals, which has to name the row.
     private func tapDelete(named label: String, on row: XCUIElement) {
-        swipeOpen(row)
+        let start = swipeOpen(row)
         let delete = app.buttons[label]
-        XCTAssertTrue(delete.waitForExistence(timeout: 10), "A swipe should reveal a delete button that says \"\(label)\"")
+        XCTAssertTrue(
+            delete.waitForExistence(timeout: 10),
+            "A swipe should reveal a delete button that says \"\(label)\"" + report(at: start, in: row))
         delete.tap()
     }
 
@@ -141,7 +181,8 @@ final class EditorRowDeletionUITests: XCTestCase {
     }
 
     /// Answers the question with Cancel. The question is a popover beside the row, which has no Cancel button: a tap
-    /// outside it, low on the screen, closes it and keeps the row.
+    /// outside it closes it and keeps the row. The popover sits beside its row, so the tap goes where the popover is not
+    /// (`TapRoom.pointOutside`), not at a fixed place that it may cover.
     private func cancelTheQuestion() {
         let cancel = app.buttons["Cancel"]
         if cancel.waitForExistence(timeout: 1) {
@@ -150,7 +191,10 @@ final class EditorRowDeletionUITests: XCTestCase {
         }
         let outside = app.otherElements["PopoverDismissRegion"]
         XCTAssertTrue(outside.waitForExistence(timeout: 5), "The question should close with a tap outside it\n\(app.debugDescription)")
-        outside.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)).tap()
+        let popover = app.popovers.firstMatch
+        let point = app.tapRoom.pointOutside(popover.exists ? popover.frame : nil)
+        let origin = outside.coordinate(withNormalizedOffset: .zero)
+        origin.withOffset(CGVector(dx: point.x - outside.frame.minX, dy: point.y - outside.frame.minY)).tap()
     }
 
     /// The delete buttons that sit in the rows, whatever they are called: a swipe has not opened any of them.
@@ -333,19 +377,20 @@ final class EditorRowDeletionUITests: XCTestCase {
         for name in ["Swift", "Kotlin", "Rust"] {
             addRow(kind, typing: name)
         }
-        XCTAssertEqual(names(of: kind), ["Swift", "Kotlin", "Rust"])
+        XCTAssertEqual(allNames(of: kind), ["Swift", "Kotlin", "Rust"])
 
         tapDelete(named: "Delete Kotlin", on: row(holding: "Kotlin"))
         XCTAssertTrue(text(kind.question).waitForExistence(timeout: 10), "The question should come: \(kind.question)")
         app.buttons["Delete"].tap()
 
-        XCTAssertTrue(waitForNames(of: kind, toBe: ["Swift", "Rust"]), "Only the row asked about should go: \(names(of: kind))")
+        XCTAssertTrue(row(holding: "Kotlin").waitForNonExistence(timeout: 10), "The row asked about should go")
+        XCTAssertEqual(allNames(of: kind), ["Swift", "Rust"], "Only the row asked about should go")
         // Rust now sits where Kotlin sat: it is a row of its own, not the open row of Kotlin, and it holds no focus
+        let rust = fields(of: kind).matching(NSPredicate(format: "value == %@", "Rust")).firstMatch
+        app.scrollTo(rust, upwards: true)
         XCTAssertFalse(app.buttons["Delete Rust"].exists, "The row that took the place should not be left swiped open")
         XCTAssertFalse(app.buttons["Delete Kotlin"].exists)
         XCTAssertFalse(text(kind.question).exists, "Nothing more should be asked")
-        let rust = fields(of: kind).element(boundBy: 1)
-        XCTAssertEqual(rust.value as? String, "Rust")
         XCTAssertTrue(rust.waitForKeyboardFocus(false, timeout: 5), "The row that took the place should not take the focus")
 
         // Its button names it, and a Cancel keeps it
@@ -353,7 +398,7 @@ final class EditorRowDeletionUITests: XCTestCase {
         XCTAssertTrue(text(kind.question).waitForExistence(timeout: 10), "The question should come for Rust")
         cancelTheQuestion()
         XCTAssertTrue(text(kind.question).waitForNonExistence(timeout: 10), "Cancel should close the question")
-        XCTAssertEqual(names(of: kind), ["Swift", "Rust"], "Cancel should keep the rows")
+        XCTAssertEqual(allNames(of: kind), ["Swift", "Rust"], "Cancel should keep the rows")
     }
 
     func testCancellingKeepsEveryRowOfSeveral() throws {
@@ -367,14 +412,16 @@ final class EditorRowDeletionUITests: XCTestCase {
         cancelTheQuestion()
 
         XCTAssertTrue(text(kind.question).waitForNonExistence(timeout: 10))
-        XCTAssertEqual(names(of: kind), ["Swift", "Kotlin"])
+        XCTAssertEqual(allNames(of: kind), ["Swift", "Kotlin"])
     }
 
     func testAddingARowWhileAnotherIsSwipedOpenKeepsBothAndFocusesTheNewOne() throws {
         let kind = Self.skill
         addRow(kind, typing: "Swift")
-        swipeOpen(row(holding: "Swift"))
-        XCTAssertTrue(app.buttons["Delete Swift"].waitForExistence(timeout: 10), "The swipe should open the row")
+        let swiped = row(holding: "Swift")
+        let start = swipeOpen(swiped)
+        XCTAssertTrue(
+            app.buttons["Delete Swift"].waitForExistence(timeout: 10), "The swipe should open the row" + report(at: start, in: swiped))
 
         let add = app.buttons[kind.add]
         app.scrollTo(add)
