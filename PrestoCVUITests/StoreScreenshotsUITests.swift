@@ -258,8 +258,8 @@ final class StoreScreenshotsUITests: XCTestCase {
     }
 
     /// Fails unless the first section of the editor holds the facts of the description, is blank where the description
-    /// says nothing, and shows all of it inside `area`. An empty field shows its hint as its value, and the empty
-    /// summary shows its hint as a text of its own.
+    /// says nothing, and shows all of it inside `area`. An empty field shows its hint as its value, and the summary
+    /// shows its hint as a text of its own over the editor, which is empty.
     private func assertTheFacts(of form: XCUIElement, areInView area: CGRect) {
         let facts = [("field.full_name", fixture.name), ("field.professional_title", fixture.draft.title),
                      ("field.location", fixture.draft.location)]
@@ -282,6 +282,12 @@ final class StoreScreenshotsUITests: XCTestCase {
         XCTAssertTrue(summaryHint.exists, "The summary should be blank, with its hint")
         XCTAssertTrue(area.contains(summaryHint.frame),
                       "The hint of the summary should be in view: it is at \(summaryHint.frame), the room is \(area)")
+        // The hint is a text of its own, there whether the summary is written or not: the editor under it holds the summary.
+        // On iPhone the section bar floats over the upper part of the editor, so its value is checked and its place is not.
+        let summary = form.textViews.firstMatch
+        XCTAssertTrue(summary.exists, "The editor should show the summary")
+        XCTAssertEqual(summary.value as? String ?? "", "",
+                       "The summary should be blank, and it holds \"\(summary.value as? String ?? "nothing")\"")
     }
 
     private func closeTheKeyboard(in app: XCUIApplication) {
