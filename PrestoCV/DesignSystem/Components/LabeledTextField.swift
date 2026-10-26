@@ -136,9 +136,9 @@ struct LabeledTextField_Previews: PreviewProvider {
         VStack(spacing: DesignTokens.Spacing.lg) {
             LabeledTextField(label: "Label", text: $text, placeholder: "Enter text")
             
-            LabeledTextField.email(text: $email, state: FieldState(isRequired: true, helpText: "field.help.required".localized)) {
+            LabeledTextField.email(text: $email, state: FieldState(isRequired: true, helpText: "field.help.required".localized), onLeave: {
                 print("Email submitted")
-            }
+            })
             
             LabeledTextField.phone(text: $phone, state: FieldState(validation: .warning, helpText: "field.phone.no_digits".localized))
             

@@ -77,7 +77,7 @@ final class CVExportSheetViewModel: ObservableObject {
 
     /// How long a selection must stay put before the sheet reacts to it: it makes its preview then, and the list of CVs
     /// stores what was chosen.
-    static let selectionInterval = Duration.milliseconds(250)
+    nonisolated static let selectionInterval = Duration.milliseconds(250)
 
     /// How the CV is exported: the page, its border, the longest CV, and what a CV needs before it is exported
     let exportPolicy: ExportPolicy

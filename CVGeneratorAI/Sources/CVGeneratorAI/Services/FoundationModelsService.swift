@@ -29,7 +29,7 @@ public final class FoundationModelsService: CVGenerationService {
                 to: prompt.text,
                 generating: CVData.self,
                 includeSchemaInPrompt: true,
-                options: GenerationOptions(sampling: .greedy)
+                options: GenerationOptions(samplingMode: .greedy)
             )
             return response.content
         } catch is CancellationError {

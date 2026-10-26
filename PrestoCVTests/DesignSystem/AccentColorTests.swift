@@ -43,6 +43,15 @@ struct AccentColorTests {
         var testDescription: String { name }
     }
 
+    /// A pair to check, named for the report. Its colours are made when the test runs, on the main actor, so that the
+    /// cases can be listed as the arguments of a test from outside it.
+    struct ContrastCase: CustomTestStringConvertible, Sendable {
+        let name: String
+        let make: @MainActor @Sendable (_ name: String) -> ContrastPair
+        @MainActor var pair: ContrastPair { make(name) }
+        var testDescription: String { name }
+    }
+
     /// The label and the fill of a primary button, at rest or pressed.
     static func primaryButton(_ name: String, isPressed: Bool) -> ContrastPair {
         let look = PrimaryButton.Look(isDisabled: false, isPressed: isPressed)
@@ -50,48 +59,70 @@ struct AccentColorTests {
     }
 
     /// The labels the app draws on a fill of the accent.
-    static let filledAccents = [
-        primaryButton("Label of a primary button (`OnAccentColor` on `AccentColor`)", isPressed: false),
-        primaryButton("Label of a pressed primary button (`OnAccentColor` on `AccentPressedColor`)", isPressed: true),
+    nonisolated static let filledAccents = [
+        ContrastCase(name: "Label of a primary button (`OnAccentColor` on `AccentColor`)") { primaryButton($0, isPressed: false) },
+        ContrastCase(name: "Label of a pressed primary button (`OnAccentColor` on `AccentPressedColor`)") {
+            primaryButton($0, isPressed: true)
+        },
         // The system draws the symbol of a swipe action in white, whatever its tint
-        ContrastPair(
-            name: "Symbol of a swipe action (white on `SwipeActionColor`)",
-            foreground: .white,
-            background: DesignTokens.Colors.swipeActionTint
-        ),
+        ContrastCase(name: "Symbol of a swipe action (white on `SwipeActionColor`)") {
+            ContrastPair(name: $0, foreground: .white, background: DesignTokens.Colors.swipeActionTint)
+        },
     ]
 
     /// The backgrounds the app draws text in the accent on: the screens, the cards, and the rows of a list or a form.
-    static let textBackgrounds: [(name: String, color: Color)] = [
-        ("a screen (`systemBackground`)", DesignTokens.Colors.background),
-        ("a card (`tertiarySystemBackground`)", DesignTokens.Colors.backgroundTertiary),
-        ("a row of a list or form (`secondarySystemGroupedBackground`)", Color(UIColor.secondarySystemGroupedBackground)),
-    ]
+    enum TextBackground: CaseIterable, Sendable {
+        case screen, card, row
 
-    static let accentTexts = textBackgrounds.map { background in
-        ContrastPair(name: "Accent text on \(background.name)", foreground: DesignTokens.Colors.accent, background: background.color)
+        var name: String {
+            switch self {
+            case .screen: "a screen (`systemBackground`)"
+            case .card: "a card (`tertiarySystemBackground`)"
+            case .row: "a row of a list or form (`secondarySystemGroupedBackground`)"
+            }
+        }
+
+        @MainActor var color: Color {
+            switch self {
+            case .screen: DesignTokens.Colors.background
+            case .card: DesignTokens.Colors.backgroundTertiary
+            case .row: Color(UIColor.secondarySystemGroupedBackground)
+            }
+        }
+    }
+
+    nonisolated static let accentTexts = TextBackground.allCases.map { background in
+        ContrastCase(name: "Accent text on \(background.name)") {
+            ContrastPair(name: $0, foreground: DesignTokens.Colors.accent, background: background.color)
+        }
     } + [
-        ContrastPair(
-            name: "Title of a pressed secondary button on a screen (`AccentPressedColor` on `systemBackground`)",
-            foreground: AccentTextButtonStyle.foregroundColor(isPressed: true),
-            background: DesignTokens.Colors.background
-        ),
-        ContrastPair(
-            name: "Title of a pressed add button on a form row (`AccentPressedColor` on `secondarySystemGroupedBackground`)",
-            foreground: AccentTextButtonStyle.foregroundColor(isPressed: true),
-            background: Color(UIColor.secondarySystemGroupedBackground)
-        ),
+        ContrastCase(name: "Title of a pressed secondary button on a screen (`AccentPressedColor` on `systemBackground`)") {
+            ContrastPair(
+                name: $0,
+                foreground: AccentTextButtonStyle.foregroundColor(isPressed: true),
+                background: DesignTokens.Colors.background
+            )
+        },
+        ContrastCase(name: "Title of a pressed add button on a form row (`AccentPressedColor` on `secondarySystemGroupedBackground`)") {
+            ContrastPair(
+                name: $0,
+                foreground: AccentTextButtonStyle.foregroundColor(isPressed: true),
+                background: Color(UIColor.secondarySystemGroupedBackground)
+            )
+        },
     ]
 
     @Test("A label on a fill of the accent reaches 4.5:1, also while the button is pressed", arguments: filledAccents, Appearance.allCases)
-    func labelOnTheAccentIsReadable(pair: ContrastPair, appearance: Appearance) {
+    func labelOnTheAccentIsReadable(accent: ContrastCase, appearance: Appearance) {
+        let pair = accent.pair
         let ratio = appearance.contrast(of: pair)
 
         #expect(ratio >= 4.5, "\(pair.name) in the \(appearance.rawValue) appearance reaches \(ratio):1")
     }
 
     @Test("Text in the accent reaches 4.5:1 on the backgrounds it is drawn on", arguments: accentTexts, Appearance.allCases)
-    func textInTheAccentIsReadable(pair: ContrastPair, appearance: Appearance) {
+    func textInTheAccentIsReadable(text: ContrastCase, appearance: Appearance) {
+        let pair = text.pair
         let ratio = appearance.contrast(of: pair)
 
         #expect(ratio >= 4.5, "\(pair.name) in the \(appearance.rawValue) appearance reaches \(ratio):1")
@@ -103,7 +134,7 @@ struct AccentColorTests {
         let title = AccentTextButtonStyle.foregroundColor(isPressed: isPressed)
 
         for appearance in Appearance.allCases {
-            for background in Self.textBackgrounds {
+            for background in TextBackground.allCases {
                 let ratio = appearance.contrast(of: ContrastPair(name: "", foreground: title, background: background.color))
 
                 #expect(ratio >= 4.5, "the title, pressed \(isPressed), on \(background.name) in the \(appearance.rawValue) appearance reaches \(ratio):1")
@@ -139,7 +170,7 @@ struct AccentColorTests {
             }
         }
 
-        var titleColour: Color {
+        @MainActor var titleColour: Color {
             switch self {
             case .primary: DesignTokens.Colors.primaryButtonForeground
             case .secondary: AccentTextButtonStyle.foregroundColor(isPressed: false)
@@ -182,8 +213,9 @@ struct AccentColorTests {
         let colourRows = Self.documentedColours.map { colour in
             Self.row(colour.name, Appearance.allCases.map { "`\($0.hex(of: colour.color))`" })
         }
-        let contrastRows = (Self.filledAccents + Self.accentTexts).map { pair in
-            Self.row(pair.name, Appearance.allCases.map { String(format: "%.2f:1", $0.contrast(of: pair)) })
+        let contrastRows = (Self.filledAccents + Self.accentTexts).map { contrastCase in
+            let pair = contrastCase.pair
+            return Self.row(pair.name, Appearance.allCases.map { String(format: "%.2f:1", $0.contrast(of: pair)) })
         }
 
         for row in colourRows + contrastRows {

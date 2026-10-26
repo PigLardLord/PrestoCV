@@ -16,7 +16,7 @@ struct AIDraftEditorTests {
         return CVEditorViewModel(cvId: nil, initialCV: cv, notice: .aiDraft, cvManagementUseCase: useCase)
     }
 
-    private static let drafts: [(String, CVData)] = [
+    private nonisolated static let drafts: [(String, CVData)] = [
         ("name", CVData(personalInfo: CVGeneratorAI.PersonalInfo(name: "Maria Rossi"))),
         ("title", CVData(personalInfo: CVGeneratorAI.PersonalInfo(title: "Teacher"))),
         ("email", CVData(personalInfo: CVGeneratorAI.PersonalInfo(email: "maria@example.com"))),

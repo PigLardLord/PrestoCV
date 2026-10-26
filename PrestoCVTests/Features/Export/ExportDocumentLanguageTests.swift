@@ -36,7 +36,7 @@ extension RealRendererSuites {
                 documentLanguageSink: { _ in },
                 lookSink: { _ in },
                 exportPolicy: .standard,
-                documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: [appLanguage], read: NaturalLanguageReader.read),
+                documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: [appLanguage], read: { NaturalLanguageReader.read($0) }),
                 appLocale: Locale(identifier: "en"),
                 previewDebounce: .zero
             )

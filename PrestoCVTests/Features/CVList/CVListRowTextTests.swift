@@ -39,7 +39,7 @@ struct CVListRowTextTests {
         LastSavedDescription(locale: Locale(identifier: "en"), calendar: TestZone(zone).calendar).text(for: savedAt, relativeTo: moment)
     }
 
-    private static let calendar: Calendar = {
+    private nonisolated static let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
         return calendar
@@ -296,11 +296,11 @@ struct CVListRowTextTests {
         await repository.setLastSaved(savedAt, for: saved.id)
         let clock = TestClock(savedAt)
         let waits = WaitLog()
-        let viewModel = makeViewModel(repository: repository, clock: clock) { duration in
+        let viewModel = makeViewModel(repository: repository, clock: clock, sleep: { duration in
             await waits.record(duration)
             guard await waits.count <= 3 else { throw CancellationError() }
             clock.advance(by: 60)
-        }
+        })
         await viewModel.loadCVs()
 
         await viewModel.keepPresentationDateCurrent()
