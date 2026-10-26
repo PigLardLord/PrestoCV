@@ -737,9 +737,10 @@ enum InventedFacts {
         return (.review, "a date in another shape")
     }
 
-    /// What the description says of the word of the present in a date, or nil when it does not say it at all. The present is the
-    /// entry's own only when the sentence that names its employer or school says it: said of another entry it is provably wrong,
-    /// said in a sentence that several entries share, or that names none, it is a doubt. A date no entry owns (a
+    /// What the description says of the word of the present in a date, or nil when it does not say it at all, or says it only of
+    /// another entry whose own sentence nevertheless says that it goes on. The present is the entry's own only when the sentence
+    /// that names its employer or school says it: said of another entry it is provably wrong unless the entry's own sentence says
+    /// that it goes on, said in a sentence that several entries share, or that names none, it is a doubt. A date no entry owns (a
     /// certification) takes the phrase from anywhere in the description.
     private static func presentSaid(
         _ words: [String], by entry: Entry?, own: [Int], against source: Source
@@ -762,6 +763,9 @@ enum InventedFacts {
         if holders.contains(where: { !source.owned.contains($0) }) {
             return (.review, "the present is said in a sentence that names no employer or school")
         }
+        // Said only of another entry. A mistake only when the entry's own sentence does not say that it goes on: a job that
+        // began "since 2019" is current whichever word of the present the draft chose, and the date then takes its own decision.
+        if own.contains(where: { says(goesOn: source.masked($0, of: entry)) }) { return nil }
         return (.invented, "the present is said only of another entry")
     }
 

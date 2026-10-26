@@ -384,6 +384,8 @@ struct PresentCase: Sendable, CustomTestStringConvertible {
 
     private static let split = "I worked at Alpha Corp until 2020. Since 2021 I work at Beta Ltd, up to the present. I studied at Gamma University and graduated in 2015."
     private static let shared = "I worked at Alpha Corp until 2020 and at Beta Ltd up to the present. I studied at Gamma University and graduated in 2015."
+    private static let both = "Since 2019 I work at Alpha Corp. I currently work at Beta Ltd. I studied at Gamma University and graduated in 2015."
+    private static let italianBoth = "Dal 2019 lavoro in Alpha Corp. Ad oggi lavoro anche in Beta Ltd. Mi sono laureato alla Gamma University nel 2015."
     private static let nobody = "I worked at Alpha Corp until 2020. I worked at Beta Ltd from 2021. I am present at every conference. I studied at Gamma University and graduated in 2015."
     private static let italian = "Ho lavorato in Alpha Corp fino al 2020. Dal 2021 lavoro in Beta Ltd, ad oggi. Mi sono laureato alla Gamma University nel 2015."
     private static let german = "Ich arbeitete bei Alpha Corp bis 2020. Seit 2021 arbeite ich bei Beta Ltd, bis heute. Ich studierte an der Gamma University bis 2015."
@@ -407,5 +409,12 @@ struct PresentCase: Sendable, CustomTestStringConvertible {
         PresentCase(label: "German: one year and a seit", description: "Ich arbeite seit 2018 bei Alpha Corp.", path: "experience[0].endDate", present: "heute", kind: .derived, reason: "says it goes on"),
         PresentCase(label: "a word of the present in the name of the employer is no word of the sentence", description: "I worked at Now Hiring Ltd in 2019.", path: "experience[0].endDate", present: "Present", kind: .review, reason: "no word that says it goes on", company: "Now Hiring Ltd"),
         PresentCase(label: "the name of the employer is no present for the job", description: "I worked at Today Magazine until 2020.", path: "experience[0].endDate", present: "Today", kind: .review, reason: "name of the employer", company: "Today Magazine"),
+        PresentCase(label: "two jobs that go on: the first says it with a since, the second with a word of the present", description: both, path: "experience[0].endDate", present: "Currently", kind: .derived, reason: "says it goes on"),
+        PresentCase(label: "two jobs that go on: the other word of the present for the first job", description: both, path: "experience[0].endDate", present: "Present", kind: .derived, reason: "says it goes on"),
+        PresentCase(label: "two jobs that go on: the second job says it itself", description: both, path: "experience[1].endDate", present: "Currently", kind: .quote, reason: "sentence of the entry"),
+        PresentCase(label: "Italian: two jobs that go on, the first with a dal", description: italianBoth, path: "experience[0].endDate", present: "Ad oggi", kind: .derived, reason: "says it goes on"),
+        PresentCase(label: "two jobs, the first with two years: the word of the second is a doubt, not a mistake", description: "Since 2019 I work at Alpha Corp, after a degree in 2015. I currently work at Beta Ltd.", path: "experience[0].endDate", present: "Currently", kind: .review, reason: "other than the end of a job whose sentence gives one year"),
+        PresentCase(label: "a school that goes on, the word of a job: a doubt, not a mistake", description: "Since 2019 I study at Gamma University. I currently work at Beta Ltd.", path: "education[0].endDate", present: "Currently", kind: .review, reason: "other than the end of a job whose sentence gives one year"),
+        PresentCase(label: "a job that ended does not take the word of the job that goes on", description: "I worked at Alpha Corp in 2019 and left. I currently work at Beta Ltd.", path: "experience[0].endDate", present: "Currently", kind: .invented, reason: "another entry"),
     ]
 }
