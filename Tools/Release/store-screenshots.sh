@@ -35,7 +35,10 @@
 # accept. The captures of a language are made aside, in <language>.partial, and put in place by a rename once all six
 # are copied: a copy that fails leaves no file of the language. A language whose test fails (or attaches fewer than six
 # screenshots) keeps none of its captures, the other languages of the device are still run, and then the run ends: the
-# second device and the composer are skipped, so that a set with a hole is never composed.
+# second device and the composer are skipped, so that a set with a hole is never composed. A run that is killed leaves the
+# same: the captures of the languages it had finished, whole, and none of the language it was in or of those after it.
+# The composer replaces the screenshots to upload in the same way, as a whole, and a run of it that is killed while it puts
+# them in place leaves a file (.compose-promoting, in <dir>) that makes the next run refuse until it is looked at.
 #
 # One run at a time: the runs share the simulators and the work folder, so a second one exits with 75 while the first
 # lives, and also while a capture of a first one that was killed is still going. Whatever way a run ends (the end, a failure,

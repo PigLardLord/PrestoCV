@@ -8,7 +8,11 @@
 #   - write nothing of a locale when one of its captures is missing,
 #   - leave the output as it was when a run fails at any step, even after it has composed a locale or a device: it makes
 #     the whole output aside and puts it in place at the end, so that a missing capture of a later locale or device, a
-#     write that fails and a folder that cannot be replaced leave the earlier set whole, with no half-made folder next to it.
+#     write that fails and a folder that cannot be replaced leave the earlier set whole, with no half-made folder next to it,
+#   - never take for whole a set that a run was killed while it put in place, also when there was no earlier output (an
+#     empty output folder): the file it writes before the first move, and removes after the last, makes the next run
+#     refuse, at every point of the promotion, the first move, the last move and before any move (the kill is the
+#     composer's COMPOSE_TEST_KILL_AFTER_MOVE hook, which does nothing when it is not set).
 #
 #   Tools/Release/compose-store-screenshots-selftest.sh
 set -u
@@ -67,8 +71,11 @@ expect() {
     fail=$((fail+1)); echo "FAIL $name: $what"; sed 's/^/     /' <<< "$OUT"
 }
 folder_holds() { [ "$(ls "$T/out/en-US/iphone" 2>/dev/null | tr '\n' ' ')" = "$1" ]; }
-# No folder of a run is left in the output: the one it makes the output in, and the one it moves what it replaces to
-no_leftovers() { [ ! -e "$T/out/.compose-staging" ] && [ ! -e "$T/out/.compose-previous" ]; }
+# Nothing of a run is left in the output: the folder it makes the output in, the one it moves what it replaces to, and the
+# file that says it is putting the output in place
+no_leftovers() {
+    [ ! -e "$T/out/.compose-staging" ] && [ ! -e "$T/out/.compose-previous" ] && [ ! -e "$T/out/.compose-promoting" ]
+}
 # Nothing was written: the output holds no file (it may be there, empty), and no folder of a run
 nothing_written() { [ -z "$(find "$T/out" -type f 2>/dev/null)" ] && no_leftovers; }
 # The files of the output, hidden ones too, each with its checksum: the output as it is
@@ -171,13 +178,67 @@ expect "a staging folder left by a run that was killed" "exit $RC" [ "$RC" = 0 ]
 expect "  leaves no folder of the run" "$(ls -A "$T/out")" no_leftovers
 expect "  holds only the six images" "the folder holds: $(ls "$T/out/en-US/iphone" 2>&1 | tr '\n' ' ')" folder_holds "01.png 02.png 03.png 04.png 05.png 06.png "
 
-# 10. What an earlier run could not put back (.compose-previous) is not written over: the run refuses
+# 10. What an earlier run could not put back (.compose-previous) is not written over, also when the file that says a run
+#     was putting the output in place is gone: the run refuses
 earlier_run; mkdir -p "$T/out/.compose-previous/en-US"; echo "kept" > "$T/out/.compose-previous/en-US/iphone"; BEFORE="$(tree_of)"
 compose_all iphone
 expect "what an earlier run could not put back" "exit $RC, want a failure" [ "$RC" != 0 ]
 expect "  names the folder" "the message is: $OUT" grep -q ".compose-previous" <<< "$OUT"
 expect "  leaves everything as it was" "$(diff <(echo "$BEFORE") <(tree_of))" unchanged
 expect "  leaves no staging folder" "$(ls -A "$T/out")" [ ! -e "$T/out/.compose-staging" ]
+
+# 11. A run that is killed while it puts the output in place leaves a set that may be whole in part only, and the next run
+#     must not take it for a whole one: not in an empty output folder (nothing was moved aside, so there is no
+#     .compose-previous to say so), and not when it replaces an earlier set. The file that says so is written before the
+#     first move and removed after the last, so every point of the promotion is tried: <n> is the move after which the
+#     run is killed, 0 for before the first move; one move more than there are is a run that is not killed.
+# compose_killed <n>: runs the composer on every locale and kills it after its nth move into place; sets OUT and RC
+compose_killed() {
+    { OUT="$(COMPOSE_TEST_KILL_AFTER_MOVE="$1" "$T/compose" "$T/listing.md" "$T/captures" "$T/out" iphone 2>&1)"; RC=$?; } 2>/dev/null
+}
+# An empty output folder: the captures, and no output
+empty_output() {
+    rm -rf "$T/captures" "$T/out"; two_locales
+    captures_for "$T/captures" iphone en 1320 2868 6; captures_for "$T/captures" iphone de 1320 2868 6
+    mkdir -p "$T/out"
+}
+# Both locales and the contact sheet are made: the folders hold the six images, and the sheet is the composer's
+whole_set() {
+    folder_holds "01.png 02.png 03.png 04.png 05.png 06.png " \
+        && [ "$(ls "$T/out/de-DE/iphone" 2>/dev/null | tr '\n' ' ')" = "01.png 02.png 03.png 04.png 05.png 06.png " ] \
+        && [ "$(wc -c < "$T/out/contact-sheet-iphone.png" | tr -d ' ')" -gt 1000 ]
+}
+# killed_at_every_move <what> <setup function> <moves the promotion makes>
+killed_at_every_move() {
+    local what="$1" setup="$2" moves="$3" n
+    for n in $(seq 0 "$moves"); do
+        "$setup"
+        compose_killed "$n"
+        expect "$what, killed after move $n" "exit $RC, want 137 (killed)" [ "$RC" = 137 ]
+        expect "  leaves the file that says it was putting the output in place" "$(ls -A "$T/out")" [ -f "$T/out/.compose-promoting" ]
+        # Into an empty folder nothing is set aside: the file is all the evidence there is of the promotion
+        [ "$setup" != empty_output ] || expect "  sets nothing aside" "$(ls -A "$T/out")" [ ! -e "$T/out/.compose-previous" ]
+        BEFORE="$(tree_of)"
+        compose_all iphone
+        expect "  the next run refuses" "exit $RC, want a failure" [ "$RC" != 0 ]
+        expect "  says why" "the message is: $OUT" grep -q "compose-promoting is there: an earlier run was stopped" <<< "$OUT"
+        expect "  changes nothing" "$(diff <(echo "$BEFORE") <(tree_of))" unchanged
+        # What the message says to do: remove the file (and .compose-previous, which holds what the run replaced)
+        rm -rf "$T/out/.compose-promoting" "$T/out/.compose-previous"
+        compose_all iphone
+        expect "  after the file is removed, a run makes the whole set" "exit $RC; $(ls -A "$T/out")" whole_set
+        expect "  leaves nothing of the run" "$(ls -A "$T/out")" no_leftovers
+    done
+    "$setup"
+    compose_killed "$((moves + 1))"
+    expect "$what, not killed (there are $moves moves)" "exit $RC, want 0; $OUT" [ "$RC" = 0 ]
+    expect "  makes the whole set" "$(ls -A "$T/out")" whole_set
+    expect "  leaves nothing of the run" "$(ls -A "$T/out")" no_leftovers
+}
+# Two folders and a contact sheet are put in place: one move each into an empty output folder, two each (the item
+# set aside, the new one) over an earlier set
+killed_at_every_move "an empty output folder" empty_output 3
+killed_at_every_move "an earlier set" earlier_run 6
 
 echo "compose-store-screenshots-selftest: $pass passed, $fail failed"
 [ "$fail" = 0 ]

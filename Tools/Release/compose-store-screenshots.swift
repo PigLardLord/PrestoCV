@@ -16,9 +16,15 @@
 // composer fails otherwise, before it writes anything of that locale. It makes the whole output aside, in
 // <output dir>/.compose-staging, and puts it in place only when all of it is made: each folder <locale>/<device> and each
 // contact sheet that it replaces is moved to <output dir>/.compose-previous first, and put back if a step fails. So a run
-// that fails leaves the output as it was, and no image of an earlier run is left in a folder it replaces. A run that is
-// killed while it puts the output in place leaves .compose-previous, and the next run refuses until it has been looked at.
-// Tools/Release/compose-store-screenshots-selftest.sh tests it.
+// that fails leaves the output as it was, and no image of an earlier run is left in a folder it replaces.
+//
+// A run cannot make the moves into place one step. Before the first of them it writes <output dir>/.compose-promoting,
+// which lists the items, and it removes it after the last one (the contact sheets too), so that the file is there exactly
+// while the output may hold only part of a set. A run that is killed in between leaves it, also when the output was empty
+// and nothing was moved aside, and the next run refuses until it has been looked at, and says why. (.compose-previous, which
+// holds what a run replaced and could not put back, is refused the same way.)
+// Tools/Release/compose-store-screenshots-selftest.sh tests it, killing a run after each move with
+// COMPOSE_TEST_KILL_AFTER_MOVE=<n> (the run ends with SIGKILL after its nth move into place, 0 before the first; unset, it does nothing).
 
 import CoreGraphics
 import CoreText
@@ -505,14 +511,38 @@ func contactSheet(_ rows: [(locale: String, images: [CGImage])], device: Device)
 
 // MARK: - Output
 
-/// Where a run makes its output before it puts it in place, and where it moves what it replaces, both in the output
-/// directory, so that moving is renaming
+/// Where a run makes its output before it puts it in place, where it moves what it replaces, and the file that says that a
+/// run is putting the output in place, all in the output directory, so that moving is renaming
 let stagingName = ".compose-staging"
 let previousName = ".compose-previous"
+let promotingName = ".compose-promoting"
+
+/// The self-test's way to end a run as a kill does, with no chance to clean up: after the nth move into place (0: after the
+/// marker is written, before the first move). Unset, as it is outside the self-test, it does nothing.
+let killAfterMove = ProcessInfo.processInfo.environment["COMPOSE_TEST_KILL_AFTER_MOVE"].flatMap { Int($0) }
+
+/// What a run leaves in the output directory while it puts the output in place. The file is the evidence that the output
+/// may hold only part of a set, so it is written before the first move and removed after the last, and a new run refuses
+/// while it exists.
+func refuseWhileUnfinished(_ output: URL) throws {
+    let files = FileManager.default
+    let promoting = output.appendingPathComponent(promotingName)
+    let previous = output.appendingPathComponent(previousName, isDirectory: true)
+    guard !files.fileExists(atPath: promoting.path) else {
+        throw Failure("\(promoting.path) is there: an earlier run was stopped while it put its screenshots in place, so "
+                      + "\(output.path) may hold only part of that set, and \(previous.path), if it is there, what that run "
+                      + "had replaced. The file lists the items. Remove them (or put back those in \(previous.path)), then "
+                      + "remove the file and \(previous.path), and run again")
+    }
+    guard !files.fileExists(atPath: previous.path) else {
+        throw Failure("\(previous.path) holds what an earlier run could not put back; move it back or remove it, then run again")
+    }
+}
 
 /// Puts what a run made in staging (the paths below it are `items`) in the output directory, replacing what is there. An item
 /// that exists is moved to `.compose-previous` first. If a step fails, the items already moved are put back, so that the
 /// output is as it was, and the error is thrown; what could not be put back stays in `.compose-previous`, and is named.
+/// `.compose-promoting` is written before the first move and removed once every item is in place, or put back.
 func promote(_ items: [String], from staging: URL, to output: URL) throws {
     struct Step {
         let item: String
@@ -521,7 +551,24 @@ func promote(_ items: [String], from staging: URL, to output: URL) throws {
     }
     let files = FileManager.default
     let aside = output.appendingPathComponent(previousName, isDirectory: true)
+    let promoting = output.appendingPathComponent(promotingName)
     var steps: [Step] = []
+    var moves = 0
+    func move(_ source: URL, to destination: URL) throws {
+        try files.moveItem(at: source, to: destination)
+        moves += 1
+        if moves == killAfterMove { kill(getpid(), SIGKILL) }
+    }
+
+    do {
+        try files.createDirectory(at: output, withIntermediateDirectories: true)
+        let listing = (["a run was putting these in place; it removes this file when all are:"] + items).joined(separator: "\n")
+        try Data((listing + "\n").utf8).write(to: promoting, options: .atomic)
+    } catch {
+        throw Failure("could not write \(promoting.path) before the screenshots were put in place (\(error.localizedDescription)); "
+                      + "nothing was moved")
+    }
+    if killAfterMove == 0 { kill(getpid(), SIGKILL) }
     do {
         for item in items {
             let destination = output.appendingPathComponent(item)
@@ -529,11 +576,11 @@ func promote(_ items: [String], from staging: URL, to output: URL) throws {
             if files.fileExists(atPath: destination.path) {
                 let previous = aside.appendingPathComponent(item)
                 try files.createDirectory(at: previous.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try files.moveItem(at: destination, to: previous)
+                try move(destination, to: previous)
                 steps[steps.count - 1].movedAside = true
             }
             try files.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try files.moveItem(at: staging.appendingPathComponent(item), to: destination)
+            try move(staging.appendingPathComponent(item), to: destination)
             steps[steps.count - 1].placed = true
         }
     } catch {
@@ -548,14 +595,24 @@ func promote(_ items: [String], from staging: URL, to output: URL) throws {
                 notPutBack.append(step.item)
             }
         }
+        // What could not be put back stays in `.compose-previous`, and the file stays with it: the next run refuses
         guard notPutBack.isEmpty else {
             throw Failure("the screenshots could not be put in place (\(reason)), and these could not be put back; they are in "
-                          + "\(aside.path): \(notPutBack.joined(separator: ", "))")
+                          + "\(aside.path), and \(promoting.path) stays until you have looked at them: \(notPutBack.joined(separator: ", "))")
         }
         try? files.removeItem(at: aside)
+        do { try files.removeItem(at: promoting) } catch {
+            throw Failure("the screenshots could not be put in place (\(reason)), and were put back, but \(promoting.path) could not "
+                          + "be removed (\(error.localizedDescription)); remove it, or the next run refuses")
+        }
         throw Failure("the screenshots could not be put in place (\(reason)); the output is as it was")
     }
     try? files.removeItem(at: aside)
+    // The last step: the file is there until every item, the contact sheets too, is in place
+    do { try files.removeItem(at: promoting) } catch {
+        throw Failure("the screenshots are in place, but \(promoting.path) could not be removed (\(error.localizedDescription)); "
+                      + "remove it, or the next run refuses")
+    }
 }
 
 // MARK: - Main
@@ -576,14 +633,12 @@ func run(_ arguments: [String]) throws {
                       + "one for each screenshot")
     }
 
-    // The output is made in `.compose-staging` and put in place at the end (`promote`). What a run that failed to put its
-    // output in place could not put back is in `.compose-previous`, and is not to be written over by a new run.
+    // The output is made in `.compose-staging` and put in place at the end (`promote`). A run that was stopped while it put its
+    // output in place left `.compose-promoting` (and `.compose-previous`, if it had moved something aside): the output may
+    // hold only part of a set, and a new run is not to take it for a whole one, or to write over what was set aside.
     let files = FileManager.default
     let staging = outputDirectory.appendingPathComponent(stagingName, isDirectory: true)
-    let previous = outputDirectory.appendingPathComponent(previousName, isDirectory: true)
-    guard !files.fileExists(atPath: previous.path) else {
-        throw Failure("\(previous.path) holds what an earlier run could not put back; move it back or remove it, then run again")
-    }
+    try refuseWhileUnfinished(outputDirectory)
     try? files.removeItem(at: staging)
     defer { try? files.removeItem(at: staging) }
     var items: [String] = []
