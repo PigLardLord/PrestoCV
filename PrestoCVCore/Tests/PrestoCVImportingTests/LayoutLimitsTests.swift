@@ -52,7 +52,7 @@ struct LayoutLimitsTests {
         let analysis = try analyze([page], limits: limits(steps: bound))
 
         #expect(analysis.lines.count >= 2_000)
-        #expect(throws: ImportError.tooLarge) { try analyze([page], limits: limits(steps: words / 2)) }
+        #expect(throws: LimitReached(.steps)) { try analyze([page], limits: limits(steps: words / 2)) }
     }
 
     @Test("A layout over the words, lines or cells of the limits is refused, the words before the analysis starts")
@@ -61,9 +61,9 @@ struct LayoutLimitsTests {
             text: "a", frame: Rect(x: 72, y: 72, width: 5, height: 10), fontSize: 10, isBold: false
         ), count: 20_001))
         // No step is allowed: the words are refused before the analysis starts
-        #expect(throws: ImportError.tooLarge) { try analyze([manyWords], limits: limits(steps: 0)) }
-        #expect(throws: ImportError.tooLarge) { try analyze([hostilePage(lines: 2_001)], limits: limits) }
-        #expect(throws: ImportError.tooLarge) { try analyze([hostilePage(lines: 1_000, cellsPerLine: 5)], limits: limits) }
+        #expect(throws: LimitReached(.words)) { try analyze([manyWords], limits: limits(steps: 0)) }
+        #expect(throws: LimitReached(.lines)) { try analyze([hostilePage(lines: 2_001)], limits: limits) }
+        #expect(throws: LimitReached(.cells)) { try analyze([hostilePage(lines: 1_000, cellsPerLine: 5)], limits: limits) }
         #expect(try analyze([hostilePage(lines: 1_000, cellsPerLine: 4)], limits: limits).lines.isEmpty == false)
     }
 

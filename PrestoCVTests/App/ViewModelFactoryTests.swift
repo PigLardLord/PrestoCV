@@ -155,7 +155,40 @@ struct ViewModelFactoryTests {
         #expect(reopened.prompt == "Ward nurse with ten years in intensive care")
     }
 
+    @Test("The import writes what it read to the log of the environment the factory was given (ADR 0030)")
+    func importLogsToTheEnvironmentsLog() throws {
+        let log = LogSpy()
+        let factory = try ViewModelFactory(
+            dependencyContainer: UnusedContainer(), cvManagementUseCase: cvs, environment: .fixed(clock: clock, diagnostics: log)
+        )
+        let viewModel = factory.makeImportViewModel()
+        viewModel.paste(["Lena Hartmann", "Pflegefachfrau", "", "## Berufserfahrung", "Pflegefachfrau | Klinik Beispiel | 2019 – heute"])
+
+        viewModel.importText()
+
+        #expect(viewModel.imported != nil)
+        #expect(log.events.contains("import.finished"))
+        #expect(log.lines.allSatisfy { !$0.contains("Hartmann") }, "No word of the CV reaches the log")
+    }
+
     #if DEBUG
+    @Test("The AI draft writes its steps to the log of the environment the factory was given (ADR 0030)")
+    func draftLogsToTheEnvironmentsLog() async throws {
+        let log = LogSpy()
+        let arguments = ["PrestoCV", AIDraftScript.scriptedDraftArgument, "nurse", AIDraftScript.claimCheckArgument, "fail"]
+        let factory = try ViewModelFactory(
+            dependencyContainer: UnusedContainer(), cvManagementUseCase: cvs,
+            environment: .fixed(clock: clock, arguments: arguments, diagnostics: log)
+        )
+        let screen = factory.makeAIGenerationViewModel()
+        screen.prompt = AIDraftScript.nurseDescription
+
+        await screen.generateCV()
+
+        #expect(screen.draft != nil)
+        #expect(log.events.suffix(4) == ["draft.language", "draft.started", "draft.claims", "draft.finished"])
+    }
+
     @Test("A debug launch that scripts the model and a claim check with no answer gives the unchecked AI draft (ADR 0028)")
     func scriptedLaunchGivesTheUncheckedDraft() async throws {
         let arguments = ["PrestoCV", AIDraftScript.scriptedDraftArgument, "nurse", AIDraftScript.claimCheckArgument, "fail"]

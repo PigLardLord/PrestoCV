@@ -28,8 +28,8 @@ struct Section: Equatable {
 /// Splits the document into sections at its headings (ADR 0027).
 enum SectionSegmenter {
 
-    /// - Throws: `ImportError.tooLarge` when looking again at the head for each heading that could be the name would pass
-    ///   the budget of `work`, and `CancellationError` once the task is cancelled.
+    /// - Throws: `LimitReached` with its steps when looking again at the head for each heading that could be the name
+    ///   would pass the budget of `work`, and `CancellationError` once the task is cancelled.
     static func sections(of document: SourceDocument, work: inout AnalysisWork) throws -> [Section] {
         var sections: [Section] = [Section(kind: .header, heading: nil, blocks: [], languages: [])]
         var column = document.blocks.first?.column

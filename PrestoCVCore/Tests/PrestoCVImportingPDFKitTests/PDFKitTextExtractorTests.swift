@@ -114,10 +114,10 @@ struct PDFKitTextExtractorTests {
             )
         }
         let linkedIn = try pdf("en-emily/linkedin.pdf")
-        await #expect(throws: ImportError.tooManyPages) {
+        await #expect(throws: LimitReached(.pages)) {
             try await PDFKitTextExtractor().layout(ofPDF: linkedIn, limits: limits(pages: 1, words: 20_000))
         }
-        await #expect(throws: ImportError.tooLarge) {
+        await #expect(throws: LimitReached(.words)) {
             try await PDFKitTextExtractor().layout(ofPDF: linkedIn, limits: limits(pages: 10, words: 10))
         }
     }

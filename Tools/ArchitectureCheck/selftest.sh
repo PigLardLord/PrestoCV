@@ -483,6 +483,23 @@ for form in 'init(id: UUID = UUID()) {}' 'init(debounce: Duration = .millisecond
             'init(file: StaticString = #filePath, line: UInt = #line) {}'; do
   default_case "R17: allowed: $form" "$form" 0
 done
+# --- ADR 0030: with the repository's own lists, a default logger is refused (R17) and the unified log adapter is made only in the composition root (R4)
+repository_lists() {   # the fixture takes the suffixes and the infrastructure types of the repository's rules.json
+  python3 - "$ROOT/rules.json" "$HERE/rules.json" <<'PY'
+import json, sys
+p, real = sys.argv[1], json.load(open(sys.argv[2])); r = json.load(open(p))
+for key in ("serviceSuffixes", "dependencySuffixes", "infrastructureTypes"): r[key] = real[key]
+json.dump(r, open(p, "w"))
+PY
+}
+for form in 'init(logger: any DiagnosticLogger = SilentLogger()) {}' 'init(logger: (any DiagnosticLogger)? = .init()) {}' \
+            'init(logger: some DiagnosticLogger = SilentLogger()) {}'; do
+  setup; repository_lists; only_rule R17; src "$form"; expect "R17: refused with the repository's lists: $form" 1 "R17 defaultDependency"
+done
+setup; repository_lists; only_rule R17; src 'init(logger: any DiagnosticLogger, clock: any Clock<Duration>) {}'
+expect "R17: allowed with the repository's lists: a logger passed in" 0 ""
+setup; repository_lists; src 'let logger = OSLogDiagnosticLogger(subsystem: "com.example")'
+expect "R4: refused with the repository's lists: the unified log adapter made outside the composition root" 1 "R4 infrastructureConstruction"
 legacy_tests "R17"; printf '%s\n' 'init(now: @escaping () -> Date = { Date() }) {}' >> "$ROOT/Tests/Old/OldTests.swift"
 expect "R17: a legacy target with R17 is checked for it, and only for it" 1 "Tests/Old/OldTests.swift:4: R17 defaultDependency"
 if grep -qE "R1 import|wallClock" "$ROOT/out.txt"; then fail=$((fail+1)); echo "FAIL a legacy target with R17 was checked for more"; sed 's/^/     /' "$ROOT/out.txt"
