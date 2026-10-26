@@ -287,7 +287,7 @@ struct ButtonScan {
 
     init(path: String, text: String) {
         self.path = path
-        self.code = Self.blank(Array(text))
+        self.code = Array(SwiftCode(text).skeleton.joined(separator: "\n"))
     }
 
     /// Every call of the view `name`, as `name(...)` or `name { ... }`.
@@ -428,77 +428,5 @@ struct ButtonScan {
 
     private static func isIdentifier(_ character: Character) -> Bool {
         character.isLetter || character.isNumber || character == "_"
-    }
-
-    // MARK: Blanking
-
-    /// The source with its comments and the text of its string literals turned into spaces. Line breaks stay, and so
-    /// does the code of an interpolation. Other scans of code read it too.
-    static func blank(_ source: [Character]) -> [Character] {
-        var blanked = source
-        /// The open string literals, innermost last: how each ends, and the depth of the brackets of the
-        /// interpolation being read in it, or nil while reading its text
-        var literals: [(end: [Character], interpolation: Int?)] = []
-        func starts(_ prefix: String, at index: Int) -> Bool {
-            let characters = Array(prefix)
-            return index + characters.count <= source.count && Array(source[index..<index + characters.count]) == characters
-        }
-        func clear(_ range: Range<Int>) {
-            for index in range where index < source.count && source[index] != "\n" { blanked[index] = " " }
-        }
-        var index = 0
-        while index < source.count {
-            if let literal = literals.last, literal.interpolation == nil {
-                if source[index] == "\\" && index + 1 < source.count && source[index + 1] == "(" {
-                    clear(index..<index + 2)
-                    literals[literals.count - 1].interpolation = 1
-                    index += 2
-                } else if source[index] == "\\" && literal.end.last != "#" {
-                    clear(index..<index + 2)
-                    index += 2
-                } else if starts(String(literal.end), at: index) {
-                    literals.removeLast()
-                    index += literal.end.count
-                } else {
-                    clear(index..<index + 1)
-                    index += 1
-                }
-                continue
-            }
-            if starts("//", at: index) {
-                let lineEnd = source[index...].firstIndex(of: "\n") ?? source.count
-                clear(index..<lineEnd)
-                index = lineEnd
-            } else if starts("/*", at: index) {
-                var end = index + 2
-                while end < source.count && !starts("*/", at: end) { end += 1 }
-                clear(index..<min(end + 2, source.count))
-                index = end + 2
-            } else if starts("#\"", at: index) {
-                literals.append((end: Array("\"#"), interpolation: nil))
-                index += 2
-            } else if starts("\"\"\"", at: index) {
-                literals.append((end: Array("\"\"\""), interpolation: nil))
-                index += 3
-            } else if source[index] == "\"" {
-                literals.append((end: ["\""], interpolation: nil))
-                index += 1
-            } else {
-                if let depth = literals.last?.interpolation {
-                    if source[index] == "(" {
-                        literals[literals.count - 1].interpolation = depth + 1
-                    } else if source[index] == ")" {
-                        if depth == 1 {
-                            clear(index..<index + 1)
-                            literals[literals.count - 1].interpolation = nil
-                        } else {
-                            literals[literals.count - 1].interpolation = depth - 1
-                        }
-                    }
-                }
-                index += 1
-            }
-        }
-        return blanked
     }
 }
