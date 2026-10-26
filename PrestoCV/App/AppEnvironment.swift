@@ -18,11 +18,13 @@ struct AppEnvironment {
     let preferredLanguages: () -> [String]
     /// How the app waits
     let sleep: @Sendable (Duration) async throws -> Void
-    /// The clock the editors measure the pause before they save on, and the import and the AI draft time their steps on
+    /// The clock the editors measure the pause before they save on, the list the pause before it stores what was chosen in
+    /// an export sheet, and the import and the AI draft time their steps on
     let clock: any Clock<Duration>
     /// Where each export gets a folder of its own
     let temporaryDirectory: URL
-    /// Where the design chosen last is kept: a file and not `UserDefaults`, which would need a privacy manifest entry
+    /// Where earlier versions kept the design chosen last for the whole app. Nothing writes the file any more: it is read
+    /// for a CV that has no look of its own. A file and not `UserDefaults`, which would need a privacy manifest entry
     let exportPreferencesFile: URL
     /// The app's own folder on the device. The system copies a PDF opened in the app ("Open in PrestoCV") into it, and the
     /// import deletes each copy once read

@@ -59,6 +59,7 @@ struct ExportTestEnvironment {
             exportService: makeService(),
             preferencesStore: InMemoryExportPreferencesStore(),
             documentLanguageSink: { _ in },
+            lookSink: { _ in },
             exportPolicy: .standard,
             documentLanguageDetector: englishDocumentLanguageDetector,
             appLocale: Locale(identifier: "en"),

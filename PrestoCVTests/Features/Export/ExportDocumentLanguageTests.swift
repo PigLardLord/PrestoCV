@@ -34,6 +34,7 @@ extension RealRendererSuites {
                 exportService: environment.makeService(),
                 preferencesStore: InMemoryExportPreferencesStore(),
                 documentLanguageSink: { _ in },
+                lookSink: { _ in },
                 exportPolicy: .standard,
                 documentLanguageDetector: DocumentLanguageDetector(preferredLanguages: [appLanguage], read: NaturalLanguageReader.read),
                 appLocale: Locale(identifier: "en"),

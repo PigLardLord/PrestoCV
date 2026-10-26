@@ -21,6 +21,7 @@ struct CVExportSheetStartTests {
             exportService: service,
             preferencesStore: InMemoryExportPreferencesStore(stored: stored),
             documentLanguageSink: { _ in },
+            lookSink: { _ in },
             exportPolicy: .standard,
             documentLanguageDetector: englishDocumentLanguageDetector,
             appLocale: Locale(identifier: "en"),
@@ -82,7 +83,7 @@ struct CVExportSheetStartTests {
         await finish(viewModel)
     }
 
-    @Test("The design chosen last makes one preview when the sheet shows, not one for each of its values")
+    @Test("The design an earlier version chose last makes one preview when the sheet shows, not one for each of its values")
     func restoredChoiceMakesOnePreview() async {
         let viewModel = makeViewModel(
             stored: ExportPreferences(templateId: "modern", colorPalette: .creative, fontScheme: .serif)

@@ -21,7 +21,7 @@ One word, one meaning, in code, UI copy, tickets and translations. Today "templa
 | **Bundled design** | A design package shipped inside `CVBundledDesigns`. | Installed design | Design Catalog |
 | **Installed design** | A design package in the design store, bundled or imported. | — | Design Catalog |
 | **Palette** / **Font scheme** | Customisations of a design. They get their own names in the UI (colour names, typeface names), never a design's name. | Design | Design Catalog |
-| **Design choice** | The design, palette and font a CV uses, stored on the CV. | — | Authoring (as opaque identifiers) |
+| **Design choice** | The design, palette and font a CV uses, stored on the CV. The legacy CV file keeps it as the `look` key (`CVLook`). | — | Authoring (as opaque identifiers) |
 | **Document** | `CVDocument`: the input of rendering, the published language of `CVPDFExporter`. | CV | Rendering |
 | **Document language** | The language a CV is written and printed in. It can differ from the app language. | App language | Authoring, Rendering, Drafting |
 | **Preview** | HTML rendered on screen from the same pipeline and policy as the PDF. | — | Rendering |
