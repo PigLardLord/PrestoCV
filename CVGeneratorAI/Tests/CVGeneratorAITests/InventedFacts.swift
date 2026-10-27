@@ -783,9 +783,10 @@ enum InventedFacts {
         "formado", "formada", "formei", "graduei", "concluido", "concluida", "conclui", "terminei",
     ]
 
-    /// The verbs that say the studies were completed: the words of completion but the nouns, which can name the degree.
+    /// The verbs that say the studies were completed: the words of completion but the nouns, which can name the degree, and the
+    /// progressive forms, which say that the studies go on.
     private static let completionVerbs: Set<String> = completionWords.subtracting([
-        "graduate", "graduation", "completion", "laurea", "abschluss",
+        "graduate", "graduation", "completion", "laurea", "abschluss", "graduating", "completing",
     ])
 
     /// The verbs that say the studies began, in the six languages of the app, folded: they date a year wherever they stand before it.
