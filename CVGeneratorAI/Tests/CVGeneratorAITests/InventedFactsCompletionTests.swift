@@ -38,6 +38,7 @@ struct InventedFactsCompletionTests {
         Case(label: "it: an undated start before the graduation does not date the year", description: "Ho iniziato a studiare alla Gamma University tempo fa e mi sono laureato nel 2013.", start: "2013", kind: .invented),
         Case(label: "fr: an undated start before the completion does not date the year", description: "J'ai commencé mes études à Gamma University il y a longtemps et fini en 2013.", start: "2013", kind: .invented),
         Case(label: "en: an ongoing completing after a start verb stays a quote", description: "I started completing my degree at Gamma University in 2013.", start: "2013", kind: .quote),
+        Case(label: "fr: a start verb before the noun diplôme stays a quote", description: "J'ai commencé mon diplôme à Gamma University en 2013.", start: "2013", kind: .quote),
     ]
 
     @Test("The start of a school is a quote only when its sentence gives the year as a start", arguments: all)
