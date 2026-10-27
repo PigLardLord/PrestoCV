@@ -15,7 +15,9 @@ from pathlib import Path
 DOC = Path(__file__).resolve().parents[2] / "docs" / "release" / "store-listing.md"
 FIELDS = ["Name", "Subtitle", "Keywords", "Promotional text", "Description", "Screenshot captions", "What's New"]
 LIMITS = {"Name": 30, "Subtitle": 30, "Promotional text": 170, "Description": 4000, "What's New": 4000}
-KEYWORD_BYTES, NOTES_LIMIT, CAPTIONS = 100, 4000, (5, 6)
+KEYWORD_BYTES, NOTES_LIMIT = 100, 4000
+# One caption for each of the six screenshots: the composer puts the nth caption on the nth capture.
+CAPTION_COUNT = 6
 # A caption is "Title | Line below". The limits keep the title on one or two lines of the screenshot, at its large size.
 CAPTION_TITLE, CAPTION_LINE = 30, 80
 # Guideline 2.3.7: no prices in the name, the subtitle, the keywords or the screenshots.
@@ -93,8 +95,9 @@ def check(locales, notes):
         if len({fold(k) for k in listed}) != len(listed):
             errors.append(f"{locale} Keywords: a keyword is listed twice")
         captions = text["Screenshot captions"].split("\n")
-        if not CAPTIONS[0] <= len(captions) <= CAPTIONS[1] or not all(c.strip() for c in captions):
-            errors.append(f"{locale} Screenshot captions: needs {CAPTIONS[0]} to {CAPTIONS[1]} non-empty lines")
+        if len(captions) != CAPTION_COUNT or not all(c.strip() for c in captions):
+            errors.append(f"{locale} Screenshot captions: needs exactly {CAPTION_COUNT} non-empty lines, one for each "
+                          f"screenshot, and has {len(captions)}")
         for number, caption in enumerate(captions, 1):
             parts = caption.split(" | ")
             if len(parts) != 2 or not all(part.strip() for part in parts):

@@ -1,3 +1,4 @@
+import DiagnosticLogging
 import Foundation
 import PrestoCVCore
 
@@ -11,14 +12,19 @@ enum LaunchEnvironment {
 
     /// Where the app keeps its data. The debug build keeps it in a folder of its own when a UI test asks for one, so
     /// that the test does not depend on what the simulator already holds: a new, empty folder for each launch, or a
-    /// named one that the launches of one test share, as a relaunch needs. Release builds ignore the request.
-    static func storage(arguments: [String]) -> Storage {
+    /// named one that the launches of one test share, as a relaunch needs. A new folder starts with the CV files the
+    /// test hands over (`seedFiles(arguments:)`); a named folder that a launch has already made keeps what the app saved
+    /// in it, so a test that wants to start over names a new one. Release builds ignore the request.
+    /// - Parameter diagnostics: Where a seed that could not be written is logged.
+    static func storage(arguments: [String], diagnostics: any DiagnosticLogger) -> Storage {
         #if DEBUG
         if let folder = uiTestFolder(arguments: arguments) {
             let directory = FileManager.default.temporaryDirectory
                 .appendingPathComponent("PrestoCVUITests-\(folder)", isDirectory: true)
+            let cvs = directory.appendingPathComponent("CVs", isDirectory: true)
+            seed(seedFiles(arguments: arguments), into: cvs, diagnostics: diagnostics)
             return Storage(
-                cvs: { directory.appendingPathComponent("CVs", isDirectory: true) },
+                cvs: { cvs },
                 unsavedEdits: { directory.appendingPathComponent("UnsavedEdits", isDirectory: true) }
             )
         }
@@ -162,5 +168,52 @@ enum LaunchEnvironment {
         }
         return arguments[index + 1]
     }
+
+    /// The CV files a UI test hands over, so that it can start from CVs it wrote itself, saved at the times it chose:
+    /// `-PrestoCVUITestsSeed` followed by a JSON object from file name to file content, in Base64: as plain JSON, CVs
+    /// whose texts had apostrophes did not reach the app. A name that is not a plain `.json` file name is left out.
+    static func seedFiles(arguments: [String]) -> [String: String] {
+        guard let index = arguments.firstIndex(of: "-PrestoCVUITestsSeed"), arguments.indices.contains(index + 1),
+              let json = Data(base64Encoded: arguments[index + 1]),
+              let files = try? JSONDecoder().decode([String: String].self, from: json) else {
+            return [:]
+        }
+        return files.filter { name, _ in
+            name.hasSuffix(".json") && !name.hasPrefix(".") && !name.contains("/")
+        }
+    }
+
+    /// Writes the files into a new folder before the app reads it. They are written into a folder beside it, which is
+    /// moved to its place when every file is there: a seed that fails (or a launch that is killed) in the middle leaves
+    /// no folder for the next launch to take for the whole seed. A folder that exists already holds what an earlier
+    /// launch of the test saved, and the seed would overwrite it, so it is left as it is. A seed that cannot be written
+    /// leaves the test without it, and the log says why.
+    private static func seed(_ files: [String: String], into directory: URL, diagnostics: any DiagnosticLogger) {
+        guard !files.isEmpty, !isFolder(directory) else { return }
+        let staging = directory.appendingPathExtension("seeding")
+        do {
+            try? FileManager.default.removeItem(at: staging)
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+            for (name, content) in files {
+                try Data(content.utf8).write(to: staging.appendingPathComponent(name), options: .atomic)
+            }
+            try FileManager.default.moveItem(at: staging, to: directory)
+        } catch {
+            try? FileManager.default.removeItem(at: staging)
+            diagnostics.error(.launch, "launch.seedFailed", .count("files", files.count), .error(error))
+        }
+    }
+
+    private static func isFolder(_ url: URL) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
+    }
     #endif
 }
+
+#if DEBUG
+extension LogCategory {
+    /// The launch of a UI test: the seed that could not be written
+    fileprivate static let launch = LogCategory("launch")
+}
+#endif

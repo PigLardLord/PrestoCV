@@ -29,6 +29,11 @@ final class LogSpy: DiagnosticLogger {
         written.withLock { $0.append(entry) }
     }
 
+    /// Every entry written, in order
+    var entries: [LogEntry] {
+        written.withLock { $0 }
+    }
+
     /// The events written, in order
     var events: [String] {
         written.withLock { $0.map { $0.event.description } }
