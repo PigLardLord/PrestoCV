@@ -750,8 +750,10 @@ enum InventedFacts {
     }
 
     /// Whether every mention of `year` in the sentences of a school is the year the studies were completed: a word of completion
-    /// before it with no word of a start after that, or right after it, and no word of a start before it. Such a year is never the
-    /// start of the studies, and the counter does not borrow the production rule to say so.
+    /// before it, or right after it, and no word of a start that dates this year. A verb of a start anywhere before the year
+    /// dates it ("I started my graduate studies in 2013"), and so does a preposition of a start right before it ("from 2013"),
+    /// but not one far before it ("graduated from Gamma University in 2013"). Such a year is never the start of the studies,
+    /// and the counter does not borrow the production rule to say so.
     private static func completionOnly(_ year: String, in sentences: [[String]]) -> Bool {
         var mentions = 0
         for sentence in sentences {
@@ -759,13 +761,9 @@ enum InventedFacts {
                 mentions += 1
                 let before = sentence[..<index]
                 let after = sentence[(index + 1)...].prefix(2)
-                let completed: Bool
-                if let last = before.lastIndex(where: completionWords.contains) {
-                    completed = !before[last...].contains(where: startWords.contains)
-                } else {
-                    completed = !before.contains(where: startWords.contains) && after.contains(where: completionWords.contains)
-                }
-                if !completed { return false }
+                let started = before.contains(where: startVerbs.contains) || before.suffix(2).contains(where: startPrepositions.contains)
+                let completed = before.contains(where: completionWords.contains) || after.contains(where: completionWords.contains)
+                if started || !completed { return false }
             }
         }
         return mentions > 0
@@ -781,14 +779,19 @@ enum InventedFacts {
         "formado", "formada", "formei", "graduei", "concluido", "concluida", "conclui", "terminei",
     ]
 
-    /// The words that say the studies began, in the six languages of the app, folded.
-    private static let startWords: Set<String> = [
-        "from", "since", "started", "starting", "began", "begun", "enrolled",
-        "dal", "dall", "dalla", "iniziato", "iniziata", "iniziai",
-        "seit", "von", "begann", "angefangen",
-        "desde", "comence", "empece",
-        "depuis", "debut", "commence",
-        "inicio", "iniciei", "comecei",
+    /// The verbs that say the studies began, in the six languages of the app, folded: they date a year wherever they stand before it.
+    private static let startVerbs: Set<String> = [
+        "started", "starting", "began", "begun", "enrolled",
+        "iniziato", "iniziata", "iniziai",
+        "begann", "angefangen", "begonnen",
+        "comence", "empece",
+        "commence", "debute",
+        "iniciei", "comecei",
+    ]
+
+    /// The prepositions that say the studies began, folded: they date the year only right before it.
+    private static let startPrepositions: Set<String> = [
+        "from", "since", "dal", "dall", "dalla", "seit", "von", "desde", "depuis", "du",
     ]
 
     /// What the description says of the word of the present in a date. The present is the entry's own only when a sentence of the

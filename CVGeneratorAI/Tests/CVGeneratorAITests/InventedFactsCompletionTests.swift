@@ -31,6 +31,9 @@ struct InventedFactsCompletionTests {
         Case(label: "it: the start year is stated, so the start stays a quote", description: "Ho studiato alla Gamma University dal 2009 e mi sono laureato nel 2013.", start: "2009", end: "2013", kind: .quote),
         Case(label: "de: the start year is stated, so the start stays a quote", description: "Ich studierte an der Gamma University seit 2009 und schloss 2013 ab.", start: "2009", end: "2013", kind: .quote),
         Case(label: "en: a year the sentence gives as a start, with the completion word, stays a quote", description: "I started at Gamma University in 2013 and graduated later.", start: "2013", kind: .quote),
+        Case(label: "en: a completion word that names the degree, after a start verb, stays a quote", description: "I started my graduate studies at Gamma University in 2013.", start: "2013", kind: .quote),
+        Case(label: "it: a completion word that names the degree, after a start verb, stays a quote", description: "Ho iniziato la laurea alla Gamma University nel 2013.", start: "2013", kind: .quote),
+        Case(label: "en: a from before the year of graduate studies stays a quote", description: "I did graduate studies at Gamma University from 2013.", start: "2013", kind: .quote),
     ]
 
     @Test("The start of a school is a quote only when its sentence gives the year as a start", arguments: all)
