@@ -31,14 +31,23 @@ struct InventedFactsCompletionTests {
         Case(label: "it: the start year is stated, so the start stays a quote", description: "Ho studiato alla Gamma University dal 2009 e mi sono laureato nel 2013.", start: "2009", end: "2013", kind: .quote),
         Case(label: "de: the start year is stated, so the start stays a quote", description: "Ich studierte an der Gamma University seit 2009 und schloss 2013 ab.", start: "2009", end: "2013", kind: .quote),
         Case(label: "en: a year the sentence gives as a start, with the completion word, stays a quote", description: "I started at Gamma University in 2013 and graduated later.", start: "2013", kind: .quote),
-        Case(label: "en: a completion word that names the degree, after a start verb, stays a quote", description: "I started my graduate studies at Gamma University in 2013.", start: "2013", kind: .quote),
-        Case(label: "it: a completion word that names the degree, after a start verb, stays a quote", description: "Ho iniziato la laurea alla Gamma University nel 2013.", start: "2013", kind: .quote),
-        Case(label: "en: a from before the year of graduate studies stays a quote", description: "I did graduate studies at Gamma University from 2013.", start: "2013", kind: .quote),
-        Case(label: "en: an undated start before the graduation does not date the year", description: "I started studying at Gamma University long ago and graduated in 2013.", start: "2013", kind: .invented),
-        Case(label: "it: an undated start before the graduation does not date the year", description: "Ho iniziato a studiare alla Gamma University tempo fa e mi sono laureato nel 2013.", start: "2013", kind: .invented),
-        Case(label: "fr: an undated start before the completion does not date the year", description: "J'ai commencé mes études à Gamma University il y a longtemps et fini en 2013.", start: "2013", kind: .invented),
-        Case(label: "en: an ongoing completing after a start verb stays a quote", description: "I started completing my degree at Gamma University in 2013.", start: "2013", kind: .quote),
-        Case(label: "fr: a start verb before the noun diplôme stays a quote", description: "J'ai commencé mon diplôme à Gamma University en 2013.", start: "2013", kind: .quote),
+        Case(label: "en: a completion word that names the degree, after a start verb, is for review", description: "I started my graduate studies at Gamma University in 2013.", start: "2013", kind: .review),
+        Case(label: "it: a completion word that names the degree, after a start verb, is for review", description: "Ho iniziato la laurea alla Gamma University nel 2013.", start: "2013", kind: .review),
+        Case(label: "en: a from before the year of graduate studies is for review", description: "I did graduate studies at Gamma University from 2013.", start: "2013", kind: .review),
+        Case(label: "en: an undated start and a graduation in one sentence is for review", description: "I started studying at Gamma University long ago and graduated in 2013.", start: "2013", kind: .review),
+        Case(label: "it: an undated start and a graduation in one sentence is for review", description: "Ho iniziato a studiare alla Gamma University tempo fa e mi sono laureato nel 2013.", start: "2013", kind: .review),
+        Case(label: "fr: an undated start and a completion in one sentence is for review", description: "J'ai commencé mes études à Gamma University il y a longtemps et fini en 2013.", start: "2013", kind: .review),
+        Case(label: "en: an ongoing completing after a start verb is for review", description: "I started completing my degree at Gamma University in 2013.", start: "2013", kind: .review),
+        Case(label: "fr: a start verb before the noun diplôme is for review", description: "J'ai commencé mon diplôme à Gamma University en 2013.", start: "2013", kind: .review),
+        Case(label: "fr: a start verb before the participle diplômé is for review", description: "J'ai commencé à Gamma University et je suis diplômé en 2013.", start: "2013", kind: .review),
+        Case(label: "en: no word of a start or a completion is for review", description: "I studied at Gamma University in 2013.", start: "2013", kind: .review),
+        Case(label: "it: no word of a start or a completion is for review", description: "Ho studiato alla Gamma University nel 2013.", start: "2013", kind: .review),
+        Case(label: "de: no word of a start or a completion is for review", description: "Ich habe an der Gamma University 2013 studiert.", start: "2013", kind: .review),
+        Case(label: "es: a start and a completion word together is for review", description: "Empecé mis estudios en la Gamma University y terminé en 2013.", start: "2013", kind: .review),
+        Case(label: "pt: a start and a completion word together is for review", description: "Comecei na Gamma University e formei-me em 2013.", start: "2013", kind: .review),
+        Case(label: "de: a start and a completion word together is for review", description: "Ich begann an der Gamma University und schloss 2013 ab.", start: "2013", kind: .review),
+        Case(label: "en: a start in one mention and a completion in another is for review", description: "I started at Gamma University in 2013. I graduated from Gamma University in 2013.", start: "2013", kind: .review),
+        Case(label: "en: a start in one mention and nothing in another is for review", description: "I started at Gamma University in 2013. I liked Gamma University in 2013.", start: "2013", kind: .review),
     ]
 
     @Test("The start of a school is a quote only when its sentence gives the year as a start", arguments: all)
@@ -49,6 +58,9 @@ struct InventedFactsCompletionTests {
 
         let finding = report.finding(at: "education[0].startDate")
         #expect(finding?.kind == item.kind, "\(item): \(report.findings)")
+        if item.kind == .review {
+            #expect(finding?.reason.contains("start or the completion") == true, "\(item): \(finding?.reason ?? "no finding")")
+        }
         if item.kind == .invented {
             #expect(finding?.reason.contains("completion") == true, "\(item): \(finding?.reason ?? "no finding")")
         }

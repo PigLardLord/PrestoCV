@@ -731,9 +731,12 @@ enum InventedFacts {
             }
         }
 
-        if let entry, entry.kind == .study, role == "startDate", ownYears.count == 1, let year = years.first,
-           completionOnly(year, in: own.map { source.sentences[$0] }) {
-            invented.append("\(year) is said only as the completion year of the studies")
+        if let entry, entry.kind == .study, role == "startDate", ownYears.count == 1, let year = years.first {
+            switch yearMeaning(year, in: own.map { source.sentences[$0] }) {
+            case .completion: invented.append("\(year) is said only as the completion year of the studies")
+            case .start: break
+            case .unclear: review.append("the sentence does not say whether \(year) is the start or the completion of the studies")
+            }
         }
 
         if entry != nil, years.count == 1, ownYears.count >= 2 {
@@ -749,31 +752,29 @@ enum InventedFacts {
         return (.review, "a date in another shape")
     }
 
-    /// Whether every mention of `year` in the sentences of a school is the year the studies were completed: a word of completion
-    /// before it, or right after it, and no word of a start that dates this year. A verb of a start anywhere before the year
-    /// dates it ("I started my graduate studies in 2013"), and so does a preposition of a start right before it ("from 2013"),
-    /// but not one far before it ("graduated from Gamma University in 2013"). Such a year is never the start of the studies,
-    /// and the counter does not borrow the production rule to say so.
-    private static func completionOnly(_ year: String, in sentences: [[String]]) -> Bool {
-        var mentions = 0
+    private enum YearMeaning { case start, completion, unclear }
+
+    /// What the sentences of a school say of `year`: a start, a completion, or neither clearly. The counter does not guess. A
+    /// mention is a start only with a word of a start (a verb anywhere before the year, a preposition within two words before it) and no
+    /// word of completion, and a completion only with a word of completion (before the year, or right after it) and no word of a
+    /// start. No word, both kinds, or a word that is also a noun of a degree ("graduate studies", "diplôme") leaves it unclear,
+    /// and so does any disagreement between the mentions. It does not borrow the production rule to say so.
+    private static func yearMeaning(_ year: String, in sentences: [[String]]) -> YearMeaning {
+        var meanings: Set<YearMeaning> = []
         for sentence in sentences {
             for index in sentence.indices where sentence[index] == year {
-                mentions += 1
                 let before = sentence[..<index]
-                let after = sentence[(index + 1)...].prefix(2)
-                // A verb of a start dates the year unless a verb of completion stands between them: "I started to study and
-                // graduated in 2013" dates the graduation, "I started my graduate studies in 2013" dates the start.
-                let verb = before.lastIndex(where: startVerbs.contains)
-                let started = verb.map { !before[$0...].contains(where: completionVerbs.contains) } ?? false
-                    || before.suffix(2).contains(where: startPrepositions.contains)
+                let after = sentence[(index + 1)...].prefix(1)
+                let started = before.contains(where: startVerbs.contains) || before.suffix(2).contains(where: startPrepositions.contains)
                 let completed = before.contains(where: completionWords.contains) || after.contains(where: completionWords.contains)
-                if started || !completed { return false }
+                meanings.insert(started == completed ? .unclear : (started ? .start : .completion))
             }
         }
-        return mentions > 0
+        return meanings.count == 1 ? meanings.first ?? .unclear : .unclear
     }
 
-    /// The words that say the studies were completed, in the six languages of the app, folded.
+    /// The words that say the studies were completed, in the six languages of the app, folded. Some are also nouns that name a
+    /// degree ("graduate", "laurea", "diplome"), which is why a start word beside any of them leaves the year unclear.
     private static let completionWords: Set<String> = [
         "graduated", "graduate", "graduating", "graduation", "finished", "completed", "completing", "completion",
         "laureato", "laureata", "laureai", "laurea", "diplomato", "diplomata", "diplomai", "concluso", "conclusi", "terminato",
@@ -783,15 +784,7 @@ enum InventedFacts {
         "formado", "formada", "formei", "graduei", "concluido", "concluida", "conclui", "terminei",
     ]
 
-    /// The verbs that say the studies were completed: the words of completion but the nouns, which can name the degree, the
-    /// progressive forms, which say that the studies go on, and "diplome", which folding makes of the noun "diplôme" as well as of
-    /// the participle "diplômé" (a start verb before the participle then still dates the year: a known blind spot, left
-    /// open to keep a stated start year of "commencé mon diplôme" a quote).
-    private static let completionVerbs: Set<String> = completionWords.subtracting([
-        "graduate", "graduation", "completion", "laurea", "abschluss", "graduating", "completing", "diplome",
-    ])
-
-    /// The verbs that say the studies began, in the six languages of the app, folded: they date a year wherever they stand before it.
+    /// The verbs that say the studies began, in the six languages of the app, folded: a year after one of them is dated by it.
     private static let startVerbs: Set<String> = [
         "started", "starting", "began", "begun", "enrolled",
         "iniziato", "iniziata", "iniziai",
@@ -801,7 +794,7 @@ enum InventedFacts {
         "iniciei", "comecei",
     ]
 
-    /// The prepositions that say the studies began, folded: they date the year only right before it.
+    /// The prepositions that say the studies began, folded: they date the year only within two words before it.
     private static let startPrepositions: Set<String> = [
         "from", "since", "dal", "dall", "dalla", "seit", "von", "desde", "depuis", "du",
     ]
