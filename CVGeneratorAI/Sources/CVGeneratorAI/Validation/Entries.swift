@@ -137,7 +137,10 @@ struct Entries {
 
         if let primary {
             let names = isShared ? secondary.map { [words(of: primary), words(of: $0)] } ?? [] : [words(of: primary)]
-            return Subject(names: names, mentions: [words(of: primary)], quotes: quotes, achievements: achievements, isEducation: isEducation)
+            return Subject(
+                names: names, mentions: [words(of: primary)], quotes: quotes, achievements: achievements, holder: words(of: primary),
+                isEducation: isEducation
+            )
         }
         return Subject(
             names: secondary.map { [words(of: $0)] } ?? [], quotes: quotes, achievements: achievements, isFoundByItsTitle: true,

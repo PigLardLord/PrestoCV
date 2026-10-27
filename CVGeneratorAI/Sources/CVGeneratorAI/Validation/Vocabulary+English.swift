@@ -75,7 +75,7 @@ extension Vocabulary {
         """,
         /// Words of graduating: a time phrase that holds one joins an education entry and gives its end date.
         graduating: """
-        graduate graduated graduating graduation
+        completed finished graduate graduated graduating graduation
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """

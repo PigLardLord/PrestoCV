@@ -19,16 +19,23 @@ struct EntryEvidence {
     let quotableByAchievements: ProseQuotes
     /// The achievements of the draft (by position) that begin with a verb of a CV.
     let verbAchievements: Set<Int>
+    /// The names of the employers and schools of the draft: their words say nothing but the name (ADR 0023, rule (b)).
+    let holders: [[String]]
+    /// The name of the entry's own employer or school: the whole of it says nothing but the name either, unless the clause writes
+    /// it once more. Nil for an entry with none (a certification).
+    let ownHolder: [String]?
 
     /// What the achievement at `number` may quote.
     func quotable(byAchievement number: Int) -> ProseQuotes {
         verbAchievements.contains(number) ? quotable.adding(quotableByAchievements) : quotable
     }
 
-    /// Whether `phrase` (as `DescriptionText.normalized` writes it) stands in a clause that backs the entry: a place, an issuer.
+    /// Whether `phrase` (as `DescriptionText.normalized` writes it) stands in a clause that backs the entry, as itself and not as a
+    /// word of the name of an employer or a school, nor as the whole of the entry's own: a place, an issuer. "Vale Verde" is not the
+    /// place of a job that the description only places at the "Centro de Saúde de Vale Verde", nor "Bristol" of one at "Bristol".
     func backs(_ phrase: String) -> Bool {
         let words = Self.foldedWords(of: phrase)
-        return backing.contains { $0.contains(words) }
+        return backing.contains { !$0.spans(of: words, besideNames: holders, ownName: ownHolder).isEmpty }
     }
 
     /// The links a clause that backs the entry writes.

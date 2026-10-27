@@ -174,124 +174,6 @@ struct Rewrite: Sendable {
     }
 }
 
-// MARK: - Reading a draft as fields
-
-/// A draft as a list of fields (`experience[0].startDate = 2016`), one for each text that is not empty.
-private enum Sheet {
-    struct Step {
-        let name: String
-        let index: Int?
-
-        init(_ name: String, _ index: Int? = nil) {
-            self.name = name
-            self.index = index
-        }
-    }
-
-    struct Leaf {
-        let steps: [Step]
-        let value: String
-
-        var path: String {
-            steps.map { step in step.index.map { "\(step.name)[\($0)]" } ?? step.name }.joined(separator: ".")
-        }
-    }
-
-    static func leaves(of cv: CVData) -> [Leaf] {
-        var found: [Leaf] = []
-        func add(_ steps: [Step], _ value: String?) {
-            guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-            found.append(Leaf(steps: steps, value: value))
-        }
-
-        let info = cv.personalInfo
-        let personal: [(String, String?)] = [
-            ("name", info.name), ("email", info.email), ("phone", info.phone), ("location", info.location),
-            ("website", info.website), ("linkedin", info.linkedin), ("github", info.github), ("title", info.title),
-        ]
-        for (name, value) in personal { add([Step("personalInfo"), Step(name)], value) }
-        add([Step("summary")], cv.summary)
-
-        for (index, job) in cv.experience.enumerated() {
-            let entry = Step("experience", index)
-            let fields: [(String, String?)] = [
-                ("title", job.title), ("company", job.company), ("location", job.location), ("startDate", job.startDate),
-                ("endDate", job.endDate), ("current", job.current ? "true" : nil), ("description", job.description),
-            ]
-            for (name, value) in fields { add([entry, Step(name)], value) }
-            for (number, achievement) in job.achievements.enumerated() { add([entry, Step("achievements", number)], achievement) }
-        }
-        for (index, study) in cv.education.enumerated() {
-            let entry = Step("education", index)
-            let fields: [(String, String?)] = [
-                ("degree", study.degree), ("institution", study.institution), ("startDate", study.startDate),
-                ("endDate", study.endDate), ("description", study.description),
-            ]
-            for (name, value) in fields { add([entry, Step(name)], value) }
-        }
-        for (index, skill) in cv.skills.enumerated() {
-            add([Step("skills", index), Step("name")], skill.name)
-            add([Step("skills", index), Step("level")], skill.level?.rawValue)
-        }
-        for (index, language) in cv.languages.enumerated() {
-            add([Step("languages", index), Step("name")], language.name)
-            add([Step("languages", index), Step("proficiency")], language.proficiency?.rawValue)
-        }
-        for (index, certification) in cv.certifications.enumerated() {
-            let entry = Step("certifications", index)
-            let fields: [(String, String?)] = [
-                ("name", certification.name), ("issuer", certification.issuer), ("date", certification.date), ("url", certification.url),
-            ]
-            for (name, value) in fields { add([entry, Step(name)], value) }
-        }
-        for (index, interest) in cv.interests.enumerated() { add([Step("interests", index)], interest) }
-        return found
-    }
-
-    /// The fields by path, with the entries and achievements renumbered: an entry with nothing left is not counted.
-    static func fields(of cv: CVData) -> [String: String] {
-        compacted(leaves(of: cv))
-    }
-
-    /// The fields the sanitised draft must have for a `keeping` outcome.
-    static func fields(of draft: CVData, dropping drops: [Drop], rewriting rewrites: [Rewrite]) -> [String: String] {
-        let dropped = Set(drops.map(\.path))
-        var rewritten: [String: String] = [:]
-        for rewrite in rewrites { rewritten[rewrite.path] = rewrite.value }
-
-        let kept = leaves(of: draft)
-            .filter { !dropped.contains($0.path) }
-            .map { leaf in rewritten[leaf.path].map { Leaf(steps: leaf.steps, value: $0) } ?? leaf }
-        return compacted(kept)
-    }
-
-    private static func compacted(_ leaves: [Leaf]) -> [String: String] {
-        var counters: [String: Int] = [:]
-        var numbers: [String: Int] = [:]
-        var fields: [String: String] = [:]
-
-        for leaf in leaves {
-            var path = ""
-            for step in leaf.steps {
-                path += path.isEmpty ? "" : "."
-                guard let index = step.index else {
-                    path += step.name
-                    continue
-                }
-                let list = path + step.name
-                let key = "\(list)#\(index)"
-                if numbers[key] == nil {
-                    numbers[key] = counters[list, default: 0]
-                    counters[list, default: 0] += 1
-                }
-                path += "\(step.name)[\(numbers[key] ?? 0)]"
-            }
-            fields[path] = leaf.value
-        }
-        return fields
-    }
-}
-
 // MARK: - Judging a row
 
 private enum Verdict {
@@ -331,12 +213,6 @@ private enum Verdict {
     private static func describe(_ value: String?) -> String {
         value.map { "\"\($0)\"" } ?? "nothing"
     }
-}
-
-private enum SourceTree {
-    /// The root of the repository, found from this file: CVGeneratorAI/Tests/CVGeneratorAITests/GroundingContractTests.swift.
-    static let root = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 }
 
 // MARK: - Builders
@@ -418,7 +294,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 2076
+    static let rowsWhenWritten = 2176
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list. All of them are residual risks of the rules (ADR 0023) that the claim check of
@@ -476,6 +352,7 @@ enum GroundingRows {
         rows += wordsAfterAnEmployerPreposition()
         rows += datesFromATimePhrase()
         rows += graduationPhrases()
+        rows += aCompletionYearIsNeverAStart()
         rows += achievementsOfGraduating()
         rows += hedgesInProse()
         rows += modalityInProse()
@@ -522,9 +399,13 @@ enum GroundingRows {
         rows += omittedEmployers()
         rows += omittedEmployersInManyWords()
         rows += titlesOfOthers()
+        rows += aNameGroundsNothingElse()
+        rows += aNameThatIsTheFieldGroundsNothingElse()
         rows += schoolsAndCertifications()
         rows += entryNamesWithoutAnArticle()
         rows += degreesThatNameNoDegree()
+        rows += aVerbIsNoDegree()
+        rows += aPastJobTakesNoTitleOfTheHeadline()
         rows += faithfulExamples()
         rows += theAppExampleKeepsEveryFact()
         rows += realModelProbes()
@@ -1767,6 +1648,40 @@ enum GroundingRows {
                             "2012 is written once, in a graduation phrase: a study keeps it as its end date only",
                             v.schoolAndGraduation, CVData(education: [study(v.degree, at: v.school, from: "2012", to: "2012")]),
                             .exactly(CVData(education: [study(v.degree, at: v.school, to: "2012")])), language: v.language))
+        }
+        return rows
+    }
+
+    // MARK: A completion year is never a start date (no-go round 3)
+
+    /// A year written with a verb of finishing a course ("I completed my degree at Alpha University in 2016") is the year the study
+    /// ended: the draft's end date may take it, its start date never (ADR 0023, rule (c), dates). A year written with a start
+    /// ("since 2014") stays the start date.
+    private static func aCompletionYearIsNeverAStart() -> [GroundingRow] {
+        typealias Variant = (language: String, completed: String, started: String, school: String)
+        let variants: [Variant] = [
+            ("en", "I completed my degree at Alpha University in 2016.", "I studied at Alpha University since 2014.", "Alpha University"),
+            ("it", "Ho conseguito la laurea all'Università Alpha nel 2016.", "Ho studiato all'Università Alpha dal 2014.", "Università Alpha"),
+            ("de", "Ich habe 2016 mein Studium an der Universität Alpha abgeschlossen.",
+             "Ich habe seit 2014 an der Universität Alpha studiert.", "Universität Alpha"),
+            ("es", "Terminé mis estudios en la Universidad Alfa en 2016.", "Estudié en la Universidad Alfa desde 2014.", "Universidad Alfa"),
+            ("fr", "J'ai terminé mes études à l'université Alpha en 2016.", "J'ai étudié à l'université Alpha depuis 2014.", "université Alpha"),
+            ("pt", "Concluí os estudos na Universidade Alfa em 2016.", "Estudei na Universidade Alfa desde 2014.", "Universidade Alfa"),
+        ]
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-completion-year-is-no-start-\(v.language)",
+                            "2016 is written with a verb of finishing: the study ended then, it did not start then",
+                            v.completed, CVData(education: [study(at: v.school, from: "2016")]),
+                            .exactly(CVData(education: [study(at: v.school)])), language: v.language))
+            rows.append(row("a-completion-year-stays-the-end-\(v.language)",
+                            "2016 is written with a verb of finishing: the end date of the study keeps it",
+                            v.completed, CVData(education: [study(at: v.school, to: "2016")]),
+                            .exactly(CVData(education: [study(at: v.school, to: "2016")])), language: v.language))
+            rows.append(row("a-stated-start-year-stays-the-start-\(v.language)",
+                            "2014 is written with a word for the start (since, seit, desde): the start date of the study keeps it",
+                            v.started, CVData(education: [study(at: v.school, from: "2014")]),
+                            .exactly(CVData(education: [study(at: v.school, from: "2014")])), language: v.language))
         }
         return rows
     }
@@ -4842,6 +4757,224 @@ enum GroundingRows {
         return rows
     }
 
+    // MARK: The name of an employer or a school grounds nothing but itself (#202)
+
+    private typealias NameVariant = (language: String, name: String, field: String, inName: String, beside: String)
+    private static let nameTitles: [NameVariant] = [
+        ("en", "Greenway Nurse Care", "nurse", "Before that, from 2015 to 2018, I worked at Greenway Nurse Care.",
+         "Before that, from 2015 to 2018, I worked as a nurse at Greenway Nurse Care."),
+        ("it", "Studio Contabile Merlini", "contabile", "Prima, dal 2013 al 2017, ho lavorato allo Studio Contabile Merlini.",
+         "Prima, dal 2013 al 2017, ho lavorato come contabile allo Studio Contabile Merlini."),
+        ("de", "Café Barista Mitte", "Barista", "Davor habe ich von 2016 bis 2019 im Café Barista Mitte gearbeitet.",
+         "Davor habe ich von 2016 bis 2019 als Barista im Café Barista Mitte gearbeitet."),
+        ("es", "Gestoría Contable Aranda", "contable", "Antes, de 2014 a 2018, trabajé en la Gestoría Contable Aranda.",
+         "Antes, de 2014 a 2018, trabajé como contable en la Gestoría Contable Aranda."),
+        ("fr", "Atelier Menuisier Dupont", "menuisier", "Avant, de 2016 à 2020, j'ai travaillé chez Atelier Menuisier Dupont.",
+         "Avant, de 2016 à 2020, j'ai travaillé comme menuisier chez Atelier Menuisier Dupont."),
+        ("pt", "Padaria Padeiro Feliz", "padeiro", "Antes, de 2014 a 2018, trabalhei na Padaria Padeiro Feliz.",
+         "Antes, de 2014 a 2018, trabalhei como padeiro na Padaria Padeiro Feliz."),
+    ]
+    private static let namePlaces: [NameVariant] = [
+        ("en", "Bristol Royal Infirmary", "Bristol", "Before that, from 2015 to 2018, I worked at Bristol Royal Infirmary.",
+         "Before that, from 2015 to 2018, I worked at Bristol Royal Infirmary in Bristol."),
+        ("it", "Clinica Villa Verona", "Verona", "Prima, dal 2013 al 2017, ho lavorato alla Clinica Villa Verona.",
+         "Prima, dal 2013 al 2017, ho lavorato alla Clinica Villa Verona a Verona."),
+        ("de", "Klinikum Kassel Nord", "Kassel", "Davor habe ich von 2016 bis 2019 im Klinikum Kassel Nord gearbeitet.",
+         "Davor habe ich von 2016 bis 2019 im Klinikum Kassel Nord in Kassel gearbeitet."),
+        ("es", "Hospital de Valencia", "Valencia", "Antes, de 2014 a 2018, trabajé en el Hospital de Valencia.",
+         "Antes, de 2014 a 2018, trabajé en el Hospital de Valencia en Valencia."),
+        ("fr", "Hôpital de Lyon", "Lyon", "Avant, de 2016 à 2020, j'ai travaillé à l'Hôpital de Lyon.",
+         "Avant, de 2016 à 2020, j'ai travaillé à l'Hôpital de Lyon à Lyon."),
+        ("pt", "Centro de Saúde de Vale Verde", "Vale Verde", "Antes, de 2014 a 2018, trabalhei no Centro de Saúde de Vale Verde.",
+         "Antes, de 2014 a 2018, trabalhei no Centro de Saúde de Vale Verde em Vale Verde."),
+    ]
+    private static let nameDegrees: [NameVariant] = [
+        ("en", "Nursing College of Leeds", "Nursing", "I studied at the Nursing College of Leeds.",
+         "I studied Nursing at the Nursing College of Leeds."),
+        ("it", "Scuola di Infermieristica Careggi", "Infermieristica", "Ho studiato alla Scuola di Infermieristica Careggi.",
+         "Ho studiato Infermieristica alla Scuola di Infermieristica Careggi."),
+        ("de", "Fachschule für Physiotherapie Kassel", "Physiotherapie", "Ich habe an der Fachschule für Physiotherapie Kassel studiert.",
+         "Ich habe Physiotherapie an der Fachschule für Physiotherapie Kassel studiert."),
+        ("es", "Escuela de Enfermería Turia", "Enfermería", "Estudié en la Escuela de Enfermería Turia.",
+         "Estudié Enfermería en la Escuela de Enfermería Turia."),
+        ("fr", "École de Cuisine Dumas", "Cuisine", "J'ai étudié à l'École de Cuisine Dumas.",
+         "J'ai étudié la Cuisine à l'École de Cuisine Dumas."),
+        ("pt", "Escola de Enfermagem do Mondego", "Enfermagem", "Estudei na Escola de Enfermagem do Mondego.",
+         "Estudei Enfermagem na Escola de Enfermagem do Mondego."),
+    ]
+    private static let nameDates: [String: (from: String, to: String)] = [
+        "en": ("2015", "2018"), "it": ("2013", "2017"), "de": ("2016", "2019"), "es": ("2014", "2018"), "fr": ("2016", "2020"),
+        "pt": ("2014", "2018"),
+    ]
+
+    /// ADR 0023, rule (b): a quote is a statement only where the description says it as itself. The words of the name of an
+    /// employer or a school are not a statement about a title, a place or a degree: "contabile" in "Studio Contabile Merlini" is not
+    /// the job of the person, nor "Vale Verde" in "Centro de Saúde de Vale Verde" its place. The same word beside the name, or in
+    /// a clause of its own, stays.
+    private static func aNameGroundsNothingElse() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        for v in nameTitles {
+            let years = nameDates[v.language] ?? ("2015", "2018")
+            let draft = CVData(experience: [job(v.field, v.name, from: years.from, to: years.to)])
+            rows.append(row("the-name-of-an-employer-gives-no-title-\(v.language)",
+                            "\(v.field) is a word of the name of the employer, and the description gives no title for the job: the title goes",
+                            v.inName, draft, .keeping([Drop("experience[0].title", "the title is only a word of the name of the employer")]),
+                            language: v.language))
+            rows.append(row("a-title-beside-the-name-of-an-employer-stays-\(v.language)",
+                            "\(v.field) stands as itself before the name of the employer: it stays",
+                            v.beside, draft, .unchanged, language: v.language))
+        }
+        for v in namePlaces {
+            let years = nameDates[v.language] ?? ("2015", "2018")
+            let draft = CVData(experience: [job("", v.name, from: years.from, to: years.to, location: v.field)])
+            rows.append(row("the-name-of-an-employer-gives-no-place-\(v.language)",
+                            "\(v.field) is a word of the name of the employer, and the description gives no place for the job: the place goes",
+                            v.inName, draft, .keeping([Drop("experience[0].location", "the place is only a word of the name of the employer")]),
+                            language: v.language))
+            rows.append(row("a-place-beside-the-name-of-an-employer-stays-\(v.language)",
+                            "\(v.field) stands as itself after the name of the employer: it stays",
+                            v.beside, draft, .unchanged, language: v.language))
+        }
+        for v in nameDegrees {
+            let draft = CVData(education: [study(v.field, at: v.name)])
+            rows.append(row("the-name-of-a-school-gives-no-degree-\(v.language)",
+                            "\(v.field) is a word of the name of the school, and the description gives no degree: the degree goes",
+                            v.inName, draft, .keeping([Drop("education[0].degree", "the degree is only a word of the name of the school")]),
+                            language: v.language))
+            rows.append(row("a-degree-beside-the-name-of-a-school-stays-\(v.language)",
+                            "\(v.field) stands as itself before the name of the school: it stays",
+                            v.beside, draft, .unchanged, language: v.language))
+        }
+        return rows
+    }
+
+    // MARK: A name that is the whole field grounds nothing else (#202)
+
+    /// The same rule when the name of the employer or the school is the very text of the field: the model copies "Bristol Royal
+    /// Infirmary" into the place of the job it names, the employer into the title, the school into the degree. Every occurrence of
+    /// the text is then the name's, and the field stands only where the clause writes the text once more than the name takes ("I
+    /// worked at Bristol in Bristol"). A name of a longer text than the field is the rule above.
+    private static func aNameThatIsTheFieldGroundsNothingElse() -> [GroundingRow] {
+        typealias Single = (language: String, name: String, inName: String, twice: String)
+        let titles: [Single] = [
+            ("en", "Barista", "Before that, from 2015 to 2018, I worked at Barista.",
+             "Before that, from 2015 to 2018, I worked as a Barista at Barista."),
+            ("it", "Cuoco", "Prima, dal 2013 al 2017, ho lavorato da Cuoco.",
+             "Prima, dal 2013 al 2017, ho lavorato come Cuoco da Cuoco."),
+            ("de", "Barista", "Davor habe ich von 2016 bis 2019 bei Barista gearbeitet.",
+             "Davor habe ich von 2016 bis 2019 als Barista bei Barista gearbeitet."),
+            ("es", "Panadero", "Antes, de 2014 a 2018, trabajé en Panadero.",
+             "Antes, de 2014 a 2018, trabajé como Panadero en Panadero."),
+            ("fr", "Menuisier", "Avant, de 2016 à 2020, j'ai travaillé chez Menuisier.",
+             "Avant, de 2016 à 2020, j'ai travaillé comme Menuisier chez Menuisier."),
+            ("pt", "Padeiro", "Antes, de 2014 a 2018, trabalhei no Padeiro.",
+             "Antes, de 2014 a 2018, trabalhei como Padeiro no Padeiro."),
+        ]
+        let places: [Single] = [
+            ("en", "Bristol", "Before that, from 2015 to 2018, I worked at Bristol.",
+             "Before that, from 2015 to 2018, I worked at Bristol in Bristol."),
+            ("it", "Verona", "Prima, dal 2013 al 2017, ho lavorato presso Verona.",
+             "Prima, dal 2013 al 2017, ho lavorato presso Verona a Verona."),
+            ("de", "Kassel", "Davor habe ich von 2016 bis 2019 bei Kassel gearbeitet.",
+             "Davor habe ich von 2016 bis 2019 bei Kassel in Kassel gearbeitet."),
+            ("es", "Valencia", "Antes, de 2014 a 2018, trabajé en Valencia.",
+             "Antes, de 2014 a 2018, trabajé en Valencia en Valencia."),
+            ("fr", "Lyon", "Avant, de 2016 à 2020, j'ai travaillé chez Lyon.",
+             "Avant, de 2016 à 2020, j'ai travaillé chez Lyon à Lyon."),
+            ("pt", "Coimbra", "Antes, de 2014 a 2018, trabalhei na Coimbra.",
+             "Antes, de 2014 a 2018, trabalhei na Coimbra em Coimbra."),
+        ]
+        let degrees: [Single] = [
+            ("en", "Cookery", "I studied at Cookery.", "I studied Cookery at Cookery."),
+            ("it", "Infermieristica", "Ho studiato a Infermieristica.", "Ho studiato Infermieristica a Infermieristica."),
+            ("de", "Physiotherapie", "Ich habe bei Physiotherapie studiert.", "Ich habe Physiotherapie bei Physiotherapie studiert."),
+            ("es", "Enfermería", "Estudié en Enfermería.", "Estudié Enfermería en Enfermería."),
+            ("fr", "Cuisine", "J'ai étudié à Cuisine.", "J'ai étudié la Cuisine à Cuisine."),
+            ("pt", "Enfermagem", "Estudei em Enfermagem.", "Estudei Enfermagem em Enfermagem."),
+        ]
+
+        var rows: [GroundingRow] = []
+        for v in nameTitles {
+            let years = nameDates[v.language] ?? ("2015", "2018")
+            rows.append(row("a-copy-of-the-name-of-an-employer-gives-no-title-\(v.language)",
+                            "the title \(v.name) is the name of the employer, copied: the title goes",
+                            v.inName, CVData(experience: [job(v.name, v.name, from: years.from, to: years.to)]),
+                            .keeping([Drop("experience[0].title", "the title is the name of the employer")]), language: v.language))
+        }
+        for v in namePlaces {
+            let years = nameDates[v.language] ?? ("2015", "2018")
+            rows.append(row("a-copy-of-the-name-of-an-employer-gives-no-place-\(v.language)",
+                            "the place \(v.name) is the name of the employer, copied: the place goes",
+                            v.inName, CVData(experience: [job("", v.name, from: years.from, to: years.to, location: v.name)]),
+                            .keeping([Drop("experience[0].location", "the place is the name of the employer")]), language: v.language))
+        }
+        for v in nameDegrees {
+            rows.append(row("a-copy-of-the-name-of-a-school-gives-no-degree-\(v.language)",
+                            "the degree \(v.name) is the name of the school, copied: the degree goes",
+                            v.inName, CVData(education: [study(v.name, at: v.name)]),
+                            .keeping([Drop("education[0].degree", "the degree is the name of the school")]), language: v.language))
+        }
+        for v in titles {
+            let years = nameDates[v.language] ?? ("2015", "2018")
+            let draft = CVData(experience: [job(v.name, v.name, from: years.from, to: years.to)])
+            rows.append(row("an-employer-named-as-the-title-gives-no-title-\(v.language)",
+                            "\(v.name) is the employer and nothing else in the clause: the title goes",
+                            v.inName, draft, .keeping([Drop("experience[0].title", "the title is the name of the employer")]),
+                            language: v.language))
+            rows.append(row("a-title-written-again-beside-the-employer-stays-\(v.language)",
+                            "\(v.name) is written twice, once as the employer and once as the title: it stays as both",
+                            v.twice, draft, .unchanged, language: v.language))
+        }
+        for v in places {
+            let years = nameDates[v.language] ?? ("2015", "2018")
+            let draft = CVData(experience: [job("", v.name, from: years.from, to: years.to, location: v.name)])
+            rows.append(row("an-employer-named-as-the-place-gives-no-place-\(v.language)",
+                            "\(v.name) is the employer and nothing else in the clause: the place goes",
+                            v.inName, draft, .keeping([Drop("experience[0].location", "the place is the name of the employer")]),
+                            language: v.language))
+            rows.append(row("a-place-written-again-beside-the-employer-stays-\(v.language)",
+                            "\(v.name) is written twice, once as the employer and once as the place: it stays as both",
+                            v.twice, draft, .unchanged, language: v.language))
+        }
+        for v in degrees {
+            let draft = CVData(education: [study(v.name, at: v.name)])
+            rows.append(row("a-school-named-as-the-degree-gives-no-degree-\(v.language)",
+                            "\(v.name) is the school and nothing else in the clause: the degree goes",
+                            v.inName, draft, .keeping([Drop("education[0].degree", "the degree is the name of the school")]),
+                            language: v.language))
+            rows.append(row("a-degree-written-again-beside-the-school-stays-\(v.language)",
+                            "\(v.name) is written twice, once as the school and once as the degree: it stays as both",
+                            v.twice, draft, .unchanged, language: v.language))
+        }
+
+        // The name that is the whole field is the entry's own: the name of another entry says nothing about this one.
+        rows.append(row("an-issuer-named-as-the-employer-of-another-entry-stays-en",
+                        "Siemens is the employer of the job, and the issuer of the BLS in the clause of the BLS: the issuer stays",
+                        "I worked at Siemens from 2015 to 2018. I have a BLS from Siemens.",
+                        CVData(experience: [job("", "Siemens", from: "2015", to: "2018")],
+                               certifications: [Certification(name: "BLS", issuer: "Siemens")]),
+                        .unchanged))
+        rows.append(row("an-issuer-named-as-the-employer-of-another-entry-stays-it",
+                        "Siemens is the employer of the job, and the issuer of the BLS in the clause of the BLS: the issuer stays",
+                        "Ho lavorato presso Siemens dal 2015 al 2018. Ho un BLS di Siemens.",
+                        CVData(experience: [job("", "Siemens", from: "2015", to: "2018")],
+                               certifications: [Certification(name: "BLS", issuer: "Siemens")]),
+                        .unchanged, language: "it"))
+        rows.append(row("a-place-named-as-the-school-of-another-entry-stays-en",
+                        "Lincoln is the school of the study, and the place of the job in the clause of the job: the place stays",
+                        "I studied Law at Lincoln from 2010 to 2014. I worked at Acme in Lincoln from 2015 to 2018.",
+                        CVData(experience: [job("", "Acme", from: "2015", to: "2018", location: "Lincoln")],
+                               education: [study("Law", at: "Lincoln", from: "2010", to: "2014")]),
+                        .unchanged))
+        rows.append(row("a-place-named-as-the-school-of-another-entry-stays-it",
+                        "Ferrara is the school of the study, and the place of the job in the clause of the job: the place stays",
+                        "Ho studiato Giurisprudenza a Ferrara dal 2010 al 2014. Ho lavorato presso Acme a Ferrara dal 2015 al 2018.",
+                        CVData(experience: [job("", "Acme", from: "2015", to: "2018", location: "Ferrara")],
+                               education: [study("Giurisprudenza", at: "Ferrara", from: "2010", to: "2014")]),
+                        .unchanged, language: "it"))
+        return rows
+    }
+
     // MARK: An employer or a school keeps no leading indefinite article (#202)
 
     /// The model copies the article of "in a nursery" into the employer: a CV names the place, so a leading indefinite article goes,
@@ -4917,6 +5050,129 @@ enum GroundingRows {
         return rows
     }
 
+    // MARK: A verb names no degree (#202)
+
+    /// The model copies the verb of "I studied at the school and finished in 2017" into the degree: "terminé" says what the person
+    /// did, not what they hold. A degree that is nothing but finite verbs, as the clause that gives it reads them, goes, and the
+    /// school stays. A degree with a noun beside the verb ("Titulado en Magisterio"), and a noun the vocabulary also lists as a verb
+    /// ("Lehre"), name a qualification and stay.
+    private static func aVerbIsNoDegree() -> [GroundingRow] {
+        typealias Variant = (language: String, description: String, verb: String, school: String)
+        var variants: [Variant] = []
+        variants.append(("en", "I studied at the Nursing College of Leeds and finished in 2017.", "finished", "Nursing College of Leeds"))
+        variants.append(("it", "Studiai alla Scuola d'Arte Turia e terminai nel 2017.", "terminai", "Scuola d'Arte Turia"))
+        variants.append(("de", "Ich habe an der Kunstschule Kassel studiert und 2017 beendet.", "beendet", "Kunstschule Kassel"))
+        variants.append(("es", "Estudié en la Escuela de Arte Turia y terminé en 2017.", "terminé", "Escuela de Arte Turia"))
+        variants.append(("fr", "J'ai étudié à l'École d'Art Dumas et j'ai terminé en 2017.", "terminé", "École d'Art Dumas"))
+        variants.append(("pt", "Estudei na Escola de Arte Turia e terminei em 2017.", "terminei", "Escola de Arte Turia"))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            rows.append(row("a-verb-names-no-degree-\(v.language)", "\(v.verb) is what the person did, not a qualification: the degree goes, and the school stays",
+                            v.description, CVData(education: [study(v.verb, at: v.school)]),
+                            .exactly(CVData(education: [study(at: v.school)])), language: v.language))
+        }
+        rows.append(row("a-verb-beside-a-noun-names-a-degree-es", "titulado is a verb of the vocabulary, but magisterio beside it is a qualification: the degree stays",
+                        "Titulado en Magisterio por la Escuela Normal de Turia.",
+                        CVData(education: [study("Titulado en Magisterio", at: "Escuela Normal de Turia")]), .unchanged, language: "es"))
+        rows.append(row("a-noun-after-a-verb-is-the-degree-es", "Magisterio is a qualification, and terminé beside it is not the degree: the degree stays",
+                        "Estudié Magisterio en la Escuela Normal de Turia y terminé en 2017.",
+                        CVData(education: [study("Magisterio", at: "Escuela Normal de Turia")]), .unchanged, language: "es"))
+        rows.append(row("a-noun-after-a-verb-is-the-degree-pt", "Enfermagem is a qualification, and terminei beside it is not the degree: the degree stays",
+                        "Estudei Enfermagem na Escola de Enfermagem do Mondego e terminei em 2017.",
+                        CVData(education: [study("Enfermagem", at: "Escola de Enfermagem do Mondego")]), .unchanged, language: "pt"))
+        rows.append(row("a-noun-after-a-verb-is-the-degree-en", "nurse is a qualification, and finished beside it is not the degree: the degree stays",
+                        "I trained as a nurse at the University of the West Country and finished in 2015.",
+                        CVData(education: [study("nurse", at: "University of the West Country")]), .unchanged))
+        rows.append(row("a-noun-the-vocabulary-lists-as-a-verb-is-a-degree-de", "Lehre is a qualification, though the vocabulary lists it as a form of a verb: the degree stays",
+                        "Ich habe eine Lehre bei der Berufsschule Kassel gemacht.",
+                        CVData(education: [study("Lehre", at: "Berufsschule Kassel")]), .unchanged, language: "de"))
+        return rows
+    }
+
+    // MARK: A past job takes no title from the headline (#202)
+
+    /// The headline of the description ("I am a nurse in Leeds") says what the person is now. A job the description says has
+    /// ended ("Before that, from 2014 to 2018, I worked at Beta": two years, or a word of ending) gets no title from it: the
+    /// clause that names the job does not state the role, so the title the model copies there is not a fact the person gave for
+    /// that job, whether or not the draft also copies it into its own headline field (ADR 0023, rules (c) and (f)). The title of
+    /// a job that goes on, a title the clause of the job states, and the degree of a study stay.
+    private static func aPastJobTakesNoTitleOfTheHeadline() -> [GroundingRow] {
+        typealias Variant = (
+            language: String, name: String, place: String, title: String, headline: String, current: String, former: String,
+            formerWithRole: String, until: String?, unended: String, study: String, school: String
+        )
+        var variants: [Variant] = []
+        variants.append(("en", "Emma Clarke", "Leeds", "nurse", "I am Emma Clarke, a nurse in Leeds.",
+                         "Since 2018 I have worked at Acme.", "Before that, from 2014 to 2018, I worked at Beta.",
+                         "Before that, from 2014 to 2018, I worked as a nurse at Beta.", "Until 2018 I worked at Beta.",
+                         "Since 2018 I have worked at Beta.", "From 2014 to 2018 I studied at Beta College.", "Beta College"))
+        variants.append(("it", "Chiara Benedetti", "Verona", "infermiera", "Mi chiamo Chiara Benedetti e sono infermiera a Verona.",
+                         "Dal 2018 lavoro presso Acme.", "Prima, dal 2014 al 2018, ho lavorato presso Beta.",
+                         "Prima, dal 2014 al 2018, ho lavorato come infermiera presso Beta.", "Fino al 2018 ho lavorato presso Beta.",
+                         "Dal 2018 lavoro presso Beta.", "Dal 2014 al 2018 ho studiato presso la Scuola Beta.", "Scuola Beta"))
+        variants.append(("de", "Anna Weber", "Kassel", "Krankenschwester", "Ich heiße Anna Weber und bin Krankenschwester in Kassel.",
+                         "Seit 2018 arbeite ich bei Acme.", "Davor habe ich von 2014 bis 2018 bei Beta gearbeitet.",
+                         "Davor habe ich von 2014 bis 2018 als Krankenschwester bei Beta gearbeitet.", "Bis 2018 habe ich bei Beta gearbeitet.",
+                         "Seit 2018 arbeite ich bei Beta.", "Von 2014 bis 2018 habe ich an der Schule Beta studiert.", "Schule Beta"))
+        variants.append(("es", "Lucía Romero", "Valencia", "enfermera", "Me llamo Lucía Romero y soy enfermera en Valencia.",
+                         "Desde 2018 trabajo en Acme.", "Antes, de 2014 a 2018, trabajé en Beta.",
+                         "Antes, de 2014 a 2018, trabajé como enfermera en Beta.", "Hasta 2018 trabajé en Beta.",
+                         "Desde 2018 trabajo en Beta.", "De 2014 a 2018 estudié en la Escuela Beta.", "Escuela Beta"))
+        variants.append(("fr", "Claire Martin", "Lyon", "infirmière", "Je m'appelle Claire Martin et je suis infirmière à Lyon.",
+                         "Depuis 2018, je travaille chez Acme.", "Avant, de 2014 à 2018, j'ai travaillé chez Beta.",
+                         "Avant, de 2014 à 2018, j'ai travaillé comme infirmière chez Beta.", "Jusqu'en 2018, j'ai travaillé chez Beta.",
+                         "Depuis 2018, je travaille chez Beta.", "De 2014 à 2018, j'ai étudié à l'École Beta.", "École Beta"))
+        // Portuguese has no word of ending among the statement words ("até" is also "even", and "até hoje" is the present).
+        variants.append(("pt", "Inês Duarte", "Coimbra", "enfermeira", "Chamo-me Inês Duarte e sou enfermeira em Coimbra.",
+                         "Desde 2018 trabalho na Acme.", "Antes, de 2014 a 2018, trabalhei na Beta.",
+                         "Antes, de 2014 a 2018, trabalhei como enfermeira na Beta.", nil,
+                         "Desde 2018 trabalho na Beta.", "De 2014 a 2018 estudei na Escola Beta.", "Escola Beta"))
+
+        let copied = "the title of the headline, copied onto a job that has ended: the clause that names the job does not state the role"
+        var rows: [GroundingRow] = []
+        for v in variants {
+            let headline = person(name: v.name, location: v.place, title: v.title)
+            let noHeadline = person(name: v.name, location: v.place)
+            rows.append(row("a-past-job-copies-the-headline-\(v.language)",
+                            "two years say the job has ended; the headline names the person's role now: its title goes, the current job keeps it",
+                            "\(v.headline) \(v.current) \(v.former)",
+                            CVData(personalInfo: headline, experience: [job(v.title, "Acme", from: "2018", current: true),
+                                                                      job(v.title, "Beta", from: "2014", to: "2018")]),
+                            .keeping([Drop("experience[1].title", copied)]), language: v.language))
+            rows.append(row("a-past-job-copies-the-headline-undated-\(v.language)",
+                            "the draft has no dates and no headline field: the description alone says the job has ended, and the title goes",
+                            "\(v.headline) \(v.current) \(v.former)",
+                            CVData(personalInfo: noHeadline, experience: [job(v.title, "Acme", from: "2018", current: true),
+                                                                         job(v.title, "Beta")]),
+                            .keeping([Drop("experience[1].title", copied)]), language: v.language))
+            if let until = v.until {
+                rows.append(row("a-past-job-until-copies-the-headline-\(v.language)",
+                                "a word of ending, with a single year, says the job has ended: the title of the headline goes",
+                                "\(v.headline) \(until)",
+                                CVData(personalInfo: noHeadline, experience: [job(v.title, "Beta", to: "2018")]),
+                                .keeping([Drop("experience[0].title", copied)]), language: v.language))
+            }
+            rows.append(row("a-past-job-states-its-role-\(v.language)",
+                            "the clause that names the job gives its role: the title stays, though the job has ended",
+                            "\(v.headline) \(v.current) \(v.formerWithRole)",
+                            CVData(personalInfo: headline, experience: [job(v.title, "Acme", from: "2018", current: true),
+                                                                      job(v.title, "Beta", from: "2014", to: "2018")]),
+                            .unchanged, language: v.language))
+            rows.append(row("a-job-with-no-end-keeps-the-headline-\(v.language)",
+                            "the description gives a start and no end: the job has not ended, so the title of the headline stays",
+                            "\(v.headline) \(v.unended)",
+                            CVData(personalInfo: headline, experience: [job(v.title, "Beta", from: "2018")]),
+                            .unchanged, language: v.language))
+            rows.append(row("the-headline-is-the-degree-of-a-study-\(v.language)",
+                            "a degree persists: the title of the headline stays as the degree of a study that ended",
+                            "\(v.headline) \(v.study)",
+                            CVData(personalInfo: headline, education: [study(v.title, at: v.school, from: "2014", to: "2018")]),
+                            .unchanged, language: v.language))
+        }
+        return rows
+    }
+
     // MARK: Schools and certifications follow the clauses of their own name
 
     /// ADR 0023 words its clause rule for jobs. The sanitiser applies it to schools and certifications as well, and a
@@ -4926,10 +5182,10 @@ enum GroundingRows {
         let certificates = "I have a BLS from the Italian Resuscitation Council in 2023 and a PALS from the American Heart Association in 2019."
 
         rows.append(row("school-omitted-school-lends-its-dates",
-                        "Beta University's 2014 is not Alpha University's when the draft leaves Beta out",
+                        "Beta University's 2014 is not Alpha University's when the draft leaves Beta out; 2010 is written with graduated, so it is not a start",
                         "At Alpha University in 2010 I graduated and at Beta University in 2014 I did a master.",
                         CVData(education: [study(at: "Alpha University", from: "2010", to: "2014")]),
-                        .exactly(CVData(education: [study(at: "Alpha University", from: "2010")]))))
+                        .exactly(CVData(education: [study(at: "Alpha University")]))))
         rows.append(row("school-joined-clause-after",
                         "graduated in 2012 is a graduation phrase: it joins the clause of the school next to it and gives the degree its year",
                         "I studied Education Sciences at the University of Bologna and graduated in 2012.",
@@ -5572,6 +5828,7 @@ enum GroundingRows {
         drops.append(Drop("experience[3].description", "assisted, administrative and tasks are words the description does not use"))
         drops.append(Drop("experience[3].achievements[0]", "the same words"))
         drops.append(Drop("education[0].endDate", "2012 is the end of another job; the clause of the studies gives 2009"))
+        drops.append(Drop("education[0].startDate", "2009 is written with graduated: the year of the degree is never the start of the studies"))
         for index in 0..<5 {
             drops.append(Drop("skills[\(index)].level", "the description names the skills and says nothing of their level"))
         }
@@ -5587,7 +5844,6 @@ enum GroundingRows {
                             because: "a PALS certificate from 2019 is a verbless clause split off by and: it belongs to renewed in 2023, whose verb is not a listed one")
         let rewrites = [
             Rewrite("experience[3].startDate", to: "2009", "I started in 2009 as a nursing assistant at the Mauriziano hospital is explained"),
-            Rewrite("education[0].startDate", to: "2009", "the year the clause of the studies gives (it is the year of the degree: the ADR does not tell them apart)"),
         ]
         return row("probe-long-en",
                    "kept: the contacts, name, place, the four employers and titles, the Mauriziano start, the degree, skills, languages, interests, BLS and ACLS",

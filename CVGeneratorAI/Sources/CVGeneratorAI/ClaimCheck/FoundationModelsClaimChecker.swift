@@ -3,9 +3,10 @@ import Foundation
 import FoundationModels
 
 /// The claim check on Apple's on-device model (ADR 0028): one call judges a batch of candidates, with a fixed instruction, greedy
-/// decoding and structured output. For each candidate the model quotes its sentence and says whose it is and how the sentence states
-/// it; only the writer's item stated as true is a fact, and only when the quote is words of the description that contain the item
-/// (`ClaimAnswer`). An answer that does not number the items 1 to n, each once, is no answer: it throws, and the draft is unchecked.
+/// decoding and an answer of exactly one verdict for each candidate. For each candidate the model quotes its sentence and says
+/// whose it is and how the sentence states it; only the writer's item stated as true is a fact, and only when the quote is words of
+/// the description that contain the item (`ClaimAnswer`). An answer that does not number the items 1 to n, each once, is no answer:
+/// it throws, and the draft is unchecked.
 @available(iOS 26, macOS 26, *)
 public struct FoundationModelsClaimChecker: ClaimChecking {
     public init() {}
@@ -21,11 +22,31 @@ public struct FoundationModelsClaimChecker: ClaimChecking {
         let session = LanguageModelSession(instructions: Self.instructions)
         let response = try await session.respond(
             to: Self.prompt(for: candidates, in: description),
-            generating: ClaimVerdicts.self,
+            schema: Self.schema(forCandidates: candidates.count),
             includeSchemaInPrompt: true,
             options: GenerationOptions(samplingMode: .greedy)
         )
-        return response.content.verdicts.map { ClaimVerdictEntry(item: $0.item, quote: $0.quote, stance: $0.stance) }
+        let verdicts = try response.content.value([ClaimVerdict].self, forProperty: Self.verdictsProperty)
+        return verdicts.map { ClaimVerdictEntry(item: $0.item, quote: $0.quote, stance: $0.stance) }
+    }
+
+    /// The name of the list of verdicts in the answer.
+    static let verdictsProperty = "verdicts"
+
+    /// The shape of the answer to a batch of `count` candidates: one list of verdicts that holds exactly `count` entries. The model
+    /// would otherwise write one entry for each sentence that mentions an item, so that a single item stated in two sentences got two
+    /// entries, and the strict reading of the answer (`ClaimAnswer`: the numbers 1 to n, each once) threw on it. With the length
+    /// fixed, the model cannot add an entry, and the reading stays strict.
+    static func schema(forCandidates count: Int) throws -> GenerationSchema {
+        let verdicts = DynamicGenerationSchema(
+            arrayOf: DynamicGenerationSchema(type: ClaimVerdict.self), minimumElements: count, maximumElements: count
+        )
+        let answer = DynamicGenerationSchema(name: "ClaimVerdicts", properties: [
+            DynamicGenerationSchema.Property(
+                name: verdictsProperty, description: "One verdict for each numbered item, in the order of the items", schema: verdicts
+            ),
+        ])
+        return try GenerationSchema(root: answer, dependencies: [])
     }
 
     static let instructions = """
@@ -77,12 +98,6 @@ public struct FoundationModelsClaimChecker: ClaimChecking {
         case .place: return "the place where the writer lives or works"
         }
     }
-}
-
-@Generable
-struct ClaimVerdicts {
-    @Guide(description: "One verdict for each numbered item, in the order of the items")
-    let verdicts: [ClaimVerdict]
 }
 
 @Generable

@@ -153,6 +153,46 @@ By default it runs the path of the product: the rules, then the check of what th
 judges every listed item without the rules, as when the instruction is tuned; then a false keep of the contract is only
 measured, since the rules drop those items before the check.
 
+### The drafting evaluation
+
+`DraftingEvaluation` runs the whole path of the app on the real model: the model drafts each of 18 descriptions (the 6
+example descriptions of the app and two written ones per language, one of them with sentences that look like facts and
+are not), `CVDataSanitizer` grounds the draft, the claim check judges its personal items, and `InventedFacts` counts what
+the result keeps, loses and invents. It needs a Mac with Apple Intelligence on, and it runs only when asked:
+
+```bash
+PRESTOCV_DRAFT_EVAL=1 PRESTOCV_DRAFT_EVAL_REV=$(git rev-parse --short HEAD) swift test --filter DraftingEvaluation
+```
+
+| Variable | Meaning |
+| --- | --- |
+| `PRESTOCV_DRAFT_EVAL` | The switch. Unset, empty, `0`, `false`, `no` and `off` are off; anything else is on. |
+| `PRESTOCV_DRAFT_EVAL_RUNS` | Runs of every input. 3 by default; a whole number of at least 1. |
+| `PRESTOCV_DRAFT_EVAL_OUT` | The folder of the run set. It must be absent or empty: a second invocation never adds to the files of the first. By default a new folder `draft-<revision>-<date>-<time>` in the temporary directory. |
+| `PRESTOCV_DRAFT_EVAL_REV` | The revision under test. Without it the revision is `unknown`, and the set is never GO. |
+| `PRESTOCV_DRAFT_EVAL_ONLY` | Comma-separated input ids, for a re-run after a fix. The set is then partial, and never GO. |
+| `PRESTOCV_DRAFT_EVAL_READY` | The folder of a finished run set, to check whether it is GO (below). Needs no model and runs on any host. |
+
+The folder holds `manifest.json` (written before the first run and updated after each one), `<input>-run<n>.json` (the
+model's draft, the grounded draft, the final draft, the calls of the claim check, the seconds and the load), `summary.json`,
+`summary.txt` and `review.json`. A set that stopped halfway has no summary, and cancelling the test writes none.
+
+- **A pass is "no hard finding", not GO.** The first line of `summary.txt` says which. The test fails on a field the counter
+  proves invented, on a run that threw, was refused (`contentNotAllowed`) or whose claim check gave no answer (the cause is
+  recorded), and on an example that loses its name, its title or a job. Fields the counter can only send to review (prose,
+  and a word that may be a skill, a language or a hobby) cannot fail the test; they go to `review.json`, once per input and
+  value, with the entry that owns them.
+- **GO needs a reading.** A person reads `review.json` and records the decision on every item in `adjudication.json` beside
+  it: `{"reviewer": "...", "revision": "...", "entries": [{"key": "...", "decision": "accept" | "reject", "note": "..."}]}`.
+  `PRESTOCV_DRAFT_EVAL_READY=<folder> swift test --filter DraftingReadiness` then fails with every reason the set is not GO: a
+  hard finding, a partial or unfinished set, an unrecorded revision, an item nobody decided, a decision of another revision, or
+  a rejected item.
+- **The sample is smaller than the runs.** The model runs with greedy sampling, so the runs of an input are the same draft.
+  `summary.txt` says how many distinct drafts the set holds; the counts are over runs and the times stay valid.
+
+The measure, the summary, the review items and the folder rules are plain code with tests that run everywhere
+(`DraftingMeasure`, `DraftingSummary`, `DraftingReview`, `DraftingRunFolder`); only the file that calls the model is gated.
+
 ## Requirements
 
 - iOS 26.5 / macOS 26 with Apple Intelligence for generation

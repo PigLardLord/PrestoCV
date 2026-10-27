@@ -24,6 +24,8 @@ struct Grounding {
     /// The clauses that back each entry, each as far as it gives facts: up to a purpose or a detail after the statement.
     private let backingFacts: [[Place: Clause]]
     private let backing: [Set<Place>]
+    /// The names of the employers and schools of the draft.
+    private let holders: [[String]]
 
     /// - Parameter person: The quotes of the person's own name, place and title.
     init(clauses: DescriptionClauses, explainer: Explainer, subjects: [Subject], person: [[String]]) {
@@ -36,6 +38,7 @@ struct Grounding {
         mentioning = subjects.map { Self.namingPlaces(of: $0.mentions, among: reading.ofEntries, in: clauses) }
         backingFacts = zip(subjects, naming).map { Self.backingClauses(of: $0, naming: $1, reading: reading, explainer: explainer) }
         backing = backingFacts.map { Set($0.keys) }
+        holders = subjects.compactMap(\.holder)
     }
 
     /// How the clauses of the description read for the entries of a draft: through the quotes of the draft, which name something and
@@ -295,8 +298,12 @@ struct Grounding {
         let joining = joiningPlaces(of: index)
         let pure = joining.filter { clauses.clause(at: $0).words.allSatisfy(explainer.isTimePhrase) }
         let graduating = subject.isEducation ? joining.filter { !pure.contains($0) && explainer.isGraduationPhrase(clauses.clause(at: $0).words) } : []
-        let dated = (backing[index].union(pure)).sorted(by: Self.isBefore).map { stated($0, of: index) }
-        let graduation = graduating.sorted(by: Self.isBefore).map(clauses.clause(at:))
+        let found = (backing[index].union(pure)).sorted(by: Self.isBefore).map { stated($0, of: index) }
+        // A year written with a word of graduating or completing ("2016 ... abgeschlossen") is the year the study ended, whichever
+        // clause writes it: it is never the start. So for a study such a clause is a graduation clause, not a dated one.
+        let completes = found.map { subject.isEducation && $0.words.contains(where: explainer.saysGraduating) }
+        let dated = found.indices.filter { !completes[$0] }.map { found[$0] }
+        let graduation = graduating.sorted(by: Self.isBefore).map(clauses.clause(at:)) + found.indices.filter { completes[$0] }.map { found[$0] }
         let joined = joining.filter { !pure.contains($0) && !graduating.contains($0) }.sorted(by: Self.isBefore)
 
         return EntryEvidence(
@@ -306,7 +313,9 @@ struct Grounding {
             statesCurrent: statesCurrent(index, joining: joining),
             quotable: ProseQuotes(sources: (dated + graduation).map { ProseQuotes.Source($0) }, language: explainer.language),
             quotableByAchievements: ProseQuotes(sources: joined.map { ProseQuotes.Source(clauses.clause(at: $0)) }, language: explainer.language),
-            verbAchievements: Set(subject.achievements.indices.filter { isQuoteOfAVerb(subject.achievements[$0], of: subject) })
+            verbAchievements: Set(subject.achievements.indices.filter { isQuoteOfAVerb(subject.achievements[$0], of: subject) }),
+            holders: holders,
+            ownHolder: subject.holder
         )
     }
 
@@ -348,21 +357,39 @@ struct Grounding {
     /// Whether the description gives `title` (a title, or a degree) for the entry at `index`: in a clause that speaks for the person
     /// and names the entry, or in one that names no other entry and holds nothing but explained words, the person's own quotes among
     /// them. A title that the description gives only in the clause of another entry ("head nurse at Beta"), or in one about someone
-    /// else ("my sister is a nurse at Acme"), is not this entry's.
+    /// else ("my sister is a nurse at Acme"), is not this entry's, nor is a word of the name of an employer or a school
+    /// ("contabile" in "Studio Contabile Merlini"), nor the whole of the entry's own ("contabile" for a job at "Contabile", unless the
+    /// clause writes it once more): it stands as the title only outside those names. A clause of no entry says
+    /// what the person is now ("I am a nurse in Leeds"): for a job that the description says is over it states no title, so the
+    /// title stands there only if the clause of the job gives it. A degree persists.
     func supportsTitle(_ title: [String], of index: Int, person: [[String]]) -> Bool {
         let subject = subjects[index]
 
         return clauses.places.contains { place in
             guard reading.speaks(at: place) else { return false }
             let clause = facts(at: place, naming: subject.names, by: subject)
-            guard clause.contains(title) else { return false }
+            let spans = clause.spans(of: title, besideNames: holders, ownName: subject.holder)
+            guard !spans.isEmpty else { return false }
+            guard !subject.isEducation || spans.contains(where: { !isOnlyVerbs($0, in: clause) }) else { return false }
             if !subject.isFoundByItsTitle && naming[index].contains(place) { return true }
             guard !namesAnotherEntry(at: place, than: subject) else { return false }
             if subject.isFoundByItsTitle { return true }
 
             let covered = clause.positions(inside: subject.quotes + person)
-            return clause.words.indices.allSatisfy { covered.contains($0) || explainer.explains(clause.words[$0]) }
+            guard clause.words.indices.allSatisfy({ covered.contains($0) || explainer.explains(clause.words[$0]) }) else { return false }
+            return subject.isEducation || !hasEnded(index)
         }
+    }
+
+    /// Whether the words of `span` in `clause`, the standalone occurrence of a degree, are nothing but finite verbs and function words
+    /// as the clause reads them ("terminé" in "estudié en la escuela y terminé en 2017"): what the person did names no qualification.
+    /// A verb beside a noun ("Titulado en Magisterio") and a word the vocabulary lists as a verb but the clause uses as a noun
+    /// ("o curso", "eine Lehre") are no such span. The other quotes of the draft are names, so no verbs; the span's own words are read.
+    private func isOnlyVerbs(_ span: Range<Int>, in clause: Clause) -> Bool {
+        let quoted = clause.positions(inside: reading.all).subtracting(span)
+        let verbs = Statement.finiteVerbs(in: clause.words, quoted: quoted, language: explainer.language)
+        return span.contains(where: verbs.contains)
+            && span.allSatisfy { verbs.contains($0) || Vocabulary.isNeutral(clause.words[$0].folded, in: explainer.language) }
     }
 
     private func namesAnotherEntry(at place: Place, than subject: Subject) -> Bool {
@@ -458,12 +485,29 @@ struct Grounding {
     private func statesCurrent(_ index: Int, joining: [Place]) -> Bool {
         let counted = backing.reduce(into: Set(joining)) { $0.formUnion($1) }
 
-        return backing[index].contains { place in
+        return periods(of: index, joining: joining).contains { period in
+            let years = Set(clauses.places.filter { $0.sentence == period.place.sentence && counted.contains($0) }
+                .flatMap { stated($0).words }.filter { $0.isNumber && $0.folded.count == 4 }.map(\.folded))
+            return PresentStatement.holds(in: period.text, sentenceYears: years.count, language: explainer.language)
+        }
+    }
+
+    /// Whether the description says that the job at `index` is over: no clause of it says the job goes on, and some clause that
+    /// backs it, with the clauses of nothing but time next to it, writes two years or an end and no word for the present
+    /// (`PresentStatement.ended`). A job with no clause that backs it, one without dates in the past tense, and one that ends
+    /// "até 2018" (the word is also "even") are not found over, and keep what they keep.
+    private func hasEnded(_ index: Int) -> Bool {
+        let joining = joiningPlaces(of: index)
+        return !statesCurrent(index, joining: joining) && periods(of: index, joining: joining).contains { PresentStatement.ended(in: $0.text) }
+    }
+
+    /// The time each clause that backs the entry gives: the clause as it states the entry, with the clauses of nothing but time that
+    /// join the entry next to it.
+    private func periods(of index: Int, joining: [Place]) -> [(place: Place, text: String)] {
+        backing[index].sorted(by: Self.isBefore).map { place in
             let neighbours = clauses.neighbours(of: place).filter { joining.contains($0) && clauses.clause(at: $0).words.allSatisfy(explainer.isTimePhrase) }
             let texts = (neighbours + [place]).sorted(by: Self.isBefore).map { stated($0).text }
-            let years = Set(clauses.places.filter { $0.sentence == place.sentence && counted.contains($0) }
-                .flatMap { stated($0).words }.filter { $0.isNumber && $0.folded.count == 4 }.map(\.folded))
-            return PresentStatement.holds(in: texts.joined(separator: " "), sentenceYears: years.count, language: explainer.language)
+            return (place, texts.joined(separator: " "))
         }
     }
 

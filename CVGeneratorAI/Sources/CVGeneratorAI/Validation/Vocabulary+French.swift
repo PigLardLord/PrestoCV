@@ -111,7 +111,7 @@ extension Vocabulary {
         """,
         /// Words of graduating: a time phrase that holds one joins an education entry and gives its end date.
         graduating: """
-        diplome diplomee diplomees diplomes
+        acheve achevee diplome diplomee diplomees diplomes termine terminee
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """

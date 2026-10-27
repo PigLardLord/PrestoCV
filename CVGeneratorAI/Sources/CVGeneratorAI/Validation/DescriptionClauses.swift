@@ -112,6 +112,15 @@ struct Clause {
         return spans(of: phrase).filter { span in !covering.contains { $0.contains(span.lowerBound) && span.upperBound <= $0.upperBound } }
     }
 
+    /// Where `phrase` says something of its own beside the names of employers and schools: where it stands as itself among them
+    /// (`standaloneSpans`), and, when the entry's own name is the phrase itself, only if the clause writes it once more than that
+    /// name takes. "Bristol" in "I worked at Bristol" is the name of the employer and no place; in "I worked at Bristol in Bristol"
+    /// the second is. The name of another entry that is the phrase says nothing about this one: it leaves the phrase as it stands.
+    func spans(of phrase: [String], besideNames names: [[String]], ownName: [String]?) -> [Range<Int>] {
+        let standalone = standaloneSpans(of: phrase, amongQuotes: names)
+        return ownName == phrase && standalone.count < 2 ? [] : standalone
+    }
+
     /// Where the clause begins to name the phrases: the last, among them, of the places where each first stands as itself. Nil when
     /// some phrase is not in the clause.
     func nameStart(of phrases: [[String]], amongQuotes quotes: [[String]]) -> Int? {

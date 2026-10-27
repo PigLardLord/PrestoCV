@@ -176,7 +176,8 @@ extension Vocabulary {
         """,
         /// Words of graduating: a time phrase that holds one joins an education entry and gives its end date.
         graduating: """
-        diplomata diplomate diplomati diplomato laureai laureata laureate laureati laureato laureo
+        completata completato conclusa concluso conseguii conseguita conseguito diplomata diplomate diplomati diplomato
+        laureai laureata laureate laureati laureato laureo terminai terminata terminato
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """

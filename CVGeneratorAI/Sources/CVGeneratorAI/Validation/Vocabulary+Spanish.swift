@@ -153,7 +153,8 @@ extension Vocabulary {
         """,
         /// Words of graduating: a time phrase that holds one joins an education entry and gives its end date.
         graduating: """
-        graduada graduado gradue graduo
+        completada completado conclui concluida concluido finalice graduada graduado gradue graduo terminada terminado
+        termine
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """
