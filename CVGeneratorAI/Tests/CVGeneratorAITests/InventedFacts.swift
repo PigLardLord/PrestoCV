@@ -761,7 +761,11 @@ enum InventedFacts {
                 mentions += 1
                 let before = sentence[..<index]
                 let after = sentence[(index + 1)...].prefix(2)
-                let started = before.contains(where: startVerbs.contains) || before.suffix(2).contains(where: startPrepositions.contains)
+                // A verb of a start dates the year unless a verb of completion stands between them: "I started to study and
+                // graduated in 2013" dates the graduation, "I started my graduate studies in 2013" dates the start.
+                let verb = before.lastIndex(where: startVerbs.contains)
+                let started = verb.map { !before[$0...].contains(where: completionVerbs.contains) } ?? false
+                    || before.suffix(2).contains(where: startPrepositions.contains)
                 let completed = before.contains(where: completionWords.contains) || after.contains(where: completionWords.contains)
                 if started || !completed { return false }
             }
@@ -776,6 +780,14 @@ enum InventedFacts {
         "abgeschlossen", "abschluss", "schloss", "beendet", "absolviert", "graduiert",
         "graduado", "graduada", "licenciado", "licenciada", "titulado", "titulada", "termine", "terminado", "finalizado",
         "diplome", "diplomee", "obtenu", "fini",
+        "formado", "formada", "formei", "graduei", "concluido", "concluida", "conclui", "terminei",
+    ]
+
+    /// The verbs that say the studies were completed, folded: a subset of the words of completion, with no noun in it.
+    private static let completionVerbs: Set<String> = [
+        "graduated", "finished", "completed", "laureato", "laureata", "laureai", "diplomato", "diplomata", "diplomai", "concluso",
+        "conclusi", "terminato", "abgeschlossen", "schloss", "beendet", "absolviert", "graduiert", "graduado", "graduada",
+        "licenciado", "licenciada", "titulado", "titulada", "termine", "terminado", "finalizado", "obtenu", "diplome", "diplomee",
         "formado", "formada", "formei", "graduei", "concluido", "concluida", "conclui", "terminei",
     ]
 
