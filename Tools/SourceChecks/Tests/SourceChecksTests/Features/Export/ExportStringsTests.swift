@@ -22,24 +22,52 @@ struct ExportStringsTests {
 
     private static var projectRoot: URL { Repository.root }
 
-    /// The catalog's entries of the export flow: key, and the value of each language
+    /// The catalog's entries of the export flow: key, and the value of each language. A key that takes a number is stored
+    /// with its format specifier (`export.preview.open %lld`) and is named here without it, as the code names it; the value
+    /// of such a key is its plural form `other`, and `pluralForms()` has the others.
     private static func catalogValues() throws -> [String: [String: String]] {
+        try catalogEntries().mapValues { localizations in
+            localizations.compactMapValues { localization in
+                if let unit = localization["stringUnit"] as? [String: Any] {
+                    return unit["value"] as? String
+                }
+                return pluralForms(of: localization)?["other"]
+            }
+        }
+    }
+
+    /// The plural forms of each language, for the keys that have them: key, language, form (`one`, `other`) and its text
+    private static func pluralForms() throws -> [String: [String: [String: String]]] {
+        try catalogEntries().compactMapValues { localizations in
+            let forms = localizations.compactMapValues(pluralForms(of:))
+            return forms.isEmpty ? nil : forms
+        }
+    }
+
+    private static func pluralForms(of localization: [String: Any]) -> [String: String]? {
+        guard let plural = (localization["variations"] as? [String: Any])?["plural"] as? [String: [String: Any]] else { return nil }
+        return plural.compactMapValues { ($0["stringUnit"] as? [String: Any])?["value"] as? String }
+    }
+
+    /// The localizations of each export key, by the name the code gives the key
+    private static func catalogEntries() throws -> [String: [String: [String: Any]]] {
         let data = try Data(contentsOf: projectRoot.appendingPathComponent("PrestoCV/Localizable.xcstrings"))
         let catalog = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         let strings = try #require(catalog["strings"] as? [String: [String: Any]])
-        var result: [String: [String: String]] = [:]
-        for (key, entry) in strings where key.hasPrefix("export.") {
-            let localizations = entry["localizations"] as? [String: [String: Any]] ?? [:]
-            result[key] = localizations.compactMapValues { ($0["stringUnit"] as? [String: Any])?["value"] as? String }
+        var result: [String: [String: [String: Any]]] = [:]
+        for (storedKey, entry) in strings where storedKey.hasPrefix("export.") {
+            let key = storedKey.replacingOccurrences(of: #" %l{0,2}[dux]$"#, with: "", options: .regularExpression)
+            result[key] = entry["localizations"] as? [String: [String: Any]] ?? [:]
         }
         return result
     }
 
-    /// The `export.` keys written as string literals in the app's Swift files
+    /// The `export.` keys written as string literals in the app's Swift files, with or without a value interpolated after
+    /// the key, as a key that takes a number is looked up (`"export.preview.open \(count)"`)
     private static func keysUsedInCode() throws -> Set<String> {
         let sources = projectRoot.appendingPathComponent("PrestoCV")
         let enumerator = try #require(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
-        let literal = try NSRegularExpression(pattern: #""(export\.[a-z_.]+)""#)
+        let literal = try NSRegularExpression(pattern: #""(export\.[a-z_.]+)(?: \\\([^"]*\))?""#)
         var keys: Set<String> = []
         for case let file as URL in enumerator where file.pathExtension == "swift" {
             let text = try String(contentsOf: file, encoding: .utf8)
@@ -53,7 +81,7 @@ struct ExportStringsTests {
     }
 
     private static func placeholders(in value: String) -> [String] {
-        let pattern = try! NSRegularExpression(pattern: #"%(\d+\$)?[@dfs]"#)
+        let pattern = try! NSRegularExpression(pattern: #"%(\d+\$)?l{0,2}[@dfs]"#)
         return pattern.matches(in: value, range: NSRange(value.startIndex..., in: value)).compactMap { match in
             Range(match.range, in: value).map { String(value[$0]) }
         }.sorted()
@@ -119,6 +147,38 @@ struct ExportStringsTests {
             let english = Self.placeholders(in: values["en"] ?? "")
             for (language, value) in values {
                 #expect(Self.placeholders(in: value) == english, "\(key) in \(language) has other placeholders than the English text")
+            }
+        }
+    }
+
+    @Test("a key that takes a number has the form for one and the form for several in every language, with the number in both")
+    func pluralKeysHaveBothForms() throws {
+        let plurals = try Self.pluralForms()
+
+        #expect(plurals.keys.contains("export.preview.open"), "the label of the preview takes the number of pages")
+        for (key, languagesForms) in plurals.sorted(by: { $0.key < $1.key }) {
+            #expect(Set(languagesForms.keys) == Self.languages, "\(key) needs all six languages")
+            for (language, forms) in languagesForms {
+                #expect(Set(forms.keys) == ["one", "other"], "\(key) in \(language) needs one and other, has \(forms.keys.sorted())")
+                for (form, value) in forms {
+                    #expect(value.contains("%lld"), "\(key) in \(language), \(form), does not show the number: \(value)")
+                }
+                #expect(forms["one"] != forms["other"], "\(key) in \(language) says the same for one and for several")
+            }
+        }
+    }
+
+    @Test("the form of a number for one is a translation too, except where the word is the same")
+    func pluralFormsDifferFromEnglish() throws {
+        let plurals = try Self.pluralForms()
+
+        for (key, languagesForms) in plurals.sorted(by: { $0.key < $1.key }) {
+            for form in ["one", "other"] {
+                let english = try #require(languagesForms["en"]?[form], "\(key) has no English \(form)")
+                for (language, forms) in languagesForms where language != "en" {
+                    let mayMatch = Self.sameAsEnglish[key]?.contains(language) == true
+                    #expect(mayMatch || forms[form] != english, "\(key) in \(language), \(form), is still the English text")
+                }
             }
         }
     }
