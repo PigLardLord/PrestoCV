@@ -783,13 +783,10 @@ enum InventedFacts {
         "formado", "formada", "formei", "graduei", "concluido", "concluida", "conclui", "terminei",
     ]
 
-    /// The verbs that say the studies were completed, folded: a subset of the words of completion, with no noun in it.
-    private static let completionVerbs: Set<String> = [
-        "graduated", "finished", "completed", "laureato", "laureata", "laureai", "diplomato", "diplomata", "diplomai", "concluso",
-        "conclusi", "terminato", "abgeschlossen", "schloss", "beendet", "absolviert", "graduiert", "graduado", "graduada",
-        "licenciado", "licenciada", "titulado", "titulada", "termine", "terminado", "finalizado", "obtenu", "diplome", "diplomee",
-        "formado", "formada", "formei", "graduei", "concluido", "concluida", "conclui", "terminei",
-    ]
+    /// The verbs that say the studies were completed: the words of completion but the nouns, which can name the degree.
+    private static let completionVerbs: Set<String> = completionWords.subtracting([
+        "graduate", "graduation", "completion", "laurea", "abschluss",
+    ])
 
     /// The verbs that say the studies began, in the six languages of the app, folded: they date a year wherever they stand before it.
     private static let startVerbs: Set<String> = [
