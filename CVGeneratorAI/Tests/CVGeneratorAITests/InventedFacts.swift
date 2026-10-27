@@ -731,6 +731,11 @@ enum InventedFacts {
             }
         }
 
+        if let entry, entry.kind == .study, role == "startDate", ownYears.count == 1, let year = years.first,
+           completionOnly(year, in: own.map { source.sentences[$0] }) {
+            invented.append("\(year) is said only as the completion year of the studies")
+        }
+
         if entry != nil, years.count == 1, ownYears.count >= 2 {
             let sorted = ownYears.sorted()
             if role == "startDate", years[0] != sorted.first { review.append("the start of the entry is not its earliest year") }
@@ -743,6 +748,48 @@ enum InventedFacts {
         if iso != nil || words.allSatisfy(isYear) { return (.derived, "reduced from a year of the sentence of the entry") }
         return (.review, "a date in another shape")
     }
+
+    /// Whether every mention of `year` in the sentences of a school is the year the studies were completed: a word of completion
+    /// before it with no word of a start after that, or right after it, and no word of a start before it. Such a year is never the
+    /// start of the studies, and the counter does not borrow the production rule to say so.
+    private static func completionOnly(_ year: String, in sentences: [[String]]) -> Bool {
+        var mentions = 0
+        for sentence in sentences {
+            for index in sentence.indices where sentence[index] == year {
+                mentions += 1
+                let before = sentence[..<index]
+                let after = sentence[(index + 1)...].prefix(2)
+                let completed: Bool
+                if let last = before.lastIndex(where: completionWords.contains) {
+                    completed = !before[last...].contains(where: startWords.contains)
+                } else {
+                    completed = !before.contains(where: startWords.contains) && after.contains(where: completionWords.contains)
+                }
+                if !completed { return false }
+            }
+        }
+        return mentions > 0
+    }
+
+    /// The words that say the studies were completed, in the six languages of the app, folded.
+    private static let completionWords: Set<String> = [
+        "graduated", "graduate", "graduating", "graduation", "finished", "completed", "completing", "completion",
+        "laureato", "laureata", "laureai", "laurea", "diplomato", "diplomata", "diplomai", "concluso", "conclusi", "terminato",
+        "abgeschlossen", "abschluss", "schloss", "beendet", "absolviert", "graduiert",
+        "graduado", "graduada", "licenciado", "licenciada", "titulado", "titulada", "termine", "terminado", "finalizado",
+        "diplome", "diplomee", "obtenu", "fini",
+        "formado", "formada", "formei", "graduei", "concluido", "concluida", "conclui", "terminei",
+    ]
+
+    /// The words that say the studies began, in the six languages of the app, folded.
+    private static let startWords: Set<String> = [
+        "from", "since", "started", "starting", "began", "begun", "enrolled",
+        "dal", "dall", "dalla", "iniziato", "iniziata", "iniziai",
+        "seit", "von", "begann", "angefangen",
+        "desde", "comence", "empece",
+        "depuis", "debut", "commence",
+        "inicio", "iniciei", "comecei",
+    ]
 
     /// What the description says of the word of the present in a date. The present is the entry's own only when a sentence of the
     /// entry itself holds the word, a quote. Nothing else proves it, and nothing proves it wrong either, so every other case is a
