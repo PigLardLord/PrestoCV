@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-13
+- **Amended by:** [ADR 0031](0031-let-the-ai-draft-write-around-the-facts.md) (2026-10-27): the summary and the role descriptions also keep the sentences that state no fact of their own, and a skill the description does not name may stay as an inferred one, without a level ((b) for those skills, (c) and (d) for the summary and the role descriptions). The rules of the facts stay as decided here.
 - **Related:** [ADR 0022](0022-ship-legacy-app-as-v1.md), issues #16, #17, #18, #34 and #35
 
 ## Context
@@ -23,6 +24,7 @@
   - name, email, phone and link;
   - title, employer, school, degree, location;
   - dates, certification, skill, language, interest, figure.
+  - **Amended by [ADR 0031](0031-let-the-ai-draft-write-around-the-facts.md):** a skill the description does not name may stay as an inferred technology or soft skill, without a level. A skill the description names is still a quote.
 
   Case, diacritics and white space are ignored. Digits are folded only for numbers, never inside addresses. Addresses are compared as whole tokens. Each kept value records where it occurs in the description.
   - **Dates the model writes in another form.** If the model writes a date in another form ("2016-01-01"), the value is cut to what the description wrote (the year "2016"). If that part is not a quote either, the date is dropped.
@@ -131,6 +133,7 @@
     A quote keeps the user's own claim, with its subject, its voice and its negation.
   - **Summary.** A summary sentence holds no number, and each of its clauses quotes a clause of the description.
   - **Role descriptions and achievements** quote clauses that back their own job, outside any purpose tail (c).
+  - **Amended by [ADR 0031](0031-let-the-ai-draft-write-around-the-facts.md):** a sentence of the summary or of a role description that quotes nothing also stays when it states no fact of its own (`WrittenText`). Achievements are still quotes, and a summary still holds no number.
   - So a paraphrase, an invented name ("Jane Smith", "Globex"), a change of person or a swapped number drops its sentence.
 - **(e) Words are compared in a normalised form.**
   - That form is lower case and without diacritics. No lemma is used: a prose quote keeps the user's forms (d), and the closed vocabulary explains a CV verb only in the forms it lists (c), so neither a paraphrase nor a future becomes a fact.

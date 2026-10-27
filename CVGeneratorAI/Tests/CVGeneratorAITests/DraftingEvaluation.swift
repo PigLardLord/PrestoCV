@@ -21,17 +21,19 @@ import FoundationModels
 // - PRESTOCV_DRAFT_EVAL_ONLY: comma-separated input ids, for a re-run after a fix. The set is then partial, and never GO.
 //
 // The folder holds manifest.json (written first, updated after every run), one JSON per input and run, summary.json, summary.txt
-// (its first line is the verdict) and review.json (the fields a person reads once per set). A set that stopped halfway has no
-// summary.
+// (its first line is the verdict) and review.json (the fields, and the drafts written around the facts, a person reads once per set).
+// A set that stopped halfway has no summary.
 //
 // A pass here means NO HARD FINDING, not GO: no field the counter proves invented in any run, no run of any input that threw, was
-// refused or whose claim check gave no answer, and an example that keeps its name, its title and a job. The fields the counter can
-// only send to review need a recorded reading (adjudication.json) before the set is GO: see `DraftingReadiness`.
+// refused or whose claim check gave no answer, an example that keeps its name, its title and a job, and no tool of another trade
+// written around the facts (ADR 0031). The thresholds of what the drafts write around the facts (`WrittenCounts`), the fields the
+// counter can only send to review and the pertinence of each draft need a recorded reading (adjudication.json) before the set is GO:
+// see `DraftingReadiness`.
 
 private let environment = ProcessInfo.processInfo.environment
 
 @Suite(
-    "Drafting evaluation: ADR 0023 and 0028 on the real model (a pass is no hard finding, not GO)", .serialized,
+    "Drafting evaluation: ADR 0023, 0028 and 0031 on the real model (a pass is no hard finding, not GO)", .serialized,
     .enabled(if: DraftingSettings.isOn(environment["PRESTOCV_DRAFT_EVAL"]))
 )
 @MainActor
@@ -75,6 +77,7 @@ struct DraftingEvaluation {
         #expect(summary.invented.isEmpty, "invented: \(summary.invented)")
         #expect(summary.failures.isEmpty, "failed runs: \(summary.failures)")
         #expect(summary.exampleMisses.isEmpty, "example misses: \(summary.exampleMisses)")
+        #expect(summary.offField.isEmpty, "off-field hits: \(summary.offField)")
     }
 
     // MARK: - One draft

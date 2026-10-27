@@ -87,9 +87,9 @@ struct DraftLog {
 
     /// The personal items the claim check judged and those it withdrew, and whether it gave no answer: a notice when it withdrew
     /// one, since the person then sees fewer items than the model wrote.
-    func claims(of grounded: CVData, checked: GeneratedDraft) {
-        let candidates = ClaimCandidates.of(grounded)
-        let kept = Set(ClaimCandidates.of(checked.cvData))
+    func claims(of grounded: CVData, checked: GeneratedDraft, in description: String) {
+        let candidates = ClaimCandidates.of(grounded, in: description)
+        let kept = Set(ClaimCandidates.of(checked.cvData, in: description))
         let withdrawn = candidates.count { !kept.contains($0) }
         let fields: [LogField] = [
             .count("checked", candidates.count), .count("withdrawn", withdrawn), .flag("unchecked", checked.personalItemsUnchecked),

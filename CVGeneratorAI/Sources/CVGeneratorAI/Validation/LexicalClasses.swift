@@ -35,6 +35,16 @@ public protocol LexicalTagger: Sendable {
     func tagsLexicalClass(inLanguage language: String) -> Bool
     /// The character offsets, in `text`, of the words it tags as verbs when it reads `text` in `language`.
     func verbs(in text: String, language: String) -> [Range<Int>]
+    /// The character offsets, in `text`, of the words it tags as the name of a person, a place or an organisation when it reads `text`
+    /// in `language`: German writes every noun with a capital, so a capital tells no name there (ADR 0031).
+    func names(in text: String, language: String) -> [Range<Int>]
+}
+
+extension LexicalTagger {
+    /// A tagger that tells no names tags none.
+    public func names(in text: String, language: String) -> [Range<Int>] {
+        []
+    }
 }
 
 /// The lexical class of the device's NaturalLanguage framework. It tags a language only once the device has the language's data,
@@ -52,21 +62,40 @@ public struct DeviceLexicalTagger: LexicalTagger {
 
     public func verbs(in text: String, language: String) -> [Range<Int>] {
         #if canImport(NaturalLanguage)
-        let tagger = NLTagger(tagSchemes: [.lexicalClass])
+        ranges(in: text, language: language, scheme: .lexicalClass, options: [.omitPunctuation, .omitWhitespace]) { $0 == .verb }
+        #else
+        []
+        #endif
+    }
+
+    public func names(in text: String, language: String) -> [Range<Int>] {
+        #if canImport(NaturalLanguage)
+        ranges(in: text, language: language, scheme: .nameType, options: [.omitPunctuation, .omitWhitespace, .joinNames]) { tag in
+            tag == .personalName || tag == .placeName || tag == .organizationName
+        }
+        #else
+        []
+        #endif
+    }
+
+    #if canImport(NaturalLanguage)
+    /// The character offsets, in `text`, of the words `scheme` gives a tag that `matches`.
+    private func ranges(
+        in text: String, language: String, scheme: NLTagScheme, options: NLTagger.Options, matching matches: (NLTag) -> Bool
+    ) -> [Range<Int>] {
+        let tagger = NLTagger(tagSchemes: [scheme])
         tagger.string = text
         tagger.setLanguage(NLLanguage(rawValue: language), range: text.startIndex..<text.endIndex)
 
-        var verbs: [Range<Int>] = []
-        tagger.enumerateTags(in: text.startIndex..<text.endIndex, unit: .word, scheme: .lexicalClass, options: [.omitPunctuation, .omitWhitespace]) { tag, range in
-            if tag == .verb {
+        var ranges: [Range<Int>] = []
+        tagger.enumerateTags(in: text.startIndex..<text.endIndex, unit: .word, scheme: scheme, options: options) { tag, range in
+            if let tag, matches(tag) {
                 let start = text.distance(from: text.startIndex, to: range.lowerBound)
-                verbs.append(start..<(start + text.distance(from: range.lowerBound, to: range.upperBound)))
+                ranges.append(start..<(start + text.distance(from: range.lowerBound, to: range.upperBound)))
             }
             return true
         }
-        return verbs
-        #else
-        return []
-        #endif
+        return ranges
     }
+    #endif
 }

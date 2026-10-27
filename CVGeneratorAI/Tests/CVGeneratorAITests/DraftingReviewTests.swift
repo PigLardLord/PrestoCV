@@ -15,9 +15,10 @@ struct DraftingReviewTests {
             ids: ["en-plain", "it-plain"], runs: 3, tweak: DraftMeasures.tweak(Scenario.reviewedOnce, for: "en-plain")
         )
 
-        let item = try #require(scenario.review.first)
+        let fields = scenario.review.filter { $0.kind == .field }
+        let item = try #require(fields.first)
 
-        #expect(scenario.review.count == 1)
+        #expect(fields.count == 1)
         #expect(scenario.review.count == scenario.summary.reviewItems)
         #expect(item.id == "en-plain")
         #expect(item.value == "bake bread")
@@ -56,6 +57,30 @@ struct DraftingReviewTests {
         #expect(Set(items.map(\.key)).count == 2)
     }
 
+    @Test("Each input's distinct final draft written around the facts is one item to read for pertinence, with the runs that wrote it")
+    func pertinence() throws {
+        let other = Tweak(edit: { $0.skills.removeLast() })
+        let scenario = try Scenario.make(runs: 3, tweak: DraftMeasures.tweak(other, for: "it-plain", run: 3))
+
+        let items = scenario.review.filter { $0.kind == .pertinence }
+
+        #expect(scenario.review.count == items.count)
+        #expect(items.map(\.id) == ["en-plain", "it-plain", "it-plain"])
+        #expect(items.map(\.seen) == [["run 1", "run 2", "run 3"], ["run 1", "run 2"], ["run 3"]])
+        #expect(items.map(\.context) == ["warehouse logistics", "cucina", "cucina"])
+        #expect(items.allSatisfy { $0.reason == ReviewItem.pertinenceReason })
+        #expect(items[0].value.contains("summary: Reliable and careful worker"))
+        #expect(items[0].value.contains("Work planning, Safety procedures, Stock control, Record keeping"))
+        #expect(items[0].value.contains("soft skills: Teamwork, Reliability, Communication"))
+    }
+
+    @Test("A draft that writes nothing around the facts, or around no role, is no item to read for pertinence")
+    func noPertinence() throws {
+        let measured = try DraftMeasures.set(["en-plain", "en-norole"], tweak: { id, _ in Tweak(written: id != "en-plain") })
+
+        #expect(ReviewItem.unique(in: measured).isEmpty)
+    }
+
     @Test("The key is the input and a hash of the value, the reason and the context, the same in every process", arguments: KeyCase.all)
     func key(_ item: KeyCase) {
         #expect(ReviewItem.key(id: item.id, value: item.value, reason: item.reason, context: item.context) == item.key)
@@ -89,10 +114,19 @@ struct DraftingReviewTests {
 
     @Test("A complete set with no hard finding and no item to read is GO")
     func goWithNothingToRead() throws {
-        let scenario = try Scenario.make()
+        let scenario = try Scenario.make(ids: ["en-norole", "it-norole"])
 
         #expect(scenario.review.isEmpty)
         #expect(scenario.verdict == .go)
+    }
+
+    @Test("A set whose drafts are written around the facts is not GO until somebody has read each for pertinence")
+    func goNeedsPertinence() throws {
+        let scenario = try Scenario.make()
+
+        #expect(scenario.review.map(\.kind) == [.pertinence, .pertinence])
+        #expect(scenario.verdict.reasons == ["review.json lists 2 items and nobody has adjudicated them (no adjudication.json)"])
+        #expect(scenario.adjudicated().verdict == .go)
     }
 
     @Test("A set with items to read is not GO until somebody has decided every one")
@@ -222,6 +256,12 @@ struct VerdictCase: Sendable, CustomTestStringConvertible {
         VerdictCase(label: "every item rejected", reason: "rejected: en-plain") { try read().adjudicated(as: .reject) },
         VerdictCase(label: "an invented field", reason: "hard findings") {
             try Scenario.make(tweak: DraftMeasures.tweak(Scenario.invented, for: "en-plain"))
+        },
+        VerdictCase(label: "an off-field hit", reason: "1 off-field hits") {
+            try Scenario.make(tweak: DraftMeasures.tweak(Tweak(edit: { $0.skills.append(Skill(name: "Java")) }), for: "en-plain")).adjudicated()
+        },
+        VerdictCase(label: "a missed threshold", reason: "a threshold is missed: enough technologies and soft skills in 1 of 2") {
+            try Scenario.make(tweak: DraftMeasures.tweak(Tweak(edit: { $0.skills = [] }), for: "it-plain")).adjudicated()
         },
         VerdictCase(label: "a run that failed", reason: "1 failed runs") {
             try Scenario.make(tweak: DraftMeasures.tweak(Tweak(error: CVGenerationError.generationFailed), for: "it-plain"))

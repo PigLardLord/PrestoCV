@@ -51,7 +51,7 @@ struct AIDraftMapper {
             ),
             relevant_experience: cvData.experience.map(experience),
             education: cvData.education.map(education),
-            skills: cvData.skills.map(skill),
+            skills: ordered(cvData.skills).map(skill),
             languages: cvData.languages.compactMap(language),
             certifications: cvData.certifications.map(certification),
             interests: interests(cvData.interests),
@@ -82,6 +82,11 @@ struct AIDraftMapper {
             period: period(start: entry.startDate, end: entry.endDate, isCurrent: false),
             description: entry.description ?? ""
         )
+    }
+
+    /// The technologies first, then the soft skills (ADR 0031): the CV has one list of skills, and each kind keeps the draft's order.
+    private func ordered(_ skills: [CVGeneratorAI.Skill]) -> [CVGeneratorAI.Skill] {
+        skills.filter { $0.kind == .technology } + skills.filter { $0.kind == .softSkill }
     }
 
     private func skill(_ entry: CVGeneratorAI.Skill) -> PrestoCVCore.Skill {

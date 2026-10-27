@@ -254,7 +254,9 @@ final class ViewModelFactory {
             claimChecker: claimChecker,
             logger: environment.diagnostics,
             clock: environment.clock,
-            sanitizer: CVDataSanitizer(languageOfText: { DescriptionLanguageDetector.languageTag(of: $0) }, lexicalClasses: lexicalClasses)
+            sanitizer: CVDataSanitizer(
+                languageOfText: { DescriptionLanguageDetector.languageTag(of: $0) }, lexicalClasses: lexicalClasses, wordList: DeviceWordList()
+            )
         )
     }
 

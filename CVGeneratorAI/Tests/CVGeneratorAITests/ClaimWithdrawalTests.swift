@@ -2,9 +2,16 @@ import Testing
 import Foundation
 @testable import CVGeneratorAI
 
-/// Which personal items the claim check judges, and what its judgements leave of a draft (ADR 0028).
+/// Which personal items the claim check judges, and what its judgements leave of a draft (ADR 0028, and ADR 0031 for the skills the
+/// description does not name).
 @Suite("Claim check: candidates and withdrawal")
 struct ClaimWithdrawalTests {
+    /// A description that names every personal item of `draft`, and the skills `Skill1` to `Skill20` of `skills(_:)`.
+    private let description = """
+        I am Maria Rossi, a teacher in Bologna. I use Excel and Swift. I speak Italian and English. I like chess and hiking.
+        Skills: \((1...20).map { "Skill\($0)" }.joined(separator: ", ")).
+        """
+
     private let draft = CVData(
         personalInfo: PersonalInfo(
             name: "Maria Rossi", email: "maria.rossi@example.com", phone: "+39 051 123456", location: "Bologna",
@@ -20,14 +27,14 @@ struct ClaimWithdrawalTests {
     )
 
     private func judged(_ stances: [String: ClaimStance]) -> [ClaimJudgement] {
-        ClaimCandidates.of(draft).map { ClaimJudgement(stance: stances[$0.value] ?? .fact, quote: "") }
+        ClaimCandidates.of(draft, in: description).map { ClaimJudgement(stance: stances[$0.value] ?? .fact, quote: "") }
     }
 
     // MARK: - Candidates
 
     @Test("The candidates are the headline title, the place, the skills, the languages and the interests, in that order")
     func candidatesInOrder() {
-        #expect(ClaimCandidates.of(draft) == [
+        #expect(ClaimCandidates.of(draft, in: description) == [
             ClaimCandidate(kind: .title, value: "teacher"), ClaimCandidate(kind: .place, value: "Bologna"),
             ClaimCandidate(kind: .skill, value: "Excel"), ClaimCandidate(kind: .skill, value: "Swift"),
             ClaimCandidate(kind: .language, value: "Italian"), ClaimCandidate(kind: .language, value: "English"),
@@ -37,7 +44,7 @@ struct ClaimWithdrawalTests {
 
     @Test("Jobs, schools, the name, the contacts, the summary and the certifications are not candidates")
     func onlyThePersonalKinds() {
-        let values = Set(ClaimCandidates.of(draft).map(\.value))
+        let values = Set(ClaimCandidates.of(draft, in: description).map(\.value))
         for value in ["Maria Rossi", "maria.rossi@example.com", "Don Milani school", "University of Bologna", "Education Sciences",
                       "Primary school teacher.", "TEFL", "2016"] {
             #expect(!values.contains(value), "\(value) is not for the claim check")
@@ -52,21 +59,30 @@ struct ClaimWithdrawalTests {
             interests: ["Excel"]
         )
 
-        #expect(ClaimCandidates.of(cvData) == [ClaimCandidate(kind: .skill, value: "Excel"), ClaimCandidate(kind: .interest, value: "Excel")])
+        #expect(ClaimCandidates.of(cvData, in: "Excel") == [
+            ClaimCandidate(kind: .skill, value: "Excel"), ClaimCandidate(kind: .interest, value: "Excel"),
+        ])
+    }
+
+    @Test("A skill the description does not name is no candidate: the model wrote it for the role, and no clause can claim it (ADR 0031)")
+    func onlyNamedSkillsAreCandidates() {
+        let cvData = CVData(skills: [Skill(name: "Kubernetes"), Skill(name: "Excel"), Skill(name: "Teamwork", kind: .softSkill)])
+
+        #expect(ClaimCandidates.of(cvData, in: "I use Excel every day.") == [ClaimCandidate(kind: .skill, value: "Excel")])
     }
 
     // MARK: - Withdrawal
 
     @Test("Every item judged a fact stays as it is")
     func factsStay() {
-        #expect(ClaimWithdrawal.keepingFacts(of: draft, candidates: ClaimCandidates.of(draft), judgements: judged([:])) == draft)
+        #expect(ClaimWithdrawal.keepingFacts(of: draft, candidates: ClaimCandidates.of(draft, in: description), judgements: judged([:])) == draft)
     }
 
     @Test("An item read as a wish, a denial, another person's or not mentioned is withdrawn",
           arguments: [ClaimStance.wish, .denied, .otherPerson, .notMentioned])
     func nonFactsGo(stance: ClaimStance) {
         let stances: [String: ClaimStance] = ["teacher": stance, "Bologna": stance, "Swift": stance, "English": stance, "chess": stance]
-        let result = ClaimWithdrawal.keepingFacts(of: draft, candidates: ClaimCandidates.of(draft), judgements: judged(stances))
+        let result = ClaimWithdrawal.keepingFacts(of: draft, candidates: ClaimCandidates.of(draft, in: description), judgements: judged(stances))
 
         #expect(result.personalInfo.title == nil)
         #expect(result.personalInfo.location == nil)
@@ -78,10 +94,28 @@ struct ClaimWithdrawalTests {
     @Test("A repeated item follows its one judgement")
     func repeatsFollowTheirJudgement() {
         let cvData = CVData(skills: [Skill(name: "Excel"), Skill(name: "Excel", level: .expert), Skill(name: "Word")])
-        let candidates = ClaimCandidates.of(cvData)
+        let candidates = ClaimCandidates.of(cvData, in: "Excel and Word")
         let judgements = [ClaimJudgement(stance: .wish, quote: ""), ClaimJudgement(stance: .fact, quote: "")]
 
         #expect(ClaimWithdrawal.keepingFacts(of: cvData, candidates: candidates, judgements: judgements).skills == [Skill(name: "Word")])
+    }
+
+    @Test("A skill the check did not judge stays as the rules left it, and a blank one goes (ADR 0031)")
+    func unjudgedSkillsStay() {
+        let cvData = CVData(skills: [Skill(name: "Excel"), Skill(name: "Kubernetes"), Skill(name: "Teamwork", kind: .softSkill), Skill(name: " ")])
+        let candidates = ClaimCandidates.of(cvData, in: "I used Excel once.")
+        let judgements = [ClaimJudgement(stance: .wish, quote: "")]
+
+        #expect(ClaimWithdrawal.keepingFacts(of: cvData, candidates: candidates, judgements: judgements).skills == [
+            Skill(name: "Kubernetes"), Skill(name: "Teamwork", kind: .softSkill),
+        ])
+    }
+
+    @Test("Withdrawing all removes every skill, those the description names and those the model wrote (ADR 0028 (ii), ADR 0031)")
+    func withdrawingAllRemovesEverySkill() {
+        let cvData = CVData(skills: [Skill(name: "Excel"), Skill(name: "Kubernetes"), Skill(name: "Teamwork", kind: .softSkill)])
+
+        #expect(ClaimWithdrawal.withdrawingAll(from: cvData).skills.isEmpty)
     }
 
     @Test("Withdrawing all removes every personal item, and keeps the name, the contacts, the summary, jobs, schools and certifications")
@@ -140,8 +174,6 @@ struct ClaimWithdrawalTests {
     }
 
     // MARK: - Checking
-
-    private let description = "I teach and I am based in Bologna."
 
     /// A draft of `count` skills, `Skill1`, `Skill2`, and so on, and nothing else.
     private func skills(_ count: Int) -> CVData {

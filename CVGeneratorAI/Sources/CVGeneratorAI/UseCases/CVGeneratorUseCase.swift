@@ -83,7 +83,7 @@ public final class CVGeneratorUseCase {
             let grounded = try sanitizer.sanitize(generated, against: request.userPrompt)
             stage = .claimCheck
             let checked = try await ClaimWithdrawal.checking(grounded, in: request.userPrompt, with: claimChecker)
-            log.claims(of: grounded, checked: checked)
+            log.claims(of: grounded, checked: checked, in: request.userPrompt)
             stage = .result
             let cvData = JobOrder.ordered(checked.cvData)
 

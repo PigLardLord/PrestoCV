@@ -4,23 +4,41 @@ import Foundation
 // The inputs of the drafting evaluation (#202) are fixtures: these tests keep them honest, so that a fact the counter looks
 // for is one the description states, a trap is a real temptation, and no input holds real contact details.
 
-@Suite("Drafting inputs: the 18 descriptions of the drafting evaluation")
+@Suite("Drafting inputs: the 30 descriptions of the drafting evaluation")
 struct DraftingInputsTests {
-    @Test("Each language has its example, its plain description and its description with traps",
+    @Test("Each language has its example, a plain description, one with traps, a sparse one and one with no role",
           arguments: DraftingInputs.languages)
-    func threeInputsPerLanguage(_ language: String) throws {
+    func fiveInputsPerLanguage(_ language: String) throws {
         let inputs = try DraftingInputs.all().filter { $0.language == language }
 
-        #expect(inputs.map(\.kind) == [.example, .plain, .traps])
-        #expect(inputs.map(\.id) == ["example-\(language)", "\(language)-plain", "\(language)-traps"])
+        #expect(inputs.map(\.kind) == [.example, .plain, .traps, .sparse, .noRole])
+        #expect(inputs.map(\.id) == ["example-", "-plain", "-traps", "-sparse", "-norole"].map {
+            $0.hasPrefix("-") ? language + $0 : $0 + language
+        })
     }
 
-    @Test("There are 18 inputs, each with an id of its own")
-    func eighteenInputs() throws {
+    @Test("There are 30 inputs, each with an id of its own")
+    func thirtyInputs() throws {
         let ids = try DraftingInputs.all().map(\.id)
 
-        #expect(ids.count == 18)
+        #expect(ids.count == 30)
         #expect(Set(ids).count == ids.count)
+    }
+
+    @Test("Every input with a role has a field and words of other trades its description does not state; one with no role has none",
+          arguments: DraftingInputs.languages)
+    func fieldsAndOffField(_ language: String) throws {
+        for input in try DraftingInputs.all() where input.language == language {
+            guard input.kind != .noRole else {
+                #expect(input.field == nil && input.offField.isEmpty, "\(input.id)")
+                continue
+            }
+            #expect(input.field?.isEmpty == false, "\(input.id)")
+            #expect(input.offField.count >= 4, "\(input.id)")
+            for word in input.offField {
+                #expect(!input.states(word), "\(input.id): \(word)")
+            }
+        }
     }
 
     @Test("Each expected fact and each trap occurs in its description", arguments: DraftingInputs.languages)
@@ -43,11 +61,17 @@ struct DraftingInputsTests {
         #expect(item.input.states(item.phrase) == item.stated, "\(item)")
     }
 
-    @Test("Every input states a name, a title and two employers; the descriptions with traps have nine traps",
+    @Test("Every full input states a name, a title and two employers; the descriptions with traps have nine traps",
           arguments: DraftingInputs.languages)
     func factsOfEveryInput(_ language: String) throws {
         for input in try DraftingInputs.all() where input.language == language {
             let kinds = input.facts.map(\.kind)
+            guard input.kind != .sparse, input.kind != .noRole else {
+                // A sparse description states a title alone, and one with no role states no fact.
+                #expect(kinds == (input.kind == .sparse ? [.title] : []), "\(input.id)")
+                #expect(input.traps.isEmpty, "\(input.id)")
+                continue
+            }
             #expect(kinds.filter { $0 == .name }.count == 1, "\(input.id)")
             #expect(kinds.filter { $0 == .title }.count == 1, "\(input.id)")
             #expect(kinds.filter { $0 == .employer }.count == 2, "\(input.id)")

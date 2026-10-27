@@ -5,7 +5,7 @@ import Foundation
 /// The CV as a whole: what survives a faithful draft, what a made-up one loses, and how entries are tidied.
 @Suite("Sanitizer: whole drafts")
 struct SanitizerEntryTests {
-    private let sanitizer = CVDataSanitizer()
+    private let sanitizer = CVDataSanitizer(lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
 
     @Test("A draft the description fully supports keeps what its clauses name, in each of the six languages of the example",
           arguments: faithfulExamples)
@@ -13,14 +13,14 @@ struct SanitizerEntryTests {
         #expect(try sanitizer.sanitize(example.draft, against: example.description) == example.survivors)
     }
 
-    @Test("What the faithful drafts lose is the paraphrased summary, and an achievement that is not a quote of the description",
+    @Test("What the faithful drafts lose is an achievement that is not a quote of the description; the summary written around the facts stays",
           arguments: faithfulExamples)
     func whatTheFaithfulDraftsLose(example: FaithfulExample) throws {
         let result = try sanitizer.sanitize(example.draft, against: example.description)
         let current = result.experience.first { $0.current }
         let past = result.experience.first { !$0.current }
 
-        #expect(result.summary == nil, "A paraphrase is made of words the description does not use")
+        #expect(result.summary == example.draft.summary, "The summary states no fact of its own: it is written around the facts (ADR 0031)")
         #expect(current?.startDate == "2016", "The date stands in the clause with the school")
         #expect(current?.title == example.draft.experience[0].title, "The title is a quote, though it is stated in the sentence about the person")
         #expect(current?.achievements == (example.keepsAchievement ? example.draft.experience[0].achievements : []), "The achievement stays when it quotes the clause after the comma, from a verb")
@@ -112,14 +112,14 @@ struct FaithfulExample: Sendable, CustomTestStringConvertible {
 
     var testDescription: String { language }
 
-    /// The draft as the sanitizer leaves it: the summary is a paraphrase, so it goes; the achievement stays when it is a quote;
+    /// The draft as the sanitizer leaves it: the summary states no fact of its own, so it stays (ADR 0031); the achievement stays when it is a quote;
     /// everything else is a quote of a clause that backs its entry or of one that joins it (the years before the employer's
     /// clause, the year of the degree after "and").
     var survivors: CVData {
         let current = draft.experience[0]
         return CVData(
             personalInfo: draft.personalInfo,
-            summary: nil,
+            summary: draft.summary,
             experience: [
                 Experience(
                     title: current.title, company: current.company, startDate: current.startDate, current: current.current,

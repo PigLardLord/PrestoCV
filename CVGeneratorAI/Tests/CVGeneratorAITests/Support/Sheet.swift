@@ -57,6 +57,7 @@ enum Sheet {
         for (index, skill) in cv.skills.enumerated() {
             add([Step("skills", index), Step("name")], skill.name)
             add([Step("skills", index), Step("level")], skill.level?.rawValue)
+            add([Step("skills", index), Step("kind")], skill.kind == .softSkill ? skill.kind.rawValue : nil)
         }
         for (index, language) in cv.languages.enumerated() {
             add([Step("languages", index), Step("name")], language.name)

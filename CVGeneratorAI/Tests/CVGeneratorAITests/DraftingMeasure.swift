@@ -112,6 +112,8 @@ struct DraftMeasure: Encodable {
     let report: InventedFacts.Report
     /// The fields of the model's draft that the counter calls invented: what the rules and the check had to remove.
     let rawInvented: [InventedFacts.Finding]
+    /// What the final draft writes around the facts (ADR 0031); nil for a run that gave no draft.
+    let written: WrittenMeasure?
     /// Why an example's draft misses the name, the title or a job; empty for the other inputs, and for a run that gave no draft (its
     /// `failure` says why).
     let misses: [String]
@@ -139,8 +141,10 @@ struct DraftMeasure: Encodable {
         self.error = error.map { String(describing: $0) }
         let refused = Self.isRefusal(error)
         self.refused = refused
-        report = InventedFacts.count(result?.cvData ?? CVData(), for: input)
+        let report = InventedFacts.count(result?.cvData ?? CVData(), for: input)
+        self.report = report
         rawInvented = raw.map { InventedFacts.count($0, for: input).invented } ?? []
+        written = result.map { WrittenMeasure($0.cvData, for: input, report: report) }
 
         var misses: [String] = []
         if input.kind == .example, result != nil {

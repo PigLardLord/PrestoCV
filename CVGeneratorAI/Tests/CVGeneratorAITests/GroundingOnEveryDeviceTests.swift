@@ -12,7 +12,7 @@ struct GroundingOnEveryDeviceTests {
 
     private func grounding(_ row: GroundingRow, by tagger: ForcedLexicalTagger) -> Result<CVData, CVGenerationError> {
         Result { () throws(CVGenerationError) in
-            try CVDataSanitizer(lexicalClasses: tagger).sanitize(row.draft, against: row.description)
+            try CVDataSanitizer(lexicalClasses: tagger, wordList: TableWordList()).sanitize(row.draft, against: row.description)
         }
     }
 

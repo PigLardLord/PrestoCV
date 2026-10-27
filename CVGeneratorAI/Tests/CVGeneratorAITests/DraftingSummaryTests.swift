@@ -41,7 +41,7 @@ struct DraftingSummaryTests {
 
     @Test("A draft that the rules changed counts apart in the final drafts and not in the model's")
     func rulesChangedTheDraft() throws {
-        let removed = Tweak(edit: { $0.skills.append(Skill(name: "Kubernetes")) }, finalEdit: { $0.skills.removeLast() })
+        let removed = Tweak(edit: { $0.interests.append("Origami") }, finalEdit: { $0.interests.removeLast() })
         let measured = try DraftMeasures.set(["en-plain"], runs: 2, tweak: DraftMeasures.tweak(removed, for: "en-plain", run: 2))
 
         let counts = DraftCounts(measured)
@@ -60,7 +60,8 @@ struct DraftingSummaryTests {
         let summary = scenario.summary
 
         #expect(summary.hardFindings == 0)
-        #expect(summary.headline == "NO HARD FINDING in 6 runs of 2 inputs. This is not GO: 1 review item needs an adjudication")
+        // The field of en-plain, and the draft of each input, which a person reads for pertinence.
+        #expect(summary.headline == "NO HARD FINDING in 6 runs of 2 inputs. This is not GO: 3 review items need an adjudication")
         #expect(summary.text.hasPrefix(summary.headline + "\n"))
     }
 
@@ -68,8 +69,8 @@ struct DraftingSummaryTests {
     func severalItems() throws {
         let scenario = try Scenario.make(runs: 2, tweak: DraftMeasures.tweak(Scenario.reviewed, for: "en-plain"))
 
-        #expect(scenario.summary.reviewItems == 2)
-        #expect(scenario.summary.headline == "NO HARD FINDING in 4 runs of 2 inputs. This is not GO: 2 review items need an adjudication")
+        #expect(scenario.summary.reviewItems == 4)
+        #expect(scenario.summary.headline == "NO HARD FINDING in 4 runs of 2 inputs. This is not GO: 4 review items need an adjudication")
     }
 
     @Test("Several review items, an unknown revision and a partial set are all open")
@@ -78,13 +79,14 @@ struct DraftingSummaryTests {
         let scenario = try Scenario.make(ids: ["en-plain", "it-plain"], all: DraftingInputs.all().map(\.id), revision: "unknown", tweak: tweak)
 
         #expect(scenario.summary.headline.hasSuffix(
-            "This is not GO: 1 review item needs an adjudication; the revision under test is not recorded; the set is partial"
+            "This is not GO: 3 review items need an adjudication; the revision under test is not recorded; the set is partial"
         ))
     }
 
     @Test("A complete, reviewed set at a known revision has nothing open, and the line does not say GO by itself")
     func nothingOpen() throws {
-        let headline = try Scenario.make(ids: ["en-plain"], all: ["en-plain"]).summary.headline
+        // A description with no role, whose draft writes nothing around the facts: nothing to read.
+        let headline = try Scenario.make(ids: ["en-norole"], all: ["en-norole"]).summary.headline
 
         #expect(headline == "NO HARD FINDING in 1 runs of 1 inputs. Nothing is left to adjudicate; GO is the verdict of the readiness check")
     }
@@ -106,7 +108,54 @@ struct DraftingSummaryTests {
         #expect(summary.invented.count == 3)
         #expect(summary.hardFindings == 3)
         #expect(summary.headline.hasPrefix("HARD FINDINGS in 6 runs of 2 inputs: 3 invented, 0 failed runs, 0 example misses"))
-        #expect(summary.text.contains("invented: en-plain run 2: skills[2].name \"Kubernetes\""))
+        #expect(summary.text.contains("invented: en-plain run 2: interests[0] \"Origami\""))
+    }
+
+    @Test("A tool of another trade that a draft writes is a hard finding, and the text names it")
+    func offFieldHit() throws {
+        let java = Tweak(edit: { $0.skills.append(Skill(name: "Java")) })
+        let summary = try Scenario.make(tweak: DraftMeasures.tweak(java, for: "en-plain")).summary
+
+        #expect(summary.offField.count == 1)
+        #expect(summary.hardFindings == 1)
+        #expect(summary.headline == "HARD FINDINGS in 2 runs of 2 inputs: 0 invented, 0 failed runs, 0 example misses, 1 off-field hits")
+        #expect(summary.offField.first?.hasPrefix("en-plain run 1: skills[") == true)
+        #expect(summary.text.contains(".name \"Java\" (a tool of another trade: Java)"))
+    }
+
+    @Test("Whatever a draft writes around a description with no role is an off-field hit")
+    func noRoleWritten() throws {
+        let summaryOnly = Tweak(edit: { $0.summary = WrittenLayer.texts["en"]?.summary })
+        let summary = try Scenario.make(ids: ["en-norole"], tweak: DraftMeasures.tweak(summaryOnly, for: "en-norole")).summary
+
+        #expect(summary.hardFindings == 1)
+        #expect(summary.offField.first?.hasPrefix("en-norole run 1: summary \"Reliable and careful") == true)
+        #expect(summary.offField.first?.hasSuffix("(written around a description with no role)") == true)
+    }
+
+    @Test("A missed threshold is no hard finding and keeps the set from GO")
+    func missedThreshold() throws {
+        let noSummary = Tweak(edit: { $0.summary = nil })
+        let scenario = try Scenario.make(tweak: DraftMeasures.tweak(noSummary, for: "en-plain"))
+        let summary = scenario.summary
+
+        #expect(summary.hardFindings == 0)
+        #expect(summary.shortfalls == ["a summary in 1 of 2 distinct drafts (90% needed)"])
+        #expect(summary.headline.contains("This is not GO: 1 threshold is missed; "))
+        #expect(summary.text.contains("missed: a summary in 1 of 2 distinct drafts (90% needed)"))
+        #expect(scenario.adjudicated().verdict.reasons == ["a threshold is missed: a summary in 1 of 2 distinct drafts (90% needed)"])
+    }
+
+    @Test("The text says what the drafts write around the facts")
+    func writtenLine() throws {
+        let summary = try Scenario.make(ids: ["example-en", "en-plain", "en-norole"]).summary
+
+        #expect(summary.text.contains(
+            "written around the facts: a summary in 2 of 2 distinct drafts (examples 1 of 1); a description on "
+                + "\(summary.written.keptJobs) of \(summary.written.keptJobs) kept jobs; enough skills in 2 of 2; "
+                + "0 of \(summary.written.sentences) sentences in another language; off-field hits 0"
+        ))
+        #expect(summary.shortfalls.isEmpty)
     }
 
     @Test("A draft whose claim check gave no answer fails its input, in all three runs, and the first line says so")

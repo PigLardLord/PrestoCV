@@ -4,8 +4,9 @@ import CVGeneratorAI
 // What the drafting evaluation (#202) says of a whole run set. Pure, like `DraftingMeasure`: `DraftingSummaryTests` builds sets by hand.
 //
 // What it says first is the hard findings: a field the counter proves invented, a run that gave no usable draft (it threw, the model
-// refused, or the claim check gave no answer), an example that lost its name, its title or every job. No hard finding is not GO:
-// the fields in review.json are only queued for a person, and `Readiness` asks for their recorded adjudication.
+// refused, or the claim check gave no answer), an example that lost its name, its title or every job, a tool of another trade written
+// around the facts. No hard finding is not GO: the thresholds of what the draft writes around the facts (ADR 0031, `WrittenCounts`)
+// must be met, and the fields and drafts in review.json are only queued for a person, and `Readiness` asks for their adjudication.
 
 // MARK: - Percentile
 
@@ -99,7 +100,13 @@ struct DraftSummary: Codable, Equatable {
     let exampleMisses: [String]
     /// "<id> run <n>: <fact>" for every expected fact a final draft lost.
     let lost: [String]
-    /// The fields a person reads once for this set (review.json).
+    /// "<id> run <n>: <hit>" for every tool of another trade a final draft writes, and anything written around no role.
+    let offField: [String]
+    /// What the distinct final drafts write around the facts.
+    let written: WrittenCounts
+    /// The thresholds of #354 the set misses: not hard findings, and no GO while any is left.
+    let shortfalls: [String]
+    /// The fields and the drafts a person reads once for this set (review.json).
     let reviewItems: Int
 
     /// - Throws: `DraftingError.incompleteSet` when `measured` is not exactly the runs the manifest announces, at its revision: a
@@ -128,20 +135,25 @@ struct DraftSummary: Codable, Equatable {
         failures = measured.compactMap { draft in draft.failure.map { "\(draft.id) run \(draft.run): \($0)" } }
         exampleMisses = measured.flatMap { draft in draft.misses.map { "\(draft.id) run \(draft.run): \($0)" } }
         lost = measured.flatMap { draft in draft.report.lost.map { "\(draft.id) run \(draft.run): \($0)" } }
+        offField = measured.flatMap { draft in (draft.written?.offField ?? []).map { "\(draft.id) run \(draft.run): \($0)" } }
+        written = WrittenCounts(measured)
+        shortfalls = written.shortfalls(p95Seconds: p95Seconds)
         reviewItems = ReviewItem.unique(in: measured).count
     }
 
-    /// What fails the evaluation by itself: an invented field, a failed run of any input, a missed example.
-    var hardFindings: Int { invented.count + failures.count + exampleMisses.count }
+    /// What fails the evaluation by itself: an invented field, a failed run of any input, a missed example, an off-field hit.
+    var hardFindings: Int { invented.count + failures.count + exampleMisses.count + offField.count }
 
     /// The first line of summary.txt: the hard findings, or their absence with what is still open.
     var headline: String {
         let set = "\(total.runs) runs of \(inputs.count) inputs"
         guard hardFindings == 0 else {
             return "HARD FINDINGS in \(set): \(invented.count) invented, \(failures.count) failed runs, "
-                + "\(exampleMisses.count) example misses"
+                + "\(exampleMisses.count) example misses, \(offField.count) off-field hits"
         }
         var open: [String] = []
+        if shortfalls.count == 1 { open.append("1 threshold is missed") }
+        if shortfalls.count > 1 { open.append("\(shortfalls.count) thresholds are missed") }
         if reviewItems == 1 { open.append("1 review item needs an adjudication") }
         if reviewItems > 1 { open.append("\(reviewItems) review items need an adjudication") }
         if revision == "unknown" || revision.isEmpty { open.append("the revision under test is not recorded") }
@@ -175,9 +187,17 @@ struct DraftSummary: Codable, Equatable {
                 + "check gave no answer \(total.unchecked)); example misses \(exampleMisses.count); "
                 + "facts lost \(total.lost); to review \(reviewItems) items"
         )
+        lines.append(
+            "written around the facts: a summary in \(written.withSummary) of \(written.drafts) distinct drafts "
+                + "(examples \(written.examplesWithSummary) of \(written.exampleDrafts)); a description on \(written.describedJobs) of "
+                + "\(written.keptJobs) kept jobs; enough skills in \(written.withSkills) of \(written.drafts); "
+                + "\(written.otherLanguage) of \(written.sentences) sentences in another language; off-field hits \(offField.count)"
+        )
         lines += invented.map { "invented: \($0)" }
         lines += failures.map { "failed: \($0)" }
         lines += exampleMisses.map { "example miss: \($0)" }
+        lines += offField.map { "off-field: \($0)" }
+        lines += shortfalls.map { "missed: \($0)" }
         return lines.joined(separator: "\n") + "\n"
     }
 

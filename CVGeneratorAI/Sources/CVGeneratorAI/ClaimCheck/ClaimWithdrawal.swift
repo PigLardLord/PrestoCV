@@ -29,7 +29,7 @@ enum ClaimWithdrawal {
     /// - Note: A checker must stop when its task is cancelled, or the time limit cannot cut it short.
     static func checking(_ grounded: CVData, in description: String, with checker: any ClaimChecking,
                          within limits: ClaimCheckLimits = .standard) async throws -> GeneratedDraft {
-        let candidates = ClaimCandidates.of(grounded)
+        let candidates = ClaimCandidates.of(grounded, in: description)
         guard !candidates.isEmpty else { return GeneratedDraft(cvData: grounded, personalItemsUnchecked: false) }
 
         do {
@@ -75,11 +75,16 @@ enum ClaimWithdrawal {
     }
 
     /// The draft without the personal items that the judgements do not call a fact. `judgements` answer `candidates` one for one, in
-    /// order; an item that is not a candidate is withdrawn. A language goes with its level.
+    /// order; an item that is not a candidate is withdrawn, apart from a skill that the check did not judge: the model wrote it for the
+    /// person's role, and it stays as the rules left it (ADR 0031). A blank one goes. A language goes with its level.
     static func keepingFacts(of cvData: CVData, candidates: [ClaimCandidate], judgements: [ClaimJudgement]) -> CVData {
         let facts = Set(zip(candidates, judgements).filter { $0.1.stance == .fact }.map(\.0))
+        let judged = Set(candidates)
         func isFact(_ kind: ClaimCandidate.Kind, _ value: String?) -> Bool {
             ClaimCandidates.candidate(kind, value).map(facts.contains) ?? false
+        }
+        func staysAsASkill(_ name: String) -> Bool {
+            ClaimCandidates.candidate(.skill, name).map { !judged.contains($0) || facts.contains($0) } ?? false
         }
         let info = cvData.personalInfo
         return CVData(
@@ -90,15 +95,21 @@ enum ClaimWithdrawal {
                 title: isFact(.title, info.title) ? info.title : nil
             ),
             summary: cvData.summary, experience: cvData.experience, education: cvData.education,
-            skills: cvData.skills.filter { isFact(.skill, $0.name) },
+            skills: cvData.skills.filter { staysAsASkill($0.name) },
             languages: cvData.languages.filter { isFact(.language, $0.name) },
             certifications: cvData.certifications,
             interests: cvData.interests.filter { isFact(.interest, $0) }
         )
     }
 
-    /// The draft without any of the personal items the check judges, for when it gave no answer: the person adds them by hand.
+    /// The draft without any of the personal items the check judges, for when it gave no answer: the person adds them by hand. The
+    /// skills the model wrote for the role go with those the description names: the person then writes the list whole (ADR 0031).
     static func withdrawingAll(from cvData: CVData) -> CVData {
-        keepingFacts(of: cvData, candidates: [], judgements: [])
+        let withdrawn = keepingFacts(of: cvData, candidates: [], judgements: [])
+        return CVData(
+            personalInfo: withdrawn.personalInfo, summary: withdrawn.summary, experience: withdrawn.experience,
+            education: withdrawn.education, skills: [], languages: withdrawn.languages, certifications: withdrawn.certifications,
+            interests: withdrawn.interests
+        )
     }
 }

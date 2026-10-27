@@ -12,6 +12,9 @@ struct Tweak {
     var error: (any Error)?
     var checks: [CheckEvent] = []
     var seconds = 10.0
+    /// Whether the model also wrote around the facts (`WrittenLayer`), as the instructions ask: on by default, so that a set made by
+    /// hand meets the thresholds of #354 unless a test spoils them.
+    var written = true
 }
 
 enum DraftMeasures {
@@ -21,6 +24,7 @@ enum DraftMeasures {
     static func measure(_ id: String, run: Int = 1, revision: String = DraftMeasures.revision, _ tweak: Tweak = Tweak()) throws -> DraftMeasure {
         let input = try InventedFactsTests.input(id)
         var raw = Draft(faithfulTo: input)
+        if tweak.written { WrittenLayer.add(to: &raw, for: input) }
         tweak.edit(&raw)
         var shown = raw
         tweak.finalEdit?(&shown)
@@ -102,6 +106,78 @@ struct Scenario {
     /// too. The skill is a doubt, and so is the language, which the skill now shadows.
     static var reviewed: Tweak { Tweak(edit: { $0.skills.append(Skill(name: "English")) }) }
 
-    /// What makes en-plain write a field the counter proves invented: a skill the description does not have.
-    static var invented: Tweak { Tweak(edit: { $0.skills.append(Skill(name: "Kubernetes")) }) }
+    /// What makes en-plain write a field the counter proves invented: a hobby the description does not have. A skill it does not name
+    /// is a doubt (ADR 0031), as the draft may add the skills of the person's role.
+    static var invented: Tweak { Tweak(edit: { $0.interests.append("Origami") }) }
+}
+
+/// What a model writes around the facts (ADR 0031), in each language of the app: a summary of two sentences and 120 characters or
+/// more, a description of each job with a sentence of 40 characters or more, 4 technologies and 3 soft skills. None of it holds a
+/// figure, a length, a rank, a name or a tool of another trade, so the counter calls all of it inferred and the thresholds are met.
+enum WrittenLayer {
+    struct Text {
+        let summary: String
+        let job: String
+        let technologies: [String]
+        let softSkills: [String]
+    }
+
+    /// Adds the layer to `draft`, unless the input has no role, study or field to write for.
+    static func add(to draft: inout Draft, for input: DraftingInput) {
+        guard input.kind != .noRole, let text = texts[input.language] else { return }
+        draft.summary = text.summary
+        draft.experience = draft.experience.map {
+            Experience(
+                title: $0.title, company: $0.company, location: $0.location, startDate: $0.startDate, endDate: $0.endDate,
+                current: $0.current, description: text.job, achievements: $0.achievements
+            )
+        }
+        draft.skills += text.technologies.map { Skill(name: $0, kind: .technology) }
+            + text.softSkills.map { Skill(name: $0, kind: .softSkill) }
+    }
+
+    static let texts: [String: Text] = [
+        "en": Text(
+            summary: "Reliable and careful worker who plans each task and keeps the place safe, tidy and well organised. "
+                + "Friendly with colleagues and calm when the day gets busy.",
+            job: "Planned the daily work, kept everything safe and tidy, and helped colleagues whenever they needed a hand.",
+            technologies: ["Work planning", "Safety procedures", "Stock control", "Record keeping"],
+            softSkills: ["Teamwork", "Reliability", "Communication"]
+        ),
+        "it": Text(
+            summary: "Persona affidabile e precisa che organizza ogni attività con cura e mantiene l'ambiente sicuro e ordinato. "
+                + "Collabora volentieri con i colleghi e resta calma nei momenti più intensi.",
+            job: "Organizzava il lavoro di ogni giorno, curava la sicurezza e aiutava i colleghi quando serviva una mano.",
+            technologies: ["Pianificazione del lavoro", "Norme di sicurezza", "Gestione delle scorte", "Archiviazione dei documenti"],
+            softSkills: ["Lavoro di squadra", "Affidabilità", "Comunicazione"]
+        ),
+        "de": Text(
+            summary: "Arbeitet zuverlässig, sorgfältig und genau und plant alles gut voraus. "
+                + "Bleibt freundlich, hilfsbereit und gelassen, auch wenn es einmal hektisch wird.",
+            job: "Plante alles sorgfältig voraus, arbeitete sicher und sauber und half immer gern aus.",
+            technologies: ["Arbeitsplanung", "Arbeitssicherheit", "Lagerverwaltung", "Dokumentation"],
+            softSkills: ["Teamfähigkeit", "Zuverlässigkeit", "Kommunikation"]
+        ),
+        "es": Text(
+            summary: "Persona fiable y cuidadosa que organiza cada tarea con calma y mantiene el lugar de trabajo seguro y ordenado. "
+                + "Colabora con gusto con sus compañeros y mantiene la calma en los días más intensos.",
+            job: "Organizaba el trabajo diario, cuidaba la seguridad y ayudaba a los compañeros cuando hacía falta.",
+            technologies: ["Planificación del trabajo", "Normas de seguridad", "Control de existencias", "Gestión de documentos"],
+            softSkills: ["Trabajo en equipo", "Fiabilidad", "Comunicación"]
+        ),
+        "fr": Text(
+            summary: "Personne fiable et soigneuse qui organise chaque tâche avec méthode et garde son poste de travail sûr et bien rangé. "
+                + "Travaille volontiers en équipe et reste calme dans les moments les plus chargés.",
+            job: "Organisait le travail de chaque jour, veillait à la sécurité et aidait les collègues quand il le fallait.",
+            technologies: ["Organisation du travail", "Règles de sécurité", "Gestion des stocks", "Suivi des documents"],
+            softSkills: ["Travail en équipe", "Fiabilité", "Communication"]
+        ),
+        "pt": Text(
+            summary: "Pessoa confiável e cuidadosa que organiza cada tarefa com calma e mantém o local de trabalho seguro e arrumado. "
+                + "Colabora de bom grado com os colegas e mantém a calma nos dias mais intensos.",
+            job: "Organizava o trabalho do dia a dia, cuidava da segurança e ajudava os colegas sempre que era preciso.",
+            technologies: ["Planejamento do trabalho", "Normas de segurança", "Controle de estoque", "Gestão de documentos"],
+            softSkills: ["Trabalho em equipe", "Confiabilidade", "Comunicação"]
+        ),
+    ]
 }

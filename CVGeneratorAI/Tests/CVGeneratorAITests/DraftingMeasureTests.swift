@@ -148,10 +148,10 @@ struct DraftingMeasureTests {
 
     @Test("The fields of the model's own draft that are invented are counted apart from the final draft's")
     func rawInvented() throws {
-        let removed = Tweak(edit: { $0.skills.append(Skill(name: "Kubernetes")) }, finalEdit: { $0.skills.removeLast() })
+        let removed = Tweak(edit: { $0.interests.append("Origami") }, finalEdit: { $0.interests.removeLast() })
         let measured = try DraftMeasures.measure("en-plain", removed)
 
-        #expect(measured.rawInvented.map(\.value) == ["Kubernetes"])
+        #expect(measured.rawInvented.map(\.value) == ["Origami"])
         #expect(measured.report.invented.isEmpty)
         #expect(measured.raw != measured.final)
     }
@@ -160,8 +160,8 @@ struct DraftingMeasureTests {
     func finalInvented() throws {
         let measured = try DraftMeasures.measure("en-plain", Scenario.invented)
 
-        #expect(measured.report.invented.map(\.value) == ["Kubernetes"])
-        #expect(measured.rawInvented.map(\.value) == ["Kubernetes"])
+        #expect(measured.report.invented.map(\.value) == ["Origami"])
+        #expect(measured.rawInvented.map(\.value) == ["Origami"])
     }
 
     // MARK: - The examples

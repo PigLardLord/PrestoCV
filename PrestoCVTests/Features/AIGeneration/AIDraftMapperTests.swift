@@ -213,6 +213,18 @@ struct AIDraftMapperTests {
         #expect(cv.skills.first?.level == PrestoCVCore.Skill.maxLevel)
     }
 
+    @Test("The technologies come before the soft skills, each kind in the order of the draft")
+    func technologiesComeFirst() {
+        let cv = map(CVData(skills: [
+            CVGeneratorAI.Skill(name: "Patience", kind: .softSkill),
+            CVGeneratorAI.Skill(name: "Lesson planning"),
+            CVGeneratorAI.Skill(name: "Teamwork", kind: .softSkill),
+            CVGeneratorAI.Skill(name: "Classroom management"),
+        ]))
+
+        #expect(cv.skills.map(\.name) == ["Lesson planning", "Classroom management", "Patience", "Teamwork"])
+    }
+
     @Test("Every language level maps to its own level", arguments: [
         (LanguageProficiency.a1, LanguageProficiencyLevel.a1),
         (.a2, .a2),

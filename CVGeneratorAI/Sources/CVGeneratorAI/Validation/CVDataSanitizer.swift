@@ -15,6 +15,10 @@ import Foundation
 ///   achievements, that stand next to them (see `Grounding`);
 /// - prose (the summary, descriptions, achievements) keeps only sentences each of whose clauses quotes a clause of the description,
 ///   or of the clauses that back its entry (see `ProseQuotes`); a summary holds no number;
+/// - when the draft keeps a fact about the person (a title, a job or a school), the model also writes around it (ADR 0031): the
+///   summary and each job's description keep the sentences that state no fact of their own (see `WrittenText`), and the skills the
+///   description does not name stay as plain technologies and soft skills, without a level (see `InferredSkills`). With no such
+///   fact, the summary keeps only its quotes and the skills only those the description names;
 /// - a skill level or language level stays only if the description states it, in a sentence with no negation or hedge, and a
 ///   language with a level that the description does not state goes whole; a language without a level may stay without one;
 /// - a skill that is also an interest of the draft, and that the person mentions only as leisure, is a hobby, and goes;
@@ -35,18 +39,24 @@ import Foundation
 public struct CVDataSanitizer: Sendable {
     private let languageOfText: @Sendable (String) -> String?
     private let lexicalClasses: any LexicalTagger
+    private let wordList: any WordList
 
     /// - Parameters:
     ///   - languageOfText: The BCP 47 tag of the language a text is written in, or nil when it cannot tell. With it, prose in
     ///     another language than the description's is dropped: the model sometimes answers a French description with an English
     ///     summary. Without it, language is not checked.
-    ///   - lexicalClasses: What tells the verbs of English and German (`LexicalClasses`): the device's lexical class.
+    ///   - lexicalClasses: What tells the verbs of English and German (`LexicalClasses`), and the names of German (`WrittenText`):
+    ///     the device's lexical class.
+    ///   - wordList: What tells a word of the description's language from a name, in the text the model writes around the facts
+    ///     (`WrittenText`): the device's dictionary.
     public init(
         languageOfText: @escaping @Sendable (String) -> String? = { _ in nil },
-        lexicalClasses: any LexicalTagger = DeviceLexicalTagger()
+        lexicalClasses: any LexicalTagger = DeviceLexicalTagger(),
+        wordList: any WordList = DeviceWordList()
     ) {
         self.languageOfText = languageOfText
         self.lexicalClasses = lexicalClasses
+        self.wordList = wordList
     }
 
     /// The draft, with what `description` does not support taken out.
@@ -84,13 +94,27 @@ public struct CVDataSanitizer: Sendable {
         let spoken = entries.spoken(in: source)
         let claimed = entries.claimed(in: source)
         let interests = unique(cvData.interests.compactMap(claimed.named)) { $0 }
+        let written = WrittenText(source: source, claimed: claimed, wordList: wordList, tagger: lexicalClasses)
+
+        let personalInfo = sanitize(cvData.personalInfo, jobTitles: jobTitles, spoken, claimed: claimed, contacts: entries.contacts(in: source))
+        let experience = sanitize(entries.jobs, source, entries, written: written)
+        let education = sanitize(entries.studies, source, entries)
+        // The model writes around the facts only when it has one to write around (ADR 0031): with no title, job or school, a summary
+        // or a skill of its own would say who the person is with nothing the person said.
+        let hasAFact = personalInfo.title != nil || !experience.isEmpty || !education.isEmpty
+        let ownWords = Self.words(of: [personalInfo.title] + experience.map(\.title) + education.map(\.degree))
 
         return CVData(
-            personalInfo: sanitize(cvData.personalInfo, jobTitles: jobTitles, spoken, claimed: claimed, contacts: entries.contacts(in: source)),
-            summary: source.grounded(cvData.summary, quoting: entries.summaryQuotes, allowsNumbers: false),
-            experience: sanitize(entries.jobs, source, entries),
-            education: sanitize(entries.studies, source, entries),
-            skills: sanitize(cvData.skills, claimed, interests: interests, entries),
+            personalInfo: personalInfo,
+            summary: hasAFact
+                ? source.written(cvData.summary, quoting: entries.summaryQuotes, allowsNumbers: false) { written.isPlain($0, ownWords: ownWords) }
+                : source.grounded(cvData.summary, quoting: entries.summaryQuotes, allowsNumbers: false),
+            experience: experience,
+            education: education,
+            skills: sanitize(
+                cvData.skills, source, claimed: claimed, interests: interests, entries,
+                inferring: hasAFact ? InferredSkills(cvData, language: source.explainer.language, written: written) : nil
+            ),
             languages: sanitize(cvData.languages, claimed),
             certifications: sanitize(entries.certifications, entries),
             interests: interests
@@ -128,7 +152,10 @@ public struct CVDataSanitizer: Sendable {
 
     /// A job needs its employer, or its title together with a date: a title alone is the person's own ("I'm a nurse"),
     /// not a job, and a job built on it carries whatever the model made up around it.
-    private func sanitize(_ jobs: [Entries.Job], _ source: DescriptionText, _ entries: Entries) -> [Experience] {
+    ///
+    /// Its description also keeps the sentences that state no fact of their own (`WrittenText`), with no word of the title or the
+    /// employer of another job (ADR 0031).
+    private func sanitize(_ jobs: [Entries.Job], _ source: DescriptionText, _ entries: Entries, written: WrittenText) -> [Experience] {
         let cleaned = jobs.compactMap { job -> Experience? in
             guard entries.hasFactualMention(of: job.subject) else { return nil }
             let evidence = entries.evidence(of: job.subject)
@@ -143,7 +170,12 @@ public struct CVDataSanitizer: Sendable {
                 startDate: dates[0],
                 endDate: dates[1],
                 current: job.entry.current && evidence.statesCurrent,
-                description: source.grounded(job.entry.description, quoting: evidence.quotable, allowsNumbers: true),
+                description: source.written(job.entry.description, quoting: evidence.quotable, allowsNumbers: true) { sentence in
+                    let ownWords = Self.words(of: [title])
+                    let others = jobs.filter { $0.subject != job.subject }.flatMap { [$0.title, $0.company] }
+                    let foreignWords = Self.words(of: others).subtracting(ownWords).filter { !Vocabulary.isNeutral($0, in: source.explainer.language) }
+                    return written.isPlain(sentence, ownWords: ownWords, foreignWords: foreignWords)
+                },
                 achievements: unique(job.entry.achievements.enumerated().compactMap { number, achievement in
                     source.grounded(achievement, quoting: evidence.quotable(byAchievement: number), allowsNumbers: true)
                 }) { $0 }
@@ -173,21 +205,39 @@ public struct CVDataSanitizer: Sendable {
         return unique(cleaned) { "\($0.degree ?? "")|\($0.institution ?? "")" }
     }
 
-    /// A skill whose name is one of the interests that the description gives, and that the person mentions only as leisure ("In my
-    /// free time I like chess and hiking"), is a hobby: as a skill it would claim an ability the person never claimed, so it goes, and
-    /// the interest stays. A skill the person mentions anywhere else ("proficient in Python", a job's clause, a list of skills) stays;
-    /// another person's clause counts for neither (see `LeisureMentions`).
-    private func sanitize(_ skills: [Skill], _ source: DescriptionText, interests: [String], _ entries: Entries) -> [Skill] {
-        let names = skills.compactMap { source.named($0.name) }
+    /// A skill the description names is a fact of the person: it stays only as a clause that claims it gives it (`claimed`), so "I have
+    /// never used Python" gives no Python. A skill whose name is one of the interests that the description gives, and that the
+    /// person mentions only as leisure ("In my free time I like chess and hiking"), is a hobby: as a skill it would claim an ability
+    /// the person never claimed, so it goes, and the interest stays. A skill the person mentions anywhere else ("proficient in
+    /// Python", a job's clause, a list of skills) stays; another person's clause counts for neither (see `LeisureMentions`).
+    ///
+    /// A skill the description does not name is one the model wrote for the person's role (ADR 0031): it stays, without a level, only
+    /// when `inferring` accepts it, and within `InferredSkills.caps` once the named skills of its kind are counted.
+    private func sanitize(
+        _ skills: [Skill], _ source: DescriptionText, claimed: DescriptionText, interests: [String], _ entries: Entries,
+        inferring inferred: InferredSkills?
+    ) -> [Skill] {
+        let names = skills.compactMap { claimed.named($0.name) }
         let hobbies = Set(interests.map { DescriptionText.normalized($0) })
-        let cleaned = skills.compactMap { skill -> Skill? in
-            guard let name = source.named(skill.name) else { return nil }
+        let cleaned = skills.compactMap { skill -> (skill: Skill, isNamed: Bool)? in
+            guard source.named(skill.name) != nil else {
+                return inferred?.accepted(skill.name).map { (skill: Skill(name: $0, kind: skill.kind), isNamed: false) }
+            }
+            guard let name = claimed.named(skill.name) else { return nil }
             let isAHobby = hobbies.contains(DescriptionText.normalized(name)) && entries.mentionsOnlyAsLeisure(name, interests: interests)
             guard !isAHobby else { return nil }
-            let allowed = source.levels(of: name, among: names, vocabulary: .skills)
-            return Skill(name: name, level: statedLevel(skill.level, allowed: allowed))
+            let allowed = claimed.levels(of: name, among: names, vocabulary: .skills)
+            return (skill: Skill(name: name, level: statedLevel(skill.level, allowed: allowed), kind: skill.kind), isNamed: true)
         }
-        return unique(cleaned) { $0.name }
+        let kept = unique(cleaned) { $0.skill.name }
+        var room = InferredSkills.caps
+        for named in kept where named.isNamed { room[named.skill.kind, default: 0] -= 1 }
+        return kept.compactMap { item in
+            guard !item.isNamed else { return item.skill }
+            guard room[item.skill.kind, default: 0] > 0 else { return nil }
+            room[item.skill.kind, default: 0] -= 1
+            return item.skill
+        }
     }
 
     /// A language the draft gives a level is kept only if the description states that level for it: any other level would be made up.
@@ -231,6 +281,11 @@ public struct CVDataSanitizer: Sendable {
     private func statedLevel<Level: Hashable>(_ level: Level?, allowed: Set<Level>?) -> Level? {
         guard let level, allowed?.contains(level) == true else { return nil }
         return level
+    }
+
+    /// The words of `texts`, as `Word.folded` writes them.
+    private static func words(of texts: [String?]) -> Set<String> {
+        Set(texts.compactMap { $0 }.flatMap { Word.words(in: $0).map(\.folded) })
     }
 
     /// Keeps the first of the items sharing a key, ignoring case and accents: the model sometimes repeats an entry.

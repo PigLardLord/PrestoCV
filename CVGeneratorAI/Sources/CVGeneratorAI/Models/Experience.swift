@@ -26,7 +26,7 @@ public struct Experience: Codable, Equatable, Sendable {
     @Guide(description: "True only if the person says they still work there")
     public let current: Bool
 
-    @Guide(description: "One or two sentences about the role, using only what the person said; otherwise null")
+    @Guide(description: "1 to 2 sentences on the responsibilities typical of this title in this field, with no number or name")
     public let description: String?
 
     @Guide(description: "Things the person said they achieved, in their own words; empty if none were mentioned")

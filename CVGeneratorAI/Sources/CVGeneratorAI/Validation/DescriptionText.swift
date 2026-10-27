@@ -124,6 +124,24 @@ struct DescriptionText {
         return kept.isEmpty ? nil : kept.joined(separator: " ")
     }
 
+    /// The sentences of `prose` that are grounded (see `grounded(_:quoting:allowsNumbers:)`) or `isPlain`: the text the model writes
+    /// around the facts keeps the sentences that state no fact of their own (ADR 0031, `WrittenText`).
+    func written(
+        _ prose: String?, quoting quotes: ProseQuotes, allowsNumbers: Bool, orPlain isPlain: (String) -> Bool
+    ) -> String? {
+        guard let prose = prose.presentValue else { return nil }
+
+        let kept = SentenceSplitter.sentences(in: prose).filter {
+            isGrounded($0, quoting: quotes, allowsNumbers: allowsNumbers) || isPlain($0)
+        }
+        return kept.isEmpty ? nil : kept.joined(separator: " ")
+    }
+
+    /// The words of the description, as `Word.folded` writes them.
+    var foldedWords: Set<String> {
+        Set(Word.words(in: text).map(\.folded))
+    }
+
     /// Addresses are read from the sentence as written, never with their digits folded: "alice١@example.com" is not
     /// "alice1@example.com". What is left once the addresses are taken out is read as words and numbers.
     private func isGrounded(_ sentence: String, quoting quotes: ProseQuotes, allowsNumbers: Bool) -> Bool {
@@ -140,7 +158,7 @@ struct DescriptionText {
     }
 
     /// A sentence is in another language only when the detector is sure of both languages and they differ.
-    private func isInTheLanguageOfTheDescription(_ sentence: String) -> Bool {
+    func isInTheLanguageOfTheDescription(_ sentence: String) -> Bool {
         guard let descriptionLanguage = language, let sentenceLanguage = languageOfText(sentence).map(Self.primaryLanguage) else { return true }
         return sentenceLanguage == descriptionLanguage
     }

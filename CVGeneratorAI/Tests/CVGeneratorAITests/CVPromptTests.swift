@@ -39,15 +39,29 @@ struct CVPromptTests {
         #expect(prompt.text == "Description:\nI'm a nurse.")
     }
 
-    @Test("The instructions forbid invention and keep the person's wording")
+    @Test("The instructions forbid invented facts and keep the person's wording")
     func instructionsKeepTheRules() {
         let instructions = CVPrompt.instructionsText
 
         #expect(instructions.contains("Never invent or guess"))
-        #expect(instructions.contains("leave that field null"))
         #expect(instructions.contains("exactly as written"))
         #expect(instructions.contains("language of the description"))
         #expect(!instructions.contains("metrics"))
+        #expect(!instructions.contains("Use only what the description says"))
+    }
+
+    @Test("The instructions ask for a summary, the typical duties of each role, technologies and soft skills, with no fact of their own (ADR 0031)")
+    func instructionsAskForTheWrittenText() {
+        let instructions = CVPrompt.instructionsText
+
+        #expect(instructions.contains("2 to 4 sentences"))
+        #expect(instructions.contains("No number, date, company, school, place or person's name"))
+        #expect(instructions.contains("no \"experience\", \"years\""), "A summary that claims experience states a fact of its own")
+        #expect(instructions.contains("responsibilities typical of"))
+        #expect(instructions.contains("technologies (4 to 8)"))
+        #expect(instructions.contains("soft skills (3 to 5)"))
+        #expect(instructions.contains("nor a skill the person said they lack or want to learn"))
+        #expect(instructions.contains("If the description names no role, study or field, leave the summary null and the skills empty"))
     }
 
     @Test("The instructions ask for achievements copied from the description, from the verb, without the employer")

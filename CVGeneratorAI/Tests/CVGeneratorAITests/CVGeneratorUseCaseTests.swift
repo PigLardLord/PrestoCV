@@ -177,7 +177,7 @@ struct CVGeneratorUseCaseTests {
     private func generator(drafting draft: CVData, checker: FakeClaimChecker) -> CVGeneratorUseCase {
         let service = FakeCVGenerationService()
         service.generateResult = .success(draft)
-        return CVGeneratorUseCase(service: service, claimChecker: checker)
+        return CVGeneratorUseCase(service: service, claimChecker: checker, sanitizer: CVDataSanitizer(wordList: TableWordList()))
     }
 
     @Test("The check judges the personal items the rules kept, against the description, and nothing else")
@@ -246,7 +246,7 @@ struct CVGeneratorUseCaseTests {
         #expect(draft.personalItemsUnchecked)
     }
 
-    @Test("A check that fails withdraws all five kinds, keeps the jobs, the schools, their dates and the achievements, and says so",
+    @Test("A check that fails withdraws all five kinds, keeps the summary, the jobs, the schools, their dates and the achievements, and says so",
           arguments: [CVGenerationError.generationFailed, .busy])
     func failedCheckWithdrawsEveryPersonalItem(failure: CVGenerationError) async throws {
         let checker = FakeClaimChecker(failure: failure)
@@ -258,12 +258,38 @@ struct CVGeneratorUseCaseTests {
         #expect(draft == GeneratedDraft(
             cvData: CVData(
                 personalInfo: PersonalInfo(name: "Maria Rossi"),
+                summary: survivors.summary,
                 experience: survivors.experience,
                 education: survivors.education
             ),
             personalItemsUnchecked: true
         ))
         #expect(await checker.calls.count == 1, "No retry")
+    }
+
+    @Test("The skills the model wrote for the role go to no check, and stay beside the facts it judges (ADR 0031)")
+    func roleSkillsSkipTheCheck() async throws {
+        let checker = FakeClaimChecker()
+        let roleSkills = [Skill(name: "Lesson planning"), Skill(name: "Patience", kind: .softSkill)]
+
+        let draft = try await generator(drafting: example.draft.withSkills(roleSkills), checker: checker)
+            .generateCV(from: CVGenerationRequest(userPrompt: example.description))
+
+        #expect(await checker.calls.flatMap(\.candidates).allSatisfy { $0.kind != .skill })
+        #expect(draft.cvData.skills == roleSkills)
+        #expect(draft.personalItemsUnchecked == false)
+    }
+
+    @Test("A check that fails withdraws the skills the model wrote for the role too, and keeps the summary (ADR 0031)")
+    func failedCheckWithdrawsRoleSkills() async throws {
+        let checker = FakeClaimChecker(failure: CVGenerationError.generationFailed)
+
+        let draft = try await generator(drafting: example.draft.withSkills([Skill(name: "Lesson planning")]), checker: checker)
+            .generateCV(from: CVGenerationRequest(userPrompt: example.description))
+
+        #expect(draft.cvData.skills.isEmpty)
+        #expect(draft.cvData.summary == example.survivors.summary)
+        #expect(draft.personalItemsUnchecked)
     }
 
     @Test("The check is not asked when the rules left no personal item")
@@ -333,5 +359,12 @@ struct CVGeneratorUseCaseTests {
         await #expect(throws: CancellationError.self) {
             try await generation.value
         }
+    }
+}
+
+private extension CVData {
+    func withSkills(_ skills: [Skill]) -> CVData {
+        CVData(personalInfo: personalInfo, summary: summary, experience: experience, education: education, skills: skills,
+               languages: languages, certifications: certifications, interests: interests)
     }
 }

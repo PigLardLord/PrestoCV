@@ -30,6 +30,10 @@ struct DraftingInput: Sendable, CustomTestStringConvertible {
         case plain
         /// A description with sentences that look like facts about the person and are not.
         case traps
+        /// A title and a few words, as people often write (#354): the draft writes around the title alone.
+        case sparse
+        /// No role, study or field at all: the draft writes nothing around the facts (ADR 0031).
+        case noRole
     }
 
     let id: String
@@ -46,6 +50,17 @@ struct DraftingInput: Sendable, CustomTestStringConvertible {
 }
 
 extension DraftingInput {
+    /// The person's role or field, in the description's language, as a reader of the draft's pertinence item sees it; nil when the
+    /// description names none.
+    var field: String? { DraftingInputs.fields[id]?.field }
+
+    /// Words of other trades that no summary, job description or skill of a draft of this input may hold (#354): a hit is a hard
+    /// finding. Written by hand before the first run, from `DraftingInputs.tools` less the tools of the person's own trade.
+    var offField: [String] {
+        guard let own = DraftingInputs.fields[id]?.own else { return [] }
+        return DraftingInputs.tools.filter { !own.contains($0) }
+    }
+
     /// Whether the description states `phrase`: its words, in any case, one right after the other and each of them whole. The trap
     /// "20" is not in "2024" or "20.5 beds", "Tom" is not in "Tomorrow", and an address is not in a longer one.
     func states(_ phrase: String) -> Bool {
@@ -81,14 +96,36 @@ extension DraftingInput {
     }
 }
 
-/// The 18 inputs of the drafting evaluation: the 6 example descriptions of the app, read from its string catalog so that they
-/// cannot drift, and 2 written descriptions per language. Every person, address and number in them is invented.
+/// The 30 inputs of the drafting evaluation: the 6 example descriptions of the app, read from its string catalog so that they
+/// cannot drift, and 4 written descriptions per language (plain, with traps, sparse, with no role). Every person, address and number
+/// in them is invented.
 enum DraftingInputs {
     static let languages = ["en", "it", "de", "es", "fr", "pt"]
 
     static func all() throws -> [DraftingInput] {
-        try examples() + written
+        try examples() + written + short
     }
+
+    // MARK: - Fields
+
+    /// Tools of one trade each, which a draft of another trade has no reason to write.
+    static let tools = ["Kubernetes", "Java", "Photoshop", "InDesign", "AutoCAD", "HACCP", "KNX", "SAP"]
+
+    /// The field of each input with a role, and the tools of `tools` its trade may use.
+    static let fields: [String: (field: String, own: Set<String>)] = [
+        "example-en": ("primary school teaching", []), "example-it": ("insegnamento nella scuola primaria", []),
+        "example-de": ("Unterricht an der Grundschule", []), "example-es": ("enseñanza primaria", []),
+        "example-fr": ("enseignement primaire", []), "example-pt": ("ensino fundamental", []),
+        "en-plain": ("warehouse logistics", ["SAP"]), "en-traps": ("nursing", []),
+        "it-plain": ("cucina", ["HACCP"]), "it-traps": ("amministrazione", ["SAP"]),
+        "de-plain": ("Elektroinstallation", ["KNX", "AutoCAD", "SAP"]), "de-traps": ("Physiotherapie", []),
+        "es-plain": ("diseño gráfico", ["Photoshop", "InDesign", "AutoCAD"]), "es-traps": ("contabilidad", ["SAP"]),
+        "fr-plain": ("boulangerie", ["HACCP"]), "fr-traps": ("informatique", ["Kubernetes", "Java", "SAP", "KNX"]),
+        "pt-plain": ("enfermagem", []), "pt-traps": ("programação", ["Kubernetes", "Java", "SAP"]),
+        "en-sparse": ("plumbing", []), "it-sparse": ("sviluppo iOS", ["Kubernetes", "Java", "Photoshop", "SAP"]),
+        "de-sparse": ("Bäckerei", ["HACCP"]), "es-sparse": ("hostelería", ["HACCP"]),
+        "fr-sparse": ("comptabilité", ["SAP"]), "pt-sparse": ("transporte de cargas", []),
+    ]
 
     // MARK: - The app's examples
 
@@ -353,6 +390,72 @@ enum DraftingInputs {
                 "japonês", "marcos.lima@example.com", "Rafael", "Nuvem Azul Tecnologia", "arquiteto de software", "alemão",
                 "Kotlin", "9", "40",
             ]
+        ),
+    ]
+
+    // MARK: - Sparse, and with no role
+
+    /// Per language a description of a title and a few words, and one that names no role, study or field (#354).
+    static let short: [DraftingInput] = [
+        DraftingInput(
+            id: "en-sparse", kind: .sparse, language: "en",
+            description: "I am a plumber and I fix pipes, taps and boilers in people's homes.",
+            facts: [.title("plumber")], traps: []
+        ),
+        DraftingInput(
+            id: "en-norole", kind: .noRole, language: "en",
+            description: "I like long walks with my dog, reading crime novels and cooking for my friends at the weekend.",
+            facts: [], traps: []
+        ),
+        DraftingInput(
+            id: "it-sparse", kind: .sparse, language: "it",
+            description: "Sono uno sviluppatore iOS e scrivo applicazioni per iPhone e iPad.",
+            facts: [.title("sviluppatore iOS", "sviluppatore")], traps: []
+        ),
+        DraftingInput(
+            id: "it-norole", kind: .noRole, language: "it",
+            description: "Mi piace camminare in montagna con il mio cane, leggere romanzi gialli e cucinare per gli amici.",
+            facts: [], traps: []
+        ),
+        DraftingInput(
+            id: "de-sparse", kind: .sparse, language: "de",
+            description: "Ich bin Bäckerin und backe jeden Morgen Brot, Brötchen und Kuchen für unsere Kunden.",
+            facts: [.title("Bäckerin")], traps: []
+        ),
+        DraftingInput(
+            id: "de-norole", kind: .noRole, language: "de",
+            description: "Ich gehe gern mit meinem Hund spazieren, lese Krimis und koche am Wochenende für meine Freunde.",
+            facts: [], traps: []
+        ),
+        DraftingInput(
+            id: "es-sparse", kind: .sparse, language: "es",
+            description: "Soy camarero y atiendo a los clientes en la terraza y en la barra del bar.",
+            facts: [.title("camarero")], traps: []
+        ),
+        DraftingInput(
+            id: "es-norole", kind: .noRole, language: "es",
+            description: "Me gusta pasear con mi perro, leer novelas policíacas y cocinar para mis amigos los fines de semana.",
+            facts: [], traps: []
+        ),
+        DraftingInput(
+            id: "fr-sparse", kind: .sparse, language: "fr",
+            description: "Je suis comptable et je tiens les comptes de petites entreprises de mon quartier.",
+            facts: [.title("comptable")], traps: []
+        ),
+        DraftingInput(
+            id: "fr-norole", kind: .noRole, language: "fr",
+            description: "J'aime me promener avec mon chien, lire des romans policiers et cuisiner pour mes amis le week-end.",
+            facts: [], traps: []
+        ),
+        DraftingInput(
+            id: "pt-sparse", kind: .sparse, language: "pt",
+            description: "Sou motorista de caminhão e faço entregas de mercadorias pelo interior do estado.",
+            facts: [.title("motorista de caminhão", "motorista")], traps: []
+        ),
+        DraftingInput(
+            id: "pt-norole", kind: .noRole, language: "pt",
+            description: "Gosto de passear com o meu cão, ler romances policiais e cozinhar para os amigos ao fim de semana.",
+            facts: [], traps: []
         ),
     ]
 }
