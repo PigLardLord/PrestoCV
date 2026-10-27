@@ -915,6 +915,19 @@
    "rules": []
   },
   {
+   "name": "StoreScreenshotComposer",
+   "path": "Tools/Release/compose-store-screenshots.swift",
+   "kind": "tool",
+   "allowedImports": [
+    "Foundation",
+    "CoreGraphics",
+    "CoreText",
+    "ImageIO",
+    "UniformTypeIdentifiers"
+   ],
+   "rules": []
+  },
+  {
    "name": "ADRValidationPrototype",
    "path": "Prototypes/ADRValidation",
    "kind": "excluded",

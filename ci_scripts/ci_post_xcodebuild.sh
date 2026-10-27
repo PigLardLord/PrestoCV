@@ -6,9 +6,10 @@
 # a check that reads this output needs both, because a script that ran no step fails nothing.
 #   archive            checks the archive, so one that is wrong never reaches TestFlight;
 #   build-for-testing  runs what ADR 0006 needs on a Mac beyond the app tests: the package tests, the architecture check
-#                      and its self-test (they see the Apple-only branches of the manifests), the self-test of the archive
-#                      check, and the builds of PrestoCVApp and CVPDFExporterExamples. It also runs the source checks, which
-#                      read the repository: the machines that then run the test plan have only the built products.
+#                      and its self-test (they see the Apple-only branches of the manifests), the self-tests of the archive
+#                      check and of the screenshot tools, the check of the store listing, and the builds of PrestoCVApp and
+#                      CVPDFExporterExamples. It also runs the source checks, which read the repository: the machines that
+#                      then run the test plan have only the built products.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -49,6 +50,14 @@ case "$ACTION" in
     step "$ROOT/Tools/ArchitectureCheck/selftest.sh"
     # The archive check itself runs on the archive, after the merge; its self-test runs here, on every pull request.
     step "$ROOT/Tools/Release/check-archive-selftest.sh"
+    # The screenshot tool erases simulators: its guards (reserved name, one run at a time, put back on every way out) are
+    # tested here on fake tools.
+    step "$ROOT/Tools/Release/store-screenshots-selftest.sh"
+    # The captions are paired with the six screenshots by position: the listing must hold exactly six for each locale, and
+    # the composer must refuse any other number, a capture of the wrong size and a folder it would leave stale.
+    step "$ROOT/Tools/Release/check-store-listing.py"
+    step "$ROOT/Tools/Release/check-store-listing-selftest.py"
+    step "$ROOT/Tools/Release/compose-store-screenshots-selftest.sh"
     # PrestoCVApp has no tests until step 5 (#88); building it checks its targets and cross-package dependencies.
     step swift build --package-path "$ROOT/PrestoCVApp"
     # The exporter's demos, apart from the library (R14); they use the legacy exporter, Apple hosts only.
