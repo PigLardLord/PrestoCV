@@ -511,7 +511,7 @@ extension CVDataSanitizer {
     /// The written skills, cleaned by code: a quality or an activity listed as a technology ("precisione", "Planung") is a soft
     /// skill, and a tool named by an activity ("software di gestione fermi") goes; the singular and the plural of one skill count
     /// once, and of two tools of one kind, by their head noun ("studio monitors", "nearfield monitor"), the second goes; a fragment, a
-    /// verb and a skill in another language go. A technology the verb it starts with leads ("usare i PLC") is
+    /// verb, a skill in another language and a soft skill that names a tool go. A technology the verb it starts with leads ("usare i PLC") is
     /// cut to its object; a tool word ("software") never leads as a verb.
     func skillCheck(technologies: [String], softSkills: [String], against description: String) -> SkillVerdict {
         let language = DescriptionText(description, languageOfText: languageOfText).explainer.language?.rawValue
@@ -575,6 +575,10 @@ extension CVDataSanitizer {
         }
         for raw in softSkills {
             guard let item = check(raw, false), keys.insert(Self.skillKey(item)).inserted else { continue }
+            guard !Self.namesATool(item, language: language) else {
+                verdict.dropped.append(Rejection(sentence: raw, reason: "a tool"))
+                continue
+            }
             verdict.softSkills.append(item)
         }
         return verdict
@@ -611,6 +615,15 @@ extension CVDataSanitizer {
         let words = item.lowercased().split { !$0.isLetter }.map(String.init).filter { $0.count > 1 }
         guard let head = ["en", "de"].contains(language ?? "") ? words.last : words.first, head.count >= 4 else { return nil }
         return skillKey(head)
+    }
+
+    /// Whether a skill's head noun is a tool word ("communication tools", "strumenti di misura"), or, in German, ends with one
+    /// ("Präzisionswerkzeug"): a tool is no quality of the person (#354). A skill that only starts with a tool word ("Systemdenken",
+    /// "systems thinking") names a quality.
+    static func namesATool(_ item: String, language: String?) -> Bool {
+        let words = item.lowercased().split { !$0.isLetter }.map(String.init)
+        guard let head = ["en", "de"].contains(language ?? "") ? words.last : words.first else { return false }
+        return toolWords.contains(head) || language == "de" && toolWords.contains { head.count > $0.count && head.hasSuffix($0) }
     }
 
     /// The key by which two skills are one: their words without a plural ending or a last vowel ("PLC" and "PLCs").

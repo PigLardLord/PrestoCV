@@ -200,6 +200,21 @@ struct SectionChecksTests {
         #expect(verdict.dropped.map(\.reason) == ["a word for a skill", "a word for a skill", "a word for a skill"])
     }
 
+    @Test("A soft skill whose head noun is a tool goes; one that only starts with a tool word stays (#354)",
+          arguments: [
+              ("de", "Präzisionswerkzeug", false), ("de", "Systemdenken", true), ("de", "Sorgfalt", true),
+              ("en", "communication tools", false), ("en", "systems thinking", true),
+              ("it", "strumenti di misura", false), ("it", "pensiero sistemico", true),
+          ])
+    func toolAsSoftSkill(language: String, skill: String, stays: Bool) {
+        let checker = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdict = checker.skillCheck(technologies: [], softSkills: [skill], against: "Feinmechanik, Suhl, 2019.")
+
+        #expect(verdict.softSkills == (stays ? [skill] : []))
+        #expect(verdict.dropped.map(\.reason) == (stays ? [] : ["a tool"]))
+    }
+
     // MARK: The summary
 
     @Test("A summary sentence about the person in the third person goes, and a short summary with no title gets an opening from the facts")

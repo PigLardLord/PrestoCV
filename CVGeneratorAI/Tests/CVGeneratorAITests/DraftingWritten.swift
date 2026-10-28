@@ -202,6 +202,8 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     case repeatedDuty
     /// A skill of more than four words: a clause, not the name of a skill ("edit the sound effects for the shows").
     case clauseAsSkill
+    /// A soft skill whose head noun is a tool ("Präzisionswerkzeug", "strumenti di misura"): a thing, no quality.
+    case toolAsSoftSkill
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -222,6 +224,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .lostYear: "a lost year"
         case .repeatedDuty: "a duty said twice in one job"
         case .clauseAsSkill: "a clause as a skill"
+        case .toolAsSoftSkill: "a tool as a soft skill"
         }
     }
 }
@@ -287,6 +290,9 @@ enum ReaderRules {
         found += summary(of: cv, for: input)
         for (index, skill) in cv.skills.enumerated() where skill.kind == .softSkill && skillWords.contains(fold(skill.name)) {
             found.append(ReaderFinding(kind: .skillWordAsQuality, path: "skills[\(index)].name", value: skill.name))
+        }
+        for (index, skill) in cv.skills.enumerated() where skill.kind == .softSkill && isTool(skill.name, language: language) {
+            found.append(ReaderFinding(kind: .toolAsSoftSkill, path: "skills[\(index)].name", value: skill.name))
         }
         for (index, interest) in cv.interests.enumerated() where isClause(interest) {
             found.append(ReaderFinding(kind: .clauseAsInterest, path: "interests[\(index)]", value: interest))
@@ -475,6 +481,21 @@ enum ReaderRules {
         "capacita", "kompetenz", "kompetenzen", "fahigkeit", "fahigkeiten", "competencia", "competencias", "habilidad",
         "habilidades", "capacidad", "capacidades", "capacite", "capacites", "aptitude", "aptitudes", "habilidade", "capacidade",
     ]
+
+    /// The nouns of a tool, a device or a machine, folded.
+    static let toolNouns: Set<String> = [
+        "tool", "tools", "device", "devices", "equipment", "software", "machine", "machines", "werkzeug", "werkzeuge", "gerat",
+        "gerate", "maschine", "maschinen", "strumento", "strumenti", "attrezzo", "attrezzi", "macchina", "macchine", "herramienta",
+        "herramientas", "maquina", "maquinas", "outil", "outils", "appareil", "appareils", "ferramenta", "ferramentas",
+    ]
+
+    /// Whether a soft skill names a tool: its head noun (the last word in English and German, the first in the other languages)
+    /// is a tool noun, or, in German, a compound that ends with one ("Messgerät").
+    static func isTool(_ skill: String, language: String) -> Bool {
+        let words = letterWords(of: skill)
+        guard let head = ["en", "de"].contains(language) ? words.last : words.first else { return false }
+        return toolNouns.contains(head) || language == "de" && toolNouns.contains { head.count > $0.count + 2 && head.hasSuffix($0) }
+    }
 
     /// The words of the first person in an interest ("like working with directors" is one of the person's).
     static let firstPersonWords: Set<String> = [

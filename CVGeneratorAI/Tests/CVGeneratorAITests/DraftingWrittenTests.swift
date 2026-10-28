@@ -294,6 +294,17 @@ struct DraftingWrittenTests {
         #expect(Self.reader(cv, "en").filter { $0.kind == .clauseAsSkill }.map(\.path) == ["skills[0].name", "skills[2].name"])
     }
 
+    @Test("A soft skill whose head noun is a tool is counted; one that only starts with a tool word is not")
+    func toolAsSoftSkill() {
+        let cv = CVData(skills: [
+            Skill(name: "Präzisionswerkzeug", kind: .softSkill), Skill(name: "Sorgfalt", kind: .softSkill),
+            Skill(name: "Messgerät", kind: .softSkill), Skill(name: "Werkzeugpflege", kind: .softSkill),
+            Skill(name: "Drehmaschine"),
+        ])
+
+        #expect(Self.reader(cv, "de").filter { $0.kind == .toolAsSoftSkill }.map(\.path) == ["skills[0].name", "skills[2].name"])
+    }
+
     @Test("A year the description gives a school and the draft does not hold is counted")
     func lostYear() throws {
         let kept = CVData(education: [Education(degree: "logistics", institution: "Leeds City College", endDate: "2013")])
