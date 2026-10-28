@@ -9,18 +9,31 @@ enum QualificationNames {
     /// trades a CV names most.
     private static let words: Set<String> = {
         let exams = """
-        toefl ielts toeic celta delta tefl tesol tkt cambridge dele delf dalf testdaf telc goethe onset hsk jlpt cils plida
-        sat gre gmat lsat mcat usmle nclex praxis gcse abitur baccalaureat maturita
+        toefl ielts toeic celta tefl tesol tkt cambridge dele delf dalf testdaf telc goethe hsk jlpt cils plida
+        gmat lsat mcat usmle nclex gcse abitur baccalaureat maturita
         """
         let certifications = """
-        pmp pmi cissp cisa cism ccna ccnp ccie comptia itil acca cfa cpa cma frm mcse mcsa mcsd ocp ceh oscp rhce rhcsa togaf cbap
-        csm psm cspo ecdl icdl bls acls pals atls cpr
+        pmp cissp cisa cism ccna ccnp ccie comptia itil acca cfa frm mcse mcsa mcsd ceh oscp rhce rhcsa togaf cbap
+        cspo ecdl icdl bls acls pals atls cpr
         """
-        let examWords = """
+        return Set([exams, certifications, examWordList].flatMap { $0.split(whereSeparator: \.isWhitespace).map(String.init) })
+    }()
+    private static let examWordList = """
         exam exams examination examinations esame esami examen examens exame exames pruefung prufung prufungen staatsexamen
         concorso concorsi concours oposicion oposiciones
         """
-        return Set([exams, certifications, examWords].flatMap { $0.split(whereSeparator: \.isWhitespace).map(String.init) })
+    private static let examWords = Set(examWordList.split(whereSeparator: \.isWhitespace).map(String.init))
+
+    /// Names of an exam or a certification that are also words or technologies: "Delta Lake", "SAT solving", "Praxis", "GRE tunnel",
+    /// "CPA" (cost per acquisition), "OCP" (OpenShift). Such a word is a qualification only as the whole name or with a word of
+    /// `qualifiers` ("SAT exam", "Delta certification"), never with another word.
+    private static let ambiguousWords: Set<String> = [
+        "delta", "sat", "gre", "praxis", "onset", "pmi", "cpa", "cma", "ocp", "csm", "psm",
+    ]
+    /// The words that make an ambiguous word the name of an exam or a certification.
+    private static let qualifiers: Set<String> = {
+        let others = "test tests certification certifications certificate certificates certified diploma level prep preparation"
+        return Set(others.split(separator: " ").map(String.init)).union(examWords)
     }()
 
     /// Names of more words, or with a mark, that no single word tells: as `DescriptionText.normalized` writes them.
@@ -28,7 +41,11 @@ enum QualificationNames {
 
     /// Whether `name` is the name of an exam or a certification.
     static func isOne(_ name: String) -> Bool {
-        if Word.words(in: name).contains(where: { words.contains($0.folded) }) { return true }
+        let folded = Word.words(in: name).map(\.folded)
+        if folded.contains(where: { words.contains($0) }) { return true }
+        if folded.contains(where: { ambiguousWords.contains($0) }), folded.allSatisfy({ ambiguousWords.contains($0) || qualifiers.contains($0) }) {
+            return true
+        }
         let normalized = DescriptionText.normalized(name)
         return phrases.contains { normalized == $0 || normalized.hasPrefix($0 + " ") || normalized.hasSuffix(" " + $0) }
     }

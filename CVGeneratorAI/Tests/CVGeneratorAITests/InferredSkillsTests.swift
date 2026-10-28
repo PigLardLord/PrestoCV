@@ -17,7 +17,8 @@ struct InferredSkillsTests {
 
     @Test("The names of technologies and soft skills stay, with the punctuation of their trade",
           arguments: ["Lesson planning", "Phonics", "C++", "C#", "F#", "Node.js", "ASP.NET", "Vue.js", ".NET", "Objective-C", "CI/CD",
-                      "Q&A", "Team leadership", "Gestione della classe", "Pädagogik", "Planificación", "Éducation", "Comunicação"])
+                      "Q&A", "Delta Lake", "SAT solving", "GRE tunnel", "CPA tracking", "OCP cluster", "Praxis management", "Master Data Management",
+                      "Maya", "NODE.JS", "Node.js Express", "Team leadership", "Gestione della classe", "Pädagogik", "Planificación", "Éducation", "Comunicação"])
     func plainNamesStay(name: String) {
         #expect(skills().accepted(name) == name)
     }
@@ -25,7 +26,7 @@ struct InferredSkillsTests {
     @Test("The name of an exam or a certification is a qualification, in any spelling",
           arguments: ["TOEFL", "toefl", "IELTS", "TOEIC", "Cambridge CELTA", "TEFL", "TESOL", "DELE", "DELF", "TestDaF", "Goethe Zertifikat",
                       "HSK", "JLPT", "GMAT", "PMP", "CISSP", "CCNA", "ITIL", "Six Sigma", "Green Belt", "Security+", "Network+", "A+",
-                      "Esame di stato", "Staatsexamen", "Examen", "Oposiciones", "Concorso pubblico", "Prüfung", "BLS", "ACLS"])
+                      "SAT", "SAT exam", "Delta certification", "GRE test", "CPA", "OCP", "Praxis", "Esame di stato", "Staatsexamen", "Examen", "Oposiciones", "Concorso pubblico", "Prüfung", "BLS", "ACLS"])
     func examsAreQualifications(name: String) {
         #expect(skills().accepted(name) == nil, "\(name)")
     }
@@ -33,7 +34,7 @@ struct InferredSkillsTests {
     @Test("An address, a link or a mark-up is no skill",
           arguments: ["help@evil.example", "evil.example", "www.evil.example", "evil.example/path", "https://evil.example", "a@b.co",
                       "<b>Phonics</b>", "Phonics; drop table", "Phonics (see evil.example)", "Phonics = 1", "Phonics | Excel", "Phonics_Excel",
-                      "Phonics\\Excel", "Phonics*", "Phonics!", "Phonics?", "Phonics, Excel", "Phonics: Excel", "{Phonics}", "[Phonics]"])
+                      "Phonics\\Excel", "evil.js", "evil.net", "evil.ts", "evil.py", "node.js.evil.com", "www.node.js", "https://node.js", "node.js/evil", "Node.js evil.js", "Phonics*", "Phonics!", "Phonics?", "Phonics, Excel", "Phonics: Excel", "{Phonics}", "[Phonics]"])
     func addressesAndMarkup(name: String) {
         #expect(skills().accepted(name) == nil, "\(name)")
     }

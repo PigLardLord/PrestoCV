@@ -12,8 +12,13 @@ struct SkillNameShape {
     private static let mostMarks = 3
     /// The most scalars a letter takes: a letter and the accent that follows it. More is a stack of marks that hides the text around.
     private static let mostScalarsPerCharacter = 3
-    /// The ends of a dotted name that are not a domain: "Node.js", "ASP.NET". Any other end makes the name a link.
-    private static let toolSuffixes: Set<String> = ["js", "net", "ts", "py"]
+    /// The dotted names of tools that read as a link, each whole and in lower case: "Node.js", "ASP.NET". No suffix is trusted
+    /// ("evil.js", "node.js.evil.com", "evil.net" are links), so a tool joins this list by its whole name, with a test that a
+    /// lookalike is still a link.
+    static let toolNames: Set<String> = [
+        "node.js", "vue.js", "react.js", "next.js", "nuxt.js", "express.js", "angular.js", "ember.js", "backbone.js", "d3.js",
+        "three.js", "chart.js", "p5.js", "alpine.js", "nest.js", "asp.net", "socket.io",
+    ]
 
     /// Whether `name` is made only of what a skill name may hold.
     static func isPlain(_ name: String) -> Bool {
@@ -45,9 +50,8 @@ struct SkillNameShape {
     private static func isAnAddress(_ name: String) -> Bool {
         let tokens = AddressTokens(name)
         guard tokens.emails.isEmpty, !tokens.hasAmbiguousAddress else { return true }
-        return tokens.links.contains { link in
-            let host = link.prefix { !"/?#:".contains($0) }
-            return !toolSuffixes.contains(String(host.split(separator: ".").last ?? ""))
-        }
+        // A link is a tool only when it is a token of the name as written, whole ("www.node.js" is a link, "Node.js" is not).
+        let written = Set(name.split(separator: " ").map { $0.lowercased() })
+        return tokens.links.contains { !toolNames.contains($0) || !written.contains($0) }
     }
 }

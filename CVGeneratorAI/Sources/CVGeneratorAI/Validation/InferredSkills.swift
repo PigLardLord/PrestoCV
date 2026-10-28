@@ -43,14 +43,22 @@ struct InferredSkills {
         guard !words.isEmpty, words.count <= 4 else { return nil }
 
         let lists = WrittenTextWords.of(language)
-        let statesAFact = words.contains { word in
-            written.isAnUnstatedLevel(word.folded) || written.isExcluded(word.folded) || lists.qualifications.contains(word.folded)
-                || Self.languageNames.contains(word.folded)
+        let statesAFact = words.enumerated().contains { index, word in
+            let next = index + 1 < words.count ? words[index + 1].folded : nil
+            return written.isAnUnstatedLevel(word.folded) || written.isExcluded(word.folded)
+                || lists.isQualification(word.folded, followedBy: next) || Self.isALanguage(word.folded)
         }
         let normalized = DescriptionText.normalized(name)
         guard !statesAFact, !interests.contains(normalized),
               !facts.contains(where: { !DescriptionText.spans(of: $0, in: normalized).isEmpty }) else { return nil }
         return name
+    }
+
+    /// Names of a language that are also a technology, each whole: "Maya" is a 3D tool. No other name is read twice.
+    private static let technologiesNamedLikeLanguages: Set<String> = ["maya"]
+
+    private static func isALanguage(_ word: String) -> Bool {
+        languageNames.contains(word) && !technologiesNamedLikeLanguages.contains(word)
     }
 
     /// The names of the world's languages, of one word, in the six languages of the app, as `Word.folded` writes them: "english",
