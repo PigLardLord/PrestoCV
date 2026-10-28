@@ -13,11 +13,16 @@ public struct DraftBrief: Equatable, Sendable {
         public let employer: String?
         /// Whether the description says the job is over: its text then speaks of it in the past.
         public let hasEnded: Bool
+        /// The clauses of the description that belong to the job, which its own request reads (ADR 0031, "A request per section").
+        public let clauses: [String]
+        /// The words of the job's clauses that the check drops in a written duty: the job's request avoids them.
+        public var avoid: [String] = []
 
-        public init(title: String, employer: String? = nil, hasEnded: Bool) {
+        public init(title: String, employer: String? = nil, hasEnded: Bool, clauses: [String] = []) {
             self.title = title
             self.employer = employer
             self.hasEnded = hasEnded
+            self.clauses = clauses
         }
     }
 
@@ -26,7 +31,7 @@ public struct DraftBrief: Equatable, Sendable {
     /// The person's headline title, when the rules kept one.
     public let headline: String?
     /// The jobs of the draft, in its order: `DraftWriting.roleDescriptions` answers them one for one.
-    public let roles: [Role]
+    public var roles: [Role]
     /// The degrees the rules kept.
     public let studies: [String]
     /// The skills the person named, which the second pass does not repeat.
@@ -42,10 +47,14 @@ public struct DraftBrief: Equatable, Sendable {
 
     /// The brief of the grounded first pass `facts`, or nil when there is nothing to write around: no headline title, no job title
     /// and no degree (a draft of no role gets no summary and no skills of the model's own), or a description of no known language.
-    init?(_ facts: CVData, language: Vocabulary.Language?) {
+    /// - Parameter contexts: The clauses of each job of `facts`, one for one with its `experience`.
+    init?(_ facts: CVData, language: Vocabulary.Language?, contexts: [[String]] = []) {
         guard let language, let name = CVPrompt.languageName(forCode: language.rawValue) else { return nil }
-        let roles = facts.experience.map {
-            Role(title: $0.title, employer: $0.company.presentValue, hasEnded: !$0.current && $0.endDate.presentValue != nil)
+        let roles = facts.experience.enumerated().map { index, job in
+            Role(
+                title: job.title, employer: job.company.presentValue, hasEnded: !job.current && job.endDate.presentValue != nil,
+                clauses: contexts.indices.contains(index) ? contexts[index] : []
+            )
         }
         let studies = facts.education.compactMap { $0.degree.presentValue }
         let headline = facts.personalInfo.title.presentValue
@@ -71,5 +80,22 @@ public struct DraftWriting: Codable, Equatable, Sendable {
         self.roleDescriptions = roleDescriptions
         self.technologies = technologies
         self.softSkills = softSkills
+    }
+}
+
+/// What the request of one job writes (ADR 0031, "A request per section"): the years it read in the job's own clauses, and its
+/// duties as sentences. None of it is a fact until the rules check it.
+public struct RoleWriting: Equatable, Sendable {
+    /// The year the job started, as the person wrote it; nil when they did not say it.
+    public let startDate: String?
+    /// The year the job ended, as the person wrote it; nil when they did not say it or still work there.
+    public let endDate: String?
+    /// The duties, as whole sentences.
+    public let duties: String?
+
+    public init(startDate: String?, endDate: String?, duties: String?) {
+        self.startDate = startDate
+        self.endDate = endDate
+        self.duties = duties
     }
 }

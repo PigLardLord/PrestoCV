@@ -424,53 +424,17 @@ struct TwoPassDraftTests {
 
     // MARK: The use case
 
-    @Test("The second pass is asked with the brief of the grounded facts, and what it wrote reaches the draft once grounded")
-    func secondPassReachesTheDraft() async throws {
-        let service = drafting(english)
-        service.writeResult = .success(writing(
-            summary: plainSummary, duties: [plainDuties, nil], technologies: ["Lesson planning", "Advanced Excel"], softSkills: ["Patience"]
-        ))
-
-        let draft = try await generator(service).generateCV(from: CVGenerationRequest(userPrompt: english.description))
-
-        let facts = try sanitizer.sanitize(english.draft, against: english.description)
-        #expect(service.writeBriefs == [DraftBrief(facts, language: .english)].compactMap { $0 })
-        #expect(draft.cvData.summary == plainSummary)
-        #expect(draft.cvData.experience.first { $0.current }?.description == plainDuties)
-        #expect(draft.cvData.skills == [Skill(name: "Lesson planning", kind: .technology), Skill(name: "Patience", kind: .softSkill)])
-    }
-
-    @Test("A second pass that fails, twice below the model, or runs out of time leaves the draft its facts", arguments: [
-        "failed", "serviceFailed", "timedOut",
-    ])
-    func failedSecondPassKeepsTheFacts(how: String) async throws {
-        let plain = try await generator(drafting(english)).generateCV(from: CVGenerationRequest(userPrompt: english.description))
-        let service = drafting(english)
-        service.writeResult = .success(writing(summary: plainSummary, technologies: ["Lesson planning"]))
-        switch how {
-        case "failed": service.writeFailures = [CVGenerationError.generationFailed]
-        case "serviceFailed": service.writeFailures = [CVGenerationError.serviceFailed, CVGenerationError.serviceFailed]
-        default: service.writeDelay = .seconds(30)
-        }
-        let limits = DraftingLimits(extraction: .seconds(30), writing: .milliseconds(20))
-
-        let draft = try await generator(service, limits: limits).generateCV(from: CVGenerationRequest(userPrompt: english.description))
-
-        #expect(draft == plain)
-        #expect(service.writeBriefs.count == (how == "serviceFailed" ? 2 : 1))
-    }
-
-    @Test("A first pass that runs out of time fails the draft with generationFailed, and the second pass is not asked")
+    @Test("A first pass that runs out of time fails the draft with generationFailed, and no section is asked")
     func firstPassTimeout() async {
         let service = drafting(english)
         service.generateDelay = .seconds(30)
-        let limits = DraftingLimits(extraction: .milliseconds(20), writing: .seconds(30))
+        let limits = DraftingLimits(extraction: .milliseconds(20), section: .seconds(30))
 
         await #expect(throws: CVGenerationError.generationFailed) {
             try await generator(service, limits: limits).generateCV(from: CVGenerationRequest(userPrompt: english.description))
         }
         #expect(service.generateRequests.count == 1)
-        #expect(service.writeBriefs.isEmpty)
+        #expect(service.sectionCalls.isEmpty)
     }
 
     @Test("A first pass that fails below the model once is tried again and the draft goes on")
@@ -484,40 +448,17 @@ struct TwoPassDraftTests {
         #expect(!draft.cvData.experience.isEmpty)
     }
 
-    @Test("A draft of no role does not ask the second pass")
-    func noRoleNoSecondPass() async {
-        let service = FakeCVGenerationService()
-        service.generateResult = .success(CVData(interests: ["chess"]))
-
-        _ = try? await generator(service).generateCV(from: CVGenerationRequest(userPrompt: "This is a test of the app, I like chess."))
-
-        #expect(service.writeBriefs.isEmpty)
-    }
-
     // MARK: The log
 
-    @Test("The log says what the second pass wrote, in counts, and why a pass was tried again or wrote nothing")
+    @Test("The log says why the first pass was tried again")
     func log() async throws {
         let logger = RecordingLogger()
         let service = drafting(english)
         service.generateFailures = [CVGenerationError.serviceFailed]
-        service.writeResult = .success(writing(
-            summary: plainSummary, duties: [plainDuties, nil], technologies: ["Lesson planning", "Phonics"], softSkills: ["Patience"]
-        ))
-        _ = try await generator(service, logger: logger).generateCV(from: CVGenerationRequest(userPrompt: english.description))
 
-        let failing = drafting(english)
-        failing.writeFailures = [CVGenerationError.generationFailed]
-        _ = try await generator(failing, logger: logger).generateCV(from: CVGenerationRequest(userPrompt: english.description))
+        _ = try await generator(service, logger: logger).generateCV(from: CVGenerationRequest(userPrompt: english.description))
 
         #expect(logger.entry("draft.retried")?.line == "draft.retried stage=model error=CVGenerationError.serviceFailed")
         #expect(logger.entry("draft.retried")?.level == .notice)
-        #expect(logger.entry("draft.written")?.line == "draft.written summary=true roles=1 technologies=2 softSkills=1")
-        #expect(logger.entry("draft.written")?.level == .info)
-        #expect(logger.entry("draft.unwritten")?.line == "draft.unwritten error=CVGenerationError.generationFailed")
-        #expect(logger.entry("draft.unwritten")?.level == .notice)
-        for line in logger.entries("draft.written").map(\.line) + logger.entries("draft.unwritten").map(\.line) {
-            #expect(!line.contains("teacher") && !line.contains("Lesson"), "The log holds no word of the draft")
-        }
     }
 }

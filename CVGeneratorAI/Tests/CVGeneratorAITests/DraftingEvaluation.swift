@@ -93,6 +93,7 @@ struct DraftingEvaluation {
         )
         let checker = CheckRecorder(wrapped: FoundationModelsClaimChecker(), log: log)
         let useCase = CVGeneratorUseCase(service: service, claimChecker: checker, sanitizer: sanitizer)
+        useCase.observeWriting = { [service] writing, draft in service.record(writing, around: draft) }
         let load = loadAverage()
         let start = ContinuousClock.now
         let result: GeneratedDraft?
@@ -109,8 +110,11 @@ struct DraftingEvaluation {
         }
         let seconds = seconds(since: start)
         try Task.checkCancellation()
-        // The rules again on the model's draft, outside the timed path: they are deterministic, so this is the draft the check saw.
-        let grounded = service.raw.flatMap { try? sanitizer.sanitize($0, writing: service.writing, against: input.description) }
+        // The rules again on the draft the sections were written around, outside the timed path: they are deterministic, so this is
+        // the draft the check saw.
+        let grounded = (service.dated ?? service.raw).flatMap {
+            try? sanitizer.sanitize($0, writing: service.writing, against: input.description)
+        }
         let checks = await log.events
         return DraftMeasure(
             input: input, run: run, revision: revision, seconds: seconds, load: load, raw: service.raw, writing: service.writing,
@@ -140,12 +144,20 @@ struct DraftingEvaluation {
 
     // MARK: - What is recorded
 
-    /// The model of the app, keeping the draft it wrote before the rules and the check.
+    /// The model of the app, keeping the draft it wrote before the rules and the check, and what the requests of the sections wrote
+    /// around it (ADR 0031, "A request per section").
     @MainActor
     final class RecordingService: CVGenerationService {
         private let model = FoundationModelsService()
         private(set) var raw: CVData?
         private(set) var writing: DraftWriting?
+        /// The facts the sections were written around, with the years the jobs' requests read.
+        private(set) var dated: CVData?
+
+        func record(_ writing: DraftWriting, around draft: CVData) {
+            self.writing = writing
+            dated = draft
+        }
 
         func availability() -> AIAvailability { model.availability() }
 
@@ -155,10 +167,30 @@ struct DraftingEvaluation {
             return draft
         }
 
-        func writeDraft(for brief: DraftBrief) async throws -> DraftWriting? {
-            let written = try await model.writeDraft(for: brief)
-            writing = written
-            return written
+        func writeJob(number: Int, of brief: DraftBrief) async throws -> RoleWriting? {
+            try await model.writeJob(number: number, of: brief)
+        }
+
+        func repairJob(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) async throws -> [String]? {
+            try await model.repairJob(number: number, of: brief, kept: kept, rejected: rejected)
+        }
+
+        func writeTools(for brief: DraftBrief) async throws -> [[String]]? { try await model.writeTools(for: brief) }
+
+        func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? { try await model.writeSoftSkills(for: brief) }
+
+        func writeMoreSkills(for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String]) async throws -> DraftWriting? {
+            try await model.writeMoreSkills(for: brief, tools: tools, qualities: qualities, excluding: kept)
+        }
+
+        func writeSummary(for brief: DraftBrief, duties: [String?], skills: [String]) async throws -> String? {
+            try await model.writeSummary(for: brief, duties: duties, skills: skills)
+        }
+
+        func repairSummary(
+            for brief: DraftBrief, duties: [String?], skills: [String], kept: [String], rejected: [String], problems: [String]
+        ) async throws -> String? {
+            try await model.repairSummary(for: brief, duties: duties, skills: skills, kept: kept, rejected: rejected, problems: problems)
         }
     }
 }

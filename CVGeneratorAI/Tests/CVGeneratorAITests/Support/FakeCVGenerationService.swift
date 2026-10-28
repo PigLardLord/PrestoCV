@@ -11,14 +11,8 @@ final class FakeCVGenerationService: CVGenerationService {
     var generateFailures: [any Error] = []
     /// How long the first pass takes before it answers; it stops early when its task is cancelled.
     var generateDelay: Duration?
-    var writeResult: Result<DraftWriting?, Error> = .success(nil)
-    /// The errors the first calls of the second pass throw, in order, before `writeResult` answers.
-    var writeFailures: [any Error] = []
-    /// How long the second pass takes before it answers; it stops early when its task is cancelled.
-    var writeDelay: Duration?
 
     private(set) var generateRequests: [CVGenerationRequest] = []
-    private(set) var writeBriefs: [DraftBrief] = []
 
     func availability() -> AIAvailability {
         availabilityResult
@@ -31,11 +25,84 @@ final class FakeCVGenerationService: CVGenerationService {
         return try generateResult.get()
     }
 
-    func writeDraft(for brief: DraftBrief) async throws -> DraftWriting? {
-        writeBriefs.append(brief)
-        if let writeDelay { try await Task.sleep(for: writeDelay) }
-        if !writeFailures.isEmpty { throw writeFailures.removeFirst() }
-        return try writeResult.get()
+    // MARK: A request per section (ADR 0031)
+
+    /// The years and duties each job's request answers, by the job's number in the brief; nil for a job not listed.
+    var jobResults: [Int: RoleWriting] = [:]
+    /// The duties each job's repair answers, by the job's number.
+    var jobRepairResults: [Int: [String]] = [:]
+    var toolsResult: [[String]]?
+    var softSkillsResult: [String]?
+    var moreSkillsResult: DraftWriting?
+    var summaryResult: String?
+    var summaryRepairResult: String?
+    /// The errors the first calls of a request throw, in order, by the request's name in `sectionCalls`.
+    var sectionFailures: [String: [any Error]] = [:]
+    /// How long a request takes before it answers, by its name in `sectionCalls`; it stops early when its task is cancelled.
+    var sectionDelays: [String: Duration] = [:]
+    /// Told the name of each section request as it starts.
+    var onSection: (@MainActor (String) -> Void)?
+
+    /// The section requests in the order they were made: "job 0", "repairJob 0", "tools", "softSkills", "moreSkills", "summary",
+    /// "repairSummary".
+    private(set) var sectionCalls: [String] = []
+    /// The brief each section request read, one for one with `sectionCalls`.
+    private(set) var sectionBriefs: [DraftBrief] = []
+    private(set) var jobRepairs: [(number: Int, kept: [String], rejected: [String])] = []
+    private(set) var moreSkillsRequests: [(tools: Int, qualities: Int, excluding: [String])] = []
+    private(set) var summaryRequests: [(duties: [String?], skills: [String])] = []
+    private(set) var summaryRepairs: [(kept: [String], rejected: [String], problems: [String])] = []
+
+    func writeJob(number: Int, of brief: DraftBrief) async throws -> RoleWriting? {
+        try await section("job \(number)", brief)
+        return jobResults[number]
+    }
+
+    func repairJob(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) async throws -> [String]? {
+        jobRepairs.append((number, kept, rejected))
+        try await section("repairJob \(number)", brief)
+        return jobRepairResults[number]
+    }
+
+    func writeTools(for brief: DraftBrief) async throws -> [[String]]? {
+        try await section("tools", brief)
+        return toolsResult
+    }
+
+    func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? {
+        try await section("softSkills", brief)
+        return softSkillsResult
+    }
+
+    func writeMoreSkills(for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String]) async throws -> DraftWriting? {
+        moreSkillsRequests.append((tools, qualities, kept))
+        try await section("moreSkills", brief)
+        return moreSkillsResult
+    }
+
+    func writeSummary(for brief: DraftBrief, duties: [String?], skills: [String]) async throws -> String? {
+        summaryRequests.append((duties, skills))
+        try await section("summary", brief)
+        return summaryResult
+    }
+
+    func repairSummary(
+        for brief: DraftBrief, duties: [String?], skills: [String], kept: [String], rejected: [String], problems: [String]
+    ) async throws -> String? {
+        summaryRepairs.append((kept, rejected, problems))
+        try await section("repairSummary", brief)
+        return summaryRepairResult
+    }
+
+    private func section(_ name: String, _ brief: DraftBrief) async throws {
+        sectionCalls.append(name)
+        sectionBriefs.append(brief)
+        onSection?(name)
+        if let delay = sectionDelays[name] { try await Task.sleep(for: delay) }
+        if let error = sectionFailures[name]?.first {
+            sectionFailures[name]?.removeFirst()
+            throw error
+        }
     }
 
     static let sample = CVData(

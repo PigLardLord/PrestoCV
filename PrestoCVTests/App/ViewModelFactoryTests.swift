@@ -480,7 +480,7 @@ struct ViewModelFactoryTests {
         await screen.generateCV()
 
         #expect(screen.draft != nil)
-        #expect(log.events.suffix(4) == ["draft.language", "draft.started", "draft.claims", "draft.finished"])
+        #expect(log.events.suffix(5) == ["draft.language", "draft.started", "draft.written", "draft.claims", "draft.finished"])
     }
 
     @Test("A debug launch that scripts the model and a claim check with no answer gives the unchecked AI draft (ADR 0028)")

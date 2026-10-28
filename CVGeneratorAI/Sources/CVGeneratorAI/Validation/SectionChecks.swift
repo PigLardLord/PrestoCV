@@ -32,6 +32,55 @@ extension CVDataSanitizer {
         }
     }
 
+    /// The place the description names right after `company`, with the preposition of a place ("the Fenwick Playhouse in Norwich",
+    /// "la Conserve Albarella di Termoli"), as the description writes it: its capitalised words, up to the first other word. Nil when
+    /// no mention of the company is followed by one. A location filled from it is checked by the rules as any location.
+    static func place(after company: String, in description: String) -> String? {
+        guard let company = company.presentValue else { return nil }
+        var searched = description.startIndex..<description.endIndex
+        while let found = description.range(of: company, options: .caseInsensitive, range: searched) {
+            if let place = place(at: found.upperBound, in: description) { return place }
+            searched = found.upperBound..<description.endIndex
+        }
+        return nil
+    }
+
+    /// The prepositions that introduce the place of an employer, in the six languages.
+    private static let placePrepositions: Set<String> = ["in", "di", "a", "à", "en", "em", "bei"]
+
+    /// The place at `start` of `text`: spaces, an optional comma, at least one space, a preposition of a place, spaces, then
+    /// capitalised words of two letters or more, joined by spaces.
+    private static func place(at start: String.Index, in text: String) -> String? {
+        var index = start
+        func skipSpaces() -> Bool {
+            let from = index
+            while index < text.endIndex, text[index].isWhitespace { index = text.index(after: index) }
+            return index > from
+        }
+        func word() -> String {
+            let from = index
+            while index < text.endIndex, text[index].isLetter || "'’-".contains(text[index]) { index = text.index(after: index) }
+            return String(text[from..<index])
+        }
+        var spaced = skipSpaces()
+        if index < text.endIndex, text[index] == "," {
+            index = text.index(after: index)
+            spaced = skipSpaces()
+        }
+        guard spaced, placePrepositions.contains(word()), skipSpaces() else { return nil }
+        var words: [String] = []
+        while true {
+            let restart = index
+            let next = word()
+            guard next.count >= 2, next.first?.isUppercase == true else { index = restart; break }
+            words.append(next)
+            let beforeSpaces = index
+            guard skipSpaces() else { break }
+            if index == text.endIndex { index = beforeSpaces; break }
+        }
+        return words.isEmpty ? nil : words.joined(separator: " ")
+    }
+
     // MARK: - The duties of a job
 
     /// A sentence the check drops, and why: the repair request reads both.

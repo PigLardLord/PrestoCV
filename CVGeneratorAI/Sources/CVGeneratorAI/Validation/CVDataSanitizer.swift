@@ -429,7 +429,7 @@ public struct CVDataSanitizer: Sendable {
     // MARK: - Helpers
 
     /// An employer or a school without its leading indefinite article ("a nursery"), when what is left is a quote too.
-    func withoutArticle(_ name: String, _ source: DescriptionText) -> String {
+    private func withoutArticle(_ name: String, _ source: DescriptionText) -> String {
         source.named(EntryWording.withoutLeadingArticle(name, in: source.explainer.language)) ?? name
     }
 
@@ -499,7 +499,7 @@ public struct CVDataSanitizer: Sendable {
     }
 
     /// Keeps the first of the items sharing a key, ignoring case and accents: the model sometimes repeats an entry.
-    func unique<T>(_ items: [T], by key: (T) -> String) -> [T] {
+    private func unique<T>(_ items: [T], by key: (T) -> String) -> [T] {
         var seen = Set<String>()
         return items.filter { seen.insert(DescriptionText.normalized(key($0))).inserted }
     }

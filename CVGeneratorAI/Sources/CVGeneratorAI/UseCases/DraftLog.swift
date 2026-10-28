@@ -18,7 +18,7 @@ struct DraftLog {
         case model
         /// The rules keep what the description supports (ADR 0023).
         case grounding
-        /// The model writes around the facts (ADR 0031).
+        /// The model writes around the facts, a section at a time (ADR 0031).
         case writing
         /// The second check of the personal items (ADR 0028).
         case claimCheck
@@ -88,12 +88,13 @@ struct DraftLog {
         logger.info(.draft, "draft.started", .count("characters", characters))
     }
 
-    /// A pass of the model tried once more, after a failure from below the model: a notice, since the draft takes longer.
+    /// A request of the model tried once more, after a failure from below the model: a notice, since the draft takes longer.
     func retried(at stage: Stage, by error: any Error) {
         logger.notice(.draft, "draft.retried", .token("stage", stage.logName), .error(error))
     }
 
-    /// What the second pass wrote around the facts, before the rules read it: how many roles it described and how many skills it wrote.
+    /// What the requests of the sections wrote around the facts and their checks kept, before the final check reads it: whether
+    /// there is a summary, how many jobs got duties and how many skills.
     func written(_ writing: DraftWriting) {
         logger.info(.draft, "draft.written", .flag("summary", writing.summary?.presentValue != nil),
             .count("roles", writing.roleDescriptions.count { $0?.presentValue != nil }),
@@ -101,10 +102,10 @@ struct DraftLog {
         )
     }
 
-    /// A second pass that failed or ran out of time: a notice, since the draft then keeps its facts alone, with no summary or
-    /// skills of the model's own.
-    func unwritten(by error: any Error) {
-        logger.notice(.draft, "draft.unwritten", .error(error))
+    /// A request that failed or ran out of time at `step`: a notice, since the draft then keeps only what the earlier requests
+    /// wrote, and no section of the model's own after it.
+    func unwritten(at step: DraftStep, by error: any Error) {
+        logger.notice(.draft, "draft.unwritten", .token("step", step.logName), .error(error))
     }
 
     /// The personal items the claim check judged and those it withdrew, and whether it gave no answer: a notice when it withdrew

@@ -116,14 +116,15 @@ struct DraftLoggingTests {
 
     // MARK: Generation
 
-    @Test("A draft logs its start with the length of the description, the claims checked and its end with the time it took")
+    @Test("A draft logs its start with the length of the description, what its sections kept, the claims checked and its end with the time it took")
     func finished() async throws {
         let logger = RecordingLogger()
         let request = CVGenerationRequest(userPrompt: example.description)
 
         _ = try await generator(drafting(example.draft), logger: logger).generateCV(from: request)
 
-        #expect(logger.events == ["draft.language", "draft.started", "draft.claims", "draft.finished"])
+        // The sections' requests log what they kept even when they wrote nothing, so a trace shows the step ran.
+        #expect(logger.events == ["draft.language", "draft.started", "draft.written", "draft.claims", "draft.finished"])
         #expect(logger.entry("draft.started")?.fields == [.count("characters", request.userPrompt.count)])
         #expect(logger.entry("draft.started")?.level == .info)
         #expect(logger.entry("draft.finished")?.fields == [.duration("elapsed", Self.step)])

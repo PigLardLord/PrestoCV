@@ -2,8 +2,9 @@ import DiagnosticLogging
 import Foundation
 
 /// Use case for generating CVs: it checks the request, asks the service for the facts, removes whatever the description does not
-/// support, asks the service to write around the facts left (ADR 0031) and keeps of it what states no fact, has the claim check judge
-/// the personal items left, lists the jobs in the order of a CV and checks the answer. It logs each step as counts, names and times, never the text (ADR 0030).
+/// support, asks the service to write around the facts left a section at a time (ADR 0031, `SectionDraft`) and keeps of it what
+/// states no fact, has the claim check judge the personal items left, lists the jobs in the order of a CV and checks the answer. It
+/// logs each step as counts, names and times, never the text (ADR 0030).
 @MainActor
 public final class CVGeneratorUseCase {
     private let service: CVGenerationService
@@ -15,6 +16,8 @@ public final class CVGeneratorUseCase {
     private let limits: DraftingLimits
     /// The availability last logged, so that a caller that asks again while the model downloads logs only a change.
     private var loggedAvailability: AIAvailability?
+    /// Told what the sections wrote and the draft the final check reads it with, before that check: the evaluation records them.
+    var observeWriting: (@MainActor (DraftWriting, CVData) -> Void)?
 
     /// - Parameters:
     ///   - claimChecker: The second check of the personal items a grounded draft keeps (ADR 0028). It can only withdraw.
@@ -34,7 +37,7 @@ public final class CVGeneratorUseCase {
         )
     }
 
-    /// - Parameter limits: How long each pass of the model may take.
+    /// - Parameter limits: How long each request of the model may take.
     init(
         service: CVGenerationService,
         claimChecker: ClaimChecking,
@@ -68,8 +71,9 @@ public final class CVGeneratorUseCase {
     /// - Returns: CV data limited to what the description supports and the claim check kept, with the current job first, then the
     ///   newest; and whether the personal items were withdrawn because the check gave no answer
     /// - Throws: CVGenerationError if the service is unavailable, the device lacks the language data that grounding the description
-    ///   needs (asked before the model runs), or generation or validation fails; `.generationFailed` when the first pass runs out of
-    ///   time; CancellationError if the task was cancelled. A second pass that fails throws nothing: the draft keeps its facts alone.
+    ///   needs (asked before the model runs), or generation or validation fails; `.generationFailed` when the request of the facts
+    ///   runs out of time; CancellationError if the task was cancelled. A later request that fails throws nothing: the draft keeps
+    ///   the facts and what the earlier requests wrote.
     ///   A claim check that fails, refuses or runs out of time throws nothing either: the draft comes back without its personal
     ///   items, even if that leaves it empty (ADR 0028).
     public func generateCV(from request: CVGenerationRequest) async throws -> GeneratedDraft {
@@ -103,9 +107,12 @@ public final class CVGeneratorUseCase {
             stage = .grounding
             let facts = try sanitizer.sanitize(generated, against: request.userPrompt)
             stage = .writing
-            let writing = try await writing(around: facts, language: language.language)
+            let section = try await SectionDraft(
+                service: service, sanitizer: sanitizer, log: log, limit: limits.section, description: request.userPrompt
+            ).write(around: facts, generated: generated, language: language.language)
+            if let section { observeWriting?(section.writing, section.draft) }
             stage = .grounding
-            let grounded = try writing.map { try sanitizer.sanitize(generated, writing: $0, against: request.userPrompt) } ?? facts
+            let grounded = try section.map { try sanitizer.sanitize($0.draft, writing: $0.writing, against: request.userPrompt) } ?? facts
             stage = .claimCheck
             let checked = try await ClaimWithdrawal.checking(grounded, in: request.userPrompt, with: claimChecker)
             log.claims(of: grounded, checked: checked, in: request.userPrompt)
@@ -122,26 +129,6 @@ public final class CVGeneratorUseCase {
         } catch {
             log.stopped(at: stage, by: error, elapsed: stopwatch.elapsed)
             throw error
-        }
-    }
-
-    /// What the second pass writes around the grounded `facts` (ADR 0031), from their brief alone: nil when they hold no role to
-    /// write around, or when the pass fails or runs out of time, and the draft then keeps its facts alone. Cancellation passes through.
-    private func writing(around facts: CVData, language: Vocabulary.Language?) async throws -> DraftWriting? {
-        guard let brief = DraftBrief(facts, language: language) else { return nil }
-        do {
-            let writing = try await DraftAttempt.run(within: limits.writing, retried: { self.log.retried(at: .writing, by: $0) }) {
-                try await self.service.writeDraft(for: brief)
-            }
-            if let writing { log.written(writing) }
-            return writing
-        } catch let cancellation as CancellationError {
-            throw cancellation
-        } catch {
-            // A pass stopped by a cancellation may report it with an error of its own.
-            try Task.checkCancellation()
-            log.unwritten(by: error)
-            return nil
         }
     }
 }

@@ -1,14 +1,39 @@
 import Foundation
 
-/// How long each pass of a draft may take on the device (ADR 0031). A call of the on-device model that runs past its time is stopped:
-/// a model caught repeating itself would otherwise run until its window fills, minutes later (#354).
-struct DraftingLimits: Equatable, Sendable {
-    /// How long the first pass, which extracts the facts, may take. The longest description takes about a quarter of it on a Mac.
-    let extraction: Duration
-    /// How long the second pass, which writes around the facts, may take.
-    let writing: Duration
+/// The steps of a draft, in order (ADR 0031, "A request per section"): the model extracts the facts, code gives each job its own
+/// clauses of the description, then the model writes each job, the skills and, last, the summary, a request at a time.
+enum DraftStep: CaseIterable, Sendable {
+    /// One request extracts the facts the description states.
+    case facts
+    /// Code gives each job the clauses of the description that belong to it, the place after its employer and the words to avoid.
+    case attribution
+    /// A request per job writes its years and duties; a job whose duties the check finds too few or too short gets one repair.
+    case jobs
+    /// A request writes the tools of each job, one the soft skills, and one more when the check leaves too few.
+    case skills
+    /// A request writes the summary from the jobs and skills kept; one repair when the check rejects a sentence or finds it short.
+    case summary
 
-    static let standard = DraftingLimits(extraction: .seconds(90), writing: .seconds(45))
+    var logName: StaticString {
+        switch self {
+        case .facts: "facts"
+        case .attribution: "attribution"
+        case .jobs: "jobs"
+        case .skills: "skills"
+        case .summary: "summary"
+        }
+    }
+}
+
+/// How long each request of a draft may take on the device (ADR 0031). A call of the on-device model that runs past its time is
+/// stopped: a model caught repeating itself would otherwise run until its window fills, minutes later (#354).
+struct DraftingLimits: Equatable, Sendable {
+    /// How long the request that extracts the facts may take. The longest description takes about a quarter of it on a Mac.
+    let extraction: Duration
+    /// How long each request that writes a section, or repairs one, may take.
+    let section: Duration
+
+    static let standard = DraftingLimits(extraction: .seconds(90), section: .seconds(30))
 }
 
 /// One call of a pass of the model, within its time, tried once more when it fails below the model.

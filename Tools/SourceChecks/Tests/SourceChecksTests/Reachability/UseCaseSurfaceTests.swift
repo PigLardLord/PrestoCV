@@ -28,10 +28,16 @@ struct UseCaseSurfaceTests {
         #expect(try Self.functions(in: "PrestoCVCore/Sources/PrestoCVImporting/ImportCV.swift", from: "public struct ImportCV") == ["importText", "importPDF"])
     }
 
-    @Test("CVDataSanitizer offers the sanitising of a draft and the language check the use case logs, and no function that a test alone calls")
+    @Test("CVDataSanitizer offers the sanitising of a draft, the language check the use case logs and what the checks of each section read, and no function that a test alone calls")
     func cvDataSanitizer() throws {
         let functions = try Self.functions(in: "CVGeneratorAI/Sources/CVGeneratorAI/Validation/CVDataSanitizer.swift", from: "struct CVDataSanitizer")
 
-        #expect(functions == ["sanitize", "languageCheck", "require"])
+        // The checks of each section (ADR 0031, "A request per section") read the facts and the words of the description as the
+        // final check reads them.
+        let sections: Set = [
+            "requireLanguageData", "grounded", "keptJobs", "joined", "foreignWords", "otherTitles", "namedTitle", "quotedWords",
+            "letterWords", "stems", "words",
+        ]
+        #expect(functions == Set(["sanitize", "languageCheck", "require"]).union(sections))
     }
 }
