@@ -28,10 +28,14 @@ struct TraceChainTests {
     }
 
     private static func chain(in folder: URL, isOpen: Bool, log: any DiagnosticLogger) -> TraceChain {
+        chain(in: folder, gate: TraceLaunchGate(gate: ConstantGate(isOpen: isOpen), answered: {}, distribution: { "debug" }), log: log)
+    }
+
+    private static func chain(in folder: URL, gate: TraceLaunchGate, log: any DiagnosticLogger) -> TraceChain {
         TraceChain(
             directory: folder.appendingPathComponent("Diagnostics", isDirectory: true),
             shareDirectory: folder.appendingPathComponent("Share", isDirectory: true),
-            gate: TraceLaunchGate(gate: ConstantGate(isOpen: isOpen), answered: {}, distribution: { "debug" }),
+            gate: gate,
             device: device,
             log: log
         )
@@ -85,6 +89,37 @@ struct TraceChainTests {
         #expect(await !chain.access.isOn())
     }
 
+    @Test("A launch whose gate stays closed removes what an earlier install stored, and a launch that records keeps it")
+    func closedLaunchPurgesWhatAnEarlierInstallStored() async throws {
+        let folder = Self.folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let testFlight = Self.chain(in: folder, gate: .given("sandbox"), log: LogSpy())
+        #expect(await testFlight.access.isOn(), "The gate has its answer before the first run begins")
+        try Self.importText(through: testFlight)
+        let stored = await testFlight.access.reader.runs()
+        _ = try await testFlight.access.reader.shareCopies(of: #require(stored.first).id)
+        #expect(stored.count == 1)
+
+        let again = Self.chain(in: folder, gate: .given("sandbox"), log: LogSpy())
+        #expect(await again.access.isOn())
+        #expect(await again.access.reader.runs().count == 1, "A TestFlight launch keeps the runs of the earlier launch")
+
+        for answer in ["production", "unknown", "unverified"] {
+            let store = Self.chain(in: folder, gate: .given("sandbox"), log: LogSpy())
+            #expect(await store.access.isOn())
+            try Self.importText(through: store)
+            _ = await store.access.reader.runs()
+
+            let appStore = Self.chain(in: folder, gate: .given(answer), log: LogSpy())
+            #expect(await !appStore.access.isOn())
+
+            #expect(!FileManager.default.fileExists(atPath: folder.appendingPathComponent("Diagnostics").path), "\(answer)")
+            #expect(!FileManager.default.fileExists(atPath: folder.appendingPathComponent("Share").path), "\(answer)")
+            #expect(await appStore.access.reader.runs().isEmpty)
+        }
+    }
+
     // MARK: The gate of a Debug build
 
     @Test("A Debug build records unless a UI test gives the store's answer")
@@ -103,5 +138,12 @@ struct TraceChainTests {
         await gate.answered()
         #expect(gate.gate.isOpen == records)
         #expect(gate.distribution() == answer)
+    }
+}
+
+private extension TraceLaunchGate {
+    /// The gate of a Debug build that a UI test gives the store's answer
+    static func given(_ answer: String) -> TraceLaunchGate {
+        current(arguments: ["PrestoCV", "-diagnosticsDistribution", answer])
     }
 }

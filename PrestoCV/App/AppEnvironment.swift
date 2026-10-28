@@ -92,8 +92,9 @@ extension AppEnvironment {
 // MARK: - The trace of a test build (ADR 0032)
 
 /// The trace of the import and the AI draft, as the app builds it: the log entries go to the open run of their kind as
-/// well, and every run goes through the gate to a recorder that keeps it in the store. Only this file and the app's entry
-/// point build it, so no other code can turn the trace on or reach its files.
+/// well, and every run goes through the gate to a recorder that keeps it in the store. A launch whose gate stays closed
+/// purges what an earlier install stored. Only this file and the app's entry point build it, so no other code can turn the
+/// trace on or reach its files.
 struct TraceChain {
     /// The trace the import and the AI draft record into
     let tracer: any DiagnosticTracer
@@ -120,12 +121,19 @@ struct TraceChain {
             now: { Date() },
             newID: { UUID() }
         )
+        // A build that may not record keeps nothing: a TestFlight install replaced by the App Store build keeps its data
+        // container, and with it the runs the earlier install stored. The store does it on its own task, after the answer.
+        let startup = Task {
+            await launch.answered()
+            if !launch.gate.isOpen { await store.purge() }
+        }
         let tracer = GatedTracer(gate: launch.gate, next: recorder)
         self.tracer = tracer
         logger = TracingLogger(tracer: tracer, next: log, kinds: ["draft": .aiDraft, "import": .textImport])
         access = TraceAccess(
             isOn: {
                 await launch.answered()
+                await startup.value
                 return launch.gate.isOpen
             },
             reader: store
