@@ -359,6 +359,46 @@ extension CVDataSanitizer {
         "el profesional", "ele ", "ela ", "o candidato", "o profissional", "a profissional",
     ]
 
+    /// Whether `sentence`, in a language that drops the subject pronoun (Spanish, Italian, Portuguese), speaks of the person in the
+    /// third person (#354): after one of the person's `titles`, with or without its article ("Contable gestiona los registros."),
+    /// it starts with the reflexive pronoun of the third person ("Se encarga de…", "Si occupa di…"), or with a verb of the third
+    /// person, read by its ending in an unstressed -a or -e and the article right after it ("Analiza los movimientos de caja.").
+    /// A rough rule: a verb with no article after it is not read, nor is the imperfect, whose first and third person agree.
+    static func speaksInTheThirdPerson(_ sentence: String, titles: [String], language: Vocabulary.Language?) -> Bool {
+        guard let language, let articles = articlesAfterAVerb[language] else { return false }
+        var words = Word.words(in: sentence).map(\.accented)
+        let folded = Word.words(in: sentence).map(\.folded)
+        let skip = words.first.map(articles.contains) == true ? 1 : 0
+        if let title = titles.map(EntryEvidence.foldedWords).first(where: { !$0.isEmpty && folded.dropFirst(skip).starts(with: $0) }) {
+            words.removeFirst(skip + title.count)
+        }
+        guard words.count >= 2 else { return false }
+        let (verb, next) = (words[0], words[1])
+        if verb == reflexivePronouns[language], next != "me", next != "mi" { return true }
+        let imperfect = ["aba", "ía", "ava"].contains { verb.hasSuffix($0) }
+        return verb.count >= 4 && (verb.hasSuffix("a") || verb.hasSuffix("e")) && articles.contains(next) && !imperfect
+            && !(language == .italian && verb.hasSuffix("re")) && !notThirdPersonVerbs.contains(verb)
+    }
+
+    /// The articles and possessives that follow a verb before its object, in the languages that drop the subject pronoun.
+    private static let articlesAfterAVerb: [Vocabulary.Language: Set<String>] = [
+        .spanish: ["el", "la", "los", "las", "un", "una", "unos", "unas", "su", "sus"],
+        .italian: ["il", "lo", "la", "i", "gli", "le", "l", "un", "uno", "una"],
+        .portuguese: ["o", "a", "os", "as", "um", "uma", "uns", "umas", "seu", "sua", "seus", "suas"],
+    ]
+
+    /// The reflexive pronoun of the third person that starts a sentence ("Se encarga…"); Portuguese "se" starts a condition.
+    private static let reflexivePronouns: [Vocabulary.Language: String] = [.spanish: "se", .italian: "si"]
+
+    /// The words ending in -a or -e that an article can follow and that are no verb of the third person: prepositions, adverbs and
+    /// determiners ("Para la empresa…", "Durante il giorno…"), and the irregular past of the first person ("Hice la contabilidad…").
+    private static let notThirdPersonVerbs: Set<String> = [
+        "para", "desde", "hasta", "entre", "sobre", "contra", "durante", "mediante", "siempre", "donde", "ante", "ahora", "nunca",
+        "toda", "hice", "tuve", "estuve", "pude", "puse", "supe", "quise", "vine", "dije", "traje", "anduve", "conduje", "produje",
+        "traduje", "come", "dove", "mentre", "oltre", "sopra", "insieme", "sempre", "ancora", "anche", "prima", "fuori", "tutta",
+        "tutte", "circa", "tramite", "grazie", "perante", "onde", "ainda", "agora", "tive", "estive", "trouxe", "disse", "soube",
+    ]
+
     /// The summary of `cvData`, sentence by sentence: a sentence about the person in the third person goes, and so does one with no
     /// word of the person in a language that keeps its pronoun; so does a sentence that starts with the verb of an earlier one, one
     /// with no word beyond a sentence of the kept `duties` (one that joins several duties stays), a second one that names nothing of the `work` (the kept duties and tools) or
@@ -394,10 +434,9 @@ extension CVDataSanitizer {
                 let lower = sentence.lowercased()
                 let verb = Self.leadingVerb(of: sentence)
                 let own = Self.stems(of: sentence)
-                if Self.thirdPersonOpeners.contains(where: lower.hasPrefix) {
-                    verdict.rejected.append(Rejection(
-                        sentence: sentence, reason: "it speaks of the person in the third person: write it as the person, with no subject"
-                    ))
+                if Self.thirdPersonOpeners.contains(where: lower.hasPrefix)
+                    || Self.speaksInTheThirdPerson(sentence, titles: titles.compactMap { $0 }, language: language) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.speaksInTheThirdPerson))
                 } else if let language, let words = Self.firstPersonWords[language],
                           !Self.letterWords(of: sentence).contains(where: words.contains) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.saysNothingOfThePerson))
@@ -454,6 +493,7 @@ extension CVDataSanitizer {
         }
     }
 
+    static let speaksInTheThirdPerson = "it speaks of the person in the third person: write it as the person, with no subject"
     static let saysNothingOfThePerson = "it says nothing of the person: write it as the person, with \"I\" and what the person does"
     static let startsAsAnEarlierOne = "it starts with the verb of an earlier sentence: say something else"
 

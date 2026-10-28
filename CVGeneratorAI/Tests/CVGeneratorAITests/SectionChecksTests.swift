@@ -228,7 +228,7 @@ struct SectionChecksTests {
             of: Self.italianJobs, summary: "Lui è un tecnico esperto. Mi occupo degli impianti con cura.", field: nil, against: description
         )
 
-        #expect(verdict.rejected.map(\.reason) == ["it speaks of the person in the third person: write it as the person, with no subject"])
+        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.speaksInTheThirdPerson])
         #expect(verdict.kept == ["Mi occupo degli impianti con cura."])
         #expect(verdict.problems.contains("it keeps fewer than 2 sentences"))
         #expect(verdict.problems.contains("it is shorter than 120 characters"))
@@ -252,6 +252,29 @@ struct SectionChecksTests {
         #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.saysNothingOfThePerson])
         #expect(verdict.kept.count == 2)
         #expect(verdict.opening == nil)
+    }
+
+    @Test("A summary sentence with a verb of the third person and no subject goes where the pronoun is dropped; one as the person stays (#354)",
+          arguments: [
+              ("es", "Contable gestiona los registros con cuidado.", false), ("es", "El contable revisa las facturas.", false),
+              ("es", "Analiza los movimientos de caja.", false), ("es", "Se encarga de la contabilidad.", false),
+              ("es", "Analizo los movimientos de caja.", true), ("es", "Experiencia en contabilidad de pymes.", true),
+              ("es", "Hice la contabilidad de tres empresas.", true), ("es", "Para la empresa llevo la contabilidad.", true),
+              ("es", "Llevaba la contabilidad de la empresa.", true),
+              ("it", "Si occupa della contabilità.", false), ("it", "Gestisce la contabilità della ditta.", false),
+              ("it", "Mi occupo della contabilità.", true), ("it", "Durante il giorno seguo la contabilità.", true),
+              ("it", "Gestire la contabilità mi piace.", true),
+              ("pt", "Analisa os movimentos de caixa.", false), ("pt", "Analiso os movimentos de caixa.", true),
+          ])
+    func summaryInTheThirdPerson(language: String, sentence: String, stays: Bool) throws {
+        let checker = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("contable", "Muebles Albarracín", from: "2017")])
+        let description = "Vivo en Teruel. Desde 2017 trabajo como contable en Muebles Albarracín, donde llevo la contabilidad y "
+            + "analizo los movimientos de caja."
+
+        let verdict = try checker.summaryCheck(of: facts, summary: sentence, field: nil, against: description)
+
+        #expect(verdict.rejected.map(\.reason).contains(CVDataSanitizer.speaksInTheThirdPerson) == !stays, "\(verdict.rejected)")
     }
 
     @Test("A summary naming no title whole gets the opening; a sentence with its verb, an earlier verb or a duty goes (#354)")

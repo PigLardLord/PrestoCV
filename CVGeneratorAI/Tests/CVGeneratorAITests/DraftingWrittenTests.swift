@@ -294,6 +294,25 @@ struct DraftingWrittenTests {
         #expect(Self.reader(cv, "en").filter { $0.kind == .clauseAsSkill }.map(\.path) == ["skills[0].name", "skills[2].name"])
     }
 
+    @Test("A summary sentence with a verb of the third person after the title is counted; one as the person is not")
+    func thirdPersonSummary() {
+        let input = DraftingInput(
+            id: "reader-es", kind: .plain, language: "es",
+            description: "Desde 2017 trabajo como contable en Muebles Albarracín, donde llevo la contabilidad.", facts: [], traps: []
+        )
+        let cv = CVData(
+            summary: "Contable gestiona los registros con cuidado. Llevo la contabilidad de una fábrica de muebles. "
+                + "Para la empresa preparo los informes mensuales. Se encarga de las facturas.",
+            experience: [Experience(title: "contable", company: "Muebles Albarracín", startDate: "2017", current: true)]
+        )
+
+        let found = ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
+
+        #expect(found.filter { $0.kind == .thirdPersonSummary }.map(\.value) == [
+            "Contable gestiona los registros con cuidado.", "Se encarga de las facturas.",
+        ])
+    }
+
     @Test("A soft skill whose head noun is a tool is counted; one that only starts with a tool word is not")
     func toolAsSoftSkill() {
         let cv = CVData(skills: [

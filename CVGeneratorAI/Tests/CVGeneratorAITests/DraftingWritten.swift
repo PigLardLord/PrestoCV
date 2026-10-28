@@ -204,6 +204,9 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     case clauseAsSkill
     /// A soft skill whose head noun is a tool ("Präzisionswerkzeug", "strumenti di misura"): a thing, no quality.
     case toolAsSoftSkill
+    /// A summary sentence in Spanish, Italian or Portuguese that starts, after a title of the person, with a verb of the third person
+    /// ("Contable gestiona los registros.", "Si occupa della contabilità."): the person spoken of, not speaking.
+    case thirdPersonSummary
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -225,6 +228,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .repeatedDuty: "a duty said twice in one job"
         case .clauseAsSkill: "a clause as a skill"
         case .toolAsSoftSkill: "a tool as a soft skill"
+        case .thirdPersonSummary: "a summary in the third person"
         }
     }
 }
@@ -467,8 +471,41 @@ enum ReaderRules {
                 found.append(ReaderFinding(kind: .repeatedSentence, path: "summary", value: sentence))
             }
         }
+        found += sentences.filter { inTheThirdPerson($0, titles: titles, language: input.language) }
+            .map { ReaderFinding(kind: .thirdPersonSummary, path: "summary", value: $0) }
         return found
     }
+
+    /// Whether `sentence` starts, after a title of the person and its article, with "se" or "si" before a word, or with a word of 4
+    /// letters or more ending in -a or -e and an article right after it: a rough rule for a verb of the third person, in the
+    /// languages that drop the subject pronoun.
+    static func inTheThirdPerson(_ sentence: String, titles: [[String]], language: String) -> Bool {
+        guard let articles = verbArticles[language] else { return false }
+        var words = sentence.lowercased().split { !$0.isLetter }.map(String.init)
+        let skip = words.first.map(articles.contains) == true ? 1 : 0
+        if let title = titles.first(where: { !$0.isEmpty && words.dropFirst(skip).map(fold).starts(with: $0) }) {
+            words.removeFirst(skip + title.count)
+        }
+        guard words.count >= 2 else { return false }
+        if ["se", "si"].contains(words[0]) && !["me", "mi"].contains(words[1]) && language != "pt" { return true }
+        let verb = words[0]
+        return verb.count >= 4 && (verb.hasSuffix("a") || verb.hasSuffix("e")) && articles.contains(words[1])
+            && !["aba", "ava", "ía"].contains(where: verb.hasSuffix) && !(language == "it" && verb.hasSuffix("re"))
+            && !notVerbs.contains(fold(verb))
+    }
+
+    /// The articles that follow a verb before its object, by language.
+    static let verbArticles: [String: Set<String>] = [
+        "es": ["el", "la", "los", "las", "un", "una", "su", "sus"],
+        "it": ["il", "lo", "la", "i", "gli", "le", "l", "un", "uno", "una"],
+        "pt": ["o", "a", "os", "as", "um", "uma", "seu", "sua"],
+    ]
+
+    /// Folded words ending in -a or -e that an article follows and that are no verb of the third person.
+    static let notVerbs: Set<String> = [
+        "para", "desde", "hasta", "entre", "sobre", "contra", "durante", "siempre", "ahora", "toda", "hice", "tuve", "estuve", "pude",
+        "come", "dove", "mentre", "oltre", "sempre", "anche", "prima", "tutte", "agora", "ainda", "tive", "estive",
+    ]
 
     /// The subject pronouns of the first person, which a summary sentence starts with before its verb.
     static let pronouns: Set<String> = ["i", "ich", "je", "j", "io", "yo", "eu"]
