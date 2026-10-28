@@ -6871,6 +6871,14 @@ extension GroundingRows {
                         "la persona dice sono operatrice sanitaria: il titolo tagliato a sanitaria torna intero",
                         "Sono operatrice sanitaria a Treviso.", CVData(personalInfo: person(title: "sanitaria")),
                         .exactly(CVData(personalInfo: person(title: "operatrice sanitaria"))), language: "it"))
+        rows.append(row("a-part-of-a-stated-title-after-and-is-the-whole-title-it",
+                        "la persona dice e sono tecnica radiologa dopo il nome: il titolo tagliato a radiologa torna intero",
+                        "Mi chiamo Lucia Ferri e sono tecnica radiologa a Parma.", CVData(personalInfo: person(title: "radiologa")),
+                        .exactly(CVData(personalInfo: person(title: "tecnica radiologa"))), language: "it"))
+        rows.append(row("words-someone-else-says-after-and-never-widen-the-title",
+                        "the clause after and is the sister's saying, not the person's: the headline stays welder",
+                        "My sister is a nurse and says I am a pipe welder. I work as a welder in a shipyard.",
+                        CVData(personalInfo: person(title: "welder")), .exactly(CVData(personalInfo: person(title: "welder")))))
         rows.append(row("words-the-person-denies-never-widen-the-title",
                         "pipe follows I am not: the person denies it, and the headline stays welder",
                         "I am not a pipe welder. I work as a welder in a shipyard.", CVData(personalInfo: person(title: "welder")),

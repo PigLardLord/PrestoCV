@@ -52,7 +52,8 @@ enum StatedTitle {
                     guard between.allSatisfy({ $0.isLetter || $0 == " " }), !words[first..<start].contains(where: {
                         stops.contains($0.folded) || $0.isNumber || EntryWording.isIndefiniteArticle($0.folded, in: language)
                             || isPresentFirstPersonBe($0.accented, in: language)
-                    }), isSaid(before: first, in: words, language: language) else { continue }
+                    }), isSaid(before: first, in: words, from: clauseStart(before: first, in: words, language: language),
+                               language: language) else { continue }
                     return String(characters[words[first].range.lowerBound..<words[start + wanted.count - 1].range.upperBound])
                 }
             }
@@ -75,13 +76,20 @@ enum StatedTitle {
         }
     }
 
-    /// Whether the words before `start` say the title as what the person is now: the lead-in, the present of "to be" in the first
-    /// person, at most an indefinite article.
-    private static func isSaid(before start: Int, in words: [Word], language: Vocabulary.Language?) -> Bool {
+    /// Whether the words before `start` say the title as what the person is now: the lead-in from `origin`, the present of "to be"
+    /// in the first person, at most an indefinite article.
+    private static func isSaid(before start: Int, in words: [Word], from origin: Int = 0, language: Vocabulary.Language?) -> Bool {
         var end = start
-        if end > 0, EntryWording.isIndefiniteArticle(words[end - 1].folded, in: language) { end -= 1 }
-        guard end > 0, isPresentFirstPersonBe(words[end - 1].accented, in: language) else { return false }
-        return LeadIn.holds(words[..<end], in: language)
+        if end > origin, EntryWording.isIndefiniteArticle(words[end - 1].folded, in: language) { end -= 1 }
+        guard end > origin, isPresentFirstPersonBe(words[end - 1].accented, in: language) else { return false }
+        return LeadIn.holds(words[origin..<end], in: language)
+    }
+
+    /// Where the clause of the word at `index` starts: after the last "and" before it ("Mi chiamo Chiara e | sono impiegata"), or at
+    /// the start of the sentence. The lead-in of that clause is read alone, so "says I am" after "and" still says nothing (#354).
+    private static func clauseStart(before index: Int, in words: [Word], language: Vocabulary.Language?) -> Int {
+        let ands = forms(ands, in: language)
+        return (words[..<index].lastIndex { ands.contains($0.accented) }).map { $0 + 1 } ?? 0
     }
 
     /// Whether the clause ends at "and": its source holds the conjunction that ends it; a comma or a semicolon is none.
