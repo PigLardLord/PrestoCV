@@ -43,18 +43,21 @@ struct InferredSkills {
         guard !words.isEmpty, words.count <= 4 else { return nil }
 
         let lists = WrittenTextWords.of(language)
-        let statesAFact = words.enumerated().contains { index, word in
-            let previous = index > 0 ? words[index - 1].folded : nil
-            let next = index + 1 < words.count ? words[index + 1].folded : nil
-            return written.isAnUnstatedLevel(word.folded) || written.isExcluded(word.folded)
-                || lists.isQualification(word.folded, after: previous, before: next)
-                || Self.languageNames.contains(word.folded)
-        }
         let normalized = DescriptionText.normalized(name)
+        let isATechnology = Self.technologiesNamedLikeQualifications.contains(normalized)
+        let statesAFact = words.contains { word in
+            written.isAnUnstatedLevel(word.folded) || written.isExcluded(word.folded)
+                || (lists.qualifications.contains(word.folded) && !isATechnology) || Self.languageNames.contains(word.folded)
+        }
         guard !statesAFact, !interests.contains(normalized),
               !facts.contains(where: { !DescriptionText.spans(of: $0, in: normalized).isEmpty }) else { return nil }
         return name
     }
+
+    /// Whole skill names, as `DescriptionText.normalized` writes them, that hold a word of a qualification and are no qualification:
+    /// "Master Data Management", "Scrum Master". Only the whole name is exempt ("Masters Data Science" is a degree). A sentence has
+    /// no such list: it loses a sentence with the word, which is the safe way to fail.
+    private static let technologiesNamedLikeQualifications: Set<String> = ["master data management", "scrum master"]
 
     /// The names of the world's languages, of one word, in the six languages of the app, as `Word.folded` writes them: "english",
     /// "inglese", "englisch". A name of more words ("Swiss German") is left out, as its words are no languages ("swiss", "central").

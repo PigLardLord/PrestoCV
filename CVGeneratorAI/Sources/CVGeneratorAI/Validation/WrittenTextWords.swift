@@ -15,17 +15,11 @@ struct WrittenTextWords: Sendable {
     let negations: Set<String>
     /// Words that name a qualification ("certified", "degree", "abilitazione"): a skill the model writes holds none.
     let qualifications: Set<String>
-    /// Pairs of words, as "first second", in which a word of `qualifications` names no qualification: the name of a technology or a
-    /// trade ("Master Data Management", "Scrum Master"). Any other use of the word, "Holds a masters", is a qualification: a
-    /// pair joins this list whole, with a test that the word alone is still one.
-    let notQualifications: Set<String>
     /// What a number written as one word is made of besides the numbers themselves: "uno" and the elided tens of "ventuno", the "und"
     /// of "einundzwanzig", the "cientos" of "doscientos".
     private let joiningParts: Set<String>
 
-    init(numbers: String, months: String, seniority: String, negations: String, qualifications: String, joiningParts: String = "",
-         notQualifications: Set<String> = []) {
-        self.notQualifications = notQualifications
+    init(numbers: String, months: String, seniority: String, negations: String, qualifications: String, joiningParts: String = "") {
         self.numbers = Self.set(of: numbers)
         self.joiningParts = Self.set(of: joiningParts)
         self.months = Self.set(of: months)
@@ -44,14 +38,6 @@ struct WrittenTextWords: Sendable {
         case .portuguese: portuguese
         case .english, nil: english
         }
-    }
-
-    /// Whether `word`, between `previous` and `next`, names a qualification: one of the list, but for the pairs of `notQualifications`.
-    func isQualification(_ word: String, after previous: String?, before next: String?) -> Bool {
-        guard qualifications.contains(word) else { return false }
-        if let previous, notQualifications.contains("\(previous) \(word)") { return false }
-        if let next, notQualifications.contains("\(word) \(next)") { return false }
-        return true
     }
 
     /// Whether `word` is a number written in words: one of the list, or a compound of them ("ventuno", "einundzwanzig",
@@ -91,8 +77,7 @@ struct WrittenTextWords: Sendable {
         degree degrees diploma diplomas bachelor bachelors master masters mba phd doctorate certificate certificates certified
         certification certifications license licensed licence licenced accredited accreditation qualification qualifications
         qualified chartered registered
-        """,
-        notQualifications: ["master data", "masters data", "scrum master"]
+        """
     )
 
     static let italian = WrittenTextWords(
