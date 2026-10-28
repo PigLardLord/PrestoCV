@@ -215,6 +215,16 @@ struct SectionChecksTests {
         #expect(verdict.dropped.map(\.reason) == (stays ? [] : ["a tool"]))
     }
 
+    @Test("A tool the model lists with a word of a quality in it is no soft skill (#354)")
+    func toolWithAQualityWord() {
+        let checker = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdict = checker.skillCheck(technologies: ["Präzisionswerkzeug", "Drehmaschine"], softSkills: [], against: "Feinmechanik, Suhl, 2019.")
+
+        #expect(verdict.softSkills.isEmpty)
+        #expect(verdict.technologies == ["Drehmaschine"])
+    }
+
     // MARK: The summary
 
     @Test("A summary sentence about the person in the third person goes, and a short summary with no title gets an opening from the facts")

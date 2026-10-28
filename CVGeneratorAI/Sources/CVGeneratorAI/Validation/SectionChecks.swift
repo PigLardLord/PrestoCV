@@ -607,7 +607,7 @@ extension CVDataSanitizer {
                 } else {
                     verdict.technologies.append(item)
                 }
-            } else if Set(letterWordsKeepingCase(lower)).isDisjoint(with: Self.toolWords) {
+            } else if Set(letterWordsKeepingCase(lower)).isDisjoint(with: Self.toolWords), !Self.namesATool(item, language: language) {
                 verdict.softSkills.append(item)
             } else {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "activity"))
