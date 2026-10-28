@@ -6854,6 +6854,29 @@ extension GroundingRows {
                         "I am a plumber and a welder.",
                         CVData(personalInfo: person(title: "welder"), experience: [job("plumber")]),
                         .exactly(CVData(personalInfo: person(title: "welder")))))
+        // Round 1 of approach 4 (#354): the model cut the headline to a part of the title the person states ("amministrativa" of
+        // "sono impiegata amministrativa a Verona"). The words the person writes in front of it, after "I am", are the title again;
+        // words of a clause that claims nothing, or that a negation splits from "I am", are not.
+        rows.append(row("a-part-of-a-stated-title-is-the-whole-title-en",
+                        "the person says I am a pipe welder: the headline the model cut to welder is the whole title",
+                        "I am a pipe welder in a shipyard.", CVData(personalInfo: person(title: "welder")),
+                        .exactly(CVData(personalInfo: person(title: "pipe welder")))))
+        rows.append(row("a-part-of-a-stated-title-is-the-whole-title-it",
+                        "la persona dice sono operatrice sanitaria: il titolo tagliato a sanitaria torna intero",
+                        "Sono operatrice sanitaria a Treviso.", CVData(personalInfo: person(title: "sanitaria")),
+                        .exactly(CVData(personalInfo: person(title: "operatrice sanitaria"))), language: "it"))
+        rows.append(row("words-the-person-denies-never-widen-the-title",
+                        "pipe follows I am not: the person denies it, and the headline stays welder",
+                        "I am not a pipe welder. I work as a welder in a shipyard.", CVData(personalInfo: person(title: "welder")),
+                        .exactly(CVData(personalInfo: person(title: "welder")))))
+        rows.append(row("words-of-a-wish-never-widen-the-title",
+                        "the words in front of the title are in a clause the person only wishes: the headline stays welder",
+                        "I work as a welder in a shipyard, and I wish I was a pipe welder.", CVData(personalInfo: person(title: "welder")),
+                        .exactly(CVData(personalInfo: person(title: "welder")))))
+        rows.append(row("a-title-after-and-is-not-widened",
+                        "plumber and is another title the person states, not a part of welder: the headline stays welder",
+                        "I am a plumber and welder in a shipyard.", CVData(personalInfo: person(title: "welder")),
+                        .exactly(CVData(personalInfo: person(title: "welder")))))
         return rows
     }
 

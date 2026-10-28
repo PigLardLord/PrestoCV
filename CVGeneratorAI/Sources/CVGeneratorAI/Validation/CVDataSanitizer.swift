@@ -103,10 +103,10 @@ public struct CVDataSanitizer: Sendable {
         let interests = unique(cvData.interests.compactMap(claimed.named).filter { !Self.isWork($0, titles: titles, source) }) { $0 }
         let written = WrittenText(source: source, claimed: claimed, wordList: wordList, tagger: lexicalClasses)
 
-        let personalInfo = Self.withStatedTitle(
+        let personalInfo = Self.withWholeTitle(Self.withStatedTitle(
             sanitize(cvData.personalInfo, jobTitles: jobTitles, spoken, claimed: claimed, contacts: entries.contacts(in: source)),
             from: cvData.experience, claimed, said: source
-        )
+        ), claimed)
         let experience = sanitize(entries.jobs, source, entries, written: written, duties: writing?.roleDescriptions ?? [])
         let education = sanitize(entries.studies, source, entries)
         // The model writes around the facts only when it has one to write around (ADR 0031): with no title, job or school, a summary
@@ -178,6 +178,15 @@ public struct CVDataSanitizer: Sendable {
         return PersonalInfo(
             name: info.name, email: info.email, phone: info.phone, location: info.location, website: info.website,
             linkedin: info.linkedin, github: info.github, title: title
+        )
+    }
+
+    /// The person's headline as the whole title the person states (`StatedTitle.whole`): not a part of it the model cut (#354).
+    private static func withWholeTitle(_ info: PersonalInfo, _ claimed: DescriptionText) -> PersonalInfo {
+        guard let title = info.title.presentValue else { return info }
+        return PersonalInfo(
+            name: info.name, email: info.email, phone: info.phone, location: info.location, website: info.website,
+            linkedin: info.linkedin, github: info.github, title: StatedTitle.whole(title, in: claimed)
         )
     }
 

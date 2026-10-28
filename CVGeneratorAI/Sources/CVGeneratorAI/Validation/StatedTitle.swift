@@ -32,6 +32,34 @@ enum StatedTitle {
         return isStated ? title : nil
     }
 
+    /// `title` with the words the person writes in front of it in a clause of `claimed`, after the present of "to be" in the first
+    /// person and at most an indefinite article: a headline the model cut to a part of the title the person states ("amministrativa"
+    /// of "sono impiegata amministrativa a Verona") is the whole title again (#354). At most 2 words come in front, with no
+    /// punctuation, article, "and", negation or word that limits among them; otherwise `title` as it is.
+    static func whole(_ title: String, in claimed: DescriptionText) -> String {
+        let wanted = EntryEvidence.foldedWords(of: title)
+        let language = claimed.explainer.language
+        let stops = forms(ands, in: language).union(WrittenTextWords.of(language).negations).union(language.flatMap { limiters[$0] } ?? [])
+        guard !wanted.isEmpty else { return title }
+        for sentence in claimed.sentences {
+            let characters = Array(Digits.ascii(sentence.raw))
+            let words = Word.words(in: sentence.raw)
+            guard words.count > wanted.count else { continue }
+            for start in 1...(words.count - wanted.count) where words[start..<(start + wanted.count)].map(\.folded) == wanted {
+                for front in 1...2 where start - front >= 1 {
+                    let first = start - front
+                    let between = characters[words[first].range.lowerBound..<words[start].range.lowerBound]
+                    guard between.allSatisfy({ $0.isLetter || $0 == " " }), !words[first..<start].contains(where: {
+                        stops.contains($0.folded) || $0.isNumber || EntryWording.isIndefiniteArticle($0.folded, in: language)
+                            || isPresentFirstPersonBe($0.accented, in: language)
+                    }), isSaid(before: first, in: words, language: language) else { continue }
+                    return String(characters[words[first].range.lowerBound..<words[start + wanted.count - 1].range.upperBound])
+                }
+            }
+        }
+        return title
+    }
+
     /// Whether a clause of `sentence` says the title as above, with nothing after it in the sentence but "and" and a clause of the person.
     private static func states(_ wanted: [String], in sentence: String, language: Vocabulary.Language?) -> Bool {
         let clauses = DescriptionClauses(sentences: [sentence], protecting: [wanted], language: language).sentences.first ?? []
