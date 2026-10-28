@@ -6537,6 +6537,23 @@ extension GroundingRows {
                         "I was a plumber and I fixed pipes, taps and boilers in people's homes.",
                         CVData(summary: "A plumber who fixes pipes, taps and boilers in people's homes.", experience: [job("plumber")]),
                         .exactly(CVData())))
+        rows.append(row("a-title-in-a-game-is-no-headline-fr",
+                        "the person is a doctor only in a video game: neither the job nor the headline stays",
+                        "Je suis médecin dans un jeu vidéo.", CVData(experience: [job("médecin")]), .exactly(CVData()), language: "fr"))
+        rows.append(row("a-title-in-a-game-is-no-headline-en",
+                        "the person is a nurse only in a video game, said after a comma: neither the job nor the headline stays",
+                        "I am a nurse, but only in a video game.", CVData(experience: [job("nurse")]), .exactly(CVData())))
+        rows.append(row("a-title-in-a-game-gives-no-summary-fr",
+                        "a role in a game is no fact to write around: the summary written around it goes too",
+                        "Je suis médecin dans un jeu vidéo.",
+                        CVData(summary: "Médecin qui soigne des patients.", experience: [job("médecin")]), .exactly(CVData()),
+                        language: "fr"))
+        rows.append(row("a-title-followed-by-a-place-is-no-headline",
+                        "a word after the title may say the role is not the person's: none may follow it, the safe way to fail",
+                        "I am a nurse in Leeds.", CVData(experience: [job("nurse")]), .exactly(CVData())))
+        rows.append(row("a-title-followed-by-the-end-of-the-sentence-is-the-headline",
+                        "the sentence ends after the title: the title is the headline",
+                        "I am a plumber.", CVData(experience: [job("plumber")]), .exactly(CVData(personalInfo: person(title: "plumber")))))
         rows.append(row("a-stated-title-leaves-the-headline-alone",
                         "the draft gives a headline of its own, which stays: the title of the job with no employer is not added",
                         "I am a plumber and a welder.",
