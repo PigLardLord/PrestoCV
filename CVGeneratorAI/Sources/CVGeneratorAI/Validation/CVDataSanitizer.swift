@@ -37,9 +37,9 @@ import Foundation
 /// The rules are conservative by construction: what could be read two ways is not accepted, and a dropped fact costs less than an
 /// invented one.
 public struct CVDataSanitizer: Sendable {
-    private let languageOfText: @Sendable (String) -> String?
-    private let lexicalClasses: any LexicalTagger
-    private let wordList: any WordList
+    let languageOfText: @Sendable (String) -> String?
+    let lexicalClasses: any LexicalTagger
+    let wordList: any WordList
 
     /// - Parameters:
     ///   - languageOfText: The BCP 47 tag of the language a text is written in, or nil when it cannot tell. With it, prose in
@@ -81,7 +81,7 @@ public struct CVDataSanitizer: Sendable {
         languageCheck(of: DescriptionText(description, languageOfText: languageOfText))
     }
 
-    private func requireLanguageData(of source: DescriptionText) throws(CVGenerationError) {
+    func requireLanguageData(of source: DescriptionText) throws(CVGenerationError) {
         try languageCheck(of: source).require()
     }
 
@@ -92,7 +92,7 @@ public struct CVDataSanitizer: Sendable {
         return LanguageCheck(language: language, data: lexicalClasses.tagsLexicalClass(inLanguage: language.rawValue) ? .present : .missing)
     }
 
-    private func grounded(_ cvData: CVData, writing: DraftWriting?, in source: DescriptionText) -> CVData {
+    func grounded(_ cvData: CVData, writing: DraftWriting?, in source: DescriptionText) -> CVData {
         let jobTitles = cvData.experience.map(\.title)
         // The person's name, place and title explain themselves in the clauses of the entries, so they are read first, wherever they stand;
         // the clauses that speak for the person then tell which of them stand in the description for the person.
@@ -146,7 +146,7 @@ public struct CVDataSanitizer: Sendable {
     ///   - claimed: What the headline title and the place are looked up in, when it is not `source`: the clauses that claim them,
     ///     so "I would like to work as a nurse in Turin" gives neither.
     ///   - contacts: What the email, the phone and the links are looked up in, when it is not `source`.
-    private func sanitize(
+    func sanitize(
         _ info: PersonalInfo, jobTitles: [String], _ source: DescriptionText, claimed: DescriptionText? = nil, contacts: DescriptionText? = nil
     ) -> PersonalInfo {
         let claimed = claimed ?? source
@@ -196,44 +196,12 @@ public struct CVDataSanitizer: Sendable {
     private func sanitize(
         _ jobs: [Entries.Job], _ source: DescriptionText, _ entries: Entries, written: WrittenText, duties: [String?]
     ) -> [Experience] {
-        let cleaned = jobs.compactMap { job -> (job: Entries.Job, experience: Experience)? in
-            guard entries.hasFactualMention(of: job.subject) else { return nil }
-            let evidence = entries.evidence(of: job.subject)
-            let title = entries.jobTitle(of: job)
-            let dates = evidence.supportedDates([job.entry.startDate, job.entry.endDate])
-            guard job.company != nil || (title != nil && dates.contains { $0 != nil }) else { return nil }
-
-            return (job: job, experience: Experience(
-                title: title ?? "",
-                company: job.company.map { withoutArticle($0, source) } ?? "",
-                location: job.location.flatMap { evidence.backs($0) ? $0 : nil },
-                startDate: dates[0],
-                endDate: dates[1],
-                current: job.entry.current && evidence.statesCurrent,
-                description: job.entry.description,
-                achievements: unique(job.entry.achievements.enumerated().compactMap { number, achievement in
-                    source.grounded(achievement, quoting: evidence.quotable(byAchievement: number), allowsNumbers: true)
-                }) { $0 }
-            ))
-        }
-        return unique(cleaned) { "\($0.experience.title)|\($0.experience.company)" }.enumerated().map { position, kept in
+        keptJobs(jobs, source, entries).enumerated().map { position, kept in
             let (job, experience) = kept
-            let ownWords = Self.words(of: [experience.title])
-            let otherJobs = jobs.filter { $0.subject != job.subject }
-            let foreignWords = Self.foreignWords(of: otherJobs.map(\.company), own: ownWords, language: source.explainer.language)
-            let otherTitles = Self.otherTitles(otherJobs.map(\.title), own: experience.title)
-            let otherEmployers = otherJobs.compactMap(\.company)
-            let evidence = entries.evidence(of: job.subject)
-            // A sentence that quotes, with no number, a clause of this job alone is the person's own (ADR 0031); any other states
-            // no fact, names no other job's title whole (D4) and restates no sentence about another employer.
+            let rule = DutyRule(job: job, among: jobs, source: source, entries: entries, written: written)
+            let evidence = rule.evidence
             let description = { (text: String?, quotes: ProseQuotes) in
-                source.written(text, quoting: quotes, allowsNumbers: true) { sentence in
-                    (evidence.quotableByAttribution.map { source.written(sentence, quoting: $0, allowsNumbers: false) { _ in false } != nil } ?? false)
-                        || Self.namedTitle(in: sentence, among: otherTitles) == nil
-                        && written.rejection(of: sentence, ownWords: ownWords, foreignWords: foreignWords,
-                                             allowing: Self.quotedWords(of: sentence, quoting: evidence.ownClauseQuotes, source)) == nil
-                        && !source.repeats(sentence, ofSentencesNaming: otherEmployers, notNaming: [job.company].compactMap { $0 })
-                }
+                source.written(text, quoting: quotes, allowsNumbers: true) { rule.rejection(of: $0) == nil }
             }
             let writtenDuties = position < duties.count
                 ? description(duties[position], evidence.quotable.adding(evidence.quotableByAchievements)) : nil
@@ -276,6 +244,32 @@ public struct CVDataSanitizer: Sendable {
         }
     }
 
+    /// The jobs of `jobs` the rules keep, in their order, each with its grounded entry before its text is written: a job needs a
+    /// factual mention, and its employer or its title with a date; of the jobs with the same title and employer, the first stays.
+    func keptJobs(_ jobs: [Entries.Job], _ source: DescriptionText, _ entries: Entries) -> [(job: Entries.Job, experience: Experience)] {
+        let cleaned = jobs.compactMap { job -> (job: Entries.Job, experience: Experience)? in
+            guard entries.hasFactualMention(of: job.subject) else { return nil }
+            let evidence = entries.evidence(of: job.subject)
+            let title = entries.jobTitle(of: job)
+            let dates = evidence.supportedDates([job.entry.startDate, job.entry.endDate])
+            guard job.company != nil || (title != nil && dates.contains { $0 != nil }) else { return nil }
+
+            return (job: job, experience: Experience(
+                title: title ?? "",
+                company: job.company.map { withoutArticle($0, source) } ?? "",
+                location: job.location.flatMap { evidence.backs($0) ? $0 : nil },
+                startDate: dates[0],
+                endDate: dates[1],
+                current: job.entry.current && evidence.statesCurrent,
+                description: job.entry.description,
+                achievements: unique(job.entry.achievements.enumerated().compactMap { number, achievement in
+                    source.grounded(achievement, quoting: evidence.quotable(byAchievement: number), allowsNumbers: true)
+                }) { $0 }
+            ))
+        }
+        return unique(cleaned) { "\($0.experience.title)|\($0.experience.company)" }
+    }
+
     /// Whether every sentence of the description that gives `interest` also names one of the draft's `titles` and says nothing of
     /// liking (`LeisureMentions.speaksOfLiking`): "I am a plumber and I fix pipes" gives the work, not a hobby, so neither "fix pipes"
     /// nor "plumber" is an interest (#354). A sentence that likes something ("I am a nurse and I love painting") keeps it.
@@ -303,7 +297,7 @@ public struct CVDataSanitizer: Sendable {
     /// The sentences of `first`, then those of `second` that `first` does not hold already, each a sentence of its own: the role's
     /// quote ("I plan the night shifts") ends with a full stop when it has none, and a written sentence opens with a capital when its
     /// first word has none ("plans the menus"), so that neither reads as part of the other (ADR 0031).
-    private static func joined(_ first: String?, _ second: String?) -> String? {
+    static func joined(_ first: String?, _ second: String?) -> String? {
         guard let second else { return first }
         guard let first else { return second }
         let held = Set(SentenceSplitter.sentences(in: first).map { DescriptionText.normalized($0) })
@@ -435,7 +429,7 @@ public struct CVDataSanitizer: Sendable {
     // MARK: - Helpers
 
     /// An employer or a school without its leading indefinite article ("a nursery"), when what is left is a quote too.
-    private func withoutArticle(_ name: String, _ source: DescriptionText) -> String {
+    func withoutArticle(_ name: String, _ source: DescriptionText) -> String {
         source.named(EntryWording.withoutLeadingArticle(name, in: source.explainer.language)) ?? name
     }
 
@@ -490,22 +484,22 @@ public struct CVDataSanitizer: Sendable {
     }
 
     /// The lowercased runs of letters of `text`.
-    private static func letterWords(of text: String) -> [String] {
+    static func letterWords(of text: String) -> [String] {
         text.lowercased().split { !$0.isLetter }.map(String.init)
     }
 
     /// The first four letters of each word of `text` of three letters or more: how a written duty is matched to a said one.
-    private static func stems(of text: String) -> Set<String> {
+    static func stems(of text: String) -> Set<String> {
         Set(letterWords(of: text).filter { $0.count >= 3 }.map { String($0.prefix(4)) })
     }
 
     /// The words of `texts`, as `Word.folded` writes them.
-    private static func words(of texts: [String?]) -> Set<String> {
+    static func words(of texts: [String?]) -> Set<String> {
         Set(texts.compactMap { $0 }.flatMap { Word.words(in: $0).map(\.folded) })
     }
 
     /// Keeps the first of the items sharing a key, ignoring case and accents: the model sometimes repeats an entry.
-    private func unique<T>(_ items: [T], by key: (T) -> String) -> [T] {
+    func unique<T>(_ items: [T], by key: (T) -> String) -> [T] {
         var seen = Set<String>()
         return items.filter { seen.insert(DescriptionText.normalized(key($0))).inserted }
     }
