@@ -6515,6 +6515,28 @@ extension GroundingRows {
             rows.append(row("a-title-not-stated-is-no-headline-\(v.id)", "\(v.reason): neither the job nor the headline stays",
                             v.description, CVData(experience: [job(v.title)]), .exactly(CVData())))
         }
+        typealias Past = (language: String, description: String, title: String)
+        var past: [Past] = []
+        past.append(("en", "I was a plumber and I fixed pipes, taps and boilers in people's homes.", "plumber"))
+        past.append(("it", "Ero uno sviluppatore iOS e scrivevo applicazioni per iPhone e iPad.", "sviluppatore iOS"))
+        past.append(("de", "Ich war Bäckerin und backte jeden Morgen Brot, Brötchen und Kuchen für unsere Kunden.", "Bäckerin"))
+        past.append(("es", "Era camarero y atendía a los clientes en la terraza y en la barra del bar.", "camarero"))
+        past.append(("fr", "J'étais étudiant en 2015 et je suivais des cours de comptabilité le soir.", "étudiant"))
+        past.append(("pt", "Fui motorista de caminhão e fazia entregas de mercadorias pelo interior do estado.", "motorista de caminhão"))
+        for v in past {
+            rows.append(row("a-title-the-person-had-is-no-headline-\(v.language)",
+                            "the person had the title, in the past of to be: neither the job nor the headline stays",
+                            v.description, CVData(experience: [job(v.title)]), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("a-title-the-person-had-is-no-headline-de-perfect",
+                        "Ich bin ... gewesen is the perfect of to be: a title the person had is no headline",
+                        "Ich bin Bäckerin gewesen und habe jeden Morgen Brot gebacken.", CVData(experience: [job("Bäckerin")]),
+                        .exactly(CVData()), language: "de"))
+        rows.append(row("a-title-the-person-had-gives-no-summary",
+                        "the past title is no fact to write around: the summary written around it goes too",
+                        "I was a plumber and I fixed pipes, taps and boilers in people's homes.",
+                        CVData(summary: "A plumber who fixes pipes, taps and boilers in people's homes.", experience: [job("plumber")]),
+                        .exactly(CVData())))
         rows.append(row("a-stated-title-leaves-the-headline-alone",
                         "the draft gives a headline of its own, which stays: the title of the job with no employer is not added",
                         "I am a plumber and a welder.",
