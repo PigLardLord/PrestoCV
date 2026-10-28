@@ -238,7 +238,12 @@ final class Scanner: SyntaxVisitor {
     }
 
     override func visit(_ node: TypeAliasDeclSyntax) -> SyntaxVisitorContinueKind {
-        if let type = node.initializer.value.tokens(viewMode: .sourceAccurate).map(\.text).first(where: infrastructureTypes.contains) {
+        // Only an alias that names the type itself, qualified or not: `[Gate]` or `Wrapper<Gate>` is another type.
+        var named = node.initializer.value
+        while let attributed = named.as(AttributedTypeSyntax.self) { named = attributed.baseType }
+        let direct = named.as(IdentifierTypeSyntax.self).flatMap { $0.genericArgumentClause == nil ? Self.name($0.name) : nil }
+            ?? named.as(MemberTypeSyntax.self).flatMap { $0.genericArgumentClause == nil ? Self.name($0.name) : nil }
+        if let type = direct, infrastructureTypes.contains(type) {
             aliases.append((Self.name(node.name), type, node.startLocation(converter: converter).line))
         }
         return .visitChildren
