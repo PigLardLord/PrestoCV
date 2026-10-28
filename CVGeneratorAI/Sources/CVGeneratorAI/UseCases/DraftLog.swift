@@ -18,6 +18,8 @@ struct DraftLog {
         case model
         /// The rules keep what the description supports (ADR 0023).
         case grounding
+        /// The model writes around the facts (ADR 0031).
+        case writing
         /// The second check of the personal items (ADR 0028).
         case claimCheck
         /// The check of what is left.
@@ -27,6 +29,7 @@ struct DraftLog {
             switch self {
             case .model: "model"
             case .grounding: "grounding"
+            case .writing: "writing"
             case .claimCheck: "claimCheck"
             case .result: "result"
             }
@@ -83,6 +86,25 @@ struct DraftLog {
     /// The model is asked, with a description of so many characters.
     func started(characters: Int) {
         logger.info(.draft, "draft.started", .count("characters", characters))
+    }
+
+    /// A pass of the model tried once more, after a failure from below the model: a notice, since the draft takes longer.
+    func retried(at stage: Stage, by error: any Error) {
+        logger.notice(.draft, "draft.retried", .token("stage", stage.logName), .error(error))
+    }
+
+    /// What the second pass wrote around the facts, before the rules read it: how many roles it described and how many skills it wrote.
+    func written(_ writing: DraftWriting) {
+        logger.info(.draft, "draft.written", .flag("summary", writing.summary?.presentValue != nil),
+            .count("roles", writing.roleDescriptions.count { $0?.presentValue != nil }),
+            .count("technologies", writing.technologies.count), .count("softSkills", writing.softSkills.count)
+        )
+    }
+
+    /// A second pass that failed or ran out of time: a notice, since the draft then keeps its facts alone, with no summary or
+    /// skills of the model's own.
+    func unwritten(by error: any Error) {
+        logger.notice(.draft, "draft.unwritten", .error(error))
     }
 
     /// The personal items the claim check judged and those it withdrew, and whether it gave no answer: a notice when it withdrew

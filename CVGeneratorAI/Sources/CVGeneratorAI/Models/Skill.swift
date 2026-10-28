@@ -22,7 +22,7 @@ public enum SkillKind: String, Codable, CaseIterable, Sendable {
 /// Skill entry
 @Generable
 public struct Skill: Codable, Equatable, Sendable {
-    @Guide(description: "A technology or soft skill, 1 to 4 words, no level")
+    @Guide(description: "Name of the skill, as the person wrote it")
     public let name: String
 
     @Guide(description: "Level, only if the person described one; otherwise null")

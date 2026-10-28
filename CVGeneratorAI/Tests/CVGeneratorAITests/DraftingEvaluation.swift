@@ -110,10 +110,11 @@ struct DraftingEvaluation {
         let seconds = seconds(since: start)
         try Task.checkCancellation()
         // The rules again on the model's draft, outside the timed path: they are deterministic, so this is the draft the check saw.
-        let grounded = service.raw.flatMap { try? sanitizer.sanitize($0, against: input.description) }
+        let grounded = service.raw.flatMap { try? sanitizer.sanitize($0, writing: service.writing, against: input.description) }
         let checks = await log.events
         return DraftMeasure(
-            input: input, run: run, revision: revision, seconds: seconds, load: load, raw: service.raw, grounded: grounded,
+            input: input, run: run, revision: revision, seconds: seconds, load: load, raw: service.raw, writing: service.writing,
+            grounded: grounded,
             result: result, error: failure, checks: checks
         )
     }
@@ -144,6 +145,7 @@ struct DraftingEvaluation {
     final class RecordingService: CVGenerationService {
         private let model = FoundationModelsService()
         private(set) var raw: CVData?
+        private(set) var writing: DraftWriting?
 
         func availability() -> AIAvailability { model.availability() }
 
@@ -151,6 +153,12 @@ struct DraftingEvaluation {
             let draft = try await model.generateCV(from: request)
             raw = draft
             return draft
+        }
+
+        func writeDraft(for brief: DraftBrief) async throws -> DraftWriting? {
+            let written = try await model.writeDraft(for: brief)
+            writing = written
+            return written
         }
     }
 }

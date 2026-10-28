@@ -61,12 +61,18 @@ public struct CVDataSanitizer: Sendable {
 
     /// The draft, with what `description` does not support taken out.
     ///
+    /// - Parameters:
+    ///   - cvData: The facts the first pass of the model extracted (ADR 0031).
+    ///   - writing: What the second pass wrote around the grounded facts of `cvData`, its roles one for one with the jobs that
+    ///     `sanitize(cvData, against: description)` keeps. Its summary replaces the first pass's when a sentence of it stays; its
+    ///     duties follow each job's own description; its skills follow the skills of `cvData`. All of it is text written around the
+    ///     facts, and stays only as such (`WrittenText`, `InferredSkills`).
     /// - Throws: `CVGenerationError.languageDataUnavailable`, and no draft, when the description is in English or German and the
     ///   device does not tag its language.
-    public func sanitize(_ cvData: CVData, against description: String) throws(CVGenerationError) -> CVData {
+    public func sanitize(_ cvData: CVData, writing: DraftWriting? = nil, against description: String) throws(CVGenerationError) -> CVData {
         let source = DescriptionText(description, languageOfText: languageOfText)
         try requireLanguageData(of: source)
-        return LexicalClasses.$tagger.withValue(lexicalClasses) { grounded(cvData, in: source) }
+        return LexicalClasses.$tagger.withValue(lexicalClasses) { grounded(cvData, writing: writing, in: source) }
     }
 
     /// The language of `description`, when it is one of the six, and whether grounding it needs the device's language data and
@@ -86,7 +92,7 @@ public struct CVDataSanitizer: Sendable {
         return LanguageCheck(language: language, data: lexicalClasses.tagsLexicalClass(inLanguage: language.rawValue) ? .present : .missing)
     }
 
-    private func grounded(_ cvData: CVData, in source: DescriptionText) -> CVData {
+    private func grounded(_ cvData: CVData, writing: DraftWriting?, in source: DescriptionText) -> CVData {
         let jobTitles = cvData.experience.map(\.title)
         // The person's name, place and title explain themselves in the clauses of the entries, so they are read first, wherever they stand;
         // the clauses that speak for the person then tell which of them stand in the description for the person.
@@ -97,22 +103,27 @@ public struct CVDataSanitizer: Sendable {
         let written = WrittenText(source: source, claimed: claimed, wordList: wordList, tagger: lexicalClasses)
 
         let personalInfo = sanitize(cvData.personalInfo, jobTitles: jobTitles, spoken, claimed: claimed, contacts: entries.contacts(in: source))
-        let experience = sanitize(entries.jobs, source, entries, written: written)
+        let experience = sanitize(entries.jobs, source, entries, written: written, duties: writing?.roleDescriptions ?? [])
         let education = sanitize(entries.studies, source, entries)
         // The model writes around the facts only when it has one to write around (ADR 0031): with no title, job or school, a summary
         // or a skill of its own would say who the person is with nothing the person said.
         let hasAFact = personalInfo.title != nil || !experience.isEmpty || !education.isEmpty
         let ownWords = Self.words(of: [personalInfo.title] + experience.map(\.title) + education.map(\.degree))
+        let summary = { (text: String?) in
+            source.written(text, quoting: entries.summaryQuotes, allowsNumbers: false) { written.isPlain($0, ownWords: ownWords) }
+        }
+        let roleSkills = (writing?.technologies ?? []).map { Skill(name: $0, kind: .technology) }
+            + (writing?.softSkills ?? []).map { Skill(name: $0, kind: .softSkill) }
 
         return CVData(
             personalInfo: personalInfo,
             summary: hasAFact
-                ? source.written(cvData.summary, quoting: entries.summaryQuotes, allowsNumbers: false) { written.isPlain($0, ownWords: ownWords) }
+                ? summary(writing?.summary) ?? summary(cvData.summary)
                 : source.grounded(cvData.summary, quoting: entries.summaryQuotes, allowsNumbers: false),
             experience: experience,
             education: education,
             skills: sanitize(
-                cvData.skills, source, claimed: claimed, interests: interests, entries,
+                cvData.skills + roleSkills, source, claimed: claimed, interests: interests, entries,
                 inferring: hasAFact ? InferredSkills(cvData, language: source.explainer.language, written: written) : nil
             ),
             languages: sanitize(cvData.languages, claimed),
@@ -154,34 +165,58 @@ public struct CVDataSanitizer: Sendable {
     /// not a job, and a job built on it carries whatever the model made up around it.
     ///
     /// Its description also keeps the sentences that state no fact of their own (`WrittenText`), with no word of the title or the
-    /// employer of another job (ADR 0031).
-    private func sanitize(_ jobs: [Entries.Job], _ source: DescriptionText, _ entries: Entries, written: WrittenText) -> [Experience] {
-        let cleaned = jobs.compactMap { job -> Experience? in
+    /// employer of another job (ADR 0031): those of its own description, then those of its `duties`, the text the second pass wrote
+    /// for the job at the same position of the result.
+    private func sanitize(
+        _ jobs: [Entries.Job], _ source: DescriptionText, _ entries: Entries, written: WrittenText, duties: [String?]
+    ) -> [Experience] {
+        let cleaned = jobs.compactMap { job -> (job: Entries.Job, experience: Experience)? in
             guard entries.hasFactualMention(of: job.subject) else { return nil }
             let evidence = entries.evidence(of: job.subject)
             let title = entries.supportedTitle(of: job.subject, job.title)
             let dates = evidence.supportedDates([job.entry.startDate, job.entry.endDate])
             guard job.company != nil || (title != nil && dates.contains { $0 != nil }) else { return nil }
 
-            return Experience(
+            return (job: job, experience: Experience(
                 title: title ?? "",
                 company: job.company.map { withoutArticle($0, source) } ?? "",
                 location: job.location.flatMap { evidence.backs($0) ? $0 : nil },
                 startDate: dates[0],
                 endDate: dates[1],
                 current: job.entry.current && evidence.statesCurrent,
-                description: source.written(job.entry.description, quoting: evidence.quotable, allowsNumbers: true) { sentence in
-                    let ownWords = Self.words(of: [title])
-                    let others = jobs.filter { $0.subject != job.subject }.flatMap { [$0.title, $0.company] }
-                    let foreignWords = Self.words(of: others).subtracting(ownWords).filter { !Vocabulary.isNeutral($0, in: source.explainer.language) }
-                    return written.isPlain(sentence, ownWords: ownWords, foreignWords: foreignWords)
-                },
+                description: job.entry.description,
                 achievements: unique(job.entry.achievements.enumerated().compactMap { number, achievement in
                     source.grounded(achievement, quoting: evidence.quotable(byAchievement: number), allowsNumbers: true)
                 }) { $0 }
+            ))
+        }
+        return unique(cleaned) { "\($0.experience.title)|\($0.experience.company)" }.enumerated().map { position, kept in
+            let (job, experience) = kept
+            let ownWords = Self.words(of: [experience.title])
+            let others = jobs.filter { $0.subject != job.subject }.flatMap { [$0.title, $0.company] }
+            let foreignWords = Self.words(of: others).subtracting(ownWords).filter { !Vocabulary.isNeutral($0, in: source.explainer.language) }
+            let description = { (text: String?) in
+                source.written(text, quoting: entries.evidence(of: job.subject).quotable, allowsNumbers: true) { sentence in
+                    written.isPlain(sentence, ownWords: ownWords, foreignWords: foreignWords)
+                }
+            }
+            let duties = position < duties.count ? description(duties[position]) : nil
+            return Experience(
+                title: experience.title, company: experience.company, location: experience.location,
+                startDate: experience.startDate, endDate: experience.endDate, current: experience.current,
+                description: Self.joined(description(experience.description), duties),
+                achievements: experience.achievements
             )
         }
-        return unique(cleaned) { "\($0.title)|\($0.company)" }
+    }
+
+    /// The sentences of `first`, then those of `second` that `first` does not hold already.
+    private static func joined(_ first: String?, _ second: String?) -> String? {
+        guard let second else { return first }
+        guard let first else { return second }
+        let held = Set(SentenceSplitter.sentences(in: first).map { DescriptionText.normalized($0) })
+        let added = SentenceSplitter.sentences(in: second).filter { !held.contains(DescriptionText.normalized($0)) }
+        return ([first] + added).joined(separator: " ")
     }
 
     private func sanitize(_ studies: [Entries.Study], _ source: DescriptionText, _ entries: Entries) -> [Education] {

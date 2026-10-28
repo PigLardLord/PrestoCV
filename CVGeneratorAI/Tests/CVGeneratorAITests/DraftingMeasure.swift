@@ -92,8 +92,10 @@ struct DraftMeasure: Encodable {
     let run: Int
     let seconds: Double
     let load: Double?
-    /// The model's draft, before the rules.
+    /// The model's draft, before the rules: the facts of the first pass.
     let raw: CVData?
+    /// What the second pass wrote around the facts, before the rules (ADR 0031); nil when it was not asked, failed or wrote nothing.
+    let writing: DraftWriting?
     /// The model's draft after the rules of ADR 0023, before the claim check.
     let grounded: CVData?
     /// What the use case returns, and the app shows.
@@ -121,8 +123,8 @@ struct DraftMeasure: Encodable {
     let failure: String?
 
     init(
-        input: DraftingInput, run: Int, revision: String, seconds: Double, load: Double?, raw: CVData?, grounded: CVData?,
-        result: GeneratedDraft?, error: (any Error)?, checks: [CheckEvent]
+        input: DraftingInput, run: Int, revision: String, seconds: Double, load: Double?, raw: CVData?, writing: DraftWriting? = nil,
+        grounded: CVData?, result: GeneratedDraft?, error: (any Error)?, checks: [CheckEvent]
     ) {
         self.revision = revision
         id = input.id
@@ -132,6 +134,7 @@ struct DraftMeasure: Encodable {
         self.seconds = seconds
         self.load = load
         self.raw = raw
+        self.writing = writing
         self.grounded = grounded
         self.final = result?.cvData
         unchecked = result?.personalItemsUnchecked ?? false

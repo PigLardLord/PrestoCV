@@ -43,6 +43,32 @@ public final class FoundationModelsService: CVGenerationService {
         }
     }
 
+    public func writeDraft(for brief: DraftBrief) async throws -> DraftWriting? {
+        let prompt = DraftWritingPrompt(brief: brief)
+        let session = LanguageModelSession(instructions: prompt.instructions)
+
+        do {
+            let response = try await session.respond(
+                to: prompt.text,
+                generating: WritingAnswer.self,
+                includeSchemaInPrompt: true,
+                options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: Self.writingTokens)
+            )
+            return response.content.writing(for: brief)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            if Task.isCancelled {
+                throw CancellationError()
+            }
+            throw Self.map(failure: error)
+        }
+    }
+
+    /// The longest answer of the second pass: a summary, two sentences for each of ten roles and thirteen skills fit well within
+    /// it, and a model caught repeating itself stops there instead of filling the window (#354).
+    static let writingTokens = 900
+
     // MARK: - Mapping
 
     /// Translates the framework's availability, keeping any reason a later OS adds as `.unknown`
@@ -97,5 +123,38 @@ public final class FoundationModelsService: CVGenerationService {
             return .serviceFailed
         }
     }
+}
+
+/// The answer of the second pass (ADR 0031), with its lists bounded: the model would otherwise fill a list until its window ends.
+@Generable
+struct WritingAnswer {
+    @Guide(description: "2 to 4 sentences on the person's profession and strengths")
+    let summary: String
+
+    @Guide(description: "One entry for each numbered role", .maximumCount(10))
+    let roles: [RoleAnswer]
+
+    @Guide(description: "Tools, methods or knowledge of the trade that fit the roles, 1 to 4 words each", .count(4...8))
+    let technologies: [String]
+
+    @Guide(description: "Ways of working with people and tasks that fit the roles, 1 to 4 words each", .count(3...5))
+    let softSkills: [String]
+
+    func writing(for brief: DraftBrief) -> DraftWriting {
+        DraftWriting(
+            summary: summary,
+            roleDescriptions: DraftWritingPrompt.descriptions(roles.map { (number: $0.number, text: $0.description) }, of: brief),
+            technologies: technologies, softSkills: softSkills
+        )
+    }
+}
+
+@Generable
+struct RoleAnswer {
+    @Guide(description: "The number of the role")
+    let number: Int
+
+    @Guide(description: "1 to 2 sentences with the responsibilities typical of the role's title")
+    let description: String
 }
 #endif

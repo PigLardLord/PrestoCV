@@ -96,11 +96,14 @@ A draft ends with one of `draft.finished`, `draft.cancelled`, `draft.refused`, `
 | `draft.rejected` | notice | `check` (`request`, `language` or `result`), `error`, `elapsed` (a result only) | The description broke a rule of the request, the device lacks the language data that grounding it needs (`draft.language` shows which), or the draft left after the checks broke a rule of the validation. |
 | `draft.language` | info, notice when the data is missing | `supported`, `language` (when supported), `data` (`notNeeded`, `present` or `missing`) | The language of the description, and the device's language data that grounding it needs. |
 | `draft.started` | info | `characters` | The model was asked. |
+| `draft.retried` | notice | `stage` (`model` or `writing`), `error` | A pass of the model failed below the model (`serviceFailed`) and is tried once more ([ADR 0031](architecture/adr/0031-let-the-ai-draft-write-around-the-facts.md)). |
+| `draft.written` | info | `summary`, `roles` (the roles described), `technologies`, `softSkills` | The second pass wrote around the facts, before the rules read it ([ADR 0031](architecture/adr/0031-let-the-ai-draft-write-around-the-facts.md)). |
+| `draft.unwritten` | notice | `error` | The second pass failed or ran out of time: the draft keeps its facts alone. |
 | `draft.claims` | info, notice when one was withdrawn | `checked` (the personal items put to the check), `withdrawn`, `unchecked` (the check gave no answer, so every item is withdrawn and left blank) | The claim check judged the personal items ([ADR 0028](architecture/adr/0028-check-each-personal-claim-of-the-ai-draft-again.md)). |
 | `draft.finished` | info | `elapsed` | The draft is ready. |
 | `draft.refused` | notice | `elapsed` | The model's guardrails refused the description. |
 | `draft.cancelled` | info | `stage`, `elapsed` | The person left, or asked again, while the draft was written. |
-| `draft.failed` | error | `stage` (`model`, `grounding`, `claimCheck` or `result`), `error`, `elapsed` | A step failed. |
+| `draft.failed` | error | `stage` (`model`, `grounding`, `claimCheck` or `result`; a first pass that runs out of time fails at `model` with `generationFailed`), `error`, `elapsed` | A step failed. |
 
 ### The launch of a UI test (category `launch`, Debug builds only)
 

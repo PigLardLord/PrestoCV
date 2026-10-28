@@ -4,15 +4,15 @@ import FoundationModels
 
 /// Core CV data model for AI generation
 ///
-/// It holds only what the on-device model can fill from a short description. The lists of facts have no length guide: a limit is
-/// taken as a number to reach, and the model then fills every list with entries it made up. The skills have one: the model writes
-/// the technologies and soft skills that fit the person's role, and the sanitizer keeps no fact among them (ADR 0031).
+/// It holds only what the on-device model can fill from a short description, in the first pass of a draft, which extracts the facts
+/// (ADR 0031). The lists have no length guide: a limit is taken as a number to reach, and the model then fills every list with
+/// entries it made up. The second pass writes the summary, the role descriptions and the role's skills (`DraftWriting`).
 @Generable
 public struct CVData: Codable, Equatable, Sendable {
     @Guide(description: "Personal and contact information")
     public let personalInfo: PersonalInfo
 
-    @Guide(description: "2 to 4 sentences on the person's profession and strengths, in the description's language, with no number, date, or name of a company, school, place or person; null only if the description names no role, study or field")
+    @Guide(description: "At most three sentences restating the description, with no numbers the person did not give; null if the description says too little")
     public let summary: String?
 
     @Guide(description: "Work experience in reverse chronological order (most recent first); empty if none was mentioned")
@@ -21,7 +21,7 @@ public struct CVData: Codable, Equatable, Sendable {
     @Guide(description: "Education; empty if none was mentioned")
     public let education: [Education]
 
-    @Guide(description: "Technologies (4 to 8) and soft skills (3 to 5) that fit the person's roles and field, and any the person named; no levels")
+    @Guide(description: "Skills the person named; empty if none was mentioned")
     public let skills: [Skill]
 
     @Guide(description: "Languages the person named; empty if none was mentioned")
