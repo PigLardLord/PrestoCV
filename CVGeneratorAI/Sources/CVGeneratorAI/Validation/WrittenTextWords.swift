@@ -15,9 +15,13 @@ struct WrittenTextWords: Sendable {
     let negations: Set<String>
     /// Words that name a qualification ("certified", "degree", "abilitazione"): a skill the model writes holds none.
     let qualifications: Set<String>
+    /// What a number written as one word is made of besides the numbers themselves: "uno" and the elided tens of "ventuno", the "und"
+    /// of "einundzwanzig", the "cientos" of "doscientos".
+    private let joiningParts: Set<String>
 
-    init(numbers: String, months: String, seniority: String, negations: String, qualifications: String) {
+    init(numbers: String, months: String, seniority: String, negations: String, qualifications: String, joiningParts: String = "") {
         self.numbers = Self.set(of: numbers)
+        self.joiningParts = Self.set(of: joiningParts)
         self.months = Self.set(of: months)
         self.seniority = Self.set(of: seniority)
         self.negations = Self.set(of: negations)
@@ -34,6 +38,22 @@ struct WrittenTextWords: Sendable {
         case .portuguese: portuguese
         case .english, nil: english
         }
+    }
+
+    /// Whether `word` is a number written in words: one of the list, or a compound of them ("ventuno", "einundzwanzig",
+    /// "doscientos", "twentyone"). A compound is two parts or more and nothing else: "tone" is no number.
+    func isNumber(_ word: String) -> Bool {
+        numbers.contains(word) || isCompound(Array(word), from: 0, parts: 0)
+    }
+
+    private func isCompound(_ characters: [Character], from start: Int, parts: Int) -> Bool {
+        guard start < characters.count else { return parts >= 2 }
+        for end in stride(from: characters.count, to: start, by: -1) {
+            let part = String(characters[start..<end])
+            guard numbers.contains(part) || joiningParts.contains(part) else { continue }
+            if isCompound(characters, from: end, parts: parts + 1) { return true }
+        }
+        return false
     }
 
     private static func set(of blob: String) -> Set<String> {
@@ -76,7 +96,8 @@ struct WrittenTextWords: Sendable {
         qualifications: """
         laurea lauree diploma diplomi master dottorato certificato certificata certificati certificazione certificazioni
         abilitazione abilitato abilitata patente iscritto iscritta albo qualifica qualifiche
-        """
+        """,
+        joiningParts: "uno vent trent quarant cinquant sessant settant ottant novant cent"
     )
 
     static let german = WrittenTextWords(
@@ -96,13 +117,14 @@ struct WrittenTextWords: Sendable {
         abschluss bachelor master diplom promotion zertifikat zertifikate zertifiziert zertifizierte zertifizierter
         zertifizierung zertifizierungen lizenz lizenziert approbation approbiert staatlich examiniert examinierte
         qualifikation qualifikationen
-        """
+        """,
+        joiningParts: "ein eine und"
     )
 
     static let spanish = WrittenTextWords(
         numbers: """
         dos tres cuatro cinco seis siete ocho nueve diez once doce trece catorce quince dieciseis diecisiete dieciocho
-        diecinueve veinte treinta cuarenta cincuenta sesenta setenta ochenta noventa cien ciento cientos mil millon millones
+        diecinueve veinte treinta cuarenta cincuenta sesenta setenta ochenta noventa cien ciento cientos cientas quinientos quinientas setecientos setecientas novecientos novecientas mil millon millones
         docena docenas decena decenas centenares
         """,
         months: "enero febrero marzo abril mayo junio julio agosto septiembre setiembre octubre noviembre diciembre",
@@ -115,13 +137,14 @@ struct WrittenTextWords: Sendable {
         qualifications: """
         grado titulo licenciatura diploma master maestria doctorado certificado certificada certificados certificacion
         certificaciones licencia colegiado colegiada titulado titulada acreditado acreditada
-        """
+        """,
+        joiningParts: "uno un una veinti"
     )
 
     static let french = WrittenTextWords(
         numbers: """
         deux trois quatre cinq six sept huit neuf dix onze douze treize quatorze quinze seize vingt trente quarante
-        cinquante soixante cent cents mille million millions milliard milliards douzaine douzaines dizaine dizaines
+        cinquante soixante cent cents quatrevingt quatrevingts vingts mille million millions milliard milliards douzaine douzaines dizaine dizaines
         centaine centaines
         """,
         months: "janvier fevrier mars avril mai juin juillet aout septembre octobre novembre decembre",
@@ -141,7 +164,8 @@ struct WrittenTextWords: Sendable {
         numbers: """
         dois duas tres quatro cinco seis sete oito nove dez onze doze treze catorze quatorze quinze dezesseis dezasseis
         dezessete dezassete dezoito dezenove dezanove vinte trinta quarenta cinquenta sessenta setenta oitenta noventa cem
-        cento centenas mil milhao milhoes dezena dezenas duzia duzias
+        cento duzentos duzentas trezentos trezentas quatrocentos quatrocentas quinhentos quinhentas seiscentos seiscentas setecentos
+        setecentas oitocentos oitocentas novecentos novecentas centenas mil milhao milhoes dezena dezenas duzia duzias
         """,
         months: "janeiro fevereiro marco abril maio junho julho agosto setembro outubro novembro dezembro",
         seniority: """

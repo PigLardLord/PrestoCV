@@ -300,7 +300,7 @@ private enum AppExample {
 
 enum GroundingRows {
     /// The rows the table had when it was written; it never has fewer.
-    static let rowsWhenWritten = 2176
+    static let rowsWhenWritten = 2313
 
     /// Rows the sanitiser does not hold yet. Each runs in `withKnownIssue`; when the sanitiser holds it, the wrapper
     /// fails and the id leaves this list. All of them are residual risks of the rules (ADR 0023) that the claim check of
@@ -6356,6 +6356,42 @@ extension GroundingRows {
                         ]),
                         .keeping([], rewriting: [Rewrite("experience[0].description", to: "Plans lessons and keeps in touch with families.",
                                                          "years is a length the description does not write")])))
+        rows += qualificationsAndCompoundNumbers()
+        return rows
+    }
+
+    /// A sentence that holds a qualification, per language: none of these words is in the app's example description.
+    private static let qualificationSentences: [String: String] = [
+        "en": "Holds a teaching license.", "it": "Ha l'abilitazione all'insegnamento.", "de": "Besitzt eine Lizenz zum Unterrichten.",
+        "es": "Tiene la licenciatura en educación.", "fr": "Possède une licence en éducation.", "pt": "Possui licenciatura em educação.",
+    ]
+
+    /// A sentence that counts with a number written as one word, per language.
+    private static let compoundNumberSentences: [String: String] = [
+        "en": "Teaches twentyone pupils.", "it": "Segue ventuno alunni.", "de": "Betreut einundzwanzig Kinder.",
+        "es": "Atiende a veintiún alumnos.", "fr": "Suit vingt-deux élèves.", "pt": "Acompanha duzentos alunos.",
+    ]
+
+    /// ADR 0031: a qualification is a fact the person has to state, in a summary and in a role text alike; and a number is one in any
+    /// way it is written, compound words included.
+    private static func qualificationsAndCompoundNumbers() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        for language in appLanguages {
+            let summary = plainSummary[language] ?? ""
+            let duties = typicalDuties[language] ?? ""
+            for (id, sentence, reason) in [
+                ("qualification", qualificationSentences[language] ?? "", "a qualification is a fact the person never stated"),
+                ("compound-number", compoundNumberSentences[language] ?? "", "a number written as one word counts what the person never counted"),
+            ] {
+                rows.append(row("written-summary-\(id)-goes-\(language)", reason, AppExample.text(in: language),
+                                CVData(personalInfo: teacher(language), summary: summary + " " + sentence),
+                                .keeping([], rewriting: [Rewrite("summary", to: summary, reason)]), language: language))
+                rows.append(row("written-role-\(id)-goes-\(language)", reason, AppExample.text(in: language),
+                                CVData(personalInfo: teacher(language),
+                                       experience: [schoolJob(language, description: duties + " " + sentence)]),
+                                .keeping([], rewriting: [Rewrite("experience[0].description", to: duties, reason)]), language: language))
+            }
+        }
         return rows
     }
 
@@ -6390,6 +6426,14 @@ extension GroundingRows {
             secondGoes("qualification-goes", "a qualification is a fact", "Certified Montessori method"),
             secondGoes("place-goes", "Bologna is the person's place, a fact of the draft", "Bologna school system"),
             secondGoes("digit-goes", "a digit counts or dates something", "Microsoft 365"),
+            secondGoes("exam-goes", "an exam is a qualification, and a qualification is a fact", "TOEFL"),
+            secondGoes("exam-in-words-goes", "an exam is a qualification, and a qualification is a fact", "Cambridge CELTA"),
+            secondGoes("address-goes", "an address is a contact detail, not a skill", "help@evil.example"),
+            secondGoes("link-goes", "a link is a contact detail, not a skill", "evil.example"),
+            secondGoes("bidi-goes", "a bidirectional control character misleads the reader", "Excel\u{202E}gnidnuof"),
+            secondGoes("zero-width-goes", "a zero-width character hides what the reader sees", "Lesson\u{200B}planning"),
+            secondGoes("control-goes", "a control character is no part of a name", "Lesson\u{0007}planning"),
+            secondGoes("markup-goes", "markup is no skill name", "<b>Phonics</b>"),
             secondGoes("too-long-goes", "a skill has at most four words", "Planning engaging lessons for young pupils"),
             secondGoes("repeated-goes", "the draft keeps one skill of a name", "lesson planning"),
             secondGoes("from-a-wish-goes", "python is only in a wish of the person", "Python for teachers",

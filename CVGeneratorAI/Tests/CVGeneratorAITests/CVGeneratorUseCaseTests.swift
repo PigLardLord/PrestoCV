@@ -280,6 +280,23 @@ struct CVGeneratorUseCaseTests {
         #expect(draft.personalItemsUnchecked == false)
     }
 
+    @Test("An exam name, an address or a hidden character the model wrote as a skill never reaches the draft, with the check passed or failed (ADR 0031)",
+          arguments: [
+              "TOEFL", "Cambridge CELTA", "Green Belt", "maria.rossi@example.com", "mailto:maria.rossi@example.com", "evil.example/page",
+              "Lesson\u{202E}planning", "Lesson\u{200B}planning", "Lesson\u{0007}planning", "<b>Phonics</b>",
+          ])
+    func unplainRoleSkillsAreDropped(name: String) async throws {
+        let roleSkills = [Skill(name: "Lesson planning"), Skill(name: name), Skill(name: "Node.js"), Skill(name: "C++")]
+
+        for checker in [FakeClaimChecker(), FakeClaimChecker(failure: CVGenerationError.generationFailed)] {
+            let draft = try await generator(drafting: example.draft.withSkills(roleSkills), checker: checker)
+                .generateCV(from: CVGenerationRequest(userPrompt: example.description))
+
+            #expect(draft.cvData.skills.map(\.name) == ["Lesson planning", "Node.js", "C++"] || draft.cvData.skills.isEmpty, "\(name)")
+            #expect(!draft.cvData.skills.map(\.name).contains(name), "\(name)")
+        }
+    }
+
     @Test("A check that fails withdraws the skills the model wrote for the role too, and keeps the summary (ADR 0031)")
     func failedCheckWithdrawsRoleSkills() async throws {
         let checker = FakeClaimChecker(failure: CVGenerationError.generationFailed)

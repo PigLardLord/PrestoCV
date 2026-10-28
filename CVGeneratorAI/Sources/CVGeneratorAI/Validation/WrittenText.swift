@@ -3,7 +3,8 @@ import Foundation
 /// The text the model writes around the facts (ADR 0031): a summary of the person's profession and the responsibilities typical of
 /// each job's title. Such a sentence quotes nothing, so it is kept only when it states no fact of its own, which the person would have
 /// had to say. A sentence is plain when it is in the language of the description and holds:
-/// - no address, and no number, in digits or in words ("five", "cinque");
+/// - no address, and no number, in digits or in words, compound ones included ("five", "cinque", "ventuno", "einundzwanzig");
+/// - no word of a qualification ("license", "abilitazione", "Abschluss"): a qualification is a fact the person has to state;
 /// - no month, and no word of duration, seniority or level ("years", "senior", "expert") that the description does not write;
 /// - no negation: the person denied nothing in it;
 /// - no word that the description holds only in the clauses that claim nothing for the person (another person's, or one that denies,
@@ -69,8 +70,8 @@ struct WrittenText {
     }
 
     private func statesAFact(_ word: String, foreignWords: Set<String>) -> Bool {
-        words.numbers.contains(word) || words.months.contains(word) || words.negations.contains(word) || isAnUnstatedLevel(word)
-            || isExcluded(word) || foreignWords.contains(word)
+        words.isNumber(word) || words.qualifications.contains(word) || words.months.contains(word) || words.negations.contains(word)
+            || isAnUnstatedLevel(word) || isExcluded(word) || foreignWords.contains(word)
     }
 
     /// "Don't", "isn't": the apostrophe splits the word, so the negation is read in the text.

@@ -5,7 +5,9 @@ import Foundation
 /// and forty characters, that holds
 /// - no digit, and no word of level, duration or seniority the description does not write ("Advanced Excel", "Senior Java");
 /// - no language ("Business English"): the languages are the person's own, and the draft lists them apart;
-/// - no word of a qualification ("Certified Scrum Master", "Abilitazione"): a qualification is a fact;
+/// - no word of a qualification ("Certified Scrum Master", "Abilitazione"), and no name of an exam or a certification ("TOEFL",
+///   "Green Belt", see `QualificationNames`): a qualification is a fact;
+/// - no address, link or mark-up, and no character that the reader cannot see or that reorders the text (see `SkillNameShape`);
 /// - no employer, school, place or person of the draft, and no interest of it;
 /// - no word that the description holds only in clauses that claim nothing for the person ("I would like to learn Kubernetes").
 ///
@@ -35,7 +37,8 @@ struct InferredSkills {
 
     /// The name of the skill, trimmed, when the draft may keep it.
     func accepted(_ name: String) -> String? {
-        guard let name = name.presentValue, name.count <= 40, !name.contains(where: \.isNumber) else { return nil }
+        guard let name = name.presentValue, name.count <= 40, !name.contains(where: \.isNumber), SkillNameShape.isPlain(name),
+              !QualificationNames.isOne(name) else { return nil }
         let words = Word.words(in: name)
         guard !words.isEmpty, words.count <= 4 else { return nil }
 
@@ -59,7 +62,8 @@ struct InferredSkills {
             for display in displays {
                 guard let name = display.localizedString(forLanguageCode: code.identifier), name.lowercased() != code.identifier else { continue }
                 let words = Word.words(in: name)
-                if words.count == 1, let word = words.first { names.insert(word.folded) }
+                // A word of two letters is the code of a language, or the Italian "ci", and "CI/CD" is a skill.
+                if words.count == 1, let word = words.first, word.folded.count > 2 { names.insert(word.folded) }
             }
         }
         return names

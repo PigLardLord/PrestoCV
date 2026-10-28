@@ -147,3 +147,103 @@ private struct ListedNames: LexicalTagger {
         Word.words(in: text).filter { names.contains($0.folded) }.map(\.range)
     }
 }
+
+/// ADR 0031: a qualification and a number are facts in any language and in any way they are written, in a sentence the model writes
+/// around the facts. The language is given, so the verdict is the same on every device.
+@Suite("Written text: qualifications and numbers written as one word")
+struct WrittenTextFactsTests {
+    struct Case: Sendable, CustomTestStringConvertible {
+        let language: String
+        let description: String
+        let plain: String
+        let qualifications: [String]
+        let numbers: [String]
+
+        var testDescription: String { language }
+    }
+
+    static let cases: [Case] = [
+        Case(language: "en", description: "I'm a primary school teacher. I teach at a school in my town.",
+             plain: "A patient teacher who plans lessons and works closely with families.",
+             qualifications: ["Holds a teaching license.", "A certified teacher.", "Has a master in education.", "Holds a degree."],
+             numbers: ["Teaches twentyone pupils.", "Follows thirtyfive pupils."]),
+        Case(language: "it", description: "Sono un'insegnante di scuola primaria. Insegno in una scuola della mia città.",
+             plain: "Insegnante paziente che prepara le lezioni e collabora con le famiglie.",
+             qualifications: ["Ha l'abilitazione all'insegnamento.", "Ha una laurea in pedagogia.", "È un'insegnante certificata."],
+             numbers: ["Segue ventuno alunni.", "Segue trentatré alunni.", "Segue duecento alunni.", "Segue tremila alunni.",
+                       "Segue centoventi alunni."]),
+        Case(language: "de", description: "Ich bin Grundschullehrerin. Ich unterrichte an einer Schule in meiner Stadt.",
+             plain: "Geduldige Lehrerin, die den Unterricht plant.",
+             qualifications: ["Sie besitzt eine Lizenz zum Unterrichten.", "Sie hat einen Abschluss in Pädagogik.",
+                              "Sie ist zertifizierte Lehrerin."],
+             numbers: ["Sie betreut einundzwanzig Kinder.", "Sie betreut zweihundert Kinder.", "Sie betreut dreitausend Kinder.",
+                       "Sie betreut zweihunderteinundzwanzig Kinder."]),
+        Case(language: "es", description: "Soy maestra de primaria. Enseño en una escuela de mi ciudad.",
+             plain: "Maestra paciente que prepara las clases y colabora con las familias.",
+             qualifications: ["Tiene la licenciatura en educación.", "Tiene una licencia para enseñar.", "Es una maestra titulada."],
+             numbers: ["Atiende a veintiuno alumnos.", "Atiende a veintiún alumnos.", "Atiende a veintidós alumnos.",
+                       "Atiende a doscientos alumnos.", "Atiende a quinientos alumnos."]),
+        Case(language: "fr", description: "Je suis institutrice. J'enseigne dans une école de ma ville.",
+             plain: "Institutrice patiente qui prépare les cours et collabore avec les familles.",
+             qualifications: ["Possède une licence en éducation.", "Est une institutrice diplômée.", "Possède un master."],
+             numbers: ["Suit vingt-deux élèves.", "Suit quatre-vingt-dix élèves.", "Suit quatrevingts élèves."]),
+        Case(language: "pt", description: "Sou professora do ensino fundamental. Leciono numa escola da minha cidade.",
+             plain: "Professora paciente que prepara as aulas e colabora com as famílias.",
+             qualifications: ["Possui licenciatura em educação.", "É uma professora habilitada.", "Possui um mestrado."],
+             numbers: ["Acompanha duzentos alunos.", "Acompanha quinhentos alunos.", "Acompanha dezoito alunos."]),
+    ]
+
+    private func written(_ item: Case) -> WrittenText {
+        let tag = item.language
+        let source = DescriptionText(item.description, languageOfText: { _ in tag })
+        return WrittenText(source: source, claimed: source, wordList: TableWordList(), tagger: ListedNames())
+    }
+
+    @Test("A sentence in plain words of the profession is plain, in every language", arguments: cases)
+    func plain(item: Case) {
+        #expect(written(item).isPlain(item.plain, ownWords: []), "\(item.plain)")
+    }
+
+    @Test("A word of a qualification states a fact the person never stated, in every language", arguments: cases)
+    func qualification(item: Case) {
+        let text = written(item)
+
+        for sentence in item.qualifications {
+            #expect(!text.isPlain(item.plain + " " + sentence, ownWords: []), "\(sentence)")
+            #expect(!text.isPlain(sentence, ownWords: []), "\(sentence)")
+        }
+    }
+
+    @Test("A number written as one word, compound or inflected, counts what the person never counted, in every language", arguments: cases)
+    func compoundNumber(item: Case) {
+        let text = written(item)
+
+        for sentence in item.numbers {
+            #expect(!text.isPlain(sentence, ownWords: []), "\(sentence)")
+        }
+    }
+
+    @Test("A compound number word is a number; a word that only looks like one is not", arguments: Vocabulary.Language.allCases)
+    func numberWords(language: Vocabulary.Language) {
+        let numbers: [Vocabulary.Language: [String]] = [
+            .english: ["twentyone", "ninetynine", "twohundred"],
+            .italian: ["ventuno", "ventidue", "trentatre", "centoventi", "duecento", "tremila", "centouno", "ventotto", "novecentonovantanove"],
+            .german: ["einundzwanzig", "zweihundert", "dreitausend", "zweihunderteinundzwanzig", "einhundert", "dreiundzwanzig"],
+            .spanish: ["veintiuno", "veintiun", "veintiuna", "veintidos", "doscientos", "doscientas", "quinientos", "setecientos"],
+            .french: ["quatrevingts", "vingts"],
+            .portuguese: ["duzentos", "trezentas", "quinhentos", "novecentos"],
+        ]
+        let others: [Vocabulary.Language: [String]] = [
+            .english: ["tone", "often", "alone", "stone", "teacher"],
+            .italian: ["insegnante", "treno", "settimana", "unico", "sedia", "tremendo", "duomo"],
+            .german: ["einzig", "dreieck", "achtung", "lehrerin", "einen", "zweiter"],
+            .spanish: ["dosis", "milagro", "docente", "diezmo", "maestra"],
+            .french: ["institutrice", "feuille", "centre", "dixieme"],
+            .portuguese: ["professora", "milagre", "dezembro", "centro"],
+        ]
+        let words = WrittenTextWords.of(language)
+
+        for word in numbers[language] ?? [] { #expect(words.isNumber(word), "\(word)") }
+        for word in others[language] ?? [] { #expect(!words.isNumber(word), "\(word)") }
+    }
+}
