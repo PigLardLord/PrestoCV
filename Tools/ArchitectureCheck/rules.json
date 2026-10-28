@@ -910,6 +910,7 @@
    "allowedImports": [
     "Testing",
     "Foundation",
+    "Synchronization",
     "DiagnosticTraceFiles",
     "DiagnosticTrace",
     "DiagnosticLogging",

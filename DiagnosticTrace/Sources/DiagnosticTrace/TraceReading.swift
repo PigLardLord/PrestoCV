@@ -23,7 +23,7 @@ public struct TraceRunListing: Sendable, Equatable, Identifiable {
 public protocol TraceReading: Sendable {
     /// The stored runs, newest first.
     func runs() async -> [TraceRunListing]
-    /// Copies of a run's files to share: its document, then its summary.
+    /// Copies of a run's files to share: its document, then its summary, then the session's events when there are any.
     func shareCopies(of id: UUID) async throws -> [URL]
     /// Removes the copies made to share.
     func discardCopies() async

@@ -3,6 +3,7 @@ import DiagnosticLoggingTestSupport
 import DiagnosticTrace
 import DiagnosticTraceFiles
 import Foundation
+import Synchronization
 import Testing
 
 @Suite("The file store keeps each run as a JSON document and a text summary, on the device only")
@@ -163,7 +164,120 @@ struct TraceFileStoreTests {
         await #expect(throws: TraceStoreError.missingRun) { try await store.shareCopies(of: UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9))) }
     }
 
+    // MARK: Protection, sharing and removal
+
+    @Test("A folder that exists already is protected before the first file goes into it, and a failure to protect writes nothing")
+    func existingFolderIsProtectedFirst() async throws {
+        let place = try ScratchFolder()
+        try FileManager.default.createDirectory(at: place.diagnostics, withIntermediateDirectories: true)
+        let spy = ProtectionSpy()
+        let store = place.store(protection: spy)
+        store.save(TraceRun.stored(day: 1, outcome: .finished))
+        await store.flush()
+
+        #expect(spy.calls.first?.folder.path == place.diagnostics.path)
+        #expect(spy.calls.first?.contents == [], "The folder was empty when it was protected")
+        #expect(place.names().count == 2)
+
+        let failing = try ScratchFolder()
+        try FileManager.default.createDirectory(at: failing.diagnostics, withIntermediateDirectories: true)
+        let logger = RecordingLogger()
+        let refused = failing.store(logger: logger, protection: ProtectionSpy(failing: true))
+        refused.save(TraceRun.stored(day: 1, outcome: .finished))
+        await refused.flush()
+
+        #expect(failing.names().isEmpty, "A folder that cannot be protected gets no CV content")
+        #expect(logger.entry("trace.writeFailed") != nil)
+    }
+
+    @Test("The folder of the copies to share is protected too")
+    func shareFolderIsProtected() async throws {
+        let place = try ScratchFolder()
+        let spy = ProtectionSpy()
+        let store = place.store(protection: spy)
+        let run = TraceRun.stored(day: 1, outcome: .finished)
+        store.save(run)
+        await store.flush()
+
+        _ = try await store.shareCopies(of: run.id)
+
+        #expect(spy.calls.map(\.folder.path).contains(place.share.path))
+    }
+
+    @Test("A share that cannot be protected leaves no copy behind")
+    func failedShareLeavesNothing() async throws {
+        let place = try ScratchFolder()
+        let run = TraceRun.stored(day: 1, outcome: .finished)
+        let store = place.store(protection: ProtectionSpy(failingFor: place.share))
+        store.save(run)
+        await store.flush()
+
+        await #expect(throws: TraceStoreError.share) { try await store.shareCopies(of: run.id) }
+
+        #expect(!FileManager.default.fileExists(atPath: place.share.path))
+    }
+
+    @Test("Copies left by an earlier launch are removed when the store starts, and a gate that stays closed still has it")
+    func staleCopiesAreRemovedAtLaunch() async throws {
+        let place = try ScratchFolder()
+        try FileManager.default.createDirectory(at: place.share, withIntermediateDirectories: true)
+        try Data("old".utf8).write(to: place.share.appendingPathComponent("run-old.json"))
+
+        let store = place.store()
+        await store.flush()
+
+        #expect(!FileManager.default.fileExists(atPath: place.share.path))
+    }
+
+    @Test("The shared files hold the session events too, such as the language data prepared between two runs")
+    func sharedFilesHoldTheSessionEvents() async throws {
+        let place = try ScratchFolder()
+        let store = place.store()
+        let first = TraceRun.stored(day: 1, outcome: .finished)
+        store.save(first)
+        store.save(sessionEvent: .stored(line: "between the two runs"))
+        store.save(TraceRun.stored(day: 2, outcome: .finished))
+        await store.flush()
+
+        let copies = try await store.shareCopies(of: first.id)
+
+        #expect(copies.map(\.lastPathComponent) == [first.fileStem + ".json", first.fileStem + ".txt", "session-events.json"])
+        let events = try TraceSessionLog.events(document: Data(contentsOf: copies[2]))
+        #expect(events.map(\.line) == ["between the two runs"])
+    }
+
+    @Test("Purging removes the stored runs, the session events and the copies, and drops what was saved and not written")
+    func purge() async throws {
+        let place = try ScratchFolder()
+        let store = place.store()
+        let run = TraceRun.stored(day: 1, outcome: .finished)
+        store.save(run)
+        store.save(sessionEvent: .stored(line: "event"))
+        await store.flush()
+        _ = try await store.shareCopies(of: run.id)
+        store.save(TraceRun.stored(day: 2, outcome: .finished))
+
+        await store.purge()
+
+        #expect(!FileManager.default.fileExists(atPath: place.diagnostics.path))
+        #expect(!FileManager.default.fileExists(atPath: place.share.path))
+        #expect(await store.runs().isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: place.diagnostics.path), "The run saved before the purge is not written after it")
+    }
+
     #if canImport(Darwin)
+    @Test("A folder that exists without the exclusion from backup gets it before the next write")
+    func existingFolderGetsTheExclusion() async throws {
+        let place = try ScratchFolder()
+        try FileManager.default.createDirectory(at: place.diagnostics, withIntermediateDirectories: true)
+        #expect(try place.diagnostics.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup != true)
+        let store = place.store()
+        store.save(TraceRun.stored(day: 1, outcome: .finished))
+        await store.flush()
+
+        #expect(try place.diagnostics.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
+    }
+
     @Test("The folder is excluded from backup")
     func excludedFromBackup() async throws {
         let place = try ScratchFolder()
@@ -199,6 +313,10 @@ private final class ScratchFolder {
         TraceFileStore(directory: diagnostics, shareDirectory: share, logger: logger)
     }
 
+    func store(logger: any DiagnosticLogger = SilentLogger(), protection: any TraceFolderProtecting) -> TraceFileStore {
+        TraceFileStore(directory: diagnostics, shareDirectory: share, logger: logger, protection: protection)
+    }
+
     /// The names of the files in the store's folder, sorted.
     func names() -> [String] {
         ((try? FileManager.default.contentsOfDirectory(atPath: diagnostics.path)) ?? []).sorted()
@@ -221,5 +339,30 @@ extension TraceRun {
 extension TraceSessionEvent {
     static func stored(line: String) -> TraceSessionEvent {
         TraceSessionEvent(time: Date(timeIntervalSince1970: 1_793_188_800), category: "draft", level: "info", line: line)
+    }
+}
+
+/// A protection that records the folders it was asked for, with what each held then, and refuses on request.
+private final class ProtectionSpy: TraceFolderProtecting {
+    struct Call: Equatable {
+        let folder: URL
+        let contents: [String]
+    }
+
+    private let recorded = Mutex<[Call]>([])
+    private let failing: Bool
+    private let failingFor: URL?
+
+    init(failing: Bool = false, failingFor: URL? = nil) {
+        self.failing = failing
+        self.failingFor = failingFor
+    }
+
+    var calls: [Call] { recorded.withLock { $0 } }
+
+    func protect(_ folder: URL) throws {
+        let contents = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        recorded.withLock { $0.append(Call(folder: folder, contents: contents)) }
+        if failing || folder.path == failingFor?.path { throw TraceStoreError.write }
     }
 }

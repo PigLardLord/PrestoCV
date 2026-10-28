@@ -67,7 +67,7 @@ Each step of the AI draft and of the import, with the text it read and wrote, ke
 **Test support and tests.**
 - `DiagnosticTraceTestSupport` may import `DiagnosticTrace`, Foundation, Synchronization. It holds `RecordingTraceStore`, `RecordingTracer` (the real recorder on a stopped clock, with the runs it recorded), `FixedDistribution` and `StoppedClock`.
 - **`DiagnosticTraceTests`** may import `DiagnosticTrace`, `DiagnosticTraceTestSupport`, `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, Testing, Foundation. They test the recorder, the gate's truth table, the decorators, the document, the summary and the retention, on Linux too.
-- **`DiagnosticTraceFilesTests`** may import `DiagnosticTraceFiles`, `DiagnosticTrace`, `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, Testing, Foundation. They write to a temporary folder, on Linux too.
+- **`DiagnosticTraceFilesTests`** may import `DiagnosticTraceFiles`, `DiagnosticTrace`, `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, Testing, Foundation, Synchronization. They write to a temporary folder, on Linux too; a spy of the folder protection records its calls under a `Mutex`.
 
 ---
 
