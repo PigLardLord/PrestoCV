@@ -419,6 +419,7 @@ enum GroundingRows {
         rows += inferredSkills()
         rows += statedTitles()
         rows += summariesWithNoRole()
+        rows += endedJobs()
         return rows
     }()
 
@@ -6545,6 +6546,75 @@ extension GroundingRows {
                         "I'm a nurse in Turin. I like hiking in the mountains.",
                         CVData(summary: "A nurse in Turin. I like hiking in the mountains."),
                         .exactly(CVData(summary: "A nurse in Turin."))))
+        return rows
+    }
+
+    /// A title the description says only in a clause that names no employer supports no job that has ended, even when the clause of
+    /// that job leaves a word unexplained ("na agência Pixel Gaúcho"); and the text of a job restates no sentence of the description
+    /// about another job alone ("onde desenvolvo aplicativos para lojas" is said of Sulware).
+    private static func endedJobs() -> [GroundingRow] {
+        let pt = """
+            Sou Tiago Ferreira, programador em Porto Alegre. Desde 2019 trabalho na Sulware Sistemas, onde desenvolvo aplicativos \
+            para lojas. Antes, de 2015 a 2019, trabalhei na agência Pixel Gaúcho.
+            """
+        let en = """
+            I'm Jane Smith, a programmer in Leeds. Since 2019 I have worked at Acme, where I build apps for shops. Before that, from \
+            2015 to 2019, I worked at the advertising agency Globex.
+            """
+        var rows: [GroundingRow] = []
+        rows.append(row("the-present-title-is-no-title-of-an-ended-job-pt",
+                        "programador is said now, with no employer: Pixel Gaúcho ended in 2019 and takes no title",
+                        pt,
+                        CVData(personalInfo: person(name: "Tiago Ferreira", title: "programador"),
+                               experience: [job("programador", "Sulware Sistemas", current: true), job("programador", "Pixel Gaúcho")]),
+                        .safe(never: [], absent: ["experience[1].title"],
+                              keeping: ["experience[1].company": "Pixel Gaúcho", "personalInfo.title": "programador"]),
+                        language: "pt"))
+        rows.append(row("the-present-title-is-no-title-of-an-ended-job-en",
+                        "programmer is said now, with no employer: Globex ended in 2019 and takes no title",
+                        en,
+                        CVData(personalInfo: person(name: "Jane Smith", title: "programmer"),
+                               experience: [job("programmer", "Acme", current: true), job("programmer", "Globex")]),
+                        .safe(never: [], absent: ["experience[1].title"],
+                              keeping: ["experience[1].company": "Globex", "personalInfo.title": "programmer"])))
+        let traps = """
+            Sou Tiago Ferreira, programador em Porto Alegre. Desde 2019 trabalho na Sulware Sistemas, onde desenvolvo \
+            aplicativos para lojas. Antes, de 2015 a 2019, trabalhei na agência Pixel Gaúcho. Estudei na Universidade do Guaíba \
+            e me formei em 2015. Falo português e espanhol. Minha irmã fala japonês e o e-mail do meu chefe é \
+            marcos.lima@example.com. Meu colega Rafael trabalha na Nuvem Azul Tecnologia. Eu gostaria de trabalhar como arquiteto \
+            de software e no ano que vem vou estudar alemão. Nunca usei Kotlin. Nossa equipe de 9 pessoas aumentou as vendas em \
+            40%. Meu e-mail é tiago.ferreira@example.com.
+            """
+        rows.append(row("the-present-title-is-no-title-of-an-ended-job-as-the-model-wrote-it-pt",
+                        "the jobs the model wrote for pt-traps, with no dates: Pixel Gaúcho ended in 2019 and takes no title",
+                        traps,
+                        CVData(personalInfo: person(name: "Tiago Ferreira", location: "Porto Alegre", title: "programador"),
+                               experience: [job("programador", "Sulware Sistemas", current: true, location: "Porto Alegre"),
+                                            job("programador", "Pixel Gaúcho", location: "Porto Alegre")]),
+                        .safe(never: [], absent: ["experience[1].title"], keeping: ["experience[1].company": "Pixel Gaúcho"]),
+                        language: "pt"))
+        rows.append(row("the-duties-of-another-job-are-not-restated-pt",
+                        "desenvolvo aplicativos para lojas is said of Sulware: it stays there and goes from Pixel Gaúcho",
+                        pt,
+                        CVData(experience: [job("", "Sulware Sistemas", current: true, description: "Desenvolvo aplicativos para lojas."),
+                                            job("", "Pixel Gaúcho", description: "Desenvolvo aplicativos para lojas.")]),
+                        .safe(never: [], absent: ["experience[1].description"],
+                              keeping: ["experience[0].description": "Desenvolvo aplicativos para lojas.",
+                                        "experience[1].company": "Pixel Gaúcho"]),
+                        language: "pt"))
+        rows.append(row("the-duties-of-another-job-are-not-restated-en",
+                        "I build apps for shops is said of Acme: it stays there and goes from Globex",
+                        en,
+                        CVData(experience: [job("", "Acme", current: true, description: "I build apps for shops."),
+                                            job("", "Globex", description: "I build apps for shops.")]),
+                        .safe(never: [], absent: ["experience[1].description"],
+                              keeping: ["experience[0].description": "I build apps for shops.", "experience[1].company": "Globex"])))
+        rows.append(row("the-duties-said-of-the-job-itself-stay",
+                        "I made websites is said of Globex itself: it stays",
+                        "Since 2019 I have worked at Acme, where I build apps for shops. Before that, from 2015 to 2019, I worked at Globex, "
+                            + "where I made websites.",
+                        CVData(experience: [job("", "Globex", from: "2015", to: "2019", description: "I made websites.")]),
+                        .unchanged))
         return rows
     }
 }

@@ -483,28 +483,47 @@ struct Grounding {
     /// for "since" only if it stands in a clause that backs an entry or joins this one: a promise ("and I will stay until 2030") backs
     /// nothing, so its year is nobody's.
     private func statesCurrent(_ index: Int, joining: [Place]) -> Bool {
-        let counted = backing.reduce(into: Set(joining)) { $0.formUnion($1) }
+        statesCurrent(periods(of: backing[index], joining: joining), counting: Set(joining))
+    }
 
-        return periods(of: index, joining: joining).contains { period in
+    /// Whether one of `periods` says that its entry goes on, its years counted in the clauses that back an entry and in `counted`.
+    private func statesCurrent(_ periods: [(place: Place, text: String)], counting counted: Set<Place>) -> Bool {
+        let counted = backing.reduce(into: counted) { $0.formUnion($1) }
+
+        return periods.contains { period in
             let years = Set(clauses.places.filter { $0.sentence == period.place.sentence && counted.contains($0) }
                 .flatMap { stated($0).words }.filter { $0.isNumber && $0.folded.count == 4 }.map(\.folded))
             return PresentStatement.holds(in: period.text, sentenceYears: years.count, language: explainer.language)
         }
     }
 
-    /// Whether the description says that the job at `index` is over: no clause of it says the job goes on, and some clause that
-    /// backs it, with the clauses of nothing but time next to it, writes two years or an end and no word for the present
-    /// (`PresentStatement.ended`). A job with no clause that backs it, one without dates in the past tense, and one that ends
-    /// "até 2018" (the word is also "even") are not found over, and keep what they keep.
+    /// Whether the description says that the job at `index` is over: no clause of it says the job goes on, and some clause of it,
+    /// with the clauses of nothing but time next to it, writes two years or an end and no word for the present
+    /// (`PresentStatement.ended`). Its clauses are those that back it, or, when none does, those that state it as a fact
+    /// (`factualMentions`) with the clauses of nothing but time next to them that back no entry: "Antes, de 2015 a 2019, trabalhei
+    /// na agência Pixel Gaúcho" says the job at Pixel is over although "agência" leaves its clause unexplained (#354). A job no
+    /// clause states as a fact, one without dates in the past tense, and one that ends "até 2018" (the word is also "even") are not
+    /// found over, and keep what they keep.
     private func hasEnded(_ index: Int) -> Bool {
-        let joining = joiningPlaces(of: index)
-        return !statesCurrent(index, joining: joining) && periods(of: index, joining: joining).contains { PresentStatement.ended(in: $0.text) }
+        let isBacked = !backing[index].isEmpty
+        let places = isBacked ? backing[index] : factualMentions(of: index)
+        let joining = isBacked ? joiningPlaces(of: index) : timePlaces(beside: places)
+        let found = periods(of: places, joining: joining)
+        return !statesCurrent(found, counting: places.union(joining)) && found.contains { PresentStatement.ended(in: $0.text) }
     }
 
-    /// The time each clause that backs the entry gives: the clause as it states the entry, with the clauses of nothing but time that
-    /// join the entry next to it.
-    private func periods(of index: Int, joining: [Place]) -> [(place: Place, text: String)] {
-        backing[index].sorted(by: Self.isBefore).map { place in
+    /// The clauses next to `places` that hold nothing but time words and back no entry.
+    private func timePlaces(beside places: Set<Place>) -> [Place] {
+        let everyBacking = backing.reduce(into: Set<Place>()) { $0.formUnion($1) }
+        return places.flatMap(clauses.neighbours(of:)).filter { place in
+            !everyBacking.contains(place) && clauses.clause(at: place).words.allSatisfy(explainer.isTimePhrase)
+        }
+    }
+
+    /// The time each of `places` gives: the clause as it states the entry, with the clauses of nothing but time of `joining` next to
+    /// it.
+    private func periods(of places: Set<Place>, joining: [Place]) -> [(place: Place, text: String)] {
+        places.sorted(by: Self.isBefore).map { place in
             let neighbours = clauses.neighbours(of: place).filter { joining.contains($0) && clauses.clause(at: $0).words.allSatisfy(explainer.isTimePhrase) }
             let texts = (neighbours + [place]).sorted(by: Self.isBefore).map { stated($0).text }
             return (place, texts.joined(separator: " "))
@@ -515,7 +534,12 @@ struct Grounding {
     /// or condition, and says it as a fact (`Statement`): a mention of work that is done. An entry the description only denies, hopes
     /// for, promises or plans has none.
     func hasFactualMention(_ index: Int) -> Bool {
-        mentioning[index].contains { place in
+        !factualMentions(of: index).isEmpty
+    }
+
+    /// The clauses that state the entry as a fact (`hasFactualMention`).
+    private func factualMentions(of index: Int) -> Set<Place> {
+        mentioning[index].filter { place in
             let clause = clauses.clause(at: place)
             guard Vocabulary.modality(in: clause.words, language: explainer.language).isEmpty else { return false }
             return reading.statement(at: place, naming: subjects[index].mentions, by: subjects[index])?.isFactual == true

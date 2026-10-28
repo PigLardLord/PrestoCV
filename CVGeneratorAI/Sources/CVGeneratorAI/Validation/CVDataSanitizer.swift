@@ -181,8 +181,8 @@ public struct CVDataSanitizer: Sendable {
     /// not a job, and a job built on it carries whatever the model made up around it.
     ///
     /// Its description also keeps the sentences that state no fact of their own (`WrittenText`), with no word of the title or the
-    /// employer of another job (ADR 0031): those of its own description, then those of its `duties`, the text the second pass wrote
-    /// for the job at the same position of the result.
+    /// employer of another job, and that restate no sentence of the description about another job alone (ADR 0031): those of its own
+    /// description, then those of its `duties`, the text the second pass wrote for the job at the same position of the result.
     private func sanitize(
         _ jobs: [Entries.Job], _ source: DescriptionText, _ entries: Entries, written: WrittenText, duties: [String?]
     ) -> [Experience] {
@@ -211,9 +211,11 @@ public struct CVDataSanitizer: Sendable {
             let ownWords = Self.words(of: [experience.title])
             let others = jobs.filter { $0.subject != job.subject }.flatMap { [$0.title, $0.company] }
             let foreignWords = Self.words(of: others).subtracting(ownWords).filter { !Vocabulary.isNeutral($0, in: source.explainer.language) }
+            let otherEmployers = jobs.filter { $0.subject != job.subject }.compactMap(\.company)
             let description = { (text: String?) in
                 source.written(text, quoting: entries.evidence(of: job.subject).quotable, allowsNumbers: true) { sentence in
                     written.isPlain(sentence, ownWords: ownWords, foreignWords: foreignWords)
+                        && !source.repeats(sentence, ofSentencesNaming: otherEmployers, notNaming: [job.company].compactMap { $0 })
                 }
             }
             let duties = position < duties.count ? description(duties[position]) : nil

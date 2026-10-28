@@ -137,6 +137,17 @@ struct DescriptionText {
         return kept.isEmpty ? nil : kept.joined(separator: " ")
     }
 
+    /// Whether each clause of `sentence` quotes a clause of a sentence of the description that names one of `names` and none of
+    /// `own` (`ProseQuotes`): what the description says of another job ("onde desenvolvo aplicativos para lojas" in the sentence of
+    /// Sulware), restated in the text of this one (#354).
+    func repeats(_ sentence: String, ofSentencesNaming names: [String], notNaming own: [String]) -> Bool {
+        let phrases = { (names: [String]) in names.compactMap(\.presentValue).map { Self.normalized($0) } }
+        let others = phrases(names)
+        let ownNames = phrases(own)
+        let mentions = { (sentence: Sentence, phrases: [String]) in phrases.contains { !Self.spans(of: $0, in: sentence.folded).isEmpty } }
+        return restates(sentence, ofSentencesWhere: { mentions($0, others) && !mentions($0, ownNames) })
+    }
+
     /// Whether each clause of `sentence` quotes a clause of the sentences of the description that `isSource` picks (`ProseQuotes`).
     func restates(_ sentence: String, ofSentencesWhere isSource: (Sentence) -> Bool) -> Bool {
         let said = sentences.filter(isSource)
