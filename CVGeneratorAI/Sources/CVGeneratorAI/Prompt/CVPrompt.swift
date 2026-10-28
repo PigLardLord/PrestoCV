@@ -40,6 +40,8 @@ struct CVPrompt: Equatable {
         - Write each achievement by copying the person's own words exactly, starting with the verb and leaving out the name of the employer. Add no word of your own.
         - Write everything you generate (summary, role descriptions, achievements) in the language of the description. Do not translate names, titles or dates.
         - Do not add skills, languages, jobs, studies or hobbies the description does not mention.
+        - Copy each hobby or interest in the person's own words exactly as written, without changing the verb.
+        - A language, a hobby or the person's job title is never a skill: languages and hobbies have lists of their own.
         - The summary restates the description in at most three sentences. Add no numbers the person did not give.
         """
 

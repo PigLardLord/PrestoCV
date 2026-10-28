@@ -19,9 +19,10 @@
   - a summary of 2 to 4 sentences on the person's profession and strengths;
   - for each job, 1 or 2 sentences on the responsibilities typical of its title in its field;
   - technologies (4 to 8) and soft skills (3 to 5) that fit the person's roles, studies and field, without a level and none already listed; the sanitizer gives each its `kind` (`Skill.kind`: `technology` or `softSkill`);
-  - in none of them a number, a date, or the name of a company, a school, a place or a person, and no "years of experience", "senior", "expert" or "experienced".
+  - in none of them a number, a date, or the name of a company, a school, a place or a person, and no "years of experience", "senior", "expert" or "experienced";
+  - whole sentences that start with a capital letter and end with a full stop, never a list of phrases or a copy of a title, a summary of at least 120 characters, and skill names in the description's language too. The text of the prompt has, after the language's name, a line that says "write in" that language in that language ("Rédige en français.", `DraftWritingPrompt.writeIn`), as the model wrote French and Italian drafts with English skills and no summary from the name alone (#354).
 
-  The first pass's instructions keep every fact rule of #202 ("Use only what the description says"), and the second pass's say never to add a language, job, study, certification, hobby, achievement or result. The instruction of the claim check (ADR 0028) does not change.
+  The first pass's instructions keep every fact rule of #202 ("Use only what the description says"), and the second pass's say never to add a language, job, study, certification, hobby, achievement or result. Since #354 the first pass's also say to copy each hobby in the person's own words, without changing the verb (the model wrote "geht gern mit meinem Hund spazieren" for "Ich gehe gern ...", which no quote backs), and that a language, a hobby or the person's job title is never a skill. The instruction of the claim check (ADR 0028) does not change.
 - **A written sentence is kept only when it states no fact of its own (`WrittenText`).** The summary and each role description are read sentence by sentence. A sentence stays when the rules of ADR 0023 keep it (a quote) or when it is plain: in the language of the description, and with
   1. no address, and no number in digits or in words ("five", "cinque");
   2. no month, and no word of duration, seniority or level that the description does not write ("years", "senior", "expert");

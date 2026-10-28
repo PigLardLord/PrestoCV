@@ -8,6 +8,7 @@ struct DraftWritingPrompt: Equatable {
 
     init(brief: DraftBrief) {
         var lines = ["Language: \(brief.language)"]
+        if let line = Self.writeIn[brief.language] { lines.append(line) }
         if let headline = brief.headline { lines.append("Headline title: \(headline)") }
         let roles = Self.numberedRoles(of: brief).map { number, role in
             "\(number). \(role.title)" + (role.hasEnded ? " (ended)" : "")
@@ -39,12 +40,20 @@ struct DraftWritingPrompt: Equatable {
         return descriptions
     }
 
+    /// "Write in English." in each language of the app, by the brief's language name: the model follows a line in the language it
+    /// must write better than the name alone, which it read as English (#354).
+    static let writeIn = [
+        "English": "Write in English.", "Italian": "Scrivi in italiano.", "German": "Schreibe auf Deutsch.",
+        "Spanish": "Escribe en español.", "French": "Rédige en français.", "Portuguese": "Escreva em português.",
+    ]
+
     /// What the model writes, and what it never adds: the rules keep only the text that states no fact of its own.
     static let instructionsText = """
         You write the parts of a CV that describe a person's work, from the facts below. Write in the language named on the first line.
-        - Summary: 2 to 4 sentences on the person's profession and strengths, from their titles and studies. No number, date, company, school, place or person's name; no "experience", "years", "senior", "expert", "experienced".
+        - Each sentence starts with a capital letter and ends with a full stop: whole sentences, never a list of phrases or a copy of a title.
+        - Summary: 2 to 4 sentences, at least 120 characters in all, on the person's profession and strengths, from their titles and studies. No number, date, company, school, place or person's name; no "experience", "years", "senior", "expert", "experienced".
         - For each numbered role: 1 to 2 sentences with the responsibilities typical of that title. No number, no name, no tool name. For a role marked ended, write in the past tense.
-        - Technologies: 4 to 8 tools, methods or knowledge of the trade that fit the roles. Soft skills: 3 to 5 ways of working with people and tasks that fit the roles. 1 to 4 words each, no level, none of the skills already listed.
+        - Technologies: 4 to 8 tools, methods or knowledge of the trade that fit the roles. Soft skills: 3 to 5 ways of working with people and tasks that fit the roles. 1 to 4 words each, no level, none of the skills already listed. Name each technology and soft skill in that language too.
         - Never add a language, job, study, certification, hobby, achievement or result.
         """
 }

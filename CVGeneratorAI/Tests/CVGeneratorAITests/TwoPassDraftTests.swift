@@ -90,6 +90,7 @@ struct TwoPassDraftTests {
         #expect(prompt.instructions == DraftWritingPrompt.instructionsText)
         #expect(prompt.text == """
             Language: Italian
+            Scrivi in italiano.
             Headline title: infermiera
             Roles:
             1. infermiera
@@ -129,6 +130,21 @@ struct TwoPassDraftTests {
         #expect(instructions.contains("Soft skills: 3 to 5"))
         #expect(instructions.contains("no level, none of the skills already listed"))
         #expect(instructions.contains("Never add a language, job, study, certification, hobby, achievement or result"))
+    }
+
+    @Test("The second pass is asked to write in the description's language, in that language, with whole sentences and skill names in it (#354)")
+    func promptAsksForTheLanguageInItself() {
+        let lines = ["English": "Write in English.", "Italian": "Scrivi in italiano.", "German": "Schreibe auf Deutsch.",
+                     "Spanish": "Escribe en español.", "French": "Rédige en français.", "Portuguese": "Escreva em português."]
+        for (language, line) in lines {
+            let brief = DraftBrief(language: language, headline: "x", roles: [], studies: [], namedSkills: [])
+            #expect(DraftWritingPrompt(brief: brief).text.components(separatedBy: "\n").dropFirst().first == line, "\(language)")
+        }
+        let instructions = DraftWritingPrompt.instructionsText
+        #expect(instructions.contains("at least 120 characters"))
+        #expect(instructions.contains("Each sentence starts with a capital letter and ends with a full stop"))
+        #expect(instructions.contains("never a list of phrases or a copy of a title"))
+        #expect(instructions.contains("Name each technology and soft skill in that language too"))
     }
 
     // MARK: Grounding what the second pass wrote

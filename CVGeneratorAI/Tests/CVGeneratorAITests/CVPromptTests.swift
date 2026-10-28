@@ -60,4 +60,12 @@ struct CVPromptTests {
         #expect(instructions.contains("Write each achievement by copying the person's own words exactly, starting with the verb"))
         #expect(instructions.contains("leaving out the name of the employer"))
     }
+
+    @Test("The instructions ask for hobbies in the person's own words and keep languages, hobbies and the job title out of the skills (#354)")
+    func instructionsKeepHobbiesAndLanguagesApart() {
+        let instructions = CVPrompt.instructionsText
+
+        #expect(instructions.contains("Copy each hobby or interest in the person's own words exactly as written"))
+        #expect(instructions.contains("A language, a hobby or the person's job title is never a skill"))
+    }
 }
