@@ -9,11 +9,11 @@ enum QualificationNames {
     /// trades a CV names most.
     private static let words: Set<String> = {
         let exams = """
-        toefl ielts toeic celta tefl tesol tkt cambridge dele delf dalf testdaf telc goethe hsk jlpt cils plida
-        gmat lsat mcat usmle nclex gcse abitur baccalaureat maturita
+        toefl ielts toeic celta delta tefl tesol tkt cambridge dele delf dalf testdaf telc goethe onset hsk jlpt cils plida
+        sat gre gmat lsat mcat usmle nclex praxis gcse abitur baccalaureat maturita
         """
         let certifications = """
-        pmp pmi cissp cisa cism ccna ccnp ccie comptia itil acca cfa cma frm mcse mcsa mcsd ceh oscp rhce rhcsa togaf cbap
+        pmp pmi cissp cisa cism ccna ccnp ccie comptia itil acca cfa cpa cma frm mcse mcsa mcsd ocp ceh oscp rhce rhcsa togaf cbap
         csm psm cspo ecdl icdl bls acls pals atls cpr
         """
         return Set([exams, certifications, examWordList].flatMap { $0.split(whereSeparator: \.isWhitespace).map(String.init) })
@@ -22,33 +22,23 @@ enum QualificationNames {
         exam exams examination examinations esame esami examen examens exame exames pruefung prufung prufungen staatsexamen
         concorso concorsi concours oposicion oposiciones
         """
-    private static let examWords = Set(examWordList.split(whereSeparator: \.isWhitespace).map(String.init))
 
-    /// Names of an exam or a certification that are also words or technologies: "Delta Lake", "SAT solving", "Praxis", "GRE tunnel",
-    /// "CPA" (cost per acquisition), "OCP" (OpenShift). A word certifications are written with ("PSM I", "PMI-ACP", "CSM")
-    /// stays in the word list. Such a word is a qualification only as the whole name or with a word of
-    /// `qualifiers`, wherever it stands ("SAT exam", "GRE General Test"), never with another word alone ("SAT solving").
-    private static let ambiguousWords: Set<String> = [
-        "delta", "sat", "gre", "praxis", "onset", "cpa", "ocp",
+    /// Whole names, as `DescriptionText.normalized` writes them, of technologies that hold a word of the list: "Delta Lake",
+    /// "SAT solving". Only the whole name is exempt: any other name with the word ("US CPA", "Digital SAT", "SAT exam") is a
+    /// qualification, the safe way to fail. A technology joins by its whole name, with a test that the word alone is still one.
+    private static let technologyNames: Set<String> = [
+        "delta lake", "sat solving", "sat solver", "sat solvers", "gre tunnel", "gre tunneling", "gre tunnelling", "cpa tracking",
+        "cpa optimization", "cpa optimisation",
     ]
-    /// The words that make an ambiguous word the name of an exam or a certification.
-    private static let qualifiers: Set<String> = {
-        let others = "test tests certification certifications certificate certificates certified diploma level prep preparation"
-        return Set(others.split(separator: " ").map(String.init)).union(examWords)
-    }()
 
     /// Names of more words, or with a mark, that no single word tells: as `DescriptionText.normalized` writes them.
     private static let phrases = ["six sigma", "green belt", "black belt", "a+", "network+", "security+", "server+", "linux+", "cloud+"]
 
     /// Whether `name` is the name of an exam or a certification.
     static func isOne(_ name: String) -> Bool {
-        let folded = Word.words(in: name).map(\.folded)
-        if folded.contains(where: { words.contains($0) }) { return true }
-        if folded.contains(where: { ambiguousWords.contains($0) }),
-           folded.allSatisfy({ ambiguousWords.contains($0) }) || folded.contains(where: { qualifiers.contains($0) }) {
-            return true
-        }
         let normalized = DescriptionText.normalized(name)
+        guard !technologyNames.contains(normalized) else { return false }
+        if Word.words(in: name).contains(where: { words.contains($0.folded) }) { return true }
         return phrases.contains { normalized == $0 || normalized.hasPrefix($0 + " ") || normalized.hasSuffix(" " + $0) }
     }
 }
