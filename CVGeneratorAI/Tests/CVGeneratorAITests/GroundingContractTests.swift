@@ -417,6 +417,7 @@ enum GroundingRows {
         rows += realModelProbes()
         rows += writtenText()
         rows += inferredSkills()
+        rows += statedTitles()
         return rows
     }()
 
@@ -6466,5 +6467,47 @@ extension GroundingRows {
                        skills: [Skill(name: "Empathy", kind: .softSkill), Skill(name: "Active listening", kind: .softSkill)]),
                 .exactly(CVData())),
         ]
+    }
+
+    // MARK: What the second pass and the two-pass extraction showed (#354)
+
+    /// The model writes a title the person states as what they are as a job with no employer and no date ("I am a plumber"). The job
+    /// goes (a title alone is no job), and the title is the person's headline; a title the person does not state as theirs is none.
+    private static func statedTitles() -> [GroundingRow] {
+        typealias Stated = (language: String, description: String, title: String)
+        var stated: [Stated] = []
+        stated.append(("en", "I am a plumber and I fix pipes, taps and boilers in people's homes.", "plumber"))
+        stated.append(("it", "Sono uno sviluppatore iOS e scrivo applicazioni per iPhone e iPad.", "sviluppatore iOS"))
+        stated.append(("de", "Ich bin Bäckerin und backe jeden Morgen Brot, Brötchen und Kuchen für unsere Kunden.", "Bäckerin"))
+        stated.append(("es", "Soy camarero y atiendo a los clientes en la terraza y en la barra del bar.", "camarero"))
+        stated.append(("fr", "Je suis comptable et je tiens les comptes de petites entreprises de mon quartier.", "comptable"))
+        stated.append(("pt", "Sou motorista de caminhão e faço entregas de mercadorias pelo interior do estado.", "motorista de caminhão"))
+
+        var rows: [GroundingRow] = []
+        for v in stated {
+            rows.append(row("a-stated-title-alone-is-the-headline-\(v.language)",
+                            "the person states the title as what they are: the job with no employer and no date goes, the title is the headline",
+                            v.description, CVData(experience: [job(v.title)]),
+                            .exactly(CVData(personalInfo: person(title: v.title))), language: v.language))
+        }
+
+        typealias Unstated = (id: String, description: String, title: String, reason: String)
+        var unstated: [Unstated] = []
+        unstated.append(("a-hobby", "I like long walks with my dog.", "long walks with my dog", "a hobby is no title"))
+        unstated.append(("a-wish", "I want to be a nurse.", "nurse", "a wish is no title"))
+        unstated.append(("of-another-person", "My mother is a nurse.", "nurse", "the title is the mother's"))
+        unstated.append(("denied", "I am not a nurse.", "nurse", "the person denies it"))
+        unstated.append(("looked-for", "I'm looking for a job as a nurse.", "nurse", "a job looked for is no title"))
+        unstated.append(("part-of-a-title", "I am a nurse assistant.", "nurse", "nurse is part of the title nurse assistant"))
+        for v in unstated {
+            rows.append(row("a-title-not-stated-is-no-headline-\(v.id)", "\(v.reason): neither the job nor the headline stays",
+                            v.description, CVData(experience: [job(v.title)]), .exactly(CVData())))
+        }
+        rows.append(row("a-stated-title-leaves-the-headline-alone",
+                        "the draft gives a headline of its own, which stays: the title of the job with no employer is not added",
+                        "I am a plumber and a welder.",
+                        CVData(personalInfo: person(title: "welder"), experience: [job("plumber")]),
+                        .exactly(CVData(personalInfo: person(title: "welder")))))
+        return rows
     }
 }

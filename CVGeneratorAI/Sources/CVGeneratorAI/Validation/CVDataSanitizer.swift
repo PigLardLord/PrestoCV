@@ -102,7 +102,10 @@ public struct CVDataSanitizer: Sendable {
         let interests = unique(cvData.interests.compactMap(claimed.named)) { $0 }
         let written = WrittenText(source: source, claimed: claimed, wordList: wordList, tagger: lexicalClasses)
 
-        let personalInfo = sanitize(cvData.personalInfo, jobTitles: jobTitles, spoken, claimed: claimed, contacts: entries.contacts(in: source))
+        let personalInfo = Self.withStatedTitle(
+            sanitize(cvData.personalInfo, jobTitles: jobTitles, spoken, claimed: claimed, contacts: entries.contacts(in: source)),
+            from: cvData.experience, claimed
+        )
         let experience = sanitize(entries.jobs, source, entries, written: written, duties: writing?.roleDescriptions ?? [])
         let education = sanitize(entries.studies, source, entries)
         // The model writes around the facts only when it has one to write around (ADR 0031): with no title, job or school, a summary
@@ -158,6 +161,19 @@ public struct CVDataSanitizer: Sendable {
             linkedin: contacts.supportedLink(info.linkedin),
             github: contacts.supportedLink(info.github),
             title: claimed.named(info.title)
+        )
+    }
+
+    /// The person's headline, or when the draft gives none, the title of a job with no employer and no date that the person states as
+    /// what they are (`StatedTitle`, #354): such a job goes (next), and its title is the person's own ("I am a plumber").
+    private static func withStatedTitle(_ info: PersonalInfo, from jobs: [Experience], _ claimed: DescriptionText) -> PersonalInfo {
+        guard info.title == nil else { return info }
+        let titleOnly = jobs.filter { $0.company.presentValue == nil && $0.startDate.presentValue == nil && $0.endDate.presentValue == nil }
+        guard let title = titleOnly.lazy.compactMap({ StatedTitle.title($0.title, in: claimed) }).first else { return info }
+
+        return PersonalInfo(
+            name: info.name, email: info.email, phone: info.phone, location: info.location, website: info.website,
+            linkedin: info.linkedin, github: info.github, title: title
         )
     }
 
