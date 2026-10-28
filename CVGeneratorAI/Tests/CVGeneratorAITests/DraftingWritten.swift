@@ -372,7 +372,8 @@ enum ReaderRules {
         var found: [ReaderFinding] = []
         for (index, skill) in cv.skills.enumerated() where skill.kind == .technology {
             let words = letterWords(of: skill.name).filter { !["l", "d"].contains($0) }
-            guard let head = (["en", "de"].contains(language) ? words.last : words.first).map(stem) else { continue }
+            guard let word = ["en", "de"].contains(language) ? words.last : words.first, word.count >= 4 else { continue }
+            let head = stem(word)
             if !heads.insert(head).inserted {
                 found.append(ReaderFinding(kind: .sharedHeadNoun, path: "skills[\(index)].name", value: skill.name))
             }

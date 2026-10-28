@@ -69,11 +69,13 @@ enum SectionPrompts {
     }
 
     static let toolsInstructions = """
-        For each job, in order, name 2 or 3 tools, machines, software, materials or techniques that a person in that trade uses. \
+        For each job, in order, name 2 or 3 tools, machines, software or techniques that a person in that trade uses, each of \
+        another kind. \
         Write in the language named on the first line.
         - job: the job's title as written.
-        - tools: the specific equipment, machines, software or methods a CV of that trade lists, 1 to 3 words each; not an everyday \
-        object or material a person of any trade uses; no personal quality, no activity, no level, none of the skills already listed.
+        - tools: the specific equipment, machines, software or methods a CV of that trade lists, 1 to 3 words each; no material, \
+        part or supply, no everyday object a person of any trade uses; no personal quality, no activity, no level, none of the \
+        skills already listed.
         """
 
     /// The soft skills request.
@@ -89,7 +91,9 @@ enum SectionPrompts {
     /// The request for the skills a draft still misses: `tools` more tools and `qualities` more qualities, none of `kept`.
     static func moreSkills(for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String]) -> Prompt {
         var lines = header(brief) + headline(brief) + [jobList(brief)]
-        if tools > 0 { lines.append("Name \(tools) more tools, machines, software, materials or techniques of the trade.") }
+        if tools > 0 {
+            lines.append("Name \(tools) more tools, machines, software or techniques of the trade, each of another kind than those listed.")
+        }
         if qualities > 0 { lines.append("Name \(qualities) more personal qualities at work.") }
         if !kept.isEmpty { lines.append("Already listed, do not repeat: " + kept.joined(separator: "; ")) }
         return Prompt(instructions: moreSkillsInstructions, text: lines.joined(separator: "\n"))

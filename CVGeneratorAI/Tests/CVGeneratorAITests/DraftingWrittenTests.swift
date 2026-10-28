@@ -170,9 +170,11 @@ struct DraftingWrittenTests {
     func sharedHeadNoun() {
         let english = CVData(skills: [Skill(name: "Mixing desks"), Skill(name: "Stage boxes"), Skill(name: "Digital desk")])
         let french = CVData(skills: [Skill(name: "carnets"), Skill(name: "carnet de notes"), Skill(name: "rétroprojecteur")])
+        let short = CVData(skills: [Skill(name: "Logic Pro"), Skill(name: "Premiere Pro")])
 
         #expect(Self.reader(english, "en").map(\.value) == ["Digital desk"])
         #expect(Self.reader(french, "fr").map(\.value) == ["carnet de notes"])
+        #expect(Self.reader(short, "en").isEmpty)
     }
 
     @Test("A headline that is a part of a stated title is counted, and a form of the title is not")

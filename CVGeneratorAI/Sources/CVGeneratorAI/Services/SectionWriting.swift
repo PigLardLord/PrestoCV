@@ -97,7 +97,8 @@ extension FoundationModelsService {
         }
         var properties: [DynamicGenerationSchema.Property] = []
         if tools > 0 {
-            properties.append(list("tools", "\(tools) more tools, machines, software, materials or techniques of the trade", tools))
+            let about = "\(tools) more tools, machines, software or techniques of the trade, each of another kind; no material or part"
+            properties.append(list("tools", about, tools))
         }
         if qualities > 0 { properties.append(list("qualities", "\(qualities) more personal qualities at work", qualities)) }
         guard !properties.isEmpty else { return nil }

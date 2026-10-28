@@ -120,7 +120,9 @@ struct SectionPromptsTests {
         let both = SectionPrompts.moreSkills(for: Self.brief, tools: 2, qualities: 1, excluding: ["PLC", "precisione"]).text
         let toolsOnly = SectionPrompts.moreSkills(for: Self.brief, tools: 1, qualities: 0, excluding: []).text
 
-        #expect(both.contains("Name 2 more tools, machines, software, materials or techniques of the trade."))
+        #expect(both.contains("Name 2 more tools, machines, software or techniques of the trade, each of another kind than those listed."))
+        #expect(!both.contains("material"))
+        #expect(!SectionPrompts.toolsInstructions.contains("materials or"))
         #expect(both.contains("Name 1 more personal qualities at work."))
         #expect(both.contains("Already listed, do not repeat: PLC; precisione"))
         #expect(!toolsOnly.contains("personal qualities"))

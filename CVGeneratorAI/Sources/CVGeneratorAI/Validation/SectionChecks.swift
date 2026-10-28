@@ -418,7 +418,8 @@ extension CVDataSanitizer {
 
     /// The written skills, cleaned by code: a quality or an activity listed as a technology ("precisione", "Planung") is a soft
     /// skill, and a tool named by an activity ("software di gestione fermi") goes; the singular and the plural of one skill count
-    /// once; a fragment, a verb and a skill in another language go. A technology the verb it starts with leads ("usare i PLC") is
+    /// once, and of two tools of one kind, by their head noun ("studio monitors", "nearfield monitor"), the second goes; a fragment, a
+    /// verb and a skill in another language go. A technology the verb it starts with leads ("usare i PLC") is
     /// cut to its object; a tool word ("software") never leads as a verb.
     func skillCheck(technologies: [String], softSkills: [String], against description: String) -> SkillVerdict {
         let language = DescriptionText(description, languageOfText: languageOfText).explainer.language?.rawValue
@@ -460,11 +461,16 @@ extension CVDataSanitizer {
             }
             return kept
         }
+        var heads = Set<String>()
         for raw in technologies {
             guard let item = check(raw, true), keys.insert(Self.skillKey(item)).inserted else { continue }
             let lower = item.lowercased()
             if !Self.softStems.contains(where: lower.contains) {
-                verdict.technologies.append(item)
+                if let head = Self.headKey(of: item, language: language), !heads.insert(head).inserted {
+                    verdict.dropped.append(Rejection(sentence: raw, reason: "same kind as an earlier tool"))
+                } else {
+                    verdict.technologies.append(item)
+                }
             } else if Set(letterWordsKeepingCase(lower)).isDisjoint(with: Self.toolWords) {
                 verdict.softSkills.append(item)
             } else {
@@ -487,6 +493,15 @@ extension CVDataSanitizer {
 
     private func letterWordsKeepingCase(_ text: String) -> [String] {
         text.split { !$0.isLetter }.map(String.init)
+    }
+
+    /// The key of a tool's head noun, the word that names its kind ("monitors" of "studio monitors", "pince" of "pince à dénuder"):
+    /// the last word in English and German, the first in the other languages, past an elided article ("l'oscilloscope"); none when
+    /// that word has fewer than 4 letters ("Logic Pro").
+    private static func headKey(of item: String, language: String?) -> String? {
+        let words = item.lowercased().split { !$0.isLetter }.map(String.init).filter { $0.count > 1 }
+        guard let head = ["en", "de"].contains(language ?? "") ? words.last : words.first, head.count >= 4 else { return nil }
+        return skillKey(head)
     }
 
     /// The key by which two skills are one: their words without a plural ending or a last vowel ("PLC" and "PLCs").

@@ -115,6 +115,26 @@ struct SectionChecksTests {
         #expect(verdict.dropped.map(\.reason) == ["another language"])
     }
 
+    @Test("Of two technologies of one kind, by their head noun, the second goes; tools of other kinds, and a short last word, stay (#354)")
+    func toolsOfOneKind() {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let french = CVDataSanitizer(languageOfText: { _ in "fr" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let sound = english.skillCheck(
+            technologies: ["studio monitors", "digital mixing desk", "nearfield monitor", "Shure microphones", "Logic Pro", "Premiere Pro"],
+            softSkills: [], against: "I mix the sound for a small theatre in Hull."
+        )
+        let wiring = french.skillCheck(
+            technologies: ["pince à dénuder", "multimètre", "pinces coupantes", "l'oscilloscope"], softSkills: [],
+            against: "Je câble des tableaux électriques à Rouen."
+        )
+
+        #expect(sound.technologies == ["studio monitors", "digital mixing desk", "Shure microphones", "Logic Pro", "Premiere Pro"])
+        #expect(sound.dropped.map(\.reason) == ["same kind as an earlier tool"])
+        #expect(wiring.technologies == ["pince à dénuder", "multimètre", "l'oscilloscope"])
+        #expect(wiring.dropped.map(\.sentence) == ["pinces coupantes"])
+    }
+
     @Test("A fragment and a lone verb go from the skills")
     func fragmentsGo() {
         let verdict = sanitizer.skillCheck(
