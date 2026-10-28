@@ -34,7 +34,7 @@ struct InferredSkillsTests {
     @Test("An address, a link or a mark-up is no skill",
           arguments: ["help@evil.example", "evil.example", "www.evil.example", "evil.example/path", "https://evil.example", "a@b.co",
                       "<b>Phonics</b>", "Phonics; drop table", "Phonics (see evil.example)", "Phonics = 1", "Phonics | Excel", "Phonics_Excel",
-                      "Phonics\\Excel", "evil.js", "evil.net", "evil.ts", "evil.py", "node.js.evil.com", "www.node.js", "https://node.js", "node.js/evil", "Node.js evil.js", "Phonics*", "Phonics!", "Phonics?", "Phonics, Excel", "Phonics: Excel", "{Phonics}", "[Phonics]"])
+                      "Phonics\\Excel", "evil.js", "evil.net", "evil.ts", "evil.py", "node.js.evil.com", "www.node.js", "https://node.js", "node.js/evil", "node.js node.js/", "node.js/", "Node.js evil.js", "Phonics*", "Phonics!", "Phonics?", "Phonics, Excel", "Phonics: Excel", "{Phonics}", "[Phonics]"])
     func addressesAndMarkup(name: String) {
         #expect(skills().accepted(name) == nil, "\(name)")
     }

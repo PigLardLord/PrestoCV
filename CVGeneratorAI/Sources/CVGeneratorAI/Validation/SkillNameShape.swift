@@ -48,10 +48,12 @@ struct SkillNameShape {
 
     /// Whether a token of `name` is an email or a link, or mentions one: "Node.js" is a tool, "evil.example" is a link.
     private static func isAnAddress(_ name: String) -> Bool {
-        let tokens = AddressTokens(name)
-        guard tokens.emails.isEmpty, !tokens.hasAmbiguousAddress else { return true }
-        // A link is a tool only when it is a token of the name as written, whole ("www.node.js" is a link, "Node.js" is not).
-        let written = Set(name.split(separator: " ").map { $0.lowercased() })
-        return tokens.links.contains { !toolNames.contains($0) || !written.contains($0) }
+        // Each token of the name is read alone and as written: a link is a tool only when the token is, whole, a name of the list
+        // ("www.node.js", "node.js/" and "https://node.js" are links, "Node.js" is not).
+        return name.split(separator: " ").contains { token in
+            let tokens = AddressTokens(String(token))
+            guard tokens.emails.isEmpty, !tokens.hasAmbiguousAddress else { return true }
+            return !tokens.links.isEmpty && !toolNames.contains(token.lowercased())
+        }
     }
 }
