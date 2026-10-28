@@ -9,6 +9,8 @@ private let launchLogger = Logger(subsystem: "com.PigLardLord.prestocv", categor
 struct RootDependencies {
     let onboardingViewModel: OnboardingViewModel
     let cvListViewModel: CVListViewModel
+    /// The diagnostics screen of a TestFlight or Debug build, which the list offers only while the trace records
+    let diagnosticsViewModel: DiagnosticsViewModel
     let viewModelFactory: ViewModelFactory
     /// Stores what earlier versions kept of unsaved editor work; nil when their folder cannot be reached.
     let leftoverEdits: LeftoverEditsImportProtocol?
@@ -100,6 +102,7 @@ final class AppLaunchViewModel: ObservableObject {
                 RootDependencies(
                     onboardingViewModel: try viewModelFactory.makeOnboardingViewModel(),
                     cvListViewModel: viewModelFactory.makeCVListViewModel(),
+                    diagnosticsViewModel: viewModelFactory.makeDiagnosticsViewModel(),
                     viewModelFactory: viewModelFactory,
                     leftoverEdits: leftoverEditsIfAvailable(into: cvManagementUseCase, from: makeLeftoverEdits)
                 )

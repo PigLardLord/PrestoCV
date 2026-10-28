@@ -4,6 +4,8 @@ import PrestoCVCore
 /// The list of the user's CVs, which is the root of the app. `emptyState` is what it shows while there is no CV.
 struct CVListView<EmptyState: View>: View {
     @ObservedObject var viewModel: CVListViewModel
+    /// The diagnostics screen of a TestFlight or Debug build, offered only while the trace records
+    @ObservedObject var diagnostics: DiagnosticsViewModel
     @EnvironmentObject var router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
     @State private var exportSheet: ExportSheet?
@@ -16,6 +18,7 @@ struct CVListView<EmptyState: View>: View {
     @State private var deleteAnchor: CGRect?
     @State private var renameTarget: CVModel?
     @State private var renameText = ""
+    @State private var isShowingDiagnostics = false
     private let makeExportSheet: @MainActor (UUID) async -> CVExportSheetViewModel?
     private let emptyState: EmptyState
 
@@ -23,10 +26,12 @@ struct CVListView<EmptyState: View>: View {
     ///   cannot be read, which the list view model has reported.
     init(
         viewModel: CVListViewModel,
+        diagnostics: DiagnosticsViewModel,
         makeExportSheet: @escaping @MainActor (UUID) async -> CVExportSheetViewModel?,
         @ViewBuilder emptyState: () -> EmptyState
     ) {
         self.viewModel = viewModel
+        self.diagnostics = diagnostics
         self.makeExportSheet = makeExportSheet
         self.emptyState = emptyState()
     }
@@ -59,6 +64,18 @@ struct CVListView<EmptyState: View>: View {
         }
         .screenTitle("navigation.my_cvs".localized, large: true)
         .toolbar {
+            if diagnostics.isAvailable {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        isShowingDiagnostics = true
+                    } label: {
+                        Image(systemName: "ladybug")
+                    }
+                    .accessibilityLabel("diagnostics.entry.label".localized)
+                    .accessibilityHint("diagnostics.entry.hint".localized)
+                    .accessibilityIdentifier("diagnostics.entry")
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
                     router.navigate(to: .templateSelection)
@@ -67,8 +84,14 @@ struct CVListView<EmptyState: View>: View {
                 }
             }
         }
+        .sheet(isPresented: $isShowingDiagnostics, onDismiss: { Task { await diagnostics.finishSharing() } }) {
+            DiagnosticsView(viewModel: diagnostics)
+        }
         .task {
             await viewModel.loadCVs()
+        }
+        .task {
+            await diagnostics.checkAvailability()
         }
         .task {
             await viewModel.keepPresentationDateCurrent()
@@ -234,7 +257,7 @@ private struct CVRowView: View {
 struct CVListView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            CVListView(viewModel: makeViewModel(), makeExportSheet: makeExportSheet) {
+            CVListView(viewModel: makeViewModel(), diagnostics: PreviewDependencies.diagnostics(), makeExportSheet: makeExportSheet) {
                 Text("navigation.my_cvs".localized)
             }
         }

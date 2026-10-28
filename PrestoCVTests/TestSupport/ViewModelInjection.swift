@@ -1,4 +1,5 @@
 import DiagnosticLogging
+import DiagnosticTrace
 import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
@@ -45,9 +46,18 @@ extension AppEnvironment {
             arguments: arguments,
             bundle: Bundle(for: AppRouter.self),
             platform: .iPhoneOrIPad,
-            diagnostics: diagnostics
+            diagnostics: diagnostics,
+            tracer: NoTracer(),
+            trace: TraceAccess(isOn: { false }, reader: NoStoredRuns())
         )
     }
+}
+
+/// A trace store with no run, for the tests whose trace does not record
+private struct NoStoredRuns: TraceReading {
+    func runs() async -> [TraceRunListing] { [] }
+    func shareCopies(of id: UUID) async throws -> [URL] { [] }
+    func discardCopies() async {}
 }
 
 /// The Gregorian calendar in UTC

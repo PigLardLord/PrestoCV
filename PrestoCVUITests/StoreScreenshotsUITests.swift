@@ -205,8 +205,9 @@ final class StoreScreenshotsUITests: XCTestCase {
     private func launch(with files: [String: String], arguments: [String] = []) throws -> XCUIApplication {
         self.app?.terminate()
         let app = XCUIApplication()
+        // As the App Store build: a Debug build offers the diagnostics of a test build, which the store's screens never show
         app.launchArguments = ["-AppleLanguages", "(\(fixture.language))", "-AppleLocale", fixture.locale,
-                               "-PrestoCVUITestsEmptyStorage"]
+                               "-PrestoCVUITestsEmptyStorage", "-diagnosticsDistribution", "production"]
         if !files.isEmpty {
             app.launchArguments += ["-PrestoCVUITestsSeed", try JSONEncoder().encode(files).base64EncodedString()]
         }

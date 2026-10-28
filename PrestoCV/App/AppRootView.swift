@@ -6,11 +6,13 @@ struct AppRootView: View {
     @StateObject private var router: AppRouter
     @ObservedObject private var onboardingViewModel: OnboardingViewModel
     @ObservedObject private var cvListViewModel: CVListViewModel
+    private let diagnosticsViewModel: DiagnosticsViewModel
     private let viewModelFactory: ViewModelFactory
     
     init(dependencies: RootDependencies) {
         self.onboardingViewModel = dependencies.onboardingViewModel
         self.cvListViewModel = dependencies.cvListViewModel
+        self.diagnosticsViewModel = dependencies.diagnosticsViewModel
         self.viewModelFactory = dependencies.viewModelFactory
         self._router = StateObject(wrappedValue: dependencies.viewModelFactory.makeAppRouter())
     }
@@ -45,6 +47,7 @@ struct AppRootView: View {
     private var listView: some View {
         CVListView(
             viewModel: cvListViewModel,
+            diagnostics: diagnosticsViewModel,
             makeExportSheet: { await viewModelFactory.makeExportSheetViewModel(exportingCVWithId: $0, from: cvListViewModel) }
         ) {
             FirstRunView(viewModel: viewModelFactory.makeNewCVChoicesViewModel())

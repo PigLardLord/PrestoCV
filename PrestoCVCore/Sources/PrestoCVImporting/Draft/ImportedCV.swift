@@ -142,45 +142,87 @@ public struct UnplacedText: Hashable, Sendable {
     public let span: SourceSpan
 }
 
+/// A value of an imported CV with its place in the CV: `experience[0].role`. The trace of a test build lists them
+/// (ADR 0032); the grounding counts their spans.
+struct ImportedField: Hashable, Sendable {
+    let path: String
+    /// The value as text: the quoted text, or what a reading rule read in it.
+    let value: String
+    let spans: [SourceSpan]
+    let reading: ReadingRule?
+    let check: CheckReason?
+}
+
 extension ImportedCV {
-    /// The spans of every value of the CV. A new field of the CV joins this list: a test compares it with the spans
-    /// found by walking the CV.
-    var sourceSpans: [SourceSpan] {
-        var spans: [SourceSpan] = []
-        func add<Value>(_ value: Sourced<Value>?) { spans += value?.spans ?? [] }
-        add(person.name)
-        add(person.title)
-        add(person.email)
-        add(person.phone)
-        add(person.location)
-        add(person.summary)
-        for link in person.links { add(link.address) }
-        for entry in experience {
-            add(entry.role)
-            add(entry.employer)
-            add(entry.location)
-            add(entry.period)
-            entry.details.forEach { add($0) }
+    /// The spans of every value of the CV. A test compares them with the spans found by walking the CV.
+    var sourceSpans: [SourceSpan] { fields.flatMap(\.spans) }
+
+    /// Every value of the CV, in the order of the CV, and the checks of whole entries. A new field of the CV joins this
+    /// list.
+    var fields: [ImportedField] {
+        var fields: [ImportedField] = []
+        func add<Value>(_ path: String, _ value: Sourced<Value>?, as text: (Value) -> String) {
+            guard let value else { return }
+            fields.append(ImportedField(path: path, value: text(value.value), spans: value.spans, reading: value.reading, check: value.check))
         }
-        for entry in education {
-            add(entry.degree)
-            add(entry.school)
-            add(entry.location)
-            add(entry.period)
-            entry.details.forEach { add($0) }
+        func add(_ path: String, _ value: Sourced<String>?) { add(path, value, as: { $0 }) }
+        func addCheck(_ path: String, _ check: CheckReason?) {
+            guard let check else { return }
+            fields.append(ImportedField(path: path, value: check.rawValue, spans: [], reading: nil, check: check))
         }
-        skills.forEach { add($0) }
-        for language in languages {
-            add(language.name)
-            add(language.level)
-            add(language.levelWords)
+        add("person.name", person.name)
+        add("person.title", person.title)
+        add("person.email", person.email, as: \.value)
+        add("person.phone", person.phone, as: \.value)
+        add("person.location", person.location)
+        add("person.summary", person.summary)
+        for (index, link) in person.links.enumerated() { add("person.links[\(index)].\(link.kind.rawValue)", link.address, as: \.value) }
+        for (index, entry) in experience.enumerated() {
+            let path = "experience[\(index)]"
+            addCheck(path + ".check", entry.check)
+            add(path + ".role", entry.role)
+            add(path + ".employer", entry.employer)
+            add(path + ".location", entry.location)
+            add(path + ".period", entry.period, as: \.traceText)
+            for (line, detail) in entry.details.enumerated() { add(path + ".details[\(line)]", detail) }
         }
-        for certification in certifications {
-            add(certification.name)
-            add(certification.issuer)
-            add(certification.year)
+        for (index, entry) in education.enumerated() {
+            let path = "education[\(index)]"
+            addCheck(path + ".check", entry.check)
+            add(path + ".degree", entry.degree)
+            add(path + ".school", entry.school)
+            add(path + ".location", entry.location)
+            add(path + ".period", entry.period, as: \.traceText)
+            for (line, detail) in entry.details.enumerated() { add(path + ".details[\(line)]", detail) }
         }
-        interests.forEach { add($0) }
-        return spans
+        for (index, skill) in skills.enumerated() { add("skills[\(index)]", skill) }
+        for (index, language) in languages.enumerated() {
+            add("languages[\(index)].name", language.name)
+            add("languages[\(index)].level", language.level, as: \.rawValue)
+            add("languages[\(index)].levelWords", language.levelWords)
+        }
+        for (index, certification) in certifications.enumerated() {
+            add("certifications[\(index)].name", certification.name)
+            add("certifications[\(index)].issuer", certification.issuer)
+            add("certifications[\(index)].year", certification.year, as: String.init)
+        }
+        for (index, interest) in interests.enumerated() { add("interests[\(index)]", interest) }
+        return fields
+    }
+}
+
+extension ImportedPeriod {
+    /// The period as a script reads it: `2019-03 – current`, `2015`.
+    var traceText: String {
+        func text(_ date: YearMonth) -> String {
+            guard let month = date.month else { return String(date.year) }
+            return "\(date.year)-\(month < 10 ? "0" : "")\(month)"
+        }
+        switch end {
+        case nil: return text(start)
+        case .date(let date): return text(start) + " – " + text(date)
+        case .current: return text(start) + " – current"
+        case .unstated: return text(start) + " –"
+        }
     }
 }

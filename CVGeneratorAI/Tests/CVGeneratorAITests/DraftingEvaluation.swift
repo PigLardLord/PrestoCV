@@ -1,5 +1,6 @@
 #if canImport(FoundationModels)
 import Testing
+import DiagnosticTrace
 import Foundation
 import FoundationModels
 @testable import CVGeneratorAI
@@ -41,7 +42,7 @@ struct DraftingEvaluation {
         let settings = try DraftingSettings(environment: environment)
         let all = try DraftingInputs.all()
         let inputs = try settings.inputs(from: all)
-        try #require(FoundationModelsService().availability() == .available, "the on-device model is not available on this host")
+        try #require(FoundationModelsService(tracer: NoTracer()).availability() == .available, "the on-device model is not available on this host")
 
         let folder = settings.folder(now: Date(), temporary: URL(fileURLWithPath: NSTemporaryDirectory()))
         try RunFolder.prepare(folder)
@@ -88,7 +89,7 @@ struct DraftingEvaluation {
         let sanitizer = CVDataSanitizer(
             languageOfText: { AppLanguageDetector.languageTag(of: $0) }, lexicalClasses: DeviceLexicalTagger()
         )
-        let checker = CheckRecorder(wrapped: FoundationModelsClaimChecker(), log: log)
+        let checker = CheckRecorder(wrapped: FoundationModelsClaimChecker(tracer: NoTracer()), log: log)
         let useCase = CVGeneratorUseCase(service: service, claimChecker: checker, sanitizer: sanitizer)
         let load = loadAverage()
         let start = ContinuousClock.now
@@ -139,7 +140,7 @@ struct DraftingEvaluation {
     /// The model of the app, keeping the draft it wrote before the rules and the check.
     @MainActor
     final class RecordingService: CVGenerationService {
-        private let model = FoundationModelsService()
+        private let model = FoundationModelsService(tracer: NoTracer())
         private(set) var raw: CVData?
 
         func availability() -> AIAvailability { model.availability() }

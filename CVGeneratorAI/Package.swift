@@ -18,11 +18,15 @@ targets.append(.target(name: "CVDraftingFoundationModels", dependencies: ["CVDra
 // Legacy targets: declared only on Apple hosts, and deleted when their replacement is wired in (ADR 0012).
 var dependencies: [Package.Dependency] = []
 #if !os(Linux)
-dependencies.append(.package(path: "../DiagnosticLogging"))
+dependencies += [.package(path: "../DiagnosticLogging"), .package(path: "../DiagnosticTrace")]
 products.append(.library(name: "CVGeneratorAI", targets: ["CVGeneratorAI"]))
 targets += [
     .target(
-        name: "CVGeneratorAI", dependencies: [.product(name: "DiagnosticLogging", package: "DiagnosticLogging")],
+        name: "CVGeneratorAI",
+        dependencies: [
+            .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+            .product(name: "DiagnosticTrace", package: "DiagnosticTrace"),
+        ],
         path: "Sources/CVGeneratorAI"
     ),
     .testTarget(
@@ -30,6 +34,8 @@ targets += [
         dependencies: [
             "CVGeneratorAI", .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
             .product(name: "DiagnosticLoggingTestSupport", package: "DiagnosticLogging"),
+            .product(name: "DiagnosticTrace", package: "DiagnosticTrace"),
+            .product(name: "DiagnosticTraceTestSupport", package: "DiagnosticTrace"),
         ],
         path: "Tests/CVGeneratorAITests"
     ),

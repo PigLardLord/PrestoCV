@@ -2,6 +2,7 @@
 import CoreText
 import DiagnosticLogging
 import DiagnosticLoggingTestSupport
+import DiagnosticTrace
 import Foundation
 import Testing
 import PrestoCVImporting
@@ -92,7 +93,7 @@ struct PDFKitLoggingTests {
         let pdf = try drawnPDF([["Lena Hartmann", "Elektrikerin in Leipzig"], ["Berufserfahrung"]])
         let importer = ImportCV(
             pdfReader: PDFKitTextExtractor(logger: logger), limits: limits(pages: pages, characters: characters, words: words),
-            logger: logger, clock: ContinuousClock()
+            logger: logger, clock: ContinuousClock(), tracer: NoTracer()
         )
 
         await #expect(throws: error) { try await importer.importPDF(pdf) }
@@ -109,7 +110,7 @@ struct PDFKitLoggingTests {
         let marker = "Quorvex"
         let logger = RecordingLogger()
         let pdf = try drawnPDF([["Lena \(marker)", "\(marker) GmbH, Leipzig", "Berufserfahrung", "03/2019 – heute \(marker)"]])
-        let importer = ImportCV(pdfReader: PDFKitTextExtractor(logger: logger), limits: .standard, logger: logger, clock: ContinuousClock())
+        let importer = ImportCV(pdfReader: PDFKitTextExtractor(logger: logger), limits: .standard, logger: logger, clock: ContinuousClock(), tracer: NoTracer())
 
         _ = try await importer.importPDF(pdf)
         _ = try? await PDFKitTextExtractor(logger: logger).layout(ofPDF: pdf, limits: limits(characters: 5))

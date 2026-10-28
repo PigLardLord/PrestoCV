@@ -1,5 +1,6 @@
 #if canImport(FoundationModels)
 import Testing
+import DiagnosticTrace
 import Foundation
 import FoundationModels
 @testable import CVGeneratorAI
@@ -132,7 +133,7 @@ struct ClaimCheckEvaluation {
             var judgements: [ClaimJudgement] = []
             for first in stride(from: 0, to: candidates.count, by: ClaimCheckLimits.standard.batchSize) {
                 let batch = Array(candidates[first..<min(first + ClaimCheckLimits.standard.batchSize, candidates.count)])
-                judgements += try await FoundationModelsClaimChecker().judgements(of: batch, in: evaluationCase.description)
+                judgements += try await FoundationModelsClaimChecker(tracer: NoTracer()).judgements(of: batch, in: evaluationCase.description)
             }
             let items = zip(evaluationCase.items, judgements).map { item, judgement in
                 MeasuredItem(item, verdict: judgement.stance.rawValue, quote: judgement.quote, modelStance: "", kept: judgement.stance == .fact)
@@ -319,7 +320,7 @@ actor RecordingClaimChecker: ClaimChecking {
 
     func judgements(of candidates: [ClaimCandidate], in description: String) async throws -> [ClaimJudgement] {
         do {
-            let entries = try await FoundationModelsClaimChecker().answer(to: candidates, in: description)
+            let entries = try await FoundationModelsClaimChecker(tracer: NoTracer()).answer(to: candidates, in: description)
             let judgements = try ClaimAnswer.judgements(from: entries, of: candidates, in: description)
             for (candidate, judgement) in zip(candidates, judgements) { judged[candidate] = judgement }
             // The answer numbers the items 1 to n, each once, or the judgements above would have thrown.

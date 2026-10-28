@@ -311,7 +311,8 @@
     "CoreGraphics",
     "CoreText",
     "DiagnosticLogging",
-    "DiagnosticLoggingTestSupport"
+    "DiagnosticLoggingTestSupport",
+    "DiagnosticTrace"
    ],
    "rules": [
     "R16"
