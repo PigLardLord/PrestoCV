@@ -1,4 +1,5 @@
 #if canImport(FoundationModels)
+import DiagnosticTrace
 import Foundation
 import FoundationModels
 
@@ -9,8 +10,12 @@ public final class FoundationModelsService: CVGenerationService {
     /// Where the fixed instructions travel. `.promptPrefix` is the alternative should the
     /// session's instructions misbehave on a device.
     private let instructionsDelivery: InstructionsDelivery = .session
+    private let tracer: any DiagnosticTracer
 
-    public init() {}
+    /// - Parameter tracer: Where the request to the model and its raw answer are recorded, in the open run of the draft (ADR 0032).
+    public init(tracer: any DiagnosticTracer) {
+        self.tracer = tracer
+    }
 
     public func availability() -> AIAvailability {
         Self.map(SystemLanguageModel.default.availability)
@@ -23,6 +28,7 @@ public final class FoundationModelsService: CVGenerationService {
 
         let prompt = CVPrompt(request: request, delivery: instructionsDelivery)
         let session = LanguageModelSession(instructions: prompt.instructions)
+        tracer.record(.request, into: .aiDraft) { prompt.traceFields }
 
         do {
             let response = try await session.respond(
@@ -31,6 +37,9 @@ public final class FoundationModelsService: CVGenerationService {
                 includeSchemaInPrompt: true,
                 options: GenerationOptions(samplingMode: .greedy)
             )
+            tracer.record(.response, into: .aiDraft) {
+                [.token("call", "draft"), .flag("answered", true), .text("raw", response.rawContent.jsonString)]
+            }
             return response.content
         } catch is CancellationError {
             throw CancellationError()
@@ -39,7 +48,14 @@ public final class FoundationModelsService: CVGenerationService {
             if Task.isCancelled {
                 throw CancellationError()
             }
-            throw Self.map(failure: error)
+            let failure = Self.map(failure: error)
+            tracer.record(.response, into: .aiDraft) {
+                [
+                    .token("call", "draft"), .flag("answered", false), .token("error", "\(failure.logCode)"),
+                    .text("framework", String(describing: error)),
+                ]
+            }
+            throw failure
         }
     }
 

@@ -1,5 +1,6 @@
 import DiagnosticLogging
 import DiagnosticLoggingTestSupport
+import DiagnosticTrace
 import Foundation
 import Testing
 @testable import PrestoCVImporting
@@ -20,7 +21,7 @@ struct ImportLoggingTests {
     private func importer(
         _ reader: ScriptedPDFReader = ScriptedPDFReader(), limits: ImportLimits? = nil, logger: RecordingLogger
     ) -> ImportCV {
-        ImportCV(pdfReader: reader, limits: limits ?? self.limits, logger: logger, clock: TickingClock(step: Self.step))
+        ImportCV(pdfReader: reader, limits: limits ?? self.limits, logger: logger, clock: TickingClock(step: Self.step), tracer: NoTracer())
     }
 
     private static let pastedCV = """

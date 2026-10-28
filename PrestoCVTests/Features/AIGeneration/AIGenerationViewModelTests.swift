@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import CVGeneratorAI
+import DiagnosticLogging
 @testable import PrestoCV
 @testable import PrestoCVCore
 
@@ -38,7 +39,9 @@ struct AIGenerationViewModelTests {
                 service: service, claimChecker: claimChecker, sanitizer: CVDataSanitizer(lexicalClasses: lexicalClasses)
             ),
             mapper: AIDraftMapper(labels: labels, languageOfText: { _ in "pt-PT" }),
-            languageData: LanguageDataPreparation(requester: languageData, sleep: { try await sleeps.sleep(for: $0) }),
+            languageData: LanguageDataPreparation(
+                requester: languageData, sleep: { try await sleeps.sleep(for: $0) }, logger: SilentLogger(), clock: ContinuousClock()
+            ),
             appLanguageCode: appLanguageCode,
             session: session,
             platform: platform

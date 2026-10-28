@@ -18,6 +18,9 @@ struct Hit {
 final class Scanner: SyntaxVisitor {
     private(set) var hits: [Hit] = []
     private(set) var imports: [(module: String, line: Int, node: String, access: String?)] = []
+    /// The aliases of an infrastructure type (`typealias Gate = DistributionGate`, qualified or not), which name it without
+    /// its name: a call through one is a construction too, so the rules that restrict the type know the alias.
+    private(set) var aliases: [(alias: String, type: String, line: Int)] = []
     /// In a manifest: the names of every target declaration, in every `#if` branch.
     private(set) var declaredPackageTargets: [String] = []
     private let converter: SourceLocationConverter
@@ -224,7 +227,25 @@ final class Scanner: SyntaxVisitor {
         if callee == "String", isInit, args.first?.label?.text == "format" { hit("fullFoundation", Self.needsFullFoundation("String(format:)"), node) }
         if callee == "DispatchSemaphore" { hit("escapeHatch", "DispatchSemaphore", node) }
         if isInit, infrastructureTypes.contains(callee) { hit("infrastructureConstruction", callee + "(...)", node) }
+        // A module-qualified type (`DiagnosticTrace.DistributionGate()`) is the type; the qualifier is no module of the fixed list.
+        if let member, member != "init", infrastructureTypes.contains(member) { hit("infrastructureConstruction", member + "(...)", node) }
+        // A contextual `.init(...)` makes the type its context expects: `let gate: DistributionGate = .init()`.
+        if callee == "", member == "init", let expected = expectedType(of: ExprSyntax(node)), infrastructureTypes.contains(expected) {
+            hit("infrastructureConstruction", expected + "(...)", node)
+        }
         if callee == "unsafeFlags" { hit("unsafeFlags", "unsafeFlags", node) }
+        return .visitChildren
+    }
+
+    override func visit(_ node: TypeAliasDeclSyntax) -> SyntaxVisitorContinueKind {
+        // Only an alias that names the type itself, qualified or not: `[Gate]` or `Wrapper<Gate>` is another type.
+        var named = node.initializer.value
+        while let attributed = named.as(AttributedTypeSyntax.self) { named = attributed.baseType }
+        let direct = named.as(IdentifierTypeSyntax.self).flatMap { $0.genericArgumentClause == nil ? Self.name($0.name) : nil }
+            ?? named.as(MemberTypeSyntax.self).flatMap { $0.genericArgumentClause == nil ? Self.name($0.name) : nil }
+        if let type = direct, infrastructureTypes.contains(type) {
+            aliases.append((Self.name(node.name), type, node.startLocation(converter: converter).line))
+        }
         return .visitChildren
     }
 
@@ -392,6 +413,8 @@ final class Scanner: SyntaxVisitor {
     /// parameter (`@escaping`, `inout`); nil for any other type.
     static func typeName(_ type: TypeSyntax) -> String? {
         if let t = type.as(AttributedTypeSyntax.self) { return typeName(t.baseType) }
+        if let t = type.as(OptionalTypeSyntax.self) { return typeName(t.wrappedType) }
+        if let t = type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) { return typeName(t.wrappedType) }
         if let t = type.as(IdentifierTypeSyntax.self) { return name(t.name) }
         if let t = type.as(MemberTypeSyntax.self) { return name(t.name) }
         return nil

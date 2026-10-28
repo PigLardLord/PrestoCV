@@ -23,6 +23,8 @@ import SwiftSyntax
 //    collected from all its files first, so that an extension of a view in another file is part of the view.
 // 9. Warnings: a detector listed in warningDetectors reports without failing, and never enters the baseline (R18: an API
 //    that needs the full Foundation).
+// 10. Composition only (compositionOnly): only the files listed may import the listed modules or make the listed types, in
+//    every target that ships, legacy ones included; a breach is a problem and never enters the baseline (ADR 0032).
 
 struct Config: Decodable {
     struct Target: Decodable {
@@ -46,6 +48,9 @@ struct Config: Decodable {
     let notYetImplemented: [String]?
     /// Detectors whose findings are printed as warnings: they do not fail the check and never enter the baseline.
     let warningDetectors: [String]?
+    /// Modules and types only the listed files may import or make (ADR 0032): the composition root's own adapters.
+    let compositionOnly: CompositionOnly?
+    struct CompositionOnly: Decodable { let adr: String; let files: [String]; let modules: [String]; let types: [String] }
 }
 
 struct Finding { let key: String; let message: String }
@@ -211,9 +216,62 @@ for (file, target, source, tree) in parsed {
     }
 }
 
+// MARK: 4b. Composition-only modules and types (ADR 0032)
+
+// Only the files the rule lists may import its modules or make its types. The check covers every target that ships,
+// legacy ones included, whose imports the allow-lists do not check (ADR 0012); test targets may, to test the chain.
+// A breach is a problem, not a finding: it never enters the baseline.
+if let only = config.compositionOnly {
+    let adrExists = adrDir.map { dir in ((try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? []).contains { $0.hasPrefix(only.adr + "-") } } ?? false
+    if !adrExists { problems.append("compositionOnly cites ADR \(only.adr), which does not exist") }
+    for file in only.files where !files.contains(file) { problems.append("compositionOnly lists \(file), which does not exist") }
+    let modules = Set(only.modules)
+    let parsedTrees = Dictionary(parsed.map { ($0.file, $0.tree) }, uniquingKeysWith: { first, _ in first })
+    // The files the rule covers: every production file, and every legacy one that is not a test, outside the modules themselves.
+    var covered: [(file: String, target: String, tree: SourceFileSyntax)] = []
+    for (file, target) in assignment where !modules.contains(target.name) {
+        let kind = target.kind ?? "production"
+        guard kind == "production" || (kind == "legacy" && !target.name.hasSuffix("Tests")) else { continue }
+        if let known = parsedTrees[file] { covered.append((file, target.name, known)); continue }
+        guard let source = try? String(contentsOf: root.appendingPathComponent(file), encoding: .utf8) else { problems.append("cannot read \(file)"); continue }
+        covered.append((file, target.name, Parser.parse(source: source)))
+    }
+    // What each type of a target declares, so that a contextual `.init()` passed as an argument resolves to its parameter's type.
+    var coveredMembers: [String: [String: TypeMembers]] = [:]
+    for (_, target, tree) in covered {
+        for (type, members) in MemberIndex.members(in: tree) { coveredMembers[target, default: [:]][type, default: TypeMembers()].merge(members) }
+    }
+    // The types and every alias of them, wherever declared (the composition root may declare one that another file uses).
+    var types = Set(only.types)
+    var grew = true
+    while grew {
+        grew = false
+        for (file, target, tree) in covered {
+            let scanner = Scanner(tree: tree, file: file, infrastructureTypes: types, viewTypes: [], memberTypes: coveredMembers[target] ?? [:],
+                                  serviceSuffixes: [], dependencySuffixes: [])
+            scanner.walk(tree)
+            for alias in scanner.aliases where types.insert(alias.alias).inserted { grew = true }
+        }
+    }
+    for (file, target, tree) in covered where !only.files.contains(file) {
+        let scanner = Scanner(tree: tree, file: file, infrastructureTypes: types, viewTypes: [], memberTypes: coveredMembers[target] ?? [:],
+                              serviceSuffixes: [], dependencySuffixes: [])
+        scanner.walk(tree)
+        for imp in scanner.imports where modules.contains(imp.module) {
+            problems.append("\(file):\(imp.line): R4 compositionOnly: \(imp.node) outside the composition root (ADR \(only.adr))")
+        }
+        for alias in scanner.aliases {
+            problems.append("\(file):\(alias.line): R4 compositionOnly: typealias \(alias.alias) of \(alias.type) outside the composition root (ADR \(only.adr))")
+        }
+        for hit in scanner.hits where hit.detector == "infrastructureConstruction" && types.contains(String(hit.detail.prefix { $0 != "(" })) {
+            problems.append("\(file):\(hit.line): R4 compositionOnly: \(hit.detail) outside the composition root (ADR \(only.adr))")
+        }
+    }
+}
+
 // MARK: 5. modules.md, both directions
 
-let frameworks: Set<String> = ["Glibc", "Darwin", "Android", "Dispatch", "Foundation", "Observation", "WebKit", "UIKit", "AppKit", "FoundationModels", "Testing", "SwiftUI", "PDFKit", "QuickLook", "UniformTypeIdentifiers", "Synchronization", "CoreGraphics", "CoreText"]
+let frameworks: Set<String> = ["Glibc", "Darwin", "Android", "Dispatch", "Foundation", "Observation", "WebKit", "UIKit", "AppKit", "FoundationModels", "Testing", "SwiftUI", "PDFKit", "QuickLook", "UniformTypeIdentifiers", "Synchronization", "CoreGraphics", "CoreText", "StoreKit"]
 if let modulesPath = value(after: "--modules") {
     var documented: [String: Set<String>?] = [:]
     let modulesText = (try? String(contentsOfFile: modulesPath, encoding: .utf8)) ?? ""
