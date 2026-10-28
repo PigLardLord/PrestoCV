@@ -34,6 +34,8 @@ struct DraftingInput: Sendable, CustomTestStringConvertible {
         case sparse
         /// No role, study or field at all: the draft writes nothing around the facts (ADR 0031).
         case noRole
+        /// A description of the app's end-to-end campaign that the evaluation lacked (#354): an employer and a tool, no title.
+        case app
     }
 
     let id: String
@@ -96,14 +98,14 @@ extension DraftingInput {
     }
 }
 
-/// The 30 inputs of the drafting evaluation: the 6 example descriptions of the app, read from its string catalog so that they
-/// cannot drift, and 4 written descriptions per language (plain, with traps, sparse, with no role). Every person, address and number
-/// in them is invented.
+/// The 31 inputs of the drafting evaluation: the 6 example descriptions of the app, read from its string catalog so that they
+/// cannot drift, 4 written descriptions per language (plain, with traps, sparse, with no role) and the descriptions of the app's
+/// end-to-end campaign. Every person, address and number in them is invented.
 enum DraftingInputs {
     static let languages = ["en", "it", "de", "es", "fr", "pt"]
 
     static func all() throws -> [DraftingInput] {
-        try examples() + written + short
+        try examples() + written + short + app
     }
 
     // MARK: - Fields
@@ -125,6 +127,7 @@ enum DraftingInputs {
         "en-sparse": ("plumbing", []), "it-sparse": ("sviluppo iOS", ["Kubernetes", "Java", "Photoshop", "SAP"]),
         "de-sparse": ("Bäckerei", ["HACCP"]), "es-sparse": ("hostelería", ["HACCP"]),
         "fr-sparse": ("comptabilité", ["SAP"]), "pt-sparse": ("transporte de cargas", []),
+        "ai-language-data": ("work at San Camillo, with Excel", []),
     ]
 
     // MARK: - The app's examples
@@ -456,6 +459,18 @@ enum DraftingInputs {
             id: "pt-norole", kind: .noRole, language: "pt",
             description: "Gosto de passear com o meu cão, ler romances policiais e cozinhar para os amigos ao fim de semana.",
             facts: [], traps: []
+        ),
+    ]
+
+    // MARK: - The app's end-to-end campaign
+
+    /// The descriptions the app's end-to-end campaign types that the evaluation did not have. `ai-language-data` ran 265 s and
+    /// ended in `serviceFailed` at a1e64ab5 (#354).
+    static let app: [DraftingInput] = [
+        DraftingInput(
+            id: "ai-language-data", kind: .app, language: "en",
+            description: "I have worked at San Camillo in Roma since 2015. I use Excel every day.",
+            facts: [.employer("San Camillo"), .skill("Excel")], traps: []
         ),
     ]
 }

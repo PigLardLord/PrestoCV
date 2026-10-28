@@ -4,12 +4,12 @@ import Foundation
 // The inputs of the drafting evaluation (#202) are fixtures: these tests keep them honest, so that a fact the counter looks
 // for is one the description states, a trap is a real temptation, and no input holds real contact details.
 
-@Suite("Drafting inputs: the 30 descriptions of the drafting evaluation")
+@Suite("Drafting inputs: the 31 descriptions of the drafting evaluation")
 struct DraftingInputsTests {
     @Test("Each language has its example, a plain description, one with traps, a sparse one and one with no role",
           arguments: DraftingInputs.languages)
     func fiveInputsPerLanguage(_ language: String) throws {
-        let inputs = try DraftingInputs.all().filter { $0.language == language }
+        let inputs = try DraftingInputs.all().filter { $0.language == language && $0.kind != .app }
 
         #expect(inputs.map(\.kind) == [.example, .plain, .traps, .sparse, .noRole])
         #expect(inputs.map(\.id) == ["example-", "-plain", "-traps", "-sparse", "-norole"].map {
@@ -17,11 +17,12 @@ struct DraftingInputsTests {
         })
     }
 
-    @Test("There are 30 inputs, each with an id of its own")
-    func thirtyInputs() throws {
+    @Test("There are 31 inputs, each with an id of its own, one of them from the app's end-to-end campaign")
+    func thirtyOneInputs() throws {
         let ids = try DraftingInputs.all().map(\.id)
 
-        #expect(ids.count == 30)
+        #expect(ids.count == 31)
+        #expect(DraftingInputs.app.map(\.id) == ["ai-language-data"])
         #expect(Set(ids).count == ids.count)
     }
 
@@ -66,9 +67,15 @@ struct DraftingInputsTests {
     func factsOfEveryInput(_ language: String) throws {
         for input in try DraftingInputs.all() where input.language == language {
             let kinds = input.facts.map(\.kind)
-            guard input.kind != .sparse, input.kind != .noRole else {
-                // A sparse description states a title alone, and one with no role states no fact.
-                #expect(kinds == (input.kind == .sparse ? [.title] : []), "\(input.id)")
+            guard input.kind != .sparse, input.kind != .noRole, input.kind != .app else {
+                // A sparse description states a title alone, one with no role states no fact, and the app's states an employer
+                // and a tool.
+                let expected: [ExpectedFact.Kind] = switch input.kind {
+                case .sparse: [.title]
+                case .app: [.employer, .skill]
+                default: []
+                }
+                #expect(kinds == expected, "\(input.id)")
                 #expect(input.traps.isEmpty, "\(input.id)")
                 continue
             }
