@@ -363,7 +363,7 @@ struct SanitizerOmittedEntryTests {
         let result = try sanitized(languages, from: "I speak Italian (native), French (A2) and English (B2).")
         let skillResult = try sanitized(skills, from: "I know Python (expert), Swift (advanced) and Go (beginner).")
 
-        #expect(result.languages.map(\.name) == ["Italian"])
+        #expect(result.languages == [Language(name: "Italian", proficiency: .native), Language(name: "English")], "English keeps no level (#354)")
         #expect(skillResult.skills == [Skill(name: "Python")])
     }
 

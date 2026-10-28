@@ -28,11 +28,11 @@ struct SanitizerOwnershipTests {
         #expect(try sanitized(CVData(languages: [Language(name: "French", proficiency: .b2)]), from: "My sister speaks French (B2).").languages.isEmpty)
     }
 
-    @Test("The level of someone else is not the person's: the person's own level stays")
+    @Test("The level of someone else is not the person's: it goes and the person's language stays; the person's own level stays (#354)")
     func levelOfSomeoneElse() throws {
         let description = "I speak German (A2). My colleague speaks German (B2)."
 
-        #expect(try sanitized(CVData(languages: [Language(name: "German", proficiency: .b2)]), from: description).languages.isEmpty)
+        #expect(try sanitized(CVData(languages: [Language(name: "German", proficiency: .b2)]), from: description).languages == [Language(name: "German")])
         #expect(try sanitized(CVData(languages: [Language(name: "German", proficiency: .a2)]), from: description).languages.count == 1)
     }
 

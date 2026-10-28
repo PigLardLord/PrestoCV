@@ -3,8 +3,8 @@ import Foundation
 @testable import CVGeneratorAI
 
 /// What an AI draft may rate: a skill level or a language level only where the description states it for that very skill
-/// or language, by a CEFR code or a level word in the same sentence. Otherwise a skill is unrated, and a language the draft rates is
-/// left out; a language the draft gives no level may stay without one.
+/// or language, by a CEFR code or a level word in the same sentence. Otherwise a skill is unrated, and a language the description
+/// names for the person stays without a level (lead decision, #354); a language it never names goes.
 @Suite("Sanitizer: a level must be stated for its own skill or language")
 struct SanitizerLevelTests {
     private let sanitizer = CVDataSanitizer()
@@ -28,35 +28,35 @@ struct SanitizerLevelTests {
         #expect(result == given)
     }
 
-    @Test("A language is left out when the draft's level is not the stated one")
+    @Test("A language loses a level that is not the stated one, and stays without one (#354)")
     func wrongLanguageLevel() throws {
         let given = [Language(name: "Italian", proficiency: .native), Language(name: "English", proficiency: .c1)]
 
         let result = try languages(given, from: "I speak Italian (native) and English (B2).")
 
-        #expect(result.map(\.name) == ["Italian"], "English was stated as B2, not C1")
+        #expect(result == [Language(name: "Italian", proficiency: .native), Language(name: "English")], "English was stated as B2, not C1")
     }
 
-    @Test("A language the draft gives no level may stay without one; a level the description does not state for it takes the language whole")
+    @Test("A language the draft gives no level may stay without one; a level the description does not state for it goes alone (#354)")
     func languageWithoutALevel() throws {
         #expect(try languages([Language(name: "French")], from: "I speak French.") == [Language(name: "French")])
-        #expect(try languages([Language(name: "French", proficiency: .b2)], from: "I speak French.").isEmpty)
+        #expect(try languages([Language(name: "French", proficiency: .b2)], from: "I speak French.") == [Language(name: "French")])
         #expect(try languages([Language(name: "German")], from: "I speak French.").isEmpty, "a language the description never names")
     }
 
-    @Test("A language is left out when the description states no level for it")
+    @Test("A language stays without a level when the description states none for it (#354)")
     func unstatedLanguageLevel() throws {
         let given = [Language(name: "Italian", proficiency: .native), Language(name: "English", proficiency: .b2)]
 
-        #expect(try languages(given, from: "I speak Italian and English.").isEmpty)
+        #expect(try languages(given, from: "I speak Italian and English.") == [Language(name: "Italian"), Language(name: "English")])
     }
 
     @Test("A level stated in another sentence, or for a language not named, does not count")
     func levelOfSomethingElse() throws {
         let given = [Language(name: "Italian", proficiency: .native)]
 
-        #expect(try languages(given, from: "I speak Italian. My brother is a native speaker.").isEmpty)
-        #expect(try languages(given, from: "I speak Italian and my sister speaks French (native).").isEmpty)
+        #expect(try languages(given, from: "I speak Italian. My brother is a native speaker.") == [Language(name: "Italian")])
+        #expect(try languages(given, from: "I speak Italian and my sister speaks French (native).") == [Language(name: "Italian")])
     }
 
     @Test("A language the description never names is left out, whatever level it is given")
@@ -69,7 +69,7 @@ struct SanitizerLevelTests {
         let description = "My English is fluent, B2 on paper."
 
         #expect(try languages([Language(name: "English", proficiency: .b2)], from: description).count == 1)
-        #expect(try languages([Language(name: "English", proficiency: .c1)], from: description).isEmpty)
+        #expect(try languages([Language(name: "English", proficiency: .c1)], from: description) == [Language(name: "English")])
     }
 
     @Test("In a sentence with several languages each level belongs to the nearest one")
@@ -79,7 +79,7 @@ struct SanitizerLevelTests {
         let swapped = [Language(name: "Italian", proficiency: .a1), Language(name: "English", proficiency: .native)]
 
         #expect(try languages(right, from: description) == right)
-        #expect(try languages(swapped, from: description).isEmpty)
+        #expect(try languages(swapped, from: description) == [Language(name: "Italian"), Language(name: "English")])
     }
 
     @Test("Without an \"and\" between them, each level still belongs to the nearest language")
@@ -89,7 +89,7 @@ struct SanitizerLevelTests {
         let shifted = [Language(name: "Italian", proficiency: .b2), Language(name: "English", proficiency: .a2), Language(name: "French", proficiency: .native)]
 
         #expect(try languages(right, from: description) == right)
-        #expect(try languages(shifted, from: description).isEmpty)
+        #expect(try languages(shifted, from: description) == [Language(name: "Italian"), Language(name: "English"), Language(name: "French")])
     }
 
     @Test("A level nearer to another language is not taken for this one")
@@ -98,7 +98,7 @@ struct SanitizerLevelTests {
 
         let result = try languages(given, from: "I speak Italian and English (B2).")
 
-        #expect(result.map(\.name) == ["English"])
+        #expect(result == [Language(name: "Italian"), Language(name: "English", proficiency: .b2)])
     }
 
     @Test("Level words are read in the app's six languages",
@@ -121,29 +121,32 @@ struct SanitizerLevelTests {
         #expect(try languages([Language(name: name, proficiency: level)], from: description).map(\.proficiency) == [level])
     }
 
+    /// `stays`: the clause denies the level only, so the language stays without one (#354); otherwise the clause denies or
+    /// hedges the speaking itself ("no more", "barely"), and the language goes.
     @Test("A level said with a negation or a hedge is not the level",
           arguments: [
-            ("My English is not fluent", "English"),
-            ("My English isn't fluent", "English"),
-            ("I speak English (B2) no more", "English"),
-            ("I barely speak English (B2)", "English"),
-            ("I speak English (B2) only a bit", "English"),
-            ("Il mio inglese non è fluente", "inglese"),
-            ("Parlo poco inglese (B2)", "inglese"),
-            ("Mein Englisch ist nicht fließend", "Englisch"),
-            ("Ich spreche kaum Englisch (B2)", "Englisch"),
-            ("Mi inglés no es fluido", "inglés"),
-            ("Hablo apenas inglés (B2)", "inglés"),
-            ("Mon anglais n'est pas courant", "anglais"),
-            ("Je parle peu anglais (B2)", "anglais"),
-            ("Meu inglês não é fluente", "inglês"),
-            ("Falo pouco inglês (B2)", "inglês"),
-          ] as [(String, String)])
-    func negatedOrHedgedLanguageLevel(description: String, name: String) throws {
+            ("My English is not fluent", "English", true),
+            ("My English isn't fluent", "English", true),
+            ("I speak English (B2) no more", "English", false),
+            ("I barely speak English (B2)", "English", false),
+            ("I speak English (B2) only a bit", "English", true),
+            ("Il mio inglese non è fluente", "inglese", true),
+            ("Parlo poco inglese (B2)", "inglese", false),
+            ("Mein Englisch ist nicht fließend", "Englisch", true),
+            ("Ich spreche kaum Englisch (B2)", "Englisch", false),
+            ("Mi inglés no es fluido", "inglés", true),
+            ("Hablo apenas inglés (B2)", "inglés", false),
+            ("Mon anglais n'est pas courant", "anglais", true),
+            ("Je parle peu anglais (B2)", "anglais", true),
+            ("Meu inglês não é fluente", "inglês", true),
+            ("Falo pouco inglês (B2)", "inglês", true),
+          ] as [(String, String, Bool)])
+    func negatedOrHedgedLanguageLevel(description: String, name: String, stays: Bool) throws {
         let claims = [LanguageProficiency.c1, .b2, .c2]
 
         for level in claims {
-            #expect(try languages([Language(name: name, proficiency: level)], from: description).isEmpty, "\(level) in: \(description)")
+            let result = try languages([Language(name: name, proficiency: level)], from: description)
+            #expect(result == (stays ? [Language(name: name)] : []), "\(level) in: \(description)")
         }
     }
 
@@ -163,7 +166,7 @@ struct SanitizerLevelTests {
 
         let result = try languages(claimed, from: description)
 
-        #expect(result.map(\.name) == [names[0], names[1]], "Only the hedged language loses its level, and with it its place")
+        #expect(result == [claimed[0], claimed[1], Language(name: names[2])], "Only the hedged language loses its level, and keeps its place (#354)")
     }
 
     @Test("The same sentences without the negation keep their level")

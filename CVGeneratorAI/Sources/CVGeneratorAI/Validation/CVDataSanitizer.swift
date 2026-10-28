@@ -20,7 +20,7 @@ import Foundation
 ///   description does not name stay as plain technologies and soft skills, without a level (see `InferredSkills`). With no such
 ///   fact, the summary keeps only its quotes and the skills only those the description names;
 /// - a skill level or language level stays only if the description states it, in a sentence with no negation or hedge, and a
-///   language with a level that the description does not state goes whole; a language without a level may stay without one;
+///   language with a level that the description does not state stays without one (#354);
 /// - a skill that is also an interest of the draft, and that the person mentions only as leisure, is a hobby, and goes;
 /// - an employer or a school keeps no leading indefinite article, and a degree that only says graduating ("diplôme") goes;
 /// - every fact is the person's: a language, a skill, an interest and the person's own name, contacts, place and title are kept only
@@ -367,8 +367,8 @@ public struct CVDataSanitizer: Sendable {
         }
     }
 
-    /// A language the draft gives a level is kept only if the description states that level for it: any other level would be made up.
-    /// A language the draft gives no level may stay without one.
+    /// A language keeps the level the draft gives it only if the description states that level for it: any other level would be made
+    /// up, and goes, but the language stays without one (#354: "Parlo italiano e inglese." lost both languages to a made-up "native").
     private func sanitize(_ languages: [Language], _ source: DescriptionText) -> [Language] {
         let names = languages.compactMap { source.named($0.name) }
         let cleaned = languages.compactMap { language -> Language? in
@@ -376,8 +376,7 @@ public struct CVDataSanitizer: Sendable {
             guard language.proficiency != nil else { return Language(name: name) }
 
             let allowed = source.levels(of: name, among: names, vocabulary: .languages, codes: LevelVocabulary<LanguageProficiency>.codes)
-            guard let level = statedLevel(language.proficiency, allowed: allowed) else { return nil }
-            return Language(name: name, proficiency: level)
+            return Language(name: name, proficiency: statedLevel(language.proficiency, allowed: allowed))
         }
         return unique(cleaned) { $0.name }
     }

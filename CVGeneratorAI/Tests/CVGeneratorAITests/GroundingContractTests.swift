@@ -874,30 +874,49 @@ enum GroundingRows {
                         CVData(skills: [Skill(name: "Python", level: .advanced)]),
                         .exactly(CVData(skills: [Skill(name: "Python")]))))
         rows.append(row("level-language-negated",
-                        "not fluent denies the level; a language without a level goes",
+                        "not fluent denies the level, not the language: English stays without one (lead decision #354)",
                         "I speak Italian (native). My English is not fluent.",
                         CVData(languages: [Language(name: "Italian", proficiency: .native), Language(name: "English", proficiency: .c2)]),
-                        .exactly(CVData(languages: [Language(name: "Italian", proficiency: .native)]))))
+                        .exactly(CVData(languages: [Language(name: "Italian", proficiency: .native), Language(name: "English")]))))
         rows.append(row("level-language-fluent",
                         "fluent states C1 or C2",
                         "My English is fluent.",
                         CVData(languages: [Language(name: "English", proficiency: .c1)]),
                         .unchanged))
         rows.append(row("level-language-fluent-is-not-native",
-                        "fluent does not state native",
+                        "fluent does not state native: the level goes, English stays (lead decision #354)",
                         "My English is fluent.",
                         CVData(languages: [Language(name: "English", proficiency: .native)]),
-                        .exactly(CVData())))
+                        .exactly(CVData(languages: [Language(name: "English")]))))
         rows.append(row("level-language-without-a-level",
-                        "a language the description gives without a level goes: any level would be made up",
+                        "a language the description gives without a level keeps none: any level would be made up (lead decision #354)",
                         "I speak French.",
                         CVData(languages: [Language(name: "French", proficiency: .b2)]),
-                        .exactly(CVData())))
+                        .exactly(CVData(languages: [Language(name: "French")]))))
+        // Lead decision (#354): a language the description states stays when the draft gives it a level the description does not
+        // state; the level goes, never the language (the drafts of "Parlo italiano e inglese." lost both languages to a made-up "native").
+        rows.append(row("a-language-with-an-unstated-level-stays-without-it-it",
+                        "the languages are stated, their level is not: they stay without one",
+                        "Parlo italiano e inglese.",
+                        CVData(languages: [Language(name: "italiano", proficiency: .native), Language(name: "inglese", proficiency: .native)]),
+                        .exactly(CVData(languages: [Language(name: "italiano"), Language(name: "inglese")])),
+                        language: "it"))
+        rows.append(row("a-language-with-an-unstated-level-stays-without-it-es",
+                        "the languages are stated, their level is not: they stay without one",
+                        "Hablo español y catalán.",
+                        CVData(languages: [Language(name: "español", proficiency: .native), Language(name: "catalán", proficiency: .c1)]),
+                        .exactly(CVData(languages: [Language(name: "español"), Language(name: "catalán")])),
+                        language: "es"))
+        rows.append(row("a-stated-level-stays-beside-an-unstated-one-en",
+                        "Italian keeps the level the description states, French loses the one it does not",
+                        "I speak Italian (native) and French.",
+                        CVData(languages: [Language(name: "Italian", proficiency: .native), Language(name: "French", proficiency: .b2)]),
+                        .exactly(CVData(languages: [Language(name: "Italian", proficiency: .native), Language(name: "French")]))))
         rows.append(row("level-language-of-the-neighbour",
-                        "the A2 of French is not the level of English, which the description gives as B2",
+                        "the A2 of French is not the level of English, which the description gives as B2: English stays without it (#354)",
                         "I speak Italian (native), French (A2) and English (B2).",
                         CVData(languages: [Language(name: "Italian", proficiency: .native), Language(name: "English", proficiency: .a2)]),
-                        .exactly(CVData(languages: [Language(name: "Italian", proficiency: .native)]))))
+                        .exactly(CVData(languages: [Language(name: "Italian", proficiency: .native), Language(name: "English")]))))
 
         let denied: [(language: String, description: String, kept: String, denied: String)] = [
             ("it", "Parlo italiano (madrelingua). Il mio inglese non è fluente.", "italiano", "inglese"),
@@ -909,9 +928,9 @@ enum GroundingRows {
         for variant in denied {
             let draft = CVData(languages: [Language(name: variant.kept, proficiency: .native), Language(name: variant.denied, proficiency: .c2)])
             rows.append(row("level-language-negated-\(variant.language)",
-                            "the same denial in \(variant.language): the denied language goes, the stated one stays",
+                            "the same denial in \(variant.language): the denied level goes, the language stays without one (#354)",
                             variant.description, draft,
-                            .exactly(CVData(languages: [Language(name: variant.kept, proficiency: .native)])),
+                            .exactly(CVData(languages: [Language(name: variant.kept, proficiency: .native), Language(name: variant.denied)])),
                             language: variant.language))
         }
         return rows
@@ -4442,8 +4461,9 @@ enum GroundingRows {
         levels.append(("pt", "Falo alemão (A2). Minha colega fala alemão (B2).", "alemão"))
         for v in levels {
             rows.append(row("the-level-of-someone-else-is-not-the-persons-\(v.language)",
-                            "the person speaks the language at A2, the colleague at B2: B2 is backed by no clause of the person, so the language goes",
-                            v.description, CVData(languages: [Language(name: v.value, proficiency: .b2)]), .exactly(CVData()), language: v.language))
+                            "the person speaks the language at A2, the colleague at B2: B2 is backed by no clause of the person, so the level goes and the language stays (#354)",
+                            v.description, CVData(languages: [Language(name: v.value, proficiency: .b2)]),
+                            .exactly(CVData(languages: [Language(name: v.value)])), language: v.language))
             rows.append(row("the-level-of-the-person-stays-beside-someone-elses-\(v.language)",
                             "the same two clauses: A2 is the person's own, so the language and its level stay",
                             v.description, CVData(languages: [Language(name: v.value, proficiency: .a2)]), .unchanged, language: v.language))
