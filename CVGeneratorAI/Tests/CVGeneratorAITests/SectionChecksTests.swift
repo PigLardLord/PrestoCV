@@ -189,6 +189,17 @@ struct SectionChecksTests {
         #expect(verdict.dropped.map(\.reason) == ["fragment", "fragment"])
     }
 
+    @Test("A word that names a skill and no skill goes from the soft skills; a quality said with it stays (#354)")
+    func skillWordsGo() {
+        let verdict = sanitizer.skillCheck(
+            technologies: [], softSkills: ["competenze", "Capacità", "compétence", "capacità di ascolto", "precisione"],
+            against: JobClausesTests.italian
+        )
+
+        #expect(verdict.softSkills == ["capacità di ascolto", "precisione"])
+        #expect(verdict.dropped.map(\.reason) == ["a word for a skill", "a word for a skill", "a word for a skill"])
+    }
+
     // MARK: The summary
 
     @Test("A summary sentence about the person in the third person goes, and a short summary with no title gets an opening from the facts")

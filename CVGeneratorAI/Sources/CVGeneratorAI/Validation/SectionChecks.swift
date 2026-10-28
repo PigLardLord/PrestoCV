@@ -531,6 +531,10 @@ extension CVDataSanitizer {
                     return nil
                 }
             }
+            guard !Self.skillWords.contains(DescriptionText.normalized(kept)) else {
+                verdict.dropped.append(Rejection(sentence: raw, reason: "a word for a skill"))
+                return nil
+            }
             return kept
         }
         var heads = Set<String>()
@@ -555,6 +559,14 @@ extension CVDataSanitizer {
         }
         return verdict
     }
+
+    /// The words that name a skill and no skill ("compétence", "skills"), without accents: alone, they are no quality (#354).
+    static let skillWords: Set<String> = [
+        "skill", "skills", "ability", "abilities", "competence", "competences", "competencies", "competenza", "competenze", "abilita",
+        "capacita", "kompetenz", "kompetenzen", "fahigkeit", "fahigkeiten", "competencia", "competencias", "habilidad",
+        "habilidades", "capacidad", "capacidades", "capacite", "capacites", "aptitude", "aptitudes", "habilidade", "capacidade",
+        "soft skill", "soft skills", "qualita", "qualities", "quality",
+    ]
 
     /// A skill the facts request quoted with its verb ("usare i PLC") as the object the verb names ("PLC"); any other as it is.
     func statedSkill(_ name: String, against description: String) -> String {
