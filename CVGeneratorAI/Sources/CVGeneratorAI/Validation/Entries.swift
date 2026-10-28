@@ -97,6 +97,25 @@ struct Entries {
         DescriptionText(sentences: grounding.contactSentences, of: source)
     }
 
+    /// The duties the person said for the job, copied from its attributed clauses.
+    func pinnedDuties(of subject: Int) -> [Grounding.PinnedDuty] {
+        grounding.pinnedDuties(of: subject)
+    }
+
+    /// The job's title the description supports, or, for a job named only in an employer clause coordinated after
+    /// another job's ("a technician at Alpha from 2016 to 2019, then at Beta from 2019 to 2021"), the head job's supported title,
+    /// when the job's own title is empty or a part of it.
+    func jobTitle(of job: Job) -> String? {
+        if let title = supportedTitle(of: job.subject, job.title) { return title }
+        guard let head = grounding.attribution.head[job.subject], let headJob = jobs.first(where: { $0.subject == head }),
+              let headTitle = supportedTitle(of: head, headJob.title) else { return nil }
+        let own = Set(Self.words(of: job.title ?? ""))
+        return own.isSubset(of: Set(Self.words(of: headTitle))) ? headTitle : nil
+    }
+
+    /// The clause that says the person's field (`Grounding.fieldClause`).
+    func fieldClause() -> String? { grounding.fieldClause() }
+
     func evidence(of subject: Int) -> EntryEvidence {
         grounding.evidence(of: subject)
     }

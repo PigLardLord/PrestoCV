@@ -189,13 +189,17 @@ public struct CVDataSanitizer: Sendable {
     /// description, then those of its `duties`, the text the second pass wrote for the job at the same position of the result. When
     /// the job has duties, a sentence of its own description that only says the person held the job (`RoleStub`) goes: it restates
     /// the title and the employer in front of them; with none, it is the job's only text, and stays.
+    ///
+    /// With duties, the job's text also holds the duties the person said for it (ADR 0031): copied from the clauses of the description
+    /// that belong to it, in front of the written ones, and all of it in the job's first person. A job named after another in one
+    /// sentence ("a sound technician at Alpha ..., then at Beta ...") keeps the title the sentence gave the first (`jobTitle(of:)`).
     private func sanitize(
         _ jobs: [Entries.Job], _ source: DescriptionText, _ entries: Entries, written: WrittenText, duties: [String?]
     ) -> [Experience] {
         let cleaned = jobs.compactMap { job -> (job: Entries.Job, experience: Experience)? in
             guard entries.hasFactualMention(of: job.subject) else { return nil }
             let evidence = entries.evidence(of: job.subject)
-            let title = entries.supportedTitle(of: job.subject, job.title)
+            let title = entries.jobTitle(of: job)
             let dates = evidence.supportedDates([job.entry.startDate, job.entry.endDate])
             guard job.company != nil || (title != nil && dates.contains { $0 != nil }) else { return nil }
 
@@ -215,26 +219,58 @@ public struct CVDataSanitizer: Sendable {
         return unique(cleaned) { "\($0.experience.title)|\($0.experience.company)" }.enumerated().map { position, kept in
             let (job, experience) = kept
             let ownWords = Self.words(of: [experience.title])
-            let others = jobs.filter { $0.subject != job.subject }.flatMap { [$0.title, $0.company] }
-            let foreignWords = Self.words(of: others).subtracting(ownWords).filter { !Vocabulary.isNeutral($0, in: source.explainer.language) }
-            let otherEmployers = jobs.filter { $0.subject != job.subject }.compactMap(\.company)
-            let description = { (text: String?) in
-                source.written(text, quoting: entries.evidence(of: job.subject).quotable, allowsNumbers: true) { sentence in
-                    written.isPlain(sentence, ownWords: ownWords, foreignWords: foreignWords)
+            let otherJobs = jobs.filter { $0.subject != job.subject }
+            let foreignWords = Self.foreignWords(of: otherJobs.map(\.company), own: ownWords, language: source.explainer.language)
+            let otherTitles = Self.otherTitles(otherJobs.map(\.title), own: experience.title)
+            let otherEmployers = otherJobs.compactMap(\.company)
+            let evidence = entries.evidence(of: job.subject)
+            // A sentence that quotes, with no number, a clause of this job alone is the person's own (ADR 0031); any other states
+            // no fact, names no other job's title whole (D4) and restates no sentence about another employer.
+            let description = { (text: String?, quotes: ProseQuotes) in
+                source.written(text, quoting: quotes, allowsNumbers: true) { sentence in
+                    (evidence.quotableByAttribution.map { source.written(sentence, quoting: $0, allowsNumbers: false) { _ in false } != nil } ?? false)
+                        || Self.namedTitle(in: sentence, among: otherTitles) == nil
+                        && written.rejection(of: sentence, ownWords: ownWords, foreignWords: foreignWords,
+                                             allowing: Self.quotedWords(of: sentence, quoting: evidence.ownClauseQuotes, source)) == nil
                         && !source.repeats(sentence, ofSentencesNaming: otherEmployers, notNaming: [job.company].compactMap { $0 })
                 }
             }
-            let duties = position < duties.count ? description(duties[position]) : nil
+            let writtenDuties = position < duties.count
+                ? description(duties[position], evidence.quotable.adding(evidence.quotableByAchievements)) : nil
+            let quoteWords = Set(Self.letterWords(of: description(experience.description, evidence.quotable) ?? ""))
+            // The duties the person said for the job (ADR 0031), copied from its clauses, pass the same check and come first, in
+            // the job's first person (`FirstPersonDuty`); one the job's own quote already holds is not said twice.
+            let pinned = entries.pinnedDuties(of: job.subject).flatMap { $0.kept { description($0, evidence.quotable) } }.filter { duty in
+                !Self.letterWords(of: duty).filter { $0.count >= 3 }.allSatisfy(quoteWords.contains)
+            }.map { FirstPersonDuty.written($0, current: experience.current, language: source.explainer.language, wordList: wordList) }
+            // A written duty that restates a said one (the same words, by their first four letters) goes.
+            let pinnedStems = Self.stems(of: pinned.joined(separator: " "))
+            let newDuties = pinned.isEmpty ? writtenDuties : writtenDuties.flatMap { text in
+                SentenceSplitter.sentences(in: text).filter { !Self.stems(of: $0).isSubset(of: pinnedStems) }.joined(separator: " ").presentValue
+            }
+            let roleDuties = position < duties.count ? Self.joined(pinned.joined(separator: " ").presentValue, newDuties) : nil
+            let dutyWords = Set(Self.letterWords(of: roleDuties ?? ""))
             let jobWords = Self.words(of: [experience.title, experience.company])
-            let quote = description(experience.description).flatMap { quote in
-                duties == nil ? quote : SentenceSplitter.sentences(in: quote)
+            let quote = description(experience.description, evidence.quotable).flatMap { quote in
+                roleDuties == nil ? quote : SentenceSplitter.sentences(in: quote)
                     .filter { !RoleStub.isStub($0, jobWords: jobWords, language: source.explainer.language) }
+                    // A quoted sentence the duties restate goes, so the job's text keeps one voice.
+                    .filter { !Self.letterWords(of: $0).filter { $0.count >= 3 }.allSatisfy(dutyWords.contains) }
                     .joined(separator: " ").presentValue
+            }
+            // A job with duties is in the first person: a quoted sentence said with a gerund ("setting up the PA systems and mixing
+            // the support acts") is written in it too, so the job's text keeps one form.
+            let firstPerson = { (text: String?) in
+                roleDuties == nil ? text : text.flatMap { text in
+                    SentenceSplitter.sentences(in: text).map {
+                        FirstPersonDuty.written($0, current: experience.current, language: source.explainer.language, wordList: wordList)
+                    }.joined(separator: " ").presentValue
+                }
             }
             return Experience(
                 title: experience.title, company: experience.company, location: experience.location,
                 startDate: experience.startDate, endDate: experience.endDate, current: experience.current,
-                description: Self.joined(quote, duties),
+                description: Self.joined(firstPerson(quote), firstPerson(roleDuties)),
                 achievements: experience.achievements
             )
         }
@@ -418,6 +454,49 @@ public struct CVDataSanitizer: Sendable {
     private func statedLevel<Level: Hashable>(_ level: Level?, allowed: Set<Level>?) -> Level? {
         guard let level, allowed?.contains(level) == true else { return nil }
         return level
+    }
+
+    /// ADR 0031, D4: the words a job's duty may not hold: those of the other jobs' employers, past its own title's and the function
+    /// words. A common noun of another job's title ("manutenzione") is no such word; the whole title is (`namedTitle`).
+    static func foreignWords(of otherEmployers: [String?], own: Set<String>, language: Vocabulary.Language?) -> Set<String> {
+        words(of: otherEmployers).subtracting(own).filter { !Vocabulary.isNeutral($0, in: language) }
+    }
+
+    /// ADR 0031, D4: the other jobs' titles that are not the job's own.
+    static func otherTitles(_ titles: [String?], own: String?) -> [String] {
+        let ownWords = Word.words(in: own ?? "").map(\.folded)
+        var seen = Set<[String]>()
+        return titles.compactMap { $0 }.filter { title in
+            let folded = Word.words(in: title).map(\.folded)
+            return !folded.isEmpty && folded != ownWords && seen.insert(folded).inserted
+        }
+    }
+
+    /// ADR 0031, D4: the first of `titles` that `sentence` holds whole, word by word.
+    static func namedTitle(in sentence: String, among titles: [String]) -> String? {
+        let words = Word.words(in: sentence).map(\.folded)
+        return titles.first { title in
+            let phrase = Word.words(in: title).map(\.folded)
+            guard !phrase.isEmpty, phrase.count <= words.count else { return false }
+            return (0...(words.count - phrase.count)).contains { Array(words[$0..<($0 + phrase.count)]) == phrase }
+        }
+    }
+
+    /// ADR 0031, D3: the words of `sentence` when it quotes one of the job's own clauses word for word, with no number; none
+    /// otherwise.
+    static func quotedWords(of sentence: String, quoting quotes: ProseQuotes?, _ source: DescriptionText) -> Set<String> {
+        guard let quotes, source.written(sentence, quoting: quotes, allowsNumbers: false, orPlain: { _ in false }) != nil else { return [] }
+        return Set(Word.words(in: sentence).map(\.folded))
+    }
+
+    /// The lowercased runs of letters of `text`.
+    private static func letterWords(of text: String) -> [String] {
+        text.lowercased().split { !$0.isLetter }.map(String.init)
+    }
+
+    /// The first four letters of each word of `text` of three letters or more: how a written duty is matched to a said one.
+    private static func stems(of text: String) -> Set<String> {
+        Set(letterWords(of: text).filter { $0.count >= 3 }.map { String($0.prefix(4)) })
     }
 
     /// The words of `texts`, as `Word.folded` writes them.

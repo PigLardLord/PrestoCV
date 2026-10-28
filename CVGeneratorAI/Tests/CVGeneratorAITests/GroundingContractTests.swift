@@ -422,8 +422,82 @@ enum GroundingRows {
         rows += summariesWithNoRole()
         rows += endedJobs()
         rows += factsInTheirPlace()
+        rows += attributedClauses()
         return rows
     }()
+
+    // MARK: A job's own clauses (ADR 0031, D1-D4): each decision with a row that keeps the person's text and one that drops the invented case
+
+    private static func attributedClauses() -> [GroundingRow] {
+        var rows: [GroundingRow] = []
+        // D1: a year in a relative clause that only continues the sentence naming the job counts for its dates.
+        rows.append(row("d1-a-year-in-the-relative-clause-of-the-job-counts",
+                        "where I trained the new nurses until 2016 continues the sentence of Acme alone: 2016 is its end",
+                        "From 2013 I worked as a nurse at Acme, where I trained the new nurses until 2016.",
+                        CVData(experience: [job("nurse", "Acme", from: "2013", to: "2016")]),
+                        .unchanged))
+        rows.append(row("d1-a-year-after-another-employer-is-not-given",
+                        "Beta is named between Acme and the relative clause: 2016 is no end of Acme's",
+                        "In 2013 I worked as a nurse at Acme and then at Beta, where I trained the new nurses until 2016.",
+                        CVData(experience: [job("nurse", "Acme", from: "2013", to: "2016"), job("", "Beta")]),
+                        .safe(never: [], absent: ["experience[0].endDate"], keeping: ["experience[0].company": "Acme"])))
+        // D2: a frequency after the object makes the clause a duty; a move or a plan to do something stays an intention.
+        rows.append(row("d2-i-plan-the-design-for-each-production-is-a-duty",
+                        "for each production says how often: I plan the sound design is the work done at Acme",
+                        "Since 2019 I have worked at Acme, where I plan the sound design for each production.",
+                        CVData(experience: [job("", "Acme", from: "2019", current: true, description: "I plan the sound design for each production.")]),
+                        .unchanged))
+        rows.append(row("d2-i-plan-the-move-for-each-is-still-an-intention",
+                        "to Berlin plans a move, whatever follows: the place goes, the name stays",
+                        "I'm Maria Rossi. I plan the move to Berlin for each child.",
+                        CVData(personalInfo: person(name: "Maria Rossi", location: "Berlin")),
+                        .exactly(CVData(personalInfo: person(name: "Maria Rossi")))))
+        rows.append(row("d2-ich-plane-die-beschallung-fuer-jede-produktion-is-a-duty",
+                        "für jede Produktion says how often: the clause claims Beschallung",
+                        "Ich bin Tontechniker. Seit 2019 plane ich die Beschallung für jede Produktion.",
+                        CVData(skills: [Skill(name: "Beschallung")]),
+                        .unchanged, language: "de"))
+        rows.append(row("d2-ich-plane-den-umzug-is-an-intention",
+                        "den Umzug nach Berlin plans a move: the place goes, the name stays",
+                        "Ich heiße Maria Rossi. Ich plane den Umzug nach Berlin.",
+                        CVData(personalInfo: person(name: "Maria Rossi", location: "Berlin")),
+                        .exactly(CVData(personalInfo: person(name: "Maria Rossi"))), language: "de"))
+        // D3: a duty that quotes its job's clause word for word keeps the acronym of that clause, for each job of a shared tail.
+        let shared = "From 2016 to 2019 I was a sound technician at Brightwater, then at Copperfield from 2019 to 2021, setting up the PA systems."
+        rows.append(row("d3-a-shared-tail-quoted-keeps-its-acronym",
+                        "setting up the PA systems is the shared tail of both jobs, quoted word for word: PA is the person's own",
+                        shared,
+                        CVData(experience: [job("sound technician", "Brightwater", from: "2016", to: "2019", description: "Setting up the PA systems."),
+                                            job("sound technician", "Copperfield", from: "2019", to: "2021", description: "Setting up the PA systems.")]),
+                        .safe(never: [], keeping: ["experience[0].description": "Setting up the PA systems.",
+                                                   "experience[1].description": "Setting up the PA systems."])))
+        rows.append(row("d3-a-quote-with-another-employer-drops",
+                        "the shared tail with Copperfield added is no quote, and Copperfield is another employer: Brightwater's text goes",
+                        shared,
+                        CVData(experience: [job("sound technician", "Brightwater", from: "2016", to: "2019",
+                                                description: "Setting up the PA systems at Copperfield."),
+                                            job("sound technician", "Copperfield", from: "2019", to: "2021")]),
+                        .safe(never: ["at Copperfield"], absent: ["experience[0].description"])))
+        // D4: a common noun of another job's title is no block; its whole title is.
+        let italian = "Dal 2014 al 2018 sono stato manutentore al Pastificio Cerreto, poi al Molino Fontebasso dal 2018 al 2020, "
+            + "programmando la manutenzione preventiva. Dal 2020 sono capoturno della manutenzione al Birrificio Valtrigno."
+        rows.append(row("d4-a-common-noun-of-another-title-stays-it",
+                        "manutenzione is a word of the title capoturno della manutenzione, and of the tail of Cerreto: the duty stays",
+                        italian,
+                        CVData(experience: [job("manutentore", "Pastificio Cerreto", from: "2014", to: "2018",
+                                                description: "Programmando la manutenzione preventiva."),
+                                            job("capoturno della manutenzione", "Birrificio Valtrigno", from: "2020", current: true)]),
+                        .safe(never: [], keeping: ["experience[0].description": "Programmando la manutenzione preventiva."]),
+                        language: "it"))
+        rows.append(row("d4-another-whole-title-drops-it",
+                        "capoturno della manutenzione is the whole title of the Valtrigno job: Cerreto's text goes",
+                        italian,
+                        CVData(experience: [job("manutentore", "Pastificio Cerreto", from: "2014", to: "2018",
+                                                description: "Ero capoturno della manutenzione."),
+                                            job("capoturno della manutenzione", "Birrificio Valtrigno", from: "2020", current: true)]),
+                        .safe(never: ["Ero capoturno"], absent: ["experience[0].description"]), language: "it"))
+        return rows
+    }
 
     // MARK: Facts are quotes (b)
 
@@ -5913,13 +5987,15 @@ enum GroundingRows {
         for index in 0...2 {
             drops.append(Drop("experience[\(index)].location", noBacking))
             drops.append(Drop("experience[\(index)].startDate", noBacking))
-            drops.append(Drop("experience[\(index)].endDate", noBacking))
+            // ADR 0031, D1: "where I coordinated a team of 9 nurses until 2021" continues the sentence of Humanitas alone: 2021 is
+            // its end, though its naming clause backs nothing.
+            if index != 1 { drops.append(Drop("experience[\(index)].endDate", noBacking)) }
             drops.append(Drop("experience[\(index)].description", noBacking))
             drops.append(Drop("experience[\(index)].achievements[0]", noBacking))
         }
         drops.append(Drop("experience[0].current", noBacking))
         drops.append(Drop("experience[3].location", "Turin is not in the clause that names the Mauriziano hospital"))
-        drops.append(Drop("experience[3].endDate", "where I stayed until 2012 joins nothing: it holds the word stayed, which nothing explains"))
+        // ADR 0031, D1: "where I stayed until 2012" continues the sentence of the Mauriziano alone: 2012 is its end.
         // ADR 0031: the Mauriziano role text is no quote, but it gives the duties of the title and states no fact of its own: it stays.
         drops.append(Drop("experience[3].achievements[0]", "the same words"))
         drops.append(Drop("education[0].endDate", "2012 is the end of another job; the clause of the studies gives 2009"))
@@ -5939,9 +6015,11 @@ enum GroundingRows {
                             because: "a PALS certificate from 2019 is a verbless clause split off by and: it belongs to renewed in 2023, whose verb is not a listed one")
         let rewrites = [
             Rewrite("experience[3].startDate", to: "2009", "I started in 2009 as a nursing assistant at the Mauriziano hospital is explained"),
+            isoDate("experience[1].endDate", "2021"),
+            isoDate("experience[3].endDate", "2012"),
         ]
         return row("probe-long-en",
-                   "kept: the contacts, name, place, the four employers and titles, the Mauriziano start, the degree, skills, languages, interests, BLS and ACLS",
+                   "kept: the contacts, name, place, the four employers and titles, the Mauriziano start and end, the Humanitas end (D1), the degree, skills, languages, interests, BLS and ACLS",
                    longDescription, draft, .keeping(drops, rewriting: rewrites), kind: .probe, language: "en")
     }
 

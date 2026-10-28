@@ -32,7 +32,33 @@ enum IntentionNouns {
     private static func isAnActivity(at index: Int, in words: [Word]) -> Bool {
         guard words[index].folded == "plan", index > 0, words[index - 1].folded == "i",
               index + 1 < words.count, words[index + 1].folded == "the" else { return false }
-        return !words[(index + 2)...].contains { english.prepositions.contains($0.folded) || (verbAfter.contains($0.folded) && $0.folded != "the") }
+        let rest = Array(words[(index + 2)...])
+        // ADR 0031, D2: a preposition right before "each" or "every" says how often, not where to: "for each production".
+        return !rest.indices.contains { position in
+            let word = rest[position].folded
+            let isFrequency = position + 1 < rest.count && frequencies.contains(rest[position + 1].folded)
+            return (english.prepositions.contains(word) && !isFrequency) || (verbAfter.contains(word) && word != "the")
+        }
+    }
+
+    private static let frequencies: Set<String> = ["each", "every"]
+
+    /// ADR 0031, D2: "Ich plane die Beleuchtung für jede Produktion": "plane" beside "ich", an article after them, and a
+    /// frequency ("für jede") as the only preposition of the clause, with no "zu", is the verb of an activity.
+    private static func isAGermanActivity(at index: Int, in words: [Word]) -> Bool {
+        let afterIch = index + 1 < words.count && words[index + 1].folded == "ich" ? index + 2 : index + 1
+        guard afterIch < words.count, german.articles.contains(words[afterIch].accented) else { return false }
+        let rest = Array(words[afterIch...])
+        var hasFrequency = false
+        for position in rest.indices {
+            let word = rest[position].accented
+            if rest[position].folded == "zu" { return false }
+            guard german.prepositions.contains(word) else { continue }
+            let next = position + 1 < rest.count ? rest[position + 1].folded : ""
+            guard rest[position].folded == "fur" || word == "für", next.hasPrefix("jede") else { return false }
+            hasFrequency = true
+        }
+        return hasFrequency
     }
 
     private static let germanWords: Set<String> = ["plan", "plane"]
@@ -66,7 +92,7 @@ enum IntentionNouns {
         let word = words[index]
         guard germanWords.contains(word.folded) else { return false }
         let isTheVerb = word.accented == "plane" && [index - 1, index + 1].contains { words.indices.contains($0) && words[$0].folded == "ich" }
-        if isTheVerb { return false }
+        if isTheVerb { return isAGermanActivity(at: index, in: words) }
 
         for previous in words[..<index].reversed() {
             if german.possessives.contains(previous.accented) { return false }

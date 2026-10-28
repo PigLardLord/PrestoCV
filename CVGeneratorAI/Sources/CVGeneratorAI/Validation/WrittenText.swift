@@ -48,15 +48,50 @@ struct WrittenText {
     ///   - ownWords: The words that are no name in it, as `Word.folded` writes them: the titles and degrees it may name.
     ///   - foreignWords: The words it may not hold: for a job, those of the other jobs' titles and employers.
     func isPlain(_ sentence: String, ownWords: Set<String>, foreignWords: Set<String> = []) -> Bool {
-        guard source.isInTheLanguageOfTheDescription(sentence) else { return false }
+        rejection(of: sentence, ownWords: ownWords, foreignWords: foreignWords) == nil
+    }
+
+    /// Why `isPlain` rejects `sentence`, as a short reason the repair request reads; nil when it is plain.
+    ///
+    /// ADR 0031, D3: `allowing` holds the words of a duty that quotes its own job's clause word for word: there its acronyms,
+    /// number words and seniority words are the person's own. Digits and another job's words still reject it.
+    func rejection(of sentence: String, ownWords: Set<String>, foreignWords: Set<String> = [], allowing: Set<String> = []) -> String? {
+        guard source.isInTheLanguageOfTheDescription(sentence) else { return "it is not in the language of the description" }
 
         let addresses = AddressTokens(sentence)
-        guard addresses.emails.isEmpty, addresses.links.isEmpty, !addresses.hasAmbiguousAddress else { return false }
-        guard !sentence.contains(where: \.isNumber), !Self.hasAContractedNegation(sentence) else { return false }
+        guard addresses.emails.isEmpty, addresses.links.isEmpty, !addresses.hasAmbiguousAddress else { return "it holds an address" }
+        guard !sentence.contains(where: \.isNumber) else { return "it holds a number" }
+        guard !Self.hasAContractedNegation(sentence) else { return "it holds a negation" }
 
         let sentenceWords = Word.words(in: sentence)
-        guard !sentenceWords.contains(where: { statesAFact($0.folded, foreignWords: foreignWords) }) else { return false }
-        return !namesSomething(sentenceWords, in: sentence, ownWords: ownWords)
+        for word in sentenceWords {
+            let folded = word.folded
+            let isAllowed = allowing.contains(folded)
+            if words.isNumber(folded) && !isAllowed { return "the word \"\(folded)\" is a number" }
+            if words.qualifications.contains(folded) { return "the word \"\(folded)\" names a qualification" }
+            if words.months.contains(folded) { return "the word \"\(folded)\" is a date" }
+            if words.negations.contains(folded) { return "the word \"\(folded)\" is a negation" }
+            if isAnUnstatedLevel(folded) && !isAllowed { return "the word \"\(folded)\" states a level the person did not say" }
+            if isExcluded(folded) { return "the word \"\(folded)\" is something the person only wishes or plans" }
+            if foreignWords.contains(folded) { return "the word \"\(folded)\" belongs to another job" }
+        }
+        if let name = nameIn(sentenceWords, in: sentence, ownWords: ownWords.union(allowing)) { return "the word \"\(name)\" reads as a name" }
+        return nil
+    }
+
+    /// The words a written duty of a job must avoid, among `candidates` (the words of the job's clauses): those that
+    /// the description holds only in clauses that claim nothing, and those of `foreignWords`.
+    func wordsToAvoid(among candidates: [Word], in text: String, ownWords: Set<String>, foreignWords: Set<String>) -> [String] {
+        var avoided: [String] = []
+        let characters = Array(Digits.ascii(text))
+        for word in candidates where !word.isNumber && !ownWords.contains(word.folded) {
+            let written = String(characters[word.range])
+            let letters = written.filter(\.isLetter)
+            let isAcronym = letters.count >= 2 && letters.allSatisfy(\.isUppercase)
+            if isExcluded(word.folded) || foreignWords.contains(word.folded) || isAcronym { avoided.append(written) }
+        }
+        var seen = Set<String>()
+        return avoided.filter { seen.insert($0.lowercased()).inserted }
     }
 
     /// Whether `word` is a word that the description holds only in clauses that claim nothing for the person.
@@ -83,6 +118,10 @@ struct WrittenText {
     // MARK: - Names
 
     private func namesSomething(_ sentenceWords: [Word], in sentence: String, ownWords: Set<String>) -> Bool {
+        nameIn(sentenceWords, in: sentence, ownWords: ownWords) != nil
+    }
+
+    private func nameIn(_ sentenceWords: [Word], in sentence: String, ownWords: Set<String>) -> String? {
         let characters = Array(Digits.ascii(sentence))
         let dictionary = (language ?? .english).rawValue
         let tagged = language == .german ? tagger.names(in: sentence, language: dictionary) : []
@@ -91,21 +130,21 @@ struct WrittenText {
             let written = String(characters[word.range])
             let letters = written.filter(\.isLetter)
             let isCapitalised = characters[word.range.lowerBound].isUppercase
-            guard letters.count < 2 || !letters.allSatisfy(\.isUppercase) else { return true }
+            guard letters.count < 2 || !letters.allSatisfy(\.isUppercase) else { return written }
 
             let isExplained = Vocabulary.explains(word.folded, in: language) || Vocabulary.isNeutral(word.folded, in: language)
             if language == .german {
-                guard !tagged.contains(where: { $0.contains(word.range.lowerBound) }) else { return true }
+                guard !tagged.contains(where: { $0.contains(word.range.lowerBound) }) else { return written }
                 if !isExplained && (isCapitalised || letters.count >= 3) && wordList.knows(written, inLanguage: dictionary) == false {
-                    return true
+                    return written
                 }
             } else if isCapitalised {
-                guard index == 0 || written == "I" else { return true }
-                if !isExplained && wordList.knows(written.lowercased(), inLanguage: dictionary) == false { return true }
+                guard index == 0 || written == "I" else { return written }
+                if !isExplained && wordList.knows(written.lowercased(), inLanguage: dictionary) == false { return written }
             } else if !isExplained && letters.count >= 3 && wordList.knows(written, inLanguage: dictionary) == false {
-                return true
+                return written
             }
         }
-        return false
+        return nil
     }
 }

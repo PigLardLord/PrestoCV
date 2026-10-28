@@ -40,6 +40,14 @@ struct Clause {
         )
     }
 
+    /// The clause as the sentence writes it from word `start` to the end of word `end - 1`, punctuation inside kept.
+    func written(from start: Int, to end: Int) -> String {
+        guard start >= 0, start < end, end <= words.count else { return "" }
+        let lower = max(words[start].range.lowerBound - offset, 0)
+        let upper = min(words[end - 1].range.upperBound - offset, original.count)
+        return lower < upper ? String(original[lower..<upper]) : ""
+    }
+
     /// Whether the word at `index` is written with a capital letter in the description.
     func isCapitalised(_ index: Int) -> Bool {
         let start = words[index].range.lowerBound - offset
