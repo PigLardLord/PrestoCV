@@ -67,15 +67,15 @@
 - every written sentence in the description's language;
 - at most 90 s a draft at the 95th percentile, the claim check included; above it, the guide counts go down to 6 technologies and 4 soft skills, and the set is measured again.
 
-**Measured: NO-GO at revision a1e64ab5** (macOS 27.0.1 build 26A434, Xcode 27.1, 30 inputs, 3 runs each, 90 runs; the model is deterministic, so the 3 runs of an input are identical).
-- Invented facts: 3 runs (1 input, 1 job title said in a sentence that names no employer). Failed runs: 9 (3 inputs: the model returned nothing). Missed examples: 3 runs (1 example lost its title). Tools of another trade: 3 runs (1 input with no role wrote a summary from its interests).
-- A summary in 5 of 23 distinct drafts of inputs with a role, study or field (3 of the 6 examples; every example needs one). A description on 12 of 37 kept jobs. Enough technologies and soft skills in 6 of 23 drafts.
-- Every written sentence in the description's language: 75 of 75.
-- Time: median 13.7 s, 95th percentile 18.9 s, maximum 21.7 s, within the 90 s budget.
-- Claim check (3 sets, 3 runs each): 0 false keeps and 0 errors; 6 false drops of 263 items (5 in the adversarial set, 1 in the held-out set, 0 in the frozen set), all of a language.
-- A person read all 28 distinct final drafts (`verdicts.md` of the evaluation folder): 2 accepted, 26 rejected, plus 3 inputs with no draft.
+**Measured: NO-GO at revision d9741774** (macOS 27.0.1 build 26A434, Xcode 27.1, 30 inputs and the language-data input of the app, 1 run each; the model is deterministic, so the 3 runs of an input are identical, as the 90-run set at a1e64ab5 showed).
+- Invented facts: 6 role descriptions in 5 runs (`example-it`, `en-plain` twice, `es-traps`, `fr-plain`, `pt-plain`): in each, the quoted clause of the description and the written sentence of the role are joined with no break ("I plan the night shifts Overseeing ..."), so the written sentence reads as capitalised words the description lacks. The job title said in a sentence that names no employer (`pt-traps`) is no longer written. Failed runs: 3 (`de-sparse`, `de-norole`, `es-sparse`: the model returned nothing). Missed examples: 0. Tools of another trade: 0.
+- A summary in 14 of 23 distinct drafts of inputs with a role, study or field (5 of the 6 examples; `example-fr` has none). A description on 22 of 38 kept jobs. Enough technologies and soft skills in 20 of 23 drafts.
+- Every written sentence in the description's language: 91 of 91. Skill names are not measured for language: `it-plain`, `it-traps`, `example-fr` and `fr-traps` hold skills in English.
+- Time: median 15.4 s, 95th percentile 20.2 s, maximum 22.1 s, within the 90 s budget.
+- Claim check (3 sets, 1 run each, the same 263 items as the 3-run set at a1e64ab5): 0 false keeps and 0 errors; 6 false drops (5 in the adversarial set, 1 in the held-out set, 0 in the frozen set), the same 6 as before, all of a language.
+- A person read all 28 distinct final drafts (`verdicts.md` of the evaluation folder): 8 accepted (4 are descriptions with no role that stayed empty), 20 rejected, plus 3 inputs with no draft. The drafts read show a language as a technology or soft skill (`en-traps`, `it-traps`, `de-traps`, `es-traps`), a second job left with no title or description (`en-traps`, `de-traps`, `es-traps`, `fr-traps`, `pt-traps`, `it-traps`), and a hobby as a technology (`pt-norole`).
 
-The thresholds are not met on the summary, the role descriptions and the skills: the model leaves them empty or short far more often than 10% of the time. The next step is a change to the prompt or the schema, then a new measurement. The owner's try on the release candidate is the human check before submission.
+The thresholds are still not met: the summary, the role descriptions and the skills are better than at a1e64ab5 (5 to 14 summaries, 12 to 22 descriptions, 6 to 20 drafts with enough skills) but short of 90%, and the joined sentences are a new invented-fact finding. The owner's try on the release candidate is the human check before submission.
 
 ## Consequences
 
