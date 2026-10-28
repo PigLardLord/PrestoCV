@@ -45,6 +45,33 @@ struct InterestQualityTests {
         #expect(result.interests == ["fotografia"])
     }
 
+    // MARK: The verb of an interest
+
+    static let german = """
+        Seit 2019 arbeite ich als Feinmechaniker bei der Werkstatt Ohlsen in Suhl. In meiner Freizeit gehe ich klettern, höre \
+        klassische Musik und spiele Schach.
+        """
+
+    static let sundays = "I have been a waiter at the Lantern Bistro in Exeter since 2019. On Sundays I play chess and go hiking in the Alps."
+
+    @Test("An interest quoted with the finite verb of its clause is the pastime the verb names; one that starts with an adjective, an infinitive or a gerund stays whole (#354)")
+    func verbOfAnInterestGoes() throws {
+        let german = CVDataSanitizer(
+            languageOfText: { _ in "de" },
+            lexicalClasses: ForcedLexicalTagger([.german: .words(["arbeite", "gehe", "hore", "spiele", "klettern"])]), wordList: TableWordList()
+        )
+        let english = CVDataSanitizer(
+            languageOfText: { _ in "en" },
+            lexicalClasses: ForcedLexicalTagger([.english: .words(["have", "been", "play", "go", "hiking"])]), wordList: TableWordList()
+        )
+
+        let leisure = try german.sanitize(CVData(interests: ["klettern", "klassische Musik", "spiele Schach"]), against: Self.german)
+        let sundays = try english.sanitize(CVData(interests: ["play chess", "hiking in the Alps"]), against: Self.sundays)
+
+        #expect(leisure.interests == ["klettern", "klassische Musik", "Schach"])
+        #expect(sundays.interests == ["chess", "hiking in the Alps"])
+    }
+
     @Test("A hobby with the person's own things in it stays")
     func hobbiesStay() throws {
         let draft = CVData(interests: ["chess", "long walks with my dog", "hiking in the Alps"])

@@ -192,7 +192,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     case mixedTense
     /// A soft skill that is the word for a skill ("competence").
     case skillWordAsQuality
-    /// An interest that is a clause: more than 4 words, a word of the first person, or a quality at work.
+    /// An interest that is a clause: more than 4 words, a word of the first person, a quality at work, or a finite verb first.
     case clauseAsInterest
     /// A summary sentence that starts with the verb of an earlier one, or that is a sentence of a job description.
     case repeatedSentence
@@ -294,7 +294,7 @@ enum ReaderRules {
         for (index, skill) in cv.skills.enumerated() where skill.kind == .softSkill && isTool(skill.name, language: language) {
             found.append(ReaderFinding(kind: .toolAsSoftSkill, path: "skills[\(index)].name", value: skill.name))
         }
-        for (index, interest) in cv.interests.enumerated() where isClause(interest) {
+        for (index, interest) in cv.interests.enumerated() where isClause(interest) || startsWithVerb(interest, in: input) {
             found.append(ReaderFinding(kind: .clauseAsInterest, path: "interests[\(index)]", value: interest))
         }
         found += report.lostYears.map { ReaderFinding(kind: .lostYear, path: $0.entry, value: $0.year) }
@@ -510,6 +510,19 @@ enum ReaderRules {
         let lowered = interest.lowercased()
         return words.count > 4 || words.contains(where: firstPersonWords.contains)
             || CVDataSanitizer.softStems.contains { lowered.contains($0) }
+    }
+
+    /// Whether an interest of more than one word starts with the finite verb of its clause ("spiele Schach" of "und spiele Schach"),
+    /// as the device tags the description, or, in German, "ich" and the interest, in English and German; a gerund ("hiking") and a German infinitive ("wandern") are none.
+    static func startsWithVerb(_ interest: String, in input: DraftingInput) -> Bool {
+        let words = letterWords(of: interest)
+        guard ["en", "de"].contains(input.language), words.count > 1, let first = words.first, !first.hasSuffix("ing"),
+              !(input.language == "de" && first.hasSuffix("n")),
+              let range = input.description.range(of: interest, options: [.caseInsensitive, .diacriticInsensitive]) else { return false }
+        let start = input.description.distance(from: input.description.startIndex, to: range.lowerBound)
+        let tagger = DeviceLexicalTagger()
+        return tagger.verbs(in: input.description, language: input.language).contains { $0.contains(start) }
+            || input.language == "de" && tagger.verbs(in: "ich " + interest, language: "de").contains { $0.contains(4) }
     }
 
     /// The words of `text`, lowered, folded and split at anything not a letter.

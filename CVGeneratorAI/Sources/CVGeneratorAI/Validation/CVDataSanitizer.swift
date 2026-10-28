@@ -102,7 +102,7 @@ public struct CVDataSanitizer: Sendable {
         let titles = ([cvData.personalInfo.title] + jobTitles).compactMap(\.presentValue)
         let interests = unique(cvData.interests.compactMap(claimed.named).filter {
             !Self.isWork($0, titles: titles, source) && !Self.isQualityAtWork($0, in: source.explainer.language)
-        }) { $0 }
+        }.map { pastime(of: $0, in: source) }) { $0 }
         let written = WrittenText(source: source, claimed: claimed, wordList: wordList, tagger: lexicalClasses)
 
         let personalInfo = Self.withWholeTitle(Self.withStatedTitle(
@@ -281,6 +281,40 @@ public struct CVDataSanitizer: Sendable {
             ))
         }
         return unique(cleaned) { "\($0.experience.title)|\($0.experience.company)" }
+    }
+
+    /// An interest quoted with the finite verb of its clause ("spiele Schach" of "... und spiele Schach", "play chess" of "I play
+    /// chess") as the pastime the verb names ("Schach", "chess"): a verb is no pastime (#354). The verb is the interest's first word
+    /// where the description's sentence that quotes the interest tags it as one, or, in German, where "ich" and the interest do, in
+    /// English and German, whose verbs grounding reads by their tags; an interest of one word, and one whose first word is a gerund ("hiking in the Alps") or a German infinitive
+    /// ("wandern gehen"), stays whole, and so does one whose rest holds no word of 3 letters or more, or, in German, no noun.
+    func pastime(of interest: String, in source: DescriptionText) -> String {
+        let language = source.explainer.language
+        let words = Word.words(in: interest)
+        guard let language, VerbForms.readsVerbsByTags(in: language), lexicalClasses.tagsLexicalClass(inLanguage: language.rawValue),
+              words.count > 1, let first = words.first?.folded,
+              !first.hasSuffix("ing"), !(language == .german && first.hasSuffix("n")) else { return interest }
+        let folded = words.map(\.folded)
+        for sentence in source.sentences {
+            let said = Word.words(in: sentence.raw)
+            guard let start = said.indices.first(where: { start in
+                start + folded.count <= said.count && said[start..<(start + folded.count)].map(\.folded) == folded
+            }) else { continue }
+            let verbs = lexicalClasses.verbs(in: sentence.raw, language: language.rawValue)
+            // A German verb that shares the subject of an earlier clause ("... und spiele Schach") is tagged as the person says it,
+            // after "ich": in the sentence the tags read it as an adjective.
+            let saidAlone = language == .german && lexicalClasses.verbs(in: "ich " + interest, language: language.rawValue)
+                .contains { $0.contains(4) }
+            guard saidAlone || verbs.contains(where: { $0.contains(said[start].range.lowerBound) }) else { return interest }
+            let rest = words.dropFirst().drop { Self.skillLinkWords.contains($0.folded) }
+            guard let next = rest.first, rest.contains(where: { $0.folded.count >= 3 }) else { return interest }
+            let kept = String(Array(interest)[next.range.lowerBound...])
+            guard language != .german || kept.split(separator: " ").contains(where: { $0.first?.isUppercase == true }) else {
+                return interest
+            }
+            return kept
+        }
+        return interest
     }
 
     /// Whether every sentence of the description that gives `interest` also names one of the draft's `titles` and says nothing of
