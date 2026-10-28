@@ -6489,11 +6489,11 @@ extension GroundingRows {
         typealias Stated = (language: String, description: String, title: String)
         var stated: [Stated] = []
         stated.append(("en", "I am a plumber and I fix pipes, taps and boilers in people's homes.", "plumber"))
-        stated.append(("it", "Sono uno sviluppatore iOS e scrivo applicazioni per iPhone e iPad.", "sviluppatore iOS"))
-        stated.append(("de", "Ich bin Bäckerin und backe jeden Morgen Brot, Brötchen und Kuchen für unsere Kunden.", "Bäckerin"))
-        stated.append(("es", "Soy camarero y atiendo a los clientes en la terraza y en la barra del bar.", "camarero"))
+        stated.append(("it", "Sono uno sviluppatore iOS e io scrivo applicazioni per iPhone e iPad.", "sviluppatore iOS"))
+        stated.append(("de", "Ich bin Bäckerin und ich backe jeden Morgen Brot, Brötchen und Kuchen für unsere Kunden.", "Bäckerin"))
+        stated.append(("es", "Soy camarero y yo atiendo a los clientes en la terraza y en la barra del bar.", "camarero"))
         stated.append(("fr", "Je suis comptable et je tiens les comptes de petites entreprises de mon quartier.", "comptable"))
-        stated.append(("pt", "Sou motorista de caminhão e faço entregas de mercadorias pelo interior do estado.", "motorista de caminhão"))
+        stated.append(("pt", "Sou motorista de caminhão e eu faço entregas de mercadorias pelo interior do estado.", "motorista de caminhão"))
 
         var rows: [GroundingRow] = []
         for v in stated {
@@ -6565,6 +6565,33 @@ extension GroundingRows {
         rows.append(row("a-title-followed-by-the-end-of-the-sentence-is-the-headline",
                         "the sentence ends after the title: the title is the headline",
                         "I am a plumber.", CVData(experience: [job("plumber")]), .exactly(CVData(personalInfo: person(title: "plumber")))))
+        rows.append(row("a-title-and-a-qualifier-is-no-headline-en",
+                        "a clause after and may say the role is not the person's: only a clause that opens with I is read as a claim",
+                        "I am a nurse and only in a video game.", CVData(experience: [job("nurse")]), .exactly(CVData())))
+        rows.append(row("a-title-and-a-qualifier-is-no-headline-es",
+                        "a clause after and may say the role is not the person's: only a clause that opens with yo is read as a claim",
+                        "Soy enfermero y solo en un videojuego.", CVData(experience: [job("enfermero")]), .exactly(CVData()),
+                        language: "es"))
+        rows.append(row("a-title-and-a-qualifier-is-no-headline-fr",
+                        "a clause after and may say the role is not the person's: only a clause that opens with je is read as a claim",
+                        "Je suis médecin et seulement dans un jeu vidéo.", CVData(experience: [job("médecin")]), .exactly(CVData()),
+                        language: "fr"))
+        rows.append(row("a-title-and-a-qualifier-gives-no-summary",
+                        "a role in a game is no fact to write around: the summary written around it goes too",
+                        "I am a nurse and only in a video game.",
+                        CVData(summary: "A nurse who cares for patients on a busy ward.", experience: [job("nurse")]), .exactly(CVData())))
+        rows.append(row("a-title-and-a-clause-with-no-pronoun-is-no-headline-es",
+                        "no pronoun tells a verb from a qualifier in Spanish: the safe way to fail is no headline",
+                        "Soy camarero y atiendo a los clientes en la terraza y en la barra del bar.", CVData(experience: [job("camarero")]),
+                        .exactly(CVData()), language: "es"))
+        rows.append(row("a-title-and-a-clause-with-no-pronoun-is-no-headline-it",
+                        "no pronoun tells a verb from a qualifier in Italian: the safe way to fail is no headline",
+                        "Sono uno sviluppatore iOS e scrivo applicazioni per iPhone e iPad.", CVData(experience: [job("sviluppatore iOS")]),
+                        .exactly(CVData()), language: "it"))
+        rows.append(row("a-title-ending-its-sentence-in-es-is-the-headline",
+                        "the sentence ends after the title, and the next sentence is the duties: the title is the headline",
+                        "Soy camarero. Atiendo a los clientes en la terraza y en la barra del bar.", CVData(experience: [job("camarero")]),
+                        .exactly(CVData(personalInfo: person(title: "camarero"))), language: "es"))
         rows.append(row("a-stated-title-leaves-the-headline-alone",
                         "the draft gives a headline of its own, which stays: the title of the job with no employer is not added",
                         "I am a plumber and a welder.",
