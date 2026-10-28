@@ -16,17 +16,18 @@ struct DraftingWrittenTests {
         #expect(measure.hasSummary == item.counts, "\(item): \(measure.summarySentences) sentences, \(measure.summaryCharacters)")
     }
 
-    @Test("A kept job counts as described with a sentence of 40 characters or more")
+    @Test("A kept job counts as described with 40 characters or more in all, in short sentences too")
     func describedJobs() throws {
         let job = try #require(WrittenLayer.texts["en"]?.job)
         let cv = CVData(experience: [
             Experience(company: "A", description: "Cook."), Experience(company: "B", description: job), Experience(company: "C"),
+            Experience(company: "D", description: "I glaze the tiles. I fire them in the kiln."),
         ])
 
         let measure = try Self.measure("en-plain", cv)
 
-        #expect(measure.keptJobs == 3)
-        #expect(measure.describedJobs == 1)
+        #expect(measure.keptJobs == 4)
+        #expect(measure.describedJobs == 2)
     }
 
     @Test("The skills count by kind, and a sparse description needs fewer")
@@ -67,6 +68,28 @@ struct DraftingWrittenTests {
         #expect(measure.offField == ["skills[0].name \"Java\" (a tool of another trade: Java)"])
     }
 
+    @Test("A tool of a design trade is an off-field hit in another trade's draft, and not in the designer's")
+    func designTools() throws {
+        let cv = CVData(skills: [Skill(name: "After Effects"), Skill(name: "Illustrator")])
+
+        let programmer = try Self.measure("pt-traps", cv)
+        let designer = try Self.measure("es-plain", cv)
+
+        #expect(programmer.offField.count == 2)
+        #expect(designer.offField.isEmpty)
+    }
+
+    @Test("A skill that starts with the stem of a one-word trap echoes it, and is an off-field hit")
+    func trapEcho() throws {
+        let cv = CVData(skills: [Skill(name: "Técnicas de auditoría"), Skill(name: "Hojas de cálculo")])
+
+        let measure = try Self.measure("es-traps", cv)
+
+        #expect(measure.offField == [
+            "skills[0].name \"Técnicas de auditoría\" (an echo of a word the person does not state of themselves: auditor)",
+        ])
+    }
+
     @Test("Whatever a draft writes around a description with no role is an off-field hit")
     func noRole() throws {
         let summary = try #require(WrittenLayer.texts["en"]?.summary)
@@ -87,7 +110,9 @@ struct DraftingWrittenTests {
 
         let measure = try Self.measure("en-plain", cv)
 
-        #expect(measure.readerFindings == [ReaderFinding(kind: .softAsTechnology, path: "skills[0].name", value: "Teamwork")])
+        #expect(measure.readerFindings.filter { $0.path.hasPrefix("skills") } == [
+            ReaderFinding(kind: .softAsTechnology, path: "skills[0].name", value: "Teamwork"),
+        ])
     }
 
     @Test("A technology that is a word for anything, or a lone word for an activity, is no tool of the trade; an acronym and a machine are")
@@ -98,8 +123,9 @@ struct DraftingWrittenTests {
 
         let measure = try Self.measure("it-plain", cv)
 
-        #expect(measure.readerFindings.map(\.kind) == [.noToolOfTheTrade, .noToolOfTheTrade])
-        #expect(measure.readerFindings.map(\.value) == ["Manutenzione", "documenti"])
+        let skills = measure.readerFindings.filter { $0.path.hasPrefix("skills") }
+        #expect(skills.map(\.kind) == [.noToolOfTheTrade, .noToolOfTheTrade])
+        #expect(skills.map(\.value) == ["Manutenzione", "documenti"])
     }
 
     @Test("A job whose duties start in two forms is counted once, and a word that joins the duties is not their form")
@@ -112,8 +138,7 @@ struct DraftingWrittenTests {
 
         let measure = try Self.measure("en-plain", cv)
 
-        #expect(measure.readerFindings.map(\.kind) == [.twoForms])
-        #expect(measure.readerFindings.map(\.path) == ["experience[0].description"])
+        #expect(measure.readerFindings.filter { $0.kind == .twoForms }.map(\.path) == ["experience[0].description"])
     }
 
     @Test("A skill of English words in a draft of another language is counted, and in an English draft it is not")
@@ -132,14 +157,129 @@ struct DraftingWrittenTests {
         #expect(!english.readerFindings.contains { $0.kind == .skillInAnotherLanguage })
     }
 
+    @Test("A loanword the other languages write as their own is no skill in another language")
+    func loanword() throws {
+        let cv = CVData(skills: [Skill(name: "Leadership", kind: .softSkill), Skill(name: "Team leader", kind: .softSkill)])
+
+        let measure = try Self.measure("it-plain", cv)
+
+        #expect(!measure.readerFindings.contains { $0.kind == .skillInAnotherLanguage })
+    }
+
+    @Test("A technology whose head noun an earlier one has is counted: the last word in English, the first in French")
+    func sharedHeadNoun() {
+        let english = CVData(skills: [Skill(name: "Mixing desks"), Skill(name: "Stage boxes"), Skill(name: "Digital desk")])
+        let french = CVData(skills: [Skill(name: "carnets"), Skill(name: "carnet de notes"), Skill(name: "rétroprojecteur")])
+
+        #expect(Self.reader(english, "en").map(\.value) == ["Digital desk"])
+        #expect(Self.reader(french, "fr").map(\.value) == ["carnet de notes"])
+    }
+
+    @Test("A headline that is a part of a stated title is counted, and a form of the title is not")
+    func headlineFragment() {
+        let title = ExpectedFact.title("addetta contabile", "addetta")
+        let fragment = Self.reader(CVData(personalInfo: PersonalInfo(title: "contabile")), "it", facts: [title])
+        let form = Self.reader(CVData(personalInfo: PersonalInfo(title: "addetta")), "it", facts: [title])
+        let whole = Self.reader(CVData(personalInfo: PersonalInfo(title: "addetta contabile")), "it", facts: [title])
+
+        #expect(fragment.map(\.kind) == [.headlineFragment])
+        #expect(form.isEmpty)
+        #expect(whole.isEmpty)
+    }
+
+    @Test("A summary that names no kept title whole is counted, even with a word of one")
+    func summaryWithoutPerson() {
+        let job = Experience(title: "boat mechanic", company: "Gullwing Marina", description: "I service the outboard engines.")
+        let about = CVData(
+            summary: "Engines are the heart of every trip. Mechanic work asks for care and precision.", experience: [job]
+        )
+        let person = CVData(summary: "I work as a boat mechanic. I keep the engines of the fleet running.", experience: [job])
+
+        #expect(Self.reader(about, "en").map(\.kind) == [.summaryWithoutPerson])
+        #expect(Self.reader(person, "en").isEmpty)
+    }
+
+    @Test("A duty that starts with an infinitive or a gerund is counted once a job, and a first person is not")
+    func infinitiveDuty() {
+        let cv = CVData(experience: [
+            Experience(company: "A", description: "Preparare le buste paga. Archiviare le pratiche."),
+            Experience(company: "B", current: true, description: "Preparo le buste paga. Archivio le pratiche."),
+        ])
+
+        #expect(Self.reader(cv, "it").map(\.path) == ["experience[0].description"])
+    }
+
+    @Test("A description with no full stop at the end is counted")
+    func unfinishedDescription() {
+        let cv = CVData(experience: [
+            Experience(company: "A", description: "tuning the pianos before each recital"),
+            Experience(company: "B", description: "I tuned the pianos before each recital."),
+        ])
+
+        #expect(Self.reader(cv, "en").map(\.kind) == [.infinitiveDuty, .unfinishedDescription])
+    }
+
+    @Test("An ended job in the past and the present is counted, and a current one is not")
+    func mixedTense() {
+        let text = "Montei os armários das cozinhas. Instalo as portas de correr."
+        let cv = CVData(experience: [
+            Experience(company: "A", endDate: "2019", description: text),
+            Experience(company: "B", current: true, description: text),
+        ])
+
+        #expect(Self.reader(cv, "pt").map(\.path) == ["experience[0].description"])
+    }
+
+    @Test("The word for a skill listed as a soft skill is counted, and a quality is not")
+    func skillWordAsQuality() {
+        let cv = CVData(skills: [Skill(name: "Compétences", kind: .softSkill), Skill(name: "Patience", kind: .softSkill)])
+
+        #expect(Self.reader(cv, "fr").map(\.value) == ["Compétences"])
+    }
+
+    @Test("An interest that is a clause or a quality at work is counted, and a pastime of a verb is not")
+    func clauseAsInterest() {
+        let cv = CVData(interests: ["play the piano", "stay calm in a crisis", "I enjoy chess", "grow tomatoes in the garden plot"])
+
+        #expect(Self.reader(cv, "en").map(\.value) == ["stay calm in a crisis", "I enjoy chess", "grow tomatoes in the garden plot"])
+    }
+
+    @Test("A summary sentence with the verb of an earlier one, or a duty's sentence, is counted")
+    func repeatedSentence() {
+        let job = Experience(title: "fleuriste", company: "Les Iris", current: true, description: "Je compose des bouquets de saison.")
+        let cv = CVData(
+            summary: "Je travaille comme fleuriste. Je travaille avec des fleurs fraîches. Je compose des bouquets de saison.",
+            experience: [job]
+        )
+
+        #expect(Self.reader(cv, "fr").map(\.value) == [
+            "Je travaille avec des fleurs fraîches.", "Je compose des bouquets de saison.",
+        ])
+    }
+
+    @Test("A year the description gives a school and the draft does not hold is counted")
+    func lostYear() throws {
+        let kept = CVData(education: [Education(degree: "logistics", institution: "Leeds City College", endDate: "2013")])
+        let lost = CVData(education: [Education(degree: "logistics", institution: "Leeds City College", startDate: "2014")])
+
+        let lostYear = { (measure: WrittenMeasure) in measure.readerFindings.filter { $0.kind == .lostYear && $0.value == "2013" } }
+
+        #expect(lostYear(try Self.measure("en-plain", kept)).isEmpty)
+        #expect(lostYear(try Self.measure("en-plain", lost)).count == 1)
+    }
+
     @Test("A run set counts the reader's classes over its distinct drafts, with no threshold")
     func readerCounts() throws {
         let teamwork = Tweak(edit: { $0.skills.append(Skill(name: "Teamwork")) })
         let measured = try DraftMeasures.set(["en-plain", "it-plain"], runs: 2, tweak: DraftMeasures.tweak(teamwork, for: "en-plain"))
 
+        let plain = WrittenCounts(try DraftMeasures.set(["en-plain", "it-plain"], runs: 2)).reader
+
         let counts = WrittenCounts(measured)
 
-        #expect(counts.reader == ReaderCounts(softAsTechnology: 1, noToolOfTheTrade: 0, twoForms: 0, skillInAnotherLanguage: 0))
+        for kind in ReaderClass.allCases {
+            #expect(counts.reader.count(kind) == plain.count(kind) + (kind == .softAsTechnology ? 1 : 0), "\(kind)")
+        }
         #expect(counts.shortfalls(p95Seconds: 10).isEmpty)
     }
 
@@ -234,6 +374,14 @@ struct DraftingWrittenTests {
     private static func measure(_ id: String, _ cv: CVData) throws -> WrittenMeasure {
         let input = try InventedFactsTests.input(id)
         return WrittenMeasure(cv, for: input, report: InventedFacts.count(cv, for: input))
+    }
+
+    /// The reader's findings in `cv` for an input of `language` with no field, whose description states `facts` alone.
+    private static func reader(_ cv: CVData, _ language: String, facts: [ExpectedFact] = []) -> [ReaderFinding] {
+        let input = DraftingInput(
+            id: "reader-\(language)", kind: .plain, language: language, description: "", facts: facts, traps: []
+        )
+        return ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
     }
 }
 

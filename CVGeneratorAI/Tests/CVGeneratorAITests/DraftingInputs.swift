@@ -115,7 +115,9 @@ enum DraftingInputs {
     // MARK: - Fields
 
     /// Tools of one trade each, which a draft of another trade has no reason to write.
-    static let tools = ["Kubernetes", "Java", "Photoshop", "InDesign", "AutoCAD", "HACCP", "KNX", "SAP"]
+    static let tools = [
+        "Kubernetes", "Java", "Photoshop", "InDesign", "Illustrator", "After Effects", "Premiere Pro", "AutoCAD", "HACCP", "KNX", "SAP",
+    ]
 
     /// The field of each input with a role, and the tools of `tools` its trade may use.
     static let fields: [String: (field: String, own: Set<String>)] = [
@@ -125,7 +127,8 @@ enum DraftingInputs {
         "en-plain": ("warehouse logistics", ["SAP"]), "en-traps": ("nursing", []),
         "it-plain": ("cucina", ["HACCP"]), "it-traps": ("amministrazione", ["SAP"]),
         "de-plain": ("Elektroinstallation", ["KNX", "AutoCAD", "SAP"]), "de-traps": ("Physiotherapie", []),
-        "es-plain": ("diseño gráfico", ["Photoshop", "InDesign", "AutoCAD"]), "es-traps": ("contabilidad", ["SAP"]),
+        "es-plain": ("diseño gráfico", ["Photoshop", "InDesign", "Illustrator", "After Effects", "Premiere Pro", "AutoCAD"]),
+        "es-traps": ("contabilidad", ["SAP"]),
         "fr-plain": ("boulangerie", ["HACCP"]), "fr-traps": ("informatique", ["Kubernetes", "Java", "SAP", "KNX"]),
         "pt-plain": ("enfermagem", []), "pt-traps": ("programação", ["Kubernetes", "Java", "SAP"]),
         "en-sparse": ("plumbing", []), "it-sparse": ("sviluppo iOS", ["Kubernetes", "Java", "Photoshop", "SAP"]),

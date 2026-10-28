@@ -13,7 +13,7 @@ struct WrittenMeasure: Codable, Equatable {
     let summarySentences: Int
     let summaryCharacters: Int
     let keptJobs: Int
-    /// The kept jobs whose description has a sentence of at least 40 characters.
+    /// The kept jobs whose description has at least 40 characters in all.
     let describedJobs: Int
     let technologies: Int
     let softSkills: Int
@@ -34,7 +34,7 @@ struct WrittenMeasure: Codable, Equatable {
         self.summarySentences = summarySentences.count
         summaryCharacters = summary.count
         keptJobs = cv.experience.count
-        describedJobs = cv.experience.filter { job in Self.sentences(of: job.description ?? "").contains { $0.count >= 40 } }.count
+        describedJobs = cv.experience.filter { ($0.description ?? "").trimmingCharacters(in: .whitespacesAndNewlines).count >= 40 }.count
         technologies = cv.skills.filter { $0.kind == .technology }.count
         softSkills = cv.skills.filter { $0.kind == .softSkill }.count
 
@@ -59,11 +59,27 @@ struct WrittenMeasure: Codable, Equatable {
                 hits.append("\(path) \"\(value)\" (a tool of another trade: \(tool))")
             }
         }
+        for (index, skill) in cv.skills.enumerated() {
+            let words = InventedFacts.words(of: skill.name)
+            if let trap = Self.trapStems(of: input).first(where: { stem in words.contains { $0.hasPrefix(stem.stem) } })?.trap {
+                hits.append("skills[\(index)].name \"\(skill.name)\" (an echo of a word the person does not state of themselves: \(trap))")
+            }
+        }
         if input.kind == .noRole {
             hits += report.inferred.map { "\($0.path) \"\($0.value)\" (written around a description with no role)" }
         }
         offField = hits
-        readerFindings = ReaderRules.findings(in: cv, language: input.language)
+        readerFindings = ReaderRules.findings(in: cv, for: input, report: report)
+    }
+
+    /// The first seven letters of each single-word trap of 6 letters or more ("auditor" of a wish to become one): a skill with a
+    /// word that starts with one ("auditoría") echoes what the person does not state of themselves.
+    static func trapStems(of input: DraftingInput) -> [(trap: String, stem: String)] {
+        input.traps.compactMap { trap in
+            let words = InventedFacts.words(of: trap)
+            guard words.count == 1, let word = words.first, word.count >= 6, word.allSatisfy(\.isLetter) else { return nil }
+            return (trap, String(word.prefix(7)))
+        }
     }
 
     /// Whether the draft has a summary of 2 to 4 sentences and at least 120 characters.
@@ -150,8 +166,8 @@ struct WrittenCounts: Codable, Equatable {
 
 // MARK: - The reader's classes
 
-/// A class of the reasons a person rejected the drafts of b14ceda8 (#354). Each is counted by a rough rule over the final draft: a
-/// number to follow from one run set to the next, not a threshold of #354 and not a hard finding.
+/// A class of the reasons a person rejected the drafts of #354. Each is counted by a rough rule over the final draft: a number to
+/// follow from one run set to the next, not a threshold of #354 and not a hard finding.
 enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A quality listed as a technology ("Teamwork").
     case softAsTechnology
@@ -159,8 +175,49 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     case noToolOfTheTrade
     /// A job whose duties start in more than one form, as the same duty written once as the person and once about them.
     case twoForms
-    /// A skill in English words in a draft of another language.
+    /// A skill in English words in a draft of another language; a loanword ("leadership") is not one.
     case skillInAnotherLanguage
+    /// A technology whose head noun an earlier one has ("digital desks" after "mixing desks").
+    case sharedHeadNoun
+    /// A headline that is a part of a title the person states, and none of its forms ("amministrativa" of "impiegata
+    /// amministrativa").
+    case headlineFragment
+    /// A summary that names neither the headline nor a kept job title whole, or, with none, no word of the person's field.
+    case summaryWithoutPerson
+    /// A job description with a sentence that starts with an infinitive or a gerund, as an instruction or a fragment.
+    case infinitiveDuty
+    /// A job description that does not end with a full stop.
+    case unfinishedDescription
+    /// An ended job whose duties are said both in the past and in the present.
+    case mixedTense
+    /// A soft skill that is the word for a skill ("competence").
+    case skillWordAsQuality
+    /// An interest that is a clause: more than 4 words, a word of the first person, or a quality at work.
+    case clauseAsInterest
+    /// A summary sentence that starts with the verb of an earlier one, or that is a sentence of a job description.
+    case repeatedSentence
+    /// A year the description gives an entry and the draft does not hold (`InventedFacts.Report.lostYears`).
+    case lostYear
+
+    /// The words of the class in the line of summary.txt.
+    var label: String {
+        switch self {
+        case .softAsTechnology: "a soft skill as a technology"
+        case .noToolOfTheTrade: "no tool of the trade"
+        case .twoForms: "two forms in one job"
+        case .skillInAnotherLanguage: "a skill in another language"
+        case .sharedHeadNoun: "two technologies of one head noun"
+        case .headlineFragment: "a headline that is a part of a title"
+        case .summaryWithoutPerson: "a summary that does not name the person's work"
+        case .infinitiveDuty: "a duty as an infinitive or a gerund"
+        case .unfinishedDescription: "a description with no full stop"
+        case .mixedTense: "an ended job in two tenses"
+        case .skillWordAsQuality: "the word for a skill as a soft skill"
+        case .clauseAsInterest: "a clause as an interest"
+        case .repeatedSentence: "a repeated summary sentence"
+        case .lostYear: "a lost year"
+        }
+    }
 }
 
 /// One value of a final draft in a reader's class.
@@ -172,36 +229,27 @@ struct ReaderFinding: Codable, Equatable, Sendable {
 
 /// The reader's classes of a run set, counted over its distinct drafts.
 struct ReaderCounts: Codable, Equatable, Sendable {
-    let softAsTechnology: Int
-    let noToolOfTheTrade: Int
-    let twoForms: Int
-    let skillInAnotherLanguage: Int
-
-    init(softAsTechnology: Int, noToolOfTheTrade: Int, twoForms: Int, skillInAnotherLanguage: Int) {
-        self.softAsTechnology = softAsTechnology
-        self.noToolOfTheTrade = noToolOfTheTrade
-        self.twoForms = twoForms
-        self.skillInAnotherLanguage = skillInAnotherLanguage
-    }
+    /// The count of each class, by its raw value; a class with none is 0.
+    let counts: [String: Int]
 
     init(_ findings: [ReaderFinding]) {
-        let count = { (kind: ReaderClass) in findings.filter { $0.kind == kind }.count }
-        self.init(
-            softAsTechnology: count(.softAsTechnology), noToolOfTheTrade: count(.noToolOfTheTrade), twoForms: count(.twoForms),
-            skillInAnotherLanguage: count(.skillInAnotherLanguage)
-        )
+        counts = Dictionary(uniqueKeysWithValues: ReaderClass.allCases.map { kind in
+            (kind.rawValue, findings.filter { $0.kind == kind }.count)
+        })
     }
+
+    func count(_ kind: ReaderClass) -> Int { counts[kind.rawValue] ?? 0 }
 
     /// The line of summary.txt.
     var line: String {
-        "the reader's classes, by rough rules: a soft skill as a technology \(softAsTechnology); no tool of the trade "
-            + "\(noToolOfTheTrade); two forms in one job \(twoForms); a skill in another language \(skillInAnotherLanguage)"
+        "the reader's classes, by rough rules: " + ReaderClass.allCases.map { "\($0.label) \(count($0))" }.joined(separator: "; ")
     }
 }
 
 /// The rough rules of the reader's classes, those of the probes of #354: word lists, not a reading.
 enum ReaderRules {
-    static func findings(in cv: CVData, language: String) -> [ReaderFinding] {
+    static func findings(in cv: CVData, for input: DraftingInput, report: InventedFacts.Report) -> [ReaderFinding] {
+        let language = input.language
         var found: [ReaderFinding] = []
         for (index, skill) in cv.skills.enumerated() {
             let path = "skills[\(index)].name"
@@ -223,9 +271,205 @@ enum ReaderRules {
             if Set(forms.map { "\($0)" }).count > 1 {
                 found.append(ReaderFinding(kind: .twoForms, path: "experience[\(index)].description", value: description))
             }
+            found += duties(of: job, at: index, language: language)
+        }
+        found += sharedHeads(in: cv, language: language)
+        found += headline(of: cv, for: input)
+        found += summary(of: cv, for: input)
+        for (index, skill) in cv.skills.enumerated() where skill.kind == .softSkill && skillWords.contains(fold(skill.name)) {
+            found.append(ReaderFinding(kind: .skillWordAsQuality, path: "skills[\(index)].name", value: skill.name))
+        }
+        for (index, interest) in cv.interests.enumerated() where isClause(interest) {
+            found.append(ReaderFinding(kind: .clauseAsInterest, path: "interests[\(index)]", value: interest))
+        }
+        found += report.lostYears.map { ReaderFinding(kind: .lostYear, path: $0.entry, value: $0.year) }
+        return found
+    }
+
+    // MARK: Duties
+
+    /// A job's description: a sentence that starts with an infinitive or a gerund, no full stop at the end, and, for an ended job,
+    /// duties in the past and in the present.
+    static func duties(of job: Experience, at index: Int, language: String) -> [ReaderFinding] {
+        let description = (job.description ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !description.isEmpty else { return [] }
+        let path = "experience[\(index)].description"
+        let sentences = WrittenMeasure.sentences(of: description).map(withoutConnector)
+        var found: [ReaderFinding] = []
+        if sentences.contains(where: { startsWithInfinitive($0, language: language) }) {
+            found.append(ReaderFinding(kind: .infinitiveDuty, path: path, value: description))
+        }
+        if let last = description.last, !".!?…".contains(last) {
+            found.append(ReaderFinding(kind: .unfinishedDescription, path: path, value: description))
+        }
+        let tenses = Set(sentences.compactMap { tense(of: $0, language: language) })
+        if !job.current, tenses.count > 1 {
+            found.append(ReaderFinding(kind: .mixedTense, path: path, value: description))
         }
         return found
     }
+
+    /// Whether `sentence` starts with an infinitive or a gerund: by the endings of the word, a rough rule; none in German, whose
+    /// infinitive ends a sentence.
+    static func startsWithInfinitive(_ sentence: String, language: String) -> Bool {
+        guard let first = letterWords(of: sentence).first else { return false }
+        switch language {
+        case "en": return first.count > 4 && first.hasSuffix("ing")
+        case "it": return first.count > 4 && ["are", "ere", "ire", "ando", "endo"].contains(where: first.hasSuffix)
+        case "es": return first.count > 4 && ["ar", "er", "ir", "ando", "iendo"].contains(where: first.hasSuffix)
+        case "pt": return first.count > 4 && ["ar", "er", "ir", "ando", "endo", "indo"].contains(where: first.hasSuffix)
+        case "fr": return first.count > 4 && ["er", "ir", "re", "ant"].contains(where: first.hasSuffix)
+        default: return false
+        }
+    }
+
+    enum Tense: Hashable { case past, present }
+
+    /// The tense of a duty said in the first person, by the endings of its verb: a rough rule, nil when it cannot tell.
+    static func tense(of sentence: String, language: String) -> Tense? {
+        let words = letterWords(of: sentence)
+        guard let first = words.first else { return nil }
+        func ending(_ word: String, past: [String], present: [String]) -> Tense? {
+            if past.contains(where: word.hasSuffix) { return .past }
+            return present.contains(where: word.hasSuffix) ? .present : nil
+        }
+        switch language {
+        case "en":
+            guard first == "i", words.count > 1 else { return nil }
+            let verb = words[1]
+            if ["was", "were", "had", "did", "made", "led", "ran", "kept", "built", "taught", "took"].contains(verb) { return .past }
+            if ["am", "have", "also"].contains(verb) { return nil }
+            return verb.hasSuffix("ed") ? .past : .present
+        case "de":
+            guard first == "ich", words.count > 1 else { return nil }
+            let verb = words[1]
+            if ["habe", "hatte", "war", "bin"].contains(verb) || verb.hasSuffix("te") { return .past }
+            return .present
+        case "fr":
+            guard first == "je" || first == "j", words.count > 1 else { return nil }
+            let verb = words[1]
+            if ["ai", "avais", "étais"].contains(verb) || verb.hasSuffix("ais") { return .past }
+            return verb == "suis" ? nil : .present
+        case "it":
+            if ["ho", "sono", "ero"].contains(first) { return .past }
+            return ending(first, past: ["avo", "evo", "ivo", "ai", "ii"], present: ["o"])
+        case "es":
+            if ["he", "fui"].contains(first) { return .past }
+            return ending(first, past: ["é", "í", "aba", "ía"], present: ["o"])
+        case "pt":
+            return ending(first, past: ["ei", "ava", "ia", "i"], present: ["o"])
+        default:
+            return nil
+        }
+    }
+
+    // MARK: Technologies
+
+    /// A technology whose head noun, by its stem, an earlier technology has: the last word in English and German, the first in the
+    /// other languages ("cahier d'exercices" after "cahiers").
+    static func sharedHeads(in cv: CVData, language: String) -> [ReaderFinding] {
+        var heads: Set<String> = []
+        var found: [ReaderFinding] = []
+        for (index, skill) in cv.skills.enumerated() where skill.kind == .technology {
+            let words = letterWords(of: skill.name).filter { !["l", "d"].contains($0) }
+            guard let head = (["en", "de"].contains(language) ? words.last : words.first).map(stem) else { continue }
+            if !heads.insert(head).inserted {
+                found.append(ReaderFinding(kind: .sharedHeadNoun, path: "skills[\(index)].name", value: skill.name))
+            }
+        }
+        return found
+    }
+
+    /// A word without the ending of its plural and its last vowel ("consoles" and "console" are "consol").
+    static func stem(_ word: String) -> String {
+        var stem = word
+        for ending in ["es", "s", "en", "n"] where stem.count > 4 && stem.hasSuffix(ending) {
+            stem.removeLast(ending.count)
+            break
+        }
+        if stem.count > 4, let last = stem.last, "aeiouàèéìòù".contains(last) { stem.removeLast() }
+        return stem
+    }
+
+    // MARK: Headline and summary
+
+    /// A headline whose words are a part of a stated title and none of its forms.
+    static func headline(of cv: CVData, for input: DraftingInput) -> [ReaderFinding] {
+        guard let title = cv.personalInfo.title, !title.isEmpty else { return [] }
+        let words = InventedFacts.words(of: title)
+        for fact in input.facts where fact.kind == .title {
+            let forms = fact.forms.map { InventedFacts.words(of: $0) }
+            guard !forms.contains(words), let full = forms.first, words.count < full.count, InventedFacts.holds(full, run: words) else {
+                continue
+            }
+            return [ReaderFinding(kind: .headlineFragment, path: "personalInfo.title", value: title)]
+        }
+        return []
+    }
+
+    /// A summary that names no title of the draft whole (or, with none, no word of the field), and summary sentences that repeat.
+    static func summary(of cv: CVData, for input: DraftingInput) -> [ReaderFinding] {
+        let summary = (cv.summary ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !summary.isEmpty else { return [] }
+        var found: [ReaderFinding] = []
+        let words = InventedFacts.words(of: summary)
+        let titles = ([cv.personalInfo.title ?? ""] + cv.experience.map(\.title)).map { InventedFacts.words(of: $0) }.filter { !$0.isEmpty }
+        let named = titles.isEmpty
+            ? InventedFacts.words(of: input.field ?? "").filter { $0.count > 3 }.contains(where: words.contains)
+            : titles.contains { InventedFacts.holds(words, run: $0) }
+        if !named {
+            found.append(ReaderFinding(kind: .summaryWithoutPerson, path: "summary", value: summary))
+        }
+        let sentences = WrittenMeasure.sentences(of: summary)
+        let duties = Set(cv.experience.flatMap { WrittenMeasure.sentences(of: $0.description ?? "") }.map(fold))
+        var verbs: Set<String> = []
+        for sentence in sentences {
+            let verb = letterWords(of: sentence).first { !pronouns.contains($0) }
+            let again = verb.map { !verbs.insert($0).inserted } ?? false
+            if again || duties.contains(fold(sentence)) {
+                found.append(ReaderFinding(kind: .repeatedSentence, path: "summary", value: sentence))
+            }
+        }
+        return found
+    }
+
+    /// The subject pronouns of the first person, which a summary sentence starts with before its verb.
+    static let pronouns: Set<String> = ["i", "ich", "je", "j", "io", "yo", "eu"]
+
+    // MARK: Soft skills and interests
+
+    /// The words for a skill, a competence or an ability, which name no quality.
+    static let skillWords: Set<String> = [
+        "skill", "skills", "ability", "abilities", "competence", "competences", "competencies", "competenza", "competenze", "abilita",
+        "capacita", "kompetenz", "kompetenzen", "fahigkeit", "fahigkeiten", "competencia", "competencias", "habilidad",
+        "habilidades", "capacidad", "capacidades", "capacite", "capacites", "aptitude", "aptitudes", "habilidade", "capacidade",
+    ]
+
+    /// The words of the first person in an interest ("like working with directors" is one of the person's).
+    static let firstPersonWords: Set<String> = [
+        "i", "my", "me", "myself", "io", "mi", "sono", "mio", "mia", "ich", "mich", "mir", "bin", "je", "j", "moi", "suis",
+        "yo", "soy", "eu", "sou", "like", "piace", "gusta", "gosto", "aime", "mag",
+    ]
+
+    /// Whether an interest is a clause, not a pastime: more than 4 words, a word of the first person, or the stem of a quality at
+    /// work.
+    static func isClause(_ interest: String) -> Bool {
+        let words = letterWords(of: interest)
+        let lowered = interest.lowercased()
+        return words.count > 4 || words.contains(where: firstPersonWords.contains)
+            || CVDataSanitizer.softStems.contains { lowered.contains($0) }
+    }
+
+    /// The words of `text`, lowered, folded and split at anything not a letter.
+    static func letterWords(of text: String) -> [String] {
+        fold(text).split { !$0.isLetter }.map(String.init)
+    }
+
+    static func fold(_ text: String) -> String {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            .trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+    }
+
 
     /// Parts of the words for qualities at work, in the six languages.
     static let qualities = [
@@ -262,6 +506,12 @@ enum ReaderRules {
         "active", "collaborative", "document", "maintenance", "troubleshooting", "mixing", "systems", "electrical", "preventive",
     ]
 
+    /// English words the other five languages write as their own in a CV ("leadership", "software").
+    static let loanwords: Set<String> = [
+        "leadership", "team", "leader", "software", "hardware", "marketing", "design", "budget", "computer", "database", "web",
+        "manager", "management", "know", "how",
+    ]
+
     static func isQuality(_ name: String) -> Bool {
         let lowered = name.lowercased()
         return qualities.contains { lowered.contains($0) }
@@ -278,7 +528,7 @@ enum ReaderRules {
     static func isEnglish(_ name: String) -> Bool {
         guard name.unicodeScalars.allSatisfy(\.isASCII) else { return false }
         let words = name.lowercased().split { !$0.isLetter }.map(String.init)
-        return words.contains(where: englishSkillWords.contains)
+        return !words.allSatisfy(loanwords.contains) && words.contains(where: englishSkillWords.contains)
     }
 
     /// `sentence` without the words that join it to the one before ("Then I rig" is "I rig").
