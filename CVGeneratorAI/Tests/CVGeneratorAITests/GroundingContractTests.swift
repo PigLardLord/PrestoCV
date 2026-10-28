@@ -6685,6 +6685,9 @@ extension GroundingRows {
                         "a clause after and may say the role is not the person's: only a clause that opens with je is read as a claim",
                         "Je suis médecin et seulement dans un jeu vidéo.", CVData(experience: [job("médecin")]), .exactly(CVData()),
                         language: "fr"))
+        rows.append(row("a-title-and-a-limiting-clause-of-the-person-is-no-headline-en",
+                        "a clause that opens with I may still say the role is not the person's: one that limits it is no claim",
+                        "I am a nurse and I only play one in a video game.", CVData(experience: [job("nurse")]), .exactly(CVData())))
         rows.append(row("a-title-and-a-qualifier-gives-no-summary",
                         "a role in a game is no fact to write around: the summary written around it goes too",
                         "I am a nurse and only in a video game.",
@@ -6726,6 +6729,22 @@ extension GroundingRows {
                           "a noun after und is no verb of the person, the safe way to fail"))
         qualified.append(("capital-it", "it", "Sono infermiere e Roma è la mia città.", "infermiere",
                           "a word with a capital after e is no verb of the person, the safe way to fail"))
+        // Fix-check of #354: an adverb that ends like a verb of the person, before a word that limits the role, or a German adverb
+        // of the -weise family, read as a verb and gave the headline.
+        qualified.append(("adverb-before-nur-de", "de", "Ich bin Arzt und bedauerlicherweise nur in einem Videospiel.", "Arzt",
+                          "nur after an adverb still qualifies the title"))
+        qualified.append(("weise-adverb-de", "de", "Ich bin Arzt und mittlerweile im Ruhestand.", "Arzt",
+                          "an adverb of time is no verb of the person"))
+        qualified.append(("weise-adverb-alone-de", "de", "Ich bin Arzt und bedauerlicherweise im Ruhestand.", "Arzt",
+                          "an adverb of the -weise family is no verb of the person"))
+        qualified.append(("adverb-before-solo-it", "it", "Sono medico e purtroppo solo in un videogioco.", "medico",
+                          "solo after an adverb still qualifies the title"))
+        qualified.append(("adverb-before-solo-es", "es", "Soy médico y acaso solo en un videojuego.", "médico",
+                          "solo after an adverb still qualifies the title"))
+        qualified.append(("adverb-before-apenas-pt", "pt", "Sou médico e decerto apenas num videogame.", "médico",
+                          "apenas after an adverb still qualifies the title"))
+        qualified.append(("verb-and-a-denial-de", "de", "Ich bin Arzt und arbeite nicht mehr.", "Arzt",
+                          "the clause of the person denies the work, the safe way to fail"))
         for v in qualified {
             rows.append(row("a-title-and-a-qualifier-with-no-pronoun-is-no-headline-\(v.id)",
                             "\(v.reason): only a clause of the person after and leaves the title the headline",

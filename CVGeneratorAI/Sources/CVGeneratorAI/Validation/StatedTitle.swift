@@ -62,10 +62,24 @@ enum StatedTitle {
 
     /// Whether the clause after "and" is the person's own claim: it opens with the first-person pronoun ("I fix pipes"), or with a verb
     /// in the first person where the pronoun is dropped. "Only in a video game" is a qualifier, which may say the role is not the person's.
+    /// A clause that holds a negation or a word that limits ("not", "only", "nur", "solo", "apenas") anywhere may say so too, after an
+    /// adverb that reads like a verb ("und bedauerlicherweise nur in einem Videospiel"): it is no claim, the safe way to fail.
     private static func isOfThePerson(_ clause: Clause, in language: Vocabulary.Language?) -> Bool {
         guard let first = clause.words.first else { return false }
+        let denials = WrittenTextWords.of(language).negations.union(language.flatMap { limiters[$0] } ?? [])
+        guard !clause.words.contains(where: { denials.contains($0.folded) }) else { return false }
         return forms(firstPersonPronouns, in: language).contains(first.folded) || opensWithAVerbOfI(clause, in: language)
     }
+
+    /// Words that limit what comes before to a part of it, as `Word.folded` writes them, beside the negations of `WrittenTextWords`.
+    private static let limiters: [Vocabulary.Language: Set<String>] = [
+        .english: ["only", "just", "merely", "solely"],
+        .italian: ["solo", "soltanto", "solamente", "unicamente", "appena", "neanche", "neppure", "nemmeno"],
+        .spanish: ["solo", "solamente", "unicamente", "apenas", "tampoco"],
+        .portuguese: ["so", "apenas", "somente", "unicamente", "tampouco"],
+        .german: ["nur", "lediglich", "bloss", "bloß", "ausschliesslich", "ausschließlich", "kaum"],
+        .french: ["seulement", "uniquement"],
+    ]
 
     /// Whether the clause opens with a verb in the first person of the present, in a language that drops the pronoun after "and"
     /// (#354): a word written in lower case of at least 4 letters with the ending of that person ("scrivo", "atiendo", "faço",
@@ -78,7 +92,12 @@ enum StatedTitle {
         let written = Array(Digits.ascii(clause.source))
         guard written.indices.contains(first.range.lowerBound), written[first.range.lowerBound].isLowercase else { return false }
         return first.folded.count >= 4 && first.folded.hasSuffix(ending) && !(notVerbs[language]?.contains(first.folded) ?? false)
+            && !(adverbEndings[language] ?? []).contains { first.folded.count > $0.count && first.folded.hasSuffix($0) }
     }
+
+    /// The endings of a family of adverbs that grows with each word, longer than the ending itself: German "bedauerlicherweise",
+    /// "normalerweise", "mittlerweile". A closed list cannot hold them.
+    private static let adverbEndings: [Vocabulary.Language: [String]] = [.german: ["weise", "weile"]]
 
     /// The ending of the first person of the present, as `Word.folded` writes it, in the languages that drop the pronoun.
     private static let firstPersonPresentEndings: [Vocabulary.Language: String] = [
