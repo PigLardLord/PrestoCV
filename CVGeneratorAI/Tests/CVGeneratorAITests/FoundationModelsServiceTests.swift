@@ -59,4 +59,49 @@ struct FoundationModelsServiceTests {
             #expect(FoundationModelsService.map(failure: framework) == expected)
         }
     }
+
+    @Test("An answer that does not parse is generationFailed, which is not tried again: the model writes it again the same (#354)")
+    func mapTreatsAnAnswerThatDoesNotParseAsTheModels() {
+        let context = LanguageModelSession.GenerationError.Context(debugDescription: "test")
+        #expect(FoundationModelsService.isParsingFailure(LanguageModelSession.GenerationError.decodingFailure(context)))
+        #expect(FoundationModelsService.map(failure: LanguageModelSession.GenerationError.decodingFailure(context)) == .generationFailed)
+
+        if #available(iOS 27.0, macOS 27.0, visionOS 27.0, *) {
+            // What the OS of 2027 throws for an answer cut by its token limit, which was a service failure and was asked again
+            let cut = GeneratedContent.ParsingError(rawContent: "{\"technologies\": [\"Exc", debugDescription: "cut")
+            #expect(FoundationModelsService.isParsingFailure(cut))
+            #expect(FoundationModelsService.map(failure: cut) == .generationFailed)
+        }
+    }
+
+    @Test("Only an answer that does not parse leaves what the stream wrote before it; a verdict on the answer leaves none")
+    func onlyAParsingFailureLeavesAnAnswer() {
+        let context = LanguageModelSession.GenerationError.Context(debugDescription: "test")
+        #expect(FoundationModelsService.leavesAnAnswer(failure: LanguageModelSession.GenerationError.decodingFailure(context)))
+        for verdict: LanguageModelSession.GenerationError in [
+            .guardrailViolation(context), .exceededContextWindowSize(context), .rateLimited(context),
+        ] {
+            #expect(!FoundationModelsService.leavesAnAnswer(failure: verdict))
+        }
+        #expect(!FoundationModelsService.leavesAnAnswer(failure: NSError(domain: "com.apple.SensitiveContentAnalysisML", code: 15)))
+        #expect(!FoundationModelsService.isParsingFailure(CancellationError()))
+    }
+
+    @Test("The second pass's answer lists the skills before the texts, and its token limit is 400 (#354)")
+    func writingAnswerPutsTheSkillsFirst() throws {
+        let names = ["technologies", "softSkills", "summary", "roles"]
+        let data = try JSONEncoder().encode(WritingAnswer.generationSchema)
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        if let declared = object?["x-order"] as? [String] {
+            #expect(declared == names)
+        } else {
+            let schema = String(decoding: data, as: UTF8.self)
+            let order = names.map { name in
+                schema.range(of: "\"\(name)\"").map { schema.distance(from: schema.startIndex, to: $0.lowerBound) }
+            }
+            #expect(order.allSatisfy { $0 != nil })
+            #expect(order.compactMap { $0 } == order.compactMap { $0 }.sorted())
+        }
+        #expect(FoundationModelsService.writingTokens == 400)
+    }
 }
