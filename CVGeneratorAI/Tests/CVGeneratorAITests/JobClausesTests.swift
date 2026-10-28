@@ -109,4 +109,22 @@ struct JobClausesTests {
         #expect(texts[0].hasSuffix("I moved the scenery between scenes."))
         #expect(texts[3].hasSuffix("I lead the sound team."))
     }
+
+    @Test("A job's quote said with a gerund is in the first person and ends with a full stop, also when no written duty stays (#354)")
+    func quoteWithNoDuties() throws {
+        let draft = CVData(experience: [
+            Self.job(
+                "sound technician", "Brightwater Events", from: "2016", to: "2019",
+                description: "setting up the PA systems and mixing the support acts"
+            ),
+            Self.job("sound technician", "Copperfield Arena", from: "2019", to: "2021"),
+        ])
+        let written = DraftWriting(summary: nil, roleDescriptions: [nil, nil], technologies: [], softSkills: [])
+
+        let withDuties = try sanitizer.sanitize(draft, writing: written, against: Self.english)
+        let plain = try sanitizer.sanitize(draft, against: Self.english)
+
+        #expect(withDuties.experience.first?.description == "I was setting up the PA systems and mixing the support acts.")
+        #expect(plain.experience.first?.description == "setting up the PA systems and mixing the support acts.")
+    }
 }

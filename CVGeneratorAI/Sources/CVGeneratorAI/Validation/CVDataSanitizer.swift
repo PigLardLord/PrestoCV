@@ -235,10 +235,11 @@ public struct CVDataSanitizer: Sendable {
                     .filter { !Self.letterWords(of: $0).filter { $0.count >= 3 }.allSatisfy(dutyWords.contains) }
                     .joined(separator: " ").presentValue
             }
-            // A job with duties is in the first person: a quoted sentence said with a gerund ("setting up the PA systems and mixing
-            // the support acts") is written in it too, so the job's text keeps one form.
+            // A job written a section at a time is in the first person, even when none of its written duties stays: a quoted
+            // sentence said with a gerund ("setting up the PA systems and mixing the support acts") is written in it too, so the
+            // job's text keeps one form; its text ends with a full stop (#354).
             let firstPerson = { (text: String?) in
-                roleDuties == nil ? text : text.flatMap { text in
+                position >= duties.count ? text : text.flatMap { text in
                     SentenceSplitter.sentences(in: text).map {
                         FirstPersonDuty.written($0, current: experience.current, language: source.explainer.language, wordList: wordList)
                     }.joined(separator: " ").presentValue
@@ -247,7 +248,7 @@ public struct CVDataSanitizer: Sendable {
             return Experience(
                 title: experience.title, company: experience.company, location: experience.location,
                 startDate: experience.startDate, endDate: experience.endDate, current: experience.current,
-                description: Self.joined(firstPerson(quote), firstPerson(roleDuties)),
+                description: Self.joined(firstPerson(quote), firstPerson(roleDuties)).map(Self.ended),
                 achievements: experience.achievements
             )
         }

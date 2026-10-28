@@ -128,7 +128,7 @@ extension CVDataSanitizer {
             verdicts.avoid = rule.wordsToAvoid()
 
             var held = earlier + verdicts.pinned
-            var form = held.first.flatMap { Self.form($0, language: language) }
+            var form = held.first.flatMap { Self.form($0, language: language) }.flatMap { $0 == .infinitive ? nil : $0 }
             for raw in SentenceSplitter.sentences(in: duties ?? "") {
                 let sentence = FirstPersonDuty.written(
                     raw.trimmingCharacters(in: .whitespacesAndNewlines), current: current, language: language, wordList: wordList
@@ -145,9 +145,15 @@ extension CVDataSanitizer {
                 } else if let own = Self.form(sentence, language: language) {
                     if let form, form != own {
                         rejection = "it is written in another form: " + form.advice
+                    } else if own == .infinitive {
+                        rejection = "it starts with an infinitive: start it with a verb in the first person"
                     } else if form == nil {
                         form = own
                     }
+                }
+                if rejection == nil, !current, Self.tense(of: sentence, language: language) == .present,
+                   held.contains(where: { Self.tense(of: $0, language: language) == .past }) {
+                    rejection = "it is in the present, and the job has ended: write it in the past, as the other duties"
                 }
                 if let rejection {
                     verdicts.rejected.append(Rejection(sentence: sentence, reason: rejection))
@@ -230,6 +236,26 @@ extension CVDataSanitizer {
         case .german, .french, nil:
             return nil
         }
+    }
+
+    /// The tense of a duty said in the first person (#354): an ended job's duties keep the past they started in.
+    enum DutyTense: Equatable, Sendable { case past, present }
+
+    /// The tense of a duty by the ending of its first word, in Italian, Spanish and Portuguese, whose duties start with the verb in the
+    /// first person ("Gestivo", "Coordiné", "Colaboro"); nil in the other languages, whose verbs do not tell it by their ending, and
+    /// for a first word with no ending of a tense.
+    static func tense(of sentence: String, language: Vocabulary.Language?) -> DutyTense? {
+        // "Sono" starts the present ("Sono responsabile") and the past ("Sono stato responsabile") alike.
+        guard let first = sentence.split(whereSeparator: { !$0.isLetter }).first.map({ $0.lowercased() }), first.count > 1,
+              first != "sono" else { return nil }
+        let (pastWords, past, present): (Set<String>, [String], [String]) = switch language {
+        case .italian: (["ho", "ero"], ["avo", "evo", "ivo"], ["o"])
+        case .spanish: (["he", "fui"], ["é", "í", "aba", "ía"], ["o"])
+        case .portuguese: (["fui"], ["ei", "ava", "ia", "i"], ["o"])
+        case .english, .german, .french, nil: ([], [], [])
+        }
+        if pastWords.contains(first) || past.contains(where: first.hasSuffix) { return .past }
+        return present.contains(where: first.hasSuffix) ? .present : nil
     }
 
     /// The rule a job's duty passes (ADR 0031, D3 and D4): a sentence that quotes, with no number, a clause of this job alone is the

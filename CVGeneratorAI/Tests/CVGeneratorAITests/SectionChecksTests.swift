@@ -73,6 +73,50 @@ struct SectionChecksTests {
         #expect(none.kept.isEmpty && none.pinned.isEmpty && none.rejected.isEmpty)
     }
 
+    /// A job the person names with no duty of its own, ended and then current (#354).
+    private static let clerk = "Dal 2013 al 2017 sono stata impiegata contabile allo Studio Ferretti di Lodi."
+    private static let clerkNow = "Dal 2017 lavoro come impiegata contabile allo Studio Ferretti di Lodi."
+    private static let clerkJob = CVData(experience: [job("impiegata contabile", "Studio Ferretti", from: "2013", to: "2017")])
+    private static let clerkJobNow = CVData(experience: [job("impiegata contabile", "Studio Ferretti", from: "2017")])
+
+    @Test("A duty that starts with an infinitive goes, also as the job's first one; a duty in the first person stays (#354)")
+    func infinitiveDuty() throws {
+        let verdicts = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Registrare le fatture dei clienti. Controllavo i pagamenti dei fornitori.",
+            against: Self.clerk
+        )
+
+        #expect(verdicts.kept == ["Controllavo i pagamenti dei fornitori."])
+        #expect(verdicts.rejected.map(\.sentence) == ["Registrare le fatture dei clienti."])
+        #expect(verdicts.rejected.first?.reason.hasPrefix("it starts with an infinitive") == true)
+    }
+
+    @Test("An ended job's duty in the present goes after one in the past; the current job's duties in the present stay (#354)")
+    func tenseOfAnEndedJob() throws {
+        let duties = "Controllavo i pagamenti dei fornitori. Registro le fatture dei clienti. Preparavo i documenti per la banca."
+        let ended = try sanitizer.dutyCheck(of: Self.clerkJob, job: 0, duties: duties, against: Self.clerk)
+        let current = try sanitizer.dutyCheck(
+            of: Self.clerkJobNow, job: 0, duties: "Controllo i pagamenti dei fornitori. Registro le fatture dei clienti.",
+            against: Self.clerkNow
+        )
+
+        #expect(ended.kept == ["Controllavo i pagamenti dei fornitori.", "Preparavo i documenti per la banca."])
+        #expect(ended.rejected.map(\.sentence) == ["Registro le fatture dei clienti."])
+        #expect(ended.rejected.first?.reason.hasPrefix("it is in the present, and the job has ended") == true)
+        #expect(current.kept == ["Controllo i pagamenti dei fornitori.", "Registro le fatture dei clienti."])
+    }
+
+    @Test("A duty's tense is the ending of its first word in Italian, Spanish and Portuguese, and none in English (#354)")
+    func tenseOfADuty() {
+        #expect(CVDataSanitizer.tense(of: "Colaboro com as equipas de design.", language: .portuguese) == .present)
+        #expect(CVDataSanitizer.tense(of: "Desenhava os cartazes da loja.", language: .portuguese) == .past)
+        #expect(CVDataSanitizer.tense(of: "Coordiné los turnos del almacén.", language: .spanish) == .past)
+        #expect(CVDataSanitizer.tense(of: "Organizo los turnos del almacén.", language: .spanish) == .present)
+        #expect(CVDataSanitizer.tense(of: "Ho gestito le fatture.", language: .italian) == .past)
+        #expect(CVDataSanitizer.tense(of: "Sono responsabile delle fatture.", language: .italian) == nil)
+        #expect(CVDataSanitizer.tense(of: "I plan the menus.", language: .english) == nil)
+    }
+
     // MARK: The context of each job
 
     @Test("Each job the facts keep gets the clauses of the description that belong to it, in the order of the facts, and the field the person states")

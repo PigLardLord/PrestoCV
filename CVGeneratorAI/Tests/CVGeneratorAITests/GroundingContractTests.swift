@@ -6150,7 +6150,7 @@ enum GroundingRows {
             personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologna"),
             experience: [
                 Experience(title: "assistant", company: "nursery", startDate: "2012", endDate: "2016",
-                           description: "I worked as an assistant in a nursery"),
+                           description: "I worked as an assistant in a nursery."),
                 Experience(title: "primary school teacher", company: "Don Milani school", startDate: "2016", current: true,
                            achievements: ["trained 3 new teachers"]),
             ],
@@ -6188,7 +6188,7 @@ enum GroundingRows {
             personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bologna"),
             experience: [
                 Experience(title: "insegnante", company: "scuola Don Milani", current: true, achievements: ["ho formato 3 nuovi insegnanti"]),
-                Experience(title: "assistente", company: "asilo nido", description: "ho lavorato come assistente in un asilo nido"),
+                Experience(title: "assistente", company: "asilo nido", description: "ho lavorato come assistente in un asilo nido."),
             ],
             education: [
                 Education(degree: "Scienze della Formazione", institution: "Università di Bologna", endDate: "2012",
@@ -6258,7 +6258,7 @@ enum GroundingRows {
             personalInfo: PersonalInfo(name: "Maria Rossi", location: "Bolonia"),
             experience: [
                 Experience(title: "maestra de primaria", company: "escuela Don Milani", current: true, achievements: ["formé a 3 nuevos maestros"]),
-                Experience(title: "auxiliar", company: "guardería", description: "trabajé como auxiliar en una guardería"),
+                Experience(title: "auxiliar", company: "guardería", description: "trabajé como auxiliar en una guardería."),
             ],
             education: [
                 Education(degree: "Ciencias de la Educación", institution: "Universidad de Bolonia", endDate: "2012",
@@ -6373,7 +6373,7 @@ enum GroundingRows {
                 Experience(title: "ward nurse", company: "Molinette hospital"),
                 // ADR 0031: the role text is no quote, but it names the job's own title and states no fact of its own: it stays.
                 Experience(title: "home care nurse", company: "Il Sorriso cooperative", location: "Moncalieri", startDate: "2016", endDate: "2019",
-                           description: "I worked as a home care nurse"),
+                           description: "I worked as a home care nurse."),
             ],
             education: [
                 Education(degree: "Nursing", institution: "University of Turin", endDate: "2016",
